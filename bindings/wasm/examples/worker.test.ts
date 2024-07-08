@@ -12,77 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import '@vitest/web-worker';
-
 import {WebIO} from '@gltf-transform/core';
-import {expect, suite, test} from 'vitest';
+import assert from 'node:assert';
+import {afterEach, expect, suite, test} from 'vitest';
 
-import Module from './built/manifold';
 import {readMesh, setupIO} from './gltf-io';
+// @ts-ignore
 import {examples} from './public/examples.js';
-import ManifoldWorker from './worker?worker';
+import {Mesh} from './public/manifold';
+import {cleanup, evaluateCADToModel, module} from './worker';
 
 const io = setupIO(new WebIO());
 
-const wasm = await Module();
-wasm.setup();
-
-function initialized(worker) {
-  return new Promise((resolve) => {
-    worker.onmessage = function(e) {
-      if (e.data == null) {
-        resolve();
-      } else {
-        reject();
-      }
-    };
-  });
+async function runExample(name: string) {
+  const code = examples.functionBodies.get(name);
+  const result = await evaluateCADToModel(code);
+  cleanup();
+  assert.ok(result?.glbURL);
+  const docIn = await io.read(result.glbURL);
+  URL.revokeObjectURL(result.glbURL);
+  const nodes = docIn.getRoot().listNodes();
+  for (const node of nodes) {
+    const docMesh = node.getMesh();
+    if (!docMesh) {
+      continue;
+    }
+    const {mesh} = readMesh(docMesh)!;
+    const manifold = new module.Manifold(mesh as Mesh);
+    const prop = manifold.getProperties();
+    const genus = manifold.genus();
+    manifold.delete();
+    return {...prop, genus};
+  }
+  assert.ok(false);
 }
 
-let glbURL = null;
-
-async function runExample(name) {
-  const worker = new ManifoldWorker();
-  await initialized(worker);
-  return new Promise((resolve, reject) => {
-    worker.onmessageerror = function({data}) {
-      reject(data);
-    };
-
-    worker.onerror = function(e) {
-      reject(e);
-    };
-
-    worker.onmessage = async function(e) {
-      try {
-        URL.revokeObjectURL(glbURL);
-        glbURL = e.data.glbURL;
-        if (glbURL == null) {
-          reject('no glbURL)');
-        }
-        const docIn = await io.read(glbURL);
-        const nodes = docIn.getRoot().listNodes();
-        for (const node of nodes) {
-          const docMesh = node.getMesh();
-          if (!docMesh) {
-            continue;
-          }
-          const {mesh} = readMesh(docMesh);
-          const manifold = wasm.Manifold(mesh);
-          const prop = manifold.getProperties();
-          const genus = manifold.genus();
-          manifold.delete();
-          // Return properties of first mesh encountered.
-          resolve({...prop, genus});
-        }
-      } catch (e) {
-        reject(e);
-      }
-    };
-
-    worker.postMessage(examples.functionBodies.get(name));
-  });
-}
+// allow vitest to report progress after each test
+// before going into heavy computation which blocks main thread
+afterEach(async () => {await new Promise(resolve => setTimeout(resolve, 500))})
 
 suite('Examples', () => {
   test('Intro', async () => {
@@ -102,8 +69,8 @@ suite('Examples', () => {
   test('Rounded Frame', async () => {
     const result = await runExample('Rounded Frame');
     expect(result.genus).to.equal(5, 'Genus');
-    expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(270807, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(74599, 1, 'Surface Area');
   });
 
   test('Heart', async () => {
@@ -116,8 +83,8 @@ suite('Examples', () => {
   test('Scallop', async () => {
     const result = await runExample('Scallop');
     expect(result.genus).to.equal(0, 'Genus');
-    expect(result.volume).to.be.closeTo(41400, 100, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(7770, 10, 'Surface Area');
+    expect(result.volume).to.be.closeTo(39900, 100, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(7930, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {

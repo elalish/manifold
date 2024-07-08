@@ -165,14 +165,15 @@ Module.setup = function() {
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
     scaleTop = vararg2vec2([scaleTop]);
-    const man =
-        Module._Extrude(this, height, nDivisions, twistDegrees, scaleTop);
+    const man = Module._Extrude(
+        this._ToPolygons(), height, nDivisions, twistDegrees, scaleTop);
     return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
   Module.CrossSection.prototype.revolve = function(
       circularSegments = 0, revolveDegrees = 360.0) {
-    return Module._Revolve(this, circularSegments, revolveDegrees);
+    return Module._Revolve(
+        this._ToPolygons(), circularSegments, revolveDegrees);
   };
 
   Module.CrossSection.prototype.add = function(other) {
@@ -196,6 +197,11 @@ Module.setup = function() {
 
   // Manifold methods
 
+  Module.Manifold.prototype.smoothOut = function(
+      minSharpAngle = 60, minSmoothness = 0) {
+    return this._SmoothOut(minSharpAngle, minSmoothness);
+  };
+
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
       const x = getValue(vec3Ptr, 'float');
@@ -215,6 +221,11 @@ Module.setup = function() {
       throw new Module.ManifoldError(status.value);
     }
     return out;
+  };
+
+  Module.Manifold.prototype.calculateNormals = function(
+      normalIdx, minSharpAngle = 60) {
+    return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
@@ -248,8 +259,12 @@ Module.setup = function() {
     return this._Translate(vararg2vec3(vec));
   };
 
-  Module.Manifold.prototype.rotate = function(vec) {
-    return this._Rotate(...vec);
+  Module.Manifold.prototype.rotate = function(xOrVec, y, z) {
+    if (Array.isArray(xOrVec)) {
+      return this._Rotate(...xOrVec);
+    } else {
+      return this._Rotate(xOrVec, y || 0, z || 0);
+    }
   };
 
   Module.Manifold.prototype.scale = function(vec) {
@@ -268,15 +283,23 @@ Module.setup = function() {
     return this._TrimByPlane(vararg2vec3([normal]), offset);
   };
 
+  Module.Manifold.prototype.slice = function(height = 0.) {
+    return Module.CrossSection(this._Slice(height));
+  };
+
+  Module.Manifold.prototype.project = function() {
+    return Module.CrossSection(this._Project()).simplify(this.precision());
+  };
+
   Module.Manifold.prototype.split = function(manifold) {
-    const vec = this._split(manifold);
+    const vec = this._Split(manifold);
     const result = fromVec(vec);
     vec.delete();
     return result;
   };
 
   Module.Manifold.prototype.splitByPlane = function(normal, offset = 0.) {
-    const vec = this._splitByPlane(vararg2vec3([normal]), offset);
+    const vec = this._SplitByPlane(vararg2vec3([normal]), offset);
     const result = fromVec(vec);
     vec.delete();
     return result;

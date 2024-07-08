@@ -69,7 +69,7 @@ int Leaf2Node(int leaf) { return leaf * 2; }
 
 struct CreateRadixTree {
   VecView<int> nodeParent_;
-  VecView<thrust::pair<int, int>> internalChildren_;
+  VecView<std::pair<int, int>> internalChildren_;
   const VecView<const uint32_t> leafMorton_;
 
   int PrefixLength(uint32_t a, uint32_t b) const {
@@ -84,7 +84,7 @@ struct CreateRadixTree {
   }
 
   int PrefixLength(int i, int j) const {
-    if (j < 0 || j >= leafMorton_.size()) {
+    if (j < 0 || j >= static_cast<int>(leafMorton_.size())) {
       return -1;
     } else {
       int out;
@@ -137,7 +137,7 @@ struct CreateRadixTree {
     int first = internal;
     // Find the range of objects with a common prefix
     int last = RangeEnd(first);
-    if (first > last) thrust::swap(first, last);
+    if (first > last) std::swap(first, last);
     // Determine where the next-highest difference occurs
     int split = FindSplit(first, last);
     int child1 = split == first ? Leaf2Node(split) : Internal2Node(split);
@@ -154,15 +154,13 @@ struct CreateRadixTree {
 
 template <typename T, const bool selfCollision, typename Recorder>
 struct FindCollisions {
+  VecView<const T> queries;
   VecView<const Box> nodeBBox_;
-  VecView<const thrust::pair<int, int>> internalChildren_;
+  VecView<const std::pair<int, int>> internalChildren_;
   Recorder recorder;
 
-  int RecordCollision(int node, thrust::tuple<T, int>& query) {
-    const T& queryObj = thrust::get<0>(query);
-    const int queryIdx = thrust::get<1>(query);
-
-    bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
+  int RecordCollision(int node, const int queryIdx) {
+    bool overlaps = nodeBBox_[node].DoesOverlap(queries[queryIdx]);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
@@ -172,14 +170,13 @@ struct FindCollisions {
     return overlaps && IsInternal(node);  // Should traverse into node
   }
 
-  void operator()(thrust::tuple<T, int> query) {
+  void operator()(const int queryIdx) {
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
     int top = -1;
     // Depth-first search
     int node = kRoot;
-    const int queryIdx = thrust::get<1>(query);
     // same implies that this query do not have any collision
     if (recorder.earlyexit(queryIdx)) return;
     while (1) {
@@ -187,8 +184,8 @@ struct FindCollisions {
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
 
-      int traverse1 = RecordCollision(child1, query);
-      int traverse2 = RecordCollision(child2, query);
+      int traverse1 = RecordCollision(child1, queryIdx);
+      int traverse2 = RecordCollision(child2, queryIdx);
 
       if (!traverse1 && !traverse2) {
         if (top < 0) break;   // done
@@ -247,7 +244,7 @@ struct BuildInternalBoxes {
   VecView<Box> nodeBBox_;
   VecView<int> counter_;
   const VecView<int> nodeParent_;
-  const VecView<thrust::pair<int, int>> internalChildren_;
+  const VecView<std::pair<int, int>> internalChildren_;
 
   void operator()(int leaf) {
     int node = Leaf2Node(leaf);
@@ -265,6 +262,14 @@ struct TransformBox {
   const glm::mat4x3 transform;
   void operator()(Box& box) { box = box.Transform(transform); }
 };
+
+uint32_t SpreadBits3(uint32_t v) {
+  v = 0xFF0000FFu & (v * 0x00010001u);
+  v = 0x0F00F00Fu & (v * 0x00000101u);
+  v = 0xC30C30C3u & (v * 0x00000011u);
+  v = 0x49249249u & (v * 0x00000005u);
+  return v;
+}
 }  // namespace
 
 namespace manifold {
@@ -277,13 +282,13 @@ namespace manifold {
 Collider::Collider(const VecView<const Box>& leafBB,
                    const VecView<const uint32_t>& leafMorton) {
   ZoneScoped;
-  ASSERT(leafBB.size() == leafMorton.size(), userErr,
-         "vectors must be the same length");
+  DEBUG_ASSERT(leafBB.size() == leafMorton.size(), userErr,
+               "vectors must be the same length");
   int num_nodes = 2 * leafBB.size() - 1;
   // assign and allocate members
   nodeBBox_.resize(num_nodes);
   nodeParent_.resize(num_nodes, -1);
-  internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
+  internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
   // organize tree
   for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
              CreateRadixTree({nodeParent_, internalChildren_, leafMorton}));
@@ -305,30 +310,30 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
   // element can store the sum when using exclusive scan
   if (queriesIn.size() < kSequentialThreshold) {
     SparseIndices queryTri;
-    for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Seq, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, SeqCollisionRecorder<inverted>>{
-                   nodeBBox_, internalChildren_, {queryTri}});
+                   queriesIn, nodeBBox_, internalChildren_, {queryTri}});
     return queryTri;
   } else {
     // compute the number of collisions to determine the size for allocation and
     // offset, this avoids the need for atomic
     Vec<int> counts(queriesIn.size() + 1, 0);
     Vec<char> empty(queriesIn.size(), 0);
-    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, CountCollisions>{
-                   nodeBBox_, internalChildren_, {counts, empty}});
+                   queriesIn, nodeBBox_, internalChildren_, {counts, empty}});
     // compute start index for each query and total count
     exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
                    counts.begin(), 0, std::plus<int>());
     if (counts.back() == 0) return SparseIndices(0);
     SparseIndices queryTri(counts.back());
     // actually recording collisions
-    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
-                   nodeBBox_, internalChildren_, {queryTri, counts, empty}});
+                   queriesIn,
+                   nodeBBox_,
+                   internalChildren_,
+                   {queryTri, counts, empty}});
     return queryTri;
   }
 }
@@ -339,10 +344,10 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
  */
 void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   ZoneScoped;
-  ASSERT(leafBB.size() == NumLeaves(), userErr,
-         "must have the same number of updated boxes as original");
+  DEBUG_ASSERT(leafBB.size() == NumLeaves(), userErr,
+               "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
-  strided_range<Vec<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
+  auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());
   copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
@@ -374,6 +379,18 @@ bool Collider::Transform(glm::mat4x3 transform) {
   return axisAligned;
 }
 
+/**
+ * Calculate the 32-bit Morton code of a position within a bounding box.
+ */
+uint32_t Collider::MortonCode(glm::vec3 position, Box bBox) {
+  glm::vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
+  xyz = glm::min(glm::vec3(1023.0f), glm::max(glm::vec3(0.0f), 1024.0f * xyz));
+  uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
+  uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
+  uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
+  return x * 4 + y * 2 + z;
+}
+
 template SparseIndices Collider::Collisions<true, false, Box>(
     const VecView<const Box>&) const;
 
@@ -391,5 +408,4 @@ template SparseIndices Collider::Collisions<false, true, Box>(
 
 template SparseIndices Collider::Collisions<false, true, glm::vec3>(
     const VecView<const glm::vec3>&) const;
-
 }  // namespace manifold

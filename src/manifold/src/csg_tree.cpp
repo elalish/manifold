@@ -32,9 +32,9 @@ constexpr int kParallelThreshold = 4096;
 namespace {
 using namespace manifold;
 struct Transform4x3 {
-  const glm::mat4x3 transform;
+  glm::mat4x3 transform;
 
-  glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) const {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -74,7 +74,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   VecView<const Box> boxes;
   const size_t i;
-  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
+  bool operator()(size_t j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 
 using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
@@ -253,9 +253,9 @@ Manifold::Impl CsgLeafNode::Compose(
             auto &oldProp = node->pImpl_->meshRelation_.properties;
             auto &newProp = combined.meshRelation_.properties;
             for (int p = 0; p < numProp; ++p) {
-              strided_range<Vec<float>::IterC> oldRange(oldProp.begin() + p,
-                                                        oldProp.end(), numProp);
-              strided_range<Vec<float>::Iter> newRange(
+              auto oldRange =
+                  StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
+              auto newRange = StridedRange(
                   newProp.begin() + numPropOut * propVertIndices[i] + p,
                   newProp.end(), numPropOut);
               copy(policy, oldRange.begin(), oldRange.end(), newRange.begin());
@@ -277,31 +277,28 @@ Manifold::Impl CsgLeafNode::Compose(
         } else {
           // no need to apply the transform to the node, just copy the vertices
           // and face normals and apply transform on the fly
-          auto vertPosBegin = thrust::make_transform_iterator(
+          auto vertPosBegin = TransformIterator(
               node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
           glm::mat3 normalTransform =
               glm::inverse(glm::transpose(glm::mat3(node->transform_)));
-          auto faceNormalBegin = thrust::make_transform_iterator(
-              node->pImpl_->faceNormal_.begin(),
-              TransformNormals({normalTransform}));
+          auto faceNormalBegin =
+              TransformIterator(node->pImpl_->faceNormal_.begin(),
+                                TransformNormals({normalTransform}));
           copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
           copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
           const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
-          for_each_n(policy,
-                     zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
-                         countAt(0)),
-                     node->pImpl_->halfedgeTangent_.size(),
-                     TransformTangents{glm::mat3(node->transform_), invert,
-                                       node->pImpl_->halfedgeTangent_,
-                                       node->pImpl_->halfedge_});
+          for_each_n(
+              policy, countAt(0), node->pImpl_->halfedgeTangent_.size(),
+              TransformTangents{combined.halfedgeTangent_, edgeIndices[i],
+                                glm::mat3(node->transform_), invert,
+                                node->pImpl_->halfedgeTangent_,
+                                node->pImpl_->halfedge_});
           if (invert)
-            for_each_n(policy,
-                       zip(combined.meshRelation_.triRef.begin(),
-                           countAt(triIndices[i])),
-                       node->pImpl_->NumTri(), FlipTris({combined.halfedge_}));
+            for_each_n(policy, countAt(triIndices[i]), node->pImpl_->NumTri(),
+                       FlipTris({combined.halfedge_}));
         }
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
@@ -313,11 +310,11 @@ Manifold::Impl CsgLeafNode::Compose(
                   UpdateMeshIDs({offset}));
       });
 
-  for (int i = 0; i < nodes.size(); i++) {
+  for (size_t i = 0; i < nodes.size(); i++) {
     auto &node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
-    for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
+    for (const auto &pair : node->pImpl_->meshRelation_.meshIDtransform) {
       combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
     }
   }
@@ -457,8 +454,8 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ZoneScoped;
   auto getImplPtr = GetImplPtr();
-  ASSERT(operation != OpType::Subtract, logicErr,
-         "BatchBoolean doesn't support Difference.");
+  DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
+               "BatchBoolean doesn't support Difference.");
   // common cases
   if (results.size() == 0) return std::make_shared<Manifold::Impl>();
   if (results.size() == 1)
@@ -537,16 +534,16 @@ void CsgOpNode::BatchUnion() const {
   // with O(n^2) complexity to take too long.
   // If the number of children exceeded this limit, we will operate on chunks
   // with size kMaxUnionSize.
-  constexpr int kMaxUnionSize = 1000;
+  constexpr size_t kMaxUnionSize = 1000;
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
   while (children_.size() > 1) {
-    const int start = (children_.size() > kMaxUnionSize)
-                          ? (children_.size() - kMaxUnionSize)
-                          : 0;
+    const size_t start = (children_.size() > kMaxUnionSize)
+                             ? (children_.size() - kMaxUnionSize)
+                             : 0;
     Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
-    for (int i = start; i < children_.size(); i++) {
+    for (size_t i = start; i < children_.size(); i++) {
       boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
                           ->GetImpl()
                           ->bBox_);

@@ -154,7 +154,7 @@ struct Mesh {
  */
 struct Smoothness {
   /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
-  int halfedge;
+  size_t halfedge;
   /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
   /// curvature is interpolated between these values. The two paired halfedges
   /// can have different values while maintaining C-1 continuity (except for 0).
@@ -492,6 +492,9 @@ struct Rect {
  */
 enum class OpType { Add, Subtract, Intersect };
 
+constexpr int DEFAULT_SEGMENTS = 0;
+constexpr float DEFAULT_ANGLE = 10.0f;
+constexpr float DEFAULT_LENGTH = 1.0f;
 /**
  * These static properties control how circular shapes are quantized by
  * default on construction. If circularSegments is specified, it takes
@@ -502,9 +505,9 @@ enum class OpType { Add, Subtract, Intersect };
  */
 class Quality {
  private:
-  inline static int circularSegments_ = 0;
-  inline static float circularAngle_ = 10.0f;
-  inline static float circularEdgeLength_ = 1.0f;
+  inline static int circularSegments_ = DEFAULT_SEGMENTS;
+  inline static float circularAngle_ = DEFAULT_ANGLE;
+  inline static float circularEdgeLength_ = DEFAULT_LENGTH;
 
  public:
   /**
@@ -564,6 +567,12 @@ class Quality {
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
     return std::max(nSeg, 3);
+  }
+
+  static void ResetToDefaults() {
+    circularSegments_ = DEFAULT_SEGMENTS;
+    circularAngle_ = DEFAULT_ANGLE;
+    circularEdgeLength_ = DEFAULT_LENGTH;
   }
 };
 /** @} */
@@ -669,7 +678,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
 template <typename T>
 void Dump(const std::vector<T>& vec) {
   std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
+  for (size_t i = 0; i < vec.size(); ++i) {
     std::cout << i << ", " << vec[i] << ", " << std::endl;
   }
   std::cout << std::endl;
@@ -683,7 +692,7 @@ void Diff(const std::vector<T>& a, const std::vector<T>& b) {
               << std::endl;
     return;
   }
-  for (int i = 0; i < a.size(); ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     if (a[i] != b[i])
       std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
   }

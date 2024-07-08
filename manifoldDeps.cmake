@@ -1,11 +1,17 @@
 include(FetchContent)
 include(GNUInstallDirs)
 find_package(PkgConfig QUIET)
+find_package(Clipper2 QUIET)
 if(MANIFOLD_PAR STREQUAL "TBB")
     find_package(TBB QUIET)
+    if(APPLE)
+        find_package(oneDPL QUIET)
+    endif()
 endif()
 if (PKG_CONFIG_FOUND)
-    pkg_check_modules(Clipper2 Clipper2)
+    if (NOT Clipper2_FOUND)
+        pkg_check_modules(Clipper2 Clipper2)
+    endif()
     if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
         pkg_check_modules(TBB tbb)
     endif()
@@ -14,6 +20,10 @@ if(Clipper2_FOUND)
     add_library(Clipper2 SHARED IMPORTED)
     set_property(TARGET Clipper2 PROPERTY
         IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
+    if(WIN32)
+        set_property(TARGET Clipper2 PROPERTY
+            IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
+    endif()
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
 else()
     message(STATUS "clipper2 not found, downloading from source")
@@ -23,17 +33,13 @@ else()
     set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
     FetchContent_Declare(Clipper2
         GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-        GIT_TAG Clipper2_1.3.0
+        GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
         GIT_PROGRESS TRUE
         SOURCE_SUBDIR CPP
     )
     FetchContent_MakeAvailable(Clipper2)
     if(NOT EMSCRIPTEN)
-        set_target_properties(Clipper2 PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES
-            "$<INSTALL_INTERFACE:include>$<BUILD_INTERFACE:${Clipper2_SOURCE_DIR}/Clipper2Lib/include>")
-        install(TARGETS Clipper2 EXPORT clipper2Targets)
-        install(EXPORT clipper2Targets DESTINATION ${CMAKE_INSTALL_DATADIR}/clipper2)
+        install(TARGETS Clipper2)
     endif()
 endif()
 
@@ -43,7 +49,7 @@ if(NOT glm_FOUND)
     set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
-        GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
+        GIT_TAG 1.0.1
         GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(glm)

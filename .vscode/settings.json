@@ -113,7 +113,8 @@
     "format": "cpp",
     "numbers": "cpp",
     "ranges": "cpp",
-    "stop_token": "cpp"
+    "stop_token": "cpp",
+    "execution": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,

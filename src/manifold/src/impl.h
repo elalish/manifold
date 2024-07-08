@@ -78,14 +78,14 @@ struct Manifold::Impl {
   }
 
   template <typename T>
-  void ForVert(int halfedge, std::function<T(int halfedge)> transform,
-               std::function<void(int halfedge, const T& here, const T& next)>
-                   binaryOp) {
+  void ForVert(
+      int halfedge, std::function<T(int halfedge)> transform,
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
     T here = transform(halfedge);
     int current = halfedge;
     do {
       const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
-      const T next = transform(nextHalfedge);
+      T next = transform(nextHalfedge);
       binaryOp(current, here, next);
       here = next;
       current = nextHalfedge;
@@ -107,14 +107,13 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
-  float MinGap(const Impl& other, float searchLength) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
-  int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return halfedge_.size() / 2; }
-  int NumTri() const { return halfedge_.size() / 3; }
-  int NumProp() const { return meshRelation_.numProp; }
-  int NumPropVert() const {
+  size_t NumVert() const { return vertPos_.size(); }
+  size_t NumEdge() const { return halfedge_.size() / 2; }
+  size_t NumTri() const { return halfedge_.size() / 3; }
+  size_t NumProp() const { return meshRelation_.numProp; }
+  size_t NumPropVert() const {
     return NumProp() == 0 ? NumVert()
                           : meshRelation_.properties.size() / NumProp();
   }
@@ -130,6 +129,7 @@ struct Manifold::Impl {
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+  float MinGap(const Impl& other, float searchLength) const;
 
   // sort.cu
   void Finish();
@@ -146,8 +146,8 @@ struct Manifold::Impl {
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
                             glm::mat3x2 projection) const;
-  CrossSection Slice(float height) const;
-  CrossSection Project() const;
+  Polygons Slice(float height) const;
+  Polygons Project() const;
 
   // edge_op.cu
   void SimplifyTopology();
@@ -174,15 +174,18 @@ struct Manifold::Impl {
   bool IsInsideQuad(int halfedge) const;
   bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  glm::vec4 TangentFromNormal(const glm::vec3& normal, int halfedge) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
   Vec<int> VertFlatFace(const Vec<bool>&) const;
+  Vec<int> VertHalfedge() const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
   void SharpenTangent(int halfedge, float smoothness);
   void SetNormals(int normalIdx, float minSharpAngle);
   void LinearizeFlatTangents();
+  void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
   void Refine(std::function<int(glm::vec3)>);

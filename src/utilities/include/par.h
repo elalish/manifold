@@ -13,33 +13,23 @@
 // limitations under the License.
 
 #pragma once
-#include <thrust/binary_search.h>
-#include <thrust/count.h>
-#include <thrust/execution_policy.h>
-#include <thrust/gather.h>
-#include <thrust/logical.h>
-#include <thrust/remove.h>
-#include <thrust/sequence.h>
-#include <thrust/sort.h>
-#include <thrust/system/cpp/execution_policy.h>
-#include <thrust/uninitialized_copy.h>
-
+#if MANIFOLD_PAR == 'T'
+#if __has_include(<pstl/glue_execution_defs.h>)
+#include <execution>
+#define HAS_PAR_UNSEQ
+#elif __has_include(<oneapi/dpl/execution>)
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/memory>
+#include <oneapi/dpl/numeric>
+#define HAS_PAR_UNSEQ
+#endif
+#endif
 #include <algorithm>
 #include <numeric>
-#if MANIFOLD_PAR == 'T'
-#include <thrust/system/tbb/execution_policy.h>
 
-#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
-    __has_include(<pstl/glue_execution_defs.h>)
-#include <execution>
-#endif
-
-#include "tbb/tbb.h"
-#define MANIFOLD_PAR_NS tbb
-#else
-#define MANIFOLD_PAR_NS cpp
-#endif
-
+#include "iters.h"
+#include "public.h"
 namespace manifold {
 
 enum class ExecutionPolicy {
@@ -59,34 +49,7 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   return ExecutionPolicy::Par;
 }
 
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
-  template <typename... Args>                                \
-  void NAME(ExecutionPolicy policy, Args... args) {          \
-    switch (policy) {                                        \
-      case ExecutionPolicy::Par:                             \
-        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-        break;                                               \
-      case ExecutionPolicy::Seq:                             \
-        thrust::NAME(thrust::cpp::par, args...);             \
-        break;                                               \
-    }                                                        \
-  }
-
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
-  template <typename Ret = RET, typename... Args>                   \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
-    switch (policy) {                                               \
-      case ExecutionPolicy::Par:                                    \
-        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-      case ExecutionPolicy::Seq:                                    \
-        break;                                                      \
-    }                                                               \
-    return thrust::NAME(thrust::cpp::par, args...);                 \
-  }
-
-#if MANIFOLD_PAR != 'T' || \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
-#if MANIFOLD_PAR == 'T'
+#ifdef HAS_PAR_UNSEQ
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
@@ -128,68 +91,68 @@ void exclusive_scan(ExecutionPolicy policy, Args... args) {
   // https://github.com/llvm/llvm-project/issues/59810
   std::exclusive_scan(args...);
 }
-template <typename DerivedPolicy, typename InputIterator1,
-          typename InputIterator2, typename OutputIterator, typename Predicate>
-OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
-                       InputIterator1 last, InputIterator2 stencil,
-                       OutputIterator result, Predicate pred) {
-  if (policy == ExecutionPolicy::Seq)
-    return thrust::copy_if(thrust::cpp::par, first, last, stencil, result,
-                           pred);
-  else
-    // note: this is not a typo, see
-    // https://github.com/NVIDIA/thrust/issues/1977
-    return thrust::copy_if(first, last, stencil, result, pred);
-}
-template <typename DerivedPolicy, typename InputIterator1,
-          typename OutputIterator, typename Predicate>
-OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
-                       InputIterator1 last, OutputIterator result,
-                       Predicate pred) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Seq)
-    return std::copy_if(first, last, result, pred);
-  else
-    return std::copy_if(std::execution::par_unseq, first, last, result, pred);
-#else
-  return std::copy_if(first, last, result, pred);
-#endif
+
+template <typename InputIterator1, typename InputIterator2,
+          typename OutputIterator>
+void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
+             InputIterator2 mapFirst, OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first, mapFirst, outputFirst](size_t i) {
+             outputFirst[mapFirst[i]] = first[i];
+           });
 }
 
-#else
-#define STL_DYNAMIC_BACKEND(NAME, RET) THRUST_DYNAMIC_BACKEND(NAME, RET)
-#define STL_DYNAMIC_BACKEND_VOID(NAME) THRUST_DYNAMIC_BACKEND_VOID(NAME)
+template <typename InputIterator, typename RandomAccessIterator,
+          typename OutputIterator>
+void gather(ExecutionPolicy policy, InputIterator mapFirst,
+            InputIterator mapLast, RandomAccessIterator inputFirst,
+            OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
+           [mapFirst, inputFirst, outputFirst](size_t i) {
+             outputFirst[i] = inputFirst[mapFirst[i]];
+           });
+}
 
-THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
-THRUST_DYNAMIC_BACKEND(copy_if, void)
-#endif
-
-THRUST_DYNAMIC_BACKEND_VOID(gather)
-THRUST_DYNAMIC_BACKEND_VOID(scatter)
-THRUST_DYNAMIC_BACKEND_VOID(for_each)
-THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_VOID(sequence)
-STL_DYNAMIC_BACKEND_VOID(transform)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
-STL_DYNAMIC_BACKEND_VOID(stable_sort)
-STL_DYNAMIC_BACKEND_VOID(fill)
-STL_DYNAMIC_BACKEND_VOID(copy)
-STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
-STL_DYNAMIC_BACKEND_VOID(copy_n)
+template <typename Iterator>
+void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first](size_t i) { first[i] = i; });
+}
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
-THRUST_DYNAMIC_BACKEND(transform_reduce, void)
-THRUST_DYNAMIC_BACKEND(gather_if, void)
-THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)
 STL_DYNAMIC_BACKEND(find_if, void)
 STL_DYNAMIC_BACKEND(all_of, bool)
 STL_DYNAMIC_BACKEND(is_sorted, bool)
-STL_DYNAMIC_BACKEND(reduce, void)
+// STL_DYNAMIC_BACKEND(reduce, void)
+template <typename Ret = void, typename... Args>
+Ret reduce(ExecutionPolicy policy, Args... args) {
+  return std::reduce(args...);
+}
 STL_DYNAMIC_BACKEND(count_if, int)
 STL_DYNAMIC_BACKEND(remove_if, void)
+STL_DYNAMIC_BACKEND(copy_if, void)
+STL_DYNAMIC_BACKEND(unique, void)
+// STL_DYNAMIC_BACKEND(transform_reduce, void)
+template <typename Ret = void, typename... Args>
+Ret transform_reduce(ExecutionPolicy policy, Args... args) {
+  return std::transform_reduce(args...);
+}
+
+STL_DYNAMIC_BACKEND_VOID(for_each)
+STL_DYNAMIC_BACKEND_VOID(for_each_n)
+STL_DYNAMIC_BACKEND_VOID(transform)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
+STL_DYNAMIC_BACKEND_VOID(stable_sort)
+STL_DYNAMIC_BACKEND_VOID(fill)
+STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
+STL_DYNAMIC_BACKEND_VOID(copy)
+STL_DYNAMIC_BACKEND_VOID(copy_n)
 
 }  // namespace manifold

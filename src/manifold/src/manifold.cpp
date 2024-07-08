@@ -20,26 +20,11 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
-#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
-using namespace thrust::placeholders;
 
 ExecutionParams manifoldParams;
-
-struct MakeTri {
-  VecView<const Halfedge> halfedges;
-
-  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
-    glm::ivec3& tri = thrust::get<0>(inOut);
-    const int face = 3 * thrust::get<1>(inOut);
-
-    for (int i : {0, 1, 2}) {
-      tri[i] = halfedges[face + i].startVert;
-    }
-  }
-};
 
 struct UpdateProperties {
   float* properties;
@@ -169,9 +154,14 @@ Mesh Manifold::GetMesh() const {
                                 impl.halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
-  // note that `triVerts` is `std::vector`, so we cannot use thrust::device
-  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_}));
+  auto& triVerts = result.triVerts;
+  const auto& halfedges = impl.halfedge_;
+  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+             [&triVerts, &halfedges](const int tri) {
+               for (int i : {0, 1, 2}) {
+                 triVerts[tri][i] = halfedges[3 * tri + i].startVert;
+               }
+             });
 
   return result;
 }
@@ -293,8 +283,8 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   std::vector<std::vector<glm::ivec2>> vertPropPair(impl.NumVert());
   out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
-  for (int run = 0; run < out.runOriginalID.size(); ++run) {
-    for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
+  for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
+    for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
       const glm::ivec3 triProp =
           impl.meshRelation_.triProperties[triNew2Old[tri]];
@@ -304,10 +294,10 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
 
         auto& bin = vertPropPair[vert];
         bool bFound = false;
-        for (int k = 0; k < bin.size(); ++k) {
-          if (bin[k].x == prop) {
+        for (const auto& b : bin) {
+          if (b.x == prop) {
             bFound = true;
-            out.triVerts[3 * tri + i] = bin[k].y;
+            out.triVerts[3 * tri + i] = b.y;
             break;
           }
         }
@@ -619,12 +609,11 @@ Manifold Manifold::SetProperties(
     } else {
       pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
     }
-    thrust::for_each_n(
-        thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
-                          oldProperties.data(), oldNumProp,
-                          pImpl->vertPos_.data(), triProperties.data(),
-                          pImpl->halfedge_.data(), propFunc}));
+    for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
+               UpdateProperties({pImpl->meshRelation_.properties.data(),
+                                 numProp, oldProperties.data(), oldNumProp,
+                                 pImpl->vertPos_.data(), triProperties.data(),
+                                 pImpl->halfedge_.data(), propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;
@@ -716,7 +705,18 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
-    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
+    if (minSmoothness == 0) {
+      const int numProp = pImpl->meshRelation_.numProp;
+      Vec<float> properties = pImpl->meshRelation_.properties;
+      Vec<glm::ivec3> triProperties = pImpl->meshRelation_.triProperties;
+      pImpl->SetNormals(0, minSharpAngle);
+      pImpl->CreateTangents(0);
+      pImpl->meshRelation_.numProp = numProp;
+      pImpl->meshRelation_.properties.swap(properties);
+      pImpl->meshRelation_.triProperties.swap(triProperties);
+    } else {
+      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
+    }
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -889,15 +889,17 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  * the bounding box will return the bottom faces, while using a height equal to
  * the top of the bounding box will return empty.
  */
-CrossSection Manifold::Slice(float height) const {
+Polygons Manifold::Slice(float height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
 /**
- * Returns a cross section representing the projected outline of this object
- * onto the X-Y plane.
+ * Returns polygons representing the projected outline of this object
+ * onto the X-Y plane. These polygons will often self-intersect, so it is
+ * recommended to run them through the positive fill rule of CrossSection to get
+ * a sensible result before using them.
  */
-CrossSection Manifold::Project() const {
+Polygons Manifold::Project() const {
   return GetCsgLeafNode().GetImpl()->Project();
 }
 

@@ -173,30 +173,21 @@ struct TmpEdge {
 };
 /** @} */
 
-struct Halfedge2Tmp {
-  void operator()(thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
-    const Halfedge& halfedge = thrust::get<1>(inout);
-    int idx = thrust::get<2>(inout);
-    if (!halfedge.IsForward()) idx = -1;
-
-    thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
-  }
-};
-
-struct TmpInvalid {
-  bool operator()(const TmpEdge& edge) { return edge.halfedgeIdx < 0; }
-};
-
 Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
-  for_each_n(autoPolicy(edges.size()),
-             zip(edges.begin(), halfedge.begin(), countAt(0)), edges.size(),
-             Halfedge2Tmp());
-  int numEdge =
+  for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
+             [&edges, &halfedge](const int idx) {
+               const Halfedge& half = halfedge[idx];
+               edges[idx] = TmpEdge(half.startVert, half.endVert,
+                                    half.IsForward() ? idx : -1);
+             });
+
+  size_t numEdge =
       remove_if<decltype(edges.begin())>(
-          autoPolicy(edges.size()), edges.begin(), edges.end(), TmpInvalid()) -
+          autoPolicy(edges.size()), edges.begin(), edges.end(),
+          [](const TmpEdge& edge) { return edge.halfedgeIdx < 0; }) -
       edges.begin();
-  ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
+  DEBUG_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
 }

@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold.h"
-#include "test.h"
+#include <algorithm>
 
-#ifdef MANIFOLD_HULL
-TEST(Hull, TictacHull) {
+#include "cross_section.h"
+#include "manifold.h"
+#include "samples.h"
+#include "sdf.h"
+#include "test.h"
+#include "tri_dist.h"
+
+using namespace manifold;
+
+TEST(Hull, Tictac) {
   const float tictacRad = 100;
   const float tictacHeight = 500;
   const int tictacSeg = 1000;
@@ -35,14 +42,23 @@ TEST(Hull, TictacHull) {
   EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
 }
 
-TEST(Hull, HollowHull) {
+#ifdef MANIFOLD_EXPORT
+TEST(Hull, Fail) {
+  Manifold body = ReadMesh("hull-body.glb");
+  Manifold mask = ReadMesh("hull-mask.glb");
+  Manifold ret = body - mask;
+  MeshGL mesh = ret.GetMesh();
+}
+#endif
+
+TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
   const float sphere_vol = sphere.GetProperties().volume;
   EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
 }
 
-TEST(Hull, CubeHull) {
+TEST(Hull, Cube) {
   std::vector<glm::vec3> cubePts = {
       {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
       {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
@@ -52,7 +68,7 @@ TEST(Hull, CubeHull) {
   EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
 }
 
-TEST(Hull, EmptyHull) {
+TEST(Hull, Empty) {
   const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
 
@@ -60,4 +76,3 @@ TEST(Hull, EmptyHull) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
-#endif

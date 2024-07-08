@@ -14,6 +14,7 @@
 
 #include "samples.h"
 
+#include "cross_section.h"
 #include "polygon.h"
 #include "test.h"
 
@@ -116,8 +117,8 @@ TEST(Samples, Scallop) {
       3, colorCurvature);
   CheckNormals(scallop);
   auto prop = scallop.GetProperties();
-  EXPECT_NEAR(prop.volume, 41.4, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 77.7, 0.1);
+  EXPECT_NEAR(prop.volume, 39.9, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
@@ -182,7 +183,8 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
 
-  CrossSection projection = bracelet.Project();
+  CrossSection projection(bracelet.Project());
+  projection = projection.Simplify(bracelet.Precision());
   Rect rect = projection.Bounds();
   Box box = bracelet.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);
@@ -191,14 +193,14 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 649, 1);
   EXPECT_EQ(projection.NumContour(), 2);
-  Manifold extrusion = Manifold::Extrude(projection, 1);
+  Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
   EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 1);
 
-  CrossSection slice = bracelet.Slice();
+  CrossSection slice(bracelet.Slice());
   EXPECT_EQ(slice.NumContour(), 2);
   EXPECT_NEAR(slice.Area(), 230.6, 0.1);
-  extrusion = Manifold::Extrude(slice, 1);
+  extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
@@ -219,10 +221,10 @@ TEST(Samples, GyroidModule) {
   EXPECT_NEAR(bounds.min.z, 0, precision);
   EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
 
-  CrossSection slice = gyroid.Slice(5);
+  CrossSection slice(gyroid.Slice(5));
   EXPECT_EQ(slice.NumContour(), 4);
   EXPECT_NEAR(slice.Area(), 121.9, 0.1);
-  Manifold extrusion = Manifold::Extrude(slice, 1);
+  Manifold extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), -3);
 
 #ifdef MANIFOLD_EXPORT
@@ -260,7 +262,8 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
-  CrossSection projection = cutSponge.first.Project();
+  CrossSection projection(cutSponge.first.Project());
+  projection = projection.Simplify(cutSponge.first.Precision());
   Rect rect = projection.Bounds();
   Box box = cutSponge.first.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);
@@ -268,7 +271,7 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.x, box.max.x);
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
-  Manifold extrusion = Manifold::Extrude(projection, 1);
+  Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
   EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 502);
 
@@ -290,75 +293,16 @@ TEST(Samples, Sponge4) {
 }
 #endif
 
-#ifdef MANIFOLD_EXPORT
-TEST(Samples, SelfIntersect) {
-  manifold::PolygonParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("self_intersectA.glb");
-  Manifold m2 = ReadMesh("self_intersectB.glb");
-  Manifold res = m1 + m2;
-  res.GetMeshGL();  // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, GenericTwinBooleanTest7081) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-}
-
-TEST(Samples, GenericTwinBooleanTest7863) {
-  manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, Havocglass8Bool) {
-  manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Havocglass8_left.glb");
-  Manifold m2 = ReadMesh("Havocglass8_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, CraycloudBool) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Cray_left.glb");
-  Manifold m2 = ReadMesh("Cray_right.glb");
-  Manifold res = m1 - m2;
-  EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(res.IsEmpty());
-}
-
-#endif
-
 TEST(Samples, CondensedMatter16) {
-  // FIXME: it should be geometrically valid
-  manifold::PolygonParams().processOverlaps = true;
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
   // FIXME: normals should be correct
   // CheckNormals(cm);
-  manifold::PolygonParams().processOverlaps = false;
 }
 
 TEST(Samples, CondensedMatter64) {
-  // FIXME: it should be geometrically valid
-  manifold::PolygonParams().processOverlaps = true;
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
   // FIXME: normals should be correct
   // CheckNormals(cm);
-  manifold::PolygonParams().processOverlaps = false;
 }

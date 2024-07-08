@@ -63,21 +63,6 @@ struct Timer {
 };
 #endif
 
-template <typename... Iters>
-thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {
-  return thrust::make_zip_iterator(thrust::make_tuple(iters...));
-}
-
-template <typename A, typename B>
-thrust::permutation_iterator<A, B> perm(A a, B b) {
-  return thrust::make_permutation_iterator(a, b);
-}
-
-template <typename T>
-thrust::counting_iterator<T> countAt(T i) {
-  return thrust::make_counting_iterator(i);
-}
-
 inline int Next3(int i) {
   constexpr glm::ivec3 next3(1, 2, 0);
   return next3[i];
@@ -89,12 +74,20 @@ inline int Prev3(int i) {
 }
 
 template <typename T>
+void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
+  Vec<T> tmp(std::move(inOut));
+  inOut.resize(new2Old.size());
+  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
+         tmp.begin(), inOut.begin());
+}
+
+template <typename T>
 T AtomicAdd(T& target, T add) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   T old_val = tar.load();
   while (!tar.compare_exchange_weak(old_val, old_val + add,
-                                    std::memory_order_seq_cst))
-    ;
+                                    std::memory_order_seq_cst)) {
+  }
   return old_val;
 }
 
@@ -104,53 +97,6 @@ inline int AtomicAdd(int& target, int add) {
   int old_val = tar.fetch_add(add, std::memory_order_seq_cst);
   return old_val;
 }
-
-// Copied from
-// https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
-template <typename Iterator>
-class strided_range {
- public:
-  typedef typename thrust::iterator_difference<Iterator>::type difference_type;
-
-  struct stride_functor
-      : public thrust::unary_function<difference_type, difference_type> {
-    difference_type stride;
-
-    stride_functor(difference_type stride) : stride(stride) {}
-
-    difference_type operator()(const difference_type& i) const {
-      return stride * i;
-    }
-  };
-
-  typedef typename thrust::counting_iterator<difference_type> CountingIterator;
-  typedef typename thrust::transform_iterator<stride_functor, CountingIterator>
-      TransformIterator;
-  typedef typename thrust::permutation_iterator<Iterator, TransformIterator>
-      PermutationIterator;
-
-  // type of the strided_range iterator
-  typedef PermutationIterator iterator;
-
-  // construct strided_range for the range [first,last)
-  strided_range(Iterator first, Iterator last, difference_type stride)
-      : first(first), last(last), stride(stride) {}
-  strided_range() {}
-
-  iterator begin(void) const {
-    return PermutationIterator(
-        first, TransformIterator(CountingIterator(0), stride_functor(stride)));
-  }
-
-  iterator end(void) const {
-    return begin() + ((last - first) + (stride - 1)) / stride;
-  }
-
- protected:
-  Iterator first;
-  Iterator last;
-  difference_type stride;
-};
 
 template <typename T>
 class ConcurrentSharedPtr {
@@ -238,5 +184,16 @@ struct UnionFind {
     return toLabel.size() + lonelyNodes;
   }
 };
+
+template <typename T>
+struct Identity {
+  T operator()(T v) const { return v; }
+};
+
+template <typename T>
+struct Negate {
+  T operator()(T v) const { return -v; }
+};
+
 /** @} */
 }  // namespace manifold

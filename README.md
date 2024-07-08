@@ -34,7 +34,6 @@ This is a modern C++ library that Github's CI verifies builds and runs on a vari
 
 System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
 - [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
-- [`Thrust`](https://github.com/NVIDIA/thrust): NVIDIA's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms)
 - [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=TBB` is enabled)
 - [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
@@ -48,7 +47,7 @@ This library is fast with guaranteed manifold output. As such you need manifold 
 
 The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
+To aid in speed, this library makes extensive use of parallelization, generally through PSTL. You can switch between the TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
 
 > Note: OMP and CUDA backends are now removed
 
@@ -83,7 +82,6 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 Offline building:
 - `FETCHCONTENT_SOURCE_DIR_GLM`: path to glm source.
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source.
-- `FETCHCONTENT_SOURCE_DIR_THRUST`: path to NVIDIA thrust source.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 

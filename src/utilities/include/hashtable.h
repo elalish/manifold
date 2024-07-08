@@ -70,7 +70,8 @@ class HashTableD {
   int Size() const { return keys_.size(); }
 
   bool Full() const {
-    return used_.load(std::memory_order_relaxed) * 2 > Size();
+    return used_.load(std::memory_order_relaxed) * 2 >
+           static_cast<size_t>(Size());
   }
 
   void Insert(Uint64 key, const V& val) {

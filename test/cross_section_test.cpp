@@ -28,7 +28,7 @@ using namespace manifold;
 
 TEST(CrossSection, Square) {
   auto a = Manifold::Cube({5, 5, 5});
-  auto b = Manifold::Extrude(CrossSection::Square({5, 5}), 5);
+  auto b = Manifold::Extrude(CrossSection::Square({5, 5}).ToPolygons(), 5);
 
   EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
 }
@@ -37,7 +37,7 @@ TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
   auto cross = a + b + b.Mirror({1, 1});
-  auto result = Manifold::Extrude(cross, 5.);
+  auto result = Manifold::Extrude(cross.ToPolygons(), 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
@@ -52,7 +52,7 @@ TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
   auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
-  auto result = Manifold::Extrude(rounded, 5.);
+  auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
@@ -103,11 +103,11 @@ TEST(CrossSection, Transform) {
   auto b = sq.Transform(glm::mat3x2(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
-  auto ex_b = Manifold::Extrude(b, 1.).GetMesh();
-  Identical(Manifold::Extrude(a, 1.).GetMesh(), ex_b);
+  auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMesh();
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMesh(), ex_b);
 
   // same transformations are applied in b_copy (giving same result)
-  Identical(ex_b, Manifold::Extrude(b_copy, 1.).GetMesh());
+  Identical(ex_b, Manifold::Extrude(b_copy.ToPolygons(), 1.).GetMesh());
 }
 
 TEST(CrossSection, Warp) {
@@ -136,12 +136,12 @@ TEST(CrossSection, Decompose) {
   EXPECT_EQ(decomp[0].NumContour(), 2);
   EXPECT_EQ(decomp[1].NumContour(), 2);
 
-  Identical(Manifold::Extrude(a, 1.).GetMesh(),
-            Manifold::Extrude(decomp[0], 1.).GetMesh());
-  Identical(Manifold::Extrude(b, 1.).GetMesh(),
-            Manifold::Extrude(decomp[1], 1.).GetMesh());
-  Identical(Manifold::Extrude(ab, 1.).GetMesh(),
-            Manifold::Extrude(recomp, 1.).GetMesh());
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMesh(),
+            Manifold::Extrude(decomp[0].ToPolygons(), 1.).GetMesh());
+  Identical(Manifold::Extrude(b.ToPolygons(), 1.).GetMesh(),
+            Manifold::Extrude(decomp[1].ToPolygons(), 1.).GetMesh());
+  Identical(Manifold::Extrude(ab.ToPolygons(), 1.).GetMesh(),
+            Manifold::Extrude(recomp.ToPolygons(), 1.).GetMesh());
 }
 
 TEST(CrossSection, FillRule) {
@@ -176,7 +176,7 @@ TEST(CrossSection, Hull) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    auto circ_tri_ex = Manifold::Extrude(circ_tri, 10);
+    auto circ_tri_ex = Manifold::Extrude(circ_tri.ToPolygons(), 10);
     ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMesh(), {});
   }
 #endif

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "manifold.h"
 #include "polygon.h"
 #include "test.h"
@@ -23,7 +24,7 @@ using namespace manifold;
  * operations between valid shapes with many faces.
  */
 
-TEST(Boolean, Sphere) {
+TEST(BooleanComplex, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   MeshGL sphereGL = WithPositionColors(sphere);
   sphere = Manifold(sphereGL);
@@ -47,7 +48,7 @@ TEST(Boolean, Sphere) {
 #endif
 }
 
-TEST(Boolean, MeshRelation) {
+TEST(BooleanComplex, MeshRelation) {
   Mesh gyroidMesh = Gyroid();
   MeshGL gyroidMeshGL = WithPositionColors(gyroidMesh);
   Manifold gyroid(gyroidMeshGL);
@@ -78,7 +79,7 @@ TEST(Boolean, MeshRelation) {
   RelatedGL(result, {gyroidMeshGL});
 }
 
-TEST(Boolean, Cylinders) {
+TEST(BooleanComplex, Cylinders) {
   Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 12);
   float arrays1[][12] = {
       {0, 0, 1, 3,    //
@@ -165,7 +166,7 @@ TEST(Boolean, Cylinders) {
   EXPECT_LE(m1.NumDegenerateTris(), 12);
 }
 
-TEST(Boolean, Subtract) {
+TEST(BooleanComplex, Subtract) {
   Mesh firstMesh;
   firstMesh.vertPos = {{0, 0, 0},           {1540, 0, 0},
                        {1540, 70, 0},       {0, 70, 0},
@@ -193,7 +194,7 @@ TEST(Boolean, Subtract) {
   first.GetMesh();
 }
 
-TEST(Boolean, Close) {
+TEST(BooleanComplex, Close) {
   PolygonParams().processOverlaps = true;
 
   const float r = 10;
@@ -216,7 +217,7 @@ TEST(Boolean, Close) {
   PolygonParams().processOverlaps = false;
 }
 
-TEST(Boolean, BooleanVolumes) {
+TEST(BooleanComplex, BooleanVolumes) {
   glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f));
 
   // Define solids which volumes are easy to compute w/ bit arithmetics:
@@ -244,7 +245,7 @@ TEST(Boolean, BooleanVolumes) {
   EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
 }
 
-TEST(Boolean, Spiral) {
+TEST(BooleanComplex, Spiral) {
   ManifoldParams().deterministic = true;
   const int d = 2;
   std::function<Manifold(const int, const float, const float)> spiral =
@@ -261,7 +262,7 @@ TEST(Boolean, Spiral) {
   EXPECT_EQ(result.Genus(), -120);
 }
 
-TEST(Boolean, Sweep) {
+TEST(BooleanComplex, Sweep) {
   PolygonParams().processOverlaps = true;
 
   // generate the minimum equivalent positive angle
@@ -333,7 +334,7 @@ TEST(Boolean, Sweep) {
       vertex.x = vertex.x * cos(angle);
     };
 
-    return Manifold::Extrude(profile, nSegments - 1, nSegments - 2)
+    return Manifold::Extrude(profile.ToPolygons(), nSegments - 1, nSegments - 2)
         .Warp(warpFunc);
   };
 
@@ -353,7 +354,7 @@ TEST(Boolean, Sweep) {
     float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
     float angle = atan2(diff.y, diff.x);
     Manifold extrusionPrimitive =
-        Manifold::Extrude(profile, distance)
+        Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
             .Translate(glm::vec3(distance, 0, 0))
             .Rotate(0, 0, angle * 180 / glm::pi<float>())
@@ -505,7 +506,7 @@ TEST(Boolean, Sweep) {
   PolygonParams().processOverlaps = false;
 }
 
-TEST(Boolean, InterpolatedNormals) {
+TEST(BooleanComplex, InterpolatedNormals) {
   MeshGL a;
   a.numProp = 8;
   a.vertProperties = {
@@ -943,3 +944,56 @@ TEST(Boolean, InterpolatedNormals) {
 
   RelatedGL(aMinusB, meshList, false, false);
 }
+
+#ifdef MANIFOLD_EXPORT
+TEST(BooleanComplex, SelfIntersect) {
+  manifold::PolygonParams().processOverlaps = true;
+  Manifold m1 = ReadMesh("self_intersectA.glb");
+  Manifold m2 = ReadMesh("self_intersectB.glb");
+  Manifold res = m1 + m2;
+  res.GetMeshGL();  // test crash
+  manifold::PolygonParams().processOverlaps = false;
+}
+
+TEST(BooleanComplex, GenericTwinBooleanTest7081) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
+  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
+  Manifold res = m1 + m2;  // Union
+  res.GetMeshGL();         // test crash
+}
+
+TEST(BooleanComplex, GenericTwinBooleanTest7863) {
+  manifold::PolygonParams().processOverlaps = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
+  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
+  Manifold res = m1 + m2;  // Union
+  res.GetMeshGL();         // test crash
+  manifold::PolygonParams().processOverlaps = false;
+}
+
+TEST(BooleanComplex, Havocglass8Bool) {
+  manifold::PolygonParams().processOverlaps = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ReadMesh("Havocglass8_left.glb");
+  Manifold m2 = ReadMesh("Havocglass8_right.glb");
+  Manifold res = m1 + m2;  // Union
+  res.GetMeshGL();         // test crash
+  manifold::PolygonParams().processOverlaps = false;
+}
+
+TEST(BooleanComplex, CraycloudBool) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ReadMesh("Cray_left.glb");
+  Manifold m2 = ReadMesh("Cray_right.glb");
+  Manifold res = m1 - m2;
+  EXPECT_EQ(res.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(res.IsEmpty());
+}
+
+#endif

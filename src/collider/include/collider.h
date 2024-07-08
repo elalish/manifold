@@ -30,15 +30,16 @@ class Collider {
   template <const bool selfCollision = false, const bool inverted = false,
             typename T>
   SparseIndices Collisions(const VecView<const T>& queriesIn) const;
+  static uint32_t MortonCode(glm::vec3 position, Box bBox);
 
  private:
   Vec<Box> nodeBBox_;
   Vec<int> nodeParent_;
   // even nodes are leaves, odd nodes are internal, root is 1
-  Vec<thrust::pair<int, int>> internalChildren_;
+  Vec<std::pair<int, int>> internalChildren_;
 
-  int NumInternal() const { return internalChildren_.size(); };
-  int NumLeaves() const {
+  size_t NumInternal() const { return internalChildren_.size(); };
+  size_t NumLeaves() const {
     return internalChildren_.empty() ? 0 : (NumInternal() + 1);
   };
 };

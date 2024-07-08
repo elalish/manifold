@@ -16,6 +16,7 @@
 
 #include "impl.h"
 #include "par.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -25,7 +26,7 @@ struct FaceAreaVolume {
   VecView<const glm::vec3> vertPos;
   const float precision;
 
-  thrust::pair<float, float> operator()(int face) {
+  std::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -39,56 +40,7 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return thrust::make_pair(area / 2.0f, volume / 6.0f);
-  }
-};
-
-struct PosMin
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::min(a, b);
-  }
-};
-
-struct PosMax
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::max(a, b);
-  }
-};
-
-struct FiniteVert {
-  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
-};
-
-struct MakeMinMax {
-  glm::ivec2 operator()(glm::ivec3 tri) {
-    return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
-                      glm::max(tri[0], glm::max(tri[1], tri[2])));
-  }
-};
-
-struct MinMax
-    : public thrust::binary_function<glm::ivec2, glm::ivec2, glm::ivec2> {
-  glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
-    a[0] = glm::min(a[0], b[0]);
-    a[1] = glm::max(a[1], b[1]);
-    return a;
-  }
-};
-
-struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
-                                                thrust::pair<float, float>,
-                                                thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
-    a.first += b.first;
-    a.second += b.second;
-    return a;
+    return std::make_pair(area / 2.0f, volume / 6.0f);
   }
 };
 
@@ -101,7 +53,7 @@ struct CurvatureAngles {
   VecView<const glm::vec3> vertPos;
   VecView<const glm::vec3> triNormal;
 
-  void operator()(int tri) {
+  void operator()(size_t tri) {
     glm::vec3 edge[3];
     glm::vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
@@ -135,19 +87,8 @@ struct CurvatureAngles {
   }
 };
 
-struct NormalizeCurvature {
-  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
-    float& meanCurvature = thrust::get<0>(inOut);
-    float& gaussianCurvature = thrust::get<1>(inOut);
-    float area = thrust::get<2>(inOut);
-    float degree = thrust::get<3>(inOut);
-    float factor = degree / (6 * area);
-    meanCurvature *= factor;
-    gaussianCurvature *= factor;
-  }
-};
-
 struct UpdateProperties {
+  VecView<glm::ivec3> triProp;
   VecView<float> properties;
 
   VecView<const float> oldProperties;
@@ -160,16 +101,13 @@ struct UpdateProperties {
   const int meanIdx;
 
   // FIXME: race condition
-  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
-    glm::ivec3& triProp = thrust::get<0>(inOut);
-    const int tri = thrust::get<1>(inOut);
-
+  void operator()(const size_t tri) {
     for (const int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
       if (oldNumProp == 0) {
-        triProp[i] = vert;
+        triProp[tri][i] = vert;
       }
-      const int propVert = triProp[i];
+      const int propVert = triProp[tri][i];
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -200,7 +138,7 @@ struct CheckHalfedges {
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
-    good &= paired.pairedHalfedge == edge;
+    good &= paired.pairedHalfedge == static_cast<int>(edge);
     good &= halfedge.startVert != halfedge.endVert;
     good &= halfedge.startVert == paired.endVert;
     good &= halfedge.endVert == paired.startVert;
@@ -211,7 +149,7 @@ struct CheckHalfedges {
 struct NoDuplicates {
   VecView<const Halfedge> halfedges;
 
-  bool operator()(int edge) {
+  bool operator()(size_t edge) {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
         halfedge.pairedHalfedge == -1)
@@ -227,7 +165,7 @@ struct CheckCCW {
   VecView<const glm::vec3> triNormal;
   const float tol;
 
-  bool operator()(int face) {
+  bool operator()(size_t face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
@@ -250,7 +188,7 @@ struct CheckCCW {
       glm::vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
       glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
-          "Tri %d does not match normal, approx height = %g, base = %g\n"
+          "Tri %ld does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
           "norm = %g, %g, %g\nverts: %d, %d, %d\n",
@@ -292,7 +230,7 @@ bool Manifold::Impl::Is2Manifold() const {
   Vec<Halfedge> halfedge(halfedge_);
   stable_sort(policy, halfedge.begin(), halfedge.end());
 
-  return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
+  return all_of(policy, countAt(0_z), countAt(2 * NumEdge() - 1),
                 NoDuplicates({halfedge}));
 }
 
@@ -301,7 +239,7 @@ bool Manifold::Impl::Is2Manifold() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
+  return all_of(autoPolicy(NumTri()), countAt(0_z), countAt(NumTri()),
                 CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
 }
 
@@ -311,7 +249,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(
-      autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
+      autoPolicy(NumTri()), countAt(0_z), countAt(NumTri()),
       CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
 }
 
@@ -323,7 +261,7 @@ Properties Manifold::Impl::GetProperties() const {
   float volume = 0;
   float areaCompensation = 0;
   float volumeCompensation = 0;
-  for (int i = 0; i < NumTri(); ++i) {
+  for (size_t i = 0; i < NumTri(); ++i) {
     auto [area1, volume1] =
         FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
     const float t1 = area + area1;
@@ -348,13 +286,16 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<float> vertArea(NumVert(), 0);
   Vec<float> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri());
-  for_each(policy, countAt(0), countAt(NumTri()),
+  for_each(policy, countAt(0_z), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
                             degree, halfedge_, vertPos_, faceNormal_}));
-  for_each_n(policy,
-             zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
-                 vertArea.begin(), degree.begin()),
-             NumVert(), NormalizeCurvature());
+  for_each_n(policy, countAt(0), NumVert(),
+             [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
+              &degree](const int vert) {
+               const float factor = degree[vert] / (6 * vertArea[vert]);
+               vertMeanCurvature[vert] *= factor;
+               vertGaussianCurvature[vert] *= factor;
+             });
 
   const int oldNumProp = NumProp();
   const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
@@ -366,10 +307,11 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   }
 
   for_each_n(
-      policy, zip(meshRelation_.triProperties.begin(), countAt(0)), NumTri(),
-      UpdateProperties({meshRelation_.properties, oldProperties, halfedge_,
-                        vertMeanCurvature, vertGaussianCurvature, oldNumProp,
-                        numProp, gaussianIdx, meanIdx}));
+      policy, countAt(0_z), NumTri(),
+      UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
+                        oldProperties, halfedge_, vertMeanCurvature,
+                        vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
+                        meanIdx}));
 
   CreateFaces();
   Finish();
@@ -384,10 +326,18 @@ void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
   bBox_.min = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
+      glm::vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::min(a, b);
+      });
   bBox_.max = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
+      glm::vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::max(a, b);
+      });
 }
 
 /**
@@ -396,9 +346,10 @@ void Manifold::Impl::CalculateBBox() {
  */
 bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
-  return transform_reduce<bool>(policy, vertPos_.begin(), vertPos_.end(),
-                                FiniteVert(), true,
-                                thrust::logical_and<bool>());
+  return transform_reduce<bool>(
+      policy, vertPos_.begin(), vertPos_.end(), true,
+      [](bool a, bool b) { return a && b; },
+      [](auto v) { return glm::all(glm::isfinite(v)); });
 }
 
 /**
@@ -408,11 +359,63 @@ bool Manifold::Impl::IsFinite() const {
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
-      policy, triVerts.begin(), triVerts.end(), MakeMinMax(),
+      policy, triVerts.begin(), triVerts.end(),
       glm::ivec2(std::numeric_limits<int>::max(),
                  std::numeric_limits<int>::min()),
-      MinMax());
+      [](auto a, auto b) {
+        a[0] = glm::min(a[0], b[0]);
+        a[1] = glm::max(a[1], b[1]);
+        return a;
+      },
+      [](auto tri) {
+        return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
+                          glm::max(tri[0], glm::max(tri[1], tri[2])));
+      });
 
-  return minmax[0] >= 0 && minmax[1] < NumVert();
+  return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());
 }
+
+/*
+ * Returns the minimum gap between two manifolds. Returns a float between
+ * 0 and searchLength.
+ */
+float Manifold::Impl::MinGap(const Manifold::Impl& other,
+                             float searchLength) const {
+  ZoneScoped;
+  Vec<Box> faceBoxOther;
+  Vec<uint32_t> faceMortonOther;
+
+  other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
+
+  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
+            faceBoxOther.end(), faceBoxOther.begin(),
+            [searchLength](const Box& box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
+
+  SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
+
+  float minDistanceSquared = transform_reduce<float>(
+      autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
+      searchLength * searchLength,
+      [](float a, float b) { return std::min(a, b); },
+      [&collisions, this, &other](int i) {
+        const int tri = collisions.Get(i, 1);
+        const int triOther = collisions.Get(i, 0);
+
+        std::array<glm::vec3, 3> p;
+        std::array<glm::vec3, 3> q;
+
+        for (const int j : {0, 1, 2}) {
+          p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
+          q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+        }
+
+        return DistanceTriangleTriangleSquared(p, q);
+      });
+
+  return sqrt(minDistanceSquared);
+};
+
 }  // namespace manifold

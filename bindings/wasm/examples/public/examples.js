@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/** @type {import("../../manifold-encapsulated-types")["Manifold"]} */
+const Manifold = globalThis.Manifold;
+
 export const examples = {
   functions: {
     Intro: function() {
@@ -128,7 +131,7 @@ export const examples = {
       // Demonstrates how at 90-degree intersections, the sphere and cylinder
       // facets match up perfectly, for any choice of global resolution
       // parameters.
-      const {sphere, cylinder, union} = Manifold;
+      const {sphere, cylinder, union, cube} = Manifold;
 
       function roundedFrame(edgeLength, radius, circularSegments = 0) {
         const edge = cylinder(edgeLength, radius, -1, circularSegments);
@@ -152,6 +155,17 @@ export const examples = {
       setMinCircularAngle(3);
       setMinCircularEdgeLength(0.5);
       const result = roundedFrame(100, 10);
+      // Demonstrate how you can use the .split method to perform
+      // a subtraction and an intersection at once
+      const [inside, outside] = result.split(cube(100, true));
+
+      const outsideNode = new GLTFNode();
+      outsideNode.manifold = outside;
+
+      const insideNode = new GLTFNode();
+      insideNode.manifold = inside;
+      insideNode.material = {baseColorFactor: [0, 1, 1]};
+
       return result;
     },
 
