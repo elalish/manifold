@@ -373,3 +373,41 @@ TEST(Smooth, SineSurface) {
   }
 #endif
 }
+
+TEST(Smooth, SDF) {
+  const float r = 10;
+  const float tol = 2;
+  Manifold gyroid =
+      Manifold(LevelSet(
+                   [r](glm::vec3 p) {
+                     const float gyroid = cos(p.x) * sin(p.y) +
+                                          cos(p.y) * sin(p.z) +
+                                          cos(p.z) * sin(p.x);
+                     const float d = glm::min(0.0f, r - glm::length(p));
+                     return gyroid - d * d;
+                   },
+                   {glm::vec3(-r - tol), glm::vec3(r + tol)}, 1))
+          .SetProperties(
+              3,
+              [r](float* newProp, glm::vec3 pos, const float* oldProp) {
+                const float rad = glm::length(pos);
+                const float d = glm::min(0.0f, r - glm::length(pos));
+                const glm::vec3 sphere = d * glm::normalize(pos + 0.0001f);
+                const glm::vec3 gyroidGrad(
+                    cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
+                    cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
+                    cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
+                const glm::vec3 normal = -glm::normalize(gyroidGrad + sphere);
+                for (const int i : {0, 1, 2}) newProp[i] = normal[i];
+              })
+          .SmoothOut(180)
+          .RefineToLength(0.1);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportOptions options2;
+    // options2.faceted = false;
+    // options2.mat.normalChannels = {3, 4, 5};
+    ExportMesh("smoothGyroid.glb", gyroid.GetMeshGL(), options2);
+  }
+#endif
+}
