@@ -34,15 +34,15 @@ target_compile_features(${PROJECT_NAME}
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
 
 if(MANIFOLD_HULL)
-add_library(hull module/hull.cpp)
-target_link_libraries(hull
-    PRIVATE manifold quickhull
-)
-target_compile_options(hull PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(hull
-    PUBLIC cxx_std_17
-)
-install(TARGETS hull EXPORT manifoldTargets)
+  add_library(hull module/hull.cpp)
+  target_link_libraries(hull
+      PRIVATE manifold quickhull
+  )
+  target_compile_options(hull PRIVATE ${MANIFOLD_FLAGS})
+  target_compile_features(hull
+      PUBLIC cxx_std_17
+  )
+  install(TARGETS hull EXPORT manifoldTargets)
 endif()
 
 install(FILES include/manifold.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
