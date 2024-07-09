@@ -18,12 +18,8 @@ endif()
 
 target_link_libraries(
     ${PROJECT_NAME}
-    PRIVATE manifold sdf cross_section
+    PRIVATE manifold sdf cross_section hull
 )
-
-if(MANIFOLD_HULL)
-    target_link_libraries(${PROJECT_NAME} PRIVATE hull)
-endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
