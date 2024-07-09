@@ -15,18 +15,9 @@
 #pragma once
 #if MANIFOLD_PAR == 'T'
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_scan.h>
-#if __has_include(<pstl/glue_execution_defs.h>)
-#include <execution>
-#define HAS_PAR_UNSEQ
-#elif __has_include(<oneapi/dpl/execution>)
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/memory>
-#include <oneapi/dpl/numeric>
-#define HAS_PAR_UNSEQ
-#endif
 #endif
 #include <algorithm>
 #include <numeric>
@@ -44,7 +35,6 @@ enum class ExecutionPolicy {
 // ExecutionPolicy:
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
-// - GPU for large workload if available.
 inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   // some random numbers
   if (size <= (1 << 12)) {
@@ -52,6 +42,113 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   }
   return ExecutionPolicy::Par;
 }
+
+constexpr size_t SEQUENTIAL_LIMIT = 1 << 14;
+
+#if MANIFOLD_PAR == 'T'
+namespace details {
+// implementation from
+// https://duvanenko.tech.blog/2018/01/14/parallel-merge/
+// https://github.com/DragonSpit/ParallelAlgorithms
+// note that the ranges are now [p, r) to fit our convention.
+template <typename T, typename Comp>
+void mergeRec(T *src, T *dest, size_t p1, size_t r1, size_t p2, size_t r2,
+              size_t p3, Comp comp) {
+  size_t length1 = r1 - p1;
+  size_t length2 = r2 - p2;
+  if (length1 < length2) {
+    std::swap(p1, p2);
+    std::swap(r1, r2);
+    std::swap(length1, length2);
+  }
+  if (length1 == 0) return;
+  if (length1 + length2 <= SEQUENTIAL_LIMIT) {
+    std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
+  } else {
+    size_t q1 = p1 + length1 / 2;
+    size_t q2 =
+        std::distance(src, std::lower_bound(src + p2, src + r2, src[q1], comp));
+    size_t q3 = p3 + (q1 - p1) + (q2 - p2);
+    dest[q3] = src[q1];
+    tbb::parallel_invoke(
+        [=] { mergeRec(src, dest, p1, q1, p2, q2, p3, comp); },
+        [=] { mergeRec(src, dest, q1 + 1, r1, q2, r2, q3 + 1, comp); });
+  }
+}
+
+template <typename T, typename Comp>
+void mergeSortRec(T *src, T *dest, size_t begin, size_t end, Comp comp) {
+  size_t numElements = end - begin;
+  if (numElements <= SEQUENTIAL_LIMIT) {
+    std::copy(src + begin, src + end, dest + begin);
+    std::stable_sort(dest + begin, dest + end, comp);
+  } else {
+    size_t middle = begin + numElements / 2;
+    tbb::parallel_invoke([=] { mergeSortRec(dest, src, begin, middle, comp); },
+                         [=] { mergeSortRec(dest, src, middle, end, comp); });
+    mergeRec(src, dest, begin, middle, middle, end, begin, comp);
+  }
+}
+
+template <typename T, typename InputIter, typename OutputIter, typename BinOp>
+struct ScanBody {
+  T sum;
+  T identity;
+  BinOp &f;
+  InputIter input;
+  OutputIter output;
+
+  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
+      : sum(sum), identity(identity), f(f), input(input), output(output) {}
+  ScanBody(ScanBody &b, tbb::split)
+      : sum(b.identity),
+        identity(b.identity),
+        f(b.f),
+        input(b.input),
+        output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    T temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      T inputTmp = input[i];
+      if (Tag::is_final_scan()) output[i] = temp;
+      temp = f(temp, inputTmp);
+    }
+    sum = temp;
+  }
+  T get_sum() const { return sum; }
+  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
+  void assign(ScanBody &b) { sum = b.sum; }
+};
+
+template <typename InputIter, typename OutputIter, typename P>
+struct CopyIfScanBody {
+  size_t sum;
+  P &pred;
+  InputIter input;
+  OutputIter output;
+
+  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
+      : sum(0), pred(pred), input(input), output(output) {}
+  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
+      : sum(0), pred(b.pred), input(b.input), output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    size_t temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      if (pred(i)) {
+        temp += 1;
+        if (Tag::is_final_scan()) output[temp - 1] = input[i];
+      }
+    }
+    sum = temp;
+  }
+  size_t get_sum() const { return sum; }
+  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
+  void assign(CopyIfScanBody &b) { sum = b.sum; }
+};
+};  // namespace details
+#endif
 
 template <typename Iter, typename F>
 void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
@@ -128,39 +225,6 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::inclusive_scan(first, last, d_first);
 }
 
-#if MANIFOLD_PAR == 'T'
-template <typename T, typename InputIter, typename OutputIter, typename BinOp>
-struct ScanBody {
-  T sum;
-  T identity;
-  BinOp &f;
-  InputIter input;
-  OutputIter output;
-
-  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
-      : sum(sum), identity(identity), f(f), input(input), output(output) {}
-  ScanBody(ScanBody &b, tbb::split)
-      : sum(b.identity),
-        identity(b.identity),
-        f(b.f),
-        input(b.input),
-        output(b.output) {}
-  template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
-    T temp = sum;
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      T inputTmp = input[i];
-      if (Tag::is_final_scan()) output[i] = temp;
-      temp = f(temp, inputTmp);
-    }
-    sum = temp;
-  }
-  T get_sum() const { return sum; }
-  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
-  void assign(ScanBody &b) { sum = b.sum; }
-};
-#endif
-
 template <typename InputIter, typename OutputIter,
           typename BinOp = decltype(std::plus<typename std::iterator_traits<
                                         InputIter>::value_type>()),
@@ -170,8 +234,8 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
                     BinOp f = std::plus<T>(), T identity = static_cast<T>(0)) {
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
-    ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f, first,
-                                                   d_first);
+    details::ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f,
+                                                            first, d_first);
     tbb::parallel_scan(
         tbb::blocked_range<size_t>(0, std::distance(first, last)), body);
     return;
@@ -267,32 +331,6 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
 }
 
 #if MANIFOLD_PAR == 'T'
-template <typename InputIter, typename OutputIter, typename P>
-struct CopyIfScanBody {
-  size_t sum;
-  P &pred;
-  InputIter input;
-  OutputIter output;
-
-  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
-      : sum(0), pred(pred), input(input), output(output) {}
-  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
-      : sum(0), pred(b.pred), input(b.input), output(b.output) {}
-  template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
-    size_t temp = sum;
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      if (pred(i)) {
-        temp += 1;
-        if (Tag::is_final_scan()) output[temp - 1] = input[i];
-      }
-    }
-    sum = temp;
-  }
-  size_t get_sum() const { return sum; }
-  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
-  void assign(CopyIfScanBody &b) { sum = b.sum; }
-};
 #endif
 
 // note that you should not have alias between input and output...
@@ -305,7 +343,7 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     auto pred2 = [&](size_t i) { return pred(first[i]); };
-    CopyIfScanBody body(pred2, first, d_first);
+    details::CopyIfScanBody body(pred2, first, d_first);
     tbb::parallel_scan(
         tbb::blocked_range<size_t>(0, std::distance(first, last)), body);
     return d_first + body.get_sum();
@@ -364,7 +402,7 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
       *first = *newSrcStart;
       // this is not a typo, the index i is offset by 1, so to compare an
       // element with its predecessor we need to compare i and i + 1.
-      CopyIfScanBody body(pred, tmp.begin() + 1, first + 1);
+      details::CopyIfScanBody body(pred, tmp.begin() + 1, first + 1);
       tbb::parallel_scan(tbb::blocked_range<size_t>(0, length - 1), body);
       first += body.get_sum() + 1;
       newSrcStart += length;
@@ -373,6 +411,62 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
   }
 #endif
   return std::unique(first, last);
+}
+
+template <typename Iterator,
+          typename T = typename std::iterator_traits<Iterator>::value_type,
+          typename Comp = decltype(std::less<T>())>
+void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
+                 Comp comp = std::less<T>()) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    std::vector<T> tmp(std::distance(first, last));
+    copy(policy, first, last, tmp.begin());
+    // apparently this prioritizes threads inside here?
+    tbb::this_task_arena::isolate([&] {
+      details::mergeSortRec(tmp.data(), &*first, 0, std::distance(first, last),
+                            comp);
+    });
+    return;
+  }
+#endif
+  std::stable_sort(first, last, comp);
+}
+
+template <typename Iter,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+void uninitialized_fill(ExecutionPolicy policy, Iter first, Iter last,
+                        T value) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          0_z, static_cast<size_t>(std::distance(first, last))),
+                      [&](const tbb::blocked_range<size_t> &range) {
+                        std::uninitialized_fill(first + range.begin(),
+                                                first + range.end(), value);
+                      });
+    return;
+  }
+#endif
+  std::uninitialized_fill(first, last, value);
+}
+
+template <typename InputIter, typename OutputIter>
+void uninitialized_copy(ExecutionPolicy policy, InputIter first, InputIter last,
+                        OutputIter d_first) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          0_z, static_cast<size_t>(std::distance(first, last))),
+                      [&](const tbb::blocked_range<size_t> &range) {
+                        std::uninitialized_copy(first + range.begin(),
+                                                first + range.end(),
+                                                d_first + range.begin());
+                      });
+    return;
+  }
+#endif
+  std::uninitialized_copy(first, last, d_first);
 }
 
 template <typename InputIterator1, typename InputIterator2,
@@ -404,48 +498,5 @@ void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
 }
-
-#ifdef HAS_PAR_UNSEQ
-#define STL_DYNAMIC_BACKEND(NAME, RET)                        \
-  template <typename Ret = RET, typename... Args>             \
-  Ret NAME(ExecutionPolicy policy, Args... args) {            \
-    switch (policy) {                                         \
-      case ExecutionPolicy::Par:                              \
-        return std::NAME(std::execution::par_unseq, args...); \
-      case ExecutionPolicy::Seq:                              \
-        break;                                                \
-    }                                                         \
-    return std::NAME(args...);                                \
-  }
-#define STL_DYNAMIC_BACKEND_VOID(NAME)                 \
-  template <typename... Args>                          \
-  void NAME(ExecutionPolicy policy, Args... args) {    \
-    switch (policy) {                                  \
-      case ExecutionPolicy::Par:                       \
-        std::NAME(std::execution::par_unseq, args...); \
-        break;                                         \
-      case ExecutionPolicy::Seq:                       \
-        std::NAME(args...);                            \
-        break;                                         \
-    }                                                  \
-  }
-#else
-#define STL_DYNAMIC_BACKEND(NAME, RET)             \
-  template <typename Ret = RET, typename... Args>  \
-  Ret NAME(ExecutionPolicy policy, Args... args) { \
-    return std::NAME(args...);                     \
-  }
-#define STL_DYNAMIC_BACKEND_VOID(NAME)              \
-  template <typename... Args>                       \
-  void NAME(ExecutionPolicy policy, Args... args) { \
-    std::NAME(args...);                             \
-  }
-#endif
-
-// void implies that the user have to specify the return type in the template
-// argument, as we are unable to deduce it
-STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
-STL_DYNAMIC_BACKEND_VOID(stable_sort)
 
 }  // namespace manifold
