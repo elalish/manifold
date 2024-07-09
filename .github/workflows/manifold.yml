@@ -58,7 +58,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DCODE_COVERAGE=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
         cd test
         ./manifold_test

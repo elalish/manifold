@@ -17,10 +17,13 @@ project(manifold_test)
 set(CMAKE_CXX_STANDARD 17)
 enable_testing()
 
-set(SOURCE_FILES test_main.cpp polygon_test.cpp cross_section_test.cpp properties_test.cpp manifold_test.cpp hull_test.cpp smooth_test.cpp sdf_test.cpp boolean_test.cpp boolean_complex_test.cpp samples_test.cpp)
+set(SOURCE_FILES test_main.cpp polygon_test.cpp cross_section_test.cpp properties_test.cpp manifold_test.cpp smooth_test.cpp sdf_test.cpp boolean_test.cpp boolean_complex_test.cpp samples_test.cpp)
 
 if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
+endif()
+if(MANIFOLD_HULL)
+  list(APPEND SOURCE_FILES hull_test.cpp)
 endif()
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
