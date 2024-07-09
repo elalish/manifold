@@ -239,7 +239,7 @@ struct CopyIfScanBody {
   void operator()(const tbb::blocked_range<size_t> &r, Tag) {
     size_t temp = sum;
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      if (pred(input[i])) {
+      if (pred(i)) {
         temp += 1;
         if (Tag::is_final_scan()) output[temp - 1] = input[i];
       }
@@ -261,7 +261,8 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
                    OutputIter d_first, P pred) {
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
-    CopyIfScanBody body(pred, first, d_first);
+    auto pred2 = [&](size_t i) { return pred(first[i]); };
+    CopyIfScanBody body(pred2, first, d_first);
     tbb::parallel_scan(
         tbb::blocked_range<size_t>(0, std::distance(first, last)), body);
     return d_first + body.get_sum();
@@ -298,6 +299,37 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   }
 #endif
   return std::remove(first, last, value);
+}
+
+template <typename Iter,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par && first != last) {
+    Iter newSrcStart = first;
+    // cap the maximum buffer size, proved to be beneficial for unique with huge
+    // array size
+    constexpr size_t MAX_BUFFER_SIZE = 1 << 16;
+    std::vector<T> tmp(std::min(
+        MAX_BUFFER_SIZE, static_cast<size_t>(std::distance(first, last))));
+    auto pred = [&](size_t i) { return tmp[i] != tmp[i + 1]; };
+    do {
+      size_t length =
+          std::min(MAX_BUFFER_SIZE,
+                   static_cast<size_t>(std::distance(newSrcStart, last)));
+      copy(policy, newSrcStart, newSrcStart + length, tmp.begin());
+      *first = *newSrcStart;
+      // this is not a typo, the index i is offset by 1, so to compare an
+      // element with its predecessor we need to compare i and i + 1.
+      CopyIfScanBody body(pred, tmp.begin() + 1, first + 1);
+      tbb::parallel_scan(tbb::blocked_range<size_t>(0, length - 1), body);
+      first += body.get_sum() + 1;
+      newSrcStart += length;
+    } while (newSrcStart != last);
+    return first;
+  }
+#endif
+  return std::unique(first, last);
 }
 
 template <typename InputIterator1, typename InputIterator2,
@@ -369,7 +401,6 @@ void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
-STL_DYNAMIC_BACKEND(unique, void)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND_VOID(stable_sort)
