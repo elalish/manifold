@@ -180,47 +180,90 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::exclusive_scan(first, last, d_first, init, f);
 }
 
-// TODO: use STL variant when parallelization is not enabled?
-
 template <typename InputIter, typename OutputIter, typename F>
 void transform(ExecutionPolicy policy, InputIter first, InputIter last,
                OutputIter d_first, F f) {
-  for_each_n(policy, countAt(0_z), std::distance(first, last),
-             [&](size_t i) { d_first[i] = f(first[i]); });
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          0_z, static_cast<size_t>(std::distance(first, last))),
+                      [&](const tbb::blocked_range<size_t> &range) {
+                        std::transform(first + range.begin(),
+                                       first + range.end(),
+                                       d_first + range.begin(), f);
+                      });
+    return;
+  }
+#endif
+  std::transform(first, last, d_first, f);
 }
 
 template <typename InputIter, typename OutputIter>
 void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           OutputIter d_first) {
-  for_each_n(policy, countAt(0_z), std::distance(first, last),
-             [&](size_t i) { d_first[i] = first[i]; });
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          0_z, static_cast<size_t>(std::distance(first, last))),
+                      [&](const tbb::blocked_range<size_t> &range) {
+                        std::copy(first + range.begin(), first + range.end(),
+                                  d_first + range.begin());
+                      });
+    return;
+  }
+#endif
+  std::copy(first, last, d_first);
 }
 
 template <typename InputIter, typename OutputIter>
 void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
             OutputIter d_first) {
-  for_each_n(policy, countAt(0_z), n, [&](size_t i) { d_first[i] = first[i]; });
+  copy(policy, first, first + n, d_first);
 }
 
 template <typename OutputIter, typename T>
 void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
-  for_each_n(policy, countAt(0_z), std::distance(first, last),
-             [&](size_t i) { first[i] = value; });
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<OutputIter>(first, last),
+                      [&](const tbb::blocked_range<OutputIter> &range) {
+                        std::fill(range.begin(), range.end(), value);
+                      });
+    return;
+  }
+#endif
+  std::fill(first, last, value);
 }
 
 template <typename InputIter, typename P>
 size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
                 P pred) {
-  return reduce(policy, TransformIterator(first, pred),
-                TransformIterator(last, pred), 0_z, std::plus<size_t>());
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    return reduce(policy, TransformIterator(first, pred),
+                  TransformIterator(last, pred), 0_z, std::plus<size_t>());
+  }
+#endif
+  return std::count_if(first, last, pred);
 }
 
 template <typename InputIter, typename P>
 bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
-  // can probably optimize a bit for short-circuiting
-  return reduce(policy, TransformIterator(first, pred),
-                TransformIterator(last, pred), true,
-                [](bool a, bool b) { return a && b; });
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    // should we use deterministic reduce here?
+    return tbb::parallel_reduce(
+        tbb::blocked_range<InputIter>(first, last), true,
+        [&](const tbb::blocked_range<InputIter> &range, bool value) {
+          if (!value) return false;
+          for (InputIter i = range.begin(); i != range.end(); i++)
+            if (!pred(*i)) return false;
+          return true;
+        },
+        [](bool a, bool b) { return a && b; });
+  }
+#endif
+  return std::all_of(first, last, pred);
 }
 
 #if MANIFOLD_PAR == 'T'
