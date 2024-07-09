@@ -17,7 +17,7 @@ jobs:
         source: '.'
         exclude: '*/third_party'
         extensions: 'h,cpp,js,ts,html'
-        clangFormatVersion: 11
+        clangFormatVersion: 15
     - uses: psf/black@stable
       with:
         options: "--check --verbose"
