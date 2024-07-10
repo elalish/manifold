@@ -143,7 +143,7 @@ class SparseIndices {
 
     size_t size =
         copy_if(policy, countAt(0_z), countAt(S.size()), new2Old.begin(),
-                [&S](const int i) { return S[i] != 0; }) -
+                [&S](const size_t i) { return S[i] != 0; }) -
         new2Old.begin();
     new2Old.resize(size);
 
