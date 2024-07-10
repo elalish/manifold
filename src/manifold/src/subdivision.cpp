@@ -520,7 +520,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
 
   Vec<int> edgeOffset(numEdge);
-  exclusive_scan(policy, edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
+  exclusive_scan(edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
                  numVert);
 
   Vec<Barycentric> vertBary(edgeOffset.back() + edgeAdded.back());
@@ -564,15 +564,17 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
       TransformIterator(subTris.begin(), [](const Partition& part) {
         return static_cast<int>(part.triVert.size());
       });
-  exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(), 0);
+  manifold::exclusive_scan(numSubTris, numSubTris + numTri, triOffset.begin(),
+                           0);
 
   Vec<int> interiorOffset(numTri);
   auto numInterior =
       TransformIterator(subTris.begin(), [](const Partition& part) {
         return static_cast<int>(part.NumInterior());
       });
-  exclusive_scan(policy, numInterior, numInterior + numTri,
-                 interiorOffset.begin(), static_cast<int>(vertBary.size()));
+  manifold::exclusive_scan(numInterior, numInterior + numTri,
+                           interiorOffset.begin(),
+                           static_cast<int>(vertBary.size()));
 
   Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
   vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
@@ -599,11 +601,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
         Vec<glm::ivec3> newTris = subTris[tri].Reindex(
             tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
-        copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
-             triVerts.begin() + triOffset[tri]);
+        copy(newTris.begin(), newTris.end(), triVerts.begin() + triOffset[tri]);
         auto start = triRef.begin() + triOffset[tri];
-        fill(ExecutionPolicy::Seq, start, start + newTris.size(),
-             meshRelation_.triRef[tri]);
+        fill(start, start + newTris.size(), meshRelation_.triRef[tri]);
 
         const glm::ivec4 idx = subTris[tri].idx;
         const glm::ivec4 vIdx =
@@ -616,8 +616,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         }
 
         const auto& subBary = subTris[tri].vertBary;
-        transform(ExecutionPolicy::Seq,
-                  subBary.begin() + subTris[tri].InteriorOffset(),
+        transform(subBary.begin() + subTris[tri].InteriorOffset(),
                   subBary.end(), vertBary.begin() + interiorOffset[tri],
                   [tri, rIdx](glm::vec4 bary) {
                     return Barycentric({tri,
@@ -658,8 +657,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                     (numPropVert + addedVerts + totalEdgeAdded));
 
     // copy retained prop verts
-    copy(policy, meshRelation_.properties.begin(),
-         meshRelation_.properties.end(), prop.begin());
+    copy(meshRelation_.properties.begin(), meshRelation_.properties.end(),
+         prop.begin());
 
     // copy interior prop verts and forward edge prop verts
     for_each_n(
@@ -758,7 +757,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  Vec<glm::ivec3> newTris = subTris[tri].Reindex(
                      tri3, edgeOffsets + propOffset, edgeFwd,
                      interiorOffset[tri] + propOffset);
-                 copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
+                 copy(newTris.begin(), newTris.end(),
                       triProp.begin() + triOffset[tri]);
                });
 

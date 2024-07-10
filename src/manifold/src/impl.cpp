@@ -547,15 +547,13 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
   });
 
   auto next =
-      copy_if(autoPolicy(tmpBuffer.size()), vertIdIter,
-              vertIdIter + tmpBuffer.size(), tmpBuffer.begin(),
+      copy_if(vertIdIter, vertIdIter + tmpBuffer.size(), tmpBuffer.begin(),
               [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
-  gather(autoPolicy(tmpBuffer.size()), tmpBuffer.begin(), next,
-         oldVertPos.begin(), vertPos_.begin());
+  gather(tmpBuffer.begin(), next, oldVertPos.begin(), vertPos_.begin());
 
   vertPos_.resize(std::distance(tmpBuffer.begin(), next));
 
-  inclusive_scan(policy, vertOld2New.begin() + 1, vertOld2New.end(),
+  inclusive_scan(vertOld2New.begin() + 1, vertOld2New.end(),
                  vertOld2New.begin() + 1);
 
   for_each(policy, triVerts.begin(), triVerts.end(),
@@ -634,7 +632,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   Vec<uint64_t> edge(numHalfedge);
   Vec<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri);
-  sequence(policy, ids.begin(), ids.end());
+  sequence(ids.begin(), ids.end());
   for_each_n(policy, countAt(0), numTri,
              [this, &edge, &triVerts](const int tri) {
                const glm::ivec3& verts = triVerts[tri];
@@ -654,9 +652,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
-  stable_sort(
-      policy, ids.begin(), ids.end(),
-      [&edge](const int& a, const int& b) { return edge[a] < edge[b]; });
+  stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
+    return edge[a] < edge[b];
+  });
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
@@ -730,14 +728,14 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.vertPos_.resize(NumVert());
   result.faceNormal_.resize(faceNormal_.size());
   result.vertNormal_.resize(vertNormal_.size());
-  transform(policy, vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
+  transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
             Transform4x3({transform_}));
 
   glm::mat3 normalTransform = NormalTransform(transform_);
-  transform(policy, faceNormal_.begin(), faceNormal_.end(),
-            result.faceNormal_.begin(), TransformNormals({normalTransform}));
-  transform(policy, vertNormal_.begin(), vertNormal_.end(),
-            result.vertNormal_.begin(), TransformNormals({normalTransform}));
+  transform(faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
+            TransformNormals({normalTransform}));
+  transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
+            TransformNormals({normalTransform}));
 
   const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
 
@@ -789,7 +787,7 @@ void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri());
-  fill(policy, vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
+  fill(vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());

@@ -232,12 +232,11 @@ Manifold::Impl CsgLeafNode::Compose(
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &propVertIndices,
        numPropOut, &combined, policy](int i) {
         auto &node = nodes[i];
-        copy(policy, node->pImpl_->halfedgeTangent_.begin(),
+        copy(node->pImpl_->halfedgeTangent_.begin(),
              node->pImpl_->halfedgeTangent_.end(),
              combined.halfedgeTangent_.begin() + edgeIndices[i]);
         transform(
-            policy, node->pImpl_->halfedge_.begin(),
-            node->pImpl_->halfedge_.end(),
+            node->pImpl_->halfedge_.begin(), node->pImpl_->halfedge_.end(),
             combined.halfedge_.begin() + edgeIndices[i],
             UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
 
@@ -246,7 +245,7 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.meshRelation_.triProperties.begin() + triIndices[i];
           if (node->pImpl_->NumProp() > 0) {
             auto &triProp = node->pImpl_->meshRelation_.triProperties;
-            transform(policy, triProp.begin(), triProp.end(), start,
+            transform(triProp.begin(), triProp.end(), start,
                       UpdateTriProp({propVertIndices[i]}));
 
             const int numProp = node->pImpl_->NumProp();
@@ -258,20 +257,19 @@ Manifold::Impl CsgLeafNode::Compose(
               auto newRange = StridedRange(
                   newProp.begin() + numPropOut * propVertIndices[i] + p,
                   newProp.end(), numPropOut);
-              copy(policy, oldRange.begin(), oldRange.end(), newRange.begin());
+              copy(oldRange.begin(), oldRange.end(), newRange.begin());
             }
           } else {
             // point all triangles at single new property of zeros.
-            fill(policy, start, start + node->pImpl_->NumTri(),
+            fill(start, start + node->pImpl_->NumTri(),
                  glm::ivec3(propVertIndices[i]));
           }
         }
 
         if (node->transform_ == glm::mat4x3(1.0f)) {
-          copy(policy, node->pImpl_->vertPos_.begin(),
-               node->pImpl_->vertPos_.end(),
+          copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
-          copy(policy, node->pImpl_->faceNormal_.begin(),
+          copy(node->pImpl_->faceNormal_.begin(),
                node->pImpl_->faceNormal_.end(),
                combined.faceNormal_.begin() + triIndices[i]);
         } else {
@@ -284,9 +282,9 @@ Manifold::Impl CsgLeafNode::Compose(
           auto faceNormalBegin =
               TransformIterator(node->pImpl_->faceNormal_.begin(),
                                 TransformNormals({normalTransform}));
-          copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
+          copy_n(vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
-          copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
+          copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
           const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
@@ -304,7 +302,7 @@ Manifold::Impl CsgLeafNode::Compose(
         // important to add an offset so that each node instance gets
         // unique meshIDs.
         const int offset = i * Manifold::Impl::meshIDCounter_;
-        transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
+        transform(node->pImpl_->meshRelation_.triRef.begin(),
                   node->pImpl_->meshRelation_.triRef.end(),
                   combined.meshRelation_.triRef.begin() + triIndices[i],
                   UpdateMeshIDs({offset}));

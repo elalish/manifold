@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <atomic>
-#include <numeric>
 #include <set>
 
 #include "impl.h"
@@ -145,8 +144,7 @@ void Manifold::Impl::Finish() {
 
 #ifdef MANIFOLD_DEBUG
   Halfedge extrema = {0, 0, 0, 0};
-  extrema = reduce(autoPolicy(halfedge_.size()), halfedge_.begin(),
-                   halfedge_.end(), extrema, Extrema());
+  extrema = reduce(halfedge_.begin(), halfedge_.end(), extrema, Extrema());
 #endif
 
   DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
@@ -193,9 +191,9 @@ void Manifold::Impl::SortVerts() {
   });
 
   Vec<int> vertNew2Old(numVert);
-  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+  sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
               [&vertMorton](const int& a, const int& b) {
                 return vertMorton[a] < vertMorton[b];
               });
@@ -226,8 +224,7 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
-  scatter(autoPolicy(oldNumVert), countAt(0),
-          countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
+  scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
            Reindex({vertOld2New}));
@@ -247,7 +244,7 @@ void Manifold::Impl::CompactProps() {
   for_each(policy, meshRelation_.triProperties.cbegin(),
            meshRelation_.triProperties.cend(), MarkProp({keep}));
   Vec<int> propOld2New(numVerts + 1, 0);
-  inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
+  inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
   Vec<float> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
@@ -308,10 +305,9 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
 void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   ZoneScoped;
   Vec<int> faceNew2Old(NumTri());
-  auto policy = autoPolicy(faceNew2Old.size());
-  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
+  sequence(faceNew2Old.begin(), faceNew2Old.end());
 
-  stable_sort(policy, faceNew2Old.begin(), faceNew2Old.end(),
+  stable_sort(faceNew2Old.begin(), faceNew2Old.end(),
               [&faceMorton](const int& a, const int& b) {
                 return faceMorton[a] < faceMorton[b];
               });
@@ -348,7 +344,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri);
-  scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -364,7 +360,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   auto policy = autoPolicy(numTri);
 
   meshRelation_.triRef.resize(numTri);
-  gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+  gather(faceNew2Old.begin(), faceNew2Old.end(),
          old.meshRelation_.triRef.begin(), meshRelation_.triRef.begin());
 
   for (const auto& pair : old.meshRelation_.meshIDtransform) {
@@ -373,7 +369,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   if (old.meshRelation_.triProperties.size() > 0) {
     meshRelation_.triProperties.resize(numTri);
-    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+    gather(faceNew2Old.begin(), faceNew2Old.end(),
            old.meshRelation_.triProperties.begin(),
            meshRelation_.triProperties.begin());
     meshRelation_.numProp = old.meshRelation_.numProp;
@@ -382,12 +378,12 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
-    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-           old.faceNormal_.begin(), faceNormal_.begin());
+    gather(faceNew2Old.begin(), faceNew2Old.end(), old.faceNormal_.begin(),
+           faceNormal_.begin());
   }
 
   Vec<int> faceOld2New(old.NumTri());
-  scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -472,8 +468,8 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = transform_reduce(
-        autoPolicy(numVert), iPos.begin(), iPos.end(),
+    auto minMax = manifold::transform_reduce(
+        iPos.begin(), iPos.end(),
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),
         [](auto a, auto b) {
@@ -506,9 +502,9 @@ bool MeshGL::Merge() {
              });
 
   Vec<int> vertNew2Old(numOpenVert);
-  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+  sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
               [&vertMorton](const int& a, const int& b) {
                 return vertMorton[a] < vertMorton[b];
               });

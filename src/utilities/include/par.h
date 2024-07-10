@@ -32,20 +32,36 @@ enum class ExecutionPolicy {
   Seq,
 };
 
+constexpr size_t kSeqThreshold = 10'000;
 // ExecutionPolicy:
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
-inline constexpr ExecutionPolicy autoPolicy(size_t size) {
-  // some random numbers
-  if (size <= (1 << 12)) {
+inline constexpr ExecutionPolicy autoPolicy(size_t size,
+                                            size_t threshold = kSeqThreshold) {
+  if (size <= threshold) {
     return ExecutionPolicy::Seq;
   }
   return ExecutionPolicy::Par;
 }
 
+template <typename Iter>
+inline constexpr ExecutionPolicy autoPolicy(Iter first, Iter last,
+                                            size_t threshold = kSeqThreshold) {
+  if (static_cast<size_t>(std::distance(first, last)) <= threshold) {
+    return ExecutionPolicy::Seq;
+  }
+  return ExecutionPolicy::Par;
+}
+
+template <typename InputIter, typename OutputIter>
+void copy(ExecutionPolicy policy, InputIter first, InputIter last,
+          OutputIter d_first);
+template <typename InputIter, typename OutputIter>
+void copy(InputIter first, InputIter last, OutputIter d_first);
+
 #if MANIFOLD_PAR == 'T'
 namespace details {
-constexpr size_t kSeqThreshold = 1 << 16;
+using manifold::kSeqThreshold;
 // implementation from
 // https://duvanenko.tech.blog/2018/01/14/parallel-merge/
 // https://github.com/DragonSpit/ParallelAlgorithms
@@ -236,8 +252,7 @@ struct SortedRange {
   bool swapBuffer() const {
     T *src = input, *target = tmp;
     if (inTmp) std::swap(src, target);
-    copy(autoPolicy(length), src + offset, src + offset + length,
-         target + offset);
+    copy(src + offset, src + offset + length, target + offset);
     return !inTmp;
   }
   void join(const SortedRange<T, SizeType> &rhs) {
@@ -265,7 +280,7 @@ void radix_sort(T *input, SizeTy n) {
                               static_cast<SizeTy>(kSeqThreshold / sizeof(T)));
   SortedRange<T, SizeTy> result(input, aux);
   tbb::parallel_reduce(tbb::blocked_range<SizeTy>(0, n, blockSize), result);
-  if (result.inTmp) copy(autoPolicy(n), aux, aux + n, input);
+  if (result.inTmp) copy(aux, aux + n, input);
   delete[] aux;
 }
 
@@ -355,6 +370,12 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
   return std::reduce(first, last, init, f);
 }
 
+template <typename InputIter, typename BinaryOp,
+          typename T = typename std::iterator_traits<InputIter>::value_type>
+T reduce(InputIter first, InputIter last, T init, BinaryOp f) {
+  return reduce(autoPolicy(first, last, 100'000), first, last, init, f);
+}
+
 template <typename InputIter, typename BinaryOp, typename UnaryOp,
           typename T = std::invoke_result_t<
               UnaryOp, typename std::iterator_traits<InputIter>::value_type>>
@@ -364,9 +385,17 @@ T transform_reduce(ExecutionPolicy policy, InputIter first, InputIter last,
                 init, f);
 }
 
+template <typename InputIter, typename BinaryOp, typename UnaryOp,
+          typename T = std::invoke_result_t<
+              UnaryOp, typename std::iterator_traits<InputIter>::value_type>>
+T transform_reduce(InputIter first, InputIter last, T init, BinaryOp f,
+                   UnaryOp g) {
+  return manifold::reduce(TransformIterator(first, g),
+                          TransformIterator(last, g), init, f);
+}
+
 template <typename InputIter, typename OutputIter,
-          typename T = typename std::iterator_traits<InputIter>::value_type,
-          typename Dummy = void>
+          typename T = typename std::iterator_traits<InputIter>::value_type>
 void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
                     OutputIter d_first) {
 #if MANIFOLD_PAR == 'T'
@@ -391,6 +420,12 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
 }
 
 template <typename InputIter, typename OutputIter,
+          typename T = typename std::iterator_traits<InputIter>::value_type>
+void inclusive_scan(InputIter first, InputIter last, OutputIter d_first) {
+  return inclusive_scan(autoPolicy(first, last, 100'000), first, last, d_first);
+}
+
+template <typename InputIter, typename OutputIter,
           typename BinOp = decltype(std::plus<typename std::iterator_traits<
                                         InputIter>::value_type>()),
           typename T = typename std::iterator_traits<InputIter>::value_type>
@@ -409,6 +444,17 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::exclusive_scan(first, last, d_first, init, f);
 }
 
+template <typename InputIter, typename OutputIter,
+          typename BinOp = decltype(std::plus<typename std::iterator_traits<
+                                        InputIter>::value_type>()),
+          typename T = typename std::iterator_traits<InputIter>::value_type>
+void exclusive_scan(InputIter first, InputIter last, OutputIter d_first,
+                    T init = static_cast<T>(0), BinOp f = std::plus<T>(),
+                    T identity = static_cast<T>(0)) {
+  exclusive_scan(autoPolicy(first, last, 100'000), first, last, d_first, init,
+                 f, identity);
+}
+
 template <typename InputIter, typename OutputIter, typename F>
 void transform(ExecutionPolicy policy, InputIter first, InputIter last,
                OutputIter d_first, F f) {
@@ -425,6 +471,11 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
   }
 #endif
   std::transform(first, last, d_first, f);
+}
+
+template <typename InputIter, typename OutputIter, typename F>
+void transform(InputIter first, InputIter last, OutputIter d_first, F f) {
+  transform(autoPolicy(first, last, 100'000), first, last, d_first, f);
 }
 
 template <typename InputIter, typename OutputIter>
@@ -446,9 +497,19 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 }
 
 template <typename InputIter, typename OutputIter>
+void copy(InputIter first, InputIter last, OutputIter d_first) {
+  copy(autoPolicy(first, last, 1'000'000), first, last, d_first);
+}
+
+template <typename InputIter, typename OutputIter>
 void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
             OutputIter d_first) {
   copy(policy, first, first + n, d_first);
+}
+
+template <typename InputIter, typename OutputIter>
+void copy_n(InputIter first, size_t n, OutputIter d_first) {
+  copy(autoPolicy(n, 1'000'000), first, first + n, d_first);
 }
 
 template <typename OutputIter, typename T>
@@ -465,6 +526,11 @@ void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
   std::fill(first, last, value);
 }
 
+template <typename OutputIter, typename T>
+void fill(OutputIter first, OutputIter last, T value) {
+  fill(autoPolicy(first, last, 500'000), first, last, value);
+}
+
 template <typename InputIter, typename P>
 size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
                 P pred) {
@@ -475,6 +541,11 @@ size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
   }
 #endif
   return std::count_if(first, last, pred);
+}
+
+template <typename InputIter, typename P>
+size_t count_if(InputIter first, InputIter last, P pred) {
+  return count_if(autoPolicy(first, last, 10'000), first, last, pred);
 }
 
 template <typename InputIter, typename P>
@@ -496,8 +567,10 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
   return std::all_of(first, last, pred);
 }
 
-#if MANIFOLD_PAR == 'T'
-#endif
+template <typename InputIter, typename P>
+bool all_of(InputIter first, InputIter last, P pred) {
+  return all_of(autoPolicy(first, last, 100'000), first, last, pred);
+}
 
 // note that you should not have alias between input and output...
 // in general it is impossible to check if there is any alias, as the input
@@ -518,6 +591,12 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
   return std::copy_if(first, last, d_first, pred);
 }
 
+template <typename InputIter, typename OutputIter, typename P>
+OutputIter copy_if(InputIter first, InputIter last, OutputIter d_first,
+                   P pred) {
+  return copy_if(autoPolicy(first, last, 10'000), first, last, d_first, pred);
+}
+
 template <typename Iter, typename P,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
@@ -535,6 +614,12 @@ Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
   return std::remove_if(first, last, pred);
 }
 
+template <typename Iter, typename P,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter remove_if(Iter first, Iter last, P pred) {
+  return remove_if(autoPolicy(first, last, 10'000), first, last, pred);
+}
+
 template <typename Iter,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
@@ -550,6 +635,12 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   }
 #endif
   return std::remove(first, last, value);
+}
+
+template <typename Iter,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter remove(Iter first, Iter last, T value) {
+  return remove(autoPolicy(first, last, 10'000), first, last, value);
 }
 
 template <typename Iter,
@@ -584,6 +675,12 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
   return std::unique(first, last);
 }
 
+template <typename Iter,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter unique(Iter first, Iter last) {
+  return unique(autoPolicy(first, last, 10'000), first, last);
+}
+
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
@@ -592,6 +689,12 @@ void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
 #else
   std::stable_sort(first, last);
 #endif
+}
+
+template <typename Iterator,
+          typename T = typename std::iterator_traits<Iterator>::value_type>
+void stable_sort(Iterator first, Iterator last) {
+  stable_sort(autoPolicy(first, last, 10'000), first, last);
 }
 
 template <typename Iterator,
@@ -606,6 +709,13 @@ void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
 #endif
 }
 
+template <typename Iterator,
+          typename T = typename std::iterator_traits<Iterator>::value_type,
+          typename Comp = decltype(std::less<T>())>
+void stable_sort(Iterator first, Iterator last, Comp comp) {
+  stable_sort(autoPolicy(first, last, 10'000), first, last, comp);
+}
+
 template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
@@ -615,6 +725,13 @@ void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
            [first, mapFirst, outputFirst](size_t i) {
              outputFirst[mapFirst[i]] = first[i];
            });
+}
+
+template <typename InputIterator1, typename InputIterator2,
+          typename OutputIterator>
+void scatter(InputIterator1 first, InputIterator1 last, InputIterator2 mapFirst,
+             OutputIterator outputFirst) {
+  scatter(autoPolicy(first, last, 100'000), first, last, mapFirst, outputFirst);
 }
 
 template <typename InputIterator, typename RandomAccessIterator,
@@ -629,11 +746,24 @@ void gather(ExecutionPolicy policy, InputIterator mapFirst,
            });
 }
 
+template <typename InputIterator, typename RandomAccessIterator,
+          typename OutputIterator>
+void gather(InputIterator mapFirst, InputIterator mapLast,
+            RandomAccessIterator inputFirst, OutputIterator outputFirst) {
+  gather(autoPolicy(std::distance(mapFirst, mapLast), 100'000), mapFirst,
+         mapLast, inputFirst, outputFirst);
+}
+
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
   for_each(policy, countAt(0_z),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
+}
+
+template <typename Iterator>
+void sequence(Iterator first, Iterator last) {
+  sequence(autoPolicy(first, last, 100'000), first, last);
 }
 
 }  // namespace manifold

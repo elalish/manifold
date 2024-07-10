@@ -673,39 +673,35 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<int> i03(w03_.size());
   Vec<int> i30(w30_.size());
 
-  transform(autoPolicy(x12_.size()), x12_.begin(), x12_.end(), i12.begin(),
+  transform(x12_.begin(), x12_.end(), i12.begin(),
             [c3](int v) { return c3 * v; });
-  transform(autoPolicy(x21_.size()), x21_.begin(), x21_.end(), i21.begin(),
+  transform(x21_.begin(), x21_.end(), i21.begin(),
             [c3](int v) { return c3 * v; });
-  transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
+  transform(w03_.begin(), w03_.end(), i03.begin(),
             [c1, c3](int v) { return c1 + c3 * v; });
-  transform(autoPolicy(w30_.size()), w30_.begin(), w30_.end(), i30.begin(),
+  transform(w30_.begin(), w30_.end(), i30.begin(),
             [c2, c3](int v) { return c2 + c3 * v; });
 
   Vec<int> vP2R(inP_.NumVert());
-  exclusive_scan(autoPolicy(i03.size()), i03.begin(), i03.end(), vP2R.begin(),
-                 0, AbsSum());
+  exclusive_scan(i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
   int numVertR = AbsSum()(vP2R.back(), i03.back());
   const int nPv = numVertR;
 
   Vec<int> vQ2R(inQ_.NumVert());
-  exclusive_scan(autoPolicy(i30.size()), i30.begin(), i30.end(), vQ2R.begin(),
-                 numVertR, AbsSum());
+  exclusive_scan(i30.begin(), i30.end(), vQ2R.begin(), numVertR, AbsSum());
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
   Vec<int> v12R(v12_.size());
   if (v12_.size() > 0) {
-    exclusive_scan(autoPolicy(i12.size()), i12.begin(), i12.end(), v12R.begin(),
-                   numVertR, AbsSum());
+    exclusive_scan(i12.begin(), i12.end(), v12R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
   const int n12 = numVertR - nPv - nQv;
 
   Vec<int> v21R(v21_.size());
   if (v21_.size() > 0) {
-    exclusive_scan(autoPolicy(i21.size()), i21.begin(), i21.end(), v21R.begin(),
-                   numVertR, AbsSum());
+    exclusive_scan(i21.begin(), i21.end(), v21R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
   const int n21 = numVertR - nPv - nQv - n12;

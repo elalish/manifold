@@ -154,8 +154,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
            });
   group.wait();
   // prefix sum computation (assign unique index to each face) and preallocation
-  exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
-                 triCount.begin(), 0_z);
+  exclusive_scan(triCount.begin(), triCount.end(), triCount.begin(), 0_z);
   triVerts.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
@@ -291,11 +290,9 @@ Polygons Manifold::Impl::Slice(float height) const {
 
 Polygons Manifold::Impl::Project() const {
   const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
-  auto policy = autoPolicy(halfedge_.size());
-
   Vec<Halfedge> cusps(NumEdge());
   cusps.resize(
-      copy_if(policy, halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
+      copy_if(halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
               [&](Halfedge edge) {
                 return faceNormal_[edge.face].z >= 0 &&
                        faceNormal_[halfedge_[edge.pairedHalfedge].face].z < 0;

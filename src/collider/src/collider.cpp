@@ -323,8 +323,8 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
                FindCollisions<T, selfCollision, CountCollisions>{
                    queriesIn, nodeBBox_, internalChildren_, {counts, empty}});
     // compute start index for each query and total count
-    exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
-                   counts.begin(), 0, std::plus<int>());
+    manifold::exclusive_scan(counts.begin(), counts.end(), counts.begin(), 0,
+                             std::plus<int>());
     if (counts.back() == 0) return SparseIndices(0);
     SparseIndices queryTri(counts.back());
     // actually recording collisions
@@ -348,13 +348,12 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
                "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
   auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
-  auto policy = autoPolicy(NumInternal());
-  copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
+  copy(leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
   Vec<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxes
   for_each_n(
-      policy, countAt(0), NumLeaves(),
+      autoPolicy(NumInternal()), countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_, counter, nodeParent_, internalChildren_}));
 }
 

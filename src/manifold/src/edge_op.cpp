@@ -162,7 +162,7 @@ void Manifold::Impl::SimplifyTopology() {
       }
     }
 
-    stable_sort(policy, entries.begin(), entries.end());
+    stable_sort(entries.begin(), entries.end());
     for (size_t i = 0; i < entries.size() - 1; ++i) {
       if (entries[i].start == entries[i + 1].start &&
           entries[i].end == entries[i + 1].end) {
