@@ -7,8 +7,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
-#include <execution>
-#include <iostream>
 #include <random>
 #include <vector>
 
@@ -600,4 +598,3 @@ int main() {
     printf("\n");
   }
 }
-
