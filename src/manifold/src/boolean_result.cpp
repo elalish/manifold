@@ -63,16 +63,20 @@ struct DuplicateVerts {
   }
 };
 
+template <bool atomic>
 struct CountVerts {
   VecView<int> count;
   VecView<const int> inclusion;
 
   void operator()(const Halfedge &edge) {
-    AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
+    if (atomic)
+      AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
+    else
+      count[edge.face] += glm::abs(inclusion[edge.startVert]);
   }
 };
 
-template <const bool inverted>
+template <const bool inverted, const bool atomic>
 struct CountNewVerts {
   VecView<int> countP;
   VecView<int> countQ;
@@ -85,10 +89,17 @@ struct CountNewVerts {
     int faceQ = pq.Get(idx, !inverted);
     int inclusion = glm::abs(i12[idx]);
 
-    AtomicAdd(countQ[faceQ], inclusion);
-    const Halfedge half = halfedges[edgeP];
-    AtomicAdd(countP[half.face], inclusion);
-    AtomicAdd(countP[halfedges[half.pairedHalfedge].face], inclusion);
+    if (atomic) {
+      AtomicAdd(countQ[faceQ], inclusion);
+      const Halfedge half = halfedges[edgeP];
+      AtomicAdd(countP[half.face], inclusion);
+      AtomicAdd(countP[halfedges[half.pairedHalfedge].face], inclusion);
+    } else {
+      countQ[faceQ] += inclusion;
+      const Halfedge half = halfedges[edgeP];
+      countP[half.face] += inclusion;
+      countP[halfedges[half.pairedHalfedge].face] += inclusion;
+    }
   }
 };
 
@@ -104,24 +115,40 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
-  for_each(autoPolicy(inP.halfedge_.size()), inP.halfedge_.begin(),
-           inP.halfedge_.end(), CountVerts({sidesPerFaceP, i03}));
-  for_each(autoPolicy(inP.halfedge_.size()), inQ.halfedge_.begin(),
-           inQ.halfedge_.end(), CountVerts({sidesPerFaceQ, i30}));
+  if (inP.halfedge_.size() >= 100'000) {
+    for_each(ExecutionPolicy::Par, inP.halfedge_.begin(), inP.halfedge_.end(),
+             CountVerts<true>({sidesPerFaceP, i03}));
+    for_each(ExecutionPolicy::Par, inQ.halfedge_.begin(), inQ.halfedge_.end(),
+             CountVerts<true>({sidesPerFaceQ, i30}));
+  } else {
+    for_each(ExecutionPolicy::Seq, inP.halfedge_.begin(), inP.halfedge_.end(),
+             CountVerts<false>({sidesPerFaceP, i03}));
+    for_each(ExecutionPolicy::Seq, inQ.halfedge_.begin(), inQ.halfedge_.end(),
+             CountVerts<false>({sidesPerFaceQ, i30}));
+  }
 
-  for_each_n(autoPolicy(i12.size()), countAt(0), i12.size(),
-             CountNewVerts<false>(
-                 {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-  for_each_n(autoPolicy(i21.size()), countAt(0), i21.size(),
-             CountNewVerts<true>(
-                 {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
+  if (i12.size() >= 100'000) {
+    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(),
+               CountNewVerts<false, true>(
+                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
+    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(),
+               CountNewVerts<true, true>(
+                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
+  } else {
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(),
+               CountNewVerts<false, false>(
+                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(),
+               CountNewVerts<true, false>(
+                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
+  }
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
                                     [](int x) { return x > 0 ? 1 : 0; });
 
-  inclusive_scan(autoPolicy(sidesPerFacePQ.size()), keepFace,
-                 keepFace + sidesPerFacePQ.size(), facePQ2R.begin() + 1);
+  inclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
+                 facePQ2R.begin() + 1);
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
@@ -134,39 +161,33 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   });
 
   auto next =
-      copy_if(autoPolicy(inP.faceNormal_.size()), faceIds,
-              faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+      copy_if(faceIds, faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
               [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
 
-  gather(autoPolicy(inP.faceNormal_.size()), tmpBuffer.begin(), next,
-         inP.faceNormal_.begin(), outR.faceNormal_.begin());
+  gather(tmpBuffer.begin(), next, inP.faceNormal_.begin(),
+         outR.faceNormal_.begin());
 
   auto faceIdsQ =
       TransformIterator(countAt(0_z), [&sidesPerFacePQ, &inP](size_t i) {
         if (sidesPerFacePQ[i + inP.faceNormal_.size()] > 0) return i;
         return std::numeric_limits<size_t>::max();
       });
-  auto end = copy_if(autoPolicy(inQ.faceNormal_.size()), faceIdsQ,
-                     faceIdsQ + inQ.faceNormal_.size(), next, [](size_t v) {
-                       return v != std::numeric_limits<size_t>::max();
-                     });
+  auto end =
+      copy_if(faceIdsQ, faceIdsQ + inQ.faceNormal_.size(), next,
+              [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
 
   if (invertQ) {
-    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
+    gather(next, end,
            TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>()),
            outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   } else {
-    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
-           inQ.faceNormal_.begin(),
+    gather(next, end, inQ.faceNormal_.begin(),
            outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   }
 
-  auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(
-      autoPolicy(sidesPerFacePQ.size()), sidesPerFacePQ.begin(),
-      sidesPerFacePQ.end(), 0);
+  auto newEnd = remove(sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
   Vec<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1, 0);
-  inclusive_scan(autoPolicy(std::distance(sidesPerFacePQ.begin(), newEnd)),
-                 sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
+  inclusive_scan(sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
   return std::make_tuple(faceEdge, facePQ2R);
@@ -487,7 +508,7 @@ void UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
                      const Manifold::Impl &inQ, bool invertQ) {
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(
-      autoPolicy(outR.NumTri()), outR.meshRelation_.triRef.begin(),
+      autoPolicy(outR.NumTri(), 100'000), outR.meshRelation_.triRef.begin(),
       outR.NumTri(),
       MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
 
@@ -541,11 +562,11 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   outR.meshRelation_.numProp = numProp;
   if (numProp == 0) return;
 
-  const int numTri = outR.NumTri();
+  const size_t numTri = outR.NumTri();
   outR.meshRelation_.triProperties.resize(numTri);
 
   Vec<glm::vec3> bary(outR.halfedge_.size());
-  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+  for_each_n(autoPolicy(numTri, 10'000), countAt(0), numTri,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
                           inQ.vertPos_, outR.vertPos_, inP.halfedge_,
                           inQ.halfedge_, outR.halfedge_, outR.precision_}));
@@ -716,14 +737,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(autoPolicy(inP_.NumVert()), countAt(0), inP_.NumVert(),
+  for_each_n(autoPolicy(inP_.NumVert(), 10'000), countAt(0), inP_.NumVert(),
              DuplicateVerts({outR.vertPos_, i03, vP2R, inP_.vertPos_}));
-  for_each_n(autoPolicy(inQ_.NumVert()), countAt(0), inQ_.NumVert(),
+  for_each_n(autoPolicy(inQ_.NumVert(), 10'000), countAt(0), inQ_.NumVert(),
              DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
-  for_each_n(autoPolicy(i12.size()), countAt(0), i12.size(),
+  for_each_n(autoPolicy(i12.size(), 10'000), countAt(0), i12.size(),
              DuplicateVerts({outR.vertPos_, i12, v12R, v12_}));
-  for_each_n(autoPolicy(i21.size()), countAt(0), i21.size(),
+  for_each_n(autoPolicy(i21.size(), 10'000), countAt(0), i21.size(),
              DuplicateVerts({outR.vertPos_, i21, v21R, v21_}));
 
   PRINT(nPv << " verts from inP");

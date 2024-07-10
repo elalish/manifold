@@ -181,7 +181,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](glm::vec3 edge) { return n - 1; });
-  for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
+  for_each_n(autoPolicy(pImpl_->NumVert(), 100'000), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](glm::vec3& v) {
                v = glm::cos(glm::half_pi<float>() * (1.0f - v));
                v = radius * glm::normalize(v);

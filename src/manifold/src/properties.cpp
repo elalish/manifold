@@ -281,7 +281,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
   Vec<float> vertArea(NumVert(), 0);
   Vec<float> degree(NumVert(), 0);
-  auto policy = autoPolicy(NumTri());
+  auto policy = autoPolicy(NumTri(), 10'000);
   for_each(policy, countAt(0_z), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
                             degree, halfedge_, vertPos_, faceNormal_}));

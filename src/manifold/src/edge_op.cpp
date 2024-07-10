@@ -144,7 +144,7 @@ void Manifold::Impl::SimplifyTopology() {
   if (!halfedge_.size()) return;
 
   const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges);
+  auto policy = autoPolicy(nbEdges, 100'000);
   size_t numFlagged = 0;
   Vec<uint8_t> bflags(nbEdges);
 

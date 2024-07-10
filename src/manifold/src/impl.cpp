@@ -534,7 +534,7 @@ Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
 void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
   ZoneScoped;
   Vec<int> vertOld2New(NumVert() + 1, 0);
-  auto policy = autoPolicy(NumVert());
+  auto policy = autoPolicy(NumVert(), 100'000);
   for_each(policy, triVerts.cbegin(), triVerts.cend(),
            MarkVerts({vertOld2New.view(1)}));
 
@@ -566,7 +566,7 @@ void Manifold::Impl::InitializeOriginal() {
   if (meshID < 0) return;
   auto& triRef = meshRelation_.triRef;
   triRef.resize(NumTri());
-  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+  for_each_n(autoPolicy(NumTri(), 100'000), countAt(0), NumTri(),
              [meshID, &triRef](const int tri) {
                triRef[tri] = {meshID, meshID, tri};
              });
@@ -583,7 +583,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   Vec<float> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size()), countAt(0), halfedge_.size(),
+  for_each_n(autoPolicy(halfedge_.size(), 10'000), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
                            meshRelation_.properties, propertyToleranceD,
@@ -606,7 +606,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
     }
   }
 
-  for_each_n(autoPolicy(halfedge_.size()), countAt(0), NumTri(),
+  for_each_n(autoPolicy(halfedge_.size(), 10'000), countAt(0), NumTri(),
              CheckCoplanarity(
                  {comp2tri, halfedge_, vertPos_, &components, precision_}));
 
@@ -624,14 +624,14 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
  */
 void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   ZoneScoped;
-  const int numTri = triVerts.size();
+  const size_t numTri = triVerts.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
   halfedge_.resize(0);
   halfedge_.resize(numHalfedge);
   Vec<uint64_t> edge(numHalfedge);
   Vec<int> ids(numHalfedge);
-  auto policy = autoPolicy(numTri);
+  auto policy = autoPolicy(numTri, 100'000);
   sequence(ids.begin(), ids.end());
   for_each_n(policy, countAt(0), numTri,
              [this, &edge, &triVerts](const int tri) {
@@ -786,7 +786,7 @@ void Manifold::Impl::SetPrecision(float minPrecision) {
 void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
-  auto policy = autoPolicy(NumTri());
+  auto policy = autoPolicy(NumTri(), 10'000);
   fill(vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
@@ -816,8 +816,8 @@ void Manifold::Impl::IncrementMeshIDs() {
     meshRelation_.meshIDtransform[nextMeshID++] = pair.second;
   }
 
-  const int numTri = NumTri();
-  for_each_n(autoPolicy(numTri), meshRelation_.triRef.begin(), numTri,
+  const size_t numTri = NumTri();
+  for_each_n(autoPolicy(numTri, 100'000), meshRelation_.triRef.begin(), numTri,
              UpdateMeshID({meshIDold2new.D()}));
 }
 
@@ -830,10 +830,10 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
                                              bool inverted) const {
   ZoneScoped;
   Vec<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
-  const int numEdge = edges.size();
+  const size_t numEdge = edges.size();
   Vec<Box> QedgeBB(numEdge);
   const auto& vertPos = Q.vertPos_;
-  auto policy = autoPolicy(numEdge);
+  auto policy = autoPolicy(numEdge, 100'000);
   for_each_n(
       policy, countAt(0), numEdge, [&QedgeBB, &edges, &vertPos](const int e) {
         QedgeBB[e] = Box(vertPos[edges[e].first], vertPos[edges[e].second]);

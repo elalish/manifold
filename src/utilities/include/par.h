@@ -44,7 +44,8 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size,
   return ExecutionPolicy::Par;
 }
 
-template <typename Iter>
+template <typename Iter,
+          typename Dummy = std::enable_if_t<!std::is_integral_v<Iter>>>
 inline constexpr ExecutionPolicy autoPolicy(Iter first, Iter last,
                                             size_t threshold = kSeqThreshold) {
   if (static_cast<size_t>(std::distance(first, last)) <= threshold) {
