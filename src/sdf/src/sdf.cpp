@@ -157,10 +157,14 @@ struct ComputeVerts {
     } else if (d1 == 0) {
       return pos1;
     }
-    const float tol2 = tol * tol;
+    const float tol2 = 4 * tol * tol;
     do {
+      const glm::vec3 mid =
+          (pos0 + pos1) * 0.5f;  //(d0 * pos0 - d1 * pos1) / (d0 - d1);
       const glm::vec3 diff = pos0 - pos1;
-      const glm::vec3 mid = (d0 * pos0 - d1 * pos1) / (d0 - d1);
+      if (glm::dot(diff, diff) < tol2) {
+        return mid;
+      }
       const float d = sdf(mid) - level;
       if ((d > 0) == (d0 > 0)) {
         d0 = d;
@@ -168,9 +172,6 @@ struct ComputeVerts {
       } else {
         d1 = d;
         pos1 = mid;
-      }
-      if (glm::dot(diff, diff) < tol2) {
-        return mid;
       }
     } while (1);
   }
@@ -202,9 +203,8 @@ struct ComputeVerts {
       keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] =
-          (val * position - gridVert.distance * Position(neighborIndex)) /
-          (val - gridVert.distance);
+      vertPos[idx] = FindSurface(position, gridVert.distance,
+                                 Position(neighborIndex), val, 0.00001);
       gridVert.edgeVerts[i] = idx;
     }
 

@@ -391,8 +391,8 @@ TEST(Smooth, SDF) {
               3,
               [r](float* newProp, glm::vec3 pos, const float* oldProp) {
                 const float rad = glm::length(pos);
-                const float d = glm::min(0.0f, r - glm::length(pos));
-                const glm::vec3 sphere = d * glm::normalize(pos + 0.0001f);
+                const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
+                const glm::vec3 sphere = 2 * d * pos;
                 const glm::vec3 gyroidGrad(
                     cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
                     cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
@@ -400,7 +400,7 @@ TEST(Smooth, SDF) {
                 const glm::vec3 normal = -glm::normalize(gyroidGrad + sphere);
                 for (const int i : {0, 1, 2}) newProp[i] = normal[i];
               })
-          .SmoothOut(180)
+          .SmoothByNormals(0)
           .RefineToLength(0.1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {

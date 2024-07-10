@@ -114,7 +114,11 @@
     "numbers": "cpp",
     "ranges": "cpp",
     "stop_token": "cpp",
-    "execution": "cpp"
+    "execution": "cpp",
+    "csetjmp": "cpp",
+    "cuchar": "cpp",
+    "propagate_const": "cpp",
+    "scoped_allocator": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,
