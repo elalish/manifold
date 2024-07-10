@@ -163,7 +163,6 @@ struct Hist {
   void prefixSum(int total, bool *canSkip) {
     for (int i = 0; i < k; ++i) {
       size_t count = 0;
-#pragma unroll 4
       for (int j = 0; j < 256; ++j) {
         size_t tmp = hist[i][j];
         hist[i][j] = count;
@@ -588,7 +587,11 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
+#if MANIFOLD_PAR == 'T'
   details::SortFunctor<Iterator, T>()(policy, first, last);
+#else
+  std::stable_sort(first, last);
+#endif
 }
 
 template <typename Iterator,
@@ -596,7 +599,11 @@ template <typename Iterator,
           typename Comp = decltype(std::less<T>())>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
                  Comp comp) {
+#if MANIFOLD_PAR == 'T'
   details::mergeSort(policy, first, last, comp);
+#else
+  std::stable_sort(first, last, comp);
+#endif
 }
 
 template <typename Iter,
