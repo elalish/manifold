@@ -160,7 +160,7 @@ struct Hist {
     for (int i = 0; i < k; ++i)
       for (int j = 0; j < 256; ++j) hist[i][j] += other.hist[i][j];
   }
-  void prefixSum(int total, bool *canSkip) {
+  void prefixSum(N total, bool *canSkip) {
     for (int i = 0; i < k; ++i) {
       size_t count = 0;
       for (int j = 0; j < 256; ++j) {
@@ -309,7 +309,7 @@ struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
 #if MANIFOLD_PAR == 'T'
     if (policy == ExecutionPolicy::Par &&
         static_cast<size_t>(std::distance(first, last)) >= kSeqThreshold) {
-      radix_sort(first, static_cast<size_t>(std::distance(first, last)));
+      radix_sort(&*first, static_cast<size_t>(std::distance(first, last)));
       return;
     }
 #endif
