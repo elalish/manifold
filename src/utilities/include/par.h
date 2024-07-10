@@ -308,7 +308,7 @@ struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
   void operator()(ExecutionPolicy policy, Iterator first, Iterator last) {
 #if MANIFOLD_PAR == 'T'
     if (policy == ExecutionPolicy::Par &&
-        std::distance(first, last) >= kSeqThreshold) {
+        static_cast<size_t>(std::distance(first, last)) >= kSeqThreshold) {
       radix_sort(first, std::distance(first, last));
       return;
     }
