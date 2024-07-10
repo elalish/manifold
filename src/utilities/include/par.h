@@ -22,7 +22,6 @@
 #endif
 #include <algorithm>
 #include <numeric>
-#include <vector>
 
 #include "iters.h"
 #include "public.h"
@@ -307,8 +306,7 @@ template <typename Iterator, typename T>
 struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
   void operator()(ExecutionPolicy policy, Iterator first, Iterator last) {
 #if MANIFOLD_PAR == 'T'
-    if (policy == ExecutionPolicy::Par &&
-        static_cast<size_t>(std::distance(first, last)) >= kSeqThreshold) {
+    if (policy == ExecutionPolicy::Par) {
       radix_sort(&*first, static_cast<size_t>(std::distance(first, last)));
       return;
     }
@@ -351,9 +349,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
     return tbb::parallel_reduce(
         tbb::blocked_range<InputIter>(first, last), init,
         [&f](const tbb::blocked_range<InputIter> &range, T value) {
-          for (InputIter i = range.begin(); i != range.end(); i++)
-            value = f(value, *i);
-          return value;
+          return std::reduce(range.begin(), range.end(), value, f);
         },
         f);
   }
@@ -436,17 +432,7 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
 template <typename InputIter, typename OutputIter>
 void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           OutputIter d_first) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Par) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0_z, static_cast<size_t>(std::distance(first, last))),
-                      [&](const tbb::blocked_range<size_t> &range) {
-                        std::copy(first + range.begin(), first + range.end(),
-                                  d_first + range.begin());
-                      });
-    return;
-  }
-#endif
+  // benchmark show that copy is not that fast...
   std::copy(first, last, d_first);
 }
 
@@ -528,11 +514,13 @@ template <typename Iter, typename P,
 Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
-    std::vector<T> tmp(std::distance(first, last));
-    auto back = copy_if(policy, first, last, tmp.begin(),
-                        [&](T v) { return !pred(v); });
-    copy(policy, tmp.begin(), back, first);
-    return first + std::distance(tmp.begin(), back);
+    T *tmp = new T[std::distance(first, last)];
+    auto back =
+        copy_if(policy, first, last, tmp, [&](T v) { return !pred(v); });
+    copy(policy, tmp, back, first);
+    auto d = std::distance(tmp, back);
+    delete[] tmp;
+    return first + d;
   }
 #endif
   return std::remove_if(first, last, pred);
@@ -543,11 +531,13 @@ template <typename Iter,
 Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
-    std::vector<T> tmp(std::distance(first, last));
-    auto back = copy_if(policy, first, last, tmp.begin(),
-                        [&](T v) { return v != value; });
-    copy(policy, tmp.begin(), back, first);
-    return first + std::distance(tmp.begin(), back);
+    T *tmp = new T[std::distance(first, last)];
+    auto back =
+        copy_if(policy, first, last, tmp, [&](T v) { return v != value; });
+    copy(policy, tmp, back, first);
+    auto d = std::distance(tmp, back);
+    delete[] tmp;
+    return first + d;
   }
 #endif
   return std::remove(first, last, value);
@@ -562,22 +552,23 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
     // cap the maximum buffer size, proved to be beneficial for unique with huge
     // array size
     constexpr size_t MAX_BUFFER_SIZE = 1 << 16;
-    std::vector<T> tmp(std::min(
-        MAX_BUFFER_SIZE, static_cast<size_t>(std::distance(first, last))));
+    T *tmp = new T[std::min(MAX_BUFFER_SIZE,
+                            static_cast<size_t>(std::distance(first, last)))];
     auto pred = [&](size_t i) { return tmp[i] != tmp[i + 1]; };
     do {
       size_t length =
           std::min(MAX_BUFFER_SIZE,
                    static_cast<size_t>(std::distance(newSrcStart, last)));
-      copy(policy, newSrcStart, newSrcStart + length, tmp.begin());
+      copy(policy, newSrcStart, newSrcStart + length, tmp);
       *first = *newSrcStart;
       // this is not a typo, the index i is offset by 1, so to compare an
       // element with its predecessor we need to compare i and i + 1.
-      details::CopyIfScanBody body(pred, tmp.begin() + 1, first + 1);
+      details::CopyIfScanBody body(pred, tmp + 1, first + 1);
       tbb::parallel_scan(tbb::blocked_range<size_t>(0, length - 1), body);
       first += body.get_sum() + 1;
       newSrcStart += length;
     } while (newSrcStart != last);
+    delete[] tmp;
     return first;
   }
 #endif
