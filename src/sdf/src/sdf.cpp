@@ -150,6 +150,31 @@ struct ComputeVerts {
     return d;
   }
 
+  inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1,
+                               float d1, float tol) const {
+    if (d0 == 0) {
+      return pos0;
+    } else if (d1 == 0) {
+      return pos1;
+    }
+    const float tol2 = tol * tol;
+    do {
+      const glm::vec3 diff = pos0 - pos1;
+      const glm::vec3 mid = (d0 * pos0 - d1 * pos1) / (d0 - d1);
+      const float d = sdf(mid) - level;
+      if ((d > 0) == (d0 > 0)) {
+        d0 = d;
+        pos0 = mid;
+      } else {
+        d1 = d;
+        pos1 = mid;
+      }
+      if (glm::dot(diff, diff) < tol2) {
+        return mid;
+      }
+    } while (1);
+  }
+
   inline void operator()(Uint64 mortonCode) {
     ZoneScoped;
     if (gridVerts.Full()) return;
