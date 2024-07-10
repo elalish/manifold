@@ -95,7 +95,11 @@ struct copy {  // 25.7.1
     std::vector<double> v1, v2;
     return measure(
         [&] {
-          v1 = std::vector<double>(size, 42.);
+          std::mt19937 mt{42};
+          std::uniform_real_distribution<double> dist{0., 1.};
+          v1 = std::vector<double>(size);
+          std::generate(std::begin(v1), std::end(v1),
+                        [&dist, &mt] { return dist(mt); });
           v2 = std::vector<double>(size);
         },
         [&] {
