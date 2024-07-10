@@ -562,7 +562,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   outR.meshRelation_.numProp = numProp;
   if (numProp == 0) return;
 
-  const size_t numTri = outR.NumTri();
+  const int numTri = outR.NumTri();
   outR.meshRelation_.triProperties.resize(numTri);
 
   Vec<glm::vec3> bary(outR.halfedge_.size());
