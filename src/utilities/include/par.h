@@ -347,7 +347,8 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
     return tbb::parallel_reduce(
-        tbb::blocked_range<InputIter>(first, last, details::kSeqThreshold), init,
+        tbb::blocked_range<InputIter>(first, last, details::kSeqThreshold),
+        init,
         [&f](const tbb::blocked_range<InputIter> &range, T value) {
           return std::reduce(range.begin(), range.end(), value, f);
         },
@@ -435,7 +436,8 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0_z, static_cast<size_t>(std::distance(first, last)), details::kSeqThreshold),
+                          0_z, static_cast<size_t>(std::distance(first, last)),
+                          details::kSeqThreshold),
                       [&](const tbb::blocked_range<size_t> &range) {
                         std::copy(first + range.begin(), first + range.end(),
                                   d_first + range.begin());
