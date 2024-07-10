@@ -162,7 +162,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
   auto processFace2 = std::bind(
       processFace, [&](size_t face) { return std::move(results[face]); },
-      [&](int face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](size_t face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
         triVerts[triCount[face]] = tri;
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
@@ -178,7 +178,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triRef.reserve(faceEdge.size());
   auto processFace2 = std::bind(
       processFace, generalTriangulation,
-      [&](int _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](size_t _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triRef.push_back(r);
@@ -203,7 +203,8 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           glm::mat3x2 projection) const {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
-    vert_edge.emplace(std::make_pair(edge->startVert, edge - start));
+    vert_edge.emplace(
+        std::make_pair(edge->startVert, static_cast<int>(edge - start)));
   }
 
   PolygonsIdx polys;

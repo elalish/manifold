@@ -191,7 +191,7 @@ bool IsConvex(const PolygonsIdx &polys, float precision) {
  */
 std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
   const size_t numTri = transform_reduce(
-      autoPolicy(polys.size()), polys.begin(), polys.end(), 0,
+      autoPolicy(polys.size()), polys.begin(), polys.end(), 0_z,
       [](size_t a, size_t b) { return a + b; },
       [](const SimplePolygonIdx &poly) { return poly.size() - 2; });
   std::vector<glm::ivec3> triangles;

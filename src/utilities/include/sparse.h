@@ -137,7 +137,7 @@ class SparseIndices {
     DEBUG_ASSERT(S.size() == size(), userErr,
                  "Different number of values than indicies!");
 
-    Vec<int> new2Old(S.size());
+    Vec<size_t> new2Old(S.size());
     auto policy = autoPolicy(S.size());
     sequence(policy, new2Old.begin(), new2Old.end());
 
