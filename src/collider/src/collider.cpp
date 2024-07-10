@@ -372,8 +372,8 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    for_each(autoPolicy(nodeBBox_.size(), 100'000), nodeBBox_.begin(), nodeBBox_.end(),
-             TransformBox({transform}));
+    for_each(autoPolicy(nodeBBox_.size(), 100'000), nodeBBox_.begin(),
+             nodeBBox_.end(), TransformBox({transform}));
   }
   return axisAligned;
 }
