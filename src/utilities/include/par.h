@@ -43,10 +43,9 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   return ExecutionPolicy::Par;
 }
 
-constexpr size_t SEQUENTIAL_LIMIT = 1 << 14;
-
 #if MANIFOLD_PAR == 'T'
 namespace details {
+constexpr size_t kSeqThreshold = 1 << 16;
 // implementation from
 // https://duvanenko.tech.blog/2018/01/14/parallel-merge/
 // https://github.com/DragonSpit/ParallelAlgorithms
@@ -62,7 +61,7 @@ void mergeRec(T *src, T *dest, size_t p1, size_t r1, size_t p2, size_t r2,
     std::swap(length1, length2);
   }
   if (length1 == 0) return;
-  if (length1 + length2 <= SEQUENTIAL_LIMIT) {
+  if (length1 + length2 <= kSeqThreshold) {
     std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
   } else {
     size_t q1 = p1 + length1 / 2;
@@ -79,7 +78,7 @@ void mergeRec(T *src, T *dest, size_t p1, size_t r1, size_t p2, size_t r2,
 template <typename T, typename Comp>
 void mergeSortRec(T *src, T *dest, size_t begin, size_t end, Comp comp) {
   size_t numElements = end - begin;
-  if (numElements <= SEQUENTIAL_LIMIT) {
+  if (numElements <= kSeqThreshold) {
     std::copy(src + begin, src + end, dest + begin);
     std::stable_sort(dest + begin, dest + end, comp);
   } else {
@@ -147,8 +146,6 @@ struct CopyIfScanBody {
   void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
   void assign(CopyIfScanBody &b) { sum = b.sum; }
 };
-
-constexpr size_t kSeqThreshold = 1 << 14;
 
 template <typename N, const int K>
 struct Hist {
@@ -607,42 +604,6 @@ void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
 #else
   std::stable_sort(first, last, comp);
 #endif
-}
-
-template <typename Iter,
-          typename T = typename std::iterator_traits<Iter>::value_type>
-void uninitialized_fill(ExecutionPolicy policy, Iter first, Iter last,
-                        T value) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Par) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0_z, static_cast<size_t>(std::distance(first, last))),
-                      [&](const tbb::blocked_range<size_t> &range) {
-                        std::uninitialized_fill(first + range.begin(),
-                                                first + range.end(), value);
-                      });
-    return;
-  }
-#endif
-  std::uninitialized_fill(first, last, value);
-}
-
-template <typename InputIter, typename OutputIter>
-void uninitialized_copy(ExecutionPolicy policy, InputIter first, InputIter last,
-                        OutputIter d_first) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Par) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0_z, static_cast<size_t>(std::distance(first, last))),
-                      [&](const tbb::blocked_range<size_t> &range) {
-                        std::uninitialized_copy(first + range.begin(),
-                                                first + range.end(),
-                                                d_first + range.begin());
-                      });
-    return;
-  }
-#endif
-  std::uninitialized_copy(first, last, d_first);
 }
 
 template <typename InputIterator1, typename InputIterator2,

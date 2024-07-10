@@ -21,7 +21,6 @@
 #endif
 
 #include "par.h"
-#include "public.h"
 #include "vec_view.h"
 
 namespace manifold {
@@ -63,7 +62,7 @@ class Vec : public VecView<T> {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
-      uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
+      copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
@@ -75,7 +74,7 @@ class Vec : public VecView<T> {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
-      uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
+      copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
@@ -114,7 +113,7 @@ class Vec : public VecView<T> {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
-      uninitialized_copy(policy, other.begin(), other.end(), this->ptr_);
+      copy(policy, other.begin(), other.end(), this->ptr_);
     }
     return *this;
   }
@@ -159,8 +158,8 @@ class Vec : public VecView<T> {
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
-        uninitialized_copy(autoPolicy(this->size_), this->ptr_,
-                           this->ptr_ + this->size_, newBuffer);
+        copy(autoPolicy(this->size_), this->ptr_, this->ptr_ + this->size_,
+             newBuffer);
       if (this->ptr_ != nullptr) {
         TracyFreeS(this->ptr_, 3);
         free(this->ptr_);
@@ -174,8 +173,8 @@ class Vec : public VecView<T> {
     bool shrink = this->size_ > 2 * newSize;
     reserve(newSize);
     if (this->size_ < newSize) {
-      uninitialized_fill(autoPolicy(newSize - this->size_),
-                         this->ptr_ + this->size_, this->ptr_ + newSize, val);
+      fill(autoPolicy(newSize - this->size_), this->ptr_ + this->size_,
+           this->ptr_ + newSize, val);
     }
     this->size_ = newSize;
     if (shrink) shrink_to_fit();
@@ -187,8 +186,8 @@ class Vec : public VecView<T> {
       newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
-      uninitialized_copy(autoPolicy(this->size_), this->ptr_,
-                         this->ptr_ + this->size_, newBuffer);
+      copy(autoPolicy(this->size_), this->ptr_, this->ptr_ + this->size_,
+           newBuffer);
     }
     if (this->ptr_ != nullptr) {
       TracyFreeS(this->ptr_, 3);
