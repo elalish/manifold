@@ -149,7 +149,7 @@ struct CopyIfScanBody {
   void assign(CopyIfScanBody &b) { sum = b.sum; }
 };
 
-constexpr size_t kSeqThreshold = 1 << 18;
+constexpr size_t kSeqThreshold = 1 << 14;
 
 template <typename N, const int K>
 struct Hist {
@@ -309,7 +309,7 @@ struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
 #if MANIFOLD_PAR == 'T'
     if (policy == ExecutionPolicy::Par &&
         static_cast<size_t>(std::distance(first, last)) >= kSeqThreshold) {
-      radix_sort(first, std::distance(first, last));
+      radix_sort(first, static_cast<size_t>(std::distance(first, last)));
       return;
     }
 #endif
