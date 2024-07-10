@@ -164,7 +164,7 @@ struct Hist {
     for (int i = 0; i < k; ++i) {
       size_t count = 0;
       for (int j = 0; j < 256; ++j) {
-        size_t tmp = hist[i][j];
+        N tmp = hist[i][j];
         hist[i][j] = count;
         count += tmp;
         if (tmp == total) canSkip[i] = true;
