@@ -157,15 +157,25 @@ struct ComputeVerts {
     } else if (d1 == 0) {
       return pos1;
     }
-    const float tol2 = 4 * tol * tol;
+
+    float maxStep = glm::length(pos0 - pos1);
+    const float k1 = 0.2 / maxStep;
     do {
-      const glm::vec3 mid =
-          (pos0 + pos1) * 0.5f;  //(d0 * pos0 - d1 * pos1) / (d0 - d1);
-      const glm::vec3 diff = pos0 - pos1;
-      if (glm::dot(diff, diff) < tol2) {
-        return mid;
+      const float l = glm::length(pos0 - pos1);
+      if (l < 2 * tol) {
+        return (pos0 + pos1) * 0.5f;
       }
+
+      const float delta = k1 * l;
+      const float a = d0 / (d0 - d1);
+      const float t =
+          delta > glm::abs(a - 0.5) ? 0.5 : a + delta * (a < 0.5 ? 1 : -1);
+      const float r = maxStep / l - 0.5;
+      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (a < 0.5 ? 1 : -1);
+
+      const glm::vec3 mid = glm::mix(pos0, pos1, x);
       const float d = sdf(mid) - level;
+
       if ((d > 0) == (d0 > 0)) {
         d0 = d;
         pos0 = mid;
@@ -173,6 +183,7 @@ struct ComputeVerts {
         d1 = d;
         pos1 = mid;
       }
+      maxStep /= 2;
     } while (1);
   }
 
