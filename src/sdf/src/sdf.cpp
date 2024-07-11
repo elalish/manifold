@@ -150,6 +150,8 @@ struct ComputeVerts {
     return d;
   }
 
+  // Simplified ITP root finding algorithm - same worst-case performance as
+  // bisection, better average performance.
   inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1,
                                float d1, float tol) const {
     if (d0 == 0) {
@@ -158,20 +160,19 @@ struct ComputeVerts {
       return pos1;
     }
 
+    // Sole tuning parameter, k: (0, 1) - smaller value gets better median
+    // performance, but also hits the worst case more often.
+    const float k = 0.1;
     float maxStep = glm::length(pos0 - pos1);
-    const float k1 = 0.2 / maxStep;
     do {
       const float l = glm::length(pos0 - pos1);
       if (l < 2 * tol) {
         return (pos0 + pos1) * 0.5f;
       }
 
-      const float delta = k1 * l;
-      const float a = d0 / (d0 - d1);
-      const float t =
-          delta > glm::abs(a - 0.5) ? 0.5 : a + delta * (a < 0.5 ? 1 : -1);
+      const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
       const float r = maxStep / l - 0.5;
-      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (a < 0.5 ? 1 : -1);
+      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
       const glm::vec3 mid = glm::mix(pos0, pos1, x);
       const float d = sdf(mid) - level;
