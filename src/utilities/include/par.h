@@ -11,6 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Simple implementation of selected functions in PSTL.
+// Iterators must be RandomAccessIterator.
 
 #pragma once
 #if MANIFOLD_PAR == 'T'
@@ -32,7 +35,7 @@ enum class ExecutionPolicy {
   Seq,
 };
 
-constexpr size_t kSeqThreshold = 10'000;
+constexpr size_t kSeqThreshold = 1e4;
 // ExecutionPolicy:
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
@@ -67,9 +70,9 @@ using manifold::kSeqThreshold;
 // https://duvanenko.tech.blog/2018/01/14/parallel-merge/
 // https://github.com/DragonSpit/ParallelAlgorithms
 // note that the ranges are now [p, r) to fit our convention.
-template <typename T, typename Comp>
-void mergeRec(T *src, T *dest, size_t p1, size_t r1, size_t p2, size_t r2,
-              size_t p3, Comp comp) {
+template <typename SrcIter, typename DestIter, typename Comp>
+void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
+              size_t r2, size_t p3, Comp comp) {
   size_t length1 = r1 - p1;
   size_t length2 = r2 - p2;
   if (length1 < length2) {
@@ -92,8 +95,9 @@ void mergeRec(T *src, T *dest, size_t p1, size_t r1, size_t p2, size_t r2,
   }
 }
 
-template <typename T, typename Comp>
-void mergeSortRec(T *src, T *dest, size_t begin, size_t end, Comp comp) {
+template <typename SrcIter, typename DestIter, typename Comp>
+void mergeSortRec(SrcIter src, DestIter dest, size_t begin, size_t end,
+                  Comp comp) {
   size_t numElements = end - begin;
   if (numElements <= kSeqThreshold) {
     std::copy(src + begin, src + end, dest + begin);
@@ -297,7 +301,7 @@ void mergeSort(ExecutionPolicy policy, Iterator first, Iterator last,
       size_t length = std::distance(first, last);
       T *tmp = new T[length];
       copy(policy, first, last, tmp);
-      details::mergeSortRec(tmp, &*first, 0, length, comp);
+      details::mergeSortRec(tmp, first, 0, length, comp);
       delete[] tmp;
     });
     return;
@@ -306,18 +310,44 @@ void mergeSort(ExecutionPolicy policy, Iterator first, Iterator last,
   std::stable_sort(first, last, comp);
 }
 
+// stable_sort using merge sort.
+//
+// For simpler implementation, we do not support types that are not trivially
+// destructable.
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type,
           typename Dummy = void>
 struct SortFunctor {
   void operator()(ExecutionPolicy policy, Iterator first, Iterator last) {
+    static_assert(
+        std::is_convertible_v<
+            typename std::iterator_traits<Iterator>::iterator_category,
+            std::random_access_iterator_tag>,
+        "You can only parallelize RandomAccessIterator.");
+    static_assert(std::is_trivially_destructible_v<T>,
+                  "Our simple implementation does not support types that are "
+                  "not trivially destructable.");
     return mergeSort(policy, first, last, std::less<T>());
   }
 };
 
+// stable_sort specialized with radix sort for integral types.
+// Typically faster than merge sort.
 template <typename Iterator, typename T>
-struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
+struct SortFunctor<
+    Iterator, T,
+    std::enable_if_t<
+        std::is_integral_v<T> &&
+        std::is_pointer_v<typename std::iterator_traits<Iterator>::pointer>>> {
   void operator()(ExecutionPolicy policy, Iterator first, Iterator last) {
+    static_assert(
+        std::is_convertible_v<
+            typename std::iterator_traits<Iterator>::iterator_category,
+            std::random_access_iterator_tag>,
+        "You can only parallelize RandomAccessIterator.");
+    static_assert(std::is_trivially_destructible_v<T>,
+                  "Our simple implementation does not support types that are "
+                  "not trivially destructable.");
 #if MANIFOLD_PAR == 'T'
     if (policy == ExecutionPolicy::Par) {
       radix_sort(&*first, static_cast<size_t>(std::distance(first, last)));
@@ -332,8 +362,13 @@ struct SortFunctor<Iterator, T, std::enable_if_t<std::is_integral_v<T>>> {
 
 #endif
 
+// Applies the function `f` to each element in the range `[first, last)`
 template <typename Iter, typename F>
 void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<Iter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
@@ -347,15 +382,29 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
   std::for_each(first, last, f);
 }
 
+// Applies the function `f` to each element in the range `[first, last)`
 template <typename Iter, typename F>
 void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<Iter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
   for_each(policy, first, first + n, f);
 }
 
+// Reduce the range `[first, last)` using a binary operation `f` with an initial
+// value `init`.
+//
+// The binary operation should be commutative and associative. Otherwise, the
+// result is non-deterministic.
 template <typename InputIter, typename BinaryOp,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
          BinaryOp f) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
@@ -371,12 +420,23 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
   return std::reduce(first, last, init, f);
 }
 
+// Reduce the range `[first, last)` using a binary operation `f` with an initial
+// value `init`.
+//
+// The binary operation should be commutative and associative. Otherwise, the
+// result is non-deterministic.
 template <typename InputIter, typename BinaryOp,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 T reduce(InputIter first, InputIter last, T init, BinaryOp f) {
   return reduce(autoPolicy(first, last, 100'000), first, last, init, f);
 }
 
+// Transform and reduce the range `[first, last)` by first applying a unary
+// function `g`, and then combining the results using a binary operation `f`
+// with an initial value `init`.
+//
+// The binary operation should be commutative and associative. Otherwise, the
+// result is non-deterministic.
 template <typename InputIter, typename BinaryOp, typename UnaryOp,
           typename T = std::invoke_result_t<
               UnaryOp, typename std::iterator_traits<InputIter>::value_type>>
@@ -386,6 +446,12 @@ T transform_reduce(ExecutionPolicy policy, InputIter first, InputIter last,
                 init, f);
 }
 
+// Transform and reduce the range `[first, last)` by first applying a unary
+// function `g`, and then combining the results using a binary operation `f`
+// with an initial value `init`.
+//
+// The binary operation should be commutative and associative. Otherwise, the
+// result is non-deterministic.
 template <typename InputIter, typename BinaryOp, typename UnaryOp,
           typename T = std::invoke_result_t<
               UnaryOp, typename std::iterator_traits<InputIter>::value_type>>
@@ -395,10 +461,26 @@ T transform_reduce(InputIter first, InputIter last, T init, BinaryOp f,
                           TransformIterator(last, g), init, f);
 }
 
+// Compute the inclusive prefix sum for the range `[first, last)`
+// using the summation operator, and store the result in the range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
                     OutputIter d_first) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_scan(
@@ -420,12 +502,31 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::inclusive_scan(first, last, d_first);
 }
 
+// Compute the inclusive prefix sum for the range `[first, last)` using the
+// summation operator, and store the result in the range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 void inclusive_scan(InputIter first, InputIter last, OutputIter d_first) {
   return inclusive_scan(autoPolicy(first, last, 100'000), first, last, d_first);
 }
 
+// Compute the inclusive prefix sum for the range `[first, last)` using the
+// binary operator `f`, with initial value `init` and
+// identity element `identity`, and store the result in the range
+// starting from `d_first`.
+//
+// This is different from `exclusive_scan` in the sequential algorithm by
+// requiring an identity element. This is needed so that each block can be
+// scanned in parallel and combined later.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter,
           typename BinOp = decltype(std::plus<typename std::iterator_traits<
                                         InputIter>::value_type>()),
@@ -433,6 +534,15 @@ template <typename InputIter, typename OutputIter,
 void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
                     OutputIter d_first, T init = static_cast<T>(0),
                     BinOp f = std::plus<T>(), T identity = static_cast<T>(0)) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     details::ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f,
@@ -445,6 +555,18 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::exclusive_scan(first, last, d_first, init, f);
 }
 
+// Compute the inclusive prefix sum for the range `[first, last)` using the
+// binary operator `f`, with initial value `init` and
+// identity element `identity`, and store the result in the range
+// starting from `d_first`.
+//
+// This is different from `exclusive_scan` in the sequential algorithm by
+// requiring an identity element. This is needed so that each block can be
+// scanned in parallel and combined later.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter,
           typename BinOp = decltype(std::plus<typename std::iterator_traits<
                                         InputIter>::value_type>()),
@@ -452,13 +574,28 @@ template <typename InputIter, typename OutputIter,
 void exclusive_scan(InputIter first, InputIter last, OutputIter d_first,
                     T init = static_cast<T>(0), BinOp f = std::plus<T>(),
                     T identity = static_cast<T>(0)) {
-  exclusive_scan(autoPolicy(first, last, 100'000), first, last, d_first, init,
-                 f, identity);
+  exclusive_scan(autoPolicy(first, last, 1e5), first, last, d_first, init, f,
+                 identity);
 }
 
+// Apply function `f` on the input range `[first, last)` and store the result in
+// the range starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter, typename F>
 void transform(ExecutionPolicy policy, InputIter first, InputIter last,
                OutputIter d_first, F f) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<size_t>(
@@ -474,14 +611,35 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
   std::transform(first, last, d_first, f);
 }
 
+// Apply function `f` on the input range `[first, last)` and store the result in
+// the range starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter, typename F>
 void transform(InputIter first, InputIter last, OutputIter d_first, F f) {
-  transform(autoPolicy(first, last, 100'000), first, last, d_first, f);
+  transform(autoPolicy(first, last, 1e5), first, last, d_first, f);
 }
 
+// Copy the input range `[first, last)` to the output range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter>
 void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           OutputIter d_first) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<size_t>(
@@ -497,24 +655,48 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
   std::copy(first, last, d_first);
 }
 
+// Copy the input range `[first, last)` to the output range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first) {
   copy(autoPolicy(first, last, 1'000'000), first, last, d_first);
 }
 
+// Copy the input range `[first, first + n)` to the output range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter>
 void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
             OutputIter d_first) {
   copy(policy, first, first + n, d_first);
 }
 
+// Copy the input range `[first, first + n)` to the output range
+// starting from `d_first`.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter>
 void copy_n(InputIter first, size_t n, OutputIter d_first) {
-  copy(autoPolicy(n, 1'000'000), first, first + n, d_first);
+  copy(autoPolicy(n, 1e6), first, first + n, d_first);
 }
 
+// Fill the range `[first, last)` with `value`.
 template <typename OutputIter, typename T>
 void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<OutputIter>(first, last),
@@ -527,11 +709,14 @@ void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
   std::fill(first, last, value);
 }
 
+// Fill the range `[first, last)` with `value`.
 template <typename OutputIter, typename T>
 void fill(OutputIter first, OutputIter last, T value) {
-  fill(autoPolicy(first, last, 500'000), first, last, value);
+  fill(autoPolicy(first, last, 5e5), first, last, value);
 }
 
+// Count the number of elements in the input range `[first, last)` satisfying
+// predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
                 P pred) {
@@ -544,13 +729,21 @@ size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
   return std::count_if(first, last, pred);
 }
 
+// Count the number of elements in the input range `[first, last)` satisfying
+// predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 size_t count_if(InputIter first, InputIter last, P pred) {
   return count_if(autoPolicy(first, last, 10'000), first, last, pred);
 }
 
+// Check if all elements in the input range `[first, last)` satisfy
+// predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
@@ -568,18 +761,36 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
   return std::all_of(first, last, pred);
 }
 
+// Check if all elements in the input range `[first, last)` satisfy
+// predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 bool all_of(InputIter first, InputIter last, P pred) {
   return all_of(autoPolicy(first, last, 100'000), first, last, pred);
 }
 
-// note that you should not have alias between input and output...
-// in general it is impossible to check if there is any alias, as the input
-// iterator can be computed on-the-fly depending on the output position and may
-// not have a pointer
+// Copy values in the input range `[first, last)` to the output range
+// starting from `d_first` that satisfies the predicate `pred`,
+// i.e. `pred(x) == true`, and returns `d_first + n` where `n` is the number of
+// times the predicate is evaluated to true.
+//
+// This function is stable, meaning that the relative order of elements in the
+// output range remains unchanged.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter, typename P>
 OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
                    OutputIter d_first, P pred) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<InputIter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(
+      std::is_convertible_v<
+          typename std::iterator_traits<OutputIter>::iterator_category,
+          std::random_access_iterator_tag>,
+      "You can only parallelize RandomAccessIterator.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     auto pred2 = [&](size_t i) { return pred(first[i]); };
@@ -592,15 +803,41 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
   return std::copy_if(first, last, d_first, pred);
 }
 
+// Copy values in the input range `[first, last)` to the output range
+// starting from `d_first` that satisfies the predicate `pred`, i.e. `pred(x) ==
+// true`, and returns `d_first + n` where `n` is the number of times the
+// predicate is evaluated to true.
+//
+// This function is stable, meaning that the relative order of elements in the
+// output range remains unchanged.
+//
+// The input range `[first, last)` and
+// the output range `[d_first, d_first + last - first)`
+// must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter, typename P>
 OutputIter copy_if(InputIter first, InputIter last, OutputIter d_first,
                    P pred) {
-  return copy_if(autoPolicy(first, last, 10'000), first, last, d_first, pred);
+  return copy_if(autoPolicy(first, last, 1e5), first, last, d_first, pred);
 }
 
+// Remove values in the input range `[first, last)` that satisfies
+// the predicate `pred`, i.e. `pred(x) == true`, and returns `first + n`
+// where `n` is the number of times the predicate is evaluated to false.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter, typename P,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<Iter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(std::is_trivially_destructible_v<T>,
+                "Our simple implementation does not support types that are "
+                "not trivially destructable.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
@@ -615,15 +852,39 @@ Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
   return std::remove_if(first, last, pred);
 }
 
+// Remove values in the input range `[first, last)` that satisfies
+// the predicate `pred`, i.e. `pred(x) == true`, and
+// returns `first + n` where `n` is the number of times the predicate is
+// evaluated to false.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter, typename P,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove_if(Iter first, Iter last, P pred) {
-  return remove_if(autoPolicy(first, last, 10'000), first, last, pred);
+  return remove_if(autoPolicy(first, last, 1e4), first, last, pred);
 }
 
+// Remove values in the input range `[first, last)` that are equal to `value`.
+// Returns `first + n` where `n` is the number of values
+// that are not equal to `value`.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<Iter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(std::is_trivially_destructible_v<T>,
+                "Our simple implementation does not support types that are "
+                "not trivially destructable.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
@@ -638,15 +899,39 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   return std::remove(first, last, value);
 }
 
+// Remove values in the input range `[first, last)` that are equal to `value`.
+// Returns `first + n` where `n` is the number of values
+// that are not equal to `value`.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter remove(Iter first, Iter last, T value) {
-  return remove(autoPolicy(first, last, 10'000), first, last, value);
+  return remove(autoPolicy(first, last, 1e4), first, last, value);
 }
 
+// For each group of consecutive elements in the range `[first, last)` with the
+// same value, unique removes all but the first element of the group. The return
+// value is an iterator `new_last` such that no two consecutive elements in the
+// range `[first, new_last)` are equal.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
+  static_assert(std::is_convertible_v<
+                    typename std::iterator_traits<Iter>::iterator_category,
+                    std::random_access_iterator_tag>,
+                "You can only parallelize RandomAccessIterator.");
+  static_assert(std::is_trivially_destructible_v<T>,
+                "Our simple implementation does not support types that are "
+                "not trivially destructable.");
 #if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Par && first != last) {
     Iter newSrcStart = first;
@@ -676,12 +961,27 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
   return std::unique(first, last);
 }
 
+// For each group of consecutive elements in the range `[first, last)` with the
+// same value, unique removes all but the first element of the group. The return
+// value is an iterator `new_last` such that no two consecutive elements in the
+// range `[first, new_last)` are equal.
+//
+// This function is stable, meaning that the relative order of elements that
+// remained are unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iter,
           typename T = typename std::iterator_traits<Iter>::value_type>
 Iter unique(Iter first, Iter last) {
-  return unique(autoPolicy(first, last, 10'000), first, last);
+  return unique(autoPolicy(first, last, 1e4), first, last);
 }
 
+// Sort the input range `[first, last)` in ascending order.
+//
+// This function is stable, meaning that the relative order of elements that are
+// incomparable remains unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
@@ -692,12 +992,25 @@ void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
 #endif
 }
 
+// Sort the input range `[first, last)` in ascending order.
+//
+// This function is stable, meaning that the relative order of elements that are
+// incomparable remains unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(Iterator first, Iterator last) {
-  stable_sort(autoPolicy(first, last, 10'000), first, last);
+  stable_sort(autoPolicy(first, last, 1e4), first, last);
 }
 
+// Sort the input range `[first, last)` in ascending order using the comparison
+// function `comp`.
+//
+// This function is stable, meaning that the relative order of elements that are
+// incomparable remains unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type,
           typename Comp = decltype(std::less<T>())>
@@ -710,13 +1023,27 @@ void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
 #endif
 }
 
+// Sort the input range `[first, last)` in ascending order using the comparison
+// function `comp`.
+//
+// This function is stable, meaning that the relative order of elements that are
+// incomparable remains unchanged.
+//
+// Only trivially destructable types are supported.
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type,
           typename Comp = decltype(std::less<T>())>
 void stable_sort(Iterator first, Iterator last, Comp comp) {
-  stable_sort(autoPolicy(first, last, 10'000), first, last, comp);
+  stable_sort(autoPolicy(first, last, 1e4), first, last, comp);
 }
 
+// `scatter` copies elements from a source range into an output array according
+// to a map. For each iterator `i` in the range `[first, last)`, the value `*i`
+// is assigned to `outputFirst[mapFirst[i - first]]`.  If the same index appears
+// more than once in the range `[mapFirst, mapFirst + (last - first))`, the
+// result is undefined.
+//
+// The map range, input range and the output range must not overlap.
 template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
@@ -728,13 +1055,26 @@ void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
            });
 }
 
+// `scatter` copies elements from a source range into an output array according
+// to a map. For each iterator `i` in the range `[first, last)`, the value `*i`
+// is assigned to `outputFirst[mapFirst[i - first]]`. If the same index appears
+// more than once in the range `[mapFirst, mapFirst + (last - first))`,
+// the result is undefined.
+//
+// The map range, input range and the output range must not overlap.
 template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(InputIterator1 first, InputIterator1 last, InputIterator2 mapFirst,
              OutputIterator outputFirst) {
-  scatter(autoPolicy(first, last, 100'000), first, last, mapFirst, outputFirst);
+  scatter(autoPolicy(first, last, 1e5), first, last, mapFirst, outputFirst);
 }
 
+// `gather` copies elements from a source array into a destination range
+// according to a map. For each input iterator `i`
+// in the range `[mapFirst, mapLast)`, the value `inputFirst[*i]`
+// is assigned to `outputFirst[i - map_first]`.
+//
+// The map range, input range and the output range must not overlap.
 template <typename InputIterator, typename RandomAccessIterator,
           typename OutputIterator>
 void gather(ExecutionPolicy policy, InputIterator mapFirst,
@@ -747,14 +1087,21 @@ void gather(ExecutionPolicy policy, InputIterator mapFirst,
            });
 }
 
+// `gather` copies elements from a source array into a destination range
+// according to a map. For each input iterator `i`
+// in the range `[mapFirst, mapLast)`, the value `inputFirst[*i]`
+// is assigned to `outputFirst[i - map_first]`.
+//
+// The map range, input range and the output range must not overlap.
 template <typename InputIterator, typename RandomAccessIterator,
           typename OutputIterator>
 void gather(InputIterator mapFirst, InputIterator mapLast,
             RandomAccessIterator inputFirst, OutputIterator outputFirst) {
-  gather(autoPolicy(std::distance(mapFirst, mapLast), 100'000), mapFirst,
-         mapLast, inputFirst, outputFirst);
+  gather(autoPolicy(std::distance(mapFirst, mapLast), 1e5), mapFirst, mapLast,
+         inputFirst, outputFirst);
 }
 
+// Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
   for_each(policy, countAt(0_z),
@@ -762,9 +1109,10 @@ void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
            [first](size_t i) { first[i] = i; });
 }
 
+// Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(Iterator first, Iterator last) {
-  sequence(autoPolicy(first, last, 100'000), first, last);
+  sequence(autoPolicy(first, last, 1e5), first, last);
 }
 
 }  // namespace manifold
