@@ -428,7 +428,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
 template <typename InputIter, typename BinaryOp,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 T reduce(InputIter first, InputIter last, T init, BinaryOp f) {
-  return reduce(autoPolicy(first, last, 100'000), first, last, init, f);
+  return reduce(autoPolicy(first, last, 1e5), first, last, init, f);
 }
 
 // Transform and reduce the range `[first, last)` by first applying a unary
@@ -512,7 +512,7 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
 template <typename InputIter, typename OutputIter,
           typename T = typename std::iterator_traits<InputIter>::value_type>
 void inclusive_scan(InputIter first, InputIter last, OutputIter d_first) {
-  return inclusive_scan(autoPolicy(first, last, 100'000), first, last, d_first);
+  return inclusive_scan(autoPolicy(first, last, 1e5), first, last, d_first);
 }
 
 // Compute the inclusive prefix sum for the range `[first, last)` using the
@@ -663,7 +663,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 // must be equal or non-overlapping.
 template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first) {
-  copy(autoPolicy(first, last, 1'000'000), first, last, d_first);
+  copy(autoPolicy(first, last, 1e6), first, last, d_first);
 }
 
 // Copy the input range `[first, first + n)` to the output range
@@ -733,7 +733,7 @@ size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
 // predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 size_t count_if(InputIter first, InputIter last, P pred) {
-  return count_if(autoPolicy(first, last, 10'000), first, last, pred);
+  return count_if(autoPolicy(first, last, 1e4), first, last, pred);
 }
 
 // Check if all elements in the input range `[first, last)` satisfy
@@ -765,7 +765,7 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
 // predicate `pred`, i.e. `pred(x) == true`.
 template <typename InputIter, typename P>
 bool all_of(InputIter first, InputIter last, P pred) {
-  return all_of(autoPolicy(first, last, 100'000), first, last, pred);
+  return all_of(autoPolicy(first, last, 1e5), first, last, pred);
 }
 
 // Copy values in the input range `[first, last)` to the output range

@@ -493,7 +493,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   const int numEdge = edges.size();
   const int numTri = NumTri();
   Vec<int> half2Edge(2 * numEdge);
-  auto policy = autoPolicy(numEdge, 1'000);
+  auto policy = autoPolicy(numEdge, 1e4);
   for_each_n(policy, countAt(0), numEdge,
              [&half2Edge, &edges, this](const int edge) {
                const int idx = edges[edge].halfedgeIdx;

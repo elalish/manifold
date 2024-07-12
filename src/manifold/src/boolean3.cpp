@@ -93,9 +93,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   ZoneScoped;
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(autoPolicy(p1q2.size(), 100'000), countAt(0_z), p1q2.size(),
+  for_each_n(autoPolicy(p1q2.size(), 1e5), countAt(0_z), p1q2.size(),
              CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_, 0_z}));
-  for_each_n(autoPolicy(p2q1.size(), 100'000), countAt(0_z), p2q1.size(),
+  for_each_n(autoPolicy(p2q1.size(), 1e5), countAt(0_z), p2q1.size(),
              CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_, p1q2.size()}));
   p1q1.Unique();
   return p1q1;
@@ -263,7 +263,7 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
   Vec<int> s11(p1q1.size());
   Vec<glm::vec4> xyzz11(p1q1.size());
 
-  for_each_n(autoPolicy(p1q1.size(), 10'000), countAt(0_z), p1q1.size(),
+  for_each_n(autoPolicy(p1q1.size(), 1e4), countAt(0_z), p1q1.size(),
              Kernel11({xyzz11, s11, inP.vertPos_, inQ.vertPos_, inP.halfedge_,
                        inQ.halfedge_, expandP, inP.vertNormal_, p1q1}));
 
@@ -355,7 +355,7 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
   Vec<float> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
-  for_each_n(autoPolicy(p0q2.size(), 10'000), countAt(0_z), p0q2.size(),
+  for_each_n(autoPolicy(p0q2.size(), 1e4), countAt(0_z), p0q2.size(),
              Kernel02({s02, z02, inP.vertPos_, inQ.halfedge_, inQ.vertPos_,
                        expandP, vertNormalP, p0q2, forward}));
 
@@ -463,7 +463,7 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   Vec<glm::vec3> v12(p1q2.size());
 
   for_each_n(
-      autoPolicy(p1q2.size(), 10'000), countAt(0_z), p1q2.size(),
+      autoPolicy(p1q2.size(), 1e4), countAt(0_z), p1q2.size(),
       Kernel12({x12, v12, p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
                 inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
 
@@ -477,7 +477,7 @@ Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
-  if (vertices.size() <= 100'000) {
+  if (vertices.size() <= 1e5) {
     for_each_n(ExecutionPolicy::Seq, countAt(0), s02.size(),
                [&w03, &vertices, &s02, reverse](const int i) {
                  w03[vertices[i]] += s02[i] * (reverse ? -1 : 1);

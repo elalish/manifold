@@ -290,7 +290,7 @@ Collider::Collider(const VecView<const Box>& leafBB,
   nodeParent_.resize(num_nodes, -1);
   internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
   // organize tree
-  for_each_n(autoPolicy(NumInternal(), 10'000), countAt(0), NumInternal(),
+  for_each_n(autoPolicy(NumInternal(), 1e4), countAt(0), NumInternal(),
              CreateRadixTree({nodeParent_, internalChildren_, leafMorton}));
   UpdateBoxes(leafBB);
 }
@@ -353,7 +353,7 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   Vec<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxes
   for_each_n(
-      autoPolicy(NumInternal(), 1'000), countAt(0), NumLeaves(),
+      autoPolicy(NumInternal(), 1e3), countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_, counter, nodeParent_, internalChildren_}));
 }
 
@@ -372,7 +372,7 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    for_each(autoPolicy(nodeBBox_.size(), 100'000), nodeBBox_.begin(),
+    for_each(autoPolicy(nodeBBox_.size(), 1e5), nodeBBox_.begin(),
              nodeBBox_.end(), TransformBox({transform}));
   }
   return axisAligned;
