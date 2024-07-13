@@ -128,7 +128,7 @@ struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
   VecView<const glm::vec3> vertPos;
 
-  bool operator()(size_t edge) {
+  bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
@@ -149,7 +149,7 @@ struct CheckHalfedges {
 struct NoDuplicates {
   VecView<const Halfedge> halfedges;
 
-  bool operator()(size_t edge) {
+  bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
         halfedge.pairedHalfedge == -1)
@@ -165,7 +165,7 @@ struct CheckCCW {
   VecView<const glm::vec3> triNormal;
   const float tol;
 
-  bool operator()(size_t face) {
+  bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
@@ -211,9 +211,7 @@ namespace manifold {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  auto policy = autoPolicy(halfedge_.size());
-
-  return all_of(policy, countAt(0_z), countAt(halfedge_.size()),
+  return all_of(countAt(0_z), countAt(halfedge_.size()),
                 CheckHalfedges({halfedge_, vertPos_}));
 }
 
@@ -223,14 +221,12 @@ bool Manifold::Impl::IsManifold() const {
  */
 bool Manifold::Impl::Is2Manifold() const {
   if (halfedge_.size() == 0) return true;
-  auto policy = autoPolicy(halfedge_.size());
-
   if (!IsManifold()) return false;
 
   Vec<Halfedge> halfedge(halfedge_);
-  stable_sort(policy, halfedge.begin(), halfedge.end());
+  stable_sort(halfedge.begin(), halfedge.end());
 
-  return all_of(policy, countAt(0_z), countAt(2 * NumEdge() - 1),
+  return all_of(countAt(0_z), countAt(2 * NumEdge() - 1),
                 NoDuplicates({halfedge}));
 }
 
@@ -239,7 +235,7 @@ bool Manifold::Impl::Is2Manifold() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(autoPolicy(NumTri()), countAt(0_z), countAt(NumTri()),
+  return all_of(countAt(0_z), countAt(NumTri()),
                 CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
 }
 
@@ -249,7 +245,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(
-      autoPolicy(NumTri()), countAt(0_z), countAt(NumTri()),
+      countAt(0_z), countAt(NumTri()),
       CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
 }
 
@@ -285,7 +281,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
   Vec<float> vertArea(NumVert(), 0);
   Vec<float> degree(NumVert(), 0);
-  auto policy = autoPolicy(NumTri());
+  auto policy = autoPolicy(NumTri(), 1e4);
   for_each(policy, countAt(0_z), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
                             degree, halfedge_, vertPos_, faceNormal_}));
@@ -323,21 +319,20 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
  * range for Morton code calculation. Ignores NaNs.
  */
 void Manifold::Impl::CalculateBBox() {
-  auto policy = autoPolicy(NumVert());
-  bBox_.min = reduce<glm::vec3>(
-      policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
-        if (isnan(a.x)) return b;
-        if (isnan(b.x)) return a;
-        return glm::min(a, b);
-      });
-  bBox_.max = reduce<glm::vec3>(
-      policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
-        if (isnan(a.x)) return b;
-        if (isnan(b.x)) return a;
-        return glm::max(a, b);
-      });
+  bBox_.min = reduce(vertPos_.begin(), vertPos_.end(),
+                     glm::vec3(std::numeric_limits<float>::infinity()),
+                     [](auto a, auto b) {
+                       if (isnan(a.x)) return b;
+                       if (isnan(b.x)) return a;
+                       return glm::min(a, b);
+                     });
+  bBox_.max = reduce(vertPos_.begin(), vertPos_.end(),
+                     glm::vec3(-std::numeric_limits<float>::infinity()),
+                     [](auto a, auto b) {
+                       if (isnan(a.x)) return b;
+                       if (isnan(b.x)) return a;
+                       return glm::max(a, b);
+                     });
 }
 
 /**
@@ -345,9 +340,8 @@ void Manifold::Impl::CalculateBBox() {
  * is insufficient as it ignores NaNs.
  */
 bool Manifold::Impl::IsFinite() const {
-  auto policy = autoPolicy(NumVert());
-  return transform_reduce<bool>(
-      policy, vertPos_.begin(), vertPos_.end(), true,
+  return transform_reduce(
+      vertPos_.begin(), vertPos_.end(), true,
       [](bool a, bool b) { return a && b; },
       [](auto v) { return glm::all(glm::isfinite(v)); });
 }
@@ -357,9 +351,8 @@ bool Manifold::Impl::IsFinite() const {
  * vertPos_ array.
  */
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
-  auto policy = autoPolicy(triVerts.size());
-  glm::ivec2 minmax = transform_reduce<glm::ivec2>(
-      policy, triVerts.begin(), triVerts.end(),
+  glm::ivec2 minmax = transform_reduce(
+      triVerts.begin(), triVerts.end(),
       glm::ivec2(std::numeric_limits<int>::max(),
                  std::numeric_limits<int>::min()),
       [](auto a, auto b) {
@@ -387,8 +380,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
 
-  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
-            faceBoxOther.end(), faceBoxOther.begin(),
+  transform(faceBoxOther.begin(), faceBoxOther.end(), faceBoxOther.begin(),
             [searchLength](const Box& box) {
               return Box(box.min - glm::vec3(searchLength),
                          box.max + glm::vec3(searchLength));
@@ -396,9 +388,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
-  float minDistanceSquared = transform_reduce<float>(
-      autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
-      searchLength * searchLength,
+  float minDistanceSquared = transform_reduce(
+      countAt(0_z), countAt(collisions.size()), searchLength * searchLength,
       [](float a, float b) { return std::min(a, b); },
       [&collisions, this, &other](int i) {
         const int tri = collisions.Get(i, 1);

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <atomic>
-#include <numeric>
 #include <set>
 
 #include "impl.h"
@@ -25,7 +24,7 @@ using namespace manifold;
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
 struct Extrema {
-  void MakeForward(Halfedge& a) {
+  void MakeForward(Halfedge& a) const {
     if (!a.IsForward()) {
       int tmp = a.startVert;
       a.startVert = a.endVert;
@@ -33,11 +32,11 @@ struct Extrema {
     }
   }
 
-  int MaxOrMinus(int a, int b) {
+  int MaxOrMinus(int a, int b) const {
     return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
   }
 
-  Halfedge operator()(Halfedge a, Halfedge b) {
+  Halfedge operator()(Halfedge a, Halfedge b) const {
     MakeForward(a);
     MakeForward(b);
     a.startVert = glm::min(a.startVert, b.startVert);
@@ -145,8 +144,7 @@ void Manifold::Impl::Finish() {
 
 #ifdef MANIFOLD_DEBUG
   Halfedge extrema = {0, 0, 0, 0};
-  extrema = reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(),
-                             halfedge_.end(), extrema, Extrema());
+  extrema = reduce(halfedge_.begin(), halfedge_.end(), extrema, Extrema());
 #endif
 
   DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
@@ -187,15 +185,15 @@ void Manifold::Impl::SortVerts() {
   ZoneScoped;
   const auto numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
-  auto policy = autoPolicy(numVert);
+  auto policy = autoPolicy(numVert, 1e5);
   for_each_n(policy, countAt(0), numVert, [this, &vertMorton](const int vert) {
     vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
   });
 
   Vec<int> vertNew2Old(numVert);
-  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+  sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
               [&vertMorton](const int& a, const int& b) {
                 return vertMorton[a] < vertMorton[b];
               });
@@ -204,11 +202,10 @@ void Manifold::Impl::SortVerts() {
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const int newNumVert = find_if<decltype(vertNew2Old.begin())>(
-                             policy, vertNew2Old.begin(), vertNew2Old.end(),
-                             [&vertMorton](const int vert) {
-                               return vertMorton[vert] == kNoCode;
-                             }) -
+  const int newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
+                                      [&vertMorton](const int vert) {
+                                        return vertMorton[vert] == kNoCode;
+                                      }) -
                          vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
@@ -227,10 +224,9 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
-  scatter(autoPolicy(oldNumVert), countAt(0),
-          countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
+  scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
-  for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
+  for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(),
            Reindex({vertOld2New}));
 }
 
@@ -243,12 +239,12 @@ void Manifold::Impl::CompactProps() {
 
   const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
   Vec<int> keep(numVerts, 0);
-  auto policy = autoPolicy(numVerts);
+  auto policy = autoPolicy(numVerts, 1e5);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
            meshRelation_.triProperties.cend(), MarkProp({keep}));
   Vec<int> propOld2New(numVerts + 1, 0);
-  inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
+  inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
   Vec<float> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
@@ -278,7 +274,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
   ZoneScoped;
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
-  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [this, &faceBox, &faceMorton](const int face) {
                // Removed tris are marked by all halfedges having pairedHalfedge
                // = -1, and this will sort them to the end (the Morton code only
@@ -309,21 +305,19 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
 void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   ZoneScoped;
   Vec<int> faceNew2Old(NumTri());
-  auto policy = autoPolicy(faceNew2Old.size());
-  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
+  sequence(faceNew2Old.begin(), faceNew2Old.end());
 
-  stable_sort(policy, faceNew2Old.begin(), faceNew2Old.end(),
+  stable_sort(faceNew2Old.begin(), faceNew2Old.end(),
               [&faceMorton](const int& a, const int& b) {
                 return faceMorton[a] < faceMorton[b];
               });
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
-  const int newNumTri = find_if<decltype(faceNew2Old.begin())>(
-                            policy, faceNew2Old.begin(), faceNew2Old.end(),
-                            [&faceMorton](const int face) {
-                              return faceMorton[face] == kNoCode;
-                            }) -
+  const int newNumTri = std::find_if(faceNew2Old.begin(), faceNew2Old.end(),
+                                     [&faceMorton](const int face) {
+                                       return faceMorton[face] == kNoCode;
+                                     }) -
                         faceNew2Old.begin();
   faceNew2Old.resize(newNumTri);
 
@@ -349,8 +343,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
   Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
-  auto policy = autoPolicy(numTri);
-  scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
+  auto policy = autoPolicy(numTri, 1e5);
+  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -363,10 +357,9 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   ZoneScoped;
   const int numTri = faceNew2Old.size();
-  auto policy = autoPolicy(numTri);
 
   meshRelation_.triRef.resize(numTri);
-  gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+  gather(faceNew2Old.begin(), faceNew2Old.end(),
          old.meshRelation_.triRef.begin(), meshRelation_.triRef.begin());
 
   for (const auto& pair : old.meshRelation_.meshIDtransform) {
@@ -375,7 +368,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   if (old.meshRelation_.triProperties.size() > 0) {
     meshRelation_.triProperties.resize(numTri);
-    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+    gather(faceNew2Old.begin(), faceNew2Old.end(),
            old.meshRelation_.triProperties.begin(),
            meshRelation_.triProperties.begin());
     meshRelation_.numProp = old.meshRelation_.numProp;
@@ -384,17 +377,17 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
-    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-           old.faceNormal_.begin(), faceNormal_.begin());
+    gather(faceNew2Old.begin(), faceNew2Old.end(), old.faceNormal_.begin(),
+           faceNormal_.begin());
   }
 
   Vec<int> faceOld2New(old.NumTri());
-  scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
   if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(policy, countAt(0), numTri,
+  for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri,
              ReindexFace({halfedge_, halfedgeTangent_, old.halfedge_,
                           old.halfedgeTangent_, faceNew2Old, faceOld2New}));
 }
@@ -474,8 +467,8 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = transform_reduce<std::pair<float, float>>(
-        autoPolicy(numVert), iPos.begin(), iPos.end(),
+    auto minMax = manifold::transform_reduce(
+        iPos.begin(), iPos.end(),
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),
         [](auto a, auto b) {
@@ -489,7 +482,7 @@ bool MeshGL::Merge() {
   precision = MaxPrecision(precision, bBox);
   if (precision < 0) return false;
 
-  auto policy = autoPolicy(numOpenVert);
+  auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
@@ -508,9 +501,9 @@ bool MeshGL::Merge() {
              });
 
   Vec<int> vertNew2Old(numOpenVert);
-  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+  sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
               [&vertMorton](const int& a, const int& b) {
                 return vertMorton[a] < vertMorton[b];
               });

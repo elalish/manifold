@@ -17,7 +17,6 @@
 #include <atomic>
 
 #include "public.h"
-#include "utils.h"
 #include "vec.h"
 
 namespace {
@@ -132,10 +131,9 @@ class HashTable {
         step_(step) {}
 
   HashTable(const HashTable& other)
-      : keys_(other.keys_),
-        values_(other.values_),
-        used_(other.used_),
-        step_(other.step_) {}
+      : keys_(other.keys_), values_(other.values_), step_(other.step_) {
+    used_.store(other.used_.load());
+  }
 
   HashTable& operator=(const HashTable& other) {
     if (this == &other) return *this;

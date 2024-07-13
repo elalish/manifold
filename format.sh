@@ -2,7 +2,7 @@
 
 shopt -s extglob
 if [ -z "$CLANG_FORMAT" ]; then
-CLANG_FORMAT=$(dirname $(which clang-11))/clang-format
+CLANG_FORMAT=clang-format
 fi
 
 $CLANG_FORMAT -i extras/*.cpp

@@ -73,12 +73,18 @@ inline int Prev3(int i) {
   return prev3[i];
 }
 
-template <typename T>
-void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
+template <typename T, typename T1>
+void Permute(Vec<T>& inOut, const Vec<T1>& new2Old) {
   Vec<T> tmp(std::move(inOut));
   inOut.resize(new2Old.size());
-  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
-         tmp.begin(), inOut.begin());
+  gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
+}
+
+template <typename T, typename T1>
+void Permute(std::vector<T>& inOut, const Vec<T1>& new2Old) {
+  std::vector<T> tmp(std::move(inOut));
+  inOut.resize(new2Old.size());
+  gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
 }
 
 template <typename T>
@@ -137,7 +143,7 @@ struct UnionFind {
   Vec<R> ranks;
 
   UnionFind(I numNodes) : parents(numNodes), ranks(numNodes, 0) {
-    sequence(autoPolicy(numNodes), parents.begin(), parents.end());
+    sequence(parents.begin(), parents.end());
   }
 
   I find(I x) {

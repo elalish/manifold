@@ -18,25 +18,6 @@
 
 namespace manifold {
 
-template <typename Iter, typename = void>
-struct InnerIter {
-  using pointer = typename std::iterator_traits<Iter>::pointer;
-  using reference = typename std::iterator_traits<Iter>::reference;
-  using difference_type = typename std::iterator_traits<Iter>::difference_type;
-  using value_type = typename std::iterator_traits<Iter>::value_type;
-  using iterator_category =
-      typename std::iterator_traits<Iter>::iterator_category;
-};
-
-template <typename Iter>
-struct InnerIter<Iter, typename std::enable_if_t<std::is_pointer_v<Iter>>> {
-  using pointer = Iter;
-  using reference = std::remove_pointer_t<Iter>&;
-  using difference_type = std::ptrdiff_t;
-  using value_type = std::remove_pointer_t<Iter>;
-  using iterator_category = std::random_access_iterator_tag;
-};
-
 template <typename F, typename Iter>
 struct TransformIterator {
  private:
@@ -45,12 +26,13 @@ struct TransformIterator {
 
  public:
   using pointer = void;
-  using reference =
-      std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
-  using difference_type = typename InnerIter<Iter>::difference_type;
-  using value_type =
-      std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
-  using iterator_category = typename InnerIter<Iter>::iterator_category;
+  using reference = std::invoke_result_t<
+      F, typename std::iterator_traits<std::remove_const_t<Iter>>::value_type>;
+  using difference_type =
+      typename std::iterator_traits<std::remove_const_t<Iter>>::difference_type;
+  using value_type = reference;
+  using iterator_category = typename std::iterator_traits<
+      std::remove_const_t<Iter>>::iterator_category;
 
   TransformIterator(Iter iter, F f) : iter(iter), f(f) {}
 
@@ -61,9 +43,9 @@ struct TransformIterator {
     return *this;
   }
 
-  value_type operator*() const { return f(*iter); }
+  reference operator*() const { return f(*iter); }
 
-  value_type operator[](size_t i) const { return f(iter[i]); }
+  reference operator[](size_t i) const { return f(iter[i]); }
 
   // prefix increment
   TransformIterator& operator++() {
@@ -222,21 +204,28 @@ struct StridedRange {
     size_t stride;
 
    public:
-    using pointer = typename InnerIter<Iter>::pointer;
-    using reference = typename InnerIter<Iter>::reference;
-    using difference_type = typename InnerIter<Iter>::difference_type;
-    using value_type = typename InnerIter<Iter>::value_type;
-    using iterator_category = typename InnerIter<Iter>::iterator_category;
+    using pointer =
+        typename std::iterator_traits<std::remove_const_t<Iter>>::pointer;
+    using reference =
+        typename std::iterator_traits<std::remove_const_t<Iter>>::reference;
+    using difference_type = typename std::iterator_traits<
+        std::remove_const_t<Iter>>::difference_type;
+    using value_type =
+        typename std::iterator_traits<std::remove_const_t<Iter>>::value_type;
+    using iterator_category = typename std::iterator_traits<
+        std::remove_const_t<Iter>>::iterator_category;
 
     StridedRangeIter(Iter iter, int stride) : iter(iter), stride(stride) {}
 
-    value_type& operator*() { return *iter; }
+    reference operator*() { return *iter; }
 
-    const value_type& operator*() const { return *iter; }
+    std::add_const_t<reference> operator*() const { return *iter; }
 
-    value_type& operator[](size_t i) { return iter[i * stride]; }
+    reference operator[](size_t i) { return iter[i * stride]; }
 
-    const value_type& operator[](size_t i) const { return iter[i * stride]; }
+    std::add_const_t<reference> operator[](size_t i) const {
+      return iter[i * stride];
+    }
 
     // prefix increment
     StridedRangeIter& operator++() {

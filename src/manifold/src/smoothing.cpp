@@ -356,7 +356,7 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
 Vec<bool> Manifold::Impl::FlatFaces() const {
   const int numTri = NumTri();
   Vec<bool> triIsFlatFace(numTri, false);
-  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+  for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri,
              [this, &triIsFlatFace](const int tri) {
                const TriRef& ref = meshRelation_.triRef[tri];
                int faceNeighbors = 0;
@@ -403,7 +403,7 @@ Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
 
 Vec<int> Manifold::Impl::VertHalfedge() const {
   Vec<int> vertHalfedge(NumVert());
-  for_each_n(autoPolicy(halfedge_.size()), countAt(0), halfedge_.size(),
+  for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
              [&vertHalfedge, this](const int idx) {
                // arbitrary, last one wins.
                vertHalfedge[halfedge_[idx].startVert] = idx;
@@ -484,7 +484,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(numTri);
-    for_each_n(autoPolicy(numTri), countAt(0), numTri, [this](int tri) {
+    for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri, [this](int tri) {
       for (const int j : {0, 1, 2})
         meshRelation_.triProperties[tri][j] = halfedge_[3 * tri + j].startVert;
     });
@@ -655,7 +655,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
  */
 void Manifold::Impl::LinearizeFlatTangents() {
   const int n = halfedgeTangent_.size();
-  for_each_n(autoPolicy(n), countAt(0), n, [this](const int halfedge) {
+  for_each_n(autoPolicy(n, 1e4), countAt(0), n, [this](const int halfedge) {
     glm::vec4& tangent = halfedgeTangent_[halfedge];
     glm::vec4& otherTangent =
         halfedgeTangent_[halfedge_[halfedge].pairedHalfedge];
@@ -690,7 +690,7 @@ void Manifold::Impl::LinearizeFlatTangents() {
 void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
   for_each_n(
-      autoPolicy(numHalfedge), countAt(0), numHalfedge,
+      autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
       [this, &fixedHalfedges](int halfedge) {
         if (!fixedHalfedges[halfedge]) return;
 
@@ -789,7 +789,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
-      autoPolicy(numVert), vertHalfedge.begin(), numVert,
+      autoPolicy(numVert, 1e4), vertHalfedge.begin(), numVert,
       [this, &tangent, &fixedHalfedge, normalIdx](int e) {
         struct FlatNormal {
           bool isFlatFace;
@@ -883,7 +883,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     }
   }
 
-  for_each_n(autoPolicy(numHalfedge), countAt(0), numHalfedge,
+  for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
              [&tangent, &vertNormal, this](const int edgeIdx) {
                tangent[edgeIdx] =
                    IsInsideQuad(edgeIdx)
@@ -933,7 +933,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
 
   const int numVert = NumVert();
   for_each_n(
-      autoPolicy(numVert), countAt(0), numVert,
+      autoPolicy(numVert, 1e4), countAt(0), numVert,
       [this, &vertTangents, &fixedHalfedge, &vertHalfedge,
        &triIsFlatFace](int v) {
         auto it = vertTangents.find(v);
@@ -1006,7 +1006,7 @@ void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
   if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    for_each_n(autoPolicy(NumTri()), countAt(0), NumVert(),
+    for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
                InterpTri({vertPos_, vertBary, &old}));
     // Make original since the subdivided faces have been warped into
     // being non-coplanar, and hence not being related to the original faces.
