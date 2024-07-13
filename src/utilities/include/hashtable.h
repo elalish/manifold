@@ -17,7 +17,6 @@
 #include <atomic>
 
 #include "public.h"
-#include "utils.h"
 #include "vec.h"
 
 namespace {

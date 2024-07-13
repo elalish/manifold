@@ -290,7 +290,7 @@ Collider::Collider(const VecView<const Box>& leafBB,
   nodeParent_.resize(num_nodes, -1);
   internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
   // organize tree
-  for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
+  for_each_n(autoPolicy(NumInternal(), 1e4), countAt(0), NumInternal(),
              CreateRadixTree({nodeParent_, internalChildren_, leafMorton}));
   UpdateBoxes(leafBB);
 }
@@ -323,8 +323,8 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
                FindCollisions<T, selfCollision, CountCollisions>{
                    queriesIn, nodeBBox_, internalChildren_, {counts, empty}});
     // compute start index for each query and total count
-    exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
-                   counts.begin(), 0, std::plus<int>());
+    manifold::exclusive_scan(counts.begin(), counts.end(), counts.begin(), 0,
+                             std::plus<int>());
     if (counts.back() == 0) return SparseIndices(0);
     SparseIndices queryTri(counts.back());
     // actually recording collisions
@@ -348,13 +348,12 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
                "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
   auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
-  auto policy = autoPolicy(NumInternal());
-  copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
+  copy(leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
   Vec<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxes
   for_each_n(
-      policy, countAt(0), NumLeaves(),
+      autoPolicy(NumInternal(), 1e3), countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_, counter, nodeParent_, internalChildren_}));
 }
 
@@ -373,8 +372,8 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    for_each(autoPolicy(nodeBBox_.size()), nodeBBox_.begin(), nodeBBox_.end(),
-             TransformBox({transform}));
+    for_each(autoPolicy(nodeBBox_.size(), 1e5), nodeBBox_.begin(),
+             nodeBBox_.end(), TransformBox({transform}));
   }
   return axisAligned;
 }

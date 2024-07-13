@@ -19,6 +19,13 @@ target_link_libraries(perfTest manifold)
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTest PUBLIC cxx_std_17)
 
+if(MANIFOLD_PAR STREQUAL "TBB" AND NOT MSVC)
+  add_executable(stlTest stl_test.cpp)
+  target_link_libraries(stlTest utilities)
+  target_compile_options(stlTest PRIVATE ${MANIFOLD_FLAGS})
+  target_compile_features(stlTest PUBLIC cxx_std_17)
+endif()
+
 add_executable(largeSceneTest large_scene_test.cpp)
 target_link_libraries(largeSceneTest manifold)
 target_compile_options(largeSceneTest PRIVATE ${MANIFOLD_FLAGS})

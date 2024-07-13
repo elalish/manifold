@@ -190,9 +190,8 @@ bool IsConvex(const PolygonsIdx &polys, float precision) {
  * avoid creating high-degree vertices.
  */
 std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
-  const size_t numTri = transform_reduce<size_t>(
-      autoPolicy(polys.size()), polys.begin(), polys.end(), 0,
-      [](size_t a, size_t b) { return a + b; },
+  const size_t numTri = manifold::transform_reduce(
+      polys.begin(), polys.end(), 0_z, [](size_t a, size_t b) { return a + b; },
       [](const SimplePolygonIdx &poly) { return poly.size() - 2; });
   std::vector<glm::ivec3> triangles;
   triangles.reserve(numTri);
@@ -845,11 +844,10 @@ class EarClip {
     }
 
     const int numVert = itr.size();
-    auto policy = autoPolicy(numVert);
     Vec<int> vertNew2Old(numVert);
-    sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+    sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-    stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+    stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
                 [&vertMorton](const int a, const int b) {
                   return vertMorton[a] < vertMorton[b];
                 });

@@ -64,7 +64,7 @@ class SparseIndices {
 
   void Sort() {
     VecView<int64_t> view = AsVec64();
-    stable_sort(autoPolicy(size()), view.begin(), view.end());
+    stable_sort(view.begin(), view.end());
   }
 
   void Resize(size_t size) { data_.resize(size * sizeof(int64_t), -1); }
@@ -128,9 +128,7 @@ class SparseIndices {
   void Unique() {
     Sort();
     VecView<int64_t> view = AsVec64();
-    size_t newSize = unique<decltype(view.begin())>(autoPolicy(view.size()),
-                                                    view.begin(), view.end()) -
-                     view.begin();
+    size_t newSize = unique(view.begin(), view.end()) - view.begin();
     Resize(newSize);
   }
 
@@ -138,20 +136,18 @@ class SparseIndices {
     DEBUG_ASSERT(S.size() == size(), userErr,
                  "Different number of values than indicies!");
 
-    Vec<int> new2Old(S.size());
-    auto policy = autoPolicy(S.size());
-    sequence(policy, new2Old.begin(), new2Old.end());
+    Vec<size_t> new2Old(S.size());
+    sequence(new2Old.begin(), new2Old.end());
 
-    size_t size = copy_if<decltype(new2Old.begin())>(
-                      policy, countAt(0_z), countAt(S.size()), new2Old.begin(),
-                      [&S](const int i) { return S[i] != 0; }) -
+    size_t size = copy_if(countAt(0_z), countAt(S.size()), new2Old.begin(),
+                          [&S](const size_t i) { return S[i] != 0; }) -
                   new2Old.begin();
     new2Old.resize(size);
 
     Permute(S, new2Old);
     Vec<char> tmp(std::move(data_));
     Resize(size);
-    gather(policy, new2Old.begin(), new2Old.end(),
+    gather(new2Old.begin(), new2Old.end(),
            reinterpret_cast<int64_t*>(tmp.data()),
            reinterpret_cast<int64_t*>(data_.data()));
 
@@ -176,11 +172,8 @@ class SparseIndices {
                  "Different number of values than indicies!");
 
     Vec<int> new2Old(v.size());
-    auto policy = autoPolicy(v.size());
-
-    size_t size = copy_if<decltype(new2Old.begin())>(
-                      policy, countAt(0_z), countAt(v.size()), new2Old.begin(),
-                      firstFinite<T>({v})) -
+    size_t size = copy_if(countAt(0_z), countAt(v.size()), new2Old.begin(),
+                          firstFinite<T>({v})) -
                   new2Old.begin();
     new2Old.resize(size);
 
@@ -188,7 +181,7 @@ class SparseIndices {
     Permute(x, new2Old);
     Vec<char> tmp(std::move(data_));
     Resize(size);
-    gather(policy, new2Old.begin(), new2Old.end(),
+    gather(new2Old.begin(), new2Old.end(),
            reinterpret_cast<int64_t*>(tmp.data()),
            reinterpret_cast<int64_t*>(data_.data()));
 

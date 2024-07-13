@@ -157,7 +157,7 @@ Mesh Manifold::GetMesh() const {
   result.triVerts.resize(NumTri());
   auto& triVerts = result.triVerts;
   const auto& halfedges = impl.halfedge_;
-  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [&triVerts, &halfedges](const int tri) {
                for (int i : {0, 1, 2}) {
                  triVerts[tri][i] = halfedges[3 * tri + i].startVert;
@@ -754,8 +754,9 @@ Manifold Manifold::Refine(int n) const {
 Manifold Manifold::RefineToLength(float length) const {
   length = glm::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine(
-      [length](glm::vec3 edge) { return glm::length(edge) / length; });
+  pImpl->Refine([length](glm::vec3 edge) {
+    return static_cast<int>(glm::length(edge) / length);
+  });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 

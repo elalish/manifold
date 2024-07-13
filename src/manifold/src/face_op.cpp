@@ -140,7 +140,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triCount.back() = 0;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
-  for_each(autoPolicy(faceEdge.size()), countAt(0_z),
+  for_each(autoPolicy(faceEdge.size(), 1e5), countAt(0_z),
            countAt(faceEdge.size() - 1), [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
@@ -154,15 +154,14 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
            });
   group.wait();
   // prefix sum computation (assign unique index to each face) and preallocation
-  exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
-                 triCount.begin(), 0_z);
+  exclusive_scan(triCount.begin(), triCount.end(), triCount.begin(), 0_z);
   triVerts.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
 
   auto processFace2 = std::bind(
       processFace, [&](size_t face) { return std::move(results[face]); },
-      [&](int face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](size_t face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
         triVerts[triCount[face]] = tri;
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
@@ -170,7 +169,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       },
       std::placeholders::_1);
   // set triangles in parallel
-  for_each(autoPolicy(faceEdge.size()), countAt(0_z),
+  for_each(autoPolicy(faceEdge.size(), 1e4), countAt(0_z),
            countAt(faceEdge.size() - 1), processFace2);
 #else
   triVerts.reserve(faceEdge.size());
@@ -178,7 +177,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triRef.reserve(faceEdge.size());
   auto processFace2 = std::bind(
       processFace, generalTriangulation,
-      [&](int _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](size_t _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triRef.push_back(r);
@@ -203,7 +202,8 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           glm::mat3x2 projection) const {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
-    vert_edge.emplace(std::make_pair(edge->startVert, edge - start));
+    vert_edge.emplace(
+        std::make_pair(edge->startVert, static_cast<int>(edge - start)));
   }
 
   PolygonsIdx polys;
@@ -290,17 +290,14 @@ Polygons Manifold::Impl::Slice(float height) const {
 
 Polygons Manifold::Impl::Project() const {
   const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
-  auto policy = autoPolicy(halfedge_.size());
-
   Vec<Halfedge> cusps(NumEdge());
-  cusps.resize(copy_if<decltype(cusps.begin())>(
-                   policy, halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
-                   [&](Halfedge edge) {
-                     return faceNormal_[edge.face].z >= 0 &&
-                            faceNormal_[halfedge_[edge.pairedHalfedge].face].z <
-                                0;
-                   }) -
-               cusps.begin());
+  cusps.resize(
+      copy_if(halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
+              [&](Halfedge edge) {
+                return faceNormal_[edge.face].z >= 0 &&
+                       faceNormal_[halfedge_[edge.pairedHalfedge].face].z < 0;
+              }) -
+      cusps.begin());
 
   PolygonsIdx polysIndexed =
       Face2Polygons(cusps.cbegin(), cusps.cend(), projection);
