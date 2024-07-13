@@ -376,32 +376,39 @@ TEST(Smooth, SineSurface) {
 
 TEST(Smooth, SDF) {
   const float r = 10;
-  const float tol = 2;
+  const float extra = 2;
+
+  auto sphericalGyroid = [r](glm::vec3 p) {
+    const float gyroid =
+        cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
+    const float d = glm::min(0.0f, r - glm::length(p));
+    return gyroid - d * d;
+  };
+
+  auto gradient = [r](glm::vec3 pos) {
+    const float rad = glm::length(pos);
+    const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
+    const glm::vec3 sphereGrad = 2 * d * pos;
+    const glm::vec3 gyroidGrad(
+        cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
+        cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
+        cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
+    return gyroidGrad + sphereGrad;
+  };
+
   Manifold gyroid =
-      Manifold(LevelSet(
-                   [r](glm::vec3 p) {
-                     const float gyroid = cos(p.x) * sin(p.y) +
-                                          cos(p.y) * sin(p.z) +
-                                          cos(p.z) * sin(p.x);
-                     const float d = glm::min(0.0f, r - glm::length(p));
-                     return gyroid - d * d;
-                   },
-                   {glm::vec3(-r - tol), glm::vec3(r + tol)}, 1))
+      Manifold(LevelSet(sphericalGyroid,
+                        {glm::vec3(-r - extra), glm::vec3(r + extra)}, 1, 0,
+                        true, 0.00001))
           .SetProperties(
               3,
-              [r](float* newProp, glm::vec3 pos, const float* oldProp) {
-                const float rad = glm::length(pos);
-                const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
-                const glm::vec3 sphere = 2 * d * pos;
-                const glm::vec3 gyroidGrad(
-                    cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
-                    cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
-                    cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
-                const glm::vec3 normal = -glm::normalize(gyroidGrad + sphere);
+              [gradient](float* newProp, glm::vec3 pos, const float* oldProp) {
+                const glm::vec3 normal = -glm::normalize(gradient(pos));
                 for (const int i : {0, 1, 2}) newProp[i] = normal[i];
               })
           .SmoothByNormals(0)
           .RefineToLength(0.1);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;

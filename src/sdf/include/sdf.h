@@ -20,5 +20,6 @@
 
 namespace manifold {
 Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
-              float level = 0, bool canParallel = true);
+              float level = 0, bool canParallel = true,
+              float precision = std::numeric_limits<float>::infinity());
 }
