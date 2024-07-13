@@ -396,10 +396,19 @@ TEST(Smooth, SDF) {
     return gyroidGrad + sphereGrad;
   };
 
-  Manifold gyroid =
-      Manifold(LevelSet(sphericalGyroid,
-                        {glm::vec3(-r - extra), glm::vec3(r + extra)}, 1, 0,
-                        true, 0.00001))
+  auto error = [sphericalGyroid](float* newProp, glm::vec3 pos,
+                                 const float* oldProp) {
+    newProp[0] = glm::abs(sphericalGyroid(pos));
+  };
+
+  Manifold gyroid = Manifold(
+      LevelSet(sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)},
+               1, 0, true, 0.00001));
+
+  Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
+
+  Manifold smoothed =
+      gyroid
           .SetProperties(
               3,
               [gradient](float* newProp, glm::vec3 pos, const float* oldProp) {
@@ -407,14 +416,17 @@ TEST(Smooth, SDF) {
                 for (const int i : {0, 1, 2}) newProp[i] = normal[i];
               })
           .SmoothByNormals(0)
-          .RefineToLength(0.1);
+          .RefineToLength(0.1)
+          .SetProperties(1, error);
+
+  MeshGL out = smoothed.GetMeshGL();
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.11);
+  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.22);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    // options2.faceted = false;
-    // options2.mat.normalChannels = {3, 4, 5};
-    ExportMesh("smoothGyroid.glb", gyroid.GetMeshGL(), options2);
+    ExportMesh("smoothGyroid.glb", out, options2);
   }
 #endif
 }
