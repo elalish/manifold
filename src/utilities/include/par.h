@@ -627,7 +627,7 @@ void transform(InputIter first, InputIter last, OutputIter d_first, F f) {
 //
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// must not overlap.
 template <typename InputIter, typename OutputIter>
 void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           OutputIter d_first) {
@@ -660,7 +660,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 //
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// must not overlap.
 template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first) {
   copy(autoPolicy(first, last, 1e6), first, last, d_first);
@@ -669,9 +669,9 @@ void copy(InputIter first, InputIter last, OutputIter d_first) {
 // Copy the input range `[first, first + n)` to the output range
 // starting from `d_first`.
 //
-// The input range `[first, last)` and
-// the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// The input range `[first, first + n)` and
+// the output range `[d_first, d_first + n)`
+// must not overlap.
 template <typename InputIter, typename OutputIter>
 void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
             OutputIter d_first) {
@@ -681,9 +681,9 @@ void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
 // Copy the input range `[first, first + n)` to the output range
 // starting from `d_first`.
 //
-// The input range `[first, last)` and
-// the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// The input range `[first, first + n)` and
+// the output range `[d_first, d_first + n)`
+// must not overlap.
 template <typename InputIter, typename OutputIter>
 void copy_n(InputIter first, size_t n, OutputIter d_first) {
   copy(autoPolicy(n, 1e6), first, first + n, d_first);
@@ -778,7 +778,7 @@ bool all_of(InputIter first, InputIter last, P pred) {
 //
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// must not overlap.
 template <typename InputIter, typename OutputIter, typename P>
 OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
                    OutputIter d_first, P pred) {
@@ -813,7 +813,7 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
 //
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
-// must be equal or non-overlapping.
+// must not overlap.
 template <typename InputIter, typename OutputIter, typename P>
 OutputIter copy_if(InputIter first, InputIter last, OutputIter d_first,
                    P pred) {
