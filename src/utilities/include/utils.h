@@ -80,6 +80,13 @@ void Permute(Vec<T>& inOut, const Vec<T1>& new2Old) {
   gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
 }
 
+template <typename T, typename T1>
+void Permute(std::vector<T>& inOut, const Vec<T1>& new2Old) {
+  std::vector<T> tmp(std::move(inOut));
+  inOut.resize(new2Old.size());
+  gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
+}
+
 template <typename T>
 T AtomicAdd(T& target, T add) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);

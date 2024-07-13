@@ -14,7 +14,6 @@
 
 #include "polygon.h"
 
-#include <algorithm>
 #include <map>
 #include <set>
 
@@ -302,7 +301,7 @@ class EarClip {
 
   struct IdxCollider {
     Collider collider;
-    Vec<VertItr> itr;
+    std::vector<VertItr> itr;
   };
 
   // A circularly-linked list representing the polygon(s) that still need to be
@@ -829,7 +828,7 @@ class EarClip {
   IdxCollider VertCollider(VertItr start) const {
     Vec<Box> vertBox;
     Vec<uint32_t> vertMorton;
-    Vec<VertItr> itr;
+    std::vector<VertItr> itr;
     const Box box(glm::vec3(bBox_.min, 0), glm::vec3(bBox_.max, 0));
 
     Loop(start, [&vertBox, &vertMorton, &itr, &box, this](VertItr v) {
