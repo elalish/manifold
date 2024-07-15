@@ -443,10 +443,9 @@ Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
     const int pair = halfedge_[3 * tri + neighbor].pairedHalfedge;
     if (pair / 3 < tri) {
       tri = pair / 3;
-      const int j = pair % 3;
-      idx = Next3(neighbor) == idx ? j : (j + 1) % 4;
-    } else if (idx > neighbor) {
-      ++idx;
+      idx = Next3(neighbor) == idx ? 0 : 1;
+    } else {
+      idx = Next3(neighbor) == idx ? 2 : 3;
     }
     return {tri, idx, (idx + 1) % 4};
   }
