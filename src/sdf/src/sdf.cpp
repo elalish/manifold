@@ -164,16 +164,18 @@ struct ComputeVerts {
     // Sole tuning parameter, k: (0, 1) - smaller value gets better median
     // performance, but also hits the worst case more often.
     const float k = 0.1;
-    float maxStep = glm::length(pos0 - pos1);
+    const float tol2 = 4 * tol * tol;
+    const float dist2 = glm::dot(pos0 - pos1, pos0 - pos1);
+    float frac = 1;
+    float biFrac = 1;
     do {
-      const float l = glm::length(pos0 - pos1);
       const float a = d0 / (d0 - d1);
-      if (l < 2 * tol) {
+      if (dist2 * frac * frac < tol2) {
         return glm::mix(pos0, pos1, a);
       }
 
       const float t = glm::mix(a, 0.5f, k);
-      const float r = maxStep / l - 0.5;
+      const float r = biFrac / frac - 0.5;
       const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
       const glm::vec3 mid = glm::mix(pos0, pos1, x);
@@ -182,11 +184,13 @@ struct ComputeVerts {
       if ((d > 0) == (d0 > 0)) {
         d0 = d;
         pos0 = mid;
+        frac *= 1 - x;
       } else {
         d1 = d;
         pos1 = mid;
+        frac *= x;
       }
-      maxStep /= 2;
+      biFrac /= 2;
     } while (1);
   }
 
