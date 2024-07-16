@@ -131,6 +131,7 @@ struct ComputeVerts {
   const glm::ivec3 gridSize;
   const glm::vec3 spacing;
   const float level;
+  const float tol;
 
   inline glm::vec3 Position(glm::ivec4 gridIndex) const {
     return origin +
@@ -148,6 +149,49 @@ struct ComputeVerts {
     if (onLowerBound || onUpperBound || onHalfBound) return glm::min(d, 0.0f);
 
     return d;
+  }
+
+  // Simplified ITP root finding algorithm - same worst-case performance as
+  // bisection, better average performance.
+  inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1,
+                               float d1) const {
+    if (d0 == 0) {
+      return pos0;
+    } else if (d1 == 0) {
+      return pos1;
+    }
+
+    // Sole tuning parameter, k: (0, 1) - smaller value gets better median
+    // performance, but also hits the worst case more often.
+    const float k = 0.1;
+    const float tol2 = 4 * tol * tol;
+    const float dist2 = glm::dot(pos0 - pos1, pos0 - pos1);
+    float frac = 1;
+    float biFrac = 1;
+    do {
+      const float a = d0 / (d0 - d1);
+      if (dist2 * frac * frac < tol2) {
+        return glm::mix(pos0, pos1, a);
+      }
+
+      const float t = glm::mix(a, 0.5f, k);
+      const float r = biFrac / frac - 0.5;
+      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+
+      const glm::vec3 mid = glm::mix(pos0, pos1, x);
+      const float d = sdf(mid) - level;
+
+      if ((d > 0) == (d0 > 0)) {
+        d0 = d;
+        pos0 = mid;
+        frac *= 1 - x;
+      } else {
+        d1 = d;
+        pos1 = mid;
+        frac *= x;
+      }
+      biFrac /= 2;
+    } while (1);
   }
 
   inline void operator()(Uint64 mortonCode) {
@@ -177,9 +221,8 @@ struct ComputeVerts {
       keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] =
-          (val * position - gridVert.distance * Position(neighborIndex)) /
-          (val - gridVert.distance);
+      vertPos[idx] = FindSurface(position, gridVert.distance,
+                                 Position(neighborIndex), val);
       gridVert.edgeVerts[i] = idx;
     }
 
@@ -298,12 +341,16 @@ namespace manifold {
  * with runtime locks that expect to not be called back by unregistered threads.
  * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
  * active.
+ * @param precision Ensure each vertex is within this distance of the true
+ * surface. Defaults to infinity, which will return the interpolated
+ * crossing-point based on the two nearest grid points. Smaller values will
+ * require more sdf evaluations per output vertex.
  * @return Mesh This class does not depend on Manifold, so it just returns a
  * Mesh, but it is guaranteed to be manifold and so can always be used as
  * input to the Manifold constructor for further operations.
  */
 Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
-              float level, bool canParallel) {
+              float level, bool canParallel, float precision) {
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
@@ -327,7 +374,7 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_z), maxMorton + 1,
                ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
-                             gridSize + 1, spacing, level}));
+                             gridSize + 1, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];

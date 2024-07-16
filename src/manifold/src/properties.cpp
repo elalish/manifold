@@ -146,19 +146,6 @@ struct CheckHalfedges {
   }
 };
 
-struct NoDuplicates {
-  VecView<const Halfedge> halfedges;
-
-  bool operator()(size_t edge) const {
-    const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
-        halfedge.pairedHalfedge == -1)
-      return true;
-    return halfedge.startVert != halfedges[edge + 1].startVert ||
-           halfedge.endVert != halfedges[edge + 1].endVert;
-  }
-};
-
 struct CheckCCW {
   VecView<const Halfedge> halfedges;
   VecView<const glm::vec3> vertPos;
@@ -226,8 +213,14 @@ bool Manifold::Impl::Is2Manifold() const {
   Vec<Halfedge> halfedge(halfedge_);
   stable_sort(halfedge.begin(), halfedge.end());
 
-  return all_of(countAt(0_z), countAt(2 * NumEdge() - 1),
-                NoDuplicates({halfedge}));
+  return all_of(
+      countAt(0_z), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+        const Halfedge h = halfedge[edge];
+        if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
+          return true;
+        return h.startVert != halfedge[edge + 1].startVert ||
+               h.endVert != halfedge[edge + 1].endVert;
+      });
 }
 
 /**

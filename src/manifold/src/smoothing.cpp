@@ -736,7 +736,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           lastTangent = thisTangent;
         } while (!fixedHalfedges[current]);
 
-        if (currentAngle.size() == 1) return;
+        if (currentAngle.size() == 1 || glm::dot(normal, normal) == 0) return;
 
         const float scale = currentAngle.back() / desiredAngle.back();
         float offset = 0;

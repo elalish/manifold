@@ -373,3 +373,60 @@ TEST(Smooth, SineSurface) {
   }
 #endif
 }
+
+TEST(Smooth, SDF) {
+  const float r = 10;
+  const float extra = 2;
+
+  auto sphericalGyroid = [r](glm::vec3 p) {
+    const float gyroid =
+        cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
+    const float d = glm::min(0.0f, r - glm::length(p));
+    return gyroid - d * d;
+  };
+
+  auto gradient = [r](glm::vec3 pos) {
+    const float rad = glm::length(pos);
+    const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
+    const glm::vec3 sphereGrad = 2 * d * pos;
+    const glm::vec3 gyroidGrad(
+        cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
+        cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
+        cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
+    return gyroidGrad + sphereGrad;
+  };
+
+  auto error = [sphericalGyroid](float* newProp, glm::vec3 pos,
+                                 const float* oldProp) {
+    newProp[0] = glm::abs(sphericalGyroid(pos));
+  };
+
+  Manifold gyroid = Manifold(
+      LevelSet(sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)},
+               0.5, 0, true, 0.00001));
+
+  Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
+
+  Manifold smoothed =
+      gyroid
+          .SetProperties(
+              3,
+              [gradient](float* newProp, glm::vec3 pos, const float* oldProp) {
+                const glm::vec3 normal = -glm::normalize(gradient(pos));
+                for (const int i : {0, 1, 2}) newProp[i] = normal[i];
+              })
+          .SmoothByNormals(0)
+          .RefineToLength(0.1)
+          .SetProperties(1, error);
+
+  MeshGL out = smoothed.GetMeshGL();
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.016);
+  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.068);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportOptions options2;
+    ExportMesh("smoothGyroid.glb", out, options2);
+  }
+#endif
+}

@@ -89,19 +89,19 @@ class Partition {
     return partition;
   }
 
-  Vec<glm::ivec3> Reindex(glm::ivec4 tri, glm::ivec4 edgeOffsets,
+  Vec<glm::ivec3> Reindex(glm::ivec4 triVerts, glm::ivec4 edgeOffsets,
                           glm::bvec4 edgeFwd, int interiorOffset) const {
     Vec<int> newVerts;
     newVerts.reserve(vertBary.size());
     glm::ivec4 triIdx = idx;
     glm::ivec4 outTri = {0, 1, 2, 3};
-    if (tri[3] < 0 && idx[1] != Next3(idx[0])) {
+    if (triVerts[3] < 0 && idx[1] != Next3(idx[0])) {
       triIdx = {idx[2], idx[0], idx[1], idx[3]};
       edgeFwd = glm::not_(edgeFwd);
       std::swap(outTri[0], outTri[1]);
     }
     for (const int i : {0, 1, 2, 3}) {
-      if (tri[triIdx[i]] >= 0) newVerts.push_back(tri[triIdx[i]]);
+      if (triVerts[triIdx[i]] >= 0) newVerts.push_back(triVerts[triIdx[i]]);
     }
     for (const int i : {0, 1, 2, 3}) {
       const int n = sortedDivisions[i] - 1;
@@ -413,20 +413,12 @@ glm::ivec4 Manifold::Impl::GetHalfedges(int tri) const {
     if (pair / 3 < tri) {
       return glm::ivec4(-1);  // only process lower tri index
     }
-    glm::ivec2 otherHalf;
-    otherHalf[0] = NextHalfedge(pair);
-    otherHalf[1] = NextHalfedge(otherHalf[0]);
-    halfedges[neighbor] = otherHalf[0];
-    if (neighbor == 2) {
-      halfedges[3] = otherHalf[1];
-    } else if (neighbor == 1) {
-      halfedges[3] = halfedges[2];
-      halfedges[2] = otherHalf[1];
-    } else {
-      halfedges[3] = halfedges[2];
-      halfedges[2] = halfedges[1];
-      halfedges[1] = otherHalf[1];
-    }
+    // The order here matters to keep small quads split the way they started, or
+    // else it can create a 4-manifold edge.
+    halfedges[2] = NextHalfedge(halfedges[neighbor]);
+    halfedges[3] = NextHalfedge(halfedges[2]);
+    halfedges[0] = NextHalfedge(pair);
+    halfedges[1] = NextHalfedge(halfedges[0]);
   }
   return halfedges;
 }
@@ -451,10 +443,9 @@ Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
     const int pair = halfedge_[3 * tri + neighbor].pairedHalfedge;
     if (pair / 3 < tri) {
       tri = pair / 3;
-      const int j = pair % 3;
-      idx = Next3(neighbor) == idx ? j : (j + 1) % 4;
-    } else if (idx > neighbor) {
-      ++idx;
+      idx = Next3(neighbor) == idx ? 0 : 1;
+    } else {
+      idx = Next3(neighbor) == idx ? 2 : 3;
     }
     return {tri, idx, (idx + 1) % 4};
   }
