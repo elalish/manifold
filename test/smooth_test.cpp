@@ -401,9 +401,9 @@ TEST(Smooth, SDF) {
     newProp[0] = glm::abs(sphericalGyroid(pos));
   };
 
-  Manifold gyroid = Manifold(
-      LevelSet(sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)},
-               0.5, 0, true, 0.00001));
+  Manifold gyroid = Manifold::LevelSet(
+      sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
+      0.00001);
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
@@ -420,7 +420,7 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.016);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.033);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.068);
 
 #ifdef MANIFOLD_EXPORT

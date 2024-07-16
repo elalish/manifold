@@ -181,6 +181,10 @@ class Manifold {
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
                           float revolveDegrees = 360.0f);
+  static Manifold LevelSet(
+      std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
+      float level = 0, float precision = std::numeric_limits<float>::infinity(),
+      bool canParallel = true);
   ///@}
 
   /** @name Topological
