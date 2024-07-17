@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <glm/gtc/integer.hpp>
+
 #include "hashtable.h"
 #include "impl.h"
 #include "manifold.h"
@@ -21,7 +23,6 @@
 
 namespace {
 using namespace manifold;
-Uint64 identity(Uint64 x) { return x; }
 
 glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
@@ -74,41 +75,22 @@ glm::ivec4 Neighbors(int i) {
   return neighbors[i];
 }
 
-Uint64 SpreadBits3(Uint64 v) {
-  v = v & 0x1fffff;
-  v = (v | v << 32) & 0x1f00000000ffff;
-  v = (v | v << 16) & 0x1f0000ff0000ff;
-  v = (v | v << 8) & 0x100f00f00f00f00f;
-  v = (v | v << 4) & 0x10c30c30c30c30c3;
-  v = (v | v << 2) & 0x1249249249249249;
-  return v;
+Uint64 EncodeIndex(glm::ivec4 gridPos, glm::ivec3 gridPow) {
+  return static_cast<Uint64>(gridPos.w) | static_cast<Uint64>(gridPos.z) << 1 |
+         static_cast<Uint64>(gridPos.y) << (1 + gridPow.z) |
+         static_cast<Uint64>(gridPos.x) << (1 + gridPow.z + gridPow.y);
 }
 
-Uint64 SqueezeBits3(Uint64 v) {
-  v = v & 0x1249249249249249;
-  v = (v ^ v >> 2) & 0x10c30c30c30c30c3;
-  v = (v ^ v >> 4) & 0x100f00f00f00f00f;
-  v = (v ^ v >> 8) & 0x1f0000ff0000ff;
-  v = (v ^ v >> 16) & 0x1f00000000ffff;
-  v = (v ^ v >> 32) & 0x1fffff;
-  return v;
-}
-
-// This is a modified 3D MortonCode, where the xyz code is shifted by one bit
-// and the w bit is added as the least significant. This allows 21 bits per x,
-// y, and z channel and 1 for w, filling the 64 bit total.
-Uint64 MortonCode(const glm::ivec4& index) {
-  return static_cast<Uint64>(index.w) | (SpreadBits3(index.x) << 1) |
-         (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
-}
-
-glm::ivec4 DecodeMorton(Uint64 code) {
-  glm::ivec4 index;
-  index.x = SqueezeBits3(code >> 1);
-  index.y = SqueezeBits3(code >> 2);
-  index.z = SqueezeBits3(code >> 3);
-  index.w = code & 0x1u;
-  return index;
+glm::ivec4 DecodeIndex(Uint64 idx, glm::ivec3 gridPow) {
+  glm::ivec4 gridPos;
+  gridPos.w = idx & 1;
+  idx = idx >> 1;
+  gridPos.z = idx & ((1 << gridPow.z) - 1);
+  idx = idx >> gridPow.z;
+  gridPos.y = idx & ((1 << gridPow.y) - 1);
+  idx = idx >> gridPow.y;
+  gridPos.x = idx & ((1 << gridPow.x) - 1);
+  return gridPos;
 }
 
 struct GridVert {
@@ -125,10 +107,11 @@ struct GridVert {
 struct ComputeVerts {
   VecView<glm::vec3> vertPos;
   VecView<int> vertIndex;
-  HashTableD<GridVert, identity> gridVerts;
+  HashTableD<GridVert> gridVerts;
   const std::function<float(glm::vec3)> sdf;
   const glm::vec3 origin;
   const glm::ivec3 gridSize;
+  const glm::ivec3 gridPow;
   const glm::vec3 spacing;
   const float level;
   const float tol;
@@ -194,11 +177,11 @@ struct ComputeVerts {
     } while (1);
   }
 
-  inline void operator()(Uint64 mortonCode) {
+  inline void operator()(Uint64 index) {
     ZoneScoped;
     if (gridVerts.Full()) return;
 
-    const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
+    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
@@ -226,14 +209,15 @@ struct ComputeVerts {
       gridVert.edgeVerts[i] = idx;
     }
 
-    if (keep) gridVerts.Insert(mortonCode, gridVert);
+    if (keep) gridVerts.Insert(index, gridVert);
   }
 };
 
 struct BuildTris {
   VecView<glm::ivec3> triVerts;
   VecView<int> triIndex;
-  const HashTableD<GridVert, identity> gridVerts;
+  const HashTableD<GridVert> gridVerts;
+  const glm::ivec3 gridPow;
 
   void CreateTri(const glm::ivec3& tri, const int edges[6]) {
     if (tri[0] < 0) return;
@@ -254,7 +238,7 @@ struct BuildTris {
     if (basekey == kOpen) return;
 
     const GridVert& base = gridVerts.At(idx);
-    const glm::ivec4 baseIndex = DecodeMorton(basekey);
+    const glm::ivec4 baseIndex = DecodeIndex(basekey, gridPow);
 
     glm::ivec4 leadIndex = baseIndex;
     if (leadIndex.w == 0)
@@ -270,17 +254,17 @@ struct BuildTris {
     glm::ivec4 thisIndex = baseIndex;
     thisIndex.x += 1;
 
-    GridVert thisVert = gridVerts[MortonCode(thisIndex)];
+    GridVert thisVert = gridVerts[EncodeIndex(thisIndex, gridPow)];
 
     tet[2] = base.NeighborInside(1);
     for (const int i : {0, 1, 2}) {
       thisIndex = leadIndex;
       --thisIndex[Prev3(i)];
-      // MortonCodes take unsigned input, so check for negatives, given the
+      // indices take unsigned input, so check for negatives, given the
       // decrement.
       GridVert nextVert = thisIndex[Prev3(i)] < 0
                               ? GridVert()
-                              : gridVerts[MortonCode(thisIndex)];
+                              : gridVerts[EncodeIndex(thisIndex, gridPow)];
       tet[3] = base.NeighborInside(Prev3(i) + 4);
 
       const int edges1[6] = {base.edgeVerts[0],
@@ -294,7 +278,7 @@ struct BuildTris {
 
       thisIndex = baseIndex;
       ++thisIndex[Next3(i)];
-      nextVert = gridVerts[MortonCode(thisIndex)];
+      nextVert = gridVerts[EncodeIndex(thisIndex, gridPow)];
       tet[2] = tet[3];
       tet[3] = base.NeighborInside(Next3(i) + 1);
 
@@ -357,38 +341,40 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
 
   const glm::vec3 dim = bounds.Size();
   const glm::ivec3 gridSize(dim / edgeLength);
+  const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-  const Uint64 maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 1, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
   // that expect to not be called back by unregistered threads. This allows
   // bindings use LevelSet despite being compiled with MANIFOLD_PAR
   // active.
-  const auto pol = canParallel ? autoPolicy(maxMorton) : ExecutionPolicy::Seq;
+  const auto pol = canParallel ? autoPolicy(maxIndex) : ExecutionPolicy::Seq;
 
   size_t tableSize = glm::min(
-      2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
-  HashTable<GridVert, identity> gridVerts(tableSize);
+      2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
+  HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0_z), maxMorton + 1,
-               ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
-                             gridSize + 1, spacing, level, precision}));
+    for_each_n(
+        pol, countAt(0_z), maxIndex + 1,
+        ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
+                      gridSize + 1, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
-      const Uint64 lastMorton =
-          MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
-      const float ratio = static_cast<float>(maxMorton) / lastMorton;
+      const Uint64 lastIndex = EncodeIndex(
+          glm::ivec4((lastVert - bounds.min) / spacing, 1), gridPow);
+      const float ratio = static_cast<float>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
       else
         tableSize *= ratio;
-      gridVerts = HashTable<GridVert, identity>(tableSize);
+      gridVerts = HashTable<GridVert>(tableSize);
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success
       vertPos.resize(index[0]);
@@ -400,7 +386,7 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
 
   Vec<int> index(1, 0);
   for_each_n(pol, countAt(0), gridVerts.Size(),
-             BuildTris({triVerts, index, gridVerts.D()}));
+             BuildTris({triVerts, index, gridVerts.D(), gridPow}));
   triVerts.resize(index[0]);
 
   pImpl_->CreateHalfedges(triVerts);
