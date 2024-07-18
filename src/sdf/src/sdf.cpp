@@ -372,7 +372,7 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0_z), maxMorton + 1,
+    for_each_n(pol, countAt(0_uz), maxMorton + 1,
                ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
                              gridSize + 1, spacing, level, precision}));
 

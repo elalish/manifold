@@ -155,7 +155,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   outR.faceNormal_.resize(numFaceR);
 
   Vec<size_t> tmpBuffer(outR.faceNormal_.size());
-  auto faceIds = TransformIterator(countAt(0_z), [&sidesPerFacePQ](size_t i) {
+  auto faceIds = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
     if (sidesPerFacePQ[i] > 0) return i;
     return std::numeric_limits<size_t>::max();
   });
@@ -168,7 +168,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
          outR.faceNormal_.begin());
 
   auto faceIdsQ =
-      TransformIterator(countAt(0_z), [&sidesPerFacePQ, &inP](size_t i) {
+      TransformIterator(countAt(0_uz), [&sidesPerFacePQ, &inP](size_t i) {
         if (sidesPerFacePQ[i + inP.faceNormal_.size()] > 0) return i;
         return std::numeric_limits<size_t>::max();
       });
@@ -255,7 +255,7 @@ void AddNewEdgeVerts(
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
         std::placeholders::_1);
     tbb::parallel_for(
-        tbb::blocked_range<size_t>(0_z, p1q2.size(), 32),
+        tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t> &range) {
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },

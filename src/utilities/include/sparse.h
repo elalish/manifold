@@ -57,7 +57,7 @@ class SparseIndices {
     size_t offset = pOffset;
     if (use_q) offset = 1 - offset;
     const int* p = ptr();
-    for_each(autoPolicy(out.size()), countAt(0_z), countAt(out.size()),
+    for_each(autoPolicy(out.size()), countAt(0_uz), countAt(out.size()),
              [&](size_t i) { out[i] = p[i * 2 + offset]; });
     return out;
   }
@@ -139,7 +139,7 @@ class SparseIndices {
     Vec<size_t> new2Old(S.size());
     sequence(new2Old.begin(), new2Old.end());
 
-    size_t size = copy_if(countAt(0_z), countAt(S.size()), new2Old.begin(),
+    size_t size = copy_if(countAt(0_uz), countAt(S.size()), new2Old.begin(),
                           [&S](const size_t i) { return S[i] != 0; }) -
                   new2Old.begin();
     new2Old.resize(size);
@@ -172,7 +172,7 @@ class SparseIndices {
                  "Different number of values than indicies!");
 
     Vec<int> new2Old(v.size());
-    size_t size = copy_if(countAt(0_z), countAt(v.size()), new2Old.begin(),
+    size_t size = copy_if(countAt(0_uz), countAt(v.size()), new2Old.begin(),
                           firstFinite<T>({v})) -
                   new2Old.begin();
     new2Old.resize(size);

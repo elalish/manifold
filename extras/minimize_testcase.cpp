@@ -74,7 +74,7 @@ bool safeToRemove(const Polygons &polys, size_t i, size_t j, float precision) {
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
             std::execution::par,
 #endif
-            countAt(0_z), countAt(polys[k].size()), [=](size_t l) {
+            countAt(0_uz), countAt(polys[k].size()), [=](size_t l) {
               if (i == k && (l == j || ll(l) == j)) return true;
               return !intersect(prev, next, polysk[l], polysk[ll(l)],
                                 precision);
