@@ -541,7 +541,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
   const Vec<glm::vec3> oldVertPos = vertPos_;
 
   Vec<size_t> tmpBuffer(oldVertPos.size());
-  auto vertIdIter = TransformIterator(countAt(0_z), [&vertOld2New](size_t i) {
+  auto vertIdIter = TransformIterator(countAt(0_uz), [&vertOld2New](size_t i) {
     if (vertOld2New[i + 1] > 0) return i;
     return std::numeric_limits<size_t>::max();
   });
@@ -846,10 +846,10 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
     q1p2 = collider_.Collisions<false, false>(QedgeBB.cview());
 
   if (inverted)
-    for_each(policy, countAt(0_z), countAt(q1p2.size()),
+    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
              ReindexEdge<true>({edges, q1p2}));
   else
-    for_each(policy, countAt(0_z), countAt(q1p2.size()),
+    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
              ReindexEdge<false>({edges, q1p2}));
   return q1p2;
 }

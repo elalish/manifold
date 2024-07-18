@@ -198,7 +198,7 @@ namespace manifold {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  return all_of(countAt(0_z), countAt(halfedge_.size()),
+  return all_of(countAt(0_uz), countAt(halfedge_.size()),
                 CheckHalfedges({halfedge_, vertPos_}));
 }
 
@@ -214,7 +214,7 @@ bool Manifold::Impl::Is2Manifold() const {
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
-      countAt(0_z), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+      countAt(0_uz), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
         const Halfedge h = halfedge[edge];
         if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
           return true;
@@ -228,7 +228,7 @@ bool Manifold::Impl::Is2Manifold() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(countAt(0_z), countAt(NumTri()),
+  return all_of(countAt(0_uz), countAt(NumTri()),
                 CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
 }
 
@@ -238,7 +238,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(
-      countAt(0_z), countAt(NumTri()),
+      countAt(0_uz), countAt(NumTri()),
       CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
 }
 
@@ -275,7 +275,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<float> vertArea(NumVert(), 0);
   Vec<float> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
-  for_each(policy, countAt(0_z), countAt(NumTri()),
+  for_each(policy, countAt(0_uz), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
                             degree, halfedge_, vertPos_, faceNormal_}));
   for_each_n(policy, countAt(0), NumVert(),
@@ -296,7 +296,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   }
 
   for_each_n(
-      policy, countAt(0_z), NumTri(),
+      policy, countAt(0_uz), NumTri(),
       UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
                         oldProperties, halfedge_, vertMeanCurvature,
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
@@ -382,7 +382,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
   float minDistanceSquared = transform_reduce(
-      countAt(0_z), countAt(collisions.size()), searchLength * searchLength,
+      countAt(0_uz), countAt(collisions.size()), searchLength * searchLength,
       [](float a, float b) { return std::min(a, b); },
       [&collisions, this, &other](int i) {
         const int tri = collisions.Get(i, 1);
