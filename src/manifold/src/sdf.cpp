@@ -93,6 +93,24 @@ glm::ivec4 DecodeIndex(Uint64 idx, glm::ivec3 gridPow) {
   return gridPos;
 }
 
+glm::vec3 Position(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing) {
+  return origin +
+         spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
+}
+
+float BoundedSDF(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing,
+                 glm::ivec3 gridSize, float level,
+                 std::function<float(glm::vec3)> sdf) {
+  const float d = sdf(Position(gridIndex, origin, spacing)) - level;
+
+  const glm::ivec3 xyz(gridIndex);
+  const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
+  const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
+  const bool onHalfBound =
+      gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
+  return (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
+}
+
 struct GridVert {
   float distance = NAN;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
@@ -108,6 +126,7 @@ struct ComputeVerts {
   VecView<glm::vec3> vertPos;
   VecView<int> vertIndex;
   HashTableD<GridVert> gridVerts;
+  VecView<const float> voxels;
   const std::function<float(glm::vec3)> sdf;
   const glm::vec3 origin;
   const glm::ivec3 gridSize;
@@ -115,24 +134,6 @@ struct ComputeVerts {
   const glm::vec3 spacing;
   const float level;
   const float tol;
-
-  inline glm::vec3 Position(glm::ivec4 gridIndex) const {
-    return origin +
-           spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
-  }
-
-  inline float BoundedSDF(glm::ivec4 gridIndex) const {
-    const float d = sdf(Position(gridIndex)) - level;
-
-    const glm::ivec3 xyz(gridIndex);
-    const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
-    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
-    const bool onHalfBound =
-        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
-    if (onLowerBound || onUpperBound || onHalfBound) return glm::min(d, 0.0f);
-
-    return d;
-  }
 
   // Simplified ITP root finding algorithm - same worst-case performance as
   // bisection, better average performance.
@@ -181,14 +182,14 @@ struct ComputeVerts {
     ZoneScoped;
     if (gridVerts.Full()) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
+    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow) + 1;
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
-    const glm::vec3 position = Position(gridIndex);
+    const glm::vec3 position = Position(gridIndex, origin, spacing);
 
     GridVert gridVert;
-    gridVert.distance = BoundedSDF(gridIndex);
+    gridVert.distance = voxels[index];
 
     bool keep = false;
     // These seven edges are uniquely owned by this gridVert; any of them
@@ -199,13 +200,13 @@ struct ComputeVerts {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const float val = BoundedSDF(neighborIndex);
+      const float val = voxels[EncodeIndex(neighborIndex, gridPow)];
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
       vertPos[idx] = FindSurface(position, gridVert.distance,
-                                 Position(neighborIndex), val);
+                                 Position(neighborIndex, origin, spacing), val);
       gridVert.edgeVerts[i] = idx;
     }
 
@@ -344,13 +345,22 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 1, 1), gridPow);
+  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
   // that expect to not be called back by unregistered threads. This allows
   // bindings use LevelSet despite being compiled with MANIFOLD_PAR
   // active.
   const auto pol = canParallel ? autoPolicy(maxIndex) : ExecutionPolicy::Seq;
+
+  glm::vec3 origin = bounds.min;
+  Vec<float> voxels(maxIndex + 1);
+  for_each_n(
+      pol, countAt(0_z), maxIndex + 1,
+      [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
+        voxels[idx] = BoundedSDF(DecodeIndex(idx, gridPow), origin, spacing,
+                                 gridSize, level, sdf);
+      });
 
   size_t tableSize = glm::min(
       2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
@@ -361,8 +371,8 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
     Vec<int> index(1, 0);
     for_each_n(
         pol, countAt(0_z), maxIndex + 1,
-        ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
-                      gridSize + 1, gridPow, spacing, level, precision}));
+        ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, bounds.min,
+                      gridSize, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
