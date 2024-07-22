@@ -527,10 +527,11 @@ void inclusive_scan(InputIter first, InputIter last, OutputIter d_first) {
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
 // must be equal or non-overlapping.
-template <typename InputIter, typename OutputIter,
-          typename BinOp = decltype(std::plus<typename std::iterator_traits<
-                                        InputIter>::value_type>()),
-          typename T = typename std::iterator_traits<InputIter>::value_type>
+template <
+    typename InputIter, typename OutputIter,
+    typename BinOp = decltype(
+        std::plus<typename std::iterator_traits<InputIter>::value_type>()),
+    typename T = typename std::iterator_traits<InputIter>::value_type>
 void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
                     OutputIter d_first, T init = static_cast<T>(0),
                     BinOp f = std::plus<T>(), T identity = static_cast<T>(0)) {
@@ -567,10 +568,11 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
 // The input range `[first, last)` and
 // the output range `[d_first, d_first + last - first)`
 // must be equal or non-overlapping.
-template <typename InputIter, typename OutputIter,
-          typename BinOp = decltype(std::plus<typename std::iterator_traits<
-                                        InputIter>::value_type>()),
-          typename T = typename std::iterator_traits<InputIter>::value_type>
+template <
+    typename InputIter, typename OutputIter,
+    typename BinOp = decltype(
+        std::plus<typename std::iterator_traits<InputIter>::value_type>()),
+    typename T = typename std::iterator_traits<InputIter>::value_type>
 void exclusive_scan(InputIter first, InputIter last, OutputIter d_first,
                     T init = static_cast<T>(0), BinOp f = std::plus<T>(),
                     T identity = static_cast<T>(0)) {
