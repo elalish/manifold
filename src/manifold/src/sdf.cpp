@@ -196,21 +196,19 @@ struct ComputeVerts {
     // These seven edges are uniquely owned by this gridVert; any of them
     // which intersect the surface create a vert.
     for (int i = 0; i < 7; ++i) {
-      glm::ivec4 neighborIndex =
-          gridIndex + Neighbors(i) + glm::ivec4(1, 1, 1, 0);
+      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const float val = voxels[EncodeIndex(neighborIndex, gridPow)];
+      const float val =
+          voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] = FindSurface(
-          position, gridVert.distance,
-          Position(neighborIndex - glm::ivec4(1, 1, 1, 0), origin, spacing),
-          val);
+      vertPos[idx] = FindSurface(position, gridVert.distance,
+                                 Position(neighborIndex, origin, spacing), val);
       gridVert.edgeVerts[i] = idx;
     }
 
@@ -345,11 +343,11 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   auto& vertPos = pImpl_->vertPos_;
 
   const glm::vec3 dim = bounds.Size();
-  const glm::ivec3 gridSize(dim / edgeLength);
+  const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
   const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
-  const glm::vec3 spacing = dim / (glm::vec3(gridSize));
+  const glm::vec3 spacing = dim / (glm::vec3(gridSize - 1));
 
-  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 4, 1), gridPow);
+  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
   // that expect to not be called back by unregistered threads. This allows
@@ -357,14 +355,14 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   // active.
   const auto pol = canParallel ? autoPolicy(maxIndex) : ExecutionPolicy::Seq;
 
-  glm::vec3 origin = bounds.min;
-  Vec<float> voxels(maxIndex + 1);
+  const glm::vec3 origin = bounds.min;
+  Vec<float> voxels(maxIndex);
   for_each_n(
-      pol, countAt(0_z), maxIndex + 1,
+      pol, countAt(0_z), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
         voxels[idx] =
             BoundedSDF(DecodeIndex(idx, gridPow) - glm::ivec4(1, 1, 1, 0),
-                       origin, spacing, gridSize + 1, level, sdf);
+                       origin, spacing, gridSize, level, sdf);
       });
 
   size_t tableSize = glm::min(
@@ -374,16 +372,15 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(
-        pol, countAt(0_z),
-        EncodeIndex(glm::ivec4(gridSize + 1, 1), gridPow) + 1,
-        ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, bounds.min,
-                      gridSize + 1, gridPow, spacing, level, precision}));
+    for_each_n(pol, countAt(0_z),
+               EncodeIndex(glm::ivec4(gridSize, 1), gridPow) + 1,
+               ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
+                             gridSize, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
-      const Uint64 lastIndex = EncodeIndex(
-          glm::ivec4((lastVert - bounds.min) / spacing, 1), gridPow);
+      const Uint64 lastIndex =
+          EncodeIndex(glm::ivec4((lastVert - origin) / spacing, 1), gridPow);
       const float ratio = static_cast<float>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large
