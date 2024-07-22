@@ -182,20 +182,22 @@ struct ComputeVerts {
     ZoneScoped;
     if (gridVerts.Full()) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow) + 1;
+    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
     const glm::vec3 position = Position(gridIndex, origin, spacing);
 
     GridVert gridVert;
-    gridVert.distance = voxels[index];
+    gridVert.distance =
+        voxels[EncodeIndex(gridIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
 
     bool keep = false;
     // These seven edges are uniquely owned by this gridVert; any of them
     // which intersect the surface create a vert.
     for (int i = 0; i < 7; ++i) {
-      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
+      glm::ivec4 neighborIndex =
+          gridIndex + Neighbors(i) + glm::ivec4(1, 1, 1, 0);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
         neighborIndex.w = 0;
@@ -205,8 +207,10 @@ struct ComputeVerts {
       keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] = FindSurface(position, gridVert.distance,
-                                 Position(neighborIndex, origin, spacing), val);
+      vertPos[idx] = FindSurface(
+          position, gridVert.distance,
+          Position(neighborIndex - glm::ivec4(1, 1, 1, 0), origin, spacing),
+          val);
       gridVert.edgeVerts[i] = idx;
     }
 
@@ -345,7 +349,7 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 2, 1), gridPow);
+  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 4, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
   // that expect to not be called back by unregistered threads. This allows
@@ -358,8 +362,9 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   for_each_n(
       pol, countAt(0_z), maxIndex + 1,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
-        voxels[idx] = BoundedSDF(DecodeIndex(idx, gridPow), origin, spacing,
-                                 gridSize, level, sdf);
+        voxels[idx] =
+            BoundedSDF(DecodeIndex(idx, gridPow) - glm::ivec4(1, 1, 1, 0),
+                       origin, spacing, gridSize + 1, level, sdf);
       });
 
   size_t tableSize = glm::min(
@@ -370,9 +375,10 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   while (1) {
     Vec<int> index(1, 0);
     for_each_n(
-        pol, countAt(0_z), maxIndex + 1,
+        pol, countAt(0_z),
+        EncodeIndex(glm::ivec4(gridSize + 1, 1), gridPow) + 1,
         ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, bounds.min,
-                      gridSize, gridPow, spacing, level, precision}));
+                      gridSize + 1, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
@@ -399,11 +405,19 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
   triVerts.resize(index[0]);
 
+  pImpl_->meshRelation_ = {(int)ReserveIDs(1)};
+  pImpl_->CalculateBBox();
+  pImpl_->SetPrecision();
+
   pImpl_->CreateHalfedges(triVerts);
-  pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+
+  pImpl_->CalculateNormals();
+
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
+
+  pImpl_->SimplifyTopology();
+  pImpl_->Finish();
   return Manifold(pImpl_);
 }
 /** @} */

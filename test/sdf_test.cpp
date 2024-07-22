@@ -51,7 +51,7 @@ TEST(SDF, CubeVoid) {
 
 TEST(SDF, Bounds) {
   const float size = 4;
-  const float edgeLength = 0.5;
+  const float edgeLength = 1;
 
   Mesh levelSet = LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
@@ -59,7 +59,31 @@ TEST(SDF, Bounds) {
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
+  if (options.exportModels) ExportMesh("cubeVoid.glb", levelSet, {});
+#endif
+
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(cubeVoid.Genus(), -1);
+  const float outerBound = size / 2 + edgeLength / 2;
+  EXPECT_NEAR(bounds.min.x, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.y, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.z, -outerBound, precision);
+  EXPECT_NEAR(bounds.max.x, outerBound, precision);
+  EXPECT_NEAR(bounds.max.y, outerBound, precision);
+  EXPECT_NEAR(bounds.max.z, outerBound, precision);
+}
+
+TEST(SDF, Bounds2) {
+  const float size = 4;
+  const float edgeLength = 1;
+
+  Manifold cubeVoid = Manifold::LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+  Box bounds = cubeVoid.BoundingBox();
+  const float precision = cubeVoid.Precision();
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cubeVoid2.glb", cubeVoid.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
