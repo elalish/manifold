@@ -357,7 +357,7 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   const glm::vec3 origin = bounds.min;
   Vec<float> voxels(maxIndex);
   for_each_n(
-      pol, countAt(0_z), maxIndex,
+      pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
         voxels[idx] =
             BoundedSDF(DecodeIndex(idx, gridPow) - glm::ivec4(1, 1, 1, 0),
@@ -371,7 +371,7 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0_z),
+    for_each_n(pol, countAt(0_uz),
                EncodeIndex(glm::ivec4(gridSize, 1), gridPow) + 1,
                ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                              gridSize, gridPow, spacing, level, precision}));

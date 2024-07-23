@@ -126,8 +126,8 @@ template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
   HashTable(size_t size, uint32_t step = 1)
-      : keys_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), kOpen},
-        values_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), {}},
+      : keys_{size == 0 ? 0 : 1_uz << (int)ceil(log2(size)), kOpen},
+        values_{size == 0 ? 0 : 1_uz << (int)ceil(log2(size)), {}},
         step_(step) {}
 
   HashTable(const HashTable& other)

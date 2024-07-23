@@ -31,9 +31,15 @@
 #include <sstream>
 #endif
 
-constexpr std::size_t operator""_z(unsigned long long n) { return n; }
-
 namespace manifold {
+
+/**
+ * Stand-in for C++23's operator""uz (P0330R8)[https://wg21.link/P0330R8].
+ */
+[[nodiscard]] constexpr std::size_t operator""_uz(
+    unsigned long long n) noexcept {
+  return n;
+}
 
 constexpr float kTolerance = 1e-5;
 
