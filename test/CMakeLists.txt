@@ -73,6 +73,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 add_test(test_all ${PROJECT_NAME})
+target_precompile_headers(${PROJECT_NAME} INTERFACE test.h)
 
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
