@@ -443,8 +443,7 @@ TEST(Manifold, Slice) {
 }
 
 TEST(Manifold, MeshRelation) {
-  Mesh gyroidMesh = Gyroid();
-  MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
+  MeshGL gyroidMeshGL = WithIndexColors(Gyroid());
   Manifold gyroid(gyroidMeshGL);
 
 #ifdef MANIFOLD_EXPORT

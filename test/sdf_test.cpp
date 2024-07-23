@@ -77,8 +77,8 @@ TEST(SDF, Bounds2) {
   const float size = 4;
   const float edgeLength = 1;
 
-  Manifold cubeVoid = Manifold::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+  Manifold cubeVoid(MeshGL::LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
@@ -152,5 +152,37 @@ TEST(SDF, SineSurface) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), {});
+#endif
+}
+
+TEST(SDF, Blobs) {
+  const float blend = 1;
+  std::vector<glm::vec4> balls = {{0, 0, 0, 2},     //
+                                  {1, 2, 3, 2},     //
+                                  {-2, 2, -2, 1},   //
+                                  {-2, -3, -2, 2},  //
+                                  {-3, -1, -3, 1},  //
+                                  {2, -3, -2, 2},   //
+                                  {-2, 3, 2, 2},    //
+                                  {-2, -3, 2, 2},   //
+                                  {1, -1, 1, -2},   //
+                                  {-4, -3, -2, 1}};
+  Manifold blobs = Manifold(MeshGL::LevelSet(
+      [&balls, blend](glm::vec3 p) {
+        float d = 0;
+        for (const auto& ball : balls) {
+          d += glm::sign(ball.w) *
+               glm::smoothstep(
+                   -blend, blend,
+                   glm::abs(ball.w) - glm::length(glm::vec3(ball) - p));
+        }
+        return d;
+      },
+      {glm::vec3(-5), glm::vec3(5)}, 0.1, 0.5));
+
+  EXPECT_EQ(blobs.Genus(), 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("blobs.glb", blobs.GetMeshGL(), {});
 #endif
 }

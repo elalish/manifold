@@ -101,14 +101,18 @@ glm::vec3 Position(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing) {
 float BoundedSDF(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing,
                  glm::ivec3 gridSize, float level,
                  std::function<float(glm::vec3)> sdf) {
-  const float d = sdf(Position(gridIndex, origin, spacing)) - level;
+  auto Min = [](glm::ivec3 p) { return glm::min(p.x, glm::min(p.y, p.z)); };
 
   const glm::ivec3 xyz(gridIndex);
-  const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
-  const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
-  const bool onHalfBound =
-      gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
-  return (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
+  const int lowerBoundDist = Min(xyz);
+  const int upperBoundDist = Min(gridSize - xyz);
+  const int boundDist = glm::min(lowerBoundDist, upperBoundDist - gridIndex.w);
+
+  if (boundDist < 0) {
+    return 0.0f;
+  }
+  const float d = sdf(Position(gridIndex, origin, spacing)) - level;
+  return boundDist == 0 ? glm::min(d, 0.0f) : d;
 }
 
 struct GridVert {
@@ -336,12 +340,9 @@ namespace manifold {
  * Mesh, but it is guaranteed to be manifold and so can always be used as
  * input to the Manifold constructor for further operations.
  */
-Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
-                            float edgeLength, float level, float precision,
-                            bool canParallel) {
-  auto pImpl_ = std::make_shared<Impl>();
-  auto& vertPos = pImpl_->vertPos_;
-
+MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
+                        float edgeLength, float level, float precision,
+                        bool canParallel) {
   const glm::vec3 dim = bounds.Size();
   const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
   const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
@@ -368,7 +369,7 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   size_t tableSize = glm::min(
       2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
-  vertPos.resize(gridVerts.Size() * 7);
+  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
@@ -402,20 +403,17 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
   triVerts.resize(index[0]);
 
-  pImpl_->meshRelation_ = {(int)ReserveIDs(1)};
-  pImpl_->CalculateBBox();
-  pImpl_->SetPrecision();
-
-  pImpl_->CreateHalfedges(triVerts);
-
-  pImpl_->CalculateNormals();
-
-  pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
-
-  pImpl_->SimplifyTopology();
-  pImpl_->Finish();
-  return Manifold(pImpl_);
+  MeshGL out;
+  out.numProp = 3;
+  out.vertProperties.resize(out.numProp * vertPos.size());
+  for (size_t i = 0; i < vertPos.size(); ++i) {
+    for (int j : {0, 1, 2}) out.vertProperties[3 * i + j] = vertPos[i][j];
+  }
+  out.triVerts.resize(3 * triVerts.size());
+  for (size_t i = 0; i < triVerts.size(); ++i) {
+    for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = triVerts[i][j];
+  }
+  return out;
 }
 /** @} */
 }  // namespace manifold

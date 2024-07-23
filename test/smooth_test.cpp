@@ -401,9 +401,9 @@ TEST(Smooth, SDF) {
     newProp[0] = glm::abs(sphericalGyroid(pos));
   };
 
-  Manifold gyroid = Manifold::LevelSet(
+  Manifold gyroid(MeshGL::LevelSet(
       sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
-      0.00001);
+      0.00001));
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
