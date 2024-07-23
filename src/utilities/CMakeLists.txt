@@ -57,11 +57,9 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 
-if (NOT CMAKE_UNITY_BUILD)
 target_precompile_headers(${PROJECT_NAME} INTERFACE
-    include/par.h
-    include/public.h)
-endif()
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/par.h>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/public.h>)
 
 if(MANIFOLD_EXCEPTIONS)
     target_compile_options(${PROJECT_NAME} INTERFACE
