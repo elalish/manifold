@@ -18,7 +18,7 @@ endif()
 
 target_link_libraries(
     ${PROJECT_NAME}
-    PRIVATE manifold sdf cross_section
+    PRIVATE manifold cross_section
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

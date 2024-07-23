@@ -21,7 +21,6 @@
 #include "helpers.cpp"
 #include "manifold.h"
 #include "polygon.h"
-#include "sdf.h"
 
 using namespace emscripten;
 using namespace manifold;

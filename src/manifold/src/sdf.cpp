@@ -342,6 +342,9 @@ namespace manifold {
 MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
                         float edgeLength, float level, float precision,
                         bool canParallel) {
+  if (precision <= 0) {
+    precision = std::numeric_limits<float>::infinity();
+  }
   const glm::vec3 dim = bounds.Size();
   const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
   const glm::ivec3 gridPow(glm::log2(gridSize) + 1);

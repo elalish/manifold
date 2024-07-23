@@ -17,7 +17,6 @@
 #include "cross_section.h"
 #include "manifold.h"
 #include "samples.h"
-#include "sdf.h"
 #include "test.h"
 #include "tri_dist.h"
 
@@ -331,7 +330,7 @@ TEST(Smooth, Torus) {
 }
 
 TEST(Smooth, SineSurface) {
-  MeshGL surface = LevelSet(
+  MeshGL surface = MeshGL::LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
@@ -361,7 +360,7 @@ TEST(Smooth, SineSurface) {
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
   EXPECT_NEAR(prop3.volume, 8.44, 0.01);
-  EXPECT_NEAR(prop3.surfaceArea, 31.72, 0.01);
+  EXPECT_NEAR(prop3.surfaceArea, 31.74, 0.01);
   EXPECT_EQ(smoothed3.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT

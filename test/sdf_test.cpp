@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sdf.h"
-
 #include "manifold.h"
 #include "test.h"
 
@@ -53,7 +51,7 @@ TEST(SDF, Bounds) {
   const float size = 4;
   const float edgeLength = 1;
 
-  Mesh levelSet = LevelSet(
+  MeshGL levelSet = MeshGL::LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
@@ -101,7 +99,7 @@ TEST(SDF, Surface) {
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(LevelSet(
+  Manifold cubeVoid(MeshGL::LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
 
   Manifold cube = Manifold::Cube(glm::vec3(size), true);
@@ -127,7 +125,8 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const float size = 20;
-  Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  Manifold layers(
+      MeshGL::LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -137,13 +136,13 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  Mesh surface(LevelSet(
+  MeshGL surface = MeshGL::LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {glm::vec3(-1.75 * glm::pi<float>()), glm::vec3(1.75 * glm::pi<float>())},
-      1));
+      1);
   Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);

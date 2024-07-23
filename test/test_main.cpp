@@ -15,7 +15,6 @@
 
 #include "manifold.h"
 #include "polygon.h"
-#include "sdf.h"
 #include "test.h"
 
 // we need to call some tracy API to establish the connection

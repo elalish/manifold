@@ -19,7 +19,6 @@
 #include "cross_section.h"
 #include "manifold.h"
 #include "public.h"
-#include "sdf.h"
 #include "types.h"
 
 ManifoldManifold *to_c(manifold::Manifold *m) {

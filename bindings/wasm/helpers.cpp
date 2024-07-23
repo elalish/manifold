@@ -6,7 +6,6 @@
 #include "cross_section.h"
 #include "manifold.h"
 #include "polygon.h"
-#include "sdf.h"
 
 using namespace emscripten;
 using namespace manifold;

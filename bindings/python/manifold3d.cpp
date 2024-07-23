@@ -27,7 +27,6 @@
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
 #include "polygon.h"
-#include "sdf.h"
 
 namespace nb = nanobind;
 using namespace manifold;
@@ -257,10 +256,7 @@ NB_MODULE(manifold3d, m) {
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
-          "scale",
-          [](const Manifold &m, float s) {
-            m.Scale({s, s, s});
-          },
+          "scale", [](const Manifold &m, float s) { m.Scale({s, s, s}); },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -554,7 +550,8 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "level_set",
           [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0) {
+             std::vector<float> bounds, float edgeLength, float level = 0.0,
+             float precision = -1) {
             // Same format as Manifold.bounding_box
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
@@ -562,12 +559,11 @@ NB_MODULE(manifold3d, m) {
             std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
               return f(v.x, v.y, v.z);
             };
-            Mesh result =
-                LevelSet(cppToPython, bound, edgeLength, level, false);
-            return MeshGL(result);
+            return MeshGL::LevelSet(cppToPython, bound, edgeLength, level,
+                                    precision, false);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
-          nb::arg("level") = 0.0,
+          nb::arg("level") = 0.0, nb::arg("precision") = -1,
           "Constructs a level-set Mesh from the input Signed-Distance Function "
           "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
           "Cubes, but better for manifoldness). Instead of using a cubic grid, "
@@ -587,6 +583,8 @@ NB_MODULE(manifold3d, m) {
           "strong effect on performance."
           ":param level: You can inset your Mesh by using a positive value, or "
           "outset it with a negative value."
+          ":param precision: The verts will be within this distance of the "
+          "real surface."
           ":return Mesh: This mesh is guaranteed to be manifold."
           "Use Manifold.from_mesh(mesh) to create a Manifold")
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
@@ -673,9 +671,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) {
-            self.Scale({s, s});
-          },
+          [](const CrossSection &self, float s) { self.Scale({s, s}); },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
