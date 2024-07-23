@@ -311,7 +311,7 @@ namespace manifold {
  */
 
 /**
- * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
+ * Constructs a level-set MeshGL from the input Signed-Distance Function (SDF).
  * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
  * for manifoldness). Instead of using a cubic grid, it uses a body-centered
  * cubic grid (two shifted cubic grids). This means if your function's interior
@@ -336,9 +336,8 @@ namespace manifold {
  * with runtime locks that expect to not be called back by unregistered threads.
  * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
  * active.
- * @return Mesh This class does not depend on Manifold, so it just returns a
- * Mesh, but it is guaranteed to be manifold and so can always be used as
- * input to the Manifold constructor for further operations.
+ * @return MeshGL This mesh is guaranteed to be manifold and so can always be
+ * used as input to the Manifold constructor for further operations.
  */
 MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
                         float edgeLength, float level, float precision,

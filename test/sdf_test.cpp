@@ -167,7 +167,7 @@ TEST(SDF, Blobs) {
                                   {-2, -3, 2, 2},   //
                                   {1, -1, 1, -2},   //
                                   {-4, -3, -2, 1}};
-  Manifold blobs = Manifold(MeshGL::LevelSet(
+  MeshGL blobs = MeshGL::LevelSet(
       [&balls, blend](glm::vec3 p) {
         float d = 0;
         for (const auto& ball : balls) {
@@ -178,11 +178,13 @@ TEST(SDF, Blobs) {
         }
         return d;
       },
-      {glm::vec3(-5), glm::vec3(5)}, 0.1, 0.5));
+      {glm::vec3(-5), glm::vec3(5)}, 0.02, 0.5);
 
-  EXPECT_EQ(blobs.Genus(), 0);
+  const int chi = blobs.NumVert() - blobs.NumTri() / 2;
+  const int genus = 1 - chi / 2;
+  EXPECT_EQ(genus, 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("blobs.glb", blobs.GetMeshGL(), {});
+  if (options.exportModels) ExportMesh("blobs.glb", blobs, {});
 #endif
 }
