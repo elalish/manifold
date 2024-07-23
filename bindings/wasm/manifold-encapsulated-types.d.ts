@@ -493,10 +493,14 @@ export class Manifold {
    * performance.
    * @param level You can inset your Mesh by using a positive value, or outset
    * it with a negative value.
+   * @param precision Ensure each vertex is within this distance of the true
+   * surface. Defaults to -1, which will return the interpolated
+   * crossing-point based on the two nearest grid points. Small positive values
+   * will require more sdf evaluations per output vertex.
    */
   static levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-      level?: number): Manifold;
+      level?: number, precision?: number): Manifold;
 
   // Transformations
 

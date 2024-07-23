@@ -205,12 +205,11 @@ Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
   return manifold.SetProperties(numProp, f);
 }
 
-Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength,
-                  float level) {
+Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength, float level,
+                  float precision) {
   float (*f)(const glm::vec3&) =
       reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
-  Mesh m = LevelSet(f, bounds, edgeLength, level);
-  return Manifold(m);
+  return Manifold(MeshGL::LevelSet(f, bounds, edgeLength, level, precision));
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

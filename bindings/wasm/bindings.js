@@ -632,7 +632,8 @@ Module.setup = function() {
   Module.Manifold.difference = manifoldBatchbool('Difference');
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 
-  Module.Manifold.levelSet = function(sdf, bounds, edgeLength, level = 0) {
+  Module.Manifold.levelSet = function(
+      sdf, bounds, edgeLength, level = 0, precision = -1) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
@@ -644,7 +645,8 @@ Module.setup = function() {
       const vert = [x, y, z];
       return sdf(vert);
     }, 'fi');
-    const out = Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level);
+    const out =
+        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, precision);
     removeFunction(wasmFuncPtr);
     return out;
   };

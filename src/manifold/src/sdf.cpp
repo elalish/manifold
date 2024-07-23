@@ -329,9 +329,9 @@ namespace manifold {
  * @param level You can inset your Mesh by using a positive value, or outset
  * it with a negative value.
  * @param precision Ensure each vertex is within this distance of the true
- * surface. Defaults to infinity, which will return the interpolated
- * crossing-point based on the two nearest grid points. Smaller values will
- * require more sdf evaluations per output vertex.
+ * surface. Defaults to -1, which will return the interpolated
+ * crossing-point based on the two nearest grid points. Small positive values
+ * will require more sdf evaluations per output vertex.
  * @param canParallel Parallel policies violate will crash language runtimes
  * with runtime locks that expect to not be called back by unregistered threads.
  * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
