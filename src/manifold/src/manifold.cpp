@@ -16,7 +16,7 @@
 #include <map>
 #include <numeric>
 
-#include "QuickHull.hpp"
+#include "quickhull.hpp"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
