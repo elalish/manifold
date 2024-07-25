@@ -343,9 +343,9 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   }
   const glm::vec3 dim = bounds.Size();
   const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
-  const glm::ivec3 gridPow(glm::log2(gridSize) + 1);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize - 1));
 
+  const glm::ivec3 gridPow(glm::log2(gridSize + 2) + 1);
   const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
