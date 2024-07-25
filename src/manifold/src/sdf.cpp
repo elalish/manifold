@@ -372,7 +372,7 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   while (1) {
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_uz),
-               EncodeIndex(glm::ivec4(gridSize, 1), gridPow) + 1,
+               EncodeIndex(glm::ivec4(gridSize, 1), gridPow),
                ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                              gridSize, gridPow, spacing, level, precision}));
 
