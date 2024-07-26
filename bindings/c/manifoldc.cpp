@@ -17,7 +17,6 @@
 #include <manifold.h>
 #include <manifoldc.h>
 #include <public.h>
-#include <sdf.h>
 
 #include <vector>
 
@@ -38,7 +37,7 @@ namespace {
 ManifoldMeshGL *level_set(void *mem,
                           float (*sdf_context)(float, float, float, void *),
                           ManifoldBox *bounds, float edge_length, float level,
-                          bool seq, void *ctx) {
+                          float precision, bool seq, void *ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<float(float, float, float)> sdf =
@@ -46,8 +45,8 @@ ManifoldMeshGL *level_set(void *mem,
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
-  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, !seq);
-  return to_c(new (mem) MeshGL(mesh));
+  return to_c(new (mem) MeshGL(MeshGL::LevelSet(
+      fun, *from_c(bounds), edge_length, level, precision, !seq)));
 }
 }  // namespace
 
@@ -275,14 +274,14 @@ ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
 ManifoldMeshGL *manifold_level_set(void *mem,
                                    float (*sdf)(float, float, float, void *),
                                    ManifoldBox *bounds, float edge_length,
-                                   float level, void *ctx) {
-  return level_set(mem, sdf, bounds, edge_length, level, false, ctx);
+                                   float level, float precision, void *ctx) {
+  return level_set(mem, sdf, bounds, edge_length, level, precision, false, ctx);
 }
 
 ManifoldMeshGL *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
-    float edge_length, float level, void *ctx) {
-  return level_set(mem, sdf, bounds, edge_length, level, true, ctx);
+    float edge_length, float level, float precision, void *ctx) {
+  return level_set(mem, sdf, bounds, edge_length, level, precision, true, ctx);
 }
 
 ManifoldManifold *manifold_smooth_by_normals(void *mem, ManifoldManifold *m,

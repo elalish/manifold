@@ -116,6 +116,10 @@ struct MeshGL {
   MeshGL() = default;
   MeshGL(const Mesh& mesh);
 
+  static MeshGL LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
+                         float edgeLength, float level = 0,
+                         float precision = -1, bool canParallel = true);
+
   bool Merge();
 };
 /** @} */

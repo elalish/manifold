@@ -21,7 +21,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities sdf
+    PUBLIC utilities
     PRIVATE $<BUILD_INTERFACE:collider> polygon ${MANIFOLD_INCLUDE} quickhull
 )
 

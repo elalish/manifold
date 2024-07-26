@@ -49,8 +49,7 @@ TEST(BooleanComplex, Sphere) {
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  Mesh gyroidMesh = Gyroid();
-  MeshGL gyroidMeshGL = WithPositionColors(gyroidMesh);
+  MeshGL gyroidMeshGL = WithPositionColors(Gyroid());
   Manifold gyroid(gyroidMeshGL);
 
   Manifold gyroid2 = gyroid.Translate(glm::vec3(2.0f));
