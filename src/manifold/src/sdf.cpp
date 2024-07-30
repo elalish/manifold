@@ -64,15 +64,27 @@ glm::ivec3 TetTri1(int i) {
   return tetTri1[i];
 }
 
-glm::ivec4 Neighbors(int i) {
-  constexpr glm::ivec4 neighbors[7] = {{0, 0, 0, 1},   //
-                                       {1, 0, 0, 0},   //
-                                       {0, 1, 0, 0},   //
-                                       {0, 0, 1, 0},   //
-                                       {-1, 0, 0, 1},  //
-                                       {0, -1, 0, 1},  //
-                                       {0, 0, -1, 1}};
-  return neighbors[i];
+glm::ivec4 Neighbor(glm::ivec4 base, int i) {
+  constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
+                                        {1, 0, 0, 0},     //
+                                        {0, 1, 0, 0},     //
+                                        {0, 0, 1, 0},     //
+                                        {-1, 0, 0, 1},    //
+                                        {0, -1, 0, 1},    //
+                                        {0, 0, -1, 1},    //
+                                        {-1, -1, -1, 1},  //
+                                        {-1, 0, 0, 0},    //
+                                        {0, -1, 0, 0},    //
+                                        {0, 0, -1, 0},    //
+                                        {0, -1, -1, 1},   //
+                                        {-1, 0, -1, 1},   //
+                                        {-1, -1, 0, 1}};
+  glm::ivec4 neighborIndex = base + neighbors[i];
+  if (neighborIndex.w == 2) {
+    neighborIndex += 1;
+    neighborIndex.w = 0;
+  }
+  return neighborIndex;
 }
 
 Uint64 EncodeIndex(glm::ivec4 gridPos, glm::ivec3 gridPow) {
@@ -115,6 +127,46 @@ float BoundedSDF(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing,
   return boundDist == 0 ? glm::min(d, 0.0f) : d;
 }
 
+// Simplified ITP root finding algorithm - same worst-case performance as
+// bisection, better average performance.
+inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
+                             float tol, float level,
+                             std::function<float(glm::vec3)> sdf) {
+  if (d0 == 0) {
+    return pos0;
+  } else if (d1 == 0) {
+    return pos1;
+  }
+
+  // Sole tuning parameter, k: (0, 1) - smaller value gets better median
+  // performance, but also hits the worst case more often.
+  const float k = 0.1;
+  const float check = 2 * tol / glm::length(pos0 - pos1);
+  float frac = 1;
+  float biFrac = 1;
+  while (frac > check) {
+    const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
+    const float r = biFrac / frac - 0.5;
+    const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+
+    const glm::vec3 mid = glm::mix(pos0, pos1, x);
+    const float d = sdf(mid) - level;
+
+    if ((d > 0) == (d0 > 0)) {
+      d0 = d;
+      pos0 = mid;
+      frac *= 1 - x;
+    } else {
+      d1 = d;
+      pos1 = mid;
+      frac *= x;
+    }
+    biFrac /= 2;
+  }
+
+  return glm::mix(pos0, pos1, d0 / (d0 - d1));
+}
+
 struct GridVert {
   float distance = NAN;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
@@ -123,6 +175,68 @@ struct GridVert {
 
   int NeighborInside(int i) const {
     return Inside() * (edgeVerts[i] < 0 ? 1 : -1);
+  }
+};
+
+struct NearSurface {
+  VecView<glm::vec3> vertPos;
+  VecView<int> vertIndex;
+  HashTableD<GridVert> gridVerts;
+  VecView<const float> voxels;
+  const std::function<float(glm::vec3)> sdf;
+  const glm::vec3 origin;
+  const glm::ivec3 gridSize;
+  const glm::ivec3 gridPow;
+  const glm::vec3 spacing;
+  const float level;
+  const float tol;
+
+  inline void operator()(Uint64 index) {
+    ZoneScoped;
+    if (gridVerts.Full()) return;
+
+    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
+
+    if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
+
+    GridVert gridVert;
+    gridVert.distance =
+        voxels[EncodeIndex(gridIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
+
+    bool keep = false;
+    float vMax = 0;
+    int closestNeighbor = -1;
+    for (int i = 0; i < 14; ++i) {
+      const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
+      const float val =
+          voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
+      if ((val > 0) == (gridVert.distance > 0)) continue;
+
+      if (i < 7) keep = true;
+
+      const float v = glm::abs(val);
+      if (v > 4 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
+        vMax = val;
+        closestNeighbor = i;
+      }
+    }
+
+    if (closestNeighbor >= 0) {
+      const glm::vec3 gridPos = Position(gridIndex, origin, spacing);
+      const glm::ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
+      const glm::vec3 pos = FindSurface(
+          gridPos, gridVert.distance, Position(neighborIndex, origin, spacing),
+          vMax, tol, level, sdf);
+      if (4 * glm::dot(pos - gridPos, pos - gridPos) < spacing[0]) {
+        const int idx = AtomicAdd(vertIndex[0], 1);
+        vertPos[idx] = pos;
+        gridVert.distance = 0;
+        for (int i = 0; i < 7; ++i) gridVert.edgeVerts[i] = idx;
+        keep = true;
+      }
+    }
+
+    if (keep) gridVerts.Insert(index, gridVert);
   }
 };
 
@@ -139,80 +253,42 @@ struct ComputeVerts {
   const float level;
   const float tol;
 
-  // Simplified ITP root finding algorithm - same worst-case performance as
-  // bisection, better average performance.
-  inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1,
-                               float d1) const {
-    if (d0 == 0) {
-      return pos0;
-    } else if (d1 == 0) {
-      return pos1;
-    }
-
-    // Sole tuning parameter, k: (0, 1) - smaller value gets better median
-    // performance, but also hits the worst case more often.
-    const float k = 0.1;
-    const float check = 2 * tol / glm::length(pos0 - pos1);
-    float frac = 1;
-    float biFrac = 1;
-    while (frac > check) {
-      const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
-      const float r = biFrac / frac - 0.5;
-      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
-
-      const glm::vec3 mid = glm::mix(pos0, pos1, x);
-      const float d = sdf(mid) - level;
-
-      if ((d > 0) == (d0 > 0)) {
-        d0 = d;
-        pos0 = mid;
-        frac *= 1 - x;
-      } else {
-        d1 = d;
-        pos1 = mid;
-        frac *= x;
-      }
-      biFrac /= 2;
-    }
-
-    return glm::mix(pos0, pos1, d0 / (d0 - d1));
-  }
-
-  inline void operator()(Uint64 index) {
+  void operator()(int idx) {
     ZoneScoped;
-    if (gridVerts.Full()) return;
+    Uint64 basekey = gridVerts.KeyAt(idx);
+    if (basekey == kOpen) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
+    GridVert& gridVert = gridVerts.At(idx);
 
-    if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
+    if (gridVert.distance == 0) return;
+
+    const glm::ivec4 gridIndex = DecodeIndex(basekey, gridPow);
 
     const glm::vec3 position = Position(gridIndex, origin, spacing);
 
-    GridVert gridVert;
-    gridVert.distance =
-        voxels[EncodeIndex(gridIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
-
-    bool keep = false;
     // These seven edges are uniquely owned by this gridVert; any of them
     // which intersect the surface create a vert.
     for (int i = 0; i < 7; ++i) {
-      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
-      if (neighborIndex.w == 2) {
-        neighborIndex += 1;
-        neighborIndex.w = 0;
+      const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
+      const GridVert& neighbor = gridVerts[EncodeIndex(neighborIndex, gridPow)];
+      if (neighbor.distance == 0) {
+        gridVert.edgeVerts[i] = neighbor.edgeVerts[0];
+        continue;
       }
+
       const float val =
-          voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
+          isfinite(neighbor.distance)
+              ? neighbor.distance
+              : voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0),
+                                   gridPow)];
       if ((val > 0) == (gridVert.distance > 0)) continue;
-      keep = true;
 
       const int idx = AtomicAdd(vertIndex[0], 1);
       vertPos[idx] = FindSurface(position, gridVert.distance,
-                                 Position(neighborIndex, origin, spacing), val);
+                                 Position(neighborIndex, origin, spacing), val,
+                                 tol, level, sdf);
       gridVert.edgeVerts[i] = idx;
     }
-
-    if (keep) gridVerts.Insert(index, gridVert);
   }
 };
 
@@ -224,8 +300,11 @@ struct BuildTris {
 
   void CreateTri(const glm::ivec3& tri, const int edges[6]) {
     if (tri[0] < 0) return;
+    const glm::ivec3 verts(edges[tri[0]], edges[tri[1]], edges[tri[2]]);
+    if (verts[0] == verts[1] || verts[1] == verts[2] || verts[2] == verts[0])
+      return;
     int idx = AtomicAdd(triIndex[0], 1);
-    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
+    triVerts[idx] = verts;
   }
 
   void CreateTris(const glm::ivec4& tet, const int edges[6]) {
@@ -373,8 +452,8 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_uz),
                EncodeIndex(glm::ivec4(gridSize, 1), gridPow),
-               ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                             gridSize, gridPow, spacing, level, precision}));
+               NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
+                            gridSize, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
@@ -389,6 +468,10 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
       gridVerts = HashTable<GridVert>(tableSize);
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success
+      for_each_n(
+          pol, countAt(0), gridVerts.Size(),
+          ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
+                        gridSize, gridPow, spacing, level, precision}));
       vertPos.resize(index[0]);
       break;
     }
