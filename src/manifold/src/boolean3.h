@@ -55,6 +55,6 @@ class Boolean3 {
   const float expandP_;
   SparseIndices p1q2_, p2q1_;
   Vec<int> x12_, x21_, w03_, w30_;
-  Vec<glm::vec3> v12_, v21_;
+  Vec<vec3> v12_, v21_;
 };
 }  // namespace manifold

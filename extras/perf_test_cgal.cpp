@@ -57,7 +57,7 @@ void manifoldToCGALSurfaceMesh(Manifold &manifold, TriangleMesh &cgalMesh) {
 int main(int argc, char **argv) {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
-    Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
+    Manifold sphere2 = sphere.Translate(vec3(0.5));
 
     TriangleMesh cgalSphere, cgalSphere2;
     manifoldToCGALSurfaceMesh(sphere, cgalSphere);

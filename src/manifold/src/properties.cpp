@@ -23,19 +23,19 @@ using namespace manifold;
 
 struct FaceAreaVolume {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
+  VecView<const vec3> vertPos;
   const float precision;
 
   std::pair<float, float> operator()(int face) {
     float perimeter = 0;
-    glm::vec3 edge[3];
+    vec3 edge[3];
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
       edge[i] = vertPos[halfedges[3 * face + j].startVert] -
                 vertPos[halfedges[3 * face + i].startVert];
       perimeter += glm::length(edge[i]);
     }
-    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+    vec3 crossP = glm::cross(edge[0], edge[1]);
 
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
@@ -50,12 +50,12 @@ struct CurvatureAngles {
   VecView<float> area;
   VecView<float> degree;
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
+  VecView<const vec3> vertPos;
+  VecView<const vec3> triNormal;
 
   void operator()(size_t tri) {
-    glm::vec3 edge[3];
-    glm::vec3 edgeLength(0.0);
+    vec3 edge[3];
+    vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
@@ -72,7 +72,7 @@ struct CurvatureAngles {
       AtomicAdd(degree[startVert], 1.0f);
     }
 
-    glm::vec3 phi;
+    vec3 phi;
     phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
     phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
@@ -88,7 +88,7 @@ struct CurvatureAngles {
 };
 
 struct UpdateProperties {
-  VecView<glm::ivec3> triProp;
+  VecView<ivec3> triProp;
   VecView<float> properties;
 
   VecView<const float> oldProperties;
@@ -126,7 +126,7 @@ struct UpdateProperties {
 
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
+  VecView<const vec3> vertPos;
 
   bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
@@ -148,15 +148,15 @@ struct CheckHalfedges {
 
 struct CheckCCW {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
+  VecView<const vec3> vertPos;
+  VecView<const vec3> triNormal;
   const float tol;
 
   bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
-    const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
-    glm::vec2 v[3];
+    const mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
@@ -165,15 +165,15 @@ struct CheckCCW {
 
 #ifdef MANIFOLD_DEBUG
     if (tol > 0 && !check) {
-      glm::vec2 v1 = v[1] - v[0];
-      glm::vec2 v2 = v[2] - v[0];
+      vec2 v1 = v[1] - v[0];
+      vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
       float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
       float base = glm::sqrt(base2);
-      glm::vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      glm::vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      glm::vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
+      vec3 V0 = vertPos[halfedges[3 * face].startVert];
+      vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
+      vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
+      vec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
           "Tri %ld does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
@@ -312,20 +312,20 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
  * range for Morton code calculation. Ignores NaNs.
  */
 void Manifold::Impl::CalculateBBox() {
-  bBox_.min = reduce(vertPos_.begin(), vertPos_.end(),
-                     glm::vec3(std::numeric_limits<float>::infinity()),
-                     [](auto a, auto b) {
-                       if (isnan(a.x)) return b;
-                       if (isnan(b.x)) return a;
-                       return glm::min(a, b);
-                     });
-  bBox_.max = reduce(vertPos_.begin(), vertPos_.end(),
-                     glm::vec3(-std::numeric_limits<float>::infinity()),
-                     [](auto a, auto b) {
-                       if (isnan(a.x)) return b;
-                       if (isnan(b.x)) return a;
-                       return glm::max(a, b);
-                     });
+  bBox_.min =
+      reduce(vertPos_.begin(), vertPos_.end(),
+             vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+               if (isnan(a.x)) return b;
+               if (isnan(b.x)) return a;
+               return glm::min(a, b);
+             });
+  bBox_.max =
+      reduce(vertPos_.begin(), vertPos_.end(),
+             vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+               if (isnan(a.x)) return b;
+               if (isnan(b.x)) return a;
+               return glm::max(a, b);
+             });
 }
 
 /**
@@ -343,19 +343,18 @@ bool Manifold::Impl::IsFinite() const {
  * Checks that the input triVerts array has all indices inside bounds of the
  * vertPos_ array.
  */
-bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
-  glm::ivec2 minmax = transform_reduce(
+bool Manifold::Impl::IsIndexInBounds(VecView<const ivec3> triVerts) const {
+  ivec2 minmax = transform_reduce(
       triVerts.begin(), triVerts.end(),
-      glm::ivec2(std::numeric_limits<int>::max(),
-                 std::numeric_limits<int>::min()),
+      ivec2(std::numeric_limits<int>::max(), std::numeric_limits<int>::min()),
       [](auto a, auto b) {
         a[0] = glm::min(a[0], b[0]);
         a[1] = glm::max(a[1], b[1]);
         return a;
       },
       [](auto tri) {
-        return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
-                          glm::max(tri[0], glm::max(tri[1], tri[2])));
+        return ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
+                     glm::max(tri[0], glm::max(tri[1], tri[2])));
       });
 
   return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());
@@ -375,8 +374,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   transform(faceBoxOther.begin(), faceBoxOther.end(), faceBoxOther.begin(),
             [searchLength](const Box& box) {
-              return Box(box.min - glm::vec3(searchLength),
-                         box.max + glm::vec3(searchLength));
+              return Box(box.min - vec3(searchLength),
+                         box.max + vec3(searchLength));
             });
 
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
@@ -388,8 +387,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
         const int tri = collisions.Get(i, 1);
         const int triOther = collisions.Get(i, 0);
 
-        std::array<glm::vec3, 3> p;
-        std::array<glm::vec3, 3> q;
+        std::array<vec3, 3> p;
+        std::array<vec3, 3> q;
 
         for (const int j : {0, 1, 2}) {
           p[j] = vertPos_[halfedge_[3 * tri + j].startVert];

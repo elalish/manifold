@@ -88,7 +88,7 @@ TEST(Samples, Scallop) {
     }
     for (int i = 0; i < numHalfedge; ++i) {
       const int vert = in.triVerts[i / 3][i % 3];
-      in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
+      in.vertPos.push_back(in.vertPos[vert] + vec3(in.halfedgeTangent[i]) *
                                                   in.halfedgeTangent[i].w);
       options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
@@ -100,14 +100,12 @@ TEST(Samples, Scallop) {
   }
 #endif
 
-  auto colorCurvature = [](float* newProp, glm::vec3 pos,
-                           const float* oldProp) {
+  auto colorCurvature = [](float* newProp, vec3 pos, const float* oldProp) {
     const float curvature = oldProp[0];
-    const glm::vec3 red(1, 0, 0);
-    const glm::vec3 blue(0, 0, 1);
+    const vec3 red(1, 0, 0);
+    const vec3 blue(0, 0, 1);
     const float limit = 15;
-    glm::vec3 color =
-        glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
+    vec3 color = glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
     for (const int i : {0, 1, 2}) {
       newProp[i] = color[i];
     }
@@ -284,8 +282,8 @@ TEST(Samples, Sponge4) {
     options.faceted = true;
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
-    for (const glm::vec3 pos : out.vertPos) {
-      options.mat.vertColor.push_back(glm::vec4(0.5f * (pos + 0.5f), 1.0f));
+    for (const vec3 pos : out.vertPos) {
+      options.mat.vertColor.push_back(vec4(0.5f * (pos + 0.5f), 1.0f));
     }
     ExportMesh("mengerSponge.glb", out, options);
   }

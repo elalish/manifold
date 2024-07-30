@@ -116,13 +116,13 @@ Manifold Manifold::Tetrahedron() {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-Manifold Manifold::Cube(glm::vec3 size, bool center) {
+Manifold Manifold::Cube(vec3 size, bool center) {
   if (size.x < 0.0f || size.y < 0.0f || size.z < 0.0f ||
       glm::length(size) == 0.) {
     return Invalid();
   }
-  glm::mat4x3 m(glm::translate(center ? (-size / 2.0f) : glm::vec3(0)) *
-                glm::scale(size));
+  mat4x3 m(glm::translate(center ? (-size / 2.0f) : vec3(0)) *
+           glm::scale(size));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -155,11 +155,10 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
     circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
   }
 
-  Manifold cylinder =
-      Manifold::Extrude({circle}, height, 0, 0.0f, glm::vec2(scale));
+  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0f, vec2(scale));
   if (center)
     cylinder =
-        cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
+        cylinder.Translate(vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
   return cylinder;
 }
 
@@ -180,12 +179,12 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
-  pImpl_->Subdivide([n](glm::vec3 edge) { return n - 1; });
+  pImpl_->Subdivide([n](vec3 edge) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
-             pImpl_->NumVert(), [radius](glm::vec3& v) {
+             pImpl_->NumVert(), [radius](vec3& v) {
                v = glm::cos(glm::half_pi<float>() * (1.0f - v));
                v = radius * glm::normalize(v);
-               if (isnan(v.x)) v = glm::vec3(0.0);
+               if (isnan(v.x)) v = vec3(0.0);
              });
   pImpl_->Finish();
   // Ignore preceding octahedron.
@@ -213,8 +212,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * Default {1, 1}.
  */
 Manifold Manifold::Extrude(const Polygons& crossSection, float height,
-                           int nDivisions, float twistDegrees,
-                           glm::vec2 scaleTop) {
+                           int nDivisions, float twistDegrees, vec2 scaleTop) {
   ZoneScoped;
   if (crossSection.size() == 0 || height <= 0.0f) {
     return Invalid();
@@ -226,7 +224,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
-  Vec<glm::ivec3> triVertsDH;
+  Vec<ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
@@ -235,7 +233,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
   for (auto& poly : crossSection) {
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
-    for (const glm::vec2& polyVert : poly) {
+    for (const vec2& polyVert : poly) {
       vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
       simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
     }
@@ -244,9 +242,9 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / float(nDivisions);
     float phi = alpha * twistDegrees;
-    glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
-    glm::mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
-    glm::mat2 transform = glm::mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
+    vec2 scale = glm::mix(vec2(1.0f), scaleTop, alpha);
+    mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
+    mat2 transform = mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
     size_t j = 0;
     size_t idx = 0;
     for (const auto& poly : crossSection) {
@@ -258,7 +256,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
         } else {
-          glm::vec2 pos = transform * poly[vert];
+          vec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
@@ -273,8 +271,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
     for (size_t j = 0; j < crossSection.size();
          ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
-  for (const glm::ivec3& tri : top) {
+  std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
+  for (const ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
@@ -347,7 +345,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
-  Vec<glm::ivec3> triVertsDH;
+  Vec<ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
 
   std::vector<int> startPoses;
@@ -373,8 +371,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
       if (!isFullRevolution) startPoses.push_back(startPosIndex);
 
-      const glm::vec2 currPolyVertex = poly[polyVert];
-      const glm::vec2 prevPolyVertex =
+      const vec2 currPolyVertex = poly[polyVert];
+      const vec2 prevPolyVertex =
           poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
 
       const int prevStartPosIndex =
@@ -413,7 +411,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
-    std::vector<glm::ivec3> frontTriangles =
+    std::vector<ivec3> frontTriangles =
         Triangulate(polygons, pImpl_->precision_);
     for (auto& t : frontTriangles) {
       triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});

@@ -83,7 +83,7 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
+val GetMeshJS(const Manifold& manifold, const ivec3& normalIdx) {
   MeshGL mesh = manifold.GetMeshGL(normalIdx);
   return MeshGL2JS(mesh);
 }
@@ -105,7 +105,7 @@ Manifold Smooth(const val& mesh,
 }  // namespace js
 
 namespace cross_js {
-CrossSection OfPolygons(std::vector<std::vector<glm::vec2>> polygons,
+CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons,
                         int fill_rule) {
   auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
             : fill_rule == 1 ? CrossSection::FillRule::NonZero
@@ -140,14 +140,14 @@ CrossSection IntersectionN(const std::vector<CrossSection>& cross_sections) {
 
 CrossSection Transform(CrossSection& cross_section, const val& mat) {
   std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
-  glm::mat3x2 matrix;
+  mat3x2 matrix;
   for (const int col : {0, 1, 2})
     for (const int row : {0, 1}) matrix[col][row] = array[col * 3 + row];
   return cross_section.Transform(matrix);
 }
 
 CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
-  void (*f)(glm::vec2&) = reinterpret_cast<void (*)(glm::vec2&)>(funcPtr);
+  void (*f)(vec2&) = reinterpret_cast<void (*)(vec2&)>(funcPtr);
   return cross_section.Warp(f);
 }
 
@@ -159,7 +159,7 @@ CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
 
-void CollectVertices(std::vector<glm::vec2>& verts, const CrossSection& cs) {
+void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {
   auto polys = cs.ToPolygons();
   for (auto poly : polys) verts.insert(verts.end(), poly.begin(), poly.end());
 }
@@ -188,27 +188,26 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 
 Manifold Transform(Manifold& manifold, const val& mat) {
   std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
-  glm::mat4x3 matrix;
+  mat4x3 matrix;
   for (const int col : {0, 1, 2, 3})
     for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);
 }
 
 Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
-  void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
+  void (*f)(vec3&) = reinterpret_cast<void (*)(vec3&)>(funcPtr);
   return manifold.Warp(f);
 }
 
 Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
-  void (*f)(float*, glm::vec3, const float*) =
-      reinterpret_cast<void (*)(float*, glm::vec3, const float*)>(funcPtr);
+  void (*f)(float*, vec3, const float*) =
+      reinterpret_cast<void (*)(float*, vec3, const float*)>(funcPtr);
   return manifold.SetProperties(numProp, f);
 }
 
 Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength, float level,
                   float precision) {
-  float (*f)(const glm::vec3&) =
-      reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
+  float (*f)(const vec3&) = reinterpret_cast<float (*)(const vec3&)>(funcPtr);
   return Manifold(MeshGL::LevelSet(f, bounds, edgeLength, level, precision));
 }
 
@@ -217,13 +216,13 @@ std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   return {r1, r2};
 }
 
-std::vector<Manifold> SplitByPlane(Manifold& m, glm::vec3 normal,
+std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
                                    float originOffset) {
   auto [a, b] = m.SplitByPlane(normal, originOffset);
   return {a, b};
 }
 
-void CollectVertices(std::vector<glm::vec3>& verts, const Manifold& manifold) {
+void CollectVertices(std::vector<vec3>& verts, const Manifold& manifold) {
   Mesh mesh = manifold.GetMesh();
   verts.insert(verts.end(), mesh.vertPos.begin(), mesh.vertPos.end());
 }

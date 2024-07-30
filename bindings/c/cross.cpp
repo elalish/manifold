@@ -76,7 +76,7 @@ void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec *csv,
 
 ManifoldCrossSection *manifold_cross_section_square(void *mem, float x, float y,
                                                     int center) {
-  auto cs = CrossSection::Square(glm::vec2(x, y), center);
+  auto cs = CrossSection::Square(vec2(x, y), center);
   return to_c(new (mem) CrossSection(cs));
 }
 
@@ -146,7 +146,7 @@ ManifoldCrossSection *manifold_cross_section_hull_polygons(
 ManifoldCrossSection *manifold_cross_section_translate(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        float x, float y) {
-  auto translated = from_c(cs)->Translate(glm::vec2(x, y));
+  auto translated = from_c(cs)->Translate(vec2(x, y));
   return to_c(new (mem) CrossSection(translated));
 }
 
@@ -160,14 +160,14 @@ ManifoldCrossSection *manifold_cross_section_rotate(void *mem,
 ManifoldCrossSection *manifold_cross_section_scale(void *mem,
                                                    ManifoldCrossSection *cs,
                                                    float x, float y) {
-  auto scaled = from_c(cs)->Scale(glm::vec2(x, y));
+  auto scaled = from_c(cs)->Scale(vec2(x, y));
   return to_c(new (mem) CrossSection(scaled));
 }
 
 ManifoldCrossSection *manifold_cross_section_mirror(void *mem,
                                                     ManifoldCrossSection *cs,
                                                     float ax_x, float ax_y) {
-  auto mirrored = from_c(cs)->Mirror(glm::vec2(ax_x, ax_y));
+  auto mirrored = from_c(cs)->Mirror(vec2(ax_x, ax_y));
   return to_c(new (mem) CrossSection(mirrored));
 }
 
@@ -176,7 +176,7 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        float x1, float y1,
                                                        float x2, float y2,
                                                        float x3, float y3) {
-  auto mat = glm::mat3x2(x1, y1, x2, y2, x3, y3);
+  auto mat = mat3x2(x1, y1, x2, y2, x3, y3);
   auto transformed = from_c(cs)->Transform(mat);
   return to_c(new (mem) CrossSection(transformed));
 }
@@ -187,7 +187,7 @@ ManifoldCrossSection *manifold_cross_section_warp(
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<ManifoldVec2(float, float)> f2 = std::bind(fun, _1, _2, ctx);
-  std::function<void(glm::vec2 & v)> warp = [f2](glm::vec2 &v) {
+  std::function<void(vec2 & v)> warp = [f2](vec2 &v) {
     v = from_c(f2(v.x, v.y));
   };
   auto warped = from_c(cs)->Warp(warp);

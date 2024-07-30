@@ -34,26 +34,26 @@ using namespace manifold;
 template <class T>
 struct glm_name {};
 template <>
-struct glm_name<glm::vec3> {
+struct glm_name<vec3> {
   static constexpr char const name[] = "Floatx3";
   static constexpr char const multi_name[] = "FloatNx3";
 };
 template <>
-struct glm_name<glm::vec2> {
+struct glm_name<vec2> {
   static constexpr char const name[] = "Floatx2";
   static constexpr char const multi_name[] = "FloatNx2";
 };
 template <>
-struct glm_name<glm::ivec3> {
+struct glm_name<ivec3> {
   static constexpr char const name[] = "Intx3";
   static constexpr char const multi_name[] = "IntNx3";
 };
 template <>
-struct glm_name<glm::mat4x3> {
+struct glm_name<mat4x3> {
   static constexpr char const name[] = "Float3x4";
 };
 template <>
-struct glm_name<glm::mat3x2> {
+struct glm_name<mat3x2> {
   static constexpr char const name[] = "Float2x3";
 };
 
@@ -248,7 +248,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("manifolds"), manifold__hull__manifolds)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec3> pts) { return Manifold::Hull(pts); },
+          [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
           nb::arg("pts"), manifold__hull__pts)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
@@ -267,16 +267,15 @@ NB_MODULE(manifold3d, m) {
       .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
       .def(
           "rotate",
-          [](const Manifold &self, glm::vec3 v) {
+          [](const Manifold &self, vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"), manifold__rotate__v.c_str())
       .def(
           "warp",
-          [](const Manifold &self,
-             std::function<glm::vec3(glm::vec3)> warp_func) {
+          [](const Manifold &self, std::function<vec3(vec3)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.Warp([&warp_func](glm::vec3 &v) { v = warp_func(v); });
+            return self.Warp([&warp_func](vec3 &v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), manifold__warp__warp_func)
       .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
@@ -285,12 +284,11 @@ NB_MODULE(manifold3d, m) {
           "set_properties",
           [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
-                 glm::vec3, const nb::ndarray<nb::numpy, const float,
-                                              nb::c_contig> &)> &f) {
+                 vec3, const nb::ndarray<nb::numpy, const float, nb::c_contig>
+                           &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
-                                                      float *newProps,
-                                                      glm::vec3 v,
+                                                      float *newProps, vec3 v,
                                                       const float *oldProps) {
               auto result =
                   f(v, nb::ndarray<nb::numpy, const float, nb::c_contig>(
@@ -332,8 +330,7 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
-      .def("to_mesh", &Manifold::GetMeshGL,
-           nb::arg("normal_idx") = glm::ivec3(0),
+      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
@@ -410,12 +407,12 @@ NB_MODULE(manifold3d, m) {
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
+      .def_static("cube", &Manifold::Cube, nb::arg("size") = vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",
           [](const CrossSection &crossSection, float height, int nDivisions,
-             float twistDegrees, glm::vec2 scaleTop) {
+             float twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(crossSection.ToPolygons(), height,
                                      nDivisions, twistDegrees, scaleTop);
           },
@@ -556,10 +553,10 @@ NB_MODULE(manifold3d, m) {
              std::vector<float> bounds, float edgeLength, float level = 0.0,
              float precision = -1) {
             // Same format as Manifold.bounding_box
-            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
-                         glm::vec3(bounds[3], bounds[4], bounds[5])};
+            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
+                         vec3(bounds[3], bounds[4], bounds[5])};
 
-            std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
+            std::function<float(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };
             return MeshGL::LevelSet(cppToPython, bound, edgeLength, level,
@@ -649,8 +646,7 @@ NB_MODULE(manifold3d, m) {
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
       .def(nb::init<>(), cross_section__cross_section)
-      .def(nb::init<std::vector<std::vector<glm::vec2>>,
-                    CrossSection::FillRule>(),
+      .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
            nb::arg("contours"),
            nb::arg("fillrule") = CrossSection::FillRule::Positive,
            cross_section__cross_section__contours__fillrule)
@@ -688,10 +684,9 @@ NB_MODULE(manifold3d, m) {
            cross_section__transform__m)
       .def(
           "warp",
-          [](const CrossSection &self,
-             std::function<glm::vec2(glm::vec2)> warp_func) {
+          [](const CrossSection &self, std::function<vec2(vec2)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.Warp([&warp_func](glm::vec2 &v) { v = warp_func(v); });
+            return self.Warp([&warp_func](vec2 &v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), cross_section__warp__warp_func)
       .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
@@ -715,7 +710,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("cross_sections"), cross_section__hull__cross_sections)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
+          [](std::vector<vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
@@ -727,7 +722,7 @@ NB_MODULE(manifold3d, m) {
       .def(
           "extrude",
           [](const CrossSection &self, float height, int nDivisions,
-             float twistDegrees, glm::vec2 scaleTop) {
+             float twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
                                      twistDegrees, scaleTop);
           },

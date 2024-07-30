@@ -74,7 +74,7 @@ class CrossSection {
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Rect& rect);
-  static CrossSection Square(const glm::vec2 dims, bool center = false);
+  static CrossSection Square(const vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
 
@@ -92,14 +92,13 @@ class CrossSection {
   /** @name Modification
    */
   ///@{
-  CrossSection Translate(const glm::vec2 v) const;
+  CrossSection Translate(const vec2 v) const;
   CrossSection Rotate(float degrees) const;
-  CrossSection Scale(const glm::vec2 s) const;
-  CrossSection Mirror(const glm::vec2 ax) const;
-  CrossSection Transform(const glm::mat3x2& m) const;
-  CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
-  CrossSection WarpBatch(
-      std::function<void(VecView<glm::vec2>)> warpFunc) const;
+  CrossSection Scale(const vec2 s) const;
+  CrossSection Mirror(const vec2 ax) const;
+  CrossSection Transform(const mat3x2& m) const;
+  CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
+  CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
 
   // Adapted from Clipper2 docs:
@@ -168,7 +167,7 @@ class CrossSection {
 
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
-  mutable glm::mat3x2 transform_ = glm::mat3x2(1.0f);
+  mutable mat3x2 transform_ = mat3x2(1.0f);
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

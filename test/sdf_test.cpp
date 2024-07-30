@@ -18,9 +18,9 @@
 using namespace manifold;
 
 struct CubeVoid {
-  float operator()(glm::vec3 p) const {
-    const glm::vec3 min = p + glm::vec3(1);
-    const glm::vec3 max = glm::vec3(1) - p;
+  float operator()(vec3 p) const {
+    const vec3 min = p + vec3(1);
+    const vec3 max = vec3(1) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
     const float max3 = glm::min(max.x, glm::min(max.y, max.z));
     return -1.0f * glm::min(min3, max3);
@@ -28,7 +28,7 @@ struct CubeVoid {
 };
 
 struct Layers {
-  float operator()(glm::vec3 p) const {
+  float operator()(vec3 p) const {
     int a = glm::mod(glm::round(2 * p.z), 4.0f);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }
@@ -52,7 +52,7 @@ TEST(SDF, Bounds) {
   const float edgeLength = 1;
 
   MeshGL levelSet = MeshGL::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
@@ -76,7 +76,7 @@ TEST(SDF, Bounds2) {
   const float edgeLength = 1;
 
   Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength));
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
@@ -100,9 +100,9 @@ TEST(SDF, Surface) {
   const float edgeLength = 0.5;
 
   Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength));
 
-  Manifold cube = Manifold::Cube(glm::vec3(size), true);
+  Manifold cube = Manifold::Cube(vec3(size), true);
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
   const float precision = cube.Precision();
@@ -125,8 +125,7 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const float size = 20;
-  Manifold layers(
-      MeshGL::LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  Manifold layers(MeshGL::LevelSet(Layers(), {vec3(0), vec3(size)}, 1));
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -137,12 +136,11 @@ TEST(SDF, Resize) {
 
 TEST(SDF, SineSurface) {
   MeshGL surface = MeshGL::LevelSet(
-      [](glm::vec3 p) {
+      [](vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
-      {glm::vec3(-1.75 * glm::pi<float>()), glm::vec3(1.75 * glm::pi<float>())},
-      1);
+      {vec3(-1.75 * glm::pi<float>()), vec3(1.75 * glm::pi<float>())}, 1);
   Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
@@ -156,28 +154,27 @@ TEST(SDF, SineSurface) {
 
 TEST(SDF, Blobs) {
   const float blend = 1;
-  std::vector<glm::vec4> balls = {{0, 0, 0, 2},     //
-                                  {1, 2, 3, 2},     //
-                                  {-2, 2, -2, 1},   //
-                                  {-2, -3, -2, 2},  //
-                                  {-3, -1, -3, 1},  //
-                                  {2, -3, -2, 2},   //
-                                  {-2, 3, 2, 2},    //
-                                  {-2, -3, 2, 2},   //
-                                  {1, -1, 1, -2},   //
-                                  {-4, -3, -2, 1}};
+  std::vector<vec4> balls = {{0, 0, 0, 2},     //
+                             {1, 2, 3, 2},     //
+                             {-2, 2, -2, 1},   //
+                             {-2, -3, -2, 2},  //
+                             {-3, -1, -3, 1},  //
+                             {2, -3, -2, 2},   //
+                             {-2, 3, 2, 2},    //
+                             {-2, -3, 2, 2},   //
+                             {1, -1, 1, -2},   //
+                             {-4, -3, -2, 1}};
   MeshGL blobs = MeshGL::LevelSet(
-      [&balls, blend](glm::vec3 p) {
+      [&balls, blend](vec3 p) {
         float d = 0;
         for (const auto& ball : balls) {
           d += glm::sign(ball.w) *
-               glm::smoothstep(
-                   -blend, blend,
-                   glm::abs(ball.w) - glm::length(glm::vec3(ball) - p));
+               glm::smoothstep(-blend, blend,
+                               glm::abs(ball.w) - glm::length(vec3(ball) - p));
         }
         return d;
       },
-      {glm::vec3(-5), glm::vec3(5)}, 0.02, 0.5);
+      {vec3(-5), vec3(5)}, 0.02, 0.5);
 
   const int chi = blobs.NumVert() - blobs.NumTri() / 2;
   const int genus = 1 - chi / 2;

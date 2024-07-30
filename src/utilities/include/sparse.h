@@ -159,9 +159,9 @@ class SparseIndices {
     VecView<T> v;
 
     bool Finite(float v) const { return isfinite(v); }
-    bool Finite(glm::vec2 v) const { return isfinite(v[0]); }
-    bool Finite(glm::vec3 v) const { return isfinite(v[0]); }
-    bool Finite(glm::vec4 v) const { return isfinite(v[0]); }
+    bool Finite(vec2 v) const { return isfinite(v[0]); }
+    bool Finite(vec3 v) const { return isfinite(v[0]); }
+    bool Finite(vec4 v) const { return isfinite(v[0]); }
 
     bool operator()(const int i) const { return Finite(v[i]); }
   };

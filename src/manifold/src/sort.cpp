@@ -47,7 +47,7 @@ struct Extrema {
   }
 };
 
-uint32_t MortonCode(glm::vec3 position, Box bBox) {
+uint32_t MortonCode(vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
   if (isnan(position.x)) return kNoCode;
@@ -68,7 +68,7 @@ struct Reindex {
 struct MarkProp {
   VecView<int> keep;
 
-  void operator()(glm::ivec3 triProp) {
+  void operator()(ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
       reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
           ->store(1, std::memory_order_relaxed);
@@ -79,7 +79,7 @@ struct MarkProp {
 struct ReindexProps {
   VecView<const int> old2new;
 
-  void operator()(glm::ivec3& triProp) {
+  void operator()(ivec3& triProp) {
     for (const int i : {0, 1, 2}) {
       triProp[i] = old2new[triProp[i]];
     }
@@ -88,9 +88,9 @@ struct ReindexProps {
 
 struct ReindexFace {
   VecView<Halfedge> halfedge;
-  VecView<glm::vec4> halfedgeTangent;
+  VecView<vec4> halfedgeTangent;
   VecView<const Halfedge> oldHalfedge;
-  VecView<const glm::vec4> oldHalfedgeTangent;
+  VecView<const vec4> oldHalfedgeTangent;
   VecView<const int> faceNew2Old;
   VecView<const int> faceOld2New;
 
@@ -284,11 +284,10 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                  return;
                }
 
-               glm::vec3 center(0.0f);
+               vec3 center(0.0f);
 
                for (const int i : {0, 1, 2}) {
-                 const glm::vec3 pos =
-                     vertPos_[halfedge_[3 * face + i].startVert];
+                 const vec3 pos = vertPos_[halfedge_[3 * face + i].startVert];
                  center += pos;
                  faceBox[face].Union(pos);
                }
@@ -341,7 +340,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
-  Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
+  Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
   scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
@@ -490,9 +489,9 @@ bool MeshGL::Merge() {
              [&vertMorton, &vertBox, &openVerts, &bBox, this](const int i) {
                int vert = openVerts[i];
 
-               const glm::vec3 center(vertProperties[numProp * vert],
-                                      vertProperties[numProp * vert + 1],
-                                      vertProperties[numProp * vert + 2]);
+               const vec3 center(vertProperties[numProp * vert],
+                                 vertProperties[numProp * vert + 1],
+                                 vertProperties[numProp * vert + 2]);
 
                vertBox[i].min = center - precision / 2;
                vertBox[i].max = center + precision / 2;
