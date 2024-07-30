@@ -65,7 +65,7 @@ struct CurvatureAngles {
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const float dihedral =
           0.25 * edgeLength[i] *
-          glm::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
+          std::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
                              edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
@@ -73,8 +73,8 @@ struct CurvatureAngles {
     }
 
     vec3 phi;
-    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
-    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    phi[0] = std::acos(-glm::dot(edge[2], edge[0]));
+    phi[1] = std::acos(-glm::dot(edge[0], edge[1]));
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
     const float area3 = edgeLength[0] * edgeLength[1] *
                         glm::length(glm::cross(edge[0], edge[1])) / 6;
@@ -160,7 +160,7 @@ struct CheckCCW {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
-    int ccw = CCW(v[0], v[1], v[2], glm::abs(tol));
+    int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
     bool check = tol > 0 ? ccw >= 0 : ccw == 0;
 
 #ifdef MANIFOLD_DEBUG
@@ -168,8 +168,8 @@ struct CheckCCW {
       vec2 v1 = v[1] - v[0];
       vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
-      float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-      float base = glm::sqrt(base2);
+      float base2 = std::max(glm::dot(v1, v1), glm::dot(v2, v2));
+      float base = std::sqrt(base2);
       vec3 V0 = vertPos[halfedges[3 * face].startVert];
       vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
       vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
@@ -287,7 +287,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
              });
 
   const int oldNumProp = NumProp();
-  const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
+  const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
   const Vec<float> oldProperties = meshRelation_.properties;
   meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
   meshRelation_.numProp = numProp;
@@ -348,13 +348,13 @@ bool Manifold::Impl::IsIndexInBounds(VecView<const ivec3> triVerts) const {
       triVerts.begin(), triVerts.end(),
       ivec2(std::numeric_limits<int>::max(), std::numeric_limits<int>::min()),
       [](auto a, auto b) {
-        a[0] = glm::min(a[0], b[0]);
-        a[1] = glm::max(a[1], b[1]);
+        a[0] = std::min(a[0], b[0]);
+        a[1] = std::max(a[1], b[1]);
         return a;
       },
       [](auto tri) {
-        return ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
-                     glm::max(tri[0], glm::max(tri[1], tri[2])));
+        return ivec2(std::min(tri[0], std::min(tri[1], tri[2])),
+                     std::max(tri[0], std::max(tri[1], tri[2])));
       });
 
   return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());

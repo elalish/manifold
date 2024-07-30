@@ -74,9 +74,9 @@ struct AssignNormals {
     // corner angles
     vec3 phi;
     float dot = -glm::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : std::acos(dot));
     dot = -glm::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : std::acos(dot));
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
 
     // assign weighted sum
@@ -155,7 +155,7 @@ struct CoplanarEdge {
       const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
-        if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
+        if (std::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
             propTol[p]) {
           propEqual = false;
           break;
@@ -176,9 +176,9 @@ struct CoplanarEdge {
     const vec3 pairVec =
         vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
 
-    const float length = glm::max(glm::length(jointVec), glm::length(edgeVec));
+    const float length = std::max(glm::length(jointVec), glm::length(edgeVec));
     const float lengthPair =
-        glm::max(glm::length(jointVec), glm::length(pairVec));
+        std::max(glm::length(jointVec), glm::length(pairVec));
     vec3 normal = glm::cross(jointVec, edgeVec);
     const float area = glm::length(normal);
     const float areaPair = glm::length(glm::cross(pairVec, jointVec));
@@ -187,9 +187,9 @@ struct CoplanarEdge {
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
-    const float volume = glm::abs(glm::dot(normal, pairVec));
+    const float volume = std::abs(glm::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > glm::max(area, areaPair) * precision) return;
+    if (volume > std::max(area, areaPair) * precision) return;
 
     // Check property linearity
     if (area > 0) {
@@ -209,9 +209,9 @@ struct CoplanarEdge {
         const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
 
         vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const float areaP = glm::max(
+        const float areaP = std::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const float volumeP = glm::abs(glm::dot(cross, iPairVec));
+        const float volumeP = std::abs(glm::dot(cross, iPairVec));
         // Only operate on consistent triangles
         if (volumeP > areaP * precision) return;
       }
@@ -243,7 +243,7 @@ struct CheckCoplanarity {
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
+      if (std::abs(glm::dot(normal, vert - origin)) > precision) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -639,8 +639,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
                  // Sort the forward halfedges in front of the backward ones by
                  // setting the highest-order bit.
                  edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
-                           ((uint64_t)glm::min(verts[i], verts[j])) << 32 |
-                           glm::max(verts[i], verts[j]);
+                           ((uint64_t)std::min(verts[i], verts[j])) << 32 |
+                           std::max(verts[i], verts[j]);
                }
              });
   // Stable sort is required here so that halfedges from the same face are

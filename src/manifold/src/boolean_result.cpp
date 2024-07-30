@@ -56,7 +56,7 @@ struct DuplicateVerts {
   VecView<const vec3> vertPosP;
 
   void operator()(const int vert) {
-    const int n = glm::abs(inclusion[vert]);
+    const int n = std::abs(inclusion[vert]);
     for (int i = 0; i < n; ++i) {
       vertPosR[vertR[vert] + i] = vertPosP[vert];
     }
@@ -70,9 +70,9 @@ struct CountVerts {
 
   void operator()(const Halfedge &edge) {
     if (atomic)
-      AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
+      AtomicAdd(count[edge.face], std::abs(inclusion[edge.startVert]));
     else
-      count[edge.face] += glm::abs(inclusion[edge.startVert]);
+      count[edge.face] += std::abs(inclusion[edge.startVert]);
   }
 };
 
@@ -87,7 +87,7 @@ struct CountNewVerts {
   void operator()(const int idx) {
     int edgeP = pq.Get(idx, inverted);
     int faceQ = pq.Get(idx, !inverted);
-    int inclusion = glm::abs(i12[idx]);
+    int inclusion = std::abs(i12[idx]);
 
     if (atomic) {
       AtomicAdd(countQ[faceQ], inclusion);
@@ -236,7 +236,7 @@ void AddNewEdgeVerts(
                         pairHasher(keyLeft), &edgesNew[keyLeft])};
     for (const auto &tuple : edges) {
       lock(std::get<1>(tuple));
-      for (int j = 0; j < glm::abs(inclusion); ++j)
+      for (int j = 0; j < std::abs(inclusion); ++j)
         std::get<2>(tuple)->push_back({vert + j, 0.0f, std::get<0>(tuple)});
       unlock(std::get<1>(tuple));
       direction = !direction;
@@ -326,7 +326,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     EdgePos edgePos = {vP2R[vStart],
                        glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
-    for (int j = 0; j < glm::abs(inclusion); ++j) {
+    for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
@@ -334,7 +334,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     inclusion = i03[vEnd];
     edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
-    for (int j = 0; j < glm::abs(inclusion); ++j) {
+    for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
@@ -460,7 +460,7 @@ struct DuplicateHalfedges {
     const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
 
-    for (int i = 0; i < glm::abs(inclusion); ++i) {
+    for (int i = 0; i < std::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
       int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardEdge;
@@ -558,7 +558,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   ZoneScoped;
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
-  const int numProp = glm::max(numPropP, numPropQ);
+  const int numProp = std::max(numPropP, numPropQ);
   outR.meshRelation_.numProp = numProp;
   if (numProp == 0) return;
 
@@ -615,8 +615,8 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
           key[1] = vert;
-          key[2] = glm::min(p0, p1);
-          key[3] = glm::max(p0, p1);
+          key[2] = std::min(p0, p1);
+          key[3] = std::max(p0, p1);
         } else if (edge == -2) {
           key[1] = vert;
         }
@@ -732,7 +732,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   if (numVertR == 0) return outR;
 
-  outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
+  outR.precision_ = std::max(inP_.precision_, inQ_.precision_);
 
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].

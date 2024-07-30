@@ -218,8 +218,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
     return Invalid();
   }
 
-  scaleTop.x = glm::max(scaleTop.x, 0.0f);
-  scaleTop.y = glm::max(scaleTop.y, 0.0f);
+  scaleTop.x = std::max(scaleTop.x, 0.0f);
+  scaleTop.y = std::max(scaleTop.y, 0.0f);
 
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
@@ -316,7 +316,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     do {
       if (poly[i].x >= 0) {
         polygons.back().push_back(poly[i]);
-        radius = glm::max(radius, poly[i].x);
+        radius = std::max(radius, poly[i].x);
       }
       const size_t next = i + 1 == poly.size() ? 0 : i + 1;
       if ((poly[next].x < 0) != (poly[i].x < 0)) {

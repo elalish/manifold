@@ -26,12 +26,12 @@ namespace manifold {
  */
 inline vec3 SafeNormalize(vec3 v) {
   v = glm::normalize(v);
-  return glm::isfinite(v.x) ? v : vec3(0);
+  return std::isfinite(v.x) ? v : vec3(0);
 }
 
 inline float MaxPrecision(float minPrecision, const Box& bBox) {
-  float precision = glm::max(minPrecision, kTolerance * bBox.Scale());
-  return glm::isfinite(precision) ? precision : -1;
+  float precision = std::max(minPrecision, kTolerance * bBox.Scale());
+  return std::isfinite(precision) ? precision : -1;
 }
 
 inline int NextHalfedge(int current) {
@@ -161,8 +161,8 @@ struct TmpEdge {
 
   TmpEdge() {}
   TmpEdge(int start, int end, int idx) {
-    first = glm::min(start, end);
-    second = glm::max(start, end);
+    first = std::min(start, end);
+    second = std::max(start, end);
     halfedgeIdx = idx;
   }
 

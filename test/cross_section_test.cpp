@@ -18,7 +18,6 @@
 
 #include <vector>
 
-#include "glm/geometric.hpp"
 #include "manifold.h"
 #include "polygon.h"
 #include "public.h"

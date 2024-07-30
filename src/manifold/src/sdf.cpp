@@ -100,18 +100,18 @@ vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
 
 float BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
                  float level, std::function<float(vec3)> sdf) {
-  auto Min = [](ivec3 p) { return glm::min(p.x, glm::min(p.y, p.z)); };
+  auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
 
   const ivec3 xyz(gridIndex);
   const int lowerBoundDist = Min(xyz);
   const int upperBoundDist = Min(gridSize - xyz);
-  const int boundDist = glm::min(lowerBoundDist, upperBoundDist - gridIndex.w);
+  const int boundDist = std::min(lowerBoundDist, upperBoundDist - gridIndex.w);
 
   if (boundDist < 0) {
     return 0.0f;
   }
   const float d = sdf(Position(gridIndex, origin, spacing)) - level;
-  return boundDist == 0 ? glm::min(d, 0.0f) : d;
+  return boundDist == 0 ? std::min(d, 0.0f) : d;
 }
 
 struct GridVert {
@@ -156,7 +156,7 @@ struct ComputeVerts {
     while (frac > check) {
       const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
       const float r = biFrac / frac - 0.5;
-      const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+      const float x = std::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
       const vec3 mid = glm::mix(pos0, pos1, x);
       const float d = sdf(mid) - level;
@@ -361,7 +361,7 @@ MeshGL MeshGL::LevelSet(std::function<float(vec3)> sdf, Box bounds,
                                  origin, spacing, gridSize, level, sdf);
       });
 
-  size_t tableSize = glm::min(
+  size_t tableSize = std::min(
       2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   Vec<vec3> vertPos(gridVerts.Size() * 7);

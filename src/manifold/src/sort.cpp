@@ -33,14 +33,14 @@ struct Extrema {
   }
 
   int MaxOrMinus(int a, int b) const {
-    return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
+    return std::min(a, b) < 0 ? -1 : std::max(a, b);
   }
 
   Halfedge operator()(Halfedge a, Halfedge b) const {
     MakeForward(a);
     MakeForward(b);
-    a.startVert = glm::min(a.startVert, b.startVert);
-    a.endVert = glm::max(a.endVert, b.endVert);
+    a.startVert = std::min(a.startVert, b.startVert);
+    a.endVert = std::max(a.endVert, b.endVert);
     a.face = MaxOrMinus(a.face, b.face);
     a.pairedHalfedge = MaxOrMinus(a.pairedHalfedge, b.pairedHalfedge);
     return a;
@@ -471,8 +471,8 @@ bool MeshGL::Merge() {
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),
         [](auto a, auto b) {
-          return std::make_pair(glm::min(a.first, b.first),
-                                glm::max(a.second, b.second));
+          return std::make_pair(std::min(a.first, b.first),
+                                std::max(a.second, b.second));
         },
         [](float f) { return std::make_pair(f, f); });
     bBox.min[i] = minMax.first;

@@ -52,7 +52,7 @@ float AngleBetween(vec3 a, vec3 b) {
 vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
   const vec3 dir = SafeNormalize(tangent);
 
-  float weight = glm::max(0.5f, glm::dot(dir, SafeNormalize(edgeVec)));
+  float weight = std::max(0.5f, glm::dot(dir, SafeNormalize(edgeVec)));
   // Quadratic weighted bezier for circular interpolation
   const vec4 bz2 = vec4(dir * 0.5f * glm::length(edgeVec), weight);
   // Equivalent cubic weighted bezier
@@ -119,9 +119,9 @@ struct InterpTri {
     if (cosTheta > 1.0f - glm::epsilon<float>()) {
       return glm::lerp(x, z, a);  // for numerical stability
     } else {
-      float angle = glm::acos(cosTheta);
-      return (glm::sin((1.0f - a) * angle) * x + glm::sin(a * angle) * z) /
-             glm::sin(angle);
+      float angle = std::acos(cosTheta);
+      return (std::sin((1.0f - a) * angle) * x + std::sin(a * angle) * z) /
+             std::sin(angle);
     }
   }
 
@@ -408,7 +408,7 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     if (!halfedge_[e].IsForward()) continue;
     const size_t pair = halfedge_[e].pairedHalfedge;
     const float dihedral =
-        glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+        std::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
     if (dihedral > minRadians) {
       sharpenedEdges.push_back({e, minSmoothness});
       sharpenedEdges.push_back({pair, minSmoothness});
@@ -449,7 +449,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
     const int tri1 = e / 3;
     const int tri2 = pair / 3;
     const float dihedral =
-        glm::degrees(glm::acos(glm::dot(faceNormal_[tri1], faceNormal_[tri2])));
+        glm::degrees(std::acos(glm::dot(faceNormal_[tri1], faceNormal_[tri2])));
     if (dihedral > minSharpAngle) {
       ++vertNumSharp[halfedge_[e].startVert];
       ++vertNumSharp[halfedge_[e].endVert];
@@ -467,7 +467,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
     }
   }
 
-  const int numProp = glm::max(oldNumProp, normalIdx + 3);
+  const int numProp = std::max(oldNumProp, normalIdx + 3);
   Vec<float> oldProperties(numProp * NumPropVert(), 0);
   meshRelation_.properties.swap(oldProperties);
   meshRelation_.numProp = numProp;
@@ -521,7 +521,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           const int face = halfedge_[next].face;
 
           const float dihedral = glm::degrees(
-              glm::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
+              std::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
           if (dihedral > minSharpAngle ||
               triIsFlatFace[face] != triIsFlatFace[prevFace] ||
               (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
@@ -567,7 +567,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
                 int current, const FaceEdge& here, FaceEdge& next) {
-              const float dihedral = glm::degrees(glm::acos(
+              const float dihedral = glm::degrees(std::acos(
                   glm::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
                   triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
@@ -577,7 +577,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                 normals.push_back(vec3(0));
               }
               group.push_back(normals.size() - 1);
-              if (glm::isfinite(next.edgeVec.x)) {
+              if (std::isfinite(next.edgeVec.x)) {
                 normals.back() +=
                     SafeNormalize(glm::cross(next.edgeVec, here.edgeVec)) *
                     AngleBetween(here.edgeVec, next.edgeVec);
@@ -904,7 +904,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       if (!forward) std::swap(edges[idx].first, edges[idx].second);
     } else {
       Smoothness& e = forward ? edges[idx].first : edges[idx].second;
-      e.smoothness = glm::min(edge.smoothness, e.smoothness);
+      e.smoothness = std::min(edge.smoothness, e.smoothness);
     }
   }
 

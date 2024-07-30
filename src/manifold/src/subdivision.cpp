@@ -187,7 +187,7 @@ class Partition {
           PartitionFan(partition.triVert, {0, 1, 2}, n[0] - 1, edgeOffsets[0]);
         }
       } else if (n[1] * n[1] >
-                 f - glm::sqrt(2.0f) * n[0] * n[2]) {  // acute-ish
+                 f - std::sqrt(2.0f) * n[0] * n[2]) {  // acute-ish
         partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
         PartitionQuad(partition.triVert, partition.vertBary,
                       {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
@@ -197,10 +197,10 @@ class Partition {
       } else {  // obtuse -> spit into two acute
         // portion of n[0] under n[2]
         const int ns =
-            glm::min(n[0] - 2, (int)glm::round((f - n[1] * n[1]) / (2 * n[0])));
+            std::min(n[0] - 2, (int)std::round((f - n[1] * n[1]) / (2 * n[0])));
         // height from n[0]: nh <= n[2]
         const int nh =
-            glm::max(1., glm::round(glm::sqrt(n[2] * n[2] - ns * ns)));
+            std::max(1., std::round(std::sqrt(n[2] * n[2] - ns * ns)));
 
         const int hOffset = partition.vertBary.size();
         const vec4 middleBary = partition.vertBary[edgeOffsets[0] + ns - 1];
@@ -322,7 +322,7 @@ class Partition {
       return;
     }
     // recursively partition
-    const int partitions = 1 + glm::min(edgeAdded[1], edgeAdded[3]);
+    const int partitions = 1 + std::min(edgeAdded[1], edgeAdded[3]);
     ivec4 newCornerVerts = {cornerVerts[1], -1, -1, cornerVerts[0]};
     ivec4 newEdgeOffsets = {edgeOffsets[1], -1,
                             GetEdgeVert(3, edgeAdded[3] + 1), edgeOffsets[0]};
@@ -335,7 +335,7 @@ class Partition {
           edgeAdded[3] - 1 - (edgeAdded[3] * i) / partitions;
       const int nextOffset1 = GetEdgeVert(1, cornerOffset1 + 1);
       const int nextOffset3 = GetEdgeVert(3, cornerOffset3 + 1);
-      const int added = glm::round(glm::mix(
+      const int added = std::round(glm::mix(
           (float)edgeAdded[0], (float)edgeAdded[2], (float)i / partitions));
 
       newCornerVerts[1] = GetEdgeVert(1, cornerOffset1);

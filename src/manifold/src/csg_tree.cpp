@@ -188,10 +188,10 @@ Manifold::Impl CsgLeafNode::Compose(
     float nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
     float nodePrecision = node->pImpl_->precision_;
-    nodePrecision *= glm::max(1.0f, nodeNewScale / nodeOldScale);
-    nodePrecision = glm::max(nodePrecision, kTolerance * nodeNewScale);
-    if (!glm::isfinite(nodePrecision)) nodePrecision = -1;
-    precision = glm::max(precision, nodePrecision);
+    nodePrecision *= std::max(1.0f, nodeNewScale / nodeOldScale);
+    nodePrecision = std::max(nodePrecision, kTolerance * nodeNewScale);
+    if (!std::isfinite(nodePrecision)) nodePrecision = -1;
+    precision = std::max(precision, nodePrecision);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -201,7 +201,7 @@ Manifold::Impl CsgLeafNode::Compose(
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
     const int numProp = node->pImpl_->NumProp();
-    numPropOut = glm::max(numPropOut, numProp);
+    numPropOut = std::max(numPropOut, numProp);
     numPropVert +=
         numProp == 0 ? 1
                      : node->pImpl_->meshRelation_.properties.size() / numProp;

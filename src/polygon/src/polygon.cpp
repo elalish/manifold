@@ -173,7 +173,7 @@ bool IsConvex(const PolygonsIdx &polys, float precision) {
           v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
       const float det = determinant2x2(lastEdge, edge);
       if (det <= 0 ||
-          (glm::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+          (std::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
         return false;
       lastEdge = glm::normalize(edge);
     }
@@ -467,11 +467,11 @@ class EarClip {
     // Find the cost of Vert v within this ear, where openSide is the unit
     // vector from Verts right to left - passed in for reuse.
     float Cost(VertItr v, vec2 openSide, float precision) const {
-      float cost = glm::min(SignedDist(v, rightDir, precision),
+      float cost = std::min(SignedDist(v, rightDir, precision),
                             SignedDist(v, left->rightDir, precision));
 
       const float openCost = determinant2x2(openSide, v->pos - right->pos);
-      return glm::min(cost, openCost);
+      return std::min(cost, openCost);
     }
 
     // For verts outside the ear, apply a cost based on the Delaunay condition
@@ -521,7 +521,7 @@ class EarClip {
           if (cost < -precision) {
             cost = DelaunayCost(test->pos - center, scale, precision);
           }
-          totalCost = glm::max(totalCost, cost);
+          totalCost = std::max(totalCost, cost);
         }
       }
 
@@ -540,7 +540,7 @@ class EarClip {
 
   static vec2 SafeNormalize(vec2 v) {
     vec2 n = glm::normalize(v);
-    return glm::isfinite(n.x) ? n : vec2(0, 0);
+    return std::isfinite(n.x) ? n : vec2(0, 0);
   }
 
   // This function and JoinPolygons are the only functions that affect the
@@ -685,9 +685,9 @@ class EarClip {
 
     area += areaCompensation;
     const vec2 size = bBox.Size();
-    const float minArea = precision_ * glm::max(size.x, size.y);
+    const float minArea = precision_ * std::max(size.x, size.y);
 
-    if (glm::isfinite(maxX) && area < -minArea) {
+    if (std::isfinite(maxX) && area < -minArea) {
       holes_.insert(start);
       hole2BBox_.insert({start, bBox});
     } else {

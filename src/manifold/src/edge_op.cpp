@@ -591,7 +591,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     triRef[tri0] = triRef[tri1];
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
-    const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
+    const float a = std::max(0.0f, std::min(1.0f, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
       Vec<ivec3>& triProp = meshRelation_.triProperties;

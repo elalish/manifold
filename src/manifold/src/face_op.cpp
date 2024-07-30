@@ -240,8 +240,8 @@ Polygons Manifold::Impl::Slice(float height) const {
     float max = -std::numeric_limits<float>::infinity();
     for (const int j : {0, 1, 2}) {
       const float z = vertPos_[halfedge_[3 * tri + j].startVert].z;
-      min = glm::min(min, z);
-      max = glm::max(max, z);
+      min = std::min(min, z);
+      max = std::max(max, z);
     }
 
     if (min <= height && max > height) {

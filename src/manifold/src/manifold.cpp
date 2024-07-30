@@ -54,8 +54,8 @@ Manifold Halfspace(Box bBox, vec3 normal, float originOffset) {
   float size = glm::length(bBox.Center() - normal * originOffset) +
                0.5f * glm::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = glm::degrees(-glm::asin(normal.z));
-  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
+  float yDeg = glm::degrees(-std::asin(normal.z));
+  float zDeg = glm::degrees(std::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0f, yDeg, zDeg);
 }
 }  // namespace
@@ -749,7 +749,7 @@ Manifold Manifold::Refine(int n) const {
  * @param length The length that edges will be broken down to.
  */
 Manifold Manifold::RefineToLength(float length) const {
-  length = glm::abs(length);
+  length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Refine([length](vec3 edge) {
     return static_cast<int>(glm::length(edge) / length);

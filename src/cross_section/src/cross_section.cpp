@@ -623,7 +623,7 @@ CrossSection CrossSection::Simplify(double epsilon) const {
       box.Union(vec2(vert.x, vert.y));
     }
     vec2 size = box.Size();
-    if (glm::abs(area) > glm::max(size.x, size.y) * epsilon) {
+    if (std::abs(area) > std::max(size.x, size.y) * epsilon) {
       filtered.push_back(poly);
     }
   }

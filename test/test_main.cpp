@@ -129,12 +129,12 @@ struct GyroidSDF {
   float operator()(vec3 p) const {
     const vec3 min = p;
     const vec3 max = vec3(glm::two_pi<float>()) - p;
-    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
-    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
-    const float bound = glm::min(min3, max3);
+    const float min3 = std::min(min.x, std::min(min.y, min.z));
+    const float max3 = std::min(max.x, std::min(max.y, max.z));
+    const float bound = std::min(min3, max3);
     const float gyroid =
         cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
-    return glm::min(gyroid, bound);
+    return std::min(gyroid, bound);
   }
 };
 
@@ -291,7 +291,7 @@ float GetMaxProperty(const MeshGL& mesh, int channel) {
   float max = -std::numeric_limits<float>::infinity();
   const int numVert = mesh.NumVert();
   for (int i = 0; i < numVert; ++i) {
-    max = glm::max(max, mesh.vertProperties[i * mesh.numProp + channel]);
+    max = std::max(max, mesh.vertProperties[i * mesh.numProp + channel]);
   }
   return max;
 }
@@ -300,20 +300,20 @@ float GetMinProperty(const MeshGL& mesh, int channel) {
   float min = std::numeric_limits<float>::infinity();
   const int numVert = mesh.NumVert();
   for (int i = 0; i < numVert; ++i) {
-    min = glm::min(min, mesh.vertProperties[i * mesh.numProp + channel]);
+    min = std::min(min, mesh.vertProperties[i * mesh.numProp + channel]);
   }
   return min;
 }
 
 void CheckFinite(const MeshGL& mesh) {
   for (float v : mesh.vertProperties) {
-    ASSERT_TRUE(glm::isfinite(v));
+    ASSERT_TRUE(std::isfinite(v));
   }
   for (float v : mesh.runTransform) {
-    ASSERT_TRUE(glm::isfinite(v));
+    ASSERT_TRUE(std::isfinite(v));
   }
   for (float v : mesh.halfedgeTangent) {
-    ASSERT_TRUE(glm::isfinite(v));
+    ASSERT_TRUE(std::isfinite(v));
   }
 }
 

@@ -217,7 +217,7 @@ TEST(Samples, GyroidModule) {
   const Box bounds = gyroid.BoundingBox();
   const float precision = gyroid.Precision();
   EXPECT_NEAR(bounds.min.z, 0, precision);
-  EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
+  EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), precision);
 
   CrossSection slice(gyroid.Slice(5));
   EXPECT_EQ(slice.NumContour(), 4);

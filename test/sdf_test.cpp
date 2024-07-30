@@ -21,15 +21,15 @@ struct CubeVoid {
   float operator()(vec3 p) const {
     const vec3 min = p + vec3(1);
     const vec3 max = vec3(1) - p;
-    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
-    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
-    return -1.0f * glm::min(min3, max3);
+    const float min3 = std::min(min.x, std::min(min.y, min.z));
+    const float max3 = std::min(max.x, std::min(max.y, max.z));
+    return -1.0f * std::min(min3, max3);
   }
 };
 
 struct Layers {
   float operator()(vec3 p) const {
-    int a = glm::mod(glm::round(2 * p.z), 4.0f);
+    int a = glm::mod(std::round(2 * p.z), 4.0f);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }
 };
@@ -137,7 +137,7 @@ TEST(SDF, Resize) {
 TEST(SDF, SineSurface) {
   MeshGL surface = MeshGL::LevelSet(
       [](vec3 p) {
-        float mid = glm::sin(p.x) + glm::sin(p.y);
+        float mid = std::sin(p.x) + std::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {vec3(-1.75 * glm::pi<float>()), vec3(1.75 * glm::pi<float>())}, 1);
@@ -170,7 +170,7 @@ TEST(SDF, Blobs) {
         for (const auto& ball : balls) {
           d += glm::sign(ball.w) *
                glm::smoothstep(-blend, blend,
-                               glm::abs(ball.w) - glm::length(vec3(ball) - p));
+                               std::abs(ball.w) - glm::length(vec3(ball) - p));
         }
         return d;
       },

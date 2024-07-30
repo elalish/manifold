@@ -36,7 +36,7 @@ TEST(Smooth, Tetrahedron) {
   float maxMeanCurvature = 0;
   for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
   EXPECT_NEAR(maxMeanCurvature, 4.73, 0.01);
 
@@ -60,8 +60,8 @@ TEST(Smooth, RefineQuads) {
   const MeshGL baseline = WithPositionColors(cylinder);
   float maxDiff = 0;
   for (size_t i = 0; i < out.vertProperties.size(); ++i) {
-    maxDiff = glm::max(
-        maxDiff, glm::abs(out.vertProperties[i] - baseline.vertProperties[i]));
+    maxDiff = std::max(
+        maxDiff, std::abs(out.vertProperties[i] - baseline.vertProperties[i]));
   }
   // This has a wide tolerance because the triangle colors on the ends are still
   // being stretched out into circular arcs, which introduces unavoidable error.
@@ -119,7 +119,7 @@ TEST(Smooth, ToLength) {
   float maxMeanCurvature = 0;
   for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
   EXPECT_NEAR(maxMeanCurvature, 1.67, 0.01);
 
@@ -240,7 +240,7 @@ TEST(Smooth, Csaszar) {
     for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
         const vec3& uvw = {0.5, 0.5, 0.0};
-        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+        const float alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
         options.mat.vertColor[out.triVerts[tri][i]] =
             glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
       }
@@ -253,7 +253,7 @@ TEST(Smooth, Csaszar) {
 vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
   const vec3 dir = glm::normalize(tangent);
 
-  float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
+  float weight = std::abs(glm::dot(dir, glm::normalize(edgeVec)));
   if (weight == 0) {
     weight = 1;
   }
@@ -262,7 +262,7 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
   // Equivalent cubic weighted bezier
   const vec4 bz3 = glm::mix(vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
   // Convert from homogeneous form to geometric form
-  return vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+  return vec4(vec3(bz3) / bz3.w, bz3.w);
 }
 
 TEST(Smooth, Torus) {
@@ -285,13 +285,13 @@ TEST(Smooth, Torus) {
         vec3 tan(v.y, -v.x, 0);
         tan *= glm::sign(glm::dot(tan, edge));
         tangent = CircularTangent(tan, edge);
-      } else if (glm::abs(glm::determinant(mat2(vec2(v), vec2(edge)))) <
+      } else if (std::abs(glm::determinant(mat2(vec2(v), vec2(edge)))) <
                  kTolerance) {
-        const float theta = glm::asin(v.z);
+        const float theta = std::asin(v.z);
         vec2 xy(v);
         const float r = glm::length(xy);
         xy = xy / r * v.z * (r > 2 ? -1.0f : 1.0f);
-        vec3 tan(xy.x, xy.y, glm::cos(theta));
+        vec3 tan(xy.x, xy.y, std::cos(theta));
         tan *= glm::sign(glm::dot(tan, edge));
         tangent = CircularTangent(tan, edge);
       } else {
@@ -314,7 +314,7 @@ TEST(Smooth, Torus) {
     float r = glm::length(v - p);
     ASSERT_NEAR(r, 1, 0.006);
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i + 3]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i + 3]));
   }
   EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
@@ -330,7 +330,7 @@ TEST(Smooth, Torus) {
 TEST(Smooth, SineSurface) {
   MeshGL surface = MeshGL::LevelSet(
       [](vec3 p) {
-        float mid = glm::sin(p.x) + glm::sin(p.y);
+        float mid = std::sin(p.x) + std::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {vec3(-2 * glm::pi<float>() + 0.2), vec3(0 * glm::pi<float>() - 0.2)}, 1);
@@ -376,13 +376,13 @@ TEST(Smooth, SDF) {
   auto sphericalGyroid = [r](vec3 p) {
     const float gyroid =
         cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
-    const float d = glm::min(0.0f, r - glm::length(p));
+    const float d = std::min(0.0f, r - glm::length(p));
     return gyroid - d * d;
   };
 
   auto gradient = [r](vec3 pos) {
     const float rad = glm::length(pos);
-    const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
+    const float d = std::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
     const vec3 sphereGrad = 2 * d * pos;
     const vec3 gyroidGrad(cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
                           cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
@@ -392,7 +392,7 @@ TEST(Smooth, SDF) {
 
   auto error = [sphericalGyroid](float* newProp, vec3 pos,
                                  const float* oldProp) {
-    newProp[0] = glm::abs(sphericalGyroid(pos));
+    newProp[0] = std::abs(sphericalGyroid(pos));
   };
 
   Manifold gyroid(MeshGL::LevelSet(
