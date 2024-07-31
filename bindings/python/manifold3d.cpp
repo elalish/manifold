@@ -257,7 +257,10 @@ NB_MODULE(manifold3d, m) {
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
-          "scale", [](const Manifold &m, float s) { m.Scale({s, s, s}); },
+          "scale",
+          [](const Manifold &m, float s) {
+            m.Scale({s, s, s});
+          },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -670,7 +673,9 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) { self.Scale({s, s}); },
+          [](const CrossSection &self, float s) {
+            self.Scale({s, s});
+          },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."

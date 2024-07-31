@@ -9,45 +9,43 @@
 
 namespace quickhull {
 
-float defaultEps() {
-  return 0.0001f;
-}
+float defaultEps() { return 0.0001f; }
 
 /*
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::getConvexHull(
-    const std::vector<glm::vec3>& pointCloud, bool CCW, bool useOriginalIndices,
-    float epsilon) {
+ConvexHull QuickHull::getConvexHull(const std::vector<glm::vec3>& pointCloud,
+                                    bool CCW, bool useOriginalIndices,
+                                    float epsilon) {
   VertexDataSource vertexDataSource(pointCloud);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
 ConvexHull QuickHull::getConvexHull(const glm::vec3* vertexData,
-                                          size_t vertexCount, bool CCW,
-                                          bool useOriginalIndices, float epsilon) {
+                                    size_t vertexCount, bool CCW,
+                                    bool useOriginalIndices, float epsilon) {
   VertexDataSource vertexDataSource(vertexData, vertexCount);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-ConvexHull QuickHull::getConvexHull(const float* vertexData,
-                                          size_t vertexCount, bool CCW,
-                                          bool useOriginalIndices, float epsilon) {
+ConvexHull QuickHull::getConvexHull(const float* vertexData, size_t vertexCount,
+                                    bool CCW, bool useOriginalIndices,
+                                    float epsilon) {
   VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-HalfEdgeMesh QuickHull::getConvexHullAsMesh(
-    const float* vertexData, size_t vertexCount, bool CCW,
-    float epsilon) {
+HalfEdgeMesh QuickHull::getConvexHullAsMesh(const float* vertexData,
+                                            size_t vertexCount, bool CCW,
+                                            float epsilon) {
   VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
   buildMesh(vertexDataSource, CCW, false, epsilon);
   return HalfEdgeMesh(m_mesh, m_vertexData);
 }
 
 void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
-                             bool useOriginalIndices, float epsilon) {
+                          bool useOriginalIndices, float epsilon) {
   // CCW is unused for now
   (void)CCW;
   // useOriginalIndices is unused for now
@@ -87,8 +85,8 @@ void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
 }
 
 ConvexHull QuickHull::getConvexHull(const VertexDataSource& pointCloud,
-                                          bool CCW, bool useOriginalIndices,
-                                          float epsilon) {
+                                    bool CCW, bool useOriginalIndices,
+                                    float epsilon) {
   buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
   return ConvexHull(m_mesh, m_vertexData, CCW, useOriginalIndices);
 }
@@ -336,8 +334,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
 std::array<size_t, 6> QuickHull::getExtremeValues() {
   std::array<size_t, 6> outIndices{0, 0, 0, 0, 0, 0};
-  float extremeVals[6] = {m_vertexData[0].x, m_vertexData[0].x, m_vertexData[0].y,
-                      m_vertexData[0].y, m_vertexData[0].z, m_vertexData[0].z};
+  float extremeVals[6] = {m_vertexData[0].x, m_vertexData[0].x,
+                          m_vertexData[0].y, m_vertexData[0].y,
+                          m_vertexData[0].z, m_vertexData[0].z};
   const size_t vCount = m_vertexData.size();
   for (size_t i = 1; i < vCount; i++) {
     const glm::vec3& pos = m_vertexData[i];
@@ -448,8 +447,8 @@ void QuickHull::setupInitialTetrahedron() {
   // Find the most distant point to the line between the two chosen extreme
   // points.
   const Ray r(m_vertexData[selectedPoints.first],
-                 (m_vertexData[selectedPoints.second] -
-                  m_vertexData[selectedPoints.first]));
+              (m_vertexData[selectedPoints.second] -
+               m_vertexData[selectedPoints.first]));
   maxD = m_epsilonSquared;
   size_t maxI = std::numeric_limits<size_t>::max();
   const size_t vCount = m_vertexData.size();
