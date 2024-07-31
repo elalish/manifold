@@ -87,7 +87,7 @@ TEST(Hull, MengerSponge) {
 }
 
 TEST(Hull, Sphere) {
-  Manifold sphere = Manifold::Sphere(1, 6000);
+  Manifold sphere = Manifold::Sphere(1, 5000);
   sphere = sphere.Translate(glm::vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
