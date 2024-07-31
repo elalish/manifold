@@ -91,5 +91,6 @@ TEST(Hull, Sphere) {
   sphere = sphere.Translate(glm::vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
-  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume, sphere.GetProperties().volume);
+  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume,
+                  sphere.GetProperties().volume);
 }
