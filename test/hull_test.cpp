@@ -87,9 +87,9 @@ TEST(Hull, MengerSponge) {
 }
 
 TEST(Hull, Sphere) {
-  Manifold sphere = Manifold::Sphere(1, 3000);
+  Manifold sphere = Manifold::Sphere(1, 1500);
   sphere = sphere.Translate(glm::vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
-  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume, 4.1887856);
+  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume, sphere.GetProperties().volume);
 }
