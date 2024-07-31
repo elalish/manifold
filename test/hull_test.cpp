@@ -76,3 +76,20 @@ TEST(Hull, Empty) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
+
+TEST(Hull, MengerSponge) {
+  Manifold sponge = MengerSponge(4);
+  sponge = sponge.Rotate(10, 20, 30);
+  Manifold spongeHull = sponge.Hull();
+  EXPECT_EQ(spongeHull.NumTri(), 12);
+  EXPECT_FLOAT_EQ(spongeHull.GetProperties().surfaceArea, 6);
+  EXPECT_FLOAT_EQ(spongeHull.GetProperties().volume, 1);
+}
+
+TEST(Hull, Sphere) {
+  Manifold sphere = Manifold::Sphere(1, 6000);
+  sphere = sphere.Translate(glm::vec3(0.5));
+  Manifold sphereHull = sphere.Hull();
+  EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
+  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume, 4.1887856);
+}

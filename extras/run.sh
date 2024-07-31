@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Go to manifold/extras directory and run the command as `./run.sh ../build/extras/testHullPerformance {path_to_dataset_folder} {name_of_csv} {implementation(Hull,Hull_CGAL)}`
-# example ./run.sh ../build/extras/testHullPerformance  ./Thingi10K/raw_meshes/ Hull4.csv Hull
+# Go to manifold/extras directory and run the command as `./run.sh {path_to_dataset_folder} {name_of_csv} {implementation(Hull,Hull_CGAL)}`
+# example ./run.sh ./Thingi10K/raw_meshes/ Hull4.csv Hull
 
 # Checking if the correct number of arguments is provided
-if [ "$#" -ne 4 ]; then
-    echo "Usage: $0 <EXECUTABLE> <input_folder> <output.csv> <Implementation>"
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <input_folder> <output.csv> <Implementation>"
     exit 1
 fi
 
-EXECUTABLE=$1
-INPUT_FOLDER=$2
-OUTPUT_CSV=$3
-IMPLEMENTATION=$4
+EXECUTABLE="../build/extras/testHullPerformance" 
+INPUT_FOLDER=$1
+OUTPUT_CSV=$2
+IMPLEMENTATION=$3
 TIME_LIMIT=10m # time limit in minutes
 RAM_LIMIT=6000  # Memory limit in MB
 
@@ -24,7 +24,7 @@ for INPUT_FILE in "$INPUT_FOLDER"/*; do
     FILE_NAME=$(basename "$INPUT_FILE")
 
     # Run the EXECUTABLE with the specified argument, time limit, and used to capture the output
-    OUTPUT=$(ulimit -v $((RAM_LIMIT * 1024)); timeout $TIME_LIMIT "$EXECUTABLE" "Input" "$IMPLEMENTATION" "0" "$INPUT_FILE" 2>&1)
+    OUTPUT=$(ulimit -v $((RAM_LIMIT * 1024)); timeout $TIME_LIMIT  $EXECUTABLE "Input" "$IMPLEMENTATION" "0" "$INPUT_FILE" 2>&1)
     STATUS=$?
 
     # Checking if the EXECUTABLE timed out
