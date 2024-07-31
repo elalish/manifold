@@ -25,7 +25,10 @@ dependencies = [
 "Bug Tracker" = "https://github.com/elalish/manifold/issues"
 
 [build-system]
-requires = ["scikit-build-core"]
+requires = [
+    "nanobind>=1.8.0",
+    "scikit-build-core",
+]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
