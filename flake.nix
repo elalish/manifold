@@ -123,6 +123,7 @@
                 tbb
                 glm
                 clipper2
+                nanobind
               ];
               nativeBuildInputs = with pkgs; [
                 cmake
