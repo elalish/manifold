@@ -16,11 +16,11 @@
 #include <map>
 #include <numeric>
 
-#include "quickhull.hpp"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
+#include "quickhull.hpp"
 
 namespace {
 using namespace manifold;
@@ -919,12 +919,12 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 
-  std::vector<quickhull::Vector3<double>> vertices(numVert);
+  std::vector<glm::vec3> vertices(numVert);
   for (int i = 0; i < numVert; i++) {
     vertices[i] = {pts[i].x, pts[i].y, pts[i].z};
   }
 
-  quickhull::QuickHull<double> qh;
+  quickhull::QuickHull<float> qh;
   // bools: correct triangle winding, and use original indices
   auto hull = qh.getConvexHull(vertices, false, true);
   const auto& triangles = hull.getIndexBuffer();
