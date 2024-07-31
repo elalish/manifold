@@ -19,24 +19,23 @@
 
 namespace quickhull {
 	
-	template<typename T>
 	class Pool {
-		std::vector<std::unique_ptr<T>> m_data;
+		std::vector<std::unique_ptr<std::vector<size_t>>> m_data;
 	public:
 		void clear() {
 			m_data.clear();
 		}
 		
-		void reclaim(std::unique_ptr<T>& ptr) {
+		void reclaim(std::unique_ptr<std::vector<size_t>>& ptr) {
 			m_data.push_back(std::move(ptr));
 		}
 		
-		std::unique_ptr<T> get() {
+		std::unique_ptr<std::vector<size_t>> get() {
 			if (m_data.size()==0) {
-				return std::unique_ptr<T>(new T());
+				return std::unique_ptr<std::vector<size_t>>(new std::vector<size_t>());
 			}
 			auto it = m_data.end()-1;
-			std::unique_ptr<T> r = std::move(*it);
+			std::unique_ptr<std::vector<size_t>> r = std::move(*it);
 			m_data.erase(it);
 			return r;
 		}
@@ -58,19 +57,18 @@ namespace quickhull {
 	
 // Plane.hpp 
 
-	template<typename T>
 	class Plane {
 	public:
 		glm::vec3 m_N;
 		
 		// Signed distance (if normal is of length 1) to the plane from origin
-		T m_D;
+		float m_D;
 		
 		// Normal length squared
-		T m_sqrNLength;
+		float m_sqrNLength;
 
 		bool isPointOnPositiveSide(const glm::vec3& Q) const {
-			T d = glm::dot(m_N,Q)+m_D;
+			float d = glm::dot(m_N,Q)+m_D;
 			if (d>=0) return true;
 			return false;
 		}
@@ -85,11 +83,10 @@ namespace quickhull {
 
 // Ray.hpp 
 
-	template <typename T>
 	struct Ray {
 		const glm::vec3 m_S;
 		const glm::vec3 m_V;
-		const T m_VInvLengthSquared;
+		const float m_VInvLengthSquared;
 		
 		Ray(const glm::vec3& S,const glm::vec3& V) : m_S(S), m_V(V), m_VInvLengthSquared(1/(m_V.x*m_V.x+m_V.y*m_V.y+m_V.z*m_V.z)) {
 		}
@@ -98,8 +95,7 @@ namespace quickhull {
 
 // VertexDataSource
 
-	
-	// template<typename T>
+
 	class VertexDataSource {
 		const glm::vec3* m_ptr;
 		size_t m_count;
@@ -141,7 +137,6 @@ namespace quickhull {
 // Mesh.hpp 
 
 
-	template <typename T>
 	class MeshBuilder {
 	public:
 		struct HalfEdge {
@@ -161,8 +156,8 @@ namespace quickhull {
 
 		struct Face {
 			size_t m_he;
-			Plane<T> m_P{};
-			T m_mostDistantPointDist;
+			Plane m_P{};
+			float m_mostDistantPointDist;
 			size_t m_mostDistantPoint;
 			size_t m_visibilityCheckedOnIteration;
 			std::uint8_t m_isVisibleFaceOnCurrentIteration : 1;
@@ -378,7 +373,6 @@ namespace quickhull {
 
 // ConvexHull.hpp
 
-	template<typename T>
 	class ConvexHull {
 		std::unique_ptr<std::vector<glm::vec3>> m_optimizedVertexBuffer;
 		VertexDataSource m_vertices;
@@ -442,7 +436,7 @@ namespace quickhull {
 		}
 		
 		// Construct vertex and index buffers from half edge mesh and pointcloud
-		ConvexHull(const MeshBuilder<T>& mesh, const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices) {
+		ConvexHull(const MeshBuilder& mesh, const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices) {
 			if (!useOriginalIndices) {
 				m_optimizedVertexBuffer.reset(new std::vector<glm::vec3>());
 			}
@@ -548,40 +542,39 @@ namespace quickhull {
 
 // HalfEdgeMesh.hpp
 	
-	template<typename FloatType, typename IndexType>
 	class HalfEdgeMesh {
 	public:
 		
 		struct HalfEdge {
-			IndexType m_endVertex;
-			IndexType m_opp;
-			IndexType m_face;
-			IndexType m_next;
+			size_t m_endVertex;
+			size_t m_opp;
+			size_t m_face;
+			size_t m_next;
 		};
 		
 		struct Face {
-			IndexType m_halfEdgeIndex; // Index of one of the half edges of this face
+			size_t m_halfEdgeIndex; // Index of one of the half edges of this face
 		};
 		
 		std::vector<glm::vec3> m_vertices;
 		std::vector<Face> m_faces;
 		std::vector<HalfEdge> m_halfEdges;
 		
-		HalfEdgeMesh(const MeshBuilder<FloatType>& builderObject, const VertexDataSource& vertexData )
+		HalfEdgeMesh(const MeshBuilder& builderObject, const VertexDataSource& vertexData )
 		{
-			std::unordered_map<IndexType,IndexType> faceMapping;
-			std::unordered_map<IndexType,IndexType> halfEdgeMapping;
-			std::unordered_map<IndexType, IndexType> vertexMapping;
+			std::unordered_map<size_t,size_t> faceMapping;
+			std::unordered_map<size_t,size_t> halfEdgeMapping;
+			std::unordered_map<size_t, size_t> vertexMapping;
 			
 			size_t i=0;
 			for (const auto& face : builderObject.m_faces) {
 				if (!face.isDisabled()) {
-					m_faces.push_back({static_cast<IndexType>(face.m_he)});
+					m_faces.push_back({static_cast<size_t>(face.m_he)});
 					faceMapping[i] = m_faces.size()-1;
 					
 					const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
 					for (const auto heIndex : heIndices) {
-						const IndexType vertexIndex = builderObject.m_halfEdges[heIndex].m_endVertex;
+						const size_t vertexIndex = builderObject.m_halfEdges[heIndex].m_endVertex;
 						if (vertexMapping.count(vertexIndex)==0) {
 							m_vertices.push_back(vertexData[vertexIndex]);
 							vertexMapping[vertexIndex] = m_vertices.size()-1;
@@ -594,7 +587,7 @@ namespace quickhull {
 			i=0;
 			for (const auto& halfEdge : builderObject.m_halfEdges) {
 				if (!halfEdge.isDisabled()) {
-					m_halfEdges.push_back({static_cast<IndexType>(halfEdge.m_endVertex),static_cast<IndexType>(halfEdge.m_opp),static_cast<IndexType>(halfEdge.m_face),static_cast<IndexType>(halfEdge.m_next)});
+					m_halfEdges.push_back({static_cast<size_t>(halfEdge.m_endVertex),static_cast<size_t>(halfEdge.m_opp),static_cast<size_t>(halfEdge.m_face),static_cast<size_t>(halfEdge.m_next)});
 					halfEdgeMapping[i] = m_halfEdges.size()-1;
 				}
 				i++;
@@ -621,10 +614,9 @@ namespace quickhull {
 
 	namespace mathutils {
 		
-		template <typename T>
-		inline T getSquaredDistanceBetweenPointAndRay(const glm::vec3& p, const Ray<T>& r) {
+		inline float getSquaredDistanceBetweenPointAndRay(const glm::vec3& p, const Ray& r) {
 			const glm::vec3 s = p-r.m_S;
-			T t = glm::dot(s,r.m_V);
+			float t = glm::dot(s,r.m_V);
 			return (s.x*s.x+s.y*s.y+s.z*s.z) - t*t*r.m_VInvLengthSquared;
 		}
 
@@ -632,8 +624,7 @@ namespace quickhull {
 			return ((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
 		}
 		// Note that the unit of distance returned is relative to plane's normal's length (divide by N.getNormalized() if needed to get the "real" distance).
-		template <typename T>
-		inline T getSignedDistanceToPlane(const glm::vec3& v, const Plane<T>& p) {
+		inline float getSignedDistanceToPlane(const glm::vec3& v, const Plane& p) {
 			return glm::dot(p.m_N,v) + p.m_D;
 		}
 		
@@ -699,18 +690,16 @@ namespace quickhull {
 		DiagnosticsData() : m_failedHorizonEdges(0) { }
 	};
 
-	template<typename FloatType>
-	FloatType defaultEps();
+	float defaultEps();
 
-	template<typename FloatType>
 	class QuickHull {
 		using vec3 = glm::vec3;
 
-		FloatType m_epsilon, m_epsilonSquared, m_scale;
+		float m_epsilon, m_epsilonSquared, m_scale;
 		bool m_planar;
 		std::vector<vec3> m_planarPointCloudTemp;
 		VertexDataSource m_vertexData;
-		MeshBuilder<FloatType> m_mesh;
+		MeshBuilder m_mesh;
 		std::array<size_t,6> m_extremeValues;
 		DiagnosticsData m_diagnostics;
 
@@ -738,27 +727,27 @@ namespace quickhull {
 		std::array<size_t,6> getExtremeValues();
 		
 		// Compute scale of the vertex data.
-		FloatType getScale(const std::array<size_t,6>& extremeValues);
+		float getScale(const std::array<size_t,6>& extremeValues);
 		
 		// Each face contains a unique pointer to a vector of indices. However, many - often most - faces do not have any points on the positive
 		// side of them especially at the the end of the iteration. When a face is removed from the mesh, its associated point vector, if such
 		// exists, is moved to the index vector pool, and when we need to add new faces with points on the positive side to the mesh,
 		// we reuse these vectors. This reduces the amount of std::vectors we have to deal with, and impact on performance is remarkable.
-		Pool<std::vector<size_t>> m_indexVectorPool;
+		Pool m_indexVectorPool;
 		inline std::unique_ptr<std::vector<size_t>> getIndexVectorFromPool();
 		inline void reclaimToIndexVectorPool(std::unique_ptr<std::vector<size_t>>& ptr);
 		
 		// Associates a point with a face if the point resides on the positive side of the plane. Returns true if the points was on the positive side.
-		inline bool addPointToFace(typename MeshBuilder<FloatType>::Face& f, size_t pointIndex);
+		inline bool addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex);
 		
 		// This will update m_mesh from which we create the ConvexHull object that getConvexHull function returns
 		void createConvexHalfEdgeMesh();
 		
 		// Constructs the convex hull into a MeshBuilder object which can be converted to a ConvexHull or Mesh object
-		void buildMesh(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, FloatType eps);
+		void buildMesh(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, float eps);
 		
 		// The public getConvexHull functions will setup a VertexDataSource object and call this
-		ConvexHull<FloatType> getConvexHull(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, FloatType eps);
+		ConvexHull getConvexHull(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, float eps);
 	public:
 		// Computes convex hull for a given point cloud.
 		// Params:
@@ -767,10 +756,10 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive of it (for a point cloud with scale 1)
-		ConvexHull<FloatType> getConvexHull(const std::vector<glm::vec3>& pointCloud,
+		ConvexHull getConvexHull(const std::vector<glm::vec3>& pointCloud,
 											bool CCW,
 											bool useOriginalIndices,
-											FloatType eps = defaultEps<FloatType>());
+											float eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud.
 		// Params:
@@ -780,11 +769,11 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
-		ConvexHull<FloatType> getConvexHull(const glm::vec3* vertexData,
+		ConvexHull getConvexHull(const glm::vec3* vertexData,
 											size_t vertexCount,
 											bool CCW,
 											bool useOriginalIndices,
-											FloatType eps = defaultEps<FloatType>());
+											float eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud. This function assumes that the vertex data resides in memory
 		// in the following format: x_0,y_0,z_0,x_1,y_1,z_1,...
@@ -795,11 +784,11 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
-		ConvexHull<FloatType> getConvexHull(const FloatType* vertexData,
+		ConvexHull getConvexHull(const float* vertexData,
 											size_t vertexCount,
 											bool CCW,
 											bool useOriginalIndices,
-											FloatType eps = defaultEps<FloatType>());
+											float eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud. This function assumes that the vertex data resides in memory
 		// in the following format: x_0,y_0,z_0,x_1,y_1,z_1,...
@@ -810,10 +799,10 @@ namespace quickhull {
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
 		// Returns:
 		//   Convex hull of the point cloud as a mesh object with half edge structure.
-		HalfEdgeMesh<FloatType, size_t> getConvexHullAsMesh(const FloatType* vertexData,
+		HalfEdgeMesh getConvexHullAsMesh(const float* vertexData,
 															size_t vertexCount,
 															bool CCW,
-															FloatType eps = defaultEps<FloatType>());
+															float eps = defaultEps());
 		
 		// Get diagnostics about last generated convex hull
 		const DiagnosticsData& getDiagnostics() {
@@ -825,15 +814,13 @@ namespace quickhull {
 	 * Inline function definitions
 	 */
 	
-	template<typename T>
-	std::unique_ptr<std::vector<size_t>> QuickHull<T>::getIndexVectorFromPool() {
+	std::unique_ptr<std::vector<size_t>> QuickHull::getIndexVectorFromPool() {
 		auto r = m_indexVectorPool.get();
 		r->clear();
 		return r;
 	}
 	
-	template<typename T>
-	void QuickHull<T>::reclaimToIndexVectorPool(std::unique_ptr<std::vector<size_t>>& ptr) {
+	void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<std::vector<size_t>>& ptr) {
 		const size_t oldSize = ptr->size();
 		if ((oldSize+1)*128 < ptr->capacity()) {
 			// Reduce memory usage! Huge vectors are needed at the beginning of iteration when faces have many points on their positive side. Later on, smaller vectors will suffice.
@@ -843,9 +830,8 @@ namespace quickhull {
 		m_indexVectorPool.reclaim(ptr);
 	}
 
-	template<typename T>
-	bool QuickHull<T>::addPointToFace(typename MeshBuilder<T>::Face& f, size_t pointIndex) {
-		const T D = mathutils::getSignedDistanceToPlane(m_vertexData[ pointIndex ],f.m_P);
+	bool QuickHull::addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex) {
+		const float D = mathutils::getSignedDistanceToPlane(m_vertexData[ pointIndex ],f.m_P);
 		if (D>0 && D*D > m_epsilonSquared*f.m_P.m_sqrNLength) {
 			if (!f.m_pointsOnPositiveSide) {
 				f.m_pointsOnPositiveSide = std::move(getIndexVectorFromPool());
