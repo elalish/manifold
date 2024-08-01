@@ -20,7 +20,7 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
-#include "quickhull.hpp"
+#include "quickhull.h"
 
 namespace {
 using namespace manifold;
@@ -924,7 +924,7 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
     vertices[i] = {pts[i].x, pts[i].y, pts[i].z};
   }
 
-  quickhull::QuickHull qh;
+  QuickHull qh;
   // bools: correct triangle winding, and use original indices
   auto hull = qh.getConvexHull(vertices, false, true);
   const auto& triangles = hull.getIndexBuffer();
