@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # do not add third_party installations
-add_subdirectory(third_party EXCLUDE_FROM_ALL)
 add_subdirectory(utilities)
 add_subdirectory(collider)
 add_subdirectory(cross_section)

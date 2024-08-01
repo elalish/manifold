@@ -29,9 +29,9 @@ ConvexHull QuickHull::getConvexHull(const glm::dvec3* vertexData,
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-ConvexHull QuickHull::getConvexHull(const double* vertexData, size_t vertexCount,
-                                    bool CCW, bool useOriginalIndices,
-                                    double epsilon) {
+ConvexHull QuickHull::getConvexHull(const double* vertexData,
+                                    size_t vertexCount, bool CCW,
+                                    bool useOriginalIndices, double epsilon) {
   VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
@@ -335,8 +335,8 @@ void QuickHull::createConvexHalfEdgeMesh() {
 std::array<size_t, 6> QuickHull::getExtremeValues() {
   std::array<size_t, 6> outIndices{0, 0, 0, 0, 0, 0};
   double extremeVals[6] = {m_vertexData[0].x, m_vertexData[0].x,
-                          m_vertexData[0].y, m_vertexData[0].y,
-                          m_vertexData[0].z, m_vertexData[0].z};
+                           m_vertexData[0].y, m_vertexData[0].y,
+                           m_vertexData[0].z, m_vertexData[0].z};
   const size_t vCount = m_vertexData.size();
   for (size_t i = 1; i < vCount; i++) {
     const glm::dvec3& pos = m_vertexData[i];
@@ -491,16 +491,16 @@ void QuickHull::setupInitialTetrahedron() {
   std::array<size_t, 3> baseTriangle{selectedPoints.first,
                                      selectedPoints.second, maxI};
   const glm::dvec3 baseTriangleVertices[] = {m_vertexData[baseTriangle[0]],
-                                            m_vertexData[baseTriangle[1]],
-                                            m_vertexData[baseTriangle[2]]};
+                                             m_vertexData[baseTriangle[1]],
+                                             m_vertexData[baseTriangle[2]]};
 
   // Next step is to find the 4th vertex of the tetrahedron. We naturally choose
   // the point farthest away from the triangle plane.
   maxD = m_epsilon;
   maxI = 0;
   const glm::dvec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
-                                                   baseTriangleVertices[1],
-                                                   baseTriangleVertices[2]);
+                                                    baseTriangleVertices[1],
+                                                    baseTriangleVertices[2]);
   Plane trianglePlane(N, baseTriangleVertices[0]);
   for (size_t i = 0; i < vCount; i++) {
     const double d = std::abs(
