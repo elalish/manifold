@@ -63,10 +63,10 @@ ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
 ManifoldMeshGL *manifold_level_set(void *mem,
                                    float (*sdf)(float, float, float, void *),
                                    ManifoldBox *bounds, float edge_length,
-                                   float level, void *ctx);
+                                   float level, float precision, void *ctx);
 ManifoldMeshGL *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
-    float edge_length, float level, void *ctx);
+    float edge_length, float level, float precision, void *ctx);
 
 // Manifold Vectors
 

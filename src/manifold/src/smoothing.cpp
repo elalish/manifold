@@ -76,7 +76,7 @@ struct InterpTri {
   static glm::vec4 Homogeneous(glm::vec3 v) { return glm::vec4(v, 1.0f); }
 
   static glm::vec3 HNormalize(glm::vec4 v) {
-    return v.w == 0 ? v : (glm::vec3(v) / v.w);
+    return v.w == 0 ? glm::vec3(v) : (glm::vec3(v) / v.w);
   }
 
   static glm::vec4 Scale(glm::vec4 v, float scale) {

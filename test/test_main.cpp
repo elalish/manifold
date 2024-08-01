@@ -15,7 +15,6 @@
 
 #include "manifold.h"
 #include "polygon.h"
-#include "sdf.h"
 #include "test.h"
 
 // we need to call some tracy API to establish the connection
@@ -139,9 +138,9 @@ struct GyroidSDF {
   }
 };
 
-Mesh Gyroid() {
+MeshGL Gyroid() {
   const float period = glm::two_pi<float>();
-  return LevelSet(GyroidSDF(), {glm::vec3(0), glm::vec3(period)}, 0.5);
+  return MeshGL::LevelSet(GyroidSDF(), {glm::vec3(0), glm::vec3(period)}, 0.5);
 }
 
 Mesh Tet() {
@@ -206,21 +205,22 @@ MeshGL CubeSTL() {
   return cube;
 }
 
-MeshGL WithIndexColors(const Mesh& in) {
-  MeshGL inGL(in);
-  inGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  const int numVert = in.vertPos.size();
-  inGL.numProp = 6;
-  inGL.vertProperties.resize(6 * numVert);
+MeshGL WithIndexColors(const MeshGL& in) {
+  MeshGL out(in);
+  out.runOriginalID = {Manifold::ReserveIDs(1)};
+  const int numVert = out.NumVert();
+  out.numProp = 6;
+  out.vertProperties.resize(6 * numVert);
   for (int i = 0; i < numVert; ++i) {
-    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = in.vertPos[i][j];
+    for (int j : {0, 1, 2})
+      out.vertProperties[6 * i + j] = in.vertProperties[3 * i + j];
     // vertex colors
     double a;
-    inGL.vertProperties[6 * i + 3] = powf(modf(i * sqrt(2.0), &a), 2.2);
-    inGL.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
-    inGL.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
+    out.vertProperties[6 * i + 3] = powf(modf(i * sqrt(2.0), &a), 2.2);
+    out.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
+    out.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
   }
-  return inGL;
+  return out;
 }
 
 MeshGL WithPositionColors(const Manifold& in) {
