@@ -43,7 +43,7 @@ if(NOT TARGET GTest::gtest_main)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold sdf samples cross_section)
+target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold samples cross_section)
 
 if(MANIFOLD_FUZZ)
   FetchContent_Declare(fuzztest
@@ -73,6 +73,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 add_test(test_all ${PROJECT_NAME})
+target_precompile_headers(${PROJECT_NAME} INTERFACE test.h)
 
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS

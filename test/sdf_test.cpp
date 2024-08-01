@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sdf.h"
-
 #include "manifold.h"
 #include "test.h"
 
@@ -51,15 +49,39 @@ TEST(SDF, CubeVoid) {
 
 TEST(SDF, Bounds) {
   const float size = 4;
-  const float edgeLength = 0.5;
+  const float edgeLength = 1;
 
-  Mesh levelSet = LevelSet(
+  MeshGL levelSet = MeshGL::LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
+  if (options.exportModels) ExportMesh("cubeVoid.glb", levelSet, {});
+#endif
+
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(cubeVoid.Genus(), -1);
+  const float outerBound = size / 2 + edgeLength / 2;
+  EXPECT_NEAR(bounds.min.x, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.y, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.z, -outerBound, precision);
+  EXPECT_NEAR(bounds.max.x, outerBound, precision);
+  EXPECT_NEAR(bounds.max.y, outerBound, precision);
+  EXPECT_NEAR(bounds.max.z, outerBound, precision);
+}
+
+TEST(SDF, Bounds2) {
+  const float size = 4;
+  const float edgeLength = 1;
+
+  Manifold cubeVoid(MeshGL::LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Box bounds = cubeVoid.BoundingBox();
+  const float precision = cubeVoid.Precision();
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cubeVoid2.glb", cubeVoid.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
@@ -77,7 +99,7 @@ TEST(SDF, Surface) {
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(LevelSet(
+  Manifold cubeVoid(MeshGL::LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
 
   Manifold cube = Manifold::Cube(glm::vec3(size), true);
@@ -103,7 +125,8 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const float size = 20;
-  Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  Manifold layers(
+      MeshGL::LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -113,13 +136,13 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  Mesh surface(LevelSet(
+  MeshGL surface = MeshGL::LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {glm::vec3(-1.75 * glm::pi<float>()), glm::vec3(1.75 * glm::pi<float>())},
-      1));
+      1);
   Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
@@ -128,5 +151,39 @@ TEST(SDF, SineSurface) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), {});
+#endif
+}
+
+TEST(SDF, Blobs) {
+  const float blend = 1;
+  std::vector<glm::vec4> balls = {{0, 0, 0, 2},     //
+                                  {1, 2, 3, 2},     //
+                                  {-2, 2, -2, 1},   //
+                                  {-2, -3, -2, 2},  //
+                                  {-3, -1, -3, 1},  //
+                                  {2, -3, -2, 2},   //
+                                  {-2, 3, 2, 2},    //
+                                  {-2, -3, 2, 2},   //
+                                  {1, -1, 1, -2},   //
+                                  {-4, -3, -2, 1}};
+  MeshGL blobs = MeshGL::LevelSet(
+      [&balls, blend](glm::vec3 p) {
+        float d = 0;
+        for (const auto& ball : balls) {
+          d += glm::sign(ball.w) *
+               glm::smoothstep(
+                   -blend, blend,
+                   glm::abs(ball.w) - glm::length(glm::vec3(ball) - p));
+        }
+        return d;
+      },
+      {glm::vec3(-5), glm::vec3(5)}, 0.02, 0.5);
+
+  const int chi = blobs.NumVert() - blobs.NumTri() / 2;
+  const int genus = 1 - chi / 2;
+  EXPECT_EQ(genus, 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("blobs.glb", blobs, {});
 #endif
 }

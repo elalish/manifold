@@ -12,7 +12,8 @@
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=Smooth.RefineQuads"
+        "--gtest_catch_exceptions=0",
+        "--gtest_filter=SDF.Gyroid"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

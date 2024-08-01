@@ -47,12 +47,12 @@ struct MeshSize {
 
 Polygons SquareHole(float xOffset = 0.0);
 Mesh Csaszar();
-Mesh Gyroid();
 Mesh Tet();
+MeshGL Gyroid();
 MeshGL TetGL();
 MeshGL CubeSTL();
 MeshGL CubeUV();
-MeshGL WithIndexColors(const Mesh& in);
+MeshGL WithIndexColors(const MeshGL& in);
 MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
 float GetMaxProperty(const MeshGL& mesh, int channel);

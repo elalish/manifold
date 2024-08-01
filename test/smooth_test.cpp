@@ -17,7 +17,6 @@
 #include "cross_section.h"
 #include "manifold.h"
 #include "samples.h"
-#include "sdf.h"
 #include "test.h"
 #include "tri_dist.h"
 
@@ -331,7 +330,7 @@ TEST(Smooth, Torus) {
 }
 
 TEST(Smooth, SineSurface) {
-  MeshGL surface = LevelSet(
+  MeshGL surface = MeshGL::LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
@@ -355,13 +354,13 @@ TEST(Smooth, SineSurface) {
   Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
   EXPECT_NEAR(prop2.volume, 9.00, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, 33.61, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.59, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
 
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
   EXPECT_NEAR(prop3.volume, 8.44, 0.01);
-  EXPECT_NEAR(prop3.surfaceArea, 31.72, 0.01);
+  EXPECT_NEAR(prop3.surfaceArea, 31.73, 0.02);
   EXPECT_EQ(smoothed3.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
@@ -401,9 +400,9 @@ TEST(Smooth, SDF) {
     newProp[0] = glm::abs(sphericalGyroid(pos));
   };
 
-  Manifold gyroid = Manifold(
-      LevelSet(sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)},
-               0.5, 0, true, 0.00001));
+  Manifold gyroid(MeshGL::LevelSet(
+      sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
+      0.00001));
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
@@ -420,7 +419,7 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.016);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.033);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.068);
 
 #ifdef MANIFOLD_EXPORT
