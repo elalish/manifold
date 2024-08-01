@@ -919,7 +919,7 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 
-  std::vector<glm::vec3> vertices(numVert);
+  std::vector<glm::dvec3> vertices(numVert);
   for (int i = 0; i < numVert; i++) {
     vertices[i] = {pts[i].x, pts[i].y, pts[i].z};
   }

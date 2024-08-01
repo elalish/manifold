@@ -9,43 +9,43 @@
 
 namespace quickhull {
 
-float defaultEps() { return 0.0001f; }
+double defaultEps() { return 0.0000001; }
 
 /*
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::getConvexHull(const std::vector<glm::vec3>& pointCloud,
+ConvexHull QuickHull::getConvexHull(const std::vector<glm::dvec3>& pointCloud,
                                     bool CCW, bool useOriginalIndices,
-                                    float epsilon) {
+                                    double epsilon) {
   VertexDataSource vertexDataSource(pointCloud);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-ConvexHull QuickHull::getConvexHull(const glm::vec3* vertexData,
+ConvexHull QuickHull::getConvexHull(const glm::dvec3* vertexData,
                                     size_t vertexCount, bool CCW,
-                                    bool useOriginalIndices, float epsilon) {
+                                    bool useOriginalIndices, double epsilon) {
   VertexDataSource vertexDataSource(vertexData, vertexCount);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-ConvexHull QuickHull::getConvexHull(const float* vertexData, size_t vertexCount,
+ConvexHull QuickHull::getConvexHull(const double* vertexData, size_t vertexCount,
                                     bool CCW, bool useOriginalIndices,
-                                    float epsilon) {
+                                    double epsilon) {
   VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-HalfEdgeMesh QuickHull::getConvexHullAsMesh(const float* vertexData,
+HalfEdgeMesh QuickHull::getConvexHullAsMesh(const double* vertexData,
                                             size_t vertexCount, bool CCW,
-                                            float epsilon) {
+                                            double epsilon) {
   VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
   buildMesh(vertexDataSource, CCW, false, epsilon);
   return HalfEdgeMesh(m_mesh, m_vertexData);
 }
 
 void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
-                          bool useOriginalIndices, float epsilon) {
+                          bool useOriginalIndices, double epsilon) {
   // CCW is unused for now
   (void)CCW;
   // useOriginalIndices is unused for now
@@ -86,7 +86,7 @@ void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
 
 ConvexHull QuickHull::getConvexHull(const VertexDataSource& pointCloud,
                                     bool CCW, bool useOriginalIndices,
-                                    float epsilon) {
+                                    double epsilon) {
   buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
   return ConvexHull(m_mesh, m_vertexData, CCW, useOriginalIndices);
 }
@@ -159,7 +159,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
       } else {
         const Plane& P = pvf.m_P;
         pvf.m_visibilityCheckedOnIteration = iter;
-        const float d = glm::dot(P.m_N, activePoint) + P.m_D;
+        const double d = glm::dot(P.m_N, activePoint) + P.m_D;
         if (d > 0) {
           pvf.m_isVisibleFaceOnCurrentIteration = 1;
           pvf.m_horizonEdgesOnCurrentIteration = 0;
@@ -281,7 +281,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
       auto& newFace = m_mesh.m_faces[newFaceIndex];
 
-      const glm::vec3 planeNormal = mathutils::getTriangleNormal(
+      const glm::dvec3 planeNormal = mathutils::getTriangleNormal(
           m_vertexData[A], m_vertexData[B], activePoint);
       newFace.m_P = Plane(planeNormal, activePoint);
       newFace.m_he = AB;
@@ -334,12 +334,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
 std::array<size_t, 6> QuickHull::getExtremeValues() {
   std::array<size_t, 6> outIndices{0, 0, 0, 0, 0, 0};
-  float extremeVals[6] = {m_vertexData[0].x, m_vertexData[0].x,
+  double extremeVals[6] = {m_vertexData[0].x, m_vertexData[0].x,
                           m_vertexData[0].y, m_vertexData[0].y,
                           m_vertexData[0].z, m_vertexData[0].z};
   const size_t vCount = m_vertexData.size();
   for (size_t i = 1; i < vCount; i++) {
-    const glm::vec3& pos = m_vertexData[i];
+    const glm::dvec3& pos = m_vertexData[i];
     if (pos.x > extremeVals[0]) {
       extremeVals[0] = pos.x;
       outIndices[0] = i;
@@ -391,10 +391,10 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   return true;
 }
 
-float QuickHull::getScale(const std::array<size_t, 6>& extremeValues) {
-  float s = 0;
+double QuickHull::getScale(const std::array<size_t, 6>& extremeValues) {
+  double s = 0;
   for (size_t i = 0; i < 6; i++) {
-    const float* v = (const float*)(&m_vertexData[extremeValues[i]]);
+    const double* v = (const double*)(&m_vertexData[extremeValues[i]]);
     v += i / 2;
     auto a = std::abs(*v);
     if (a > s) {
@@ -412,7 +412,7 @@ void QuickHull::setupInitialTetrahedron() {
     size_t v[4] = {0, std::min((size_t)1, vertexCount - 1),
                    std::min((size_t)2, vertexCount - 1),
                    std::min((size_t)3, vertexCount - 1)};
-    const glm::vec3 N = mathutils::getTriangleNormal(
+    const glm::dvec3 N = mathutils::getTriangleNormal(
         m_vertexData[v[0]], m_vertexData[v[1]], m_vertexData[v[2]]);
     const Plane trianglePlane(N, m_vertexData[v[0]]);
     if (trianglePlane.isPointOnPositiveSide(m_vertexData[v[3]])) {
@@ -422,13 +422,13 @@ void QuickHull::setupInitialTetrahedron() {
   }
 
   // Find two most distant extreme points.
-  float maxD = m_epsilonSquared;
+  double maxD = m_epsilonSquared;
   std::pair<size_t, size_t> selectedPoints;
   for (size_t i = 0; i < 6; i++) {
     for (size_t j = i + 1; j < 6; j++) {
       // I found a function for squaredDistance but i can't seem to include it
       // like this for some reason
-      const float d = mathutils::getSquaredDistance(
+      const double d = mathutils::getSquaredDistance(
           m_vertexData[m_extremeValues[i]], m_vertexData[m_extremeValues[j]]);
       if (d > maxD) {
         maxD = d;
@@ -453,7 +453,7 @@ void QuickHull::setupInitialTetrahedron() {
   size_t maxI = std::numeric_limits<size_t>::max();
   const size_t vCount = m_vertexData.size();
   for (size_t i = 0; i < vCount; i++) {
-    const float distToRay =
+    const double distToRay =
         mathutils::getSquaredDistanceBetweenPointAndRay(m_vertexData[i], r);
     if (distToRay > maxD) {
       maxD = distToRay;
@@ -490,7 +490,7 @@ void QuickHull::setupInitialTetrahedron() {
   assert(selectedPoints.first != maxI && selectedPoints.second != maxI);
   std::array<size_t, 3> baseTriangle{selectedPoints.first,
                                      selectedPoints.second, maxI};
-  const glm::vec3 baseTriangleVertices[] = {m_vertexData[baseTriangle[0]],
+  const glm::dvec3 baseTriangleVertices[] = {m_vertexData[baseTriangle[0]],
                                             m_vertexData[baseTriangle[1]],
                                             m_vertexData[baseTriangle[2]]};
 
@@ -498,12 +498,12 @@ void QuickHull::setupInitialTetrahedron() {
   // the point farthest away from the triangle plane.
   maxD = m_epsilon;
   maxI = 0;
-  const glm::vec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
+  const glm::dvec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
                                                    baseTriangleVertices[1],
                                                    baseTriangleVertices[2]);
   Plane trianglePlane(N, baseTriangleVertices[0]);
   for (size_t i = 0; i < vCount; i++) {
-    const float d = std::abs(
+    const double d = std::abs(
         mathutils::getSignedDistanceToPlane(m_vertexData[i], trianglePlane));
     if (d > maxD) {
       maxD = d;
@@ -539,10 +539,10 @@ void QuickHull::setupInitialTetrahedron() {
   m_mesh.setup(baseTriangle[0], baseTriangle[1], baseTriangle[2], maxI);
   for (auto& f : m_mesh.m_faces) {
     auto v = m_mesh.getVertexIndicesOfFace(f);
-    const glm::vec3& va = m_vertexData[v[0]];
-    const glm::vec3& vb = m_vertexData[v[1]];
-    const glm::vec3& vc = m_vertexData[v[2]];
-    const glm::vec3 N1 = mathutils::getTriangleNormal(va, vb, vc);
+    const glm::dvec3& va = m_vertexData[v[0]];
+    const glm::dvec3& vb = m_vertexData[v[1]];
+    const glm::dvec3& vc = m_vertexData[v[2]];
+    const glm::dvec3 N1 = mathutils::getTriangleNormal(va, vb, vc);
     const Plane plane(N1, va);
     f.m_P = plane;
   }

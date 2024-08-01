@@ -48,7 +48,7 @@ namespace quickhull {
 		
 
 		// // Projection onto another vector
-		// glm::vec3 projection(const glm::vec3& o) const {
+		// glm::dvec3 projection(const glm::dvec3& o) const {
 		// 	T C = dotProduct(o)/o.getLengthSquared();
 		// 	return o*C;
 		// }
@@ -59,16 +59,16 @@ namespace quickhull {
 
 	class Plane {
 	public:
-		glm::vec3 m_N;
+		glm::dvec3 m_N;
 		
 		// Signed distance (if normal is of length 1) to the plane from origin
-		float m_D;
+		double m_D;
 		
 		// Normal length squared
-		float m_sqrNLength;
+		double m_sqrNLength;
 
-		bool isPointOnPositiveSide(const glm::vec3& Q) const {
-			float d = glm::dot(m_N,Q)+m_D;
+		bool isPointOnPositiveSide(const glm::dvec3& Q) const {
+			double d = glm::dot(m_N,Q)+m_D;
 			if (d>=0) return true;
 			return false;
 		}
@@ -76,7 +76,7 @@ namespace quickhull {
 		Plane() = default;
 
 		// Construct a plane using normal N and any point P on the plane
-		Plane(const glm::vec3& N, const glm::vec3& P) : m_N(N), m_D(glm::dot(-N,P)), m_sqrNLength(m_N.x*m_N.x+m_N.y*m_N.y+m_N.z*m_N.z) {
+		Plane(const glm::dvec3& N, const glm::dvec3& P) : m_N(N), m_D(glm::dot(-N,P)), m_sqrNLength(m_N.x*m_N.x+m_N.y*m_N.y+m_N.z*m_N.z) {
 			
 		}
 	};
@@ -84,11 +84,11 @@ namespace quickhull {
 // Ray.hpp 
 
 	struct Ray {
-		const glm::vec3 m_S;
-		const glm::vec3 m_V;
-		const float m_VInvLengthSquared;
+		const glm::dvec3 m_S;
+		const glm::dvec3 m_V;
+		const double m_VInvLengthSquared;
 		
-		Ray(const glm::vec3& S,const glm::vec3& V) : m_S(S), m_V(V), m_VInvLengthSquared(1/(m_V.x*m_V.x+m_V.y*m_V.y+m_V.z*m_V.z)) {
+		Ray(const glm::dvec3& S,const glm::dvec3& V) : m_S(S), m_V(V), m_VInvLengthSquared(1/(m_V.x*m_V.x+m_V.y*m_V.y+m_V.z*m_V.z)) {
 		}
 	};
 	
@@ -97,15 +97,15 @@ namespace quickhull {
 
 
 	class VertexDataSource {
-		const glm::vec3* m_ptr;
+		const glm::dvec3* m_ptr;
 		size_t m_count;
 	
 	public:
-		VertexDataSource(const glm::vec3* ptr, size_t count) : m_ptr(ptr), m_count(count) {
+		VertexDataSource(const glm::dvec3* ptr, size_t count) : m_ptr(ptr), m_count(count) {
 			
 		}
 		
-		VertexDataSource(const std::vector<glm::vec3>& vec) : m_ptr(&vec[0]), m_count(vec.size()) {
+		VertexDataSource(const std::vector<glm::dvec3>& vec) : m_ptr(&vec[0]), m_count(vec.size()) {
 			
 		}
 		
@@ -119,15 +119,15 @@ namespace quickhull {
 			return m_count;
 		}
 		
-		const glm::vec3& operator[](size_t index) const {
+		const glm::dvec3& operator[](size_t index) const {
 			return m_ptr[index];
 		}
 		
-		const glm::vec3* begin() const {
+		const glm::dvec3* begin() const {
 			return m_ptr;
 		}
 		
-		const glm::vec3* end() const {
+		const glm::dvec3* end() const {
 			return m_ptr + m_count;
 		}
 	};
@@ -157,7 +157,7 @@ namespace quickhull {
 		struct Face {
 			size_t m_he;
 			Plane m_P{};
-			float m_mostDistantPointDist;
+			double m_mostDistantPointDist;
 			size_t m_mostDistantPoint;
 			size_t m_visibilityCheckedOnIteration;
 			std::uint8_t m_isVisibleFaceOnCurrentIteration : 1;
@@ -374,7 +374,7 @@ namespace quickhull {
 // ConvexHull.hpp
 
 	class ConvexHull {
-		std::unique_ptr<std::vector<glm::vec3>> m_optimizedVertexBuffer;
+		std::unique_ptr<std::vector<glm::dvec3>> m_optimizedVertexBuffer;
 		VertexDataSource m_vertices;
 		std::vector<size_t> m_indices;
 	public:
@@ -384,7 +384,7 @@ namespace quickhull {
 		ConvexHull(const ConvexHull& o) {
 			m_indices = o.m_indices;
 			if (o.m_optimizedVertexBuffer) {
-				m_optimizedVertexBuffer.reset(new std::vector<glm::vec3>(*o.m_optimizedVertexBuffer));
+				m_optimizedVertexBuffer.reset(new std::vector<glm::dvec3>(*o.m_optimizedVertexBuffer));
 				m_vertices = VertexDataSource(*m_optimizedVertexBuffer);
 			}
 			else {
@@ -398,7 +398,7 @@ namespace quickhull {
 			}
 			m_indices = o.m_indices;
 			if (o.m_optimizedVertexBuffer) {
-				m_optimizedVertexBuffer.reset(new std::vector<glm::vec3>(*o.m_optimizedVertexBuffer));
+				m_optimizedVertexBuffer.reset(new std::vector<glm::dvec3>(*o.m_optimizedVertexBuffer));
 				m_vertices = VertexDataSource(*m_optimizedVertexBuffer);
 			}
 			else {
@@ -438,7 +438,7 @@ namespace quickhull {
 		// Construct vertex and index buffers from half edge mesh and pointcloud
 		ConvexHull(const MeshBuilder& mesh, const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices) {
 			if (!useOriginalIndices) {
-				m_optimizedVertexBuffer.reset(new std::vector<glm::vec3>());
+				m_optimizedVertexBuffer.reset(new std::vector<glm::dvec3>());
 			}
 			
 			std::vector<bool> faceProcessed(mesh.m_faces.size(),false);
@@ -556,7 +556,7 @@ namespace quickhull {
 			size_t m_halfEdgeIndex; // Index of one of the half edges of this face
 		};
 		
-		std::vector<glm::vec3> m_vertices;
+		std::vector<glm::dvec3> m_vertices;
 		std::vector<Face> m_faces;
 		std::vector<HalfEdge> m_halfEdges;
 		
@@ -614,32 +614,32 @@ namespace quickhull {
 
 	namespace mathutils {
 		
-		inline float getSquaredDistanceBetweenPointAndRay(const glm::vec3& p, const Ray& r) {
-			const glm::vec3 s = p-r.m_S;
-			float t = glm::dot(s,r.m_V);
+		inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p, const Ray& r) {
+			const glm::dvec3 s = p-r.m_S;
+			double t = glm::dot(s,r.m_V);
 			return (s.x*s.x+s.y*s.y+s.z*s.z) - t*t*r.m_VInvLengthSquared;
 		}
 
-		inline float getSquaredDistance(const glm::vec3& p1, const glm::vec3& p2) {
+		inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
 			return ((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
 		}
 		// Note that the unit of distance returned is relative to plane's normal's length (divide by N.getNormalized() if needed to get the "real" distance).
-		inline float getSignedDistanceToPlane(const glm::vec3& v, const Plane& p) {
+		inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
 			return glm::dot(p.m_N,v) + p.m_D;
 		}
 		
-		inline glm::vec3 getTriangleNormal(const glm::vec3& a,const glm::vec3& b,const glm::vec3& c) {
+		inline glm::dvec3 getTriangleNormal(const glm::dvec3& a,const glm::dvec3& b,const glm::dvec3& c) {
 			// We want to get (a-c).crossProduct(b-c) without constructing temp vectors
-			float x = a.x - c.x;
-			float y = a.y - c.y;
-			float z = a.z - c.z;
-			float rhsx = b.x - c.x;
-			float rhsy = b.y - c.y;
-			float rhsz = b.z - c.z;
-			float px = y * rhsz - z * rhsy ;
-			float py = z * rhsx - x * rhsz ;
-			float pz = x * rhsy - y * rhsx ;
-			return glm::vec3(px,py,pz);
+			double x = a.x - c.x;
+			double y = a.y - c.y;
+			double z = a.z - c.z;
+			double rhsx = b.x - c.x;
+			double rhsy = b.y - c.y;
+			double rhsz = b.z - c.z;
+			double px = y * rhsz - z * rhsy ;
+			double py = z * rhsx - x * rhsz ;
+			double pz = x * rhsy - y * rhsx ;
+			return glm::dvec3(px,py,pz);
 		}
 		
 		
@@ -690,12 +690,12 @@ namespace quickhull {
 		DiagnosticsData() : m_failedHorizonEdges(0) { }
 	};
 
-	float defaultEps();
+	double defaultEps();
 
 	class QuickHull {
-		using vec3 = glm::vec3;
+		using vec3 = glm::dvec3;
 
-		float m_epsilon, m_epsilonSquared, m_scale;
+		double m_epsilon, m_epsilonSquared, m_scale;
 		bool m_planar;
 		std::vector<vec3> m_planarPointCloudTemp;
 		VertexDataSource m_vertexData;
@@ -727,7 +727,7 @@ namespace quickhull {
 		std::array<size_t,6> getExtremeValues();
 		
 		// Compute scale of the vertex data.
-		float getScale(const std::array<size_t,6>& extremeValues);
+		double getScale(const std::array<size_t,6>& extremeValues);
 		
 		// Each face contains a unique pointer to a vector of indices. However, many - often most - faces do not have any points on the positive
 		// side of them especially at the the end of the iteration. When a face is removed from the mesh, its associated point vector, if such
@@ -744,10 +744,10 @@ namespace quickhull {
 		void createConvexHalfEdgeMesh();
 		
 		// Constructs the convex hull into a MeshBuilder object which can be converted to a ConvexHull or Mesh object
-		void buildMesh(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, float eps);
+		void buildMesh(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, double eps);
 		
 		// The public getConvexHull functions will setup a VertexDataSource object and call this
-		ConvexHull getConvexHull(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, float eps);
+		ConvexHull getConvexHull(const VertexDataSource& pointCloud, bool CCW, bool useOriginalIndices, double eps);
 	public:
 		// Computes convex hull for a given point cloud.
 		// Params:
@@ -756,10 +756,10 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive of it (for a point cloud with scale 1)
-		ConvexHull getConvexHull(const std::vector<glm::vec3>& pointCloud,
+		ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud,
 											bool CCW,
 											bool useOriginalIndices,
-											float eps = defaultEps());
+											double eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud.
 		// Params:
@@ -769,11 +769,11 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
-		ConvexHull getConvexHull(const glm::vec3* vertexData,
+		ConvexHull getConvexHull(const glm::dvec3* vertexData,
 											size_t vertexCount,
 											bool CCW,
 											bool useOriginalIndices,
-											float eps = defaultEps());
+											double eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud. This function assumes that the vertex data resides in memory
 		// in the following format: x_0,y_0,z_0,x_1,y_1,z_1,...
@@ -784,11 +784,11 @@ namespace quickhull {
 		//   useOriginalIndices: should the output mesh use same vertex indices as the original point cloud. If this is false,
 		//      then we generate a new vertex buffer which contains only the vertices that are part of the convex hull.
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
-		ConvexHull getConvexHull(const float* vertexData,
+		ConvexHull getConvexHull(const double* vertexData,
 											size_t vertexCount,
 											bool CCW,
 											bool useOriginalIndices,
-											float eps = defaultEps());
+											double eps = defaultEps());
 		
 		// Computes convex hull for a given point cloud. This function assumes that the vertex data resides in memory
 		// in the following format: x_0,y_0,z_0,x_1,y_1,z_1,...
@@ -799,10 +799,10 @@ namespace quickhull {
 		//   eps: minimum distance to a plane to consider a point being on positive side of it (for a point cloud with scale 1)
 		// Returns:
 		//   Convex hull of the point cloud as a mesh object with half edge structure.
-		HalfEdgeMesh getConvexHullAsMesh(const float* vertexData,
+		HalfEdgeMesh getConvexHullAsMesh(const double* vertexData,
 															size_t vertexCount,
 															bool CCW,
-															float eps = defaultEps());
+															double eps = defaultEps());
 		
 		// Get diagnostics about last generated convex hull
 		const DiagnosticsData& getDiagnostics() {
@@ -831,7 +831,7 @@ namespace quickhull {
 	}
 
 	bool QuickHull::addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex) {
-		const float D = mathutils::getSignedDistanceToPlane(m_vertexData[ pointIndex ],f.m_P);
+		const double D = mathutils::getSignedDistanceToPlane(m_vertexData[ pointIndex ],f.m_P);
 		if (D>0 && D*D > m_epsilonSquared*f.m_P.m_sqrNLength) {
 			if (!f.m_pointsOnPositiveSide) {
 				f.m_pointsOnPositiveSide = std::move(getIndexVectorFromPool());
