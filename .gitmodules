@@ -1,6 +1,3 @@
 [submodule "src/third_party/quickhull"]
 	path = src/third_party/quickhull
 	url = https://github.com/akuukka/quickhull
-[submodule "bindings/python/third_party/nanobind"]
-	path = bindings/python/third_party/nanobind
-	url = https://github.com/wjakob/nanobind

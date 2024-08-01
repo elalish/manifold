@@ -24,7 +24,14 @@ if(NB_VERSION VERSION_GREATER_EQUAL 1.8.0)
     OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
   find_package(nanobind CONFIG REQUIRED)
 else()
-  add_subdirectory(third_party)
+  message(STATUS "nanobind not found, downloading from source")
+  include(FetchContent)
+  FetchContent_Declare(nanobind
+    GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+    GIT_TAG 8d7f1ee0621c17fa370b704b2100ffa0243d5bf  # v2.0.0
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(nanobind)
 endif()
 nanobind_add_module(
   manifold3d
