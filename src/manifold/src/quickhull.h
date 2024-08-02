@@ -41,16 +41,16 @@ class Pool {
 
 class Plane {
  public:
-  glm::dvec3 N;
+  glm::dvec3 m_N;
 
   // Signed distance (if normal is of length 1) to the plane from origin
-  double D;
+  double m_D;
 
   // Normal length squared
   double sqrNLength;
 
   bool isPointOnPositiveSide(const glm::dvec3& Q) const {
-    double d = glm::dot(N, Q) + D;
+    double d = glm::dot(m_N, Q) + m_D;
     if (d >= 0) return true;
     return false;
   }
@@ -59,8 +59,8 @@ class Plane {
 
   // Construct a plane using normal N and any point P on the plane
   Plane(const glm::dvec3& N, const glm::dvec3& P)
-      : N(N),
-        D(glm::dot(-N, P)),
+      : m_N(N),
+        m_D(glm::dot(-N, P)),
         sqrNLength(N.x * N.x + N.y * N.y + N.z * N.z) {}
 };
 
@@ -108,7 +108,7 @@ class MeshBuilder {
   struct HalfEdge {
     size_t endVertex;
     size_t opp;
-    size_t face;
+    size_t m_face;
     size_t next;
 
     void disable() { endVertex = std::numeric_limits<size_t>::max(); }
@@ -120,7 +120,7 @@ class MeshBuilder {
 
   struct Face {
     size_t he;
-    Plane P{};
+    Plane m_P{};
     double mostDistantPointDist;
     size_t mostDistantPoint;
     size_t visibilityCheckedOnIteration;
@@ -212,84 +212,84 @@ class MeshBuilder {
     HalfEdge AB;
     AB.endVertex = b;
     AB.opp = 6;
-    AB.face = 0;
+    AB.m_face = 0;
     AB.next = 1;
     halfEdges.push_back(AB);
 
     HalfEdge BC;
     BC.endVertex = c;
     BC.opp = 9;
-    BC.face = 0;
+    BC.m_face = 0;
     BC.next = 2;
     halfEdges.push_back(BC);
 
     HalfEdge CA;
     CA.endVertex = a;
     CA.opp = 3;
-    CA.face = 0;
+    CA.m_face = 0;
     CA.next = 0;
     halfEdges.push_back(CA);
 
     HalfEdge AC;
     AC.endVertex = c;
     AC.opp = 2;
-    AC.face = 1;
+    AC.m_face = 1;
     AC.next = 4;
     halfEdges.push_back(AC);
 
     HalfEdge CD;
     CD.endVertex = d;
     CD.opp = 11;
-    CD.face = 1;
+    CD.m_face = 1;
     CD.next = 5;
     halfEdges.push_back(CD);
 
     HalfEdge DA;
     DA.endVertex = a;
     DA.opp = 7;
-    DA.face = 1;
+    DA.m_face = 1;
     DA.next = 3;
     halfEdges.push_back(DA);
 
     HalfEdge BA;
     BA.endVertex = a;
     BA.opp = 0;
-    BA.face = 2;
+    BA.m_face = 2;
     BA.next = 7;
     halfEdges.push_back(BA);
 
     HalfEdge AD;
     AD.endVertex = d;
     AD.opp = 5;
-    AD.face = 2;
+    AD.m_face = 2;
     AD.next = 8;
     halfEdges.push_back(AD);
 
     HalfEdge DB;
     DB.endVertex = b;
     DB.opp = 10;
-    DB.face = 2;
+    DB.m_face = 2;
     DB.next = 6;
     halfEdges.push_back(DB);
 
     HalfEdge CB;
     CB.endVertex = b;
     CB.opp = 1;
-    CB.face = 3;
+    CB.m_face = 3;
     CB.next = 10;
     halfEdges.push_back(CB);
 
     HalfEdge BD;
     BD.endVertex = d;
     BD.opp = 8;
-    BD.face = 3;
+    BD.m_face = 3;
     BD.next = 11;
     halfEdges.push_back(BD);
 
     HalfEdge DC;
     DC.endVertex = c;
     DC.opp = 4;
-    DC.face = 3;
+    DC.m_face = 3;
     DC.next = 9;
     halfEdges.push_back(DC);
 
@@ -395,19 +395,19 @@ class ConvexHull {
   }
 
   // Construct vertex and index buffers from half edge mesh and pointcloud
-  ConvexHull(const MeshBuilder& mesh, const VertexDataSource& pointCloud,
+  ConvexHull(const MeshBuilder& mesh_input, const VertexDataSource& pointCloud,
              bool CCW, bool useOriginalIndices) {
     if (!useOriginalIndices) {
       optimizedVertexBuffer.reset(new std::vector<glm::dvec3>());
     }
 
-    std::vector<bool> faceProcessed(mesh.faces.size(), false);
+    std::vector<bool> faceProcessed(mesh_input.faces.size(), false);
     std::vector<size_t> faceStack;
     // Map vertex indices from original point cloud to the new mesh vertex
     // indices
     std::unordered_map<size_t, size_t> vertexIndexMapping;
-    for (size_t i = 0; i < mesh.faces.size(); i++) {
-      if (!mesh.faces[i].isDisabled()) {
+    for (size_t i = 0; i < mesh_input.faces.size(); i++) {
+      if (!mesh_input.faces[i].isDisabled()) {
         faceStack.push_back(i);
         break;
       }
@@ -418,31 +418,31 @@ class ConvexHull {
 
     const size_t iCCW = CCW ? 1 : 0;
     const size_t finalMeshFaceCount =
-        mesh.faces.size() - mesh.disabledFaces.size();
+        mesh_input.faces.size() - mesh_input.disabledFaces.size();
     indices.reserve(finalMeshFaceCount * 3);
 
     while (faceStack.size()) {
       auto it = faceStack.end() - 1;
       size_t top = *it;
-      assert(!mesh.faces[top].isDisabled());
+      assert(!mesh_input.faces[top].isDisabled());
       faceStack.erase(it);
       if (faceProcessed[top]) {
         continue;
       } else {
         faceProcessed[top] = true;
-        auto halfEdges = mesh.getHalfEdgeIndicesOfFace(mesh.faces[top]);
+        auto halfEdgesMesh = mesh_input.getHalfEdgeIndicesOfFace(mesh_input.faces[top]);
         size_t adjacent[] = {
-            mesh.halfEdges[mesh.halfEdges[halfEdges[0]].opp].face,
-            mesh.halfEdges[mesh.halfEdges[halfEdges[1]].opp].face,
-            mesh.halfEdges[mesh.halfEdges[halfEdges[2]].opp].face};
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[0]].opp].m_face,
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[1]].opp].m_face,
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[2]].opp].m_face};
         for (auto a : adjacent) {
-          if (!faceProcessed[a] && !mesh.faces[a].isDisabled()) {
+          if (!faceProcessed[a] && !mesh_input.faces[a].isDisabled()) {
             faceStack.push_back(a);
           }
         }
-        auto vertices = mesh.getVertexIndicesOfFace(mesh.faces[top]);
+        auto MeshVertices = mesh_input.getVertexIndicesOfFace(mesh_input.faces[top]);
         if (!useOriginalIndices) {
-          for (auto& v : vertices) {
+          for (auto& v : MeshVertices) {
             auto itV = vertexIndexMapping.find(v);
             if (itV == vertexIndexMapping.end()) {
               optimizedVertexBuffer->push_back(pointCloud[v]);
@@ -453,9 +453,9 @@ class ConvexHull {
             }
           }
         }
-        indices.push_back(vertices[0]);
-        indices.push_back(vertices[1 + iCCW]);
-        indices.push_back(vertices[2 - iCCW]);
+        indices.push_back(MeshVertices[0]);
+        indices.push_back(MeshVertices[1 + iCCW]);
+        indices.push_back(MeshVertices[2 - iCCW]);
       }
     }
 
@@ -482,7 +482,7 @@ class HalfEdgeMesh {
   struct HalfEdge {
     size_t endVertex;
     size_t opp;
-    size_t face;
+    size_t m_face;
     size_t next;
   };
 
@@ -524,7 +524,7 @@ class HalfEdgeMesh {
       if (!halfEdge.isDisabled()) {
         halfEdges.push_back({static_cast<size_t>(halfEdge.endVertex),
                              static_cast<size_t>(halfEdge.opp),
-                             static_cast<size_t>(halfEdge.face),
+                             static_cast<size_t>(halfEdge.m_face),
                              static_cast<size_t>(halfEdge.next)});
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
@@ -537,7 +537,7 @@ class HalfEdgeMesh {
     }
 
     for (auto& he : halfEdges) {
-      he.face = faceMapping[he.face];
+      he.m_face = faceMapping[he.m_face];
       he.opp = halfEdgeMapping[he.opp];
       he.next = halfEdgeMapping[he.next];
       he.endVertex = vertexMapping[he.endVertex];
@@ -562,7 +562,7 @@ inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
 inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
-  return glm::dot(p.N, v) + p.D;
+  return glm::dot(p.m_N, v) + p.m_D;
 }
 
 inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
@@ -658,13 +658,13 @@ class QuickHull {
   std::vector<size_t> newHalfEdgeIndices;
   std::vector<std::unique_ptr<std::vector<size_t>>> disabledFacePointVectors;
   std::vector<size_t> visibleFaces;
-  std::vector<size_t> horizonEdges;
+  std::vector<size_t> horizonEdgesData;
   struct FaceData {
-    size_t faceIndex;
+    size_t m_faceIndex;
     // If the face turns out not to be visible, this half edge will be marked as
     // horizon edge
     size_t enteredFromHalfEdge;
-    FaceData(size_t fi, size_t he) : faceIndex(fi), enteredFromHalfEdge(he) {}
+    FaceData(size_t fi, size_t he) : m_faceIndex(fi), enteredFromHalfEdge(he) {}
   };
   std::vector<FaceData> possiblyVisibleFaces;
   std::deque<size_t> faceList;
@@ -683,7 +683,7 @@ class QuickHull {
   std::array<size_t, 6> getExtremeValues();
 
   // Compute scale of the vertex data.
-  double getScale(const std::array<size_t, 6>& extremeValues);
+  double getScale(const std::array<size_t, 6>& extremeValuesInput);
 
   // Each face contains a unique pointer to a vector of indices. However, many -
   // often most - faces do not have any points on the positive side of them
@@ -803,8 +803,8 @@ void QuickHull::reclaimToIndexVectorPool(
 bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
                                size_t pointIndex) {
   const double D =
-      mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
-  if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
+      mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.m_P);
+  if (D > 0 && D * D > epsilonSquared * f.m_P.sqrNLength) {
     if (!f.pointsOnPositiveSide) {
       f.pointsOnPositiveSide = getIndexVectorFromPool();
     }

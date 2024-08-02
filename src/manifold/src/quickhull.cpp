@@ -90,7 +90,7 @@ ConvexHull QuickHull::getConvexHull(const VertexDataSource& pointCloud,
 
 void QuickHull::createConvexHalfEdgeMesh() {
   visibleFaces.clear();
-  horizonEdges.clear();
+  horizonEdgesData.clear();
   possiblyVisibleFaces.clear();
 
   // Compute base tetrahedron
@@ -138,7 +138,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
     // Find out the faces that have our active point on their positive side
     // (these are the "visible faces"). The face on top of the stack of course
     // is one of them. At the same time, we create a list of horizon edges.
-    horizonEdges.clear();
+    horizonEdgesData.clear();
     possiblyVisibleFaces.clear();
     visibleFaces.clear();
     possiblyVisibleFaces.emplace_back(topFaceIndex,
@@ -146,7 +146,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
     while (possiblyVisibleFaces.size()) {
       const auto faceData = possiblyVisibleFaces.back();
       possiblyVisibleFaces.pop_back();
-      auto& pvf = mesh.faces[faceData.faceIndex];
+      auto& pvf = mesh.faces[faceData.m_faceIndex];
       assert(!pvf.isDisabled());
 
       if (pvf.visibilityCheckedOnIteration == iter) {
@@ -154,46 +154,46 @@ void QuickHull::createConvexHalfEdgeMesh() {
           continue;
         }
       } else {
-        const Plane& P = pvf.P;
+        const Plane& P = pvf.m_P;
         pvf.visibilityCheckedOnIteration = iter;
-        const double d = glm::dot(P.N, activePoint) + P.D;
+        const double d = glm::dot(P.m_N, activePoint) + P.m_D;
         if (d > 0) {
           pvf.isVisibleFaceOnCurrentIteration = 1;
           pvf.horizonEdgesOnCurrentIteration = 0;
-          visibleFaces.push_back(faceData.faceIndex);
+          visibleFaces.push_back(faceData.m_faceIndex);
           for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
             if (mesh.halfEdges[heIndex].opp != faceData.enteredFromHalfEdge) {
               possiblyVisibleFaces.emplace_back(
-                  mesh.halfEdges[mesh.halfEdges[heIndex].opp].face, heIndex);
+                  mesh.halfEdges[mesh.halfEdges[heIndex].opp].m_face, heIndex);
             }
           }
           continue;
         }
-        assert(faceData.faceIndex != topFaceIndex);
+        assert(faceData.m_faceIndex != topFaceIndex);
       }
 
       // The face is not visible. Therefore, the halfedge we came from is part
       // of the horizon edge.
       pvf.isVisibleFaceOnCurrentIteration = 0;
-      horizonEdges.push_back(faceData.enteredFromHalfEdge);
+      horizonEdgesData.push_back(faceData.enteredFromHalfEdge);
       // Store which half edge is the horizon edge. The other half edges of the
       // face will not be part of the final mesh so their data slots can by
       // recycled.
-      const auto halfEdges = mesh.getHalfEdgeIndicesOfFace(
-          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]);
+      const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
+          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].m_face]);
       const std::int8_t ind =
-          (halfEdges[0] == faceData.enteredFromHalfEdge)
+          (halfEdgesMesh[0] == faceData.enteredFromHalfEdge)
               ? 0
-              : (halfEdges[1] == faceData.enteredFromHalfEdge ? 1 : 2);
-      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]
+              : (halfEdgesMesh[1] == faceData.enteredFromHalfEdge ? 1 : 2);
+      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].m_face]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
-    const size_t horizonEdgeCount = horizonEdges.size();
+    const size_t horizonEdgeCount = horizonEdgesData.size();
 
     // Order horizon edges so that they form a loop. This may fail due to
     // numerical instability in which case we give up trying to solve horizon
     // edge for this point and accept a minor degeneration in the convex hull.
-    if (!reorderHorizonEdges(horizonEdges)) {
+    if (!reorderHorizonEdges(horizonEdgesData)) {
       diagnostics.failedHorizonEdges++;
       std::cerr << "Failed to solve horizon edge." << std::endl;
       auto it = std::find(tf.pointsOnPositiveSide->begin(),
@@ -215,16 +215,16 @@ void QuickHull::createConvexHalfEdgeMesh() {
     size_t disableCounter = 0;
     for (auto faceIndex : visibleFaces) {
       auto& disabledFace = mesh.faces[faceIndex];
-      auto halfEdges = mesh.getHalfEdgeIndicesOfFace(disabledFace);
+      auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(disabledFace);
       for (size_t j = 0; j < 3; j++) {
         if ((disabledFace.horizonEdgesOnCurrentIteration & (1 << j)) == 0) {
           if (disableCounter < horizonEdgeCount * 2) {
             // Use on this iteration
-            newHalfEdgeIndices.push_back(halfEdges[j]);
+            newHalfEdgeIndices.push_back(halfEdgesMesh[j]);
             disableCounter++;
           } else {
             // Mark for reusal on later iteration step
-            mesh.disableHalfEdge(halfEdges[j]);
+            mesh.disableHalfEdge(halfEdgesMesh[j]);
           }
         }
       }
@@ -247,7 +247,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
     // Create new faces using the edgeloop
     for (size_t i = 0; i < horizonEdgeCount; i++) {
-      const size_t AB = horizonEdges[i];
+      const size_t AB = horizonEdgesData[i];
 
       auto horizonEdgeVertexIndices =
           mesh.getVertexIndicesOfHalfEdge(mesh.halfEdges[AB]);
@@ -266,9 +266,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
       mesh.halfEdges[BC].next = CA;
       mesh.halfEdges[CA].next = AB;
 
-      mesh.halfEdges[BC].face = newFaceIndex;
-      mesh.halfEdges[CA].face = newFaceIndex;
-      mesh.halfEdges[AB].face = newFaceIndex;
+      mesh.halfEdges[BC].m_face = newFaceIndex;
+      mesh.halfEdges[CA].m_face = newFaceIndex;
+      mesh.halfEdges[AB].m_face = newFaceIndex;
 
       mesh.halfEdges[CA].endVertex = A;
       mesh.halfEdges[BC].endVertex = C;
@@ -277,7 +277,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
       const glm::dvec3 planeNormal = mathutils::getTriangleNormal(
           originalVertexData[A], originalVertexData[B], activePoint);
-      newFace.P = Plane(planeNormal, activePoint);
+      newFace.m_P = Plane(planeNormal, activePoint);
       newFace.he = AB;
 
       mesh.halfEdges[CA].opp =
@@ -362,12 +362,12 @@ std::array<size_t, 6> QuickHull::getExtremeValues() {
 bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   const size_t horizonEdgeCount = horizonEdges.size();
   for (size_t i = 0; i < horizonEdgeCount - 1; i++) {
-    const size_t endVertex = mesh.halfEdges[horizonEdges[i]].endVertex;
+    const size_t endVertexCheck = mesh.halfEdges[horizonEdges[i]].endVertex;
     bool foundNext = false;
     for (size_t j = i + 1; j < horizonEdgeCount; j++) {
       const size_t beginVertex =
           mesh.halfEdges[mesh.halfEdges[horizonEdges[j]].opp].endVertex;
-      if (beginVertex == endVertex) {
+      if (beginVertex == endVertexCheck) {
         std::swap(horizonEdges[i + 1], horizonEdges[j]);
         foundNext = true;
         break;
@@ -382,10 +382,10 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   return true;
 }
 
-double QuickHull::getScale(const std::array<size_t, 6>& extremeValues) {
+double QuickHull::getScale(const std::array<size_t, 6>& extremeValuesInput) {
   double s = 0;
   for (size_t i = 0; i < 6; i++) {
-    const double* v = (const double*)(&originalVertexData[extremeValues[i]]);
+    const double* v = (const double*)(&originalVertexData[extremeValuesInput[i]]);
     v += i / 2;
     auto a = std::abs(*v);
     if (a > s) {
@@ -542,7 +542,7 @@ void QuickHull::setupInitialTetrahedron() {
     const glm::dvec3& vc = originalVertexData[v[2]];
     const glm::dvec3 N1 = mathutils::getTriangleNormal(va, vb, vc);
     const Plane plane(N1, va);
-    f.P = plane;
+    f.m_P = plane;
   }
 
   // Finally we assign a face for each vertex outside the tetrahedron (vertices
