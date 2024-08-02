@@ -809,7 +809,7 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
       mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
   if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
     if (!f.pointsOnPositiveSide) {
-      f.pointsOnPositiveSide = getIndexVectorFromPool();
+      f.pointsOnPositiveSide = std::move(getIndexVectorFromPool());
     }
     f.pointsOnPositiveSide->push_back(pointIndex);
     if (D > f.mostDistantPointDist) {
