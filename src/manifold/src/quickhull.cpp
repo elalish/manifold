@@ -60,8 +60,8 @@ void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
   scale = getScale(extremeValues);
 
   // Epsilon we use depends on the scale
-  epsilon = epsilon * scale;
-  epsilonSquared = epsilon * epsilon;
+  m_epsilon = epsilon * scale;
+  epsilonSquared = m_epsilon * m_epsilon;
 
   // Reset diagnostics
   diagnostics = DiagnosticsData();
@@ -493,7 +493,7 @@ void QuickHull::setupInitialTetrahedron() {
 
   // Next step is to find the 4th vertex of the tetrahedron. We naturally choose
   // the point farthest away from the triangle plane.
-  maxD = epsilon;
+  maxD = m_epsilon;
   maxI = 0;
   const glm::dvec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
                                                     baseTriangleVertices[1],
@@ -507,7 +507,7 @@ void QuickHull::setupInitialTetrahedron() {
       maxI = i;
     }
   }
-  if (maxD == epsilon) {
+  if (maxD == m_epsilon) {
     // All the points seem to lie on a 2D subspace of R^3. How to handle this?
     // Well, let's add one extra point to the point cloud so that the convex
     // hull will have volume.

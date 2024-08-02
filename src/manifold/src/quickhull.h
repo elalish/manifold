@@ -645,7 +645,7 @@ double defaultEps();
 class QuickHull {
   using vec3 = glm::dvec3;
 
-  double epsilon, epsilonSquared, scale;
+  double m_epsilon, epsilonSquared, scale;
   bool planar;
   std::vector<vec3> planarPointCloudTemp;
   VertexDataSource originalVertexData;
