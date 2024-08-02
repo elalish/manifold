@@ -72,9 +72,7 @@ struct Ray {
   const double VInvLengthSquared;
 
   Ray(const glm::dvec3& S, const glm::dvec3& V)
-      : S(S),
-        V(V),
-        VInvLengthSquared(1 / (V.x * V.x + V.y * V.y + V.z * V.z)) {}
+      : S(S), V(V), VInvLengthSquared(1 / (glm::dot(V, V))) {}
 };
 
 // VertexDataSource
@@ -555,12 +553,11 @@ inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
                                                    const Ray& r) {
   const glm::dvec3 s = p - r.S;
   double t = glm::dot(s, r.V);
-  return (s.x * s.x + s.y * s.y + s.z * s.z) - t * t * r.VInvLengthSquared;
+  return glm::dot(s, s) - t * t * r.VInvLengthSquared;
 }
 
 inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
-  return ((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y) +
-          (p1.z - p2.z) * (p1.z - p2.z));
+  return (glm::dot(p1 - p2, p1 - p2));
 }
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
@@ -809,7 +806,7 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
       mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
   if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
     if (!f.pointsOnPositiveSide) {
-      f.pointsOnPositiveSide = std::move(getIndexVectorFromPool());
+      f.pointsOnPositiveSide = getIndexVectorFromPool();
     }
     f.pointsOnPositiveSide->push_back(pointIndex);
     if (D > f.mostDistantPointDist) {
