@@ -385,7 +385,8 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
 double QuickHull::getScale(const std::array<size_t, 6>& extremeValuesInput) {
   double s = 0;
   for (size_t i = 0; i < 6; i++) {
-    const double* v = (const double*)(&originalVertexData[extremeValuesInput[i]]);
+    const double* v =
+        (const double*)(&originalVertexData[extremeValuesInput[i]]);
     v += i / 2;
     auto a = std::abs(*v);
     if (a > s) {

@@ -430,17 +430,22 @@ class ConvexHull {
         continue;
       } else {
         faceProcessed[top] = true;
-        auto halfEdgesMesh = mesh_input.getHalfEdgeIndicesOfFace(mesh_input.faces[top]);
+        auto halfEdgesMesh =
+            mesh_input.getHalfEdgeIndicesOfFace(mesh_input.faces[top]);
         size_t adjacent[] = {
-            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[0]].opp].m_face,
-            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[1]].opp].m_face,
-            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[2]].opp].m_face};
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[0]].opp]
+                .m_face,
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[1]].opp]
+                .m_face,
+            mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[2]].opp]
+                .m_face};
         for (auto a : adjacent) {
           if (!faceProcessed[a] && !mesh_input.faces[a].isDisabled()) {
             faceStack.push_back(a);
           }
         }
-        auto MeshVertices = mesh_input.getVertexIndicesOfFace(mesh_input.faces[top]);
+        auto MeshVertices =
+            mesh_input.getVertexIndicesOfFace(mesh_input.faces[top]);
         if (!useOriginalIndices) {
           for (auto& v : MeshVertices) {
             auto itV = vertexIndexMapping.find(v);
@@ -802,8 +807,8 @@ void QuickHull::reclaimToIndexVectorPool(
 
 bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
                                size_t pointIndex) {
-  const double D =
-      mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.m_P);
+  const double D = mathutils::getSignedDistanceToPlane(
+      originalVertexData[pointIndex], f.m_P);
   if (D > 0 && D * D > epsilonSquared * f.m_P.sqrNLength) {
     if (!f.pointsOnPositiveSide) {
       f.pointsOnPositiveSide = getIndexVectorFromPool();
