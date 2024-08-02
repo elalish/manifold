@@ -41,16 +41,16 @@ class Pool {
 
 class Plane {
  public:
-  glm::dvec3 m_N;
+  glm::dvec3 N;
 
   // Signed distance (if normal is of length 1) to the plane from origin
-  double m_D;
+  double D;
 
   // Normal length squared
   double sqrNLength;
 
   bool isPointOnPositiveSide(const glm::dvec3& Q) const {
-    double d = glm::dot(m_N, Q) + m_D;
+    double d = glm::dot(N, Q) + D;
     if (d >= 0) return true;
     return false;
   }
@@ -59,8 +59,8 @@ class Plane {
 
   // Construct a plane using normal N and any point P on the plane
   Plane(const glm::dvec3& N, const glm::dvec3& P)
-      : m_N(N),
-        m_D(glm::dot(-N, P)),
+      : N(N),
+        D(glm::dot(-N, P)),
         sqrNLength(N.x * N.x + N.y * N.y + N.z * N.z) {}
 };
 
@@ -108,7 +108,7 @@ class MeshBuilder {
   struct HalfEdge {
     size_t endVertex;
     size_t opp;
-    size_t m_face;
+    size_t face;
     size_t next;
 
     void disable() { endVertex = std::numeric_limits<size_t>::max(); }
@@ -120,7 +120,7 @@ class MeshBuilder {
 
   struct Face {
     size_t he;
-    Plane m_P{};
+    Plane P{};
     double mostDistantPointDist;
     size_t mostDistantPoint;
     size_t visibilityCheckedOnIteration;
@@ -212,84 +212,84 @@ class MeshBuilder {
     HalfEdge AB;
     AB.endVertex = b;
     AB.opp = 6;
-    AB.m_face = 0;
+    AB.face = 0;
     AB.next = 1;
     halfEdges.push_back(AB);
 
     HalfEdge BC;
     BC.endVertex = c;
     BC.opp = 9;
-    BC.m_face = 0;
+    BC.face = 0;
     BC.next = 2;
     halfEdges.push_back(BC);
 
     HalfEdge CA;
     CA.endVertex = a;
     CA.opp = 3;
-    CA.m_face = 0;
+    CA.face = 0;
     CA.next = 0;
     halfEdges.push_back(CA);
 
     HalfEdge AC;
     AC.endVertex = c;
     AC.opp = 2;
-    AC.m_face = 1;
+    AC.face = 1;
     AC.next = 4;
     halfEdges.push_back(AC);
 
     HalfEdge CD;
     CD.endVertex = d;
     CD.opp = 11;
-    CD.m_face = 1;
+    CD.face = 1;
     CD.next = 5;
     halfEdges.push_back(CD);
 
     HalfEdge DA;
     DA.endVertex = a;
     DA.opp = 7;
-    DA.m_face = 1;
+    DA.face = 1;
     DA.next = 3;
     halfEdges.push_back(DA);
 
     HalfEdge BA;
     BA.endVertex = a;
     BA.opp = 0;
-    BA.m_face = 2;
+    BA.face = 2;
     BA.next = 7;
     halfEdges.push_back(BA);
 
     HalfEdge AD;
     AD.endVertex = d;
     AD.opp = 5;
-    AD.m_face = 2;
+    AD.face = 2;
     AD.next = 8;
     halfEdges.push_back(AD);
 
     HalfEdge DB;
     DB.endVertex = b;
     DB.opp = 10;
-    DB.m_face = 2;
+    DB.face = 2;
     DB.next = 6;
     halfEdges.push_back(DB);
 
     HalfEdge CB;
     CB.endVertex = b;
     CB.opp = 1;
-    CB.m_face = 3;
+    CB.face = 3;
     CB.next = 10;
     halfEdges.push_back(CB);
 
     HalfEdge BD;
     BD.endVertex = d;
     BD.opp = 8;
-    BD.m_face = 3;
+    BD.face = 3;
     BD.next = 11;
     halfEdges.push_back(BD);
 
     HalfEdge DC;
     DC.endVertex = c;
     DC.opp = 4;
-    DC.m_face = 3;
+    DC.face = 3;
     DC.next = 9;
     halfEdges.push_back(DC);
 
@@ -434,11 +434,11 @@ class ConvexHull {
             mesh_input.getHalfEdgeIndicesOfFace(mesh_input.faces[top]);
         size_t adjacent[] = {
             mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[0]].opp]
-                .m_face,
+                .face,
             mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[1]].opp]
-                .m_face,
+                .face,
             mesh_input.halfEdges[mesh_input.halfEdges[halfEdgesMesh[2]].opp]
-                .m_face};
+                .face};
         for (auto a : adjacent) {
           if (!faceProcessed[a] && !mesh_input.faces[a].isDisabled()) {
             faceStack.push_back(a);
@@ -487,7 +487,7 @@ class HalfEdgeMesh {
   struct HalfEdge {
     size_t endVertex;
     size_t opp;
-    size_t m_face;
+    size_t face;
     size_t next;
   };
 
@@ -529,7 +529,7 @@ class HalfEdgeMesh {
       if (!halfEdge.isDisabled()) {
         halfEdges.push_back({static_cast<size_t>(halfEdge.endVertex),
                              static_cast<size_t>(halfEdge.opp),
-                             static_cast<size_t>(halfEdge.m_face),
+                             static_cast<size_t>(halfEdge.face),
                              static_cast<size_t>(halfEdge.next)});
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
@@ -542,7 +542,7 @@ class HalfEdgeMesh {
     }
 
     for (auto& he : halfEdges) {
-      he.m_face = faceMapping[he.m_face];
+      he.face = faceMapping[he.face];
       he.opp = halfEdgeMapping[he.opp];
       he.next = halfEdgeMapping[he.next];
       he.endVertex = vertexMapping[he.endVertex];
@@ -567,7 +567,7 @@ inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
 inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
-  return glm::dot(p.m_N, v) + p.m_D;
+  return glm::dot(p.N, v) + p.D;
 }
 
 inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
@@ -665,11 +665,11 @@ class QuickHull {
   std::vector<size_t> visibleFaces;
   std::vector<size_t> horizonEdgesData;
   struct FaceData {
-    size_t m_faceIndex;
+    size_t faceIndex;
     // If the face turns out not to be visible, this half edge will be marked as
     // horizon edge
     size_t enteredFromHalfEdge;
-    FaceData(size_t fi, size_t he) : m_faceIndex(fi), enteredFromHalfEdge(he) {}
+    FaceData(size_t fi, size_t he) : faceIndex(fi), enteredFromHalfEdge(he) {}
   };
   std::vector<FaceData> possiblyVisibleFaces;
   std::deque<size_t> faceList;
@@ -807,9 +807,9 @@ void QuickHull::reclaimToIndexVectorPool(
 
 bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
                                size_t pointIndex) {
-  const double D = mathutils::getSignedDistanceToPlane(
-      originalVertexData[pointIndex], f.m_P);
-  if (D > 0 && D * D > epsilonSquared * f.m_P.sqrNLength) {
+  const double D =
+      mathutils::getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
+  if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
     if (!f.pointsOnPositiveSide) {
       f.pointsOnPositiveSide = getIndexVectorFromPool();
     }
