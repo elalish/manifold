@@ -1,5 +1,61 @@
-#ifndef QUICKHULL_HPP_
-#define QUICKHULL_HPP_
+// Copyright 2024 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/*
+ * Implementation of the 3D QuickHull algorithm by Antti Kuukka
+ *
+ * No copyrights. What follows is 100% Public Domain.
+ *
+ *
+ *
+ * INPUT:  a list of points in 3D space (for example, vertices of a 3D mesh)
+ *
+ * OUTPUT: a ConvexHull object which provides vertex and index buffers of the
+ *generated convex hull as a triangle mesh.
+ *
+ *
+ *
+ * The implementation is thread-safe if each thread is using its own QuickHull
+ *object.
+ *
+ *
+ * SUMMARY OF THE ALGORITHM:
+ *         - Create initial simplex (tetrahedron) using extreme points. We have
+ *four faces now and they form a convex mesh M.
+ *         - For each point, assign them to the first face for which they are on
+ *the positive side of (so each point is assigned to at most one face). Points
+ *inside the initial tetrahedron are left behind now and no longer affect the
+ *calculations.
+ *         - Add all faces that have points assigned to them to Face Stack.
+ *         - Iterate until Face Stack is empty:
+ *              - Pop topmost face F from the stack
+ *              - From the points assigned to F, pick the point P that is
+ *farthest away from the plane defined by F.
+ *              - Find all faces of M that have P on their positive side. Let us
+ *call these the "visible faces".
+ *              - Because of the way M is constructed, these faces are
+ *connected. Solve their horizon edge loop.
+ *				- "Extrude to P": Create new faces by connecting
+ *P with the points belonging to the horizon edge. Add the new faces to M and
+ *remove the visible faces from M.
+ *              - Each point that was assigned to visible faces is now assigned
+ *to at most one of the newly created faces.
+ *              - Those new faces that have points assigned to them are added to
+ *the top of Face Stack.
+ *          - M is now the convex hull.
+ *
+ * */
+#pragma once
 #include <array>
 #include <cassert>
 #include <cinttypes>
@@ -562,7 +618,7 @@ inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
 }
 
 inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
-  return (glm::dot(p1 - p2, p1 - p2));
+  return glm::dot(p1 - p2, p1 - p2);
 }
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
@@ -588,54 +644,6 @@ inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
 }  // namespace mathutils
 
 // QuickHull.hpp
-
-/*
- * Implementation of the 3D QuickHull algorithm by Antti Kuukka
- *
- * No copyrights. What follows is 100% Public Domain.
- *
- *
- *
- * INPUT:  a list of points in 3D space (for example, vertices of a 3D mesh)
- *
- * OUTPUT: a ConvexHull object which provides vertex and index buffers of the
- *generated convex hull as a triangle mesh.
- *
- *
- *
- * The implementation is thread-safe if each thread is using its own QuickHull
- *object.
- *
- *
- * SUMMARY OF THE ALGORITHM:
- *         - Create initial simplex (tetrahedron) using extreme points. We have
- *four faces now and they form a convex mesh M.
- *         - For each point, assign them to the first face for which they are on
- *the positive side of (so each point is assigned to at most one face). Points
- *inside the initial tetrahedron are left behind now and no longer affect the
- *calculations.
- *         - Add all faces that have points assigned to them to Face Stack.
- *         - Iterate until Face Stack is empty:
- *              - Pop topmost face F from the stack
- *              - From the points assigned to F, pick the point P that is
- *farthest away from the plane defined by F.
- *              - Find all faces of M that have P on their positive side. Let us
- *call these the "visible faces".
- *              - Because of the way M is constructed, these faces are
- *connected. Solve their horizon edge loop.
- *				- "Extrude to P": Create new faces by connecting
- *P with the points belonging to the horizon edge. Add the new faces to M and
- *remove the visible faces from M.
- *              - Each point that was assigned to visible faces is now assigned
- *to at most one of the newly created faces.
- *              - Those new faces that have points assigned to them are added to
- *the top of Face Stack.
- *          - M is now the convex hull.
- *
- * TO DO:
- *  - Implement a proper 2D QuickHull and use that to solve the degenerate 2D
- *case (when all the points lie on the same plane in 3D space).
- * */
 
 struct DiagnosticsData {
   // How many times QuickHull failed to solve the  horizon edge. Failures lead
@@ -822,5 +830,3 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
   }
   return false;
 }
-
-#endif /* QUICKHULL_HPP_ */
