@@ -11,12 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+// 
+// Derived from the public domain work of Antti Kuukka at https://github.com/akuukka/quickhull
 
-/*
- * Implementation of the 3D QuickHull algorithm by Antti Kuukka
- *
- * No copyrights. What follows is 100% Public Domain.
- * */
 #include "quickhull.h"
 
 #include <algorithm>
