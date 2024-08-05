@@ -11,8 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-// 
-// Derived from the public domain work of Antti Kuukka at https://github.com/akuukka/quickhull
+//
+// Derived from the public domain work of Antti Kuukka at
+// https://github.com/akuukka/quickhull
 
 /*
  * INPUT:  a list of points in 3D space (for example, vertices of a 3D mesh)
