@@ -56,43 +56,45 @@ class HullImpl {
 
   // Check if the mesh remains convex after adding new faces
   bool isMeshConvex() {
-      // Get the mesh from the manifold
-      manifold::Mesh mesh = hullManifold.GetMesh();
+    // Get the mesh from the manifold
+    manifold::Mesh mesh = hullManifold.GetMesh();
 
-      const auto& vertPos = mesh.vertPos;
+    const auto &vertPos = mesh.vertPos;
 
-      // Iterate over each triangle
-      for (const auto& tri : mesh.triVerts) {
+    // Iterate over each triangle
+    for (const auto &tri : mesh.triVerts) {
+      // Get the vertices of the triangle
+      glm::vec3 v0 = vertPos[tri[0]];
+      glm::vec3 v1 = vertPos[tri[1]];
+      glm::vec3 v2 = vertPos[tri[2]];
 
-          // Get the vertices of the triangle
-          glm::vec3 v0 = vertPos[tri[0]];
-          glm::vec3 v1 = vertPos[tri[1]];
-          glm::vec3 v2 = vertPos[tri[2]];
+      // Compute the normal of the triangle
+      glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
-          // Compute the normal of the triangle
-          glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+      // Check all other vertices
+      for (int i = 0; i < (int)vertPos.size(); ++i) {
+        if (i == tri[0] || i == tri[2] || i == tri[3])
+          continue;  // Skip vertices of the current triangle
 
-          // Check all other vertices
-          for (int i = 0; i < (int)vertPos.size(); ++i) {
-              if (i == tri[0] || i == tri[2] || i == tri[3]) continue; // Skip vertices of the current triangle
+        // Get the vertex
+        glm::vec3 v = vertPos[i];
 
-              // Get the vertex
-              glm::vec3 v = vertPos[i];
+        // Compute the signed distance from the plane
+        double distance = glm::dot(normal, v - v0);
 
-              // Compute the signed distance from the plane
-              double distance = glm::dot(normal, v - v0);
-
-              // If any vertex lies on the opposite side of the normal direction
-              if (distance > 0) {
-                  // The manifold is not convex
-                  return false;
-              }
-          }
+        // If any vertex lies on the opposite side of the normal direction
+        if (distance > 0) {
+          // The manifold is not convex
+          return false;
+        }
       }
-      // If we didn't find any vertex on the opposite side for any triangle, it's convex
-      return true;
+    }
+    // If we didn't find any vertex on the opposite side for any triangle, it's
+    // convex
+    return true;
   }
-  private:
+
+ protected:
   manifold::Manifold hullManifold;
   manifold::Manifold inputManifold;
 };
@@ -111,8 +113,6 @@ class HullImplOriginal : public HullImpl {
   }
 
  private:
-  manifold::Manifold hullManifold;
-  manifold::Manifold inputManifold;
   // Prints the volume and area of the manifold and the convex hull of our
   // implementation,
   void PrintVolArea() {
@@ -176,8 +176,6 @@ class HullImplCGAL : public HullImpl {
     return;
   }
   TriangleMesh cgalHull, cgalInput;
-  manifold::Manifold hullManifold;
-  manifold::Manifold inputManifold;
 
  public:
   // This was the code  where I converted the CGAL Hull back to manifold, but I
@@ -251,7 +249,7 @@ int main(int argc, char **argv) {
   else if (!strcmp(argv[2], "Hull_CGAL"))
     hullImpl = new HullImplCGAL();
   else {
-    std::cout << "Invalid Implementation" << endl;
+    std::cout << "Invalid Implementation";
     return 0;
   }
   if (!strcmp(argv[1], "Sphere"))
@@ -262,5 +260,8 @@ int main(int argc, char **argv) {
     auto inputMesh = ImportMesh(argv[4], 1);
     Manifold inputManifold = Manifold(inputMesh);
     hullImpl->hull(inputManifold, inputManifold.GetMesh().vertPos);
+#ifdef MANIFOLD_DEBUG
+    if (!hullImpl->isMeshConvex()) cout << "INVALID HULL" << endl;
+#endif
   }
 }
