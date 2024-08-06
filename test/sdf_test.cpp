@@ -37,11 +37,8 @@ struct Layers {
 TEST(SDF, Sphere) {
   MeshGL sphere =
       MeshGL::LevelSet([](glm::vec3 pos) { return 1 - glm::length(pos); },
-                       {glm::vec3(-2), glm::vec3(2)}, 1);
-  Dump(sphere.vertProperties);
-  Dump(sphere.triVerts);
+                       {glm::vec3(-1.4), glm::vec3(1.4)}, 0.9);
   Manifold a(sphere);
-  std::cout << sphere.NumVert() << ", " << sphere.NumTri() << std::endl;
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("sphereSDF.glb", sphere, {});
 #endif

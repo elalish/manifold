@@ -169,6 +169,7 @@ inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
 
 struct GridVert {
   float distance = NAN;
+  int idx = -1;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   int Inside() const { return distance > 0 ? 1 : -1; }
@@ -210,12 +211,18 @@ struct NearSurface {
       const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
       const float val =
           voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
-      if ((val > 0) == (gridVert.distance > 0)) continue;
 
-      if (i < 7) keep = true;
+      if ((val > 0) == (gridVert.distance > 0)) {
+        continue;
+      }
+
+      if (i < 7) {
+        gridVert.edgeVerts[i] = 0;
+        keep = true;
+      }
 
       const float v = glm::abs(val);
-      if (v > 4 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
+      if (v > 8 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
         vMax = val;
         closestNeighbor = i;
       }
@@ -230,10 +237,14 @@ struct NearSurface {
       if (4 * glm::dot(pos - gridPos, pos - gridPos) < spacing[0]) {
         const int idx = AtomicAdd(vertIndex[0], 1);
         vertPos[idx] = pos;
-        gridVert.distance = 0;
-        for (int i = 0; i < 7; ++i) gridVert.edgeVerts[i] = idx;
+        gridVert.idx = idx;
+        for (int j = 0; j < 7; ++j) {
+          if (gridVert.edgeVerts[j] == 0) gridVert.edgeVerts[j] = idx;
+        }
         keep = true;
       }
+    } else {
+      for (int j = 0; j < 7; ++j) gridVert.edgeVerts[j] = -1;
     }
 
     if (keep) gridVerts.Insert(index, gridVert);
@@ -260,7 +271,7 @@ struct ComputeVerts {
 
     GridVert& gridVert = gridVerts.At(idx);
 
-    if (gridVert.distance == 0) return;
+    if (gridVert.idx >= 0) return;
 
     const glm::ivec4 gridIndex = DecodeIndex(basekey, gridPow);
 
@@ -271,10 +282,6 @@ struct ComputeVerts {
     for (int i = 0; i < 7; ++i) {
       const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
       const GridVert& neighbor = gridVerts[EncodeIndex(neighborIndex, gridPow)];
-      if (neighbor.distance == 0) {
-        gridVert.edgeVerts[i] = neighbor.edgeVerts[0];
-        continue;
-      }
 
       const float val =
           isfinite(neighbor.distance)
@@ -282,6 +289,11 @@ struct ComputeVerts {
               : voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0),
                                    gridPow)];
       if ((val > 0) == (gridVert.distance > 0)) continue;
+
+      if (neighbor.idx >= 0) {
+        gridVert.edgeVerts[i] = neighbor.idx;
+        continue;
+      }
 
       const int idx = AtomicAdd(vertIndex[0], 1);
       vertPos[idx] = FindSurface(position, gridVert.distance,
