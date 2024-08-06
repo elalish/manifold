@@ -381,13 +381,13 @@ TEST(Smooth, SDF) {
     const float gyroid =
         cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
     const float d = glm::min(0.0f, r - glm::length(p));
-    return gyroid - d * d;
+    return gyroid - d * d / 2;
   };
 
   auto gradient = [r](glm::vec3 pos) {
     const float rad = glm::length(pos);
     const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
-    const glm::vec3 sphereGrad = 2 * d * pos;
+    const glm::vec3 sphereGrad = d * pos;
     const glm::vec3 gyroidGrad(
         cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
         cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
@@ -419,8 +419,8 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.030);
-  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.075);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.026);
+  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {

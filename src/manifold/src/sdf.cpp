@@ -26,6 +26,7 @@ using namespace manifold;
 
 constexpr int kCrossing = -2;
 constexpr int kNone = -1;
+constexpr glm::ivec4 kVoxelOffset(1, 1, 1, 0);
 
 glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
@@ -170,15 +171,25 @@ inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
   return glm::mix(pos0, pos1, d0 / (d0 - d1));
 }
 
+/**
+ * Each GridVert is connected to 14 others, and in charge of 7 of these edges
+ * (see Neighbor() above). Each edge that changes sign contributes one vert,
+ * unless the GridVert is close enough to the surface, in which case it
+ * contributes only a single movedVert and all crossing edgeVerts refer to that.
+ */
 struct GridVert {
   float distance = NAN;
-  int idx = kNone;
-  int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
+  int movedVert = kNone;
+  int edgeVerts[7] = {kNone, kNone, kNone, kNone, kNone, kNone, kNone};
 
-  int Inside() const { return distance > 0 ? 1 : -1; }
+  inline bool HasMoved() const { return movedVert >= 0; }
 
-  int NeighborInside(int i) const {
-    return Inside() * (edgeVerts[i] < 0 ? 1 : -1);
+  inline bool SameSide(float dist) const { return dist > 0 == distance > 0; }
+
+  inline int Inside() const { return distance > 0 ? 1 : -1; }
+
+  inline int NeighborInside(int i) const {
+    return Inside() * (edgeVerts[i] == kNone ? 1 : -1);
   }
 };
 
@@ -204,8 +215,7 @@ struct NearSurface {
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
     GridVert gridVert;
-    gridVert.distance =
-        voxels[EncodeIndex(gridIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
+    gridVert.distance = voxels[EncodeIndex(gridIndex + kVoxelOffset, gridPow)];
 
     bool keep = false;
     float vMax = 0;
@@ -213,11 +223,9 @@ struct NearSurface {
     for (int i = 0; i < 14; ++i) {
       const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
       const float val =
-          voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0), gridPow)];
+          voxels[EncodeIndex(neighborIndex + kVoxelOffset, gridPow)];
 
-      if ((val > 0) == (gridVert.distance > 0)) {
-        continue;
-      }
+      if (gridVert.SameSide(val)) continue;
 
       if (i < 7) {
         gridVert.edgeVerts[i] = kCrossing;
@@ -225,7 +233,8 @@ struct NearSurface {
       }
 
       const float v = glm::abs(val);
-      if (v > 8 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
+      // Approximate bound on vert movement.
+      if (v > 4 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
         vMax = val;
         closestNeighbor = i;
       }
@@ -237,10 +246,11 @@ struct NearSurface {
       const glm::vec3 pos = FindSurface(
           gridPos, gridVert.distance, Position(neighborIndex, origin, spacing),
           vMax, tol, level, sdf);
-      if (4 * glm::dot(pos - gridPos, pos - gridPos) < spacing[0]) {
+      // Bound the delta of each vert to ensure the tetrahedron cannot invert.
+      if (glm::all(glm::lessThan(glm::abs(pos - gridPos), 0.2f * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
         vertPos[idx] = pos;
-        gridVert.idx = idx;
+        gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
           if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
         }
@@ -269,14 +279,14 @@ struct ComputeVerts {
 
   void operator()(int idx) {
     ZoneScoped;
-    Uint64 basekey = gridVerts.KeyAt(idx);
-    if (basekey == kOpen) return;
+    Uint64 baseKey = gridVerts.KeyAt(idx);
+    if (baseKey == kOpen) return;
 
     GridVert& gridVert = gridVerts.At(idx);
 
-    if (gridVert.idx >= 0) return;
+    if (gridVert.HasMoved()) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(basekey, gridPow);
+    const glm::ivec4 gridIndex = DecodeIndex(baseKey, gridPow);
 
     const glm::vec3 position = Position(gridIndex, origin, spacing);
 
@@ -289,12 +299,11 @@ struct ComputeVerts {
       const float val =
           isfinite(neighbor.distance)
               ? neighbor.distance
-              : voxels[EncodeIndex(neighborIndex + glm::ivec4(1, 1, 1, 0),
-                                   gridPow)];
-      if ((val > 0) == (gridVert.distance > 0)) continue;
+              : voxels[EncodeIndex(neighborIndex + kVoxelOffset, gridPow)];
+      if (gridVert.SameSide(val)) continue;
 
-      if (neighbor.idx >= 0) {
-        gridVert.edgeVerts[i] = neighbor.idx;
+      if (neighbor.HasMoved()) {
+        gridVert.edgeVerts[i] = neighbor.movedVert;
         continue;
       }
 
@@ -331,11 +340,11 @@ struct BuildTris {
 
   void operator()(int idx) {
     ZoneScoped;
-    Uint64 basekey = gridVerts.KeyAt(idx);
-    if (basekey == kOpen) return;
+    Uint64 baseKey = gridVerts.KeyAt(idx);
+    if (baseKey == kOpen) return;
 
     const GridVert& base = gridVerts.At(idx);
-    const glm::ivec4 baseIndex = DecodeIndex(basekey, gridPow);
+    const glm::ivec4 baseIndex = DecodeIndex(baseKey, gridPow);
 
     glm::ivec4 leadIndex = baseIndex;
     if (leadIndex.w == 0)
@@ -357,8 +366,9 @@ struct BuildTris {
     for (const int i : {0, 1, 2}) {
       thisIndex = leadIndex;
       --thisIndex[Prev3(i)];
-      // indices take unsigned input, so check for negatives, given the
-      // decrement.
+      // Indices take unsigned input, so check for negatives, given the
+      // decrement. If negative, the vert is outside and only connected to other
+      // outside verts - no edgeVerts.
       GridVert nextVert = thisIndex[Prev3(i)] < 0
                               ? GridVert()
                               : gridVerts[EncodeIndex(thisIndex, gridPow)];
@@ -453,9 +463,8 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   for_each_n(
       pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
-        voxels[idx] =
-            BoundedSDF(DecodeIndex(idx, gridPow) - glm::ivec4(1, 1, 1, 0),
-                       origin, spacing, gridSize, level, sdf);
+        voxels[idx] = BoundedSDF(DecodeIndex(idx, gridPow) - kVoxelOffset,
+                                 origin, spacing, gridSize, level, sdf);
       });
 
   size_t tableSize = glm::min(
