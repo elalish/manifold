@@ -24,6 +24,9 @@
 namespace {
 using namespace manifold;
 
+constexpr int kCrossing = -2;
+constexpr int kNone = -1;
+
 glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
                                       {0, 3, 4},     //
@@ -169,7 +172,7 @@ inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
 
 struct GridVert {
   float distance = NAN;
-  int idx = -1;
+  int idx = kNone;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   int Inside() const { return distance > 0 ? 1 : -1; }
@@ -217,7 +220,7 @@ struct NearSurface {
       }
 
       if (i < 7) {
-        gridVert.edgeVerts[i] = 0;
+        gridVert.edgeVerts[i] = kCrossing;
         keep = true;
       }
 
@@ -239,12 +242,12 @@ struct NearSurface {
         vertPos[idx] = pos;
         gridVert.idx = idx;
         for (int j = 0; j < 7; ++j) {
-          if (gridVert.edgeVerts[j] == 0) gridVert.edgeVerts[j] = idx;
+          if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
         }
         keep = true;
       }
     } else {
-      for (int j = 0; j < 7; ++j) gridVert.edgeVerts[j] = -1;
+      for (int j = 0; j < 7; ++j) gridVert.edgeVerts[j] = kNone;
     }
 
     if (keep) gridVerts.Insert(index, gridVert);

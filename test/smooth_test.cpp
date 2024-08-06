@@ -419,8 +419,8 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.033);
-  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.068);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.030);
+  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.075);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
