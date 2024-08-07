@@ -54,6 +54,7 @@ class HullImpl {
                     const std::vector<glm::vec3> &pts) = 0;
   virtual ~HullImpl() = default;
 
+#ifdef MANIFOLD_DEBUG
   // Check if the mesh remains convex after adding new faces
   bool isMeshConvex() {
     // Get the mesh from the manifold
@@ -93,6 +94,7 @@ class HullImpl {
     // convex
     return true;
   }
+#endif
 
  protected:
   manifold::Manifold hullManifold;
