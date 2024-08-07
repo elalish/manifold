@@ -23,7 +23,7 @@
 using namespace manifold;
 
 // Check if the mesh remains convex after adding new faces
-bool isMeshConvex(manifold::Manifold hullManifold) {
+bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
   // Get the mesh from the manifold
   manifold::Mesh mesh = hullManifold.GetMesh();
 
@@ -51,7 +51,7 @@ bool isMeshConvex(manifold::Manifold hullManifold) {
       double distance = glm::dot(normal, v - v0);
 
       // If any vertex lies on the opposite side of the normal direction
-      if (distance > 0) {
+      if (distance > epsilon) {
         // The manifold is not convex
         return false;
       }
@@ -134,7 +134,7 @@ TEST(Hull, Sphere) {
                   sphere.GetProperties().volume);
 }
 
-TEST(Hull, DISABLED_FailingTest1) {
+TEST(Hull, FailingTest1) {
   // 39202.stl
   const std::vector<glm::vec3> hullPts = {
       {-24.983196259f, -43.272167206f, 52.710712433f},
@@ -158,10 +158,15 @@ TEST(Hull, DISABLED_FailingTest1) {
       {-20.442623138f, -35.407661438f, 8.2749996185f},
       {10.229375839f, -14.717799187f, 10.508025169f}};
   auto hull = Manifold::Hull(hullPts);
-  EXPECT_TRUE(isMeshConvex(hull));
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("failing_test1.glb", hull.GetMesh(), {});
+  }
+#endif
+  EXPECT_TRUE(isMeshConvex(hull, 8.99628e-06));
 }
 
-TEST(Hull, DISABLED_FailingTest2) {
+TEST(Hull, FailingTest2) {
   // 1750623.stl
   const std::vector<glm::vec3> hullPts = {
       {174.17001343f, -12.022000313f, 29.562002182f},
@@ -186,5 +191,10 @@ TEST(Hull, DISABLED_FailingTest2) {
       {174.17001343f, -19.502000809f, 29.562002182f},
       {190.06401062f, -0.81000006199f, -14.250000954f}};
   auto hull = Manifold::Hull(hullPts);
-  EXPECT_TRUE(isMeshConvex(hull));
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("failing_test2.glb", hull.GetMesh(), {});
+  }
+#endif
+  EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
 }

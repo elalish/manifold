@@ -1,3 +1,0 @@
-[submodule "src/third_party/quickhull"]
-	path = src/third_party/quickhull
-	url = https://github.com/akuukka/quickhull

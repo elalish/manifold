@@ -22,7 +22,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE $<BUILD_INTERFACE:collider> polygon ${MANIFOLD_INCLUDE} quickhull
+    PRIVATE $<BUILD_INTERFACE:collider> polygon ${MANIFOLD_INCLUDE}
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
