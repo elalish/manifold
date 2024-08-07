@@ -636,7 +636,7 @@ inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
   double px = y * rhsz - z * rhsy;
   double py = z * rhsx - x * rhsz;
   double pz = x * rhsy - y * rhsx;
-  return glm::dvec3(px, py, pz);
+  return glm::normalize(glm::dvec3(px, py, pz));
 }
 
 }  // namespace mathutils
