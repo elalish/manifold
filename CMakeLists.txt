@@ -19,16 +19,19 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
+option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
-option(MANIFOLD_TEST "Enable testing suite" ON)
 # fuzztest is a rather large dependency
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
-option(MANIFOLD_PYBIND "Build python bindings" OFF)
-option(MANIFOLD_CBIND "Build C (FFI) bindings" ON)
-option(MANIFOLD_JSBIND "Build js binding" ${EMSCRIPTEN})
 option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
+include(CMakeDependentOption)
+cmake_dependent_option(MANIFOLD_TEST "Enable testing suite" ON "MANIFOLD_CROSS_SECTION" OFF)
+cmake_dependent_option(MANIFOLD_CBIND "Build C (FFI) bindings" ON "MANIFOLD_CROSS_SECTION" OFF)
+cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" EMSCRIPTEN "MANIFOLD_CROSS_SECTION" OFF)
+cmake_dependent_option(MANIFOLD_PYBIND "Build python bindings" OFF "MANIFOLD_CROSS_SECTION" OFF)
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MANIFOLD_FUZZ)
