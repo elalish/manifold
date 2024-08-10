@@ -39,7 +39,6 @@ System Dependencies (note that we will automatically download the dependency if 
 
 Other dependencies:
 - [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem
-- [`quickhull`](https://github.com/akuukka/quickhull): 3D convex hull algorithm.
 
 ## What's here
 
