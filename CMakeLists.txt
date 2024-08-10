@@ -17,6 +17,12 @@ project(manifold LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
+if(EMSCRIPTEN)
+  set(JSBIND_DEFAULT ON)
+else()
+  set(JSBIND_DEFAULT OFF)
+endif()
+
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
@@ -29,7 +35,7 @@ option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
 cmake_dependent_option(MANIFOLD_TEST "Enable testing suite" ON "MANIFOLD_CROSS_SECTION" OFF)
 cmake_dependent_option(MANIFOLD_CBIND "Build C (FFI) bindings" ON "MANIFOLD_CROSS_SECTION" OFF)
-cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" EMSCRIPTEN "MANIFOLD_CROSS_SECTION" OFF)
+cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ${JSBIND_DEFAULT} "MANIFOLD_CROSS_SECTION" OFF)
 cmake_dependent_option(MANIFOLD_PYBIND "Build python bindings" OFF "MANIFOLD_CROSS_SECTION" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
