@@ -89,21 +89,21 @@ struct SwappableEdge {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
     int tri = halfedge[edge].face;
-    glm::ivec3 triedge = TriOf(edge);
+    glm::ivec3 triEdge = TriOf(edge);
     glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
+      v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
     if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
     edge = halfedge[edge].pairedHalfedge;
     tri = halfedge[edge].face;
-    triedge = TriOf(edge);
+    triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
+      v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
     return CCW(v[0], v[1], v[2], precision) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   }
@@ -122,31 +122,16 @@ struct SortEntry {
 namespace manifold {
 
 /**
- * Collapses degenerate triangles by removing edges shorter than precision_ and
- * any edge that is preceeded by an edge that joins the same two face relations.
- * It also performs edge swaps on the long edges of degenerate triangles, though
- * there are some configurations of degenerates that cannot be removed this way.
- *
- * Before collapsing edges, the mesh is checked for duplicate edges (more than
- * one pair of triangles sharing the same edge), which are removed by
- * duplicating one vert and adding two triangles. These degenerate triangles are
- * likely to be collapsed again in the subsequent simplification.
- *
- * Note when an edge collapse would result in something non-manifold, the
- * vertices are duplicated in such a way as to remove handles or separate
- * meshes, thus decreasing the Genus(). It only increases when meshes that have
- * collapsed to just a pair of triangles are removed entirely.
- *
- * Rather than actually removing the edges, this step merely marks them for
- * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
+ * Duplicates just enough verts to covert an even-manifold to a proper
+ * 2-manifold, splitting non-manifold verts and edges with too many triangles.
  */
-void Manifold::Impl::SimplifyTopology() {
+void Manifold::Impl::CleanupTopology() {
   if (!halfedge_.size()) return;
 
   const size_t nbEdges = halfedge_.size();
   auto policy = autoPolicy(nbEdges, 1e5);
   size_t numFlagged = 0;
-  Vec<uint8_t> bflags(nbEdges);
+  Vec<uint8_t> bFlags(nbEdges);
 
   // In the case of a very bad triangulation, it is possible to create pinched
   // verts. They must be removed before edge collapse.
@@ -154,6 +139,11 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     ZoneScopedN("DedupeEdge");
+    for (size_t i = 0; i < nbEdges; ++i) {
+      if (halfedge_[i].IsForward()) {
+        RemoveIfFolded(i);
+      }
+    }
     Vec<SortEntry> entries;
     entries.reserve(nbEdges / 2);
     for (size_t i = 0; i < nbEdges; ++i) {
@@ -178,10 +168,40 @@ void Manifold::Impl::SimplifyTopology() {
               << std::endl;
   }
 #endif
+}
+
+/**
+ * Collapses degenerate triangles by removing edges shorter than precision_ and
+ * any edge that is preceeded by an edge that joins the same two face relations.
+ * It also performs edge swaps on the long edges of degenerate triangles, though
+ * there are some configurations of degenerates that cannot be removed this way.
+ *
+ * Before collapsing edges, the mesh is checked for duplicate edges (more than
+ * one pair of triangles sharing the same edge), which are removed by
+ * duplicating one vert and adding two triangles. These degenerate triangles are
+ * likely to be collapsed again in the subsequent simplification.
+ *
+ * Note when an edge collapse would result in something non-manifold, the
+ * vertices are duplicated in such a way as to remove handles or separate
+ * meshes, thus decreasing the Genus(). It only increases when meshes that have
+ * collapsed to just a pair of triangles are removed entirely.
+ *
+ * Rather than actually removing the edges, this step merely marks them for
+ * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
+ */
+void Manifold::Impl::SimplifyTopology() {
+  if (!halfedge_.size()) return;
+
+  CleanupTopology();
 
   if (!ManifoldParams().cleanupTriangles) {
     return;
   }
+
+  const size_t nbEdges = halfedge_.size();
+  auto policy = autoPolicy(nbEdges, 1e5);
+  size_t numFlagged = 0;
+  Vec<uint8_t> bFlags(nbEdges);
 
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
@@ -190,9 +210,9 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     ShortEdge se{halfedge_, vertPos_, precision_};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         CollapseEdge(i, scratchBuffer);
         scratchBuffer.resize(0);
         numFlagged++;
@@ -212,9 +232,9 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         CollapseEdge(i, scratchBuffer);
         scratchBuffer.resize(0);
         numFlagged++;
@@ -234,12 +254,12 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     SwappableEdge se{halfedge_, vertPos_, faceNormal_, precision_};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         numFlagged++;
         tag++;
         RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
@@ -406,10 +426,10 @@ void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
   }
 }
 
-void Manifold::Impl::RemoveIfFolded(int edge) {
+bool Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
-  if (halfedge_[tri0edge[1]].pairedHalfedge == -1) return;
+  if (halfedge_[tri0edge[1]].pairedHalfedge == -1) return false;
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
       if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
@@ -432,6 +452,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
   }
+  return true;
 }
 
 // Collapses the given edge by removing startVert. May split the mesh

@@ -330,34 +330,37 @@ TEST(Smooth, Torus) {
 }
 
 TEST(Smooth, SineSurface) {
-  MeshGL surface = MeshGL::LevelSet(
-      [](glm::vec3 p) {
-        float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
-      },
-      {glm::vec3(-2 * glm::pi<float>() + 0.2),
-       glm::vec3(0 * glm::pi<float>() - 0.2)},
-      1);
+  Manifold surface =
+      Manifold::LevelSet(
+          [](glm::vec3 p) {
+            float mid = glm::sin(p.x) + glm::sin(p.y);
+            return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
+          },
+          {glm::vec3(-2 * glm::pi<float>() + 0.2),
+           glm::vec3(0 * glm::pi<float>() - 0.2)},
+          1)
+          .AsOriginal();
+
   Manifold smoothed =
-      Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
+      surface.CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
   EXPECT_NEAR(prop.volume, 8.09, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 30.93, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
-  Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
+  Manifold smoothed1 = surface.SmoothOut(50).Refine(8);
   auto prop1 = smoothed1.GetProperties();
   EXPECT_FLOAT_EQ(prop1.volume, prop.volume);
   EXPECT_FLOAT_EQ(prop1.surfaceArea, prop.surfaceArea);
   EXPECT_EQ(smoothed1.Genus(), 0);
 
-  Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
+  Manifold smoothed2 = surface.SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
   EXPECT_NEAR(prop2.volume, 9.00, 0.01);
   EXPECT_NEAR(prop2.surfaceArea, 33.59, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
 
-  Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
+  Manifold smoothed3 = surface.SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
   EXPECT_NEAR(prop3.volume, 8.44, 0.01);
   EXPECT_NEAR(prop3.surfaceArea, 31.73, 0.02);
@@ -400,9 +403,9 @@ TEST(Smooth, SDF) {
     newProp[0] = glm::abs(sphericalGyroid(pos));
   };
 
-  Manifold gyroid(MeshGL::LevelSet(
+  Manifold gyroid = Manifold::LevelSet(
       sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
-      0.00001));
+      0.00001);
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 

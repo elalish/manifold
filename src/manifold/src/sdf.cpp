@@ -439,12 +439,16 @@ namespace manifold {
  * @return MeshGL This mesh is guaranteed to be manifold and so can always be
  * used as input to the Manifold constructor for further operations.
  */
-MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
-                        float edgeLength, float level, float precision,
-                        bool canParallel) {
+Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
+                            float edgeLength, float level, float precision,
+                            bool canParallel) {
   if (precision <= 0) {
     precision = std::numeric_limits<float>::infinity();
   }
+
+  auto pImpl_ = std::make_shared<Impl>();
+  auto& vertPos = pImpl_->vertPos_;
+
   const glm::vec3 dim = bounds.Size();
   const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize - 1));
@@ -470,7 +474,7 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   size_t tableSize = glm::min(
       2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
-  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
+  vertPos.resize(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
@@ -508,17 +512,12 @@ MeshGL MeshGL::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
   triVerts.resize(index[0]);
 
-  MeshGL out;
-  out.numProp = 3;
-  out.vertProperties.resize(out.numProp * vertPos.size());
-  for (size_t i = 0; i < vertPos.size(); ++i) {
-    for (int j : {0, 1, 2}) out.vertProperties[3 * i + j] = vertPos[i][j];
-  }
-  out.triVerts.resize(3 * triVerts.size());
-  for (size_t i = 0; i < triVerts.size(); ++i) {
-    for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = triVerts[i][j];
-  }
-  return out;
+  pImpl_->CreateHalfedges(triVerts);
+  pImpl_->CleanupTopology();
+  pImpl_->Finish();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  return Manifold(pImpl_);
 }
 /** @} */
 }  // namespace manifold

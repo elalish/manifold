@@ -108,7 +108,7 @@ struct Manifold::Impl {
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
 
-  bool IsEmpty() const { return NumVert() == 0; }
+  bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }
   size_t NumEdge() const { return halfedge_.size() / 2; }
   size_t NumTri() const { return halfedge_.size() / 3; }
@@ -150,13 +150,14 @@ struct Manifold::Impl {
   Polygons Project() const;
 
   // edge_op.cu
+  void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
   void CollapseEdge(int edge, std::vector<int>& edges);
   void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
-  void RemoveIfFolded(int edge);
+  bool RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
