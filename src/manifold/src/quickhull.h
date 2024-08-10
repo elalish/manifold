@@ -67,6 +67,7 @@
 #include <vector>
 
 #include "par.h"
+#include "vec.h"
 
 // Pool.hpp
 
@@ -127,32 +128,6 @@ struct Ray {
 
   Ray(const glm::dvec3& S, const glm::dvec3& V)
       : S(S), V(V), VInvLengthSquared(1 / (glm::dot(V, V))) {}
-};
-
-// VertexDataSource
-
-class VertexDataSource {
-  const glm::dvec3* ptr;
-  size_t count;
-
- public:
-  VertexDataSource(const glm::dvec3* ptr, size_t count)
-      : ptr(ptr), count(count) {}
-
-  VertexDataSource(const std::vector<glm::dvec3>& vec)
-      : ptr(&vec[0]), count(vec.size()) {}
-
-  VertexDataSource() : ptr(nullptr), count(0) {}
-
-  VertexDataSource& operator=(const VertexDataSource& other) = default;
-
-  size_t size() const { return count; }
-
-  const glm::dvec3& operator[](size_t index) const { return ptr[index]; }
-
-  const glm::dvec3* begin() const { return ptr; }
-
-  const glm::dvec3* end() const { return ptr + count; }
 };
 
 // Mesh.hpp
@@ -389,7 +364,7 @@ class MeshBuilder {
 
 class ConvexHull {
   std::unique_ptr<std::vector<glm::dvec3>> optimizedVertexBuffer;
-  VertexDataSource vertices;
+  manifold::Vec<glm::dvec3> vertices;
   std::vector<size_t> indices;
 
  public:
@@ -401,7 +376,7 @@ class ConvexHull {
     if (o.optimizedVertexBuffer) {
       optimizedVertexBuffer.reset(
           new std::vector<glm::dvec3>(*o.optimizedVertexBuffer));
-      vertices = VertexDataSource(*optimizedVertexBuffer);
+      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
     } else {
       vertices = o.vertices;
     }
@@ -415,7 +390,7 @@ class ConvexHull {
     if (o.optimizedVertexBuffer) {
       optimizedVertexBuffer.reset(
           new std::vector<glm::dvec3>(*o.optimizedVertexBuffer));
-      vertices = VertexDataSource(*optimizedVertexBuffer);
+      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
     } else {
       vertices = o.vertices;
     }
@@ -426,8 +401,8 @@ class ConvexHull {
     indices = std::move(o.indices);
     if (o.optimizedVertexBuffer) {
       optimizedVertexBuffer = std::move(o.optimizedVertexBuffer);
-      o.vertices = VertexDataSource();
-      vertices = VertexDataSource(*optimizedVertexBuffer);
+      o.vertices = manifold::Vec<glm::dvec3>();
+      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
     } else {
       vertices = o.vertices;
     }
@@ -440,8 +415,8 @@ class ConvexHull {
     indices = std::move(o.indices);
     if (o.optimizedVertexBuffer) {
       optimizedVertexBuffer = std::move(o.optimizedVertexBuffer);
-      o.vertices = VertexDataSource();
-      vertices = VertexDataSource(*optimizedVertexBuffer);
+      o.vertices = manifold::Vec<glm::dvec3>();
+      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
     } else {
       vertices = o.vertices;
     }
@@ -449,8 +424,9 @@ class ConvexHull {
   }
 
   // Construct vertex and index buffers from half edge mesh and pointcloud
-  ConvexHull(const MeshBuilder& mesh_input, const VertexDataSource& pointCloud,
-             bool CCW, bool useOriginalIndices) {
+  ConvexHull(const MeshBuilder& mesh_input,
+             const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
+             bool useOriginalIndices) {
     if (!useOriginalIndices) {
       optimizedVertexBuffer.reset(new std::vector<glm::dvec3>());
     }
@@ -519,7 +495,7 @@ class ConvexHull {
     }
 
     if (!useOriginalIndices) {
-      vertices = VertexDataSource(*optimizedVertexBuffer);
+      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
     } else {
       vertices = pointCloud;
     }
@@ -529,9 +505,11 @@ class ConvexHull {
 
   const std::vector<size_t>& getIndexBuffer() const { return indices; }
 
-  VertexDataSource& getVertexBuffer() { return vertices; }
+  manifold::VecView<glm::dvec3>& getVertexBuffer() { return vertices; }
 
-  const VertexDataSource& getVertexBuffer() const { return vertices; }
+  const manifold::VecView<glm::dvec3>& getVertexBuffer() const {
+    return vertices;
+  }
 };
 
 // HalfEdgeMesh.hpp
@@ -555,7 +533,7 @@ class HalfEdgeMesh {
   std::vector<HalfEdge> halfEdges;
 
   HalfEdgeMesh(const MeshBuilder& builderObject,
-               const VertexDataSource& vertexData) {
+               const manifold::VecView<glm::dvec3>& vertexData) {
     std::unordered_map<size_t, size_t> faceMapping;
     std::unordered_map<size_t, size_t> halfEdgeMapping;
     std::unordered_map<size_t, size_t> vertexMapping;
@@ -659,7 +637,7 @@ class QuickHull {
   double m_epsilon, epsilonSquared, scale;
   bool planar;
   std::vector<vec3> planarPointCloudTemp;
-  VertexDataSource originalVertexData;
+  manifold::Vec<glm::dvec3> originalVertexData;
   MeshBuilder mesh;
   std::array<size_t, 6> extremeValues;
   DiagnosticsData diagnostics;
@@ -718,13 +696,13 @@ class QuickHull {
 
   // Constructs the convex hull into a MeshBuilder object which can be converted
   // to a ConvexHull or Mesh object
-  void buildMesh(const VertexDataSource& pointCloud, bool CCW,
+  void buildMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
                  bool useOriginalIndices, double eps);
 
   // The public getConvexHull functions will setup a VertexDataSource object and
   // call this
-  ConvexHull getConvexHull(const VertexDataSource& pointCloud, bool CCW,
-                           bool useOriginalIndices, double eps);
+  ConvexHull getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
+                           bool CCW, bool useOriginalIndices, double eps);
 
  public:
   // Computes convex hull for a given point cloud.

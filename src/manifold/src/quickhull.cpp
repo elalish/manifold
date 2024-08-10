@@ -32,33 +32,11 @@ double defaultEps() { return 0.0000001; }
 ConvexHull QuickHull::getConvexHull(const std::vector<glm::dvec3>& pointCloud,
                                     bool CCW, bool useOriginalIndices,
                                     double epsilon) {
-  VertexDataSource vertexDataSource(pointCloud);
+  manifold::Vec<glm::dvec3> vertexDataSource(pointCloud);
   return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
 }
 
-ConvexHull QuickHull::getConvexHull(const glm::dvec3* vertexData,
-                                    size_t vertexCount, bool CCW,
-                                    bool useOriginalIndices, double epsilon) {
-  VertexDataSource vertexDataSource(vertexData, vertexCount);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
-}
-
-ConvexHull QuickHull::getConvexHull(const double* vertexData,
-                                    size_t vertexCount, bool CCW,
-                                    bool useOriginalIndices, double epsilon) {
-  VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
-}
-
-HalfEdgeMesh QuickHull::getConvexHullAsMesh(const double* vertexData,
-                                            size_t vertexCount, bool CCW,
-                                            double epsilon) {
-  VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
-  buildMesh(vertexDataSource, CCW, false, epsilon);
-  return HalfEdgeMesh(mesh, originalVertexData);
-}
-
-void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
+void QuickHull::buildMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
                           bool useOriginalIndices, double epsilon) {
   // CCW is unused for now
   (void)CCW;
@@ -98,7 +76,7 @@ void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
   }
 }
 
-ConvexHull QuickHull::getConvexHull(const VertexDataSource& pointCloud,
+ConvexHull QuickHull::getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
                                     bool CCW, bool useOriginalIndices,
                                     double epsilon) {
   buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
@@ -540,7 +518,7 @@ void QuickHull::setupInitialTetrahedron() {
     const vec3 extraPoint = N1 + originalVertexData[0];
     planarPointCloudTemp.push_back(extraPoint);
     maxI = planarPointCloudTemp.size() - 1;
-    originalVertexData = VertexDataSource(planarPointCloudTemp);
+    originalVertexData = manifold::Vec<glm::dvec3>(planarPointCloudTemp);
   }
 
   // Enforce CCW orientation (if user prefers clockwise orientation, swap two
