@@ -256,7 +256,8 @@ NB_MODULE(manifold3d, m) {
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
-          "scale", [](const Manifold &self, float s) { 
+          "scale",
+          [](const Manifold &self, float s) { 
             self.Scale({s, s, s}); 
           },
           nb::arg("s"),
@@ -449,7 +450,7 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0, nb::arg("precision") = -1,
-          manifold__level_set__f__bounds__edge_length__level__precision)
+          manifold__level_set__sdf__bounds__edge_length__level__precision)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
@@ -651,8 +652,8 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) { 
-            self.Scale({s, s}); 
+          [](const CrossSection &self, float s) {
+            self.Scale({s, s});
           },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
