@@ -128,7 +128,7 @@ inline mat4x3 RotateUp(vec3 up) {
 inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
   vec2 v1 = p1 - p0;
   vec2 v2 = p2 - p0;
-  double area = v1.x * v2.y - v1.y * v2.x;
+  double area = fma(v1.x, v2.y, -v1.y * v2.x);
   double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
   if (area * area * 4 <= base2 * tol * tol)
     return 0;

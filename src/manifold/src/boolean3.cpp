@@ -38,8 +38,8 @@ vec2 Interpolate(vec3 pL, vec3 pR, double x) {
   if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
     return vec2(pL.y, pL.z);
   vec2 yz;
-  yz[0] = (useL ? pL.y : pR.y) + lambda * dLR.y;
-  yz[1] = (useL ? pL.z : pR.z) + lambda * dLR.z;
+  yz[0] = fma(lambda, dLR.y, useL ? pL.y : pR.y);
+  yz[1] = fma(lambda, dLR.z, useL ? pL.z : pR.z);
   return yz;
 }
 
@@ -53,14 +53,14 @@ vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
   double lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!isfinite(lambda)) lambda = 0.0;
   vec4 xyzz;
-  xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
+  xyzz.x = fma(lambda, dx, useL ? pL.x : pR.x);
   const double pDy = pR.y - pL.y;
   const double qDy = qR.y - qL.y;
   const bool useP = fabs(pDy) < fabs(qDy);
-  xyzz.y = (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y)) +
-           lambda * (useP ? pDy : qDy);
-  xyzz.z = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
-  xyzz.w = (useL ? qL.z : qR.z) + lambda * (qR.z - qL.z);
+  xyzz.y = fma(lambda, useP ? pDy : qDy,
+               useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y));
+  xyzz.z = fma(lambda, pR.z - pL.z, useL ? pL.z : pR.z);
+  xyzz.w = fma(lambda, qR.z - qL.z, useL ? qL.z : qR.z);
   return xyzz;
 }
 
