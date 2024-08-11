@@ -35,7 +35,7 @@
                 cmake
                 ninja
                 (python3.withPackages
-                  (ps: with ps; [ trimesh pytest ]))
+                  (ps: with ps; [ nanobind trimesh pytest ]))
                 gtest
                 pkg-config
               ]) ++ build-tools;
@@ -134,6 +134,7 @@
                 pkg-config
               ];
               checkInputs = [
+                nanobind
                 trimesh
                 pytest
               ];
