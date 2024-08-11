@@ -220,10 +220,8 @@ TEST(Boolean, SelfSubtract) {
 
 TEST(Boolean, Perturb) {
   Mesh tmp;
-  tmp.vertPos = {{0.0, 0.0, 0.0},
-                 {0.0, 1.0, 0.0},
-                 {1.0, 0.0, 0.0},
-                 {0.0, 0.0, 1.0}};
+  tmp.vertPos = {
+      {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}};
   tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   Manifold corner(tmp);
   Manifold empty = corner - corner;

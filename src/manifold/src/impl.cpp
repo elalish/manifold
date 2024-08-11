@@ -411,7 +411,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 
   std::vector<double> propertyToleranceD(propertyTolerance.size());
   manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
-            propertyToleranceD.begin(), [](float v) { return (double)v; });
+                      propertyToleranceD.begin(),
+                      [](float v) { return (double)v; });
 
   *this = Impl(mesh, relation, propertyToleranceD, !meshGL.faceID.empty());
 

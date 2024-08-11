@@ -205,8 +205,8 @@ Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
   return manifold.SetProperties(numProp, f);
 }
 
-Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength, double level,
-                  double precision) {
+Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
+                  double level, double precision) {
   double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
   return Manifold(MeshGL::LevelSet(f, bounds, edgeLength, level, precision));
 }

@@ -203,10 +203,10 @@ void Manifold::Impl::SortVerts() {
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
   const auto newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
-                                      [&vertMorton](const int vert) {
-                                        return vertMorton[vert] == kNoCode;
-                                      }) -
-                         vertNew2Old.begin();
+                                       [&vertMorton](const int vert) {
+                                         return vertMorton[vert] == kNoCode;
+                                       }) -
+                          vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
   Permute(vertPos_, vertNew2Old);
@@ -221,7 +221,8 @@ void Manifold::Impl::SortVerts() {
  * vertNew2Old. This may be a subset, so the total number of original verts is
  * also given.
  */
-void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, size_t oldNumVert) {
+void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
+                                  size_t oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),

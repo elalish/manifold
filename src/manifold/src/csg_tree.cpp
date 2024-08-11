@@ -125,11 +125,11 @@ std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
 
 std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
                                          double zDegrees) const {
-  mat3 rX(1.0, 0.0, 0.0,                      //
+  mat3 rX(1.0, 0.0, 0.0,                        //
           0.0, cosd(xDegrees), sind(xDegrees),  //
           0.0, -sind(xDegrees), cosd(xDegrees));
   mat3 rY(cosd(yDegrees), 0.0, -sind(yDegrees),  //
-          0.0, 1.0, 0.0,                       //
+          0.0, 1.0, 0.0,                         //
           sind(yDegrees), 0.0, cosd(yDegrees));
   mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0,   //
           -sind(zDegrees), cosd(zDegrees), 0.0,  //

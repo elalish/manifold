@@ -36,8 +36,8 @@ constexpr double cellAngleB = cellAngleA;
 constexpr double cellAngleC = 120;
 constexpr double LayerSeperationC = 3.364;
 
-Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1}, double ar1 = 1.0,
-              double ar2 = 2.0) {
+Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1},
+              double ar1 = 1.0, double ar2 = 2.0) {
   double cyR = std::min(ar1, ar2) / 5.0;
   double dist = length(p1 - p2);
   vec3 cyC = (p1 + p2) / 2.0;

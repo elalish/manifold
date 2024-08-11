@@ -49,10 +49,9 @@ struct UpdateProperties {
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   normal = glm::normalize(normal);
-  Manifold cutter =
-      Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
+  Manifold cutter = Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
   double size = glm::length(bBox.Center() - normal * originOffset) +
-               0.5 * glm::length(bBox.Size());
+                0.5 * glm::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
   double yDeg = glm::degrees(-std::asin(normal.z));
   double zDeg = glm::degrees(std::atan2(normal.y, normal.x));
@@ -864,8 +863,8 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  * @param originOffset The distance of the plane from the origin in the
  * direction of the normal vector.
  */
-std::pair<Manifold, Manifold> Manifold::SplitByPlane(vec3 normal,
-                                                     double originOffset) const {
+std::pair<Manifold, Manifold> Manifold::SplitByPlane(
+    vec3 normal, double originOffset) const {
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
 

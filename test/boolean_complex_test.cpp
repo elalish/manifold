@@ -303,7 +303,8 @@ TEST(BooleanComplex, Sweep) {
 
   CrossSection profile = generateProfile();
 
-  auto partialRevolve = [minPosAngle, profile](double startAngle, double endAngle,
+  auto partialRevolve = [minPosAngle, profile](double startAngle,
+                                               double endAngle,
                                                int nSegmentsPerRotation) {
     double posEndAngle = minPosAngle(endAngle);
     double totalAngle = 0;

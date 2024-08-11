@@ -145,10 +145,8 @@ MeshGL Gyroid() {
 
 Mesh Tet() {
   Mesh tet;
-  tet.vertPos = {{-1.0, -1.0, 1.0},
-                 {-1.0, 1.0, -1.0},
-                 {1.0, -1.0, -1.0},
-                 {1.0, 1.0, 1.0}};
+  tet.vertPos = {
+      {-1.0, -1.0, 1.0}, {-1.0, 1.0, -1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}};
   tet.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   return tet;
 }
@@ -382,7 +380,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         const int vert = output.triVerts[3 * tri + j];
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
-        const double volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+        const double volume =
+            glm::dot(edges[0], glm::cross(edges[1], edges[2]));
         ASSERT_LE(volume, area * out.Precision());
 
         if (checkNormals) {

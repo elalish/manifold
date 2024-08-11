@@ -35,7 +35,7 @@ vec3 OrthogonalTo(vec3 in, vec3 altIn, vec3 ref) {
 double Wrap(double radians) {
   return radians < -glm::pi<double>()  ? radians + glm::two_pi<double>()
          : radians > glm::pi<double>() ? radians - glm::two_pi<double>()
-                                      : radians;
+                                       : radians;
 }
 
 // Get the angle between two unit-vectors.

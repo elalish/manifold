@@ -186,8 +186,7 @@ class Partition {
         } else {
           PartitionFan(partition.triVert, {0, 1, 2}, n[0] - 1, edgeOffsets[0]);
         }
-      } else if (n[1] * n[1] >
-                 f - std::sqrt(2.0) * n[0] * n[2]) {  // acute-ish
+      } else if (n[1] * n[1] > f - std::sqrt(2.0) * n[0] * n[2]) {  // acute-ish
         partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
         PartitionQuad(partition.triVert, partition.vertBary,
                       {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
@@ -642,7 +641,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     const int addedVerts = NumVert() - numVert;
     const int propOffset = numPropVert - numVert;
     Vec<double> prop(meshRelation_.numProp *
-                    (numPropVert + addedVerts + totalEdgeAdded));
+                     (numPropVert + addedVerts + totalEdgeAdded));
 
     // copy retained prop verts
     copy(meshRelation_.properties.begin(), meshRelation_.properties.end(),

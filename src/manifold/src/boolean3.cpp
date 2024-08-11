@@ -23,8 +23,8 @@ using namespace manifold;
 namespace {
 
 // These two functions (Interpolate and Intersect) are the only places where
-// doubleing-point operations take place in the whole Boolean function. These are
-// carefully designed to minimize rounding error and to eliminate it at edge
+// doubleing-point operations take place in the whole Boolean function. These
+// are carefully designed to minimize rounding error and to eliminate it at edge
 // cases to ensure consistency.
 
 vec2 Interpolate(vec3 pL, vec3 pR, double x) {
@@ -346,9 +346,9 @@ struct Kernel02 {
 };
 
 std::tuple<Vec<int>, Vec<double>> Shadow02(const Manifold::Impl &inP,
-                                          const Manifold::Impl &inQ,
-                                          SparseIndices &p0q2, bool forward,
-                                          double expandP) {
+                                           const Manifold::Impl &inQ,
+                                           SparseIndices &p0q2, bool forward,
+                                           double expandP) {
   ZoneScoped;
   Vec<int> s02(p0q2.size());
   Vec<double> z02(p0q2.size());

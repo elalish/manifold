@@ -117,12 +117,10 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 ||
-      glm::length(size) == 0.) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || glm::length(size) == 0.) {
     return Invalid();
   }
-  mat4x3 m(glm::translate(center ? (-size / 2.0) : vec3(0)) *
-           glm::scale(size));
+  mat4x3 m(glm::translate(center ? (-size / 2.0) : vec3(0)) * glm::scale(size));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -157,8 +155,7 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
 
   Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
   if (center)
-    cylinder =
-        cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
+    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
   return cylinder;
 }
 
@@ -321,8 +318,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
       const size_t next = i + 1 == poly.size() ? 0 : i + 1;
       if ((poly[next].x < 0) != (poly[i].x < 0)) {
         const double y = poly[next].y + poly[next].x *
-                                           (poly[i].y - poly[next].y) /
-                                           (poly[i].x - poly[next].x);
+                                            (poly[i].y - poly[next].y) /
+                                            (poly[i].x - poly[next].x);
         polygons.back().push_back({0, y});
       }
       i = next;

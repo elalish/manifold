@@ -69,7 +69,8 @@ inline mat3x2 GetAxisAlignedProjection(vec3 normal) {
   return glm::transpose(projection);
 }
 
-inline vec3 GetBarycentric(const vec3& v, const mat3& triPos, double precision) {
+inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
+                           double precision) {
   const mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
                    triPos[1] - triPos[0]);
   const vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),

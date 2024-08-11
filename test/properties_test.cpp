@@ -89,8 +89,8 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 1, precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 1, precision);
 
-    sphere = sphere.Scale(vec3(2.0))
-                 .CalculateCurvature(gaussianIdx - 3, meanIdx - 3);
+    sphere = sphere.Scale(vec3(2.0)).CalculateCurvature(gaussianIdx - 3,
+                                                        meanIdx - 3);
     sphereGL = sphere.GetMeshGL();
     ASSERT_EQ(sphereGL.numProp, 5);
     EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 1, precision);

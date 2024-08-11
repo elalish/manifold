@@ -57,7 +57,8 @@ TEST(Manifold, GetMeshGL) {
   for (size_t i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
       // note: one is float, one is double, they are not equal...
-      ASSERT_FLOAT_EQ(meshGL_out.vertProperties[3 * i + j], mesh_out.vertPos[i][j]);
+      ASSERT_FLOAT_EQ(meshGL_out.vertProperties[3 * i + j],
+                      mesh_out.vertPos[i][j]);
     }
   }
   for (size_t i = 0; i < meshGL_out.NumTri(); ++i) {
@@ -279,10 +280,9 @@ TEST(Manifold, PartialRevolveOnYAxis) {
     EXPECT_EQ(revolute.Genus(), 1);
     auto prop = revolute.GetProperties();
     EXPECT_NEAR(prop.volume, 24.0 * glm::pi<double>(), 1.0);
-    EXPECT_NEAR(
-        prop.surfaceArea,
-        48.0 * glm::pi<double>() + 4.0 * 4.0 * 2.0 - 2.0 * 2.0 * 2.0,
-        1.0);
+    EXPECT_NEAR(prop.surfaceArea,
+                48.0 * glm::pi<double>() + 4.0 * 4.0 * 2.0 - 2.0 * 2.0 * 2.0,
+                1.0);
   }
 }
 
@@ -412,11 +412,11 @@ TEST(Manifold, Transform) {
   Manifold cube2 = cube;
   cube = cube.Rotate(30, 40, 50).Scale({6, 5, 4}).Translate({1, 2, 3});
 
-  mat3 rX(1.0, 0.0, 0.0,          //
+  mat3 rX(1.0, 0.0, 0.0,            //
           0.0, cosd(30), sind(30),  //
           0.0, -sind(30), cosd(30));
   mat3 rY(cosd(40), 0.0, -sind(40),  //
-          0.0, 1.0, 0.0,           //
+          0.0, 1.0, 0.0,             //
           sind(40), 0.0, cosd(40));
   mat3 rZ(cosd(50), sind(50), 0.0,   //
           -sind(50), cosd(50), 0.0,  //

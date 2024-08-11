@@ -94,12 +94,11 @@ ivec4 DecodeIndex(Uint64 idx, ivec3 gridPow) {
 }
 
 vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
-  return origin +
-         spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
+  return origin + spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
 double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
-                 double level, std::function<double(vec3)> sdf) {
+                  double level, std::function<double(vec3)> sdf) {
   auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
 
   const ivec3 xyz(gridIndex);
