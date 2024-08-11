@@ -184,7 +184,9 @@ struct GridVert {
 
   inline bool HasMoved() const { return movedVert >= 0; }
 
-  inline bool SameSide(float dist) const { return dist > 0 == distance > 0; }
+  inline bool SameSide(float dist) const {
+    return (dist > 0) == (distance > 0);
+  }
 
   inline int Inside() const { return distance > 0 ? 1 : -1; }
 
