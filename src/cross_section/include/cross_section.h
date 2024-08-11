@@ -18,8 +18,6 @@
 #include <memory>
 #include <vector>
 
-#include "glm/ext/matrix_float3x2.hpp"
-#include "glm/ext/vector_float2.hpp"
 #include "public.h"
 #include "vec_view.h"
 
@@ -75,7 +73,7 @@ class CrossSection {
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Rect& rect);
   static CrossSection Square(const vec2 dims, bool center = false);
-  static CrossSection Circle(float radius, int circularSegments = 0);
+  static CrossSection Circle(double radius, int circularSegments = 0);
   ///@}
 
   /** @name Information
@@ -93,7 +91,7 @@ class CrossSection {
    */
   ///@{
   CrossSection Translate(const vec2 v) const;
-  CrossSection Rotate(float degrees) const;
+  CrossSection Rotate(double degrees) const;
   CrossSection Scale(const vec2 s) const;
   CrossSection Mirror(const vec2 ax) const;
   CrossSection Transform(const mat3x2& m) const;
@@ -167,7 +165,7 @@ class CrossSection {
 
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
-  mutable mat3x2 transform_ = mat3x2(1.0f);
+  mutable mat3x2 transform_ = mat3x2(1.0);
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

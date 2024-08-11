@@ -34,8 +34,8 @@ class CsgNode : public std::enable_shared_from_this<CsgNode> {
 
   std::shared_ptr<CsgNode> Translate(const vec3 &t) const;
   std::shared_ptr<CsgNode> Scale(const vec3 &s) const;
-  std::shared_ptr<CsgNode> Rotate(float xDegrees = 0, float yDegrees = 0,
-                                  float zDegrees = 0) const;
+  std::shared_ptr<CsgNode> Rotate(double xDegrees = 0, double yDegrees = 0,
+                                  double zDegrees = 0) const;
 };
 
 class CsgLeafNode final : public CsgNode {
@@ -59,7 +59,7 @@ class CsgLeafNode final : public CsgNode {
 
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
-  mutable mat4x3 transform_ = mat4x3(1.0f);
+  mutable mat4x3 transform_ = mat4x3(1.0);
 };
 
 class CsgOpNode final : public CsgNode {
@@ -88,7 +88,7 @@ class CsgOpNode final : public CsgNode {
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
   CsgNodeType op_;
-  mat4x3 transform_ = mat4x3(1.0f);
+  mat4x3 transform_ = mat4x3(1.0);
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
 

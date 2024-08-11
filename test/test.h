@@ -45,7 +45,7 @@ struct MeshSize {
   int numPropVert = numVert;
 };
 
-Polygons SquareHole(float xOffset = 0.0);
+Polygons SquareHole(double xOffset = 0.0);
 Mesh Csaszar();
 Mesh Tet();
 MeshGL Gyroid();

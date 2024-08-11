@@ -34,15 +34,15 @@ Polygons Turn180(Polygons polys) {
 }
 
 Polygons Duplicate(Polygons polys) {
-  float xMin = std::numeric_limits<float>::infinity();
-  float xMax = -std::numeric_limits<float>::infinity();
+  double xMin = std::numeric_limits<double>::infinity();
+  double xMax = -std::numeric_limits<double>::infinity();
   for (SimplePolygon &poly : polys) {
     for (vec2 &vert : poly) {
       xMin = std::min(xMin, vert.x);
       xMax = std::max(xMax, vert.x);
     }
   }
-  const float shift = xMax - xMin;
+  const double shift = xMax - xMin;
 
   const int nPolys = polys.size();
   for (int i = 0; i < nPolys; ++i) {
@@ -56,7 +56,7 @@ Polygons Duplicate(Polygons polys) {
 }
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
-              float precision = -1.0f) {
+              double precision = -1.0) {
   PolygonParams().verbose = options.params.verbose;
 
   std::vector<ivec3> triangles;

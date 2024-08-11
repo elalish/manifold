@@ -32,8 +32,9 @@ constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
 void AtomicAddVec3(vec3& target, const vec3& add) {
   for (int i : {0, 1, 2}) {
-    std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
-    float old_val = tar.load(std::memory_order_relaxed);
+    std::atomic<double>& tar =
+        reinterpret_cast<std::atomic<double>&>(target[i]);
+    double old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
                                       std::memory_order_relaxed)) {
     }
@@ -43,7 +44,7 @@ void AtomicAddVec3(vec3& target, const vec3& add) {
 struct Transform4x3 {
   const mat4x3 transform;
 
-  vec3 operator()(vec3 position) { return transform * vec4(position, 1.0f); }
+  vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
 struct AssignNormals {
@@ -51,7 +52,7 @@ struct AssignNormals {
   VecView<vec3> vertNormal;
   VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
-  const float precision;
+  const double precision;
   const bool calculateTriNormal;
 
   void operator()(const int face) {
@@ -73,11 +74,11 @@ struct AssignNormals {
 
     // corner angles
     vec3 phi;
-    float dot = -glm::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : std::acos(dot));
+    double dot = -glm::dot(edge[2], edge[0]);
+    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
     dot = -glm::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : std::acos(dot));
-    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
+    phi[2] = glm::pi<double>() - phi[0] - phi[1];
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -129,15 +130,15 @@ struct UpdateMeshID {
 struct CoplanarEdge {
   VecView<std::pair<int, int>> face2face;
   VecView<std::pair<int, int>> vert2vert;
-  VecView<float> triArea;
+  VecView<double> triArea;
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   VecView<const TriRef> triRef;
   VecView<const ivec3> triProp;
-  VecView<const float> prop;
-  VecView<const float> propTol;
+  VecView<const double> prop;
+  VecView<const double> propTol;
   const int numProp;
-  const float precision;
+  const double precision;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -176,18 +177,18 @@ struct CoplanarEdge {
     const vec3 pairVec =
         vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
 
-    const float length = std::max(glm::length(jointVec), glm::length(edgeVec));
-    const float lengthPair =
+    const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
+    const double lengthPair =
         std::max(glm::length(jointVec), glm::length(pairVec));
     vec3 normal = glm::cross(jointVec, edgeVec);
-    const float area = glm::length(normal);
-    const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    const double area = glm::length(normal);
+    const double areaPair = glm::length(glm::cross(pairVec, jointVec));
     triArea[edge.face] = area;
     triArea[pair.face] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
-    const float volume = std::abs(glm::dot(normal, pairVec));
+    const double volume = std::abs(glm::dot(normal, pairVec));
     // Only operate on coplanar triangles
     if (volume > std::max(area, areaPair) * precision) return;
 
@@ -195,13 +196,13 @@ struct CoplanarEdge {
     if (area > 0) {
       normal /= area;
       for (int i = 0; i < numProp; ++i) {
-        const float scale = precision / propTol[i];
+        const double scale = precision / propTol[i];
 
-        const float baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
-        const float jointProp =
+        const double baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
+        const double jointProp =
             prop[numProp * triProp[pair.face][jointNum] + i];
-        const float edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
-        const float pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
+        const double edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
+        const double pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
 
         const vec3 iJointVec =
             jointVec + normal * scale * (jointProp - baseProp);
@@ -209,9 +210,9 @@ struct CoplanarEdge {
         const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
 
         vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const float areaP = std::max(
+        const double areaP = std::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const float volumeP = std::abs(glm::dot(cross, iPairVec));
+        const double volumeP = std::abs(glm::dot(cross, iPairVec));
         // Only operate on consistent triangles
         if (volumeP > areaP * precision) return;
       }
@@ -226,7 +227,7 @@ struct CheckCoplanarity {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const float precision;
+  const double precision;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
@@ -408,7 +409,11 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
   }
 
-  *this = Impl(mesh, relation, propertyTolerance, !meshGL.faceID.empty());
+  std::vector<double> propertyToleranceD(propertyTolerance.size());
+  manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
+            propertyToleranceD.begin(), [](float v) { return (double)v; });
+
+  *this = Impl(mesh, relation, propertyToleranceD, !meshGL.faceID.empty());
 
   // A Manifold created from an input mesh is never an original - the input is
   // the original.
@@ -421,7 +426,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
  * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
-                     const std::vector<float>& propertyTolerance,
+                     const std::vector<double>& propertyTolerance,
                      bool hasFaceIDs)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
@@ -483,21 +488,21 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
   std::vector<ivec3> triVerts;
   switch (shape) {
     case Shape::Tetrahedron:
-      vertPos = {{-1.0f, -1.0f, 1.0f},
-                 {-1.0f, 1.0f, -1.0f},
-                 {1.0f, -1.0f, -1.0f},
-                 {1.0f, 1.0f, 1.0f}};
+      vertPos = {{-1.0, -1.0, 1.0},
+                 {-1.0, 1.0, -1.0},
+                 {1.0, -1.0, -1.0},
+                 {1.0, 1.0, 1.0}};
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
     case Shape::Cube:
-      vertPos = {{0.0f, 0.0f, 0.0f},  //
-                 {0.0f, 0.0f, 1.0f},  //
-                 {0.0f, 1.0f, 0.0f},  //
-                 {0.0f, 1.0f, 1.0f},  //
-                 {1.0f, 0.0f, 0.0f},  //
-                 {1.0f, 0.0f, 1.0f},  //
-                 {1.0f, 1.0f, 0.0f},  //
-                 {1.0f, 1.0f, 1.0f}};
+      vertPos = {{0.0, 0.0, 0.0},  //
+                 {0.0, 0.0, 1.0},  //
+                 {0.0, 1.0, 0.0},  //
+                 {0.0, 1.0, 1.0},  //
+                 {1.0, 0.0, 0.0},  //
+                 {1.0, 0.0, 1.0},  //
+                 {1.0, 1.0, 0.0},  //
+                 {1.0, 1.0, 1.0}};
       triVerts = {{1, 0, 4}, {2, 4, 0},  //
                   {1, 3, 0}, {3, 1, 5},  //
                   {3, 2, 0}, {3, 7, 2},  //
@@ -506,12 +511,12 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
                   {7, 3, 5}, {7, 5, 6}};
       break;
     case Shape::Octahedron:
-      vertPos = {{1.0f, 0.0f, 0.0f},   //
-                 {-1.0f, 0.0f, 0.0f},  //
-                 {0.0f, 1.0f, 0.0f},   //
-                 {0.0f, -1.0f, 0.0f},  //
-                 {0.0f, 0.0f, 1.0f},   //
-                 {0.0f, 0.0f, -1.0f}};
+      vertPos = {{1.0, 0.0, 0.0},   //
+                 {-1.0, 0.0, 0.0},  //
+                 {0.0, 1.0, 0.0},   //
+                 {0.0, -1.0, 0.0},  //
+                 {0.0, 0.0, 1.0},   //
+                 {0.0, 0.0, -1.0}};
       triVerts = {{0, 2, 4}, {1, 5, 3},  //
                   {2, 1, 4}, {3, 5, 0},  //
                   {1, 3, 4}, {0, 5, 2},  //
@@ -519,7 +524,7 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
       break;
   }
   vertPos_ = vertPos;
-  for (auto& v : vertPos_) v = m * vec4(v, 1.0f);
+  for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
   Finish();
   meshRelation_.originalID = ReserveIDs(1);
@@ -570,15 +575,15 @@ void Manifold::Impl::InitializeOriginal() {
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
+void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   ZoneScoped;
-  Vec<float> propertyToleranceD =
-      propertyTolerance.empty() ? Vec<float>(meshRelation_.numProp, kTolerance)
+  Vec<double> propertyToleranceD =
+      propertyTolerance.empty() ? Vec<double>(meshRelation_.numProp, kTolerance)
                                 : propertyTolerance;
 
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
-  Vec<float> triArea(NumTri());
+  Vec<double> triArea(NumTri());
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
@@ -705,7 +710,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
 
 Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
   ZoneScoped;
-  if (transform_ == mat4x3(1.0f)) return *this;
+  if (transform_ == mat4x3(1.0)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
   result.collider_ = collider_;
@@ -761,7 +766,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
  * Sets the precision based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetPrecision(float minPrecision) {
+void Manifold::Impl::SetPrecision(double minPrecision) {
   precision_ = MaxPrecision(minPrecision, bBox_);
 }
 

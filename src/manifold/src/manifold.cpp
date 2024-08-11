@@ -28,14 +28,14 @@ using namespace manifold;
 ExecutionParams manifoldParams;
 
 struct UpdateProperties {
-  float* properties;
+  double* properties;
   const int numProp;
-  const float* oldProperties;
+  const double* oldProperties;
   const int numOldProp;
   const vec3* vertPos;
   const ivec3* triProperties;
   const Halfedge* halfedges;
-  std::function<void(float*, vec3, const float*)> propFunc;
+  std::function<void(double*, vec3, const double*)> propFunc;
 
   void operator()(int tri) {
     for (int i : {0, 1, 2}) {
@@ -47,16 +47,16 @@ struct UpdateProperties {
   }
 };
 
-Manifold Halfspace(Box bBox, vec3 normal, float originOffset) {
+Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
-      Manifold::Cube(vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
-  float size = glm::length(bBox.Center() - normal * originOffset) +
-               0.5f * glm::length(bBox.Size());
-  cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = glm::degrees(-std::asin(normal.z));
-  float zDeg = glm::degrees(std::atan2(normal.y, normal.x));
-  return cutter.Rotate(0.0f, yDeg, zDeg);
+      Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
+  double size = glm::length(bBox.Center() - normal * originOffset) +
+               0.5 * glm::length(bBox.Size());
+  cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
+  double yDeg = glm::degrees(-std::asin(normal.z));
+  double zDeg = glm::degrees(std::atan2(normal.y, normal.x));
+  return cutter.Rotate(0.0, yDeg, zDeg);
 }
 }  // namespace
 
@@ -230,7 +230,7 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
     out.runOriginalID.push_back(rel.originalID);
     if (updateNormals) {
       runNormalTransform.push_back(NormalTransform(rel.transform) *
-                                   (rel.backSide ? -1.0f : 1.0f));
+                                   (rel.backSide ? -1.0 : 1.0));
     }
     if (!isOriginal) {
       for (const int col : {0, 1, 2, 3}) {
@@ -390,7 +390,7 @@ Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
  * considered degenerate and removed. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-float Manifold::Precision() const {
+double Manifold::Precision() const {
   return GetCsgLeafNode().GetImpl()->precision_;
 }
 
@@ -509,8 +509,8 @@ Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
  * @param yDegrees Second rotation, degrees about the Y-axis.
  * @param zDegrees Third rotation, degrees about the Z-axis.
  */
-Manifold Manifold::Rotate(float xDegrees, float yDegrees,
-                          float zDegrees) const {
+Manifold Manifold::Rotate(double xDegrees, double yDegrees,
+                          double zDegrees) const {
   return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
@@ -538,7 +538,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
     return Manifold();
   }
   auto n = glm::normalize(normal);
-  auto m = mat4x3(mat3(1.0f) - 2.0f * glm::outerProduct(n, n));
+  auto m = mat4x3(mat3(1.0) - 2.0 * glm::outerProduct(n, n));
   return Manifold(pNode_->Transform(m));
 }
 
@@ -583,11 +583,11 @@ Manifold Manifold::WarpBatch(
  */
 Manifold Manifold::SetProperties(
     int numProp,
-    std::function<void(float* newProp, vec3 position, const float* oldProp)>
+    std::function<void(double* newProp, vec3 position, const double* oldProp)>
         propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const Vec<float> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<double> oldProperties = pImpl->meshRelation_.properties;
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
@@ -603,9 +603,9 @@ Manifold Manifold::SetProperties(
           triProperties[i][j] = idx++;
         }
       }
-      pImpl->meshRelation_.properties = Vec<float>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * idx, 0);
     } else {
-      pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
     for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
                UpdateProperties({pImpl->meshRelation_.properties.data(),
@@ -657,7 +657,7 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * of zero, the model is faceted and all normals match their triangle normals,
  * but in this case it would be better not to calculate normals at all.
  */
-Manifold Manifold::CalculateNormals(int normalIdx, float minSharpAngle) const {
+Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->SetNormals(normalIdx, minSharpAngle);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -700,12 +700,12 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of
  * 180 - all edges will be smooth.
  */
-Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
+Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
       const int numProp = pImpl->meshRelation_.numProp;
-      Vec<float> properties = pImpl->meshRelation_.properties;
+      Vec<double> properties = pImpl->meshRelation_.properties;
       Vec<ivec3> triProperties = pImpl->meshRelation_.triProperties;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
@@ -748,7 +748,7 @@ Manifold Manifold::Refine(int n) const {
  *
  * @param length The length that edges will be broken down to.
  */
-Manifold Manifold::RefineToLength(float length) const {
+Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Refine([length](vec3 edge) {
@@ -865,7 +865,7 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  * direction of the normal vector.
  */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(vec3 normal,
-                                                     float originOffset) const {
+                                                     double originOffset) const {
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
 
@@ -878,7 +878,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(vec3 normal,
  * @param originOffset The distance of the plane from the origin in the
  * direction of the normal vector.
  */
-Manifold Manifold::TrimByPlane(vec3 normal, float originOffset) const {
+Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
@@ -888,7 +888,7 @@ Manifold Manifold::TrimByPlane(vec3 normal, float originOffset) const {
  * the bounding box will return the bottom faces, while using a height equal to
  * the top of the bounding box will return empty.
  */
-Polygons Manifold::Slice(float height) const {
+Polygons Manifold::Slice(double height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
@@ -952,17 +952,17 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * Returns the minimum gap between two manifolds. Returns a float between
+ * Returns the minimum gap between two manifolds. Returns a double between
  * 0 and searchLength.
  *
  * @param other The other manifold to compute the minimum gap to.
  * @param searchLength The maximum distance to search for a minimum gap.
  */
-float Manifold::MinGap(const Manifold& other, float searchLength) const {
+double Manifold::MinGap(const Manifold& other, double searchLength) const {
   auto intersect = *this ^ other;
   auto prop = intersect.GetProperties();
 
-  if (prop.volume != 0) return 0.0f;
+  if (prop.volume != 0) return 0.0;
 
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);

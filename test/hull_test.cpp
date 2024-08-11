@@ -23,10 +23,10 @@
 using namespace manifold;
 
 TEST(Hull, Tictac) {
-  const float tictacRad = 100;
-  const float tictacHeight = 500;
+  const double tictacRad = 100;
+  const double tictacHeight = 500;
   const int tictacSeg = 1000;
-  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const double tictacMid = tictacHeight - 2 * tictacRad;
   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
   const std::vector<Manifold> spheres{sphere,
                                       sphere.Translate({0, 0, tictacMid})};
@@ -53,7 +53,7 @@ TEST(Hull, Fail) {
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
-  const float sphere_vol = sphere.GetProperties().volume;
+  const double sphere_vol = sphere.GetProperties().volume;
   EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
 }
 

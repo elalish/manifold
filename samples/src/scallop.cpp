@@ -21,20 +21,20 @@ namespace manifold {
  * Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
  */
 Manifold Scallop() {
-  constexpr float height = 1;
-  constexpr float radius = 3;
-  constexpr float offset = 2;
+  constexpr double height = 1;
+  constexpr double radius = 3;
+  constexpr double offset = 2;
   constexpr int wiggles = 12;
-  constexpr float sharpness = 0.8;
+  constexpr double sharpness = 0.8;
 
   Mesh scallop;
   std::vector<Smoothness> sharpenedEdges;
   scallop.vertPos = {{-offset, 0, height}, {-offset, 0, -height}};
 
-  const float delta = glm::pi<float>() / wiggles;
+  const double delta = glm::pi<double>() / wiggles;
   for (int i = 0; i < 2 * wiggles; ++i) {
-    float theta = (i - wiggles) * delta;
-    float amp = 0.5 * height * glm::max(glm::cos(0.8f * theta), 0.0f);
+    double theta = (i - wiggles) * delta;
+    double amp = 0.5 * height * glm::max(glm::cos(0.8 * theta), 0.0);
 
     scallop.vertPos.push_back({radius * glm::cos(theta),
                                radius * glm::sin(theta),
@@ -42,7 +42,7 @@ Manifold Scallop() {
     int j = i + 1;
     if (j == 2 * wiggles) j = 0;
 
-    float smoothness = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
+    double smoothness = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
     size_t halfedge = 3 * scallop.triVerts.size() + 1;
     sharpenedEdges.push_back({halfedge, smoothness});
     scallop.triVerts.push_back({0, 2 + i, 2 + j});

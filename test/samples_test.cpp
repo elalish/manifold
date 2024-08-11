@@ -100,11 +100,11 @@ TEST(Samples, Scallop) {
   }
 #endif
 
-  auto colorCurvature = [](float* newProp, vec3 pos, const float* oldProp) {
-    const float curvature = oldProp[0];
+  auto colorCurvature = [](double* newProp, vec3 pos, const double* oldProp) {
+    const double curvature = oldProp[0];
     const vec3 red(1, 0, 0);
     const vec3 blue(0, 0, 1);
-    const float limit = 15;
+    const double limit = 15;
     vec3 color = glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
     for (const int i : {0, 1, 2}) {
       newProp[i] = color[i];
@@ -185,10 +185,10 @@ TEST(Samples, Bracelet) {
   projection = projection.Simplify(bracelet.Precision());
   Rect rect = projection.Bounds();
   Box box = bracelet.BoundingBox();
-  EXPECT_EQ(rect.min.x, box.min.x);
-  EXPECT_EQ(rect.min.y, box.min.y);
-  EXPECT_EQ(rect.max.x, box.max.x);
-  EXPECT_EQ(rect.max.y, box.max.y);
+  EXPECT_FLOAT_EQ(rect.min.x, box.min.x);
+  EXPECT_FLOAT_EQ(rect.min.y, box.min.y);
+  EXPECT_FLOAT_EQ(rect.max.x, box.max.x);
+  EXPECT_FLOAT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 649, 1);
   EXPECT_EQ(projection.NumContour(), 2);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
@@ -207,7 +207,7 @@ TEST(Samples, Bracelet) {
 }
 
 TEST(Samples, GyroidModule) {
-  const float size = 20;
+  const double size = 20;
   Manifold gyroid = GyroidModule(size);
   CheckNormals(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 4);
@@ -215,7 +215,7 @@ TEST(Samples, GyroidModule) {
   CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
-  const float precision = gyroid.Precision();
+  const double precision = gyroid.Precision();
   EXPECT_NEAR(bounds.min.z, 0, precision);
   EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), precision);
 
@@ -283,7 +283,7 @@ TEST(Samples, Sponge4) {
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
     for (const vec3 pos : out.vertPos) {
-      options.mat.vertColor.push_back(vec4(0.5f * (pos + 0.5f), 1.0f));
+      options.mat.vertColor.push_back(vec4(0.5 * (pos + 0.5), 1.0));
     }
     ExportMesh("mengerSponge.glb", out, options);
   }

@@ -165,7 +165,7 @@ bool V2Lesser(vec2 a, vec2 b) {
 
 void HullBacktrack(const vec2& pt, std::vector<vec2>& stack) {
   auto sz = stack.size();
-  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 0.0f) <= 0.0f) {
+  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 0.0) <= 0.0) {
     stack.pop_back();
     sz = stack.size();
   }
@@ -291,11 +291,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == mat3x2(1.0f)) {
+  if (transform_ == mat3x2(1.0)) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = mat3x2(1.0f);
+  transform_ = mat3x2(1.0);
   return paths_;
 }
 
@@ -308,7 +308,7 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
  * @param center Set to true to shift the center to the origin.
  */
 CrossSection CrossSection::Square(const vec2 size, bool center) {
-  if (size.x < 0.0f || size.y < 0.0f || glm::length(size) == 0.0f) {
+  if (size.x < 0.0 || size.y < 0.0 || glm::length(size) == 0.0) {
     return CrossSection();
   }
 
@@ -338,13 +338,13 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Quality defaults according to the radius.
  */
-CrossSection CrossSection::Circle(float radius, int circularSegments) {
-  if (radius <= 0.0f) {
+CrossSection CrossSection::Circle(double radius, int circularSegments) {
+  if (radius <= 0.0) {
     return CrossSection();
   }
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
-  float dPhi = 360.0f / n;
+  double dPhi = 360.0 / n;
   auto circle = C2::PathD(n);
   for (int i = 0; i < n; ++i) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
@@ -482,8 +482,8 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  * @param v The vector to add to every vertex.
  */
 CrossSection CrossSection::Translate(const vec2 v) const {
-  mat3x2 m(1.0f, 0.0f,  //
-           0.0f, 1.0f,  //
+  mat3x2 m(1.0, 0.0,  //
+           0.0, 1.0,  //
            v.x, v.y);
   return Transform(m);
 }
@@ -494,12 +494,12 @@ CrossSection CrossSection::Translate(const vec2 v) const {
  *
  * @param degrees degrees about the Z-axis to rotate.
  */
-CrossSection CrossSection::Rotate(float degrees) const {
+CrossSection CrossSection::Rotate(double degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
   mat3x2 m(c, s,   //
            -s, c,  //
-           0.0f, 0.0f);
+           0.0, 0.0);
   return Transform(m);
 }
 
@@ -510,9 +510,9 @@ CrossSection CrossSection::Rotate(float degrees) const {
  * @param v The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat3x2 m(scale.x, 0.0f,  //
-           0.0f, scale.y,  //
-           0.0f, 0.0f);
+  mat3x2 m(scale.x, 0.0,  //
+           0.0, scale.y,  //
+           0.0, 0.0);
   return Transform(m);
 }
 
@@ -529,7 +529,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
     return CrossSection();
   }
   auto n = glm::normalize(glm::abs(ax));
-  auto m = mat3x2(mat2(1.0f) - 2.0f * glm::outerProduct(n, n));
+  auto m = mat3x2(mat2(1.0) - 2.0 * glm::outerProduct(n, n));
   return Transform(m);
 }
 

@@ -25,7 +25,7 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = Manifold::Sphere(1.0f, 12);
+  Manifold sphere = Manifold::Sphere(1.0, 12);
   MeshGL sphereGL = WithPositionColors(sphere);
   sphere = Manifold(sphereGL);
 
@@ -52,7 +52,7 @@ TEST(BooleanComplex, MeshRelation) {
   MeshGL gyroidMeshGL = WithPositionColors(Gyroid());
   Manifold gyroid(gyroidMeshGL);
 
-  Manifold gyroid2 = gyroid.Translate(vec3(2.0f));
+  Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
@@ -80,7 +80,7 @@ TEST(BooleanComplex, MeshRelation) {
 
 TEST(BooleanComplex, Cylinders) {
   Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 12);
-  float arrays1[][12] = {
+  double arrays1[][12] = {
       {0, 0, 1, 3,    //
        -1, 0, 0, 3,   //
        0, -1, 0, 6},  //
@@ -107,7 +107,7 @@ TEST(BooleanComplex, Cylinders) {
        0, 0, 1, 4,    //
        0, -1, 0, 6},  //
   };
-  float arrays2[][12] = {
+  double arrays2[][12] = {
       {1, 0, 0, 3,    //
        0, 0, 1, 2,    //
        0, -1, 0, 6},  //
@@ -196,7 +196,7 @@ TEST(BooleanComplex, Subtract) {
 TEST(BooleanComplex, Close) {
   PolygonParams().processOverlaps = true;
 
-  const float r = 10;
+  const double r = 10;
   Manifold a = Manifold::Sphere(r, 256);
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
@@ -204,10 +204,10 @@ TEST(BooleanComplex, Close) {
     result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
   }
   auto prop = result.GetProperties();
-  const float tol = 0.004;
-  EXPECT_NEAR(prop.volume, (4.0f / 3.0f) * glm::pi<float>() * r * r * r,
+  const double tol = 0.004;
+  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * glm::pi<double>() * r * r * r,
               tol * r * r * r);
-  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>() * r * r, tol * r * r);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
@@ -217,7 +217,7 @@ TEST(BooleanComplex, Close) {
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
-  mat4 m = glm::translate(mat4(1.0f), vec3(1.0f));
+  mat4 m = glm::translate(mat4(1.0), vec3(1.0));
 
   // Define solids which volumes are easy to compute w/ bit arithmetics:
   // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
@@ -225,9 +225,9 @@ TEST(BooleanComplex, BooleanVolumes) {
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
   auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0f), vec3(1.0f, 0, 0))));
+      mat4x3(glm::translate(mat4(1.0), vec3(1.0, 0, 0))));
   auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0f), vec3(3.0f, 0, 0))));
+      mat4x3(glm::translate(mat4(1.0), vec3(3.0, 0, 0))));
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 
@@ -247,10 +247,10 @@ TEST(BooleanComplex, BooleanVolumes) {
 TEST(BooleanComplex, Spiral) {
   ManifoldParams().deterministic = true;
   const int d = 2;
-  std::function<Manifold(const int, const float, const float)> spiral =
-      [&](const int rec, const float r, const float add) {
-        const float rot = 360.0f / (glm::pi<float>() * r * 2) * d;
-        const float rNext = r + add / 360 * rot;
+  std::function<Manifold(const int, const double, const double)> spiral =
+      [&](const int rec, const double r, const double add) {
+        const double rot = 360.0 / (glm::pi<double>() * r * 2) * d;
+        const double rNext = r + add / 360 * rot;
         const Manifold cube =
             Manifold::Cube(vec3(1), true).Translate({0, r, 0});
         if (rec > 0)
@@ -265,10 +265,10 @@ TEST(BooleanComplex, Sweep) {
   PolygonParams().processOverlaps = true;
 
   // generate the minimum equivalent positive angle
-  auto minPosAngle = [](float angle) {
-    float div = angle / glm::two_pi<float>();
-    float wholeDiv = floor(div);
-    return angle - wholeDiv * glm::two_pi<float>();
+  auto minPosAngle = [](double angle) {
+    double div = angle / glm::two_pi<double>();
+    double wholeDiv = floor(div);
+    return angle - wholeDiv * glm::two_pi<double>();
   };
 
   // calculate determinant
@@ -276,16 +276,16 @@ TEST(BooleanComplex, Sweep) {
 
   // generate sweep profile
   auto generateProfile = []() {
-    float filletRadius = 2.5;
-    float filletWidth = 5;
+    double filletRadius = 2.5;
+    double filletWidth = 5;
     int numberOfArcPoints = 10;
     vec2 arcCenterPoint = vec2(filletWidth - filletRadius, filletRadius);
     std::vector<vec2> arcPoints;
 
     for (int i = 0; i < numberOfArcPoints; i++) {
-      float angle = i * glm::pi<float>() / numberOfArcPoints;
-      float y = arcCenterPoint.y - cos(angle) * filletRadius;
-      float x = arcCenterPoint.x + sin(angle) * filletRadius;
+      double angle = i * glm::pi<double>() / numberOfArcPoints;
+      double y = arcCenterPoint.y - cos(angle) * filletRadius;
+      double x = arcCenterPoint.x + sin(angle) * filletRadius;
       arcPoints.push_back(vec2(x, y));
     }
 
@@ -303,10 +303,10 @@ TEST(BooleanComplex, Sweep) {
 
   CrossSection profile = generateProfile();
 
-  auto partialRevolve = [minPosAngle, profile](float startAngle, float endAngle,
+  auto partialRevolve = [minPosAngle, profile](double startAngle, double endAngle,
                                                int nSegmentsPerRotation) {
-    float posEndAngle = minPosAngle(endAngle);
-    float totalAngle = 0;
+    double posEndAngle = minPosAngle(endAngle);
+    double totalAngle = 0;
     if (startAngle < 0 && endAngle < 0 && startAngle < endAngle) {
       totalAngle = endAngle - startAngle;
     } else {
@@ -314,15 +314,15 @@ TEST(BooleanComplex, Sweep) {
     }
 
     int nSegments =
-        ceil(totalAngle / glm::two_pi<float>() * nSegmentsPerRotation + 1);
+        ceil(totalAngle / glm::two_pi<double>() * nSegmentsPerRotation + 1);
     if (nSegments < 2) {
       nSegments = 2;
     }
 
-    float angleStep = totalAngle / (nSegments - 1);
+    double angleStep = totalAngle / (nSegments - 1);
     auto warpFunc = [nSegments, angleStep, startAngle](vec3& vertex) {
-      float zIndex = nSegments - 1 - vertex.z;
-      float angle = zIndex * angleStep + startAngle;
+      double zIndex = nSegments - 1 - vertex.z;
+      double angle = zIndex * angleStep + startAngle;
 
       // transform
       vertex.z = vertex.y;
@@ -339,21 +339,21 @@ TEST(BooleanComplex, Sweep) {
     vec2 diff = p2 - p1;
     vec2 vec1 = p1 - p2;
     vec2 vec2 = p3 - p2;
-    float determinant = det(vec1, vec2);
+    double determinant = det(vec1, vec2);
 
-    float startAngle = atan2(vec1.x, -vec1.y);
-    float endAngle = atan2(-vec2.x, vec2.y);
+    double startAngle = atan2(vec1.x, -vec1.y);
+    double endAngle = atan2(-vec2.x, vec2.y);
 
     Manifold round =
         partialRevolve(startAngle, endAngle, 20).Translate(vec3(p2.x, p2.y, 0));
 
-    float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
-    float angle = atan2(diff.y, diff.x);
+    double distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+    double angle = atan2(diff.y, diff.x);
     Manifold extrusionPrimitive =
         Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
             .Translate(vec3(distance, 0, 0))
-            .Rotate(0, 0, angle * 180 / glm::pi<float>())
+            .Rotate(0, 0, angle * 180 / glm::pi<double>())
             .Translate(vec3(p1.x, p1.y, 0));
 
     std::vector<Manifold> result;
@@ -368,7 +368,7 @@ TEST(BooleanComplex, Sweep) {
     return result;
   };
 
-  auto scalePath = [](std::vector<vec2> path, float scale) {
+  auto scalePath = [](std::vector<vec2> path, double scale) {
     std::vector<vec2> newPath;
     for (vec2 point : path) {
       newPath.push_back(scale * point);

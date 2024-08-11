@@ -202,7 +202,7 @@ void Manifold::Impl::SortVerts() {
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const int newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
+  const auto newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
                                       [&vertMorton](const int vert) {
                                         return vertMorton[vert] == kNoCode;
                                       }) -
@@ -221,7 +221,7 @@ void Manifold::Impl::SortVerts() {
  * vertNew2Old. This may be a subset, so the total number of original verts is
  * also given.
  */
-void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
+void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, size_t oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
@@ -237,7 +237,7 @@ void Manifold::Impl::CompactProps() {
   ZoneScoped;
   if (meshRelation_.numProp == 0) return;
 
-  const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  const auto numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
@@ -246,7 +246,7 @@ void Manifold::Impl::CompactProps() {
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  Vec<float> oldProp = meshRelation_.properties;
+  Vec<double> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
   const int numProp = meshRelation_.numProp;
   auto& properties = meshRelation_.properties;
@@ -284,7 +284,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                  return;
                }
 
-               vec3 center(0.0f);
+               vec3 center(0.0);
 
                for (const int i : {0, 1, 2}) {
                  const vec3 pos = vertPos_[halfedge_[3 * face + i].startVert];
@@ -332,7 +332,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
  */
 void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   ZoneScoped;
-  const int numTri = faceNew2Old.size();
+  const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
   if (meshRelation_.triProperties.size() == NumTri())
@@ -343,7 +343,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
-  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -355,7 +355,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
 
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   ZoneScoped;
-  const int numTri = faceNew2Old.size();
+  const auto numTri = faceNew2Old.size();
 
   meshRelation_.triRef.resize(numTri);
   gather(faceNew2Old.begin(), faceNew2Old.end(),
@@ -381,7 +381,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   }
 
   Vec<int> faceOld2New(old.NumTri());
-  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -454,7 +454,7 @@ bool MeshGL::Merge() {
     return false;
   }
 
-  const int numOpenVert = openEdges.size();
+  const auto numOpenVert = openEdges.size();
   Vec<int> openVerts(numOpenVert);
   int i = 0;
   for (const auto& edge : openEdges) {
@@ -468,13 +468,13 @@ bool MeshGL::Merge() {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
     auto minMax = manifold::transform_reduce(
         iPos.begin(), iPos.end(),
-        std::make_pair(std::numeric_limits<float>::infinity(),
-                       -std::numeric_limits<float>::infinity()),
+        std::make_pair(std::numeric_limits<double>::infinity(),
+                       -std::numeric_limits<double>::infinity()),
         [](auto a, auto b) {
           return std::make_pair(std::min(a.first, b.first),
                                 std::max(a.second, b.second));
         },
-        [](float f) { return std::make_pair(f, f); });
+        [](double f) { return std::make_pair(f, f); });
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }
@@ -493,8 +493,8 @@ bool MeshGL::Merge() {
                                  vertProperties[numProp * vert + 1],
                                  vertProperties[numProp * vert + 2]);
 
-               vertBox[i].min = center - precision / 2;
-               vertBox[i].max = center + precision / 2;
+               vertBox[i].min = center - (double)precision / 2;
+               vertBox[i].max = center + (double)precision / 2;
 
                vertMorton[i] = MortonCode(center, bBox);
              });

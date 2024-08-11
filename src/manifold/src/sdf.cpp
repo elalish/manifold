@@ -95,11 +95,11 @@ ivec4 DecodeIndex(Uint64 idx, ivec3 gridPow) {
 
 vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
   return origin +
-         spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
+         spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
-float BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
-                 float level, std::function<float(vec3)> sdf) {
+double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
+                 double level, std::function<double(vec3)> sdf) {
   auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
 
   const ivec3 xyz(gridIndex);
@@ -108,14 +108,14 @@ float BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
   const int boundDist = std::min(lowerBoundDist, upperBoundDist - gridIndex.w);
 
   if (boundDist < 0) {
-    return 0.0f;
+    return 0.0;
   }
-  const float d = sdf(Position(gridIndex, origin, spacing)) - level;
-  return boundDist == 0 ? std::min(d, 0.0f) : d;
+  const double d = sdf(Position(gridIndex, origin, spacing)) - level;
+  return boundDist == 0 ? std::min(d, 0.0) : d;
 }
 
 struct GridVert {
-  float distance = NAN;
+  double distance = NAN;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   int Inside() const { return distance > 0 ? 1 : -1; }
@@ -129,18 +129,18 @@ struct ComputeVerts {
   VecView<vec3> vertPos;
   VecView<int> vertIndex;
   HashTableD<GridVert> gridVerts;
-  VecView<const float> voxels;
-  const std::function<float(vec3)> sdf;
+  VecView<const double> voxels;
+  const std::function<double(vec3)> sdf;
   const vec3 origin;
   const ivec3 gridSize;
   const ivec3 gridPow;
   const vec3 spacing;
-  const float level;
-  const float tol;
+  const double level;
+  const double tol;
 
   // Simplified ITP root finding algorithm - same worst-case performance as
   // bisection, better average performance.
-  inline vec3 FindSurface(vec3 pos0, float d0, vec3 pos1, float d1) const {
+  inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1) const {
     if (d0 == 0) {
       return pos0;
     } else if (d1 == 0) {
@@ -149,17 +149,17 @@ struct ComputeVerts {
 
     // Sole tuning parameter, k: (0, 1) - smaller value gets better median
     // performance, but also hits the worst case more often.
-    const float k = 0.1;
-    const float check = 2 * tol / glm::length(pos0 - pos1);
-    float frac = 1;
-    float biFrac = 1;
+    const double k = 0.1;
+    const double check = 2 * tol / glm::length(pos0 - pos1);
+    double frac = 1;
+    double biFrac = 1;
     while (frac > check) {
-      const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
-      const float r = biFrac / frac - 0.5;
-      const float x = std::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+      const double t = glm::mix(d0 / (d0 - d1), 0.5, k);
+      const double r = biFrac / frac - 0.5;
+      const double x = std::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
       const vec3 mid = glm::mix(pos0, pos1, x);
-      const float d = sdf(mid) - level;
+      const double d = sdf(mid) - level;
 
       if ((d > 0) == (d0 > 0)) {
         d0 = d;
@@ -199,7 +199,7 @@ struct ComputeVerts {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const float val =
+      const double val =
           voxels[EncodeIndex(neighborIndex + ivec4(1, 1, 1, 0), gridPow)];
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
@@ -313,7 +313,7 @@ namespace manifold {
  * the manifold, which is due to the underlying grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
- * `float operator()(vec3 point)`, which returns the
+ * `double operator()(vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
  * negative outside.
  * @param bounds An axis-aligned box that defines the extent of the grid.
@@ -333,14 +333,14 @@ namespace manifold {
  * @return MeshGL This mesh is guaranteed to be manifold and so can always be
  * used as input to the Manifold constructor for further operations.
  */
-MeshGL MeshGL::LevelSet(std::function<float(vec3)> sdf, Box bounds,
-                        float edgeLength, float level, float precision,
+MeshGL MeshGL::LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                        double edgeLength, double level, double precision,
                         bool canParallel) {
   if (precision <= 0) {
-    precision = std::numeric_limits<float>::infinity();
+    precision = std::numeric_limits<double>::infinity();
   }
   const vec3 dim = bounds.Size();
-  const ivec3 gridSize(dim / edgeLength + 1.0f);
+  const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
   const ivec3 gridPow(glm::log2(gridSize + 2) + 1);
@@ -353,7 +353,7 @@ MeshGL MeshGL::LevelSet(std::function<float(vec3)> sdf, Box bounds,
   const auto pol = canParallel ? autoPolicy(maxIndex) : ExecutionPolicy::Seq;
 
   const vec3 origin = bounds.min;
-  Vec<float> voxels(maxIndex);
+  Vec<double> voxels(maxIndex);
   for_each_n(
       pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
@@ -376,7 +376,7 @@ MeshGL MeshGL::LevelSet(std::function<float(vec3)> sdf, Box bounds,
       const vec3 lastVert = vertPos[index[0] - 1];
       const Uint64 lastIndex =
           EncodeIndex(ivec4((lastVert - origin) / spacing, 1), gridPow);
-      const float ratio = static_cast<float>(maxIndex) / lastIndex;
+      const double ratio = static_cast<double>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;

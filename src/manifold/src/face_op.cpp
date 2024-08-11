@@ -225,7 +225,7 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
   return polys;
 }
 
-Polygons Manifold::Impl::Slice(float height) const {
+Polygons Manifold::Impl::Slice(double height) const {
   Box plane = bBox_;
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
@@ -236,10 +236,10 @@ Polygons Manifold::Impl::Slice(float height) const {
   std::unordered_set<int> tris;
   for (size_t i = 0; i < collisions.size(); ++i) {
     const int tri = collisions.Get(i, 1);
-    float min = std::numeric_limits<float>::infinity();
-    float max = -std::numeric_limits<float>::infinity();
+    double min = std::numeric_limits<double>::infinity();
+    double max = -std::numeric_limits<double>::infinity();
     for (const int j : {0, 1, 2}) {
-      const float z = vertPos_[halfedge_[3 * tri + j].startVert].z;
+      const double z = vertPos_[halfedge_[3 * tri + j].startVert].z;
       min = std::min(min, z);
       max = std::max(max, z);
     }
@@ -273,7 +273,7 @@ Polygons Manifold::Impl::Slice(float height) const {
       Halfedge up = halfedge_[3 * tri + k];
       const vec3 below = vertPos_[up.startVert];
       const vec3 above = vertPos_[up.endVert];
-      const float a = (height - below.z) / (above.z - below.z);
+      const double a = (height - below.z) / (above.z - below.z);
       poly.push_back(vec2(glm::mix(below, above, a)));
 
       const int pair = up.pairedHalfedge;

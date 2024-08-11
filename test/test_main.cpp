@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   return RUN_ALL_TESTS();
 }
 
-Polygons SquareHole(float xOffset) {
+Polygons SquareHole(double xOffset) {
   Polygons polys;
   polys.push_back({
       {2 + xOffset, 2},    //
@@ -126,29 +126,29 @@ Mesh Csaszar() {
 }
 
 struct GyroidSDF {
-  float operator()(vec3 p) const {
+  double operator()(vec3 p) const {
     const vec3 min = p;
-    const vec3 max = vec3(glm::two_pi<float>()) - p;
-    const float min3 = std::min(min.x, std::min(min.y, min.z));
-    const float max3 = std::min(max.x, std::min(max.y, max.z));
-    const float bound = std::min(min3, max3);
-    const float gyroid =
+    const vec3 max = vec3(glm::two_pi<double>()) - p;
+    const double min3 = std::min(min.x, std::min(min.y, min.z));
+    const double max3 = std::min(max.x, std::min(max.y, max.z));
+    const double bound = std::min(min3, max3);
+    const double gyroid =
         cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
     return std::min(gyroid, bound);
   }
 };
 
 MeshGL Gyroid() {
-  const float period = glm::two_pi<float>();
+  const double period = glm::two_pi<double>();
   return MeshGL::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
 }
 
 Mesh Tet() {
   Mesh tet;
-  tet.vertPos = {{-1.0f, -1.0f, 1.0f},
-                 {-1.0f, 1.0f, -1.0f},
-                 {1.0f, -1.0f, -1.0f},
-                 {1.0f, 1.0f, 1.0f}};
+  tet.vertPos = {{-1.0, -1.0, 1.0},
+                 {-1.0, 1.0, -1.0},
+                 {1.0, -1.0, -1.0},
+                 {1.0, 1.0, 1.0}};
   tet.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   return tet;
 }
@@ -228,7 +228,7 @@ MeshGL WithPositionColors(const Manifold& in) {
   const vec3 size = bbox.Size();
 
   Manifold out = in.SetProperties(
-      3, [bbox, size](float* prop, vec3 pos, const float* oldProp) {
+      3, [bbox, size](double* prop, vec3 pos, const double* oldProp) {
         for (int i : {0, 1, 2}) {
           prop[i] = (pos[i] - bbox.min[i]) / size[i];
         }
@@ -336,7 +336,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
     const mat4x3 transform = output.runTransform.empty()
-                                 ? mat4x3(1.0f)
+                                 ? mat4x3(1.0)
                                  : mat4x3(m[0], m[1], m[2], m[3], m[4], m[5],
                                           m[6], m[7], m[8], m[9], m[10], m[11]);
     size_t i = 0;
@@ -374,7 +374,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           glm::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
       vec3 inNormal =
           glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
-      const float area = glm::length(inNormal);
+      const double area = glm::length(inNormal);
       if (area == 0) continue;
       inNormal /= area;
 
@@ -382,7 +382,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         const int vert = output.triVerts[3 * tri + j];
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
-        const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+        const double volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
         ASSERT_LE(volume, area * out.Precision());
 
         if (checkNormals) {
@@ -393,7 +393,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
           for (size_t p = 3; p < inMesh.numProp; ++p) {
-            const float propOut =
+            const double propOut =
                 output.vertProperties[vert * output.numProp + p];
 
             vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
@@ -403,7 +403,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             for (int k : {0, 1, 2}) {
               edgesP[k] = edges[k] + inNormal * inProp[k] - inNormal * propOut;
             }
-            const float volumeP =
+            const double volumeP =
                 glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
 
             ASSERT_LE(volumeP, area * out.Precision());

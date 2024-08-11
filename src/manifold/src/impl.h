@@ -37,7 +37,7 @@ struct Manifold::Impl {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
     int numProp = 0;
-    Vec<float> properties;
+    Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
     Vec<ivec3> triProperties;
@@ -47,7 +47,7 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
-  float precision_ = -1;
+  double precision_ = -1;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
@@ -66,7 +66,7 @@ struct Manifold::Impl {
 
   Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<float>& propertyTolerance = {},
+       const std::vector<double>& propertyTolerance = {},
        bool hasFaceIDs = false);
 
   inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
@@ -92,7 +92,7 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces(const std::vector<float>& propertyTolerance = {});
+  void CreateFaces(const std::vector<double>& propertyTolerance = {});
   void RemoveUnreferencedVerts(Vec<ivec3>& triVerts);
   void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triVerts);
@@ -124,17 +124,17 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetPrecision(float minPrecision = -1);
+  void SetPrecision(double minPrecision = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
-  float MinGap(const Impl& other, float searchLength) const;
+  double MinGap(const Impl& other, double searchLength) const;
 
   // sort.cu
   void Finish();
   void SortVerts();
-  void ReindexVerts(const Vec<int>& vertNew2Old, int numOldVert);
+  void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
   void CompactProps();
   void GetFaceBoxMorton(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) const;
   void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
@@ -146,7 +146,7 @@ struct Manifold::Impl {
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
                             mat3x2 projection) const;
-  Polygons Slice(float height) const;
+  Polygons Slice(double height) const;
   Polygons Project() const;
 
   // edge_op.cu
@@ -180,10 +180,10 @@ struct Manifold::Impl {
   Vec<bool> FlatFaces() const;
   Vec<int> VertFlatFace(const Vec<bool>&) const;
   Vec<int> VertHalfedge() const;
-  std::vector<Smoothness> SharpenEdges(float minSharpAngle,
-                                       float minSmoothness) const;
-  void SharpenTangent(int halfedge, float smoothness);
-  void SetNormals(int normalIdx, float minSharpAngle);
+  std::vector<Smoothness> SharpenEdges(double minSharpAngle,
+                                       double minSmoothness) const;
+  void SharpenTangent(int halfedge, double smoothness);
+  void SetNormals(int normalIdx, double minSharpAngle);
   void LinearizeFlatTangents();
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);

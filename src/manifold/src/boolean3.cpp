@@ -23,18 +23,18 @@ using namespace manifold;
 namespace {
 
 // These two functions (Interpolate and Intersect) are the only places where
-// floating-point operations take place in the whole Boolean function. These are
+// doubleing-point operations take place in the whole Boolean function. These are
 // carefully designed to minimize rounding error and to eliminate it at edge
 // cases to ensure consistency.
 
-vec2 Interpolate(vec3 pL, vec3 pR, float x) {
-  const float dxL = x - pL.x;
-  const float dxR = x - pR.x;
+vec2 Interpolate(vec3 pL, vec3 pR, double x) {
+  const double dxL = x - pL.x;
+  const double dxR = x - pR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
                "Boolean manifold error: not in domain");
   const bool useL = fabs(dxL) < fabs(dxR);
   const vec3 dLR = pR - pL;
-  const float lambda = (useL ? dxL : dxR) / dLR.x;
+  const double lambda = (useL ? dxL : dxR) / dLR.x;
   if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
     return vec2(pL.y, pL.z);
   vec2 yz;
@@ -44,18 +44,18 @@ vec2 Interpolate(vec3 pL, vec3 pR, float x) {
 }
 
 vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
-  const float dyL = qL.y - pL.y;
-  const float dyR = qR.y - pR.y;
+  const double dyL = qL.y - pL.y;
+  const double dyR = qR.y - pR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
                "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
-  const float dx = pR.x - pL.x;
-  float lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!isfinite(lambda)) lambda = 0.0f;
+  const double dx = pR.x - pL.x;
+  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
+  if (!isfinite(lambda)) lambda = 0.0;
   vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
-  const float pDy = pR.y - pL.y;
-  const float qDy = qR.y - qL.y;
+  const double pDy = pR.y - pL.y;
+  const double qDy = qR.y - qL.y;
   const bool useP = fabs(pDy) < fabs(qDy);
   xyzz.y = (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y)) +
            lambda * (useP ? pDy : qDy);
@@ -100,19 +100,19 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p1q1;
 }
 
-inline bool Shadows(float p, float q, float dir) {
+inline bool Shadows(double p, double q, double dir) {
   return p == q ? dir < 0 : p < q;
 }
 
 inline std::pair<int, vec2> Shadow01(
     const int p0, const int q1, VecView<const vec3> vertPosP,
     VecView<const vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
-    const float expandP, VecView<const vec3> normalP, const bool reverse) {
+    const double expandP, VecView<const vec3> normalP, const bool reverse) {
   const int q1s = halfedgeQ[q1].startVert;
   const int q1e = halfedgeQ[q1].endVert;
-  const float p0x = vertPosP[p0].x;
-  const float q1sx = vertPosQ[q1s].x;
-  const float q1ex = vertPosQ[q1e].x;
+  const double p0x = vertPosP[p0].x;
+  const double q1sx = vertPosQ[q1s].x;
+  const double q1ex = vertPosQ[q1e].x;
   int s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
                           Shadows(q1ex, p0x, expandP * normalP[q1e].x)
                     : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
@@ -123,10 +123,10 @@ inline std::pair<int, vec2> Shadow01(
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
       vec3 diff = vertPosQ[q1s] - vertPosP[p0];
-      const float start2 = glm::dot(diff, diff);
+      const double start2 = glm::dot(diff, diff);
       diff = vertPosQ[q1e] - vertPosP[p0];
-      const float end2 = glm::dot(diff, diff);
-      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
+      const double end2 = glm::dot(diff, diff);
+      const double dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
       if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
     } else {
       if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
@@ -181,7 +181,7 @@ struct Kernel11 {
   VecView<const vec3> vertPosQ;
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
-  const float expandP;
+  const double expandP;
   VecView<const vec3> normalP;
   const SparseIndices &p1q1;
 
@@ -244,10 +244,10 @@ struct Kernel11 {
       const int p1s = halfedgeP[p1].startVert;
       const int p1e = halfedgeP[p1].endVert;
       vec3 diff = vertPosP[p1s] - vec3(xyzz11);
-      const float start2 = glm::dot(diff, diff);
+      const double start2 = glm::dot(diff, diff);
       diff = vertPosP[p1e] - vec3(xyzz11);
-      const float end2 = glm::dot(diff, diff);
-      const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+      const double end2 = glm::dot(diff, diff);
+      const double dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
 
       if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
     }
@@ -257,7 +257,7 @@ struct Kernel11 {
 std::tuple<Vec<int>, Vec<vec4>> Shadow11(SparseIndices &p1q1,
                                          const Manifold::Impl &inP,
                                          const Manifold::Impl &inQ,
-                                         float expandP) {
+                                         double expandP) {
   ZoneScoped;
   Vec<int> s11(p1q1.size());
   Vec<vec4> xyzz11(p1q1.size());
@@ -273,11 +273,11 @@ std::tuple<Vec<int>, Vec<vec4>> Shadow11(SparseIndices &p1q1,
 
 struct Kernel02 {
   VecView<int> s;
-  VecView<float> z;
+  VecView<double> z;
   VecView<const vec3> vertPosP;
   VecView<const Halfedge> halfedgeQ;
   VecView<const vec3> vertPosQ;
-  const float expandP;
+  const double expandP;
   VecView<const vec3> vertNormalP;
   const SparseIndices &p0q2;
   const bool forward;
@@ -286,7 +286,7 @@ struct Kernel02 {
     const int p0 = p0q2.Get(idx, !forward);
     const int q2 = p0q2.Get(idx, forward);
     int &s02 = s[idx];
-    float &z02 = z[idx];
+    double &z02 = z[idx];
 
     // For yzzLR[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -295,7 +295,7 @@ struct Kernel02 {
     // intersection is between the left and right.
     bool shadows = false;
     int closestVert = -1;
-    float minMetric = std::numeric_limits<float>::infinity();
+    double minMetric = std::numeric_limits<double>::infinity();
     s02 = 0;
 
     const vec3 posP = vertPosP[p0];
@@ -307,7 +307,7 @@ struct Kernel02 {
       if (!forward) {
         const int qVert = halfedgeQ[q1F].startVert;
         const vec3 diff = posP - vertPosQ[qVert];
-        const float metric = glm::dot(diff, diff);
+        const double metric = glm::dot(diff, diff);
         if (metric < minMetric) {
           minMetric = metric;
           closestVert = qVert;
@@ -345,13 +345,13 @@ struct Kernel02 {
   }
 };
 
-std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
+std::tuple<Vec<int>, Vec<double>> Shadow02(const Manifold::Impl &inP,
                                           const Manifold::Impl &inQ,
                                           SparseIndices &p0q2, bool forward,
-                                          float expandP) {
+                                          double expandP) {
   ZoneScoped;
   Vec<int> s02(p0q2.size());
-  Vec<float> z02(p0q2.size());
+  Vec<double> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
   for_each_n(autoPolicy(p0q2.size(), 1e4), countAt(0_uz), p0q2.size(),
@@ -368,7 +368,7 @@ struct Kernel12 {
   VecView<vec3> v;
   VecView<const int64_t> p0q2;
   VecView<const int> s02;
-  VecView<const float> z02;
+  VecView<const double> z02;
   VecView<const int64_t> p1q1;
   VecView<const int> s11;
   VecView<const vec4> xyzz11;
@@ -454,7 +454,7 @@ struct Kernel12 {
 std::tuple<Vec<int>, Vec<vec3>> Intersect12(
     const Manifold::Impl &inP, const Manifold::Impl &inQ, const Vec<int> &s02,
     const SparseIndices &p0q2, const Vec<int> &s11, const SparseIndices &p1q1,
-    const Vec<float> &z02, const Vec<vec4> &xyzz11, SparseIndices &p1q2,
+    const Vec<double> &z02, const Vec<vec4> &xyzz11, SparseIndices &p1q2,
     bool forward) {
   ZoneScoped;
   Vec<int> x12(p1q2.size());
@@ -552,12 +552,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Build up Z-projection of vertices onto triangles, keeping only those that
   // fall inside the triangle.
   Vec<int> s02;
-  Vec<float> z02;
+  Vec<double> z02;
   std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_);
   PRINT("s02 size = " << s02.size());
 
   Vec<int> s20;
-  Vec<float> z20;
+  Vec<double> z20;
   std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_);
   PRINT("s20 size = " << s20.size());
 

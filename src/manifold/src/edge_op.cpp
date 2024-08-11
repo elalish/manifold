@@ -28,7 +28,7 @@ ivec3 TriOf(int edge) {
 
 bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
   const vec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
-  float l[3];
+  double l[3];
   for (int i : {0, 1, 2}) l[i] = glm::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
 }
@@ -47,7 +47,7 @@ struct DuplicateEdge {
 struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
-  const float precision;
+  const double precision;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -83,7 +83,7 @@ struct SwappableEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
-  const float precision;
+  const double precision;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -589,13 +589,13 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const int tri1 = halfedge_[tri1edge[0]].face;
     faceNormal_[tri0] = faceNormal_[tri1];
     triRef[tri0] = triRef[tri1];
-    const float l01 = glm::length(v[1] - v[0]);
-    const float l02 = glm::length(v[2] - v[0]);
-    const float a = std::max(0.0f, std::min(1.0f, l02 / l01));
+    const double l01 = glm::length(v[1] - v[0]);
+    const double l02 = glm::length(v[2] - v[0]);
+    const double a = std::max(0.0, std::min(1.0, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
       Vec<ivec3>& triProp = meshRelation_.triProperties;
-      Vec<float>& prop = meshRelation_.properties;
+      Vec<double>& prop = meshRelation_.properties;
       triProp[tri0] = triProp[tri1];
       triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
       triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];

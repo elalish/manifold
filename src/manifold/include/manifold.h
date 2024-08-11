@@ -116,9 +116,9 @@ struct MeshGL {
   MeshGL() = default;
   MeshGL(const Mesh& mesh);
 
-  static MeshGL LevelSet(std::function<float(vec3)> sdf, Box bounds,
-                         float edgeLength, float level = 0,
-                         float precision = -1, bool canParallel = true);
+  static MeshGL LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                         double edgeLength, double level = 0,
+                         double precision = -1, bool canParallel = true);
 
   bool Merge();
 };
@@ -174,17 +174,17 @@ class Manifold {
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
-  static Manifold Cube(vec3 size = vec3(1.0f), bool center = false);
-  static Manifold Cylinder(float height, float radiusLow,
-                           float radiusHigh = -1.0f, int circularSegments = 0,
+  static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
+  static Manifold Cylinder(double height, double radiusLow,
+                           double radiusHigh = -1.0, int circularSegments = 0,
                            bool center = false);
-  static Manifold Sphere(float radius, int circularSegments = 0);
-  static Manifold Extrude(const Polygons& crossSection, float height,
-                          int nDivisions = 0, float twistDegrees = 0.0f,
-                          vec2 scaleTop = vec2(1.0f));
+  static Manifold Sphere(double radius, int circularSegments = 0);
+  static Manifold Extrude(const Polygons& crossSection, double height,
+                          int nDivisions = 0, double twistDegrees = 0.0,
+                          vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
-                          float revolveDegrees = 360.0f);
+                          double revolveDegrees = 360.0);
   ///@}
 
   /** @name Topological
@@ -223,10 +223,10 @@ class Manifold {
   int NumProp() const;
   int NumPropVert() const;
   Box BoundingBox() const;
-  float Precision() const;
+  double Precision() const;
   int Genus() const;
   Properties GetProperties() const;
-  float MinGap(const Manifold& other, float searchLength) const;
+  double MinGap(const Manifold& other, double searchLength) const;
   ///@}
 
   /** @name Mesh ID
@@ -244,21 +244,21 @@ class Manifold {
   ///@{
   Manifold Translate(vec3) const;
   Manifold Scale(vec3) const;
-  Manifold Rotate(float xDegrees, float yDegrees = 0.0f,
-                  float zDegrees = 0.0f) const;
+  Manifold Rotate(double xDegrees, double yDegrees = 0.0,
+                  double zDegrees = 0.0) const;
   Manifold Transform(const mat4x3&) const;
   Manifold Mirror(vec3) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
-  Manifold SetProperties(int,
-                         std::function<void(float*, vec3, const float*)>) const;
+  Manifold SetProperties(
+      int, std::function<void(double*, vec3, const double*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
+  Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
   Manifold SmoothByNormals(int normalIdx) const;
-  Manifold SmoothOut(float minSharpAngle = 60, float minSmoothness = 0) const;
+  Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   Manifold Refine(int) const;
-  Manifold RefineToLength(float) const;
-  // Manifold RefineToPrecision(float);
+  Manifold RefineToLength(double) const;
+  // Manifold RefineToPrecision(double);
   ///@}
 
   /** @name Boolean
@@ -277,14 +277,14 @@ class Manifold {
   Manifold& operator^=(const Manifold&);
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
   std::pair<Manifold, Manifold> SplitByPlane(vec3 normal,
-                                             float originOffset) const;
-  Manifold TrimByPlane(vec3 normal, float originOffset) const;
+                                             double originOffset) const;
+  Manifold TrimByPlane(vec3 normal, double originOffset) const;
   ///@}
 
   /** @name 2D from 3D
    */
   ///@{
-  Polygons Slice(float height = 0) const;
+  Polygons Slice(double height = 0) const;
   Polygons Project() const;
   ///@}
 

@@ -35,13 +35,13 @@ template <class T>
 struct glm_name {};
 template <>
 struct glm_name<vec3> {
-  static constexpr char const name[] = "Floatx3";
-  static constexpr char const multi_name[] = "FloatNx3";
+  static constexpr char const name[] = "Doublex3";
+  static constexpr char const multi_name[] = "DoubleNx3";
 };
 template <>
 struct glm_name<vec2> {
-  static constexpr char const name[] = "Floatx2";
-  static constexpr char const multi_name[] = "FloatNx2";
+  static constexpr char const name[] = "Doublex2";
+  static constexpr char const multi_name[] = "DoubleNx2";
 };
 template <>
 struct glm_name<ivec3> {
@@ -50,11 +50,11 @@ struct glm_name<ivec3> {
 };
 template <>
 struct glm_name<mat4x3> {
-  static constexpr char const name[] = "Float3x4";
+  static constexpr char const name[] = "Double3x4";
 };
 template <>
 struct glm_name<mat3x2> {
-  static constexpr char const name[] = "Float2x3";
+  static constexpr char const name[] = "Double2x3";
 };
 
 // handle glm::vecN
@@ -257,7 +257,7 @@ NB_MODULE(manifold3d, m) {
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
-          [](const Manifold &m, float s) {
+          [](const Manifold &m, double s) {
             m.Scale({s, s, s});
           },
           nb::arg("s"),
@@ -284,18 +284,18 @@ NB_MODULE(manifold3d, m) {
           "set_properties",
           [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
-                 vec3, const nb::ndarray<nb::numpy, const float, nb::c_contig>
+                 vec3, const nb::ndarray<nb::numpy, const double, nb::c_contig>
                            &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
-                                                      float *newProps, vec3 v,
-                                                      const float *oldProps) {
+                                                      double *newProps, vec3 v,
+                                                      const double *oldProps) {
               auto result =
-                  f(v, nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                  f(v, nb::ndarray<nb::numpy, const double, nb::c_contig>(
                            oldProps, {static_cast<unsigned long>(oldNumProp)},
                            nb::handle()));
-              nb::ndarray<float, nb::shape<-1>> array;
-              std::vector<float> vec;
+              nb::ndarray<double, nb::shape<-1>> array;
+              std::vector<double> vec;
               if (nb::try_cast(result, array)) {
                 if (array.ndim() != 1 ||
                     array.shape(0) != static_cast<size_t>(newNumProp))
@@ -318,7 +318,7 @@ NB_MODULE(manifold3d, m) {
       .def("min_gap", &Manifold::MinGap, nb::arg("other"),
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
-           "Returns a float between 0 and searchLength.")
+           "Returns a double between 0 and searchLength.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
@@ -363,7 +363,7 @@ NB_MODULE(manifold3d, m) {
            manifold__trim_by_plane__normal__origin_offset)
       .def(
           "slice",
-          [](const Manifold &self, float height) {
+          [](const Manifold &self, double height) {
             return CrossSection(self.Slice(height));
           },
           nb::arg("height"), manifold__slice__height)
@@ -386,7 +386,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "smooth",
           [](const MeshGL &mesh, std::vector<size_t> sharpened_edges,
-             std::vector<float> edge_smoothness) {
+             std::vector<double> edge_smoothness) {
             if (sharpened_edges.size() != edge_smoothness.size()) {
               throw std::runtime_error(
                   "sharpened_edges.size() != edge_smoothness.size()");
@@ -411,8 +411,8 @@ NB_MODULE(manifold3d, m) {
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",
-          [](const CrossSection &crossSection, float height, int nDivisions,
-             float twistDegrees, vec2 scaleTop) {
+          [](const CrossSection &crossSection, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(crossSection.ToPolygons(), height,
                                      nDivisions, twistDegrees, scaleTop);
           },
@@ -423,7 +423,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "revolve",
           [](const CrossSection &crossSection, int circularSegments,
-             float revolveDegrees) {
+             double revolveDegrees) {
             return Manifold::Revolve(crossSection.ToPolygons(),
                                      circularSegments, revolveDegrees);
           },
@@ -549,14 +549,14 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL::faceID)
       .def_static(
           "level_set",
-          [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0,
-             float precision = -1) {
+          [](const std::function<double(double, double, double)> &f,
+             std::vector<double> bounds, double edgeLength, double level = 0.0,
+             double precision = -1) {
             // Same format as Manifold.bounding_box
             Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
                          vec3(bounds[3], bounds[4], bounds[5])};
 
-            std::function<float(vec3)> cppToPython = [&f](vec3 v) {
+            std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };
             return MeshGL::LevelSet(cppToPython, bound, edgeLength, level,
@@ -573,7 +573,7 @@ NB_MODULE(manifold3d, m) {
           "is due to the underlying grid."
           "\n\n"
           ":param f: The signed-distance functor, containing this function "
-          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
+          "signature: `def sdf(xyz : tuple) -> double:`, which returns the "
           "signed distance of a given point in R^3. Positive values are "
           "inside, negative outside."
           ":param bounds: An axis-aligned box that defines the extent of the "
@@ -670,7 +670,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) {
+          [](const CrossSection &self, double s) {
             self.Scale({s, s});
           },
           nb::arg("s"),
@@ -721,8 +721,8 @@ NB_MODULE(manifold3d, m) {
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude",
-          [](const CrossSection &self, float height, int nDivisions,
-             float twistDegrees, vec2 scaleTop) {
+          [](const CrossSection &self, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
                                      twistDegrees, scaleTop);
           },
@@ -733,7 +733,7 @@ NB_MODULE(manifold3d, m) {
       .def(
           "revolve",
           [](const CrossSection &self, int circularSegments,
-             float revolveDegrees) {
+             double revolveDegrees) {
             return Manifold::Revolve(self.ToPolygons(), circularSegments,
                                      revolveDegrees);
           },

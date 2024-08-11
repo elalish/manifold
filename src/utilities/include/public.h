@@ -41,28 +41,28 @@ namespace manifold {
   return n;
 }
 
-constexpr float kTolerance = 1e-5;
+constexpr double kTolerance = 1e-5;
 
 /** @defgroup Math data structure definitions
  *  @brief Abstract away from glm.
  *  In the future the underlying data type can change.
  *  @{
  */
-using vec2 = glm::vec2;
-using vec3 = glm::vec3;
-using vec4 = glm::vec4;
-using mat2 = glm::mat2;
-using mat2x3 = glm::mat2x3;
-using mat2x4 = glm::mat2x4;
-using mat3x2 = glm::mat3x2;
-using mat3 = glm::mat3;
-using mat3x4 = glm::mat3x4;
-using mat4x3 = glm::mat4x3;
-using mat4 = glm::mat4;
+using vec2 = glm::dvec2;
+using vec3 = glm::dvec3;
+using vec4 = glm::dvec4;
+using mat2 = glm::dmat2;
+using mat2x3 = glm::dmat2x3;
+using mat2x4 = glm::dmat2x4;
+using mat3x2 = glm::dmat3x2;
+using mat3 = glm::dmat3;
+using mat3x4 = glm::dmat3x4;
+using mat4x3 = glm::dmat4x3;
+using mat4 = glm::dmat4;
 using ivec2 = glm::vec<2, int>;
 using ivec3 = glm::vec<3, int>;
 using ivec4 = glm::vec<4, int>;
-using quat = glm::quat;
+using quat = glm::dquat;
 ///@}
 
 /** @defgroup Connections
@@ -75,11 +75,11 @@ using quat = glm::quat;
  *
  * @param x Angle in degrees.
  */
-inline float sind(float x) {
+inline double sind(double x) {
   if (!std::isfinite(x)) return sin(x);
-  if (x < 0.0f) return -sind(-x);
+  if (x < 0.0) return -sind(-x);
   int quo;
-  x = remquo(fabs(x), 90.0f, &quo);
+  x = remquo(fabs(x), 90.0, &quo);
   switch (quo % 4) {
     case 0:
       return sin(glm::radians(x));
@@ -90,7 +90,7 @@ inline float sind(float x) {
     case 3:
       return -cos(glm::radians(x));
   }
-  return 0.0f;
+  return 0.0;
 }
 
 /**
@@ -98,7 +98,7 @@ inline float sind(float x) {
  *
  * @param x Angle in degrees.
  */
-inline float cosd(float x) { return sind(x + 90.0f); }
+inline double cosd(double x) { return sind(x + 90.0); }
 
 /**
  * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
@@ -109,8 +109,8 @@ inline float cosd(float x) { return sind(x + 90.0f); }
 inline mat4x3 RotateUp(vec3 up) {
   up = glm::normalize(up);
   vec3 axis = glm::cross(up, {0, 0, 1});
-  float angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
+  double angle = glm::asin(glm::length(axis));
+  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<double>() - angle;
   return mat4x3(glm::rotate(mat4(1), angle, axis));
 }
 
@@ -125,11 +125,11 @@ inline mat4x3 RotateUp(vec3 up) {
  * @return int, like Signum, this returns 1 for CCW, -1 for CW, and 0 if within
  * tol of colinear.
  */
-inline int CCW(vec2 p0, vec2 p1, vec2 p2, float tol) {
+inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
   vec2 v1 = p1 - p0;
   vec2 v2 = p2 - p0;
-  float area = v1.x * v2.y - v1.y * v2.x;
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  double area = v1.x * v2.y - v1.y * v2.x;
+  double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
   if (area * area * 4 <= base2 * tol * tol)
     return 0;
   else
@@ -173,7 +173,7 @@ struct Mesh {
   /// errors. When creating a Manifold, the precision used will be the maximum
   /// of this and a baseline precision from the size of the bounding box. Any
   /// edge shorter than precision may be collapsed.
-  float precision = 0;
+  double precision = 0;
 };
 
 /**
@@ -186,19 +186,19 @@ struct Smoothness {
   /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
   /// curvature is interpolated between these values. The two paired halfedges
   /// can have different values while maintaining C-1 continuity (except for 0).
-  float smoothness;
+  double smoothness;
 };
 
 /**
  * Geometric properties of the manifold, created with Manifold.GetProperties().
  */
 struct Properties {
-  float surfaceArea, volume;
+  double surfaceArea, volume;
 };
 
 struct Box {
-  vec3 min = vec3(std::numeric_limits<float>::infinity());
-  vec3 max = vec3(-std::numeric_limits<float>::infinity());
+  vec3 min = vec3(std::numeric_limits<double>::infinity());
+  vec3 max = vec3(-std::numeric_limits<double>::infinity());
 
   /**
    * Default constructor is an infinite box that contains all space.
@@ -221,13 +221,13 @@ struct Box {
   /**
    * Returns the center point of the Box.
    */
-  vec3 Center() const { return 0.5f * (max + min); }
+  vec3 Center() const { return 0.5 * (max + min); }
 
   /**
    * Returns the absolute-largest coordinate value of any contained
    * point.
    */
-  float Scale() const {
+  double Scale() const {
     vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
     return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
   }
@@ -275,8 +275,8 @@ struct Box {
    */
   Box Transform(const mat4x3& transform) const {
     Box out;
-    vec3 minT = transform * vec4(min, 1.0f);
-    vec3 maxT = transform * vec4(max, 1.0f);
+    vec3 minT = transform * vec4(min, 1.0);
+    vec3 maxT = transform * vec4(max, 1.0);
     out.min = glm::min(minT, maxT);
     out.max = glm::max(minT, maxT);
     return out;
@@ -348,8 +348,8 @@ struct Box {
  * Axis-aligned rectangular bounds.
  */
 struct Rect {
-  vec2 min = vec2(std::numeric_limits<float>::infinity());
-  vec2 max = vec2(-std::numeric_limits<float>::infinity());
+  vec2 min = vec2(std::numeric_limits<double>::infinity());
+  vec2 max = vec2(-std::numeric_limits<double>::infinity());
 
   /**
    * Default constructor is an empty rectangle..
@@ -377,7 +377,7 @@ struct Rect {
   /**
    * Return the area of the rectangle.
    */
-  float Area() const {
+  double Area() const {
     auto sz = Size();
     return sz.x * sz.y;
   }
@@ -386,7 +386,7 @@ struct Rect {
    * Returns the absolute-largest coordinate value of any contained
    * point.
    */
-  float Scale() const {
+  double Scale() const {
     vec2 absMax = glm::max(glm::abs(min), glm::abs(max));
     return glm::max(absMax.x, absMax.y);
   }
@@ -394,7 +394,7 @@ struct Rect {
   /**
    * Returns the center point of the rectangle.
    */
-  vec2 Center() const { return 0.5f * (max + min); }
+  vec2 Center() const { return 0.5 * (max + min); }
 
   /**
    * Does this rectangle contain (includes on border) the given point?
@@ -521,8 +521,8 @@ struct Rect {
 enum class OpType { Add, Subtract, Intersect };
 
 constexpr int DEFAULT_SEGMENTS = 0;
-constexpr float DEFAULT_ANGLE = 10.0f;
-constexpr float DEFAULT_LENGTH = 1.0f;
+constexpr double DEFAULT_ANGLE = 10.0;
+constexpr double DEFAULT_LENGTH = 1.0;
 /**
  * These static properties control how circular shapes are quantized by
  * default on construction. If circularSegments is specified, it takes
@@ -534,8 +534,8 @@ constexpr float DEFAULT_LENGTH = 1.0f;
 class Quality {
  private:
   inline static int circularSegments_ = DEFAULT_SEGMENTS;
-  inline static float circularAngle_ = DEFAULT_ANGLE;
-  inline static float circularEdgeLength_ = DEFAULT_LENGTH;
+  inline static double circularAngle_ = DEFAULT_ANGLE;
+  inline static double circularEdgeLength_ = DEFAULT_LENGTH;
 
  public:
   /**
@@ -548,7 +548,7 @@ class Quality {
    * angle will increase if the the segments hit the minimum edge length.
    * Default is 10 degrees.
    */
-  static void SetMinCircularAngle(float angle) {
+  static void SetMinCircularAngle(double angle) {
     if (angle <= 0) return;
     circularAngle_ = angle;
   }
@@ -562,7 +562,7 @@ class Quality {
    * @param length The minimum length of segments. The length will
    * increase if the the segments hit the minimum angle. Default is 1.0.
    */
-  static void SetMinCircularEdgeLength(float length) {
+  static void SetMinCircularEdgeLength(double length) {
     if (length <= 0) return;
     circularEdgeLength_ = length;
   }
@@ -588,10 +588,10 @@ class Quality {
    * @param radius For a given radius of circle, determine how many default
    * segments there will be.
    */
-  static int GetCircularSegments(float radius) {
+  static int GetCircularSegments(double radius) {
     if (circularSegments_ > 0) return circularSegments_;
-    int nSegA = 360.0f / circularAngle_;
-    int nSegL = 2.0f * radius * glm::pi<float>() / circularEdgeLength_;
+    int nSegA = 360.0 / circularAngle_;
+    int nSegL = 2.0 * radius * glm::pi<double>() / circularEdgeLength_;
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
     return std::max(nSeg, 3);

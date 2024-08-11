@@ -35,7 +35,7 @@ struct Transform4x3 {
   mat4x3 transform;
 
   vec3 operator()(vec3 position) const {
-    return transform * vec4(position, 1.0f);
+    return transform * vec4(position, 1.0);
   }
 };
 
@@ -112,28 +112,28 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
 }
 
 std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
-  mat4x3 transform(1.0f);
+  mat4x3 transform(1.0);
   transform[3] += t;
   return Transform(transform);
 }
 
 std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
-  mat4x3 transform(1.0f);
+  mat4x3 transform(1.0);
   for (int i : {0, 1, 2}) transform[i] *= v;
   return Transform(transform);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Rotate(float xDegrees, float yDegrees,
-                                         float zDegrees) const {
-  mat3 rX(1.0f, 0.0f, 0.0f,                      //
-          0.0f, cosd(xDegrees), sind(xDegrees),  //
-          0.0f, -sind(xDegrees), cosd(xDegrees));
-  mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
-          0.0f, 1.0f, 0.0f,                       //
-          sind(yDegrees), 0.0f, cosd(yDegrees));
-  mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
-          -sind(zDegrees), cosd(zDegrees), 0.0f,  //
-          0.0f, 0.0f, 1.0f);
+std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
+                                         double zDegrees) const {
+  mat3 rX(1.0, 0.0, 0.0,                      //
+          0.0, cosd(xDegrees), sind(xDegrees),  //
+          0.0, -sind(xDegrees), cosd(xDegrees));
+  mat3 rY(cosd(yDegrees), 0.0, -sind(yDegrees),  //
+          0.0, 1.0, 0.0,                       //
+          sind(yDegrees), 0.0, cosd(yDegrees));
+  mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0,   //
+          -sind(zDegrees), cosd(zDegrees), 0.0,  //
+          0.0, 0.0, 1.0);
   mat4x3 transform(rZ * rY * rX);
   return Transform(transform);
 }
@@ -148,10 +148,10 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
     : pImpl_(pImpl_), transform_(transform_) {}
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
-  if (transform_ == mat4x3(1.0f)) return pImpl_;
+  if (transform_ == mat4x3(1.0)) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
-  transform_ = mat4x3(1.0f);
+  transform_ = mat4x3(1.0);
   return pImpl_;
 }
 
@@ -173,7 +173,7 @@ CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 Manifold::Impl CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
   ZoneScoped;
-  float precision = -1;
+  double precision = -1;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
@@ -184,11 +184,11 @@ Manifold::Impl CsgLeafNode::Compose(
   std::vector<int> propVertIndices;
   int numPropOut = 0;
   for (auto &node : nodes) {
-    float nodeOldScale = node->pImpl_->bBox_.Scale();
-    float nodeNewScale =
+    double nodeOldScale = node->pImpl_->bBox_.Scale();
+    double nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
-    float nodePrecision = node->pImpl_->precision_;
-    nodePrecision *= std::max(1.0f, nodeNewScale / nodeOldScale);
+    double nodePrecision = node->pImpl_->precision_;
+    nodePrecision *= std::max(1.0, nodeNewScale / nodeOldScale);
     nodePrecision = std::max(nodePrecision, kTolerance * nodeNewScale);
     if (!std::isfinite(nodePrecision)) nodePrecision = -1;
     precision = std::max(precision, nodePrecision);
@@ -266,7 +266,7 @@ Manifold::Impl CsgLeafNode::Compose(
           }
         }
 
-        if (node->transform_ == mat4x3(1.0f)) {
+        if (node->transform_ == mat4x3(1.0)) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),

@@ -195,7 +195,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 
 struct EdgePos {
   int vert;
-  float edgePos;
+  double edgePos;
   bool isStart;
 };
 
@@ -237,7 +237,7 @@ void AddNewEdgeVerts(
     for (const auto &tuple : edges) {
       lock(std::get<1>(tuple));
       for (int j = 0; j < std::abs(inclusion); ++j)
-        std::get<2>(tuple)->push_back({vert + j, 0.0f, std::get<0>(tuple)});
+        std::get<2>(tuple)->push_back({vert + j, 0.0, std::get<0>(tuple)});
       unlock(std::get<1>(tuple));
       direction = !direction;
     }
@@ -531,7 +531,7 @@ struct Barycentric {
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
   VecView<const Halfedge> halfedgeR;
-  const float precision;
+  const double precision;
 
   void operator()(const int tri) {
     const TriRef refPQ = ref[tri];

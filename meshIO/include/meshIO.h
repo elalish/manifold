@@ -29,12 +29,12 @@ namespace manifold {
  */
 struct Material {
   /// Roughness value between 0 (shiny) and 1 (matte).
-  float roughness = 0.2;
+  double roughness = 0.2;
   /// Metalness value, generally either 0 (dielectric) or 1 (metal).
-  float metalness = 1;
+  double metalness = 1;
   /// Color (RGBA) multiplier to apply to the whole mesh (each value between 0
   /// and 1).
-  vec4 color = vec4(1.0f);
+  vec4 color = vec4(1.0);
   /// Optional: If non-empty, must match Mesh.vertPos. Provides an RGBA color
   /// for each vertex, linearly interpolated across triangles. Colors are
   /// linear, not sRGB. Only used with Mesh export, not MeshGL.

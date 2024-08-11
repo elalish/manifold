@@ -52,7 +52,7 @@ class Boolean3 {
 
  private:
   const Manifold::Impl &inP_, &inQ_;
-  const float expandP_;
+  const double expandP_;
   SparseIndices p1q2_, p2q1_;
   Vec<int> x12_, x21_, w03_, w30_;
   Vec<vec3> v12_, v21_;

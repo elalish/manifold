@@ -11,18 +11,18 @@
 
 using namespace manifold;
 
-inline float cross(vec2 p, vec2 q) { return p.x * q.y - p.y * q.x; }
+inline double cross(vec2 p, vec2 q) { return p.x * q.y - p.y * q.x; }
 
 // return true if p intersects with q
 // note that we don't care about collinear, intersection in the ends etc.
 // https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
-inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, float precision) {
+inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
   vec2 r = p1 - p0;
   vec2 s = q1 - q0;
   // allow some error in the intersection point
-  float epsilon_r = 2.0 * precision / glm::length(r);
-  float epsilon_s = 2.0 * precision / glm::length(s);
-  float rxs = cross(r, s);
+  double epsilon_r = 2.0 * precision / glm::length(r);
+  double epsilon_s = 2.0 * precision / glm::length(s);
+  double rxs = cross(r, s);
   // in case they are nearly collinear, ignore them...
   // this is to avoid treating degenerate triangles as intersecting
   //
@@ -31,8 +31,8 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, float precision) {
   if (rxs < kTolerance && rxs > -kTolerance) {
     return false;
   }
-  float u = cross(q0 - p0, r) / rxs;
-  float t = cross(q0 - p0, s) / rxs;
+  double u = cross(q0 - p0, r) / rxs;
+  double t = cross(q0 - p0, s) / rxs;
   // we only care about intersection in the middle of both lines, excluding
   // their ends
   if (epsilon_r <= u && u <= (1 - epsilon_r) &&  //
@@ -43,10 +43,10 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, float precision) {
     //
     // in that case, apply perturbation perpendicular to r
     vec2 r_orth = glm::normalize(vec2(-r.y, r.x)) * precision;
-    float u1 = cross(q0 - p0 + r_orth, r) / rxs;
-    float u2 = cross(q0 - p0 - r_orth, r) / rxs;
-    float t1 = cross(q0 - p0 + r_orth, s) / rxs;
-    float t2 = cross(q0 - p0 - r_orth, s) / rxs;
+    double u1 = cross(q0 - p0 + r_orth, r) / rxs;
+    double u2 = cross(q0 - p0 - r_orth, r) / rxs;
+    double t1 = cross(q0 - p0 + r_orth, s) / rxs;
+    double t2 = cross(q0 - p0 - r_orth, s) / rxs;
     return 0 <= u1 && u1 <= 1 &&  //
            0 <= t1 && t1 <= 1 &&  //
            0 <= u2 && u2 <= 1 &&  //
@@ -60,7 +60,7 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, float precision) {
 // check if removing point j in polygon i will introduce self-intersection
 // this checks if the new edge j-1 <-> j+1 intersects with any other edges,
 // assuming the original polygon does not contain self-intersection
-bool safeToRemove(const Polygons &polys, size_t i, size_t j, float precision) {
+bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
   if (polys[i].size() == 3) return false;
   vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
   vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
@@ -106,7 +106,7 @@ void Dump(const Polygons &polys) {
   }
 }
 
-void DumpTriangulation(const Polygons &polys, float precision) {
+void DumpTriangulation(const Polygons &polys, double precision) {
   ExecutionParams oldParams = PolygonParams();
   manifold::PolygonParams().processOverlaps = true;
   std::vector<ivec3> result = Triangulate(polys);
@@ -162,7 +162,7 @@ std::vector<int> getChildren(const Polygons &polys, size_t i) {
 // 1. the updated polys is still valid (no overlapping edges, correct winding
 // direction)
 // 2. same error in triangulation (either geometryErr or overlapping triangles)
-void simplify(Polygons &polys, float precision = -1) {
+void simplify(Polygons &polys, double precision = -1) {
   bool removedSomething = true;
   std::string msg;
   while (removedSomething) {
@@ -253,7 +253,7 @@ struct Edge {
   }
 };
 
-int isValid(const Polygons &polys, float precision = -1) {
+int isValid(const Polygons &polys, double precision = -1) {
   size_t numEdge = 0;
   for (const SimplePolygon &poly : polys) numEdge += poly.size();
   std::vector<Edge> edges;
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
   }
   std::ifstream fin(argv[1]);
   std::string line;
-  float precision = -1;
+  double precision = -1;
   Polygons polys;
   SimplePolygon poly;
   // search for precision first
@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
   while (std::getline(fin, line)) {
     if (line.length() > 5 && line.substr(0, 5).compare("    {") == 0) {
       std::istringstream iss(line.substr(5));
-      float x, y;
+      double x, y;
       if (!(iss >> x)) {
         std::cerr << "Error parsing coordinate:" << std::endl;
         std::cerr << "Line: " << line << std::endl;
@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
   }
 
   if (precision == -1) {
-    float bound = 0;
+    double bound = 0;
     for (const SimplePolygon &poly : polys) {
       for (const vec2 &pt : poly) {
         bound = glm::max(bound, glm::abs(pt.x));

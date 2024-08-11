@@ -28,13 +28,13 @@ using namespace manifold;
 TEST(Properties, GetProperties) {
   Manifold cube = Manifold::Cube();
   auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 1.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
 
-  cube = cube.Scale(vec3(-1.0f));
+  cube = cube.Scale(vec3(-1.0));
   prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 1.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
 }
 
 TEST(Properties, Precision) {
@@ -89,7 +89,7 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 1, precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 1, precision);
 
-    sphere = sphere.Scale(vec3(2.0f))
+    sphere = sphere.Scale(vec3(2.0))
                  .CalculateCurvature(gaussianIdx - 3, meanIdx - 3);
     sphereGL = sphere.GetMeshGL();
     ASSERT_EQ(sphereGL.numProp, 5);
@@ -106,7 +106,7 @@ TEST(Properties, MinGapCubeCube) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Translate({2, 2, 0});
 
-  float distance = a.MinGap(b, 1.5f);
+  float distance = a.MinGap(b, 1.5);
 
   EXPECT_FLOAT_EQ(distance, sqrt(2));
 }
@@ -124,7 +124,7 @@ TEST(Properties, MinGapCubeSphereOverlapping) {
   auto a = Manifold::Cube();
   auto b = Manifold::Sphere(1);
 
-  float distance = a.MinGap(b, 0.1f);
+  float distance = a.MinGap(b, 0.1);
 
   EXPECT_FLOAT_EQ(distance, 0);
 }
@@ -133,7 +133,7 @@ TEST(Properties, MinGapSphereSphere) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
 
-  float distance = a.MinGap(b, 0.85f);
+  float distance = a.MinGap(b, 0.85);
 
   EXPECT_FLOAT_EQ(distance, 2 * sqrt(2) - 2);
 }
@@ -142,9 +142,9 @@ TEST(Properties, MinGapSphereSphereOutOfBounds) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
 
-  float distance = a.MinGap(b, 0.8f);
+  float distance = a.MinGap(b, 0.8);
 
-  EXPECT_FLOAT_EQ(distance, 0.8f);
+  EXPECT_FLOAT_EQ(distance, 0.8);
 }
 
 TEST(Properties, MinGapClosestPointOnEdge) {
@@ -152,7 +152,7 @@ TEST(Properties, MinGapClosestPointOnEdge) {
   auto b =
       Manifold::Cube({1, 1, 1}, true).Rotate(0, 45, 0).Translate({2, 0, 0});
 
-  float distance = a.MinGap(b, 0.7f);
+  float distance = a.MinGap(b, 0.7);
 
   EXPECT_FLOAT_EQ(distance, 2 - sqrt(2));
 }
@@ -161,7 +161,7 @@ TEST(Properties, MinGapClosestPointOnTriangleFace) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Scale({10, 10, 10}).Translate({2, -5, -1});
 
-  float distance = a.MinGap(b, 1.1f);
+  float distance = a.MinGap(b, 1.1);
 
   EXPECT_FLOAT_EQ(distance, 1);
 }
@@ -172,9 +172,9 @@ TEST(Properties, MingapAfterTransformations) {
       Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
-  float distance = a.MinGap(b, 1.1f);
+  float distance = a.MinGap(b, 1.1);
 
-  ASSERT_NEAR(distance, 1, 0.001f);
+  ASSERT_NEAR(distance, 1, 0.001);
 }
 
 TEST(Properties, MingapStretchyBracelet) {
@@ -183,7 +183,7 @@ TEST(Properties, MingapStretchyBracelet) {
 
   float distance = a.MinGap(b, 10);
 
-  ASSERT_NEAR(distance, 5, 0.001f);
+  ASSERT_NEAR(distance, 5, 0.001);
 }
 
 TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
@@ -192,9 +192,9 @@ TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
       Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
-  float distance = a.MinGap(b, 0.95f);
+  float distance = a.MinGap(b, 0.95);
 
-  ASSERT_NEAR(distance, 0.95f, 0.001f);
+  ASSERT_NEAR(distance, 0.95, 0.001);
 }
 
 TEST(Properties, TriangleDistanceClosestPointsOnVertices) {
@@ -224,14 +224,14 @@ TEST(Properties, TriangleDistanceClosestPointOnEdge2) {
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 
-  EXPECT_FLOAT_EQ(distance, 0.5f);
+  EXPECT_FLOAT_EQ(distance, 0.5);
 }
 
 TEST(Properties, TriangleDistanceClosestPointOnFace) {
   std::array<vec3, 3> p = {vec3{-1, 0, 0}, vec3{1, 0, 0}, vec3{0, 1, 0}};
 
-  std::array<vec3, 3> q = {vec3{-1, 2, -0.5f}, vec3{1, 2, -0.5f},
-                           vec3{0, 2, 1.5f}};
+  std::array<vec3, 3> q = {vec3{-1, 2, -0.5}, vec3{1, 2, -0.5},
+                           vec3{0, 2, 1.5}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 
@@ -241,7 +241,7 @@ TEST(Properties, TriangleDistanceClosestPointOnFace) {
 TEST(Properties, TriangleDistanceOverlapping) {
   std::array<vec3, 3> p = {vec3{-1, 0, 0}, vec3{1, 0, 0}, vec3{0, 1, 0}};
 
-  std::array<vec3, 3> q = {vec3{-1, 0, 0}, vec3{1, 0.5f, 0}, vec3{0, 1, 0}};
+  std::array<vec3, 3> q = {vec3{-1, 0, 0}, vec3{1, 0.5, 0}, vec3{0, 1, 0}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 

@@ -37,13 +37,13 @@ using SimplePolygonIdx = std::vector<PolyVert>;
 using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
-                                  float precision = -1);
+                                  double precision = -1);
 /** @} */
 
 /** @ingroup Connections
  *  @{
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, float precision = -1);
+std::vector<ivec3> Triangulate(const Polygons &polygons, double precision = -1);
 
 ExecutionParams &PolygonParams();
 /** @} */
