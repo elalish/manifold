@@ -139,7 +139,7 @@ CrossSection IntersectionN(const std::vector<CrossSection>& cross_sections) {
 }
 
 CrossSection Transform(CrossSection& cross_section, const val& mat) {
-  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
+  std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
   mat3x2 matrix;
   for (const int col : {0, 1, 2})
     for (const int row : {0, 1}) matrix[col][row] = array[col * 3 + row];
@@ -187,7 +187,7 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 }
 
 Manifold Transform(Manifold& manifold, const val& mat) {
-  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
+  std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
   mat4x3 matrix;
   for (const int col : {0, 1, 2, 3})
     for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
@@ -200,14 +200,14 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
 }
 
 Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
-  void (*f)(float*, vec3, const float*) =
-      reinterpret_cast<void (*)(float*, vec3, const float*)>(funcPtr);
+  void (*f)(double*, vec3, const double*) =
+      reinterpret_cast<void (*)(double*, vec3, const double*)>(funcPtr);
   return manifold.SetProperties(numProp, f);
 }
 
-Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength, float level,
-                  float precision) {
-  float (*f)(const vec3&) = reinterpret_cast<float (*)(const vec3&)>(funcPtr);
+Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength, double level,
+                  double precision) {
+  double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
   return Manifold(MeshGL::LevelSet(f, bounds, edgeLength, level, precision));
 }
 
@@ -217,7 +217,7 @@ std::vector<Manifold> Split(Manifold& a, Manifold& b) {
 }
 
 std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
-                                   float originOffset) {
+                                   double originOffset) {
   auto [a, b] = m.SplitByPlane(normal, originOffset);
   return {a, b};
 }
