@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef MANIFOLD_CROSS_SECTION
 #include "cross_section.h"
+#endif
 #include "manifold.h"
 #include "polygon.h"
 #include "test.h"
@@ -261,6 +263,7 @@ TEST(BooleanComplex, Spiral) {
   EXPECT_EQ(result.Genus(), -120);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 TEST(BooleanComplex, Sweep) {
   PolygonParams().processOverlaps = true;
 
@@ -502,6 +505,7 @@ TEST(BooleanComplex, Sweep) {
 
   PolygonParams().processOverlaps = false;
 }
+#endif
 
 TEST(BooleanComplex, InterpolatedNormals) {
   MeshGL a;

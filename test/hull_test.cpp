@@ -14,7 +14,6 @@
 
 #include <algorithm>
 
-#include "cross_section.h"
 #include "manifold.h"
 #include "samples.h"
 #include "test.h"

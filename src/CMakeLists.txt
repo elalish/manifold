@@ -14,6 +14,8 @@
 
 add_subdirectory(utilities)
 add_subdirectory(collider)
-add_subdirectory(cross_section)
+if(MANIFOLD_CROSS_SECTION)
+    add_subdirectory(cross_section)
+endif()
 add_subdirectory(polygon)
 add_subdirectory(manifold)
