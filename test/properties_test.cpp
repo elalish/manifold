@@ -14,7 +14,6 @@
 
 #include <algorithm>
 
-#include "cross_section.h"
 #include "manifold.h"
 #include "samples.h"
 #include "test.h"
@@ -177,6 +176,7 @@ TEST(Properties, MingapAfterTransformations) {
   ASSERT_NEAR(distance, 1, 0.001f);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 TEST(Properties, MingapStretchyBracelet) {
   auto a = StretchyBracelet();
   auto b = StretchyBracelet().Translate({0, 0, 20});
@@ -185,6 +185,7 @@ TEST(Properties, MingapStretchyBracelet) {
 
   ASSERT_NEAR(distance, 5, 0.001f);
 }
+#endif
 
 TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
   auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);

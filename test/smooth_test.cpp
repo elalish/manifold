@@ -14,7 +14,9 @@
 
 #include <algorithm>
 
+#ifdef MANIFOLD_CROSS_SECTION
 #include "cross_section.h"
+#endif
 #include "manifold.h"
 #include "samples.h"
 #include "test.h"
@@ -103,6 +105,7 @@ TEST(Smooth, TruncatedCone) {
 #endif
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
@@ -128,6 +131,7 @@ TEST(Smooth, ToLength) {
     ExportMesh("smoothToLength.glb", smooth.GetMesh(), {});
 #endif
 }
+#endif
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
@@ -267,6 +271,7 @@ glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
   return glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Torus) {
   Mesh torusMesh =
       Manifold::Revolve(
@@ -328,6 +333,7 @@ TEST(Smooth, Torus) {
   if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
 #endif
 }
+#endif
 
 TEST(Smooth, SineSurface) {
   MeshGL surface = MeshGL::LevelSet(
