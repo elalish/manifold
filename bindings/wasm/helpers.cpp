@@ -209,7 +209,7 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength, float level,
                   float precision) {
   float (*f)(const glm::vec3&) =
       reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
-  return Manifold(MeshGL::LevelSet(f, bounds, edgeLength, level, precision));
+  return Manifold::LevelSet(f, bounds, edgeLength, level, precision);
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
