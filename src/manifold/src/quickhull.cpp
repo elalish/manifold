@@ -65,10 +65,10 @@ void QuickHull::buildMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
   planar = false;
   createConvexHalfEdgeMesh();
   if (planar) {
-    const size_t extraPointIndex = planarPointCloudTemp.size() - 1;
+    const int extraPointIndex = planarPointCloudTemp.size() - 1;
     for (auto& he : mesh.halfEdges) {
-      if (he.endVertex == extraPointIndex) {
-        he.endVertex = 0;
+      if (he.halfEdgeManifold.endVert == extraPointIndex) {
+        he.halfEdgeManifold.endVert = 0;
       }
     }
     originalVertexData = pointCloud;
@@ -157,9 +157,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
           for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
-            if (mesh.halfEdges[heIndex].opp != faceData.enteredFromHalfEdge) {
+            if (mesh.halfEdges[heIndex].halfEdgeManifold.pairedHalfedge != faceData.enteredFromHalfEdge) {
               possiblyVisibleFaces.emplace_back(
-                  mesh.halfEdges[mesh.halfEdges[heIndex].opp].face, heIndex);
+                  mesh.halfEdges[mesh.halfEdges[heIndex].halfEdgeManifold.pairedHalfedge].halfEdgeManifold.face, heIndex);
             }
           }
           continue;
@@ -175,12 +175,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
       // face will not be part of the final mesh so their data slots can by
       // recycled.
       const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
-          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]);
+          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].halfEdgeManifold.face]);
       const std::int8_t ind =
           (halfEdgesMesh[0] == faceData.enteredFromHalfEdge)
               ? 0
               : (halfEdgesMesh[1] == faceData.enteredFromHalfEdge ? 1 : 2);
-      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]
+      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].halfEdgeManifold.face]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
     const size_t horizonEdgeCount = horizonEdgesData.size();
@@ -191,9 +191,28 @@ void QuickHull::createConvexHalfEdgeMesh() {
     if (!reorderHorizonEdges(horizonEdgesData)) {
       diagnostics.failedHorizonEdges++;
       std::cerr << "Failed to solve horizon edge." << std::endl;
-      auto it = std::find(tf.pointsOnPositiveSide->begin(),
+      long unsigned int* it = std::find(tf.pointsOnPositiveSide->begin(),
                           tf.pointsOnPositiveSide->end(), activePointIndex);
-      tf.pointsOnPositiveSide->erase(it);
+      if (tf.pointsOnPositiveSide->end()==it){
+        
+      }
+      else{
+        int change_flag=0;
+        for (size_t index=0;index<tf.pointsOnPositiveSide->size();index++)
+        {
+          if ((*tf.pointsOnPositiveSide)[index]==*it)
+          {
+            change_flag=1;
+          }
+          else if (change_flag==1)
+          {
+            (*tf.pointsOnPositiveSide)[index-1]=(*tf.pointsOnPositiveSide)[index];
+          }
+        }
+        tf.pointsOnPositiveSide->resize(tf.pointsOnPositiveSide->size()-1);
+      }
+      
+      
       if (tf.pointsOnPositiveSide->size() == 0) {
         reclaimToIndexVectorPool(tf.pointsOnPositiveSide);
       }
@@ -261,12 +280,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
       mesh.halfEdges[BC].next = CA;
       mesh.halfEdges[CA].next = AB;
 
-      mesh.halfEdges[BC].face = newFaceIndex;
-      mesh.halfEdges[CA].face = newFaceIndex;
-      mesh.halfEdges[AB].face = newFaceIndex;
+      mesh.halfEdges[BC].halfEdgeManifold.face = newFaceIndex;
+      mesh.halfEdges[CA].halfEdgeManifold.face = newFaceIndex;
+      mesh.halfEdges[AB].halfEdgeManifold.face = newFaceIndex;
 
-      mesh.halfEdges[CA].endVertex = A;
-      mesh.halfEdges[BC].endVertex = C;
+      mesh.halfEdges[CA].halfEdgeManifold.endVert = A;
+      mesh.halfEdges[BC].halfEdgeManifold.endVert = C;
 
       auto& newFace = mesh.faces[newFaceIndex];
 
@@ -275,9 +294,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
       newFace.P = Plane(planeNormal, activePoint);
       newFace.he = AB;
 
-      mesh.halfEdges[CA].opp =
+      mesh.halfEdges[CA].halfEdgeManifold.pairedHalfedge =
           newHalfEdgeIndices[i > 0 ? i * 2 - 1 : 2 * horizonEdgeCount - 1];
-      mesh.halfEdges[BC].opp =
+      mesh.halfEdges[BC].halfEdgeManifold.pairedHalfedge =
           newHalfEdgeIndices[((i + 1) * 2) % (horizonEdgeCount * 2)];
     }
 
@@ -357,11 +376,11 @@ std::array<size_t, 6> QuickHull::getExtremeValues() {
 bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   const size_t horizonEdgeCount = horizonEdges.size();
   for (size_t i = 0; i < horizonEdgeCount - 1; i++) {
-    const size_t endVertexCheck = mesh.halfEdges[horizonEdges[i]].endVertex;
+    const size_t endVertexCheck = mesh.halfEdges[horizonEdges[i]].halfEdgeManifold.endVert;
     bool foundNext = false;
     for (size_t j = i + 1; j < horizonEdgeCount; j++) {
       const size_t beginVertex =
-          mesh.halfEdges[mesh.halfEdges[horizonEdges[j]].opp].endVertex;
+          mesh.halfEdges[mesh.halfEdges[horizonEdges[j]].halfEdgeManifold.pairedHalfedge].halfEdgeManifold.endVert;
       if (beginVertex == endVertexCheck) {
         std::swap(horizonEdges[i + 1], horizonEdges[j]);
         foundNext = true;
@@ -372,8 +391,8 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
       return false;
     }
   }
-  assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]].endVertex ==
-         mesh.halfEdges[mesh.halfEdges[horizonEdges[0]].opp].endVertex);
+  assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]].halfEdgeManifold.endVert ==
+         mesh.halfEdges[mesh.halfEdges[horizonEdges[0]].halfEdgeManifold.pairedHalfedge].halfEdgeManifold.endVert);
   return true;
 }
 
