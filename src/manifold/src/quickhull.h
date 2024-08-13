@@ -83,8 +83,7 @@ class Pool {
 
   std::unique_ptr<manifold::Vec<size_t>> get() {
     if (data.size() == 0) {
-      return std::unique_ptr<manifold::Vec<size_t>>(
-          new manifold::Vec<size_t>());
+      return std::make_unique<manifold::Vec<size_t>>();
     }
     auto it = data.end() - 1;
     std::unique_ptr<manifold::Vec<size_t>> r = std::move(*it);
@@ -382,7 +381,7 @@ class ConvexHull {
     if (o.optimizedVertexBuffer) {
       optimizedVertexBuffer.reset(
           new manifold::Vec<glm::dvec3>(*o.optimizedVertexBuffer));
-      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
+      vertices = *optimizedVertexBuffer;
     } else {
       vertices = o.vertices;
     }
