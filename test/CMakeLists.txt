@@ -17,10 +17,10 @@ project(manifold_test)
 set(CMAKE_CXX_STANDARD 17)
 enable_testing()
 
-set(SOURCE_FILES test_main.cpp polygon_test.cpp sdf_test.cpp boolean_test.cpp)
+set(SOURCE_FILES test_main.cpp polygon_test.cpp properties_test.cpp hull_test.cpp sdf_test.cpp boolean_test.cpp)
 
 if(MANIFOLD_CROSS_SECTION)
-  list(APPEND SOURCE_FILES boolean_complex_test.cpp cross_section_test.cpp hull_test.cpp manifold_test.cpp properties_test.cpp samples_test.cpp smooth_test.cpp)
+  list(APPEND SOURCE_FILES boolean_complex_test.cpp cross_section_test.cpp manifold_test.cpp samples_test.cpp smooth_test.cpp)
 endif()
 
 if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
