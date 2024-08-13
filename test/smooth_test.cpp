@@ -338,37 +338,49 @@ TEST(Smooth, SineSurface) {
       {glm::vec3(-2 * glm::pi<float>() + 0.2),
        glm::vec3(0 * glm::pi<float>() - 0.2)},
       1);
+
   Manifold smoothed =
       Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
   EXPECT_NEAR(prop.volume, 8.09, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 30.93, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
+  EXPECT_FLOAT_EQ(
+      smoothed.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+      prop.volume);
 
   Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
   auto prop1 = smoothed1.GetProperties();
   EXPECT_FLOAT_EQ(prop1.volume, prop.volume);
   EXPECT_FLOAT_EQ(prop1.surfaceArea, prop.surfaceArea);
   EXPECT_EQ(smoothed1.Genus(), 0);
+  EXPECT_FLOAT_EQ(
+      smoothed1.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+      prop1.volume);
 
   Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
   EXPECT_NEAR(prop2.volume, 9.00, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, 33.59, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.52, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
+  EXPECT_NEAR(smoothed2.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+              prop2.volume, 0.001);
 
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
   EXPECT_NEAR(prop3.volume, 8.44, 0.01);
   EXPECT_NEAR(prop3.surfaceArea, 31.73, 0.02);
   EXPECT_EQ(smoothed3.Genus(), 0);
+  EXPECT_FLOAT_EQ(
+      smoothed3.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+      prop3.volume);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
     // options2.faceted = false;
     // options2.mat.normalChannels = {3, 4, 5};
-    ExportMesh("smoothSineSurface.glb", smoothed.GetMeshGL(), options2);
+    ExportMesh("smoothSineSurface.glb", smoothed2.GetMeshGL(), options2);
   }
 #endif
 }

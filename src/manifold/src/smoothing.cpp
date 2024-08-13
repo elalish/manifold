@@ -971,7 +971,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
             }
           });
         } else {  // Sharpen vertex uniformly
-          fixedHalfedge[vertHalfedge[v]] = true;
           float smoothness = 0;
           float denom = 0;
           for (const Pair& pair : vert) {
