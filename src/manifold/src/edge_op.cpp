@@ -426,10 +426,10 @@ void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
   }
 }
 
-bool Manifold::Impl::RemoveIfFolded(int edge) {
+void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
-  if (halfedge_[tri0edge[1]].pairedHalfedge == -1) return false;
+  if (halfedge_[tri0edge[1]].pairedHalfedge == -1) return;
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
       if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
@@ -452,7 +452,6 @@ bool Manifold::Impl::RemoveIfFolded(int edge) {
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
   }
-  return true;
 }
 
 // Collapses the given edge by removing startVert. May split the mesh

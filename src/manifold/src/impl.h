@@ -157,7 +157,7 @@ struct Manifold::Impl {
   void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
-  bool RemoveIfFolded(int edge);
+  void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
