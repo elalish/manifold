@@ -561,10 +561,10 @@ class HalfEdgeMesh {
     i = 0;
     for (const auto& halfEdge : builderObject.halfEdges) {
       if (!halfEdge.isDisabled()) {
-        halfEdges.push_back({static_cast<int>(halfEdge.halfEdgeManifold.endVert),
+        halfEdges.push_back({{static_cast<int>(halfEdge.halfEdgeManifold.endVert),
                              static_cast<int>(halfEdge.halfEdgeManifold.pairedHalfedge),
                              static_cast<int>(halfEdge.halfEdgeManifold.face),
-                             static_cast<int>(halfEdge.next)});
+                             static_cast<int>(halfEdge.next)}});
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
       i++;
@@ -633,13 +633,26 @@ struct DiagnosticsData {
 
 double defaultEps();
 
+// Computes convex hull for a given point cloud.
+  // Params:
+  //   pointCloud: a vector of of 3D points
+  //   CCW: whether the output mesh triangles should have CCW orientation
+  //   useOriginalIndices: should the output mesh use same vertex indices as the
+  //   original point cloud. If this is false,
+  //      then we generate a new vertex buffer which contains only the vertices
+  //      that are part of the convex hull.
+  //   eps: minimum distance to a plane to consider a point being on positive of
+  //   it (for a point cloud with scale 1)
+  ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud, bool CCW,
+                           bool useOriginalIndices, double eps = defaultEps());
+
 class QuickHull {
   using vec3 = glm::dvec3;
 
   double m_epsilon, epsilonSquared, scale;
   bool planar;
   std::vector<vec3> planarPointCloudTemp;
-  manifold::Vec<glm::dvec3> originalVertexData;
+  manifold::VecView<glm::dvec3> originalVertexData;
   MeshBuilder mesh;
   std::array<size_t, 6> extremeValues;
   DiagnosticsData diagnostics;
@@ -698,59 +711,18 @@ class QuickHull {
 
   // Constructs the convex hull into a MeshBuilder object which can be converted
   // to a ConvexHull or Mesh object
-  void buildMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
+  void buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
                  bool useOriginalIndices, double eps);
 
-  // The public getConvexHull functions will setup a VertexDataSource object and
+ public:
+  QuickHull(const manifold::Vec<glm::dvec3>& pointCloudVec) : originalVertexData(manifold::VecView(pointCloudVec))
+  {
+    
+  }
+  // The getConvexHull functions will setup a VertexDataSource object and
   // call this
   ConvexHull getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
                            bool CCW, bool useOriginalIndices, double eps);
-
- public:
-  // Computes convex hull for a given point cloud.
-  // Params:
-  //   pointCloud: a vector of of 3D points
-  //   CCW: whether the output mesh triangles should have CCW orientation
-  //   useOriginalIndices: should the output mesh use same vertex indices as the
-  //   original point cloud. If this is false,
-  //      then we generate a new vertex buffer which contains only the vertices
-  //      that are part of the convex hull.
-  //   eps: minimum distance to a plane to consider a point being on positive of
-  //   it (for a point cloud with scale 1)
-  ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud, bool CCW,
-                           bool useOriginalIndices, double eps = defaultEps());
-
-  // Computes convex hull for a given point cloud.
-  // Params:
-  //   vertexData: pointer to the first 3D point of the point cloud
-  //   vertexCount: number of vertices in the point cloud
-  //   CCW: whether the output mesh triangles should have CCW orientation
-  //   useOriginalIndices: should the output mesh use same vertex indices as the
-  //   original point cloud. If this is false,
-  //      then we generate a new vertex buffer which contains only the vertices
-  //      that are part of the convex hull.
-  //   eps: minimum distance to a plane to consider a point being on positive
-  //   side of it (for a point cloud with scale 1)
-  ConvexHull getConvexHull(const glm::dvec3* vertexData, size_t vertexCount,
-                           bool CCW, bool useOriginalIndices,
-                           double eps = defaultEps());
-
-  // Computes convex hull for a given point cloud. This function assumes that
-  // the vertex data resides in memory in the following format:
-  // x_0,y_0,z_0,x_1,y_1,z_1,... Params:
-  //   vertexData: pointer to the X component of the first point of the point
-  //   cloud. vertexCount: number of vertices in the point cloud CCW: whether
-  //   the output mesh triangles should have CCW orientation useOriginalIndices:
-  //   should the output mesh use same vertex indices as the original point
-  //   cloud. If this is false,
-  //      then we generate a new vertex buffer which contains only the vertices
-  //      that are part of the convex hull.
-  //   eps: minimum distance to a plane to consider a point being on positive
-  //   side of it (for a point cloud with scale 1)
-  ConvexHull getConvexHull(const double* vertexData, size_t vertexCount,
-                           bool CCW, bool useOriginalIndices,
-                           double eps = defaultEps());
-
   // Computes convex hull for a given point cloud. This function assumes that
   // the vertex data resides in memory in the following format:
   // x_0,y_0,z_0,x_1,y_1,z_1,... Params:

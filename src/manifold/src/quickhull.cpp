@@ -29,14 +29,15 @@ double defaultEps() { return 0.0000001; }
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::getConvexHull(const std::vector<glm::dvec3>& pointCloud,
+ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud,
                                     bool CCW, bool useOriginalIndices,
                                     double epsilon) {
-  manifold::Vec<glm::dvec3> vertexDataSource(pointCloud);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
+  manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
+  QuickHull qh(pointCloudVec);
+  return qh.getConvexHull(pointCloudVec, CCW, useOriginalIndices, epsilon);
 }
 
-void QuickHull::buildMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
+void QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
                           bool useOriginalIndices, double epsilon) {
   // CCW is unused for now
   (void)CCW;
@@ -80,7 +81,7 @@ ConvexHull QuickHull::getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
                                     bool CCW, bool useOriginalIndices,
                                     double epsilon) {
   buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
-  return ConvexHull(mesh, originalVertexData, CCW, useOriginalIndices);
+  return ConvexHull(mesh, pointCloud, CCW, useOriginalIndices);
 }
 
 void QuickHull::createConvexHalfEdgeMesh() {
