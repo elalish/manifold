@@ -40,7 +40,7 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 
     // Check all other vertices
     for (int i = 0; i < (int)vertPos.size(); ++i) {
-      if (i == tri[0] || i == tri[2] || i == tri[3])
+      if (i == tri[0] || i == tri[1] || i == tri[2])
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
