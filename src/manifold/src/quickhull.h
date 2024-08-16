@@ -135,23 +135,23 @@ struct Ray {
 class MeshBuilder {
  public:
   struct HalfEdge {
-    // size_t endVertex;
-    // size_t opp;
-    // size_t face;
-    manifold::Halfedge halfEdgeManifold;
-    int next;
+    size_t endVertex;
+    size_t opp;
+    size_t face;
+    // manifold::Halfedge halfEdgeManifold={-1};
+    size_t next;
 
     void disable() {
-      halfEdgeManifold.endVert = std::numeric_limits<int>::max();
+      endVertex = std::numeric_limits<size_t>::max();
     }
 
     bool isDisabled() const {
-      return halfEdgeManifold.endVert == std::numeric_limits<int>::max();
+      return endVertex == std::numeric_limits<size_t>::max();
     }
   };
 
   struct Face {
-    int he;
+    size_t he;
     Plane P{};
     double mostDistantPointDist;
     size_t mostDistantPoint;
@@ -164,7 +164,7 @@ class MeshBuilder {
     std::unique_ptr<manifold::Vec<size_t>> pointsOnPositiveSide;
 
     Face()
-        : he(std::numeric_limits<int>::max()),
+        : he(std::numeric_limits<size_t>::max()),
           mostDistantPointDist(0),
           mostDistantPoint(0),
           visibilityCheckedOnIteration(0),
@@ -172,9 +172,9 @@ class MeshBuilder {
           inFaceStack(0),
           horizonEdgesOnCurrentIteration(0) {}
 
-    void disable() { he = std::numeric_limits<int>::max(); }
+    void disable() { he = std::numeric_limits<size_t>::max(); }
 
-    bool isDisabled() const { return he == std::numeric_limits<int>::max(); }
+    bool isDisabled() const { return he == std::numeric_limits<size_t>::max(); }
   };
 
   // Mesh data
@@ -222,7 +222,7 @@ class MeshBuilder {
   }
 
   void disableHalfEdge(size_t heIndex) {
-    auto& he = halfEdges[heIndex];
+    HalfEdge& he = halfEdges[heIndex];
     he.disable();
     disabledHalfEdges.push_back(heIndex);
   }
@@ -242,86 +242,86 @@ class MeshBuilder {
 
     // Create halfedges
     HalfEdge AB;
-    AB.halfEdgeManifold.endVert = b;
-    AB.halfEdgeManifold.pairedHalfedge = 6;
-    AB.halfEdgeManifold.face = 0;
+    AB.endVertex = b;
+    AB.opp = 6;
+    AB.face = 0;
     AB.next = 1;
     halfEdges.push_back(AB);
 
     HalfEdge BC;
-    BC.halfEdgeManifold.endVert = c;
-    BC.halfEdgeManifold.pairedHalfedge = 9;
-    BC.halfEdgeManifold.face = 0;
+    BC.endVertex = c;
+    BC.opp = 9;
+    BC.face = 0;
     BC.next = 2;
     halfEdges.push_back(BC);
 
     HalfEdge CA;
-    CA.halfEdgeManifold.endVert = a;
-    CA.halfEdgeManifold.pairedHalfedge = 3;
-    CA.halfEdgeManifold.face = 0;
+    CA.endVertex = a;
+    CA.opp = 3;
+    CA.face = 0;
     CA.next = 0;
     halfEdges.push_back(CA);
 
     HalfEdge AC;
-    AC.halfEdgeManifold.endVert = c;
-    AC.halfEdgeManifold.pairedHalfedge = 2;
-    AC.halfEdgeManifold.face = 1;
+    AC.endVertex = c;
+    AC.opp = 2;
+    AC.face = 1;
     AC.next = 4;
     halfEdges.push_back(AC);
 
     HalfEdge CD;
-    CD.halfEdgeManifold.endVert = d;
-    CD.halfEdgeManifold.pairedHalfedge = 11;
-    CD.halfEdgeManifold.face = 1;
+    CD.endVertex = d;
+    CD.opp = 11;
+    CD.face = 1;
     CD.next = 5;
     halfEdges.push_back(CD);
 
     HalfEdge DA;
-    DA.halfEdgeManifold.endVert = a;
-    DA.halfEdgeManifold.pairedHalfedge = 7;
-    DA.halfEdgeManifold.face = 1;
+    DA.endVertex = a;
+    DA.opp = 7;
+    DA.face = 1;
     DA.next = 3;
     halfEdges.push_back(DA);
 
     HalfEdge BA;
-    BA.halfEdgeManifold.endVert = a;
-    BA.halfEdgeManifold.pairedHalfedge = 0;
-    BA.halfEdgeManifold.face = 2;
+    BA.endVertex = a;
+    BA.opp = 0;
+    BA.face = 2;
     BA.next = 7;
     halfEdges.push_back(BA);
 
     HalfEdge AD;
-    AD.halfEdgeManifold.endVert = d;
-    AD.halfEdgeManifold.pairedHalfedge = 5;
-    AD.halfEdgeManifold.face = 2;
+    AD.endVertex = d;
+    AD.opp = 5;
+    AD.face = 2;
     AD.next = 8;
     halfEdges.push_back(AD);
 
     HalfEdge DB;
-    DB.halfEdgeManifold.endVert = b;
-    DB.halfEdgeManifold.pairedHalfedge = 10;
-    DB.halfEdgeManifold.face = 2;
+    DB.endVertex = b;
+    DB.opp = 10;
+    DB.face = 2;
     DB.next = 6;
     halfEdges.push_back(DB);
 
     HalfEdge CB;
-    CB.halfEdgeManifold.endVert = b;
-    CB.halfEdgeManifold.pairedHalfedge = 1;
-    CB.halfEdgeManifold.face = 3;
+    CB.endVertex = b;
+    CB.opp = 1;
+    CB.face = 3;
     CB.next = 10;
     halfEdges.push_back(CB);
 
     HalfEdge BD;
-    BD.halfEdgeManifold.endVert = d;
-    BD.halfEdgeManifold.pairedHalfedge = 8;
-    BD.halfEdgeManifold.face = 3;
+    BD.endVertex = d;
+    BD.opp = 8;
+    BD.face = 3;
     BD.next = 11;
     halfEdges.push_back(BD);
 
     HalfEdge DC;
-    DC.halfEdgeManifold.endVert = c;
-    DC.halfEdgeManifold.pairedHalfedge = 4;
-    DC.halfEdgeManifold.face = 3;
+    DC.endVertex = c;
+    DC.opp = 4;
+    DC.face = 3;
     DC.next = 9;
     halfEdges.push_back(DC);
 
@@ -346,192 +346,36 @@ class MeshBuilder {
   std::array<size_t, 3> getVertexIndicesOfFace(const Face& f) const {
     std::array<size_t, 3> v;
     const HalfEdge* he = &halfEdges[f.he];
-    v[0] = he->halfEdgeManifold.endVert;
+    v[0] = he->endVertex;
     he = &halfEdges[he->next];
-    v[1] = he->halfEdgeManifold.endVert;
+    v[1] = he->endVertex;
     he = &halfEdges[he->next];
-    v[2] = he->halfEdgeManifold.endVert;
+    v[2] = he->endVertex;
     return v;
   }
 
-  std::array<int, 2> getVertexIndicesOfHalfEdge(const HalfEdge& he) const {
+  std::array<size_t, 2> getVertexIndicesOfHalfEdge(const HalfEdge& he) const {
     return {
-        halfEdges[he.halfEdgeManifold.pairedHalfedge].halfEdgeManifold.endVert,
-        he.halfEdgeManifold.endVert};
+        halfEdges[he.opp].endVertex,
+        he.endVertex};
   }
 
-  std::array<int, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
+  std::array<size_t, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
     return {f.he, halfEdges[f.he].next, halfEdges[halfEdges[f.he].next].next};
   }
 };
 
-// ConvexHull.hpp
-
-class ConvexHull {
-  std::unique_ptr<manifold::Vec<glm::dvec3>> optimizedVertexBuffer;
-  manifold::Vec<glm::dvec3> vertices;
-  std::vector<size_t> indices;
-
- public:
-  ConvexHull() {}
-
-  // Copy constructor
-  ConvexHull(const ConvexHull& o) {
-    indices = o.indices;
-    if (o.optimizedVertexBuffer) {
-      optimizedVertexBuffer.reset(
-          new manifold::Vec<glm::dvec3>(*o.optimizedVertexBuffer));
-      vertices = *optimizedVertexBuffer;
-    } else {
-      vertices = o.vertices;
-    }
-  }
-
-  ConvexHull& operator=(const ConvexHull& o) {
-    if (&o == this) {
-      return *this;
-    }
-    indices = o.indices;
-    if (o.optimizedVertexBuffer) {
-      optimizedVertexBuffer.reset(
-          new manifold::Vec<glm::dvec3>(*o.optimizedVertexBuffer));
-      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
-    } else {
-      vertices = o.vertices;
-    }
-    return *this;
-  }
-
-  ConvexHull(ConvexHull&& o) {
-    indices = std::move(o.indices);
-    if (o.optimizedVertexBuffer) {
-      optimizedVertexBuffer = std::move(o.optimizedVertexBuffer);
-      o.vertices = manifold::Vec<glm::dvec3>();
-      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
-    } else {
-      vertices = o.vertices;
-    }
-  }
-
-  ConvexHull& operator=(ConvexHull&& o) {
-    if (&o == this) {
-      return *this;
-    }
-    indices = std::move(o.indices);
-    if (o.optimizedVertexBuffer) {
-      optimizedVertexBuffer = std::move(o.optimizedVertexBuffer);
-      o.vertices = manifold::Vec<glm::dvec3>();
-      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
-    } else {
-      vertices = o.vertices;
-    }
-    return *this;
-  }
-
-  // Construct vertex and index buffers from half edge mesh and pointcloud
-  ConvexHull(const MeshBuilder& mesh_input,
-             const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
-             bool useOriginalIndices) {
-    if (!useOriginalIndices) {
-      optimizedVertexBuffer.reset(new manifold::Vec<glm::dvec3>());
-    }
-
-    std::vector<bool> faceProcessed(mesh_input.faces.size(), false);
-    std::vector<size_t> faceStack;
-    // Map vertex indices from original point cloud to the new mesh vertex
-    // indices
-    std::unordered_map<size_t, size_t> vertexIndexMapping;
-    for (size_t i = 0; i < mesh_input.faces.size(); i++) {
-      if (!mesh_input.faces[i].isDisabled()) {
-        faceStack.push_back(i);
-        break;
-      }
-    }
-    if (faceStack.size() == 0) {
-      return;
-    }
-
-    const size_t iCCW = CCW ? 1 : 0;
-    const size_t finalMeshFaceCount =
-        mesh_input.faces.size() - mesh_input.disabledFaces.size();
-    indices.reserve(finalMeshFaceCount * 3);
-
-    while (faceStack.size()) {
-      auto it = faceStack.end() - 1;
-      size_t top = *it;
-      assert(!mesh_input.faces[top].isDisabled());
-      faceStack.erase(it);
-      if (faceProcessed[top]) {
-        continue;
-      } else {
-        faceProcessed[top] = true;
-        auto halfEdgesMesh =
-            mesh_input.getHalfEdgeIndicesOfFace(mesh_input.faces[top]);
-        int adjacent[] = {mesh_input
-                              .halfEdges[mesh_input.halfEdges[halfEdgesMesh[0]]
-                                             .halfEdgeManifold.pairedHalfedge]
-                              .halfEdgeManifold.face,
-                          mesh_input
-                              .halfEdges[mesh_input.halfEdges[halfEdgesMesh[1]]
-                                             .halfEdgeManifold.pairedHalfedge]
-                              .halfEdgeManifold.face,
-                          mesh_input
-                              .halfEdges[mesh_input.halfEdges[halfEdgesMesh[2]]
-                                             .halfEdgeManifold.pairedHalfedge]
-                              .halfEdgeManifold.face};
-        for (auto a : adjacent) {
-          if (!faceProcessed[a] && !mesh_input.faces[a].isDisabled()) {
-            faceStack.push_back(a);
-          }
-        }
-        auto MeshVertices =
-            mesh_input.getVertexIndicesOfFace(mesh_input.faces[top]);
-        if (!useOriginalIndices) {
-          for (auto& v : MeshVertices) {
-            auto itV = vertexIndexMapping.find(v);
-            if (itV == vertexIndexMapping.end()) {
-              optimizedVertexBuffer->push_back(pointCloud[v]);
-              vertexIndexMapping[v] = optimizedVertexBuffer->size() - 1;
-              v = optimizedVertexBuffer->size() - 1;
-            } else {
-              v = itV->second;
-            }
-          }
-        }
-        indices.push_back(MeshVertices[0]);
-        indices.push_back(MeshVertices[1 + iCCW]);
-        indices.push_back(MeshVertices[2 - iCCW]);
-      }
-    }
-
-    if (!useOriginalIndices) {
-      vertices = manifold::Vec<glm::dvec3>(*optimizedVertexBuffer);
-    } else {
-      vertices = pointCloud;
-    }
-  }
-
-  std::vector<size_t>& getIndexBuffer() { return indices; }
-
-  const std::vector<size_t>& getIndexBuffer() const { return indices; }
-
-  manifold::VecView<glm::dvec3>& getVertexBuffer() { return vertices; }
-
-  const manifold::VecView<glm::dvec3>& getVertexBuffer() const {
-    return vertices;
-  }
-};
 
 // HalfEdgeMesh.hpp
 
 class HalfEdgeMesh {
  public:
   struct HalfEdge {
-    // size_t endVertex;
-    // size_t opp;
-    // size_t face;
-    manifold::Halfedge halfEdgeManifold;
-    int next;
+    size_t endVertex;
+    size_t opp;
+    size_t face;
+    // manifold::Halfedge halfEdgeManifold;
+    size_t next;
   };
 
   struct Face {
@@ -558,7 +402,7 @@ class HalfEdgeMesh {
         const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
         for (const auto heIndex : heIndices) {
           const size_t vertexIndex =
-              builderObject.halfEdges[heIndex].halfEdgeManifold.endVert;
+              builderObject.halfEdges[heIndex].endVertex;
           if (vertexMapping.count(vertexIndex) == 0) {
             vertices.push_back(vertexData[vertexIndex]);
             vertexMapping[vertexIndex] = vertices.size() - 1;
@@ -572,10 +416,10 @@ class HalfEdgeMesh {
     for (const auto& halfEdge : builderObject.halfEdges) {
       if (!halfEdge.isDisabled()) {
         halfEdges.push_back(
-            {{static_cast<int>(halfEdge.halfEdgeManifold.endVert),
-              static_cast<int>(halfEdge.halfEdgeManifold.pairedHalfedge),
-              static_cast<int>(halfEdge.halfEdgeManifold.face),
-              static_cast<int>(halfEdge.next)}});
+    {static_cast<size_t>(halfEdge.endVertex),
+      static_cast<size_t>(halfEdge.opp),
+      static_cast<size_t>(halfEdge.face),
+      static_cast<size_t>(halfEdge.next)});
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
       i++;
@@ -587,11 +431,11 @@ class HalfEdgeMesh {
     }
 
     for (auto& he : halfEdges) {
-      he.halfEdgeManifold.face = faceMapping[he.halfEdgeManifold.face];
-      he.halfEdgeManifold.pairedHalfedge =
-          halfEdgeMapping[he.halfEdgeManifold.pairedHalfedge];
+      he.face = faceMapping[he.face];
+      he.opp =
+          halfEdgeMapping[he.opp];
       he.next = halfEdgeMapping[he.next];
-      he.halfEdgeManifold.endVert = vertexMapping[he.halfEdgeManifold.endVert];
+      he.endVertex = vertexMapping[he.endVertex];
     }
   }
 };
@@ -645,18 +489,6 @@ struct DiagnosticsData {
 
 double defaultEps();
 
-// Computes convex hull for a given point cloud.
-// Params:
-//   pointCloud: a vector of of 3D points
-//   CCW: whether the output mesh triangles should have CCW orientation
-//   useOriginalIndices: should the output mesh use same vertex indices as the
-//   original point cloud. If this is false,
-//      then we generate a new vertex buffer which contains only the vertices
-//      that are part of the convex hull.
-//   eps: minimum distance to a plane to consider a point being on positive of
-//   it (for a point cloud with scale 1)
-ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud, bool CCW,
-                         bool useOriginalIndices, double eps = defaultEps());
 
 class QuickHull {
   using vec3 = glm::dvec3;
@@ -679,7 +511,7 @@ class QuickHull {
     size_t faceIndex;
     // If the face turns out not to be visible, this half edge will be marked as
     // horizon edge
-    int enteredFromHalfEdge;
+    size_t enteredFromHalfEdge;
     FaceData(size_t fi, size_t he) : faceIndex(fi), enteredFromHalfEdge(he) {}
   };
   std::vector<FaceData> possiblyVisibleFaces;
@@ -723,16 +555,13 @@ class QuickHull {
 
   // Constructs the convex hull into a MeshBuilder object which can be converted
   // to a ConvexHull or Mesh object
-  void buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
+  std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
                  bool useOriginalIndices, double eps);
 
  public:
   QuickHull(const manifold::Vec<glm::dvec3>& pointCloudVec)
       : originalVertexData(manifold::VecView(pointCloudVec)) {}
-  // The getConvexHull functions will setup a VertexDataSource object and
-  // call this
-  ConvexHull getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
-                           bool CCW, bool useOriginalIndices, double eps);
+
   // Computes convex hull for a given point cloud. This function assumes that
   // the vertex data resides in memory in the following format:
   // x_0,y_0,z_0,x_1,y_1,z_1,... Params:
@@ -743,8 +572,13 @@ class QuickHull {
   //   a point cloud with scale 1)
   // Returns:
   //   Convex hull of the point cloud as a mesh object with half edge structure.
-  HalfEdgeMesh getConvexHullAsMesh(const double* vertexData, size_t vertexCount,
-                                   bool CCW, double eps = defaultEps());
+ std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud,
+                                   bool CCW, bool useOriginalIndices, double epsilon = defaultEps())
+                                   {
+  manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
+  QuickHull qh(pointCloudVec);
+  return qh.buildMesh(pointCloudVec, CCW, useOriginalIndices, epsilon);
+}
 
   // Get diagnostics about last generated convex hull
   const DiagnosticsData& getDiagnostics() { return diagnostics; }

@@ -29,14 +29,8 @@ double defaultEps() { return 0.0000001; }
  * Implementation of the algorithm
  */
 
-ConvexHull getConvexHull(const std::vector<glm::dvec3>& pointCloud, bool CCW,
-                         bool useOriginalIndices, double epsilon) {
-  manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
-  QuickHull qh(pointCloudVec);
-  return qh.getConvexHull(pointCloudVec, CCW, useOriginalIndices, epsilon);
-}
 
-void QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
+std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
                           bool CCW, bool useOriginalIndices, double epsilon) {
   // CCW is unused for now
   (void)CCW;
@@ -44,8 +38,7 @@ void QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
   (void)useOriginalIndices;
 
   if (pointCloud.size() == 0) {
-    mesh = MeshBuilder();
-    return;
+    return make_pair(manifold::Vec<manifold::Halfedge>{}, std::vector<glm::dvec3>{});
   }
   originalVertexData = pointCloud;
 
@@ -65,22 +58,116 @@ void QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
   planar = false;
   createConvexHalfEdgeMesh();
   if (planar) {
-    const int extraPointIndex = planarPointCloudTemp.size() - 1;
+    const size_t extraPointIndex = planarPointCloudTemp.size() - 1;
     for (auto& he : mesh.halfEdges) {
-      if (he.halfEdgeManifold.endVert == extraPointIndex) {
-        he.halfEdgeManifold.endVert = 0;
+      if (he.endVertex == extraPointIndex) {
+        he.endVertex = 0;
       }
     }
     originalVertexData = pointCloud;
     planarPointCloudTemp.clear();
   }
-}
 
-ConvexHull QuickHull::getConvexHull(const manifold::Vec<glm::dvec3>& pointCloud,
-                                    bool CCW, bool useOriginalIndices,
-                                    double epsilon) {
-  buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
-  return ConvexHull(mesh, pointCloud, CCW, useOriginalIndices);
+  std::vector<size_t> halfEdgeStack;
+  std::vector<bool> halfEdgeProcessed(mesh.halfEdges.size(), false);
+  std::vector<bool> halfEdgeProcessedNext(mesh.halfEdges.size(), false);
+  for (size_t i = 0; i < mesh.halfEdges.size(); i++) {
+      if (!mesh.halfEdges[i].isDisabled() && !mesh.faces[mesh.halfEdges[i].face].isDisabled()) {
+        halfEdgeStack.push_back(i);
+      }
+    }
+    if (halfEdgeStack.size() == 0) {
+      return make_pair(manifold::Vec<manifold::Halfedge>{}, std::vector<glm::dvec3>{});
+    }
+  manifold::Vec<manifold::Halfedge> halfEdgeVec;
+  std::vector<glm::dvec3> newVerts;
+  std::unordered_map<size_t, size_t> vertexIndexMapping;
+  for (size_t index = 0; index < halfEdgeStack.size(); index++) {
+      size_t top = halfEdgeStack[index]; 
+       
+      if(mesh.halfEdges[top].isDisabled() || mesh.faces[mesh.halfEdges[top].face].isDisabled())
+      {
+        std::cout << "ERROR: Halfedge " << top << " is not disabled" << std::endl;
+        // assert(true);
+        break;
+      }
+      if (halfEdgeProcessed[top]) {
+        continue;
+      } else {
+        while(halfEdgeProcessed[top]!=true) {
+          if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
+            std::cout << "ERROR: Halfedge " << top << " has no paired halfedge" << std::endl;
+            break;
+          }
+          halfEdgeProcessed[top] = true;
+          auto itV = vertexIndexMapping.find(mesh.halfEdges[top].endVertex);
+          if (itV == vertexIndexMapping.end()) {
+            newVerts.push_back(pointCloud[mesh.halfEdges[top].endVertex]);
+            vertexIndexMapping[mesh.halfEdges[top].endVertex] = newVerts.size() - 1;
+            mesh.halfEdges[top].endVertex = newVerts.size() - 1;
+          } else {
+            mesh.halfEdges[top].endVertex = itV->second;
+          }
+          if (!halfEdgeProcessedNext[top])
+          {
+            size_t top2 = mesh.halfEdges[top].opp;
+            if(mesh.halfEdges[top2].isDisabled() || mesh.faces[mesh.halfEdges[top2].face].isDisabled())
+            {
+              std::cout << "ERROR: Halfedge " << top2 << " is disabled" << std::endl;
+              break;
+            }
+            if (halfEdgeProcessedNext[top] || halfEdgeProcessedNext[top2]) {
+              std::cout << "ERROR: Both halfedges " << top << " and " << top2 << " are not synced" << std::endl;
+              // assert(true);
+              break;
+            }
+            mesh.halfEdges[top].opp=std::numeric_limits<size_t>::max();
+            mesh.halfEdges[top2].opp=halfEdgeVec.size();
+            halfEdgeProcessedNext[top]=true;
+            halfEdgeProcessedNext[top2]=true;
+          }
+          else
+          {
+            size_t top2 = mesh.halfEdges[top].opp;
+            if (top2==std::numeric_limits<size_t>::max())
+            {
+              std::cout << "ERROR: Halfedge " << top << " has no paired halfedge" << std::endl;
+              break;
+            }
+            halfEdgeVec[top2].pairedHalfedge=halfEdgeVec.size();
+            halfEdgeVec[top2].startVert=mesh.halfEdges[top].endVertex;
+          }
+          manifold::Halfedge temp_Halfedge;
+          temp_Halfedge.endVert = mesh.halfEdges[top].endVertex;
+          temp_Halfedge.face = mesh.halfEdges[top].face;
+          if (mesh.halfEdges[top].opp==std::numeric_limits<size_t>::max())
+          {
+            temp_Halfedge.pairedHalfedge=-1;
+            temp_Halfedge.startVert=-1;
+          }
+          else
+          {
+            temp_Halfedge.pairedHalfedge = mesh.halfEdges[top].opp;
+            temp_Halfedge.startVert = halfEdgeVec[mesh.halfEdges[top].opp].endVert;
+          }
+          halfEdgeVec.push_back(temp_Halfedge);
+          top=mesh.halfEdges[top].next;
+          if(mesh.halfEdges[top].isDisabled()|| mesh.faces[mesh.halfEdges[top].face].isDisabled())
+          {
+            std::cout << "ERROR: Halfedge " << top << " is disabled" << std::endl;
+            break;
+          }
+        }
+      }
+  }
+  for (size_t i = 0; i < halfEdgeVec.size(); i+=3) {
+    if (CCW)
+    {
+      std::swap(halfEdgeVec[i+1], halfEdgeVec[i+2]);
+    }
+  }
+  
+  return make_pair(halfEdgeVec, newVerts);
 }
 
 void QuickHull::createConvexHalfEdgeMesh() {
@@ -157,12 +244,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
           for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
-            if (mesh.halfEdges[heIndex].halfEdgeManifold.pairedHalfedge !=
+            if (mesh.halfEdges[heIndex].opp !=
                 faceData.enteredFromHalfEdge) {
               possiblyVisibleFaces.emplace_back(
                   mesh.halfEdges[mesh.halfEdges[heIndex]
-                                     .halfEdgeManifold.pairedHalfedge]
-                      .halfEdgeManifold.face,
+                                     .opp]
+                      .face,
                   heIndex);
             }
           }
@@ -180,13 +267,13 @@ void QuickHull::createConvexHalfEdgeMesh() {
       // recycled.
       const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
           mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge]
-                         .halfEdgeManifold.face]);
+                         .face]);
       const std::int8_t ind =
           (halfEdgesMesh[0] == faceData.enteredFromHalfEdge)
               ? 0
               : (halfEdgesMesh[1] == faceData.enteredFromHalfEdge ? 1 : 2);
       mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge]
-                     .halfEdgeManifold.face]
+                     .face]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
     const size_t horizonEdgeCount = horizonEdgesData.size();
@@ -277,12 +364,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
       mesh.halfEdges[BC].next = CA;
       mesh.halfEdges[CA].next = AB;
 
-      mesh.halfEdges[BC].halfEdgeManifold.face = newFaceIndex;
-      mesh.halfEdges[CA].halfEdgeManifold.face = newFaceIndex;
-      mesh.halfEdges[AB].halfEdgeManifold.face = newFaceIndex;
+      mesh.halfEdges[BC].face = newFaceIndex;
+      mesh.halfEdges[CA].face = newFaceIndex;
+      mesh.halfEdges[AB].face = newFaceIndex;
 
-      mesh.halfEdges[CA].halfEdgeManifold.endVert = A;
-      mesh.halfEdges[BC].halfEdgeManifold.endVert = C;
+      mesh.halfEdges[CA].endVertex = A;
+      mesh.halfEdges[BC].endVertex = C;
 
       auto& newFace = mesh.faces[newFaceIndex];
 
@@ -291,9 +378,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
       newFace.P = Plane(planeNormal, activePoint);
       newFace.he = AB;
 
-      mesh.halfEdges[CA].halfEdgeManifold.pairedHalfedge =
+      mesh.halfEdges[CA].opp =
           newHalfEdgeIndices[i > 0 ? i * 2 - 1 : 2 * horizonEdgeCount - 1];
-      mesh.halfEdges[BC].halfEdgeManifold.pairedHalfedge =
+      mesh.halfEdges[BC].opp =
           newHalfEdgeIndices[((i + 1) * 2) % (horizonEdgeCount * 2)];
     }
 
@@ -374,13 +461,13 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   const size_t horizonEdgeCount = horizonEdges.size();
   for (size_t i = 0; i < horizonEdgeCount - 1; i++) {
     const size_t endVertexCheck =
-        mesh.halfEdges[horizonEdges[i]].halfEdgeManifold.endVert;
+        mesh.halfEdges[horizonEdges[i]].endVertex;
     bool foundNext = false;
     for (size_t j = i + 1; j < horizonEdgeCount; j++) {
       const size_t beginVertex =
           mesh.halfEdges[mesh.halfEdges[horizonEdges[j]]
-                             .halfEdgeManifold.pairedHalfedge]
-              .halfEdgeManifold.endVert;
+                             .opp]
+              .endVertex;
       if (beginVertex == endVertexCheck) {
         std::swap(horizonEdges[i + 1], horizonEdges[j]);
         foundNext = true;
@@ -392,10 +479,10 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
     }
   }
   assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]]
-             .halfEdgeManifold.endVert ==
+             .endVertex ==
          mesh.halfEdges[mesh.halfEdges[horizonEdges[0]]
-                            .halfEdgeManifold.pairedHalfedge]
-             .halfEdgeManifold.endVert);
+                            .opp]
+             .endVertex);
   return true;
 }
 
