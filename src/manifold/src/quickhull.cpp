@@ -29,17 +29,10 @@ double defaultEps() { return 0.0000001; }
  * Implementation of the algorithm
  */
 
-std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
-QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
-                     bool useOriginalIndices, double epsilon) {
-  // CCW is unused for now
-  (void)CCW;
-  // useOriginalIndices is unused for now
-  (void)useOriginalIndices;
-
+ConvexHull QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
+                                bool CCW, double epsilon) {
   if (pointCloud.size() == 0) {
-    return make_pair(manifold::Vec<manifold::Halfedge>{},
-                     std::vector<glm::dvec3>{});
+    return ConvexHull();
   }
   originalVertexData = pointCloud;
 
@@ -71,7 +64,8 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
 
   std::vector<size_t> halfEdgeStack;
   std::vector<bool> halfEdgeProcessed(mesh.halfEdges.size(), false);
-  std::vector<bool> halfEdgeProcessedNext(mesh.halfEdges.size(), false);
+  std::vector<bool> halfEdgeProcessedOpp(mesh.halfEdges.size(), false);
+  // Iterates through the halfEdges and identifies the valid ones
   for (size_t i = 0; i < mesh.halfEdges.size(); i++) {
     if (!mesh.halfEdges[i].isDisabled() &&
         !mesh.faces[mesh.halfEdges[i].face].isDisabled()) {
@@ -79,24 +73,29 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
     }
   }
   if (halfEdgeStack.size() == 0) {
-    return make_pair(manifold::Vec<manifold::Halfedge>{},
-                     std::vector<glm::dvec3>{});
+    return ConvexHull();
   }
   manifold::Vec<manifold::Halfedge> halfEdgeVec;
   std::vector<glm::dvec3> newVerts;
+  // To map the index of the vertex in the original point cloud to the index in
+  // the new point cloud
   std::unordered_map<size_t, size_t> vertexIndexMapping;
+  manifold::Halfedge currHalfEdge;
+  // Iterates through the valid half edges
   for (size_t index = 0; index < halfEdgeStack.size(); index++) {
     size_t top = halfEdgeStack[index];
 
     if (mesh.halfEdges[top].isDisabled() ||
         mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
       std::cout << "ERROR: Halfedge " << top << " is not disabled" << std::endl;
-      // assert(true);
       break;
     }
+    // If the half edge has already been processed, skip it
     if (halfEdgeProcessed[top]) {
       continue;
     } else {
+      // Process the half edge in the same face till we reach the starting half
+      // edge
       while (halfEdgeProcessed[top] != true) {
         if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
           std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
@@ -104,6 +103,9 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
           break;
         }
         halfEdgeProcessed[top] = true;
+        // Maps the endVertex of this half edge to the new point cloud (Since,
+        // we will do this for all halfEdges just mapping the end vertex is
+        // enough)
         auto itV = vertexIndexMapping.find(mesh.halfEdges[top].endVertex);
         if (itV == vertexIndexMapping.end()) {
           newVerts.push_back(pointCloud[mesh.halfEdges[top].endVertex]);
@@ -113,7 +115,10 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
         } else {
           mesh.halfEdges[top].endVertex = itV->second;
         }
-        if (!halfEdgeProcessedNext[top]) {
+        // If this half edge has not processed it's opposite (i.e in the
+        // opposite edge store this index as the opposite) process it and mark
+        // it's opp as max so we can correct it later
+        if (!halfEdgeProcessedOpp[top]) {
           size_t top2 = mesh.halfEdges[top].opp;
           if (mesh.halfEdges[top2].isDisabled() ||
               mesh.faces[mesh.halfEdges[top2].face].isDisabled()) {
@@ -121,38 +126,47 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
                       << std::endl;
             break;
           }
-          if (halfEdgeProcessedNext[top] || halfEdgeProcessedNext[top2]) {
+          if (halfEdgeProcessedOpp[top] || halfEdgeProcessedOpp[top2]) {
             std::cout << "ERROR: Both halfedges " << top << " and " << top2
                       << " are not synced" << std::endl;
             // assert(true);
             break;
           }
+          // Set's curr.opp as max so we can correct it later
           mesh.halfEdges[top].opp = std::numeric_limits<size_t>::max();
+          // Set's the opposite half edge's opp as the current half edge
           mesh.halfEdges[top2].opp = halfEdgeVec.size();
-          halfEdgeProcessedNext[top] = true;
-          halfEdgeProcessedNext[top2] = true;
-        } else {
+          // Marks both edges as processed (so we will be able to handle the
+          // opposite half edge later)
+          halfEdgeProcessedOpp[top] = true;
+          halfEdgeProcessedOpp[top2] = true;
+        }
+        // If the opposite half edge has been handled, then just update the opp
+        // of it's opposite half edge (since we set it to max before)
+        else {
           size_t top2 = mesh.halfEdges[top].opp;
           if (top2 == std::numeric_limits<size_t>::max()) {
             std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
                       << std::endl;
             break;
           }
+          // Updates the opposite half edge's opp as the current half edge
           halfEdgeVec[top2].pairedHalfedge = halfEdgeVec.size();
+          // Updates the start vertex of the opposite half edge
           halfEdgeVec[top2].startVert = mesh.halfEdges[top].endVertex;
         }
-        manifold::Halfedge temp_Halfedge;
-        temp_Halfedge.endVert = mesh.halfEdges[top].endVertex;
-        temp_Halfedge.face = mesh.halfEdges[top].face;
+        // Updates values of the current half edge
+        currHalfEdge.endVert = mesh.halfEdges[top].endVertex;
+        currHalfEdge.face = mesh.halfEdges[top].face;
         if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
-          temp_Halfedge.pairedHalfedge = -1;
-          temp_Halfedge.startVert = -1;
+          currHalfEdge.pairedHalfedge = -1;
+          currHalfEdge.startVert = -1;
         } else {
-          temp_Halfedge.pairedHalfedge = mesh.halfEdges[top].opp;
-          temp_Halfedge.startVert =
-              halfEdgeVec[mesh.halfEdges[top].opp].endVert;
+          currHalfEdge.pairedHalfedge = mesh.halfEdges[top].opp;
+          currHalfEdge.startVert = halfEdgeVec[mesh.halfEdges[top].opp].endVert;
         }
-        halfEdgeVec.push_back(temp_Halfedge);
+        halfEdgeVec.push_back(currHalfEdge);
+        // Move to the next half edge
         top = mesh.halfEdges[top].next;
         if (mesh.halfEdges[top].isDisabled() ||
             mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
@@ -162,13 +176,14 @@ QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
       }
     }
   }
+  // Handles counter clockwise if needed
   for (size_t i = 0; i < halfEdgeVec.size(); i += 3) {
     if (CCW) {
       std::swap(halfEdgeVec[i + 1], halfEdgeVec[i + 2]);
     }
   }
 
-  return make_pair(halfEdgeVec, newVerts);
+  return ConvexHull(halfEdgeVec, newVerts);
 }
 
 void QuickHull::createConvexHalfEdgeMesh() {

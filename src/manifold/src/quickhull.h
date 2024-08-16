@@ -69,6 +69,17 @@
 #include "par.h"
 #include "shared.h"
 #include "vec.h"
+
+class ConvexHull {
+ public:
+  manifold::Vec<manifold::Halfedge> halfEdges;
+  std::vector<glm::dvec3> vertices;
+  ConvexHull(manifold::Vec<manifold::Halfedge> halfEdges,
+             std::vector<glm::dvec3> vertices)
+      : halfEdges(halfEdges), vertices(vertices) {}
+  ConvexHull() = default;
+};
+
 // Pool.hpp
 
 class Pool {
@@ -544,11 +555,9 @@ class QuickHull {
   // getConvexHull function returns
   void createConvexHalfEdgeMesh();
 
-  // Constructs the convex hull into a MeshBuilder object which can be converted
-  // to a ConvexHull or Mesh object
-  std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
-  buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
-            bool useOriginalIndices, double eps);
+  // Constructs the convex hull into halfEdges and NewVerts
+  ConvexHull buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
+                       bool CCW, double eps);
 
  public:
   QuickHull(const manifold::Vec<glm::dvec3>& pointCloudVec)
@@ -563,13 +572,12 @@ class QuickHull {
   //   distance to a plane to consider a point being on positive side of it (for
   //   a point cloud with scale 1)
   // Returns:
-  //   Convex hull of the point cloud as a mesh object with half edge structure.
-  std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
-  getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
-                      bool useOriginalIndices, double epsilon = defaultEps()) {
+  //   Convex hull of the point cloud as halfEdge vector and vertex vector
+  ConvexHull getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud,
+                                 bool CCW, double epsilon = defaultEps()) {
     manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
     QuickHull qh(pointCloudVec);
-    return qh.buildMesh(pointCloudVec, CCW, useOriginalIndices, epsilon);
+    return qh.buildMesh(pointCloudVec, CCW, epsilon);
   }
 
   // Get diagnostics about last generated convex hull

@@ -487,14 +487,14 @@ void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
     pointCloudVec[i] = {vertPos[i].x, vertPos[i].y, vertPos[i].z};
   }
   QuickHull qh(pointCloudVec);
-  std::pair<Vec<Halfedge>, Vec<glm::dvec3>> retVal;
-  retVal = qh.getConvexHullAsMesh(pointCloudVec, false, true);
-  for (size_t i = 0; i < retVal.second.size(); i++) {
+  ConvexHull hull;
+  hull = qh.getConvexHullAsMesh(pointCloudVec, false);
+  for (size_t i = 0; i < hull.vertices.size(); i++) {
     vertPos_.push_back(
-        glm::vec3(retVal.second[i].x, retVal.second[i].y, retVal.second[i].z));
+        glm::vec3(hull.vertices[i].x, hull.vertices[i].y, hull.vertices[i].z));
   }
   numVert = vertPos_.size();
-  halfedge_ = retVal.first;
+  halfedge_ = hull.halfEdges;
   meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
   Finish();
