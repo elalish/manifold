@@ -29,16 +29,17 @@ double defaultEps() { return 0.0000001; }
  * Implementation of the algorithm
  */
 
-
-std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
-                          bool CCW, bool useOriginalIndices, double epsilon) {
+std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
+QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
+                     bool useOriginalIndices, double epsilon) {
   // CCW is unused for now
   (void)CCW;
   // useOriginalIndices is unused for now
   (void)useOriginalIndices;
 
   if (pointCloud.size() == 0) {
-    return make_pair(manifold::Vec<manifold::Halfedge>{}, std::vector<glm::dvec3>{});
+    return make_pair(manifold::Vec<manifold::Halfedge>{},
+                     std::vector<glm::dvec3>{});
   }
   originalVertexData = pointCloud;
 
@@ -72,101 +73,101 @@ std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> QuickHull::
   std::vector<bool> halfEdgeProcessed(mesh.halfEdges.size(), false);
   std::vector<bool> halfEdgeProcessedNext(mesh.halfEdges.size(), false);
   for (size_t i = 0; i < mesh.halfEdges.size(); i++) {
-      if (!mesh.halfEdges[i].isDisabled() && !mesh.faces[mesh.halfEdges[i].face].isDisabled()) {
-        halfEdgeStack.push_back(i);
-      }
+    if (!mesh.halfEdges[i].isDisabled() &&
+        !mesh.faces[mesh.halfEdges[i].face].isDisabled()) {
+      halfEdgeStack.push_back(i);
     }
-    if (halfEdgeStack.size() == 0) {
-      return make_pair(manifold::Vec<manifold::Halfedge>{}, std::vector<glm::dvec3>{});
-    }
+  }
+  if (halfEdgeStack.size() == 0) {
+    return make_pair(manifold::Vec<manifold::Halfedge>{},
+                     std::vector<glm::dvec3>{});
+  }
   manifold::Vec<manifold::Halfedge> halfEdgeVec;
   std::vector<glm::dvec3> newVerts;
   std::unordered_map<size_t, size_t> vertexIndexMapping;
   for (size_t index = 0; index < halfEdgeStack.size(); index++) {
-      size_t top = halfEdgeStack[index]; 
-       
-      if(mesh.halfEdges[top].isDisabled() || mesh.faces[mesh.halfEdges[top].face].isDisabled())
-      {
-        std::cout << "ERROR: Halfedge " << top << " is not disabled" << std::endl;
-        // assert(true);
-        break;
-      }
-      if (halfEdgeProcessed[top]) {
-        continue;
-      } else {
-        while(halfEdgeProcessed[top]!=true) {
-          if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
-            std::cout << "ERROR: Halfedge " << top << " has no paired halfedge" << std::endl;
+    size_t top = halfEdgeStack[index];
+
+    if (mesh.halfEdges[top].isDisabled() ||
+        mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
+      std::cout << "ERROR: Halfedge " << top << " is not disabled" << std::endl;
+      // assert(true);
+      break;
+    }
+    if (halfEdgeProcessed[top]) {
+      continue;
+    } else {
+      while (halfEdgeProcessed[top] != true) {
+        if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
+          std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
+                    << std::endl;
+          break;
+        }
+        halfEdgeProcessed[top] = true;
+        auto itV = vertexIndexMapping.find(mesh.halfEdges[top].endVertex);
+        if (itV == vertexIndexMapping.end()) {
+          newVerts.push_back(pointCloud[mesh.halfEdges[top].endVertex]);
+          vertexIndexMapping[mesh.halfEdges[top].endVertex] =
+              newVerts.size() - 1;
+          mesh.halfEdges[top].endVertex = newVerts.size() - 1;
+        } else {
+          mesh.halfEdges[top].endVertex = itV->second;
+        }
+        if (!halfEdgeProcessedNext[top]) {
+          size_t top2 = mesh.halfEdges[top].opp;
+          if (mesh.halfEdges[top2].isDisabled() ||
+              mesh.faces[mesh.halfEdges[top2].face].isDisabled()) {
+            std::cout << "ERROR: Halfedge " << top2 << " is disabled"
+                      << std::endl;
             break;
           }
-          halfEdgeProcessed[top] = true;
-          auto itV = vertexIndexMapping.find(mesh.halfEdges[top].endVertex);
-          if (itV == vertexIndexMapping.end()) {
-            newVerts.push_back(pointCloud[mesh.halfEdges[top].endVertex]);
-            vertexIndexMapping[mesh.halfEdges[top].endVertex] = newVerts.size() - 1;
-            mesh.halfEdges[top].endVertex = newVerts.size() - 1;
-          } else {
-            mesh.halfEdges[top].endVertex = itV->second;
-          }
-          if (!halfEdgeProcessedNext[top])
-          {
-            size_t top2 = mesh.halfEdges[top].opp;
-            if(mesh.halfEdges[top2].isDisabled() || mesh.faces[mesh.halfEdges[top2].face].isDisabled())
-            {
-              std::cout << "ERROR: Halfedge " << top2 << " is disabled" << std::endl;
-              break;
-            }
-            if (halfEdgeProcessedNext[top] || halfEdgeProcessedNext[top2]) {
-              std::cout << "ERROR: Both halfedges " << top << " and " << top2 << " are not synced" << std::endl;
-              // assert(true);
-              break;
-            }
-            mesh.halfEdges[top].opp=std::numeric_limits<size_t>::max();
-            mesh.halfEdges[top2].opp=halfEdgeVec.size();
-            halfEdgeProcessedNext[top]=true;
-            halfEdgeProcessedNext[top2]=true;
-          }
-          else
-          {
-            size_t top2 = mesh.halfEdges[top].opp;
-            if (top2==std::numeric_limits<size_t>::max())
-            {
-              std::cout << "ERROR: Halfedge " << top << " has no paired halfedge" << std::endl;
-              break;
-            }
-            halfEdgeVec[top2].pairedHalfedge=halfEdgeVec.size();
-            halfEdgeVec[top2].startVert=mesh.halfEdges[top].endVertex;
-          }
-          manifold::Halfedge temp_Halfedge;
-          temp_Halfedge.endVert = mesh.halfEdges[top].endVertex;
-          temp_Halfedge.face = mesh.halfEdges[top].face;
-          if (mesh.halfEdges[top].opp==std::numeric_limits<size_t>::max())
-          {
-            temp_Halfedge.pairedHalfedge=-1;
-            temp_Halfedge.startVert=-1;
-          }
-          else
-          {
-            temp_Halfedge.pairedHalfedge = mesh.halfEdges[top].opp;
-            temp_Halfedge.startVert = halfEdgeVec[mesh.halfEdges[top].opp].endVert;
-          }
-          halfEdgeVec.push_back(temp_Halfedge);
-          top=mesh.halfEdges[top].next;
-          if(mesh.halfEdges[top].isDisabled()|| mesh.faces[mesh.halfEdges[top].face].isDisabled())
-          {
-            std::cout << "ERROR: Halfedge " << top << " is disabled" << std::endl;
+          if (halfEdgeProcessedNext[top] || halfEdgeProcessedNext[top2]) {
+            std::cout << "ERROR: Both halfedges " << top << " and " << top2
+                      << " are not synced" << std::endl;
+            // assert(true);
             break;
           }
+          mesh.halfEdges[top].opp = std::numeric_limits<size_t>::max();
+          mesh.halfEdges[top2].opp = halfEdgeVec.size();
+          halfEdgeProcessedNext[top] = true;
+          halfEdgeProcessedNext[top2] = true;
+        } else {
+          size_t top2 = mesh.halfEdges[top].opp;
+          if (top2 == std::numeric_limits<size_t>::max()) {
+            std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
+                      << std::endl;
+            break;
+          }
+          halfEdgeVec[top2].pairedHalfedge = halfEdgeVec.size();
+          halfEdgeVec[top2].startVert = mesh.halfEdges[top].endVertex;
+        }
+        manifold::Halfedge temp_Halfedge;
+        temp_Halfedge.endVert = mesh.halfEdges[top].endVertex;
+        temp_Halfedge.face = mesh.halfEdges[top].face;
+        if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
+          temp_Halfedge.pairedHalfedge = -1;
+          temp_Halfedge.startVert = -1;
+        } else {
+          temp_Halfedge.pairedHalfedge = mesh.halfEdges[top].opp;
+          temp_Halfedge.startVert =
+              halfEdgeVec[mesh.halfEdges[top].opp].endVert;
+        }
+        halfEdgeVec.push_back(temp_Halfedge);
+        top = mesh.halfEdges[top].next;
+        if (mesh.halfEdges[top].isDisabled() ||
+            mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
+          std::cout << "ERROR: Halfedge " << top << " is disabled" << std::endl;
+          break;
         }
       }
-  }
-  for (size_t i = 0; i < halfEdgeVec.size(); i+=3) {
-    if (CCW)
-    {
-      std::swap(halfEdgeVec[i+1], halfEdgeVec[i+2]);
     }
   }
-  
+  for (size_t i = 0; i < halfEdgeVec.size(); i += 3) {
+    if (CCW) {
+      std::swap(halfEdgeVec[i + 1], halfEdgeVec[i + 2]);
+    }
+  }
+
   return make_pair(halfEdgeVec, newVerts);
 }
 
@@ -244,13 +245,9 @@ void QuickHull::createConvexHalfEdgeMesh() {
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
           for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
-            if (mesh.halfEdges[heIndex].opp !=
-                faceData.enteredFromHalfEdge) {
+            if (mesh.halfEdges[heIndex].opp != faceData.enteredFromHalfEdge) {
               possiblyVisibleFaces.emplace_back(
-                  mesh.halfEdges[mesh.halfEdges[heIndex]
-                                     .opp]
-                      .face,
-                  heIndex);
+                  mesh.halfEdges[mesh.halfEdges[heIndex].opp].face, heIndex);
             }
           }
           continue;
@@ -266,14 +263,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
       // face will not be part of the final mesh so their data slots can by
       // recycled.
       const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
-          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge]
-                         .face]);
+          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]);
       const std::int8_t ind =
           (halfEdgesMesh[0] == faceData.enteredFromHalfEdge)
               ? 0
               : (halfEdgesMesh[1] == faceData.enteredFromHalfEdge ? 1 : 2);
-      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge]
-                     .face]
+      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
     const size_t horizonEdgeCount = horizonEdgesData.size();
@@ -460,14 +455,11 @@ std::array<size_t, 6> QuickHull::getExtremeValues() {
 bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
   const size_t horizonEdgeCount = horizonEdges.size();
   for (size_t i = 0; i < horizonEdgeCount - 1; i++) {
-    const size_t endVertexCheck =
-        mesh.halfEdges[horizonEdges[i]].endVertex;
+    const size_t endVertexCheck = mesh.halfEdges[horizonEdges[i]].endVertex;
     bool foundNext = false;
     for (size_t j = i + 1; j < horizonEdgeCount; j++) {
       const size_t beginVertex =
-          mesh.halfEdges[mesh.halfEdges[horizonEdges[j]]
-                             .opp]
-              .endVertex;
+          mesh.halfEdges[mesh.halfEdges[horizonEdges[j]].opp].endVertex;
       if (beginVertex == endVertexCheck) {
         std::swap(horizonEdges[i + 1], horizonEdges[j]);
         foundNext = true;
@@ -478,11 +470,8 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
       return false;
     }
   }
-  assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]]
-             .endVertex ==
-         mesh.halfEdges[mesh.halfEdges[horizonEdges[0]]
-                            .opp]
-             .endVertex);
+  assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]].endVertex ==
+         mesh.halfEdges[mesh.halfEdges[horizonEdges[0]].opp].endVertex);
   return true;
 }
 

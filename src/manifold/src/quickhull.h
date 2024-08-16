@@ -141,9 +141,7 @@ class MeshBuilder {
     // manifold::Halfedge halfEdgeManifold={-1};
     size_t next;
 
-    void disable() {
-      endVertex = std::numeric_limits<size_t>::max();
-    }
+    void disable() { endVertex = std::numeric_limits<size_t>::max(); }
 
     bool isDisabled() const {
       return endVertex == std::numeric_limits<size_t>::max();
@@ -355,16 +353,13 @@ class MeshBuilder {
   }
 
   std::array<size_t, 2> getVertexIndicesOfHalfEdge(const HalfEdge& he) const {
-    return {
-        halfEdges[he.opp].endVertex,
-        he.endVertex};
+    return {halfEdges[he.opp].endVertex, he.endVertex};
   }
 
   std::array<size_t, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
     return {f.he, halfEdges[f.he].next, halfEdges[halfEdges[f.he].next].next};
   }
 };
-
 
 // HalfEdgeMesh.hpp
 
@@ -401,8 +396,7 @@ class HalfEdgeMesh {
 
         const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
         for (const auto heIndex : heIndices) {
-          const size_t vertexIndex =
-              builderObject.halfEdges[heIndex].endVertex;
+          const size_t vertexIndex = builderObject.halfEdges[heIndex].endVertex;
           if (vertexMapping.count(vertexIndex) == 0) {
             vertices.push_back(vertexData[vertexIndex]);
             vertexMapping[vertexIndex] = vertices.size() - 1;
@@ -415,11 +409,10 @@ class HalfEdgeMesh {
     i = 0;
     for (const auto& halfEdge : builderObject.halfEdges) {
       if (!halfEdge.isDisabled()) {
-        halfEdges.push_back(
-    {static_cast<size_t>(halfEdge.endVertex),
-      static_cast<size_t>(halfEdge.opp),
-      static_cast<size_t>(halfEdge.face),
-      static_cast<size_t>(halfEdge.next)});
+        halfEdges.push_back({static_cast<size_t>(halfEdge.endVertex),
+                             static_cast<size_t>(halfEdge.opp),
+                             static_cast<size_t>(halfEdge.face),
+                             static_cast<size_t>(halfEdge.next)});
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
       i++;
@@ -432,8 +425,7 @@ class HalfEdgeMesh {
 
     for (auto& he : halfEdges) {
       he.face = faceMapping[he.face];
-      he.opp =
-          halfEdgeMapping[he.opp];
+      he.opp = halfEdgeMapping[he.opp];
       he.next = halfEdgeMapping[he.next];
       he.endVertex = vertexMapping[he.endVertex];
     }
@@ -488,7 +480,6 @@ struct DiagnosticsData {
 };
 
 double defaultEps();
-
 
 class QuickHull {
   using vec3 = glm::dvec3;
@@ -555,8 +546,9 @@ class QuickHull {
 
   // Constructs the convex hull into a MeshBuilder object which can be converted
   // to a ConvexHull or Mesh object
-  std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
-                 bool useOriginalIndices, double eps);
+  std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
+  buildMesh(const manifold::VecView<glm::dvec3>& pointCloud, bool CCW,
+            bool useOriginalIndices, double eps);
 
  public:
   QuickHull(const manifold::Vec<glm::dvec3>& pointCloudVec)
@@ -572,13 +564,13 @@ class QuickHull {
   //   a point cloud with scale 1)
   // Returns:
   //   Convex hull of the point cloud as a mesh object with half edge structure.
- std::pair<manifold::Vec<manifold::Halfedge>,std::vector<glm::dvec3>> getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud,
-                                   bool CCW, bool useOriginalIndices, double epsilon = defaultEps())
-                                   {
-  manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
-  QuickHull qh(pointCloudVec);
-  return qh.buildMesh(pointCloudVec, CCW, useOriginalIndices, epsilon);
-}
+  std::pair<manifold::Vec<manifold::Halfedge>, std::vector<glm::dvec3>>
+  getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud, bool CCW,
+                      bool useOriginalIndices, double epsilon = defaultEps()) {
+    manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
+    QuickHull qh(pointCloudVec);
+    return qh.buildMesh(pointCloudVec, CCW, useOriginalIndices, epsilon);
+  }
 
   // Get diagnostics about last generated convex hull
   const DiagnosticsData& getDiagnostics() { return diagnostics; }

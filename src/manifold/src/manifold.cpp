@@ -937,7 +937,8 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
 //   // mesh.triVerts.reserve(numTris);
 //   // for (int i = 0; i < numTris; i++) {
 //   //   const int j = i * 3;
-//   //   mesh.triVerts.push_back({triangles[j], triangles[j + 1], triangles[j + 2]});
+//   //   mesh.triVerts.push_back({triangles[j], triangles[j + 1], triangles[j +
+//   2]});
 //   // }
 //   return Manifold(mesh);
 // }

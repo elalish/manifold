@@ -478,9 +478,9 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   Finish();
 }
 
-void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos){
+void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
   int numVert = vertPos.size();
-  if (numVert < 4) return; // What to return here? 
+  if (numVert < 4) return;  // What to return here?
 
   Vec<glm::dvec3> pointCloudVec(numVert);
   for (int i = 0; i < numVert; i++) {
@@ -488,16 +488,17 @@ void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos){
   }
   QuickHull qh(pointCloudVec);
   std::pair<Vec<Halfedge>, Vec<glm::dvec3>> retVal;
-  retVal= qh.getConvexHullAsMesh(pointCloudVec, false, true);
-  for (size_t i=0;i<retVal.second.size();i++){
-    vertPos_.push_back(glm::vec3(retVal.second[i].x, retVal.second[i].y, retVal.second[i].z));
+  retVal = qh.getConvexHullAsMesh(pointCloudVec, false, true);
+  for (size_t i = 0; i < retVal.second.size(); i++) {
+    vertPos_.push_back(
+        glm::vec3(retVal.second[i].x, retVal.second[i].y, retVal.second[i].z));
   }
-  numVert=vertPos_.size();
-  halfedge_=retVal.first;
+  numVert = vertPos_.size();
+  halfedge_ = retVal.first;
   meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
   Finish();
-  return; 
+  return;
 }
 
 /**
