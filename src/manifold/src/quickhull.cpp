@@ -159,7 +159,6 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
         }
         // Updates values of the current half edge
         currHalfEdge.endVert = mesh.halfEdges[top].endVertex;
-        currHalfEdge.face = mesh.halfEdges[top].face;
         if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
           currHalfEdge.pairedHalfedge = -1;
           currHalfEdge.startVert = -1;
@@ -167,6 +166,8 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
           currHalfEdge.pairedHalfedge = mesh.halfEdges[top].opp;
           currHalfEdge.startVert = halfEdgeVec[mesh.halfEdges[top].opp].endVert;
         }
+        // Sets the face id to the index/3
+        currHalfEdge.face = halfEdgeVec.size()/3;
         halfEdgeVec.push_back(currHalfEdge);
         // Move to the next half edge
         top = mesh.halfEdges[top].next;
