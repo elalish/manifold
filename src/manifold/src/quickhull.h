@@ -70,12 +70,13 @@
 #include "shared.h"
 #include "vec.h"
 
+namespace manifold {
+
 class ConvexHull {
  public:
-  manifold::Vec<manifold::Halfedge> halfEdges;
+  Vec<Halfedge> halfEdges;
   std::vector<glm::dvec3> vertices;
-  ConvexHull(manifold::Vec<manifold::Halfedge> halfEdges,
-             std::vector<glm::dvec3> vertices)
+  ConvexHull(Vec<Halfedge> halfEdges, std::vector<glm::dvec3> vertices)
       : halfEdges(halfEdges), vertices(vertices) {}
   ConvexHull() = default;
 };
@@ -83,21 +84,21 @@ class ConvexHull {
 // Pool.hpp
 
 class Pool {
-  std::vector<std::unique_ptr<manifold::Vec<size_t>>> data;
+  std::vector<std::unique_ptr<Vec<size_t>>> data;
 
  public:
   void clear() { data.clear(); }
 
-  void reclaim(std::unique_ptr<manifold::Vec<size_t>>& ptr) {
+  void reclaim(std::unique_ptr<Vec<size_t>>& ptr) {
     data.push_back(std::move(ptr));
   }
 
-  std::unique_ptr<manifold::Vec<size_t>> get() {
+  std::unique_ptr<Vec<size_t>> get() {
     if (data.size() == 0) {
-      return std::make_unique<manifold::Vec<size_t>>();
+      return std::make_unique<Vec<size_t>>();
     }
     auto it = data.end() - 1;
-    std::unique_ptr<manifold::Vec<size_t>> r = std::move(*it);
+    std::unique_ptr<Vec<size_t>> r = std::move(*it);
     data.erase(it);
     return r;
   }
@@ -149,8 +150,11 @@ class MeshBuilder {
     size_t endVertex;
     size_t opp;
     size_t face;
-    // manifold::Halfedge halfEdgeManifold={-1};
     size_t next;
+
+    HalfEdge(size_t endVertex, size_t opp, size_t face, size_t next)
+        : endVertex(endVertex), opp(opp), face(face), next(next) {}
+    HalfEdge() = default;
 
     void disable() { endVertex = std::numeric_limits<size_t>::max(); }
 
@@ -170,7 +174,7 @@ class MeshBuilder {
     std::uint8_t horizonEdgesOnCurrentIteration : 3;
     // Bit for each half edge assigned to this face, each being 0 or 1 depending
     // on whether the edge belongs to horizon edge
-    std::unique_ptr<manifold::Vec<size_t>> pointsOnPositiveSide;
+    std::unique_ptr<Vec<size_t>> pointsOnPositiveSide;
 
     Face()
         : he(std::numeric_limits<size_t>::max()),
@@ -223,7 +227,7 @@ class MeshBuilder {
 
   // Mark a face as disabled and return a pointer to the points that were on the
   // positive of it.
-  std::unique_ptr<manifold::Vec<size_t>> disableFace(size_t faceIndex) {
+  std::unique_ptr<Vec<size_t>> disableFace(size_t faceIndex) {
     auto& f = faces[faceIndex];
     f.disable();
     disabledFaces.push_back(faceIndex);
@@ -250,89 +254,30 @@ class MeshBuilder {
     halfEdges.reserve(12);
 
     // Create halfedges
-    HalfEdge AB;
-    AB.endVertex = b;
-    AB.opp = 6;
-    AB.face = 0;
-    AB.next = 1;
-    halfEdges.push_back(AB);
-
-    HalfEdge BC;
-    BC.endVertex = c;
-    BC.opp = 9;
-    BC.face = 0;
-    BC.next = 2;
-    halfEdges.push_back(BC);
-
-    HalfEdge CA;
-    CA.endVertex = a;
-    CA.opp = 3;
-    CA.face = 0;
-    CA.next = 0;
-    halfEdges.push_back(CA);
-
-    HalfEdge AC;
-    AC.endVertex = c;
-    AC.opp = 2;
-    AC.face = 1;
-    AC.next = 4;
-    halfEdges.push_back(AC);
-
-    HalfEdge CD;
-    CD.endVertex = d;
-    CD.opp = 11;
-    CD.face = 1;
-    CD.next = 5;
-    halfEdges.push_back(CD);
-
-    HalfEdge DA;
-    DA.endVertex = a;
-    DA.opp = 7;
-    DA.face = 1;
-    DA.next = 3;
-    halfEdges.push_back(DA);
-
-    HalfEdge BA;
-    BA.endVertex = a;
-    BA.opp = 0;
-    BA.face = 2;
-    BA.next = 7;
-    halfEdges.push_back(BA);
-
-    HalfEdge AD;
-    AD.endVertex = d;
-    AD.opp = 5;
-    AD.face = 2;
-    AD.next = 8;
-    halfEdges.push_back(AD);
-
-    HalfEdge DB;
-    DB.endVertex = b;
-    DB.opp = 10;
-    DB.face = 2;
-    DB.next = 6;
-    halfEdges.push_back(DB);
-
-    HalfEdge CB;
-    CB.endVertex = b;
-    CB.opp = 1;
-    CB.face = 3;
-    CB.next = 10;
-    halfEdges.push_back(CB);
-
-    HalfEdge BD;
-    BD.endVertex = d;
-    BD.opp = 8;
-    BD.face = 3;
-    BD.next = 11;
-    halfEdges.push_back(BD);
-
-    HalfEdge DC;
-    DC.endVertex = c;
-    DC.opp = 4;
-    DC.face = 3;
-    DC.next = 9;
-    halfEdges.push_back(DC);
+    // AB
+    halfEdges.push_back(HalfEdge(b, 6, 0, 1));
+    // BC
+    halfEdges.push_back(HalfEdge(c, 9, 0, 2));
+    // CA
+    halfEdges.push_back(HalfEdge(a, 3, 0, 0));
+    // AC
+    halfEdges.push_back(HalfEdge(c, 2, 1, 4));
+    // CD
+    halfEdges.push_back(HalfEdge(d, 11, 1, 5));
+    // DA
+    halfEdges.push_back(HalfEdge(a, 7, 1, 3));
+    // BA
+    halfEdges.push_back(HalfEdge(a, 0, 2, 7));
+    // AD
+    halfEdges.push_back(HalfEdge(d, 5, 2, 8));
+    // DB
+    halfEdges.push_back(HalfEdge(b, 10, 2, 6));
+    // CB
+    halfEdges.push_back(HalfEdge(b, 1, 3, 10));
+    // BD
+    halfEdges.push_back(HalfEdge(d, 8, 3, 11));
+    // DC
+    halfEdges.push_back(HalfEdge(c, 4, 3, 9));
 
     // Create faces
     Face ABC;
@@ -380,8 +325,10 @@ class HalfEdgeMesh {
     size_t endVertex;
     size_t opp;
     size_t face;
-    // manifold::Halfedge halfEdgeManifold;
     size_t next;
+    HalfEdge(size_t endVertex, size_t opp, size_t face, size_t next)
+        : endVertex(endVertex), opp(opp), face(face), next(next) {}
+    HalfEdge() = default;
   };
 
   struct Face {
@@ -394,7 +341,7 @@ class HalfEdgeMesh {
   std::vector<HalfEdge> halfEdges;
 
   HalfEdgeMesh(const MeshBuilder& builderObject,
-               const manifold::VecView<glm::dvec3>& vertexData) {
+               const VecView<glm::dvec3>& vertexData) {
     std::unordered_map<size_t, size_t> faceMapping;
     std::unordered_map<size_t, size_t> halfEdgeMapping;
     std::unordered_map<size_t, size_t> vertexMapping;
@@ -420,10 +367,8 @@ class HalfEdgeMesh {
     i = 0;
     for (const auto& halfEdge : builderObject.halfEdges) {
       if (!halfEdge.isDisabled()) {
-        halfEdges.push_back({static_cast<size_t>(halfEdge.endVertex),
-                             static_cast<size_t>(halfEdge.opp),
-                             static_cast<size_t>(halfEdge.face),
-                             static_cast<size_t>(halfEdge.next)});
+        halfEdges.push_back(HalfEdge(halfEdge.endVertex, halfEdge.opp,
+                                     halfEdge.face, halfEdge.next));
         halfEdgeMapping[i] = halfEdges.size() - 1;
       }
       i++;
@@ -498,7 +443,7 @@ class QuickHull {
   double m_epsilon, epsilonSquared, scale;
   bool planar;
   std::vector<vec3> planarPointCloudTemp;
-  manifold::VecView<glm::dvec3> originalVertexData;
+  VecView<glm::dvec3> originalVertexData;
   MeshBuilder mesh;
   std::array<size_t, 6> extremeValues;
   DiagnosticsData diagnostics;
@@ -506,7 +451,7 @@ class QuickHull {
   // Temporary variables used during iteration process
   std::vector<size_t> newFaceIndices;
   std::vector<size_t> newHalfEdgeIndices;
-  std::vector<std::unique_ptr<manifold::Vec<size_t>>> disabledFacePointVectors;
+  std::vector<std::unique_ptr<Vec<size_t>>> disabledFacePointVectors;
   std::vector<size_t> visibleFaces;
   std::vector<size_t> horizonEdgesData;
   struct FaceData {
@@ -543,9 +488,8 @@ class QuickHull {
   // side to the mesh, we reuse these vectors. This reduces the amount of
   // std::vectors we have to deal with, and impact on performance is remarkable.
   Pool indexVectorPool;
-  inline std::unique_ptr<manifold::Vec<size_t>> getIndexVectorFromPool();
-  inline void reclaimToIndexVectorPool(
-      std::unique_ptr<manifold::Vec<size_t>>& ptr);
+  inline std::unique_ptr<Vec<size_t>> getIndexVectorFromPool();
+  inline void reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr);
 
   // Associates a point with a face if the point resides on the positive side of
   // the plane. Returns true if the points was on the positive side.
@@ -556,12 +500,12 @@ class QuickHull {
   void createConvexHalfEdgeMesh();
 
   // Constructs the convex hull into halfEdges and NewVerts
-  ConvexHull buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
-                       bool CCW, double eps);
+  ConvexHull buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
+                       double eps);
 
  public:
-  QuickHull(const manifold::Vec<glm::dvec3>& pointCloudVec)
-      : originalVertexData(manifold::VecView(pointCloudVec)) {}
+  QuickHull(const Vec<glm::dvec3>& pointCloudVec)
+      : originalVertexData(VecView(pointCloudVec)) {}
 
   // Computes convex hull for a given point cloud. This function assumes that
   // the vertex data resides in memory in the following format:
@@ -573,9 +517,9 @@ class QuickHull {
   //   a point cloud with scale 1)
   // Returns:
   //   Convex hull of the point cloud as halfEdge vector and vertex vector
-  ConvexHull getConvexHullAsMesh(const manifold::Vec<glm::dvec3>& pointCloud,
-                                 bool CCW, double epsilon = defaultEps()) {
-    manifold::Vec<glm::dvec3> pointCloudVec(pointCloud);
+  ConvexHull getConvexHullAsMesh(const Vec<glm::dvec3>& pointCloud, bool CCW,
+                                 double epsilon = defaultEps()) {
+    Vec<glm::dvec3> pointCloudVec(pointCloud);
     QuickHull qh(pointCloudVec);
     return qh.buildMesh(pointCloudVec, CCW, epsilon);
   }
@@ -588,15 +532,14 @@ class QuickHull {
  * Inline function definitions
  */
 
-std::unique_ptr<manifold::Vec<size_t>> QuickHull::getIndexVectorFromPool() {
+std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
   auto r = indexVectorPool.get();
   // r->clear();
   r->resize(0);
   return r;
 }
 
-void QuickHull::reclaimToIndexVectorPool(
-    std::unique_ptr<manifold::Vec<size_t>>& ptr) {
+void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
   const size_t oldSize = ptr->size();
   if ((oldSize + 1) * 128 < ptr->capacity()) {
     // Reduce memory usage! Huge vectors are needed at the beginning of
@@ -625,3 +568,4 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
   }
   return false;
 }
+}  // namespace manifold

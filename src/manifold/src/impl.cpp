@@ -480,7 +480,10 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
 
 void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
   int numVert = vertPos.size();
-  if (numVert < 4) return;  // What to return here?
+  if (numVert < 4) {
+    status_ = Error::InvalidConstruction;
+    return;
+  }
 
   Vec<glm::dvec3> pointCloudVec(numVert);
   for (int i = 0; i < numVert; i++) {

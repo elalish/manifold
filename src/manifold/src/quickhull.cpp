@@ -23,14 +23,16 @@
 #include <iostream>
 #include <limits>
 
+namespace manifold {
+
 double defaultEps() { return 0.0000001; }
 
 /*
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
-                                bool CCW, double epsilon) {
+ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
+                                double epsilon) {
   if (pointCloud.size() == 0) {
     return ConvexHull();
   }
@@ -75,12 +77,12 @@ ConvexHull QuickHull::buildMesh(const manifold::VecView<glm::dvec3>& pointCloud,
   if (halfEdgeStack.size() == 0) {
     return ConvexHull();
   }
-  manifold::Vec<manifold::Halfedge> halfEdgeVec;
+  Vec<Halfedge> halfEdgeVec;
   std::vector<glm::dvec3> newVerts;
   // To map the index of the vertex in the original point cloud to the index in
   // the new point cloud
   std::unordered_map<size_t, size_t> vertexIndexMapping;
-  manifold::Halfedge currHalfEdge;
+  Halfedge currHalfEdge;
   // Iterates through the valid half edges
   for (size_t index = 0; index < halfEdgeStack.size(); index++) {
     size_t top = halfEdgeStack[index];
@@ -631,7 +633,7 @@ void QuickHull::setupInitialTetrahedron() {
     const vec3 extraPoint = N1 + originalVertexData[0];
     planarPointCloudTemp.push_back(extraPoint);
     maxI = planarPointCloudTemp.size() - 1;
-    originalVertexData = manifold::Vec<glm::dvec3>(planarPointCloudTemp);
+    originalVertexData = Vec<glm::dvec3>(planarPointCloudTemp);
   }
 
   // Enforce CCW orientation (if user prefers clockwise orientation, swap two
@@ -664,3 +666,4 @@ void QuickHull::setupInitialTetrahedron() {
     }
   }
 }
+}  // namespace manifold

@@ -923,7 +923,13 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
 /**
  * Compute the convex hull of this manifold.
  */
-Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
+Manifold Manifold::Hull() const {
+  std::vector<glm::vec3> pts;
+  for (auto vertex : GetCsgLeafNode().GetImpl()->vertPos_) {
+    pts.push_back(vertex);
+  }
+  return Hull(pts);
+}
 
 /**
  * Compute the convex hull enveloping a set of manifolds.
