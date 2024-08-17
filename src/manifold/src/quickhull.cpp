@@ -167,7 +167,7 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
           currHalfEdge.startVert = halfEdgeVec[mesh.halfEdges[top].opp].endVert;
         }
         // Sets the face id to the index/3
-        currHalfEdge.face = halfEdgeVec.size()/3;
+        currHalfEdge.face = halfEdgeVec.size() / 3;
         halfEdgeVec.push_back(currHalfEdge);
         // Move to the next half edge
         top = mesh.halfEdges[top].next;
