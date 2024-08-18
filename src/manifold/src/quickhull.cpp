@@ -87,11 +87,9 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   for (size_t index = 0; index < halfEdgeStack.size(); index++) {
     size_t top = halfEdgeStack[index];
 
-    if (mesh.halfEdges[top].isDisabled() ||
-        mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
-      std::cout << "ERROR: Halfedge " << top << " is not disabled" << std::endl;
-      break;
-    }
+    DEBUG_ASSERT(!(mesh.halfEdges[top].isDisabled() ||
+                   mesh.faces[mesh.halfEdges[top].face].isDisabled()),
+                 logicErr, "halfEdge is disabled");
     // If the half edge has already been processed, skip it
     if (halfEdgeProcessed[top]) {
       continue;
@@ -99,11 +97,9 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
       // Process the half edge in the same face till we reach the starting half
       // edge
       while (halfEdgeProcessed[top] != true) {
-        if (mesh.halfEdges[top].opp == std::numeric_limits<size_t>::max()) {
-          std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
-                    << std::endl;
-          break;
-        }
+        DEBUG_ASSERT(
+            mesh.halfEdges[top].opp != std::numeric_limits<size_t>::max(),
+            logicErr, "halfEdge has no paired halfedge");
         halfEdgeProcessed[top] = true;
         // Maps the endVertex of this half edge to the new point cloud (Since,
         // we will do this for all halfEdges just mapping the end vertex is
@@ -122,18 +118,12 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
         // it's opp as max so we can correct it later
         if (!halfEdgeProcessedOpp[top]) {
           size_t top2 = mesh.halfEdges[top].opp;
-          if (mesh.halfEdges[top2].isDisabled() ||
-              mesh.faces[mesh.halfEdges[top2].face].isDisabled()) {
-            std::cout << "ERROR: Halfedge " << top2 << " is disabled"
-                      << std::endl;
-            break;
-          }
-          if (halfEdgeProcessedOpp[top] || halfEdgeProcessedOpp[top2]) {
-            std::cout << "ERROR: Both halfedges " << top << " and " << top2
-                      << " are not synced" << std::endl;
-            // assert(true);
-            break;
-          }
+          DEBUG_ASSERT(!(mesh.halfEdges[top2].isDisabled() ||
+                         mesh.faces[mesh.halfEdges[top2].face].isDisabled()),
+                       logicErr, "paired halfEdge is disabled");
+          DEBUG_ASSERT(
+              !(halfEdgeProcessedOpp[top] || halfEdgeProcessedOpp[top2]),
+              logicErr, "halfEdge has already been processed");
           // Set's curr.opp as max so we can correct it later
           mesh.halfEdges[top].opp = std::numeric_limits<size_t>::max();
           // Set's the opposite half edge's opp as the current half edge
@@ -147,11 +137,8 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
         // of it's opposite half edge (since we set it to max before)
         else {
           size_t top2 = mesh.halfEdges[top].opp;
-          if (top2 == std::numeric_limits<size_t>::max()) {
-            std::cout << "ERROR: Halfedge " << top << " has no paired halfedge"
-                      << std::endl;
-            break;
-          }
+          DEBUG_ASSERT(top2 != std::numeric_limits<size_t>::max(), logicErr,
+                       "halfEdge has no paired halfedge");
           // Updates the opposite half edge's opp as the current half edge
           halfEdgeVec[top2].pairedHalfedge = halfEdgeVec.size();
           // Updates the start vertex of the opposite half edge
@@ -171,11 +158,9 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
         halfEdgeVec.push_back(currHalfEdge);
         // Move to the next half edge
         top = mesh.halfEdges[top].next;
-        if (mesh.halfEdges[top].isDisabled() ||
-            mesh.faces[mesh.halfEdges[top].face].isDisabled()) {
-          std::cout << "ERROR: Halfedge " << top << " is disabled" << std::endl;
-          break;
-        }
+        DEBUG_ASSERT(!(mesh.halfEdges[top].isDisabled() ||
+                       mesh.faces[mesh.halfEdges[top].face].isDisabled()),
+                     logicErr, "next halfEdge is disabled");
       }
     }
   }
