@@ -54,7 +54,9 @@ class Vec : public VecView<T> {
 
   Vec(size_t size, T val) { resize(size, val); }
 
-  Vec(const Vec<T> &vec) {
+  Vec(const Vec<T> &vec) { *this = Vec(vec.view()); }
+
+  Vec(const VecView<const T> &vec) {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -179,6 +181,10 @@ class Vec : public VecView<T> {
     this->size_ = newSize;
     if (shrink) shrink_to_fit();
   }
+
+  void pop_back() { resize(this->size_ - 1); }
+
+  void clear() { resize(0); }
 
   void shrink_to_fit() {
     T *newBuffer = nullptr;

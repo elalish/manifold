@@ -495,10 +495,7 @@ void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
   manifold::transform(hull.vertices.begin(), hull.vertices.end(),
                       vertPos_.begin(),
                       [](const glm::dvec3& v) { return glm::vec3(v); });
-  halfedge_ = std::move(hull.halfEdges);
-  for_each(autoPolicy(halfedge_.size(), 1e5), countAt(0_uz),
-           countAt(halfedge_.size()),
-           [this](size_t i) { halfedge_[i].face = i / 3; });
+  halfedge_ = std::move(hull.halfedges);
   meshRelation_.originalID = ReserveIDs(1);
   CalculateBBox();
   SetPrecision(bBox_.Scale() * kTolerance);

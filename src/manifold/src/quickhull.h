@@ -56,7 +56,6 @@
 #pragma once
 #include <array>
 #include <deque>
-#include <limits>
 #include <vector>
 
 #include "shared.h"
@@ -66,11 +65,8 @@ namespace manifold {
 
 class ConvexHull {
  public:
-  Vec<Halfedge> halfEdges;
+  Vec<Halfedge> halfedges;
   std::vector<glm::dvec3> vertices;
-  ConvexHull(Vec<Halfedge> halfEdges, std::vector<glm::dvec3> vertices)
-      : halfEdges(halfEdges), vertices(vertices) {}
-  ConvexHull() = default;
 };
 
 // Pool.hpp
@@ -135,25 +131,8 @@ struct Ray {
 
 class MeshBuilder {
  public:
-  struct HalfEdge {
-    size_t endVertex;
-    size_t opp;
-    size_t face;
-    size_t next;
-
-    HalfEdge(size_t endVertex, size_t opp, size_t face, size_t next)
-        : endVertex(endVertex), opp(opp), face(face), next(next) {}
-    HalfEdge() = default;
-
-    void disable() { endVertex = std::numeric_limits<size_t>::max(); }
-
-    bool isDisabled() const {
-      return endVertex == std::numeric_limits<size_t>::max();
-    }
-  };
-
   struct Face {
-    size_t he;
+    int he;
     Plane P{};
     double mostDistantPointDist = 0.0;
     size_t mostDistantPoint = 0;
@@ -172,30 +151,31 @@ class MeshBuilder {
           horizonEdgesOnCurrentIteration(0) {}
 
     Face()
-        : he(std::numeric_limits<size_t>::max()),
+        : he(-1),
           isVisibleFaceOnCurrentIteration(0),
           inFaceStack(0),
           horizonEdgesOnCurrentIteration(0) {}
 
-    void disable() { he = std::numeric_limits<size_t>::max(); }
+    void disable() { he = -1; }
 
-    bool isDisabled() const { return he == std::numeric_limits<size_t>::max(); }
+    bool isDisabled() const { return he == -1; }
   };
 
   // Mesh data
   std::vector<Face> faces;
-  std::vector<HalfEdge> halfEdges;
+  Vec<Halfedge> halfedges;
+  Vec<int> halfedgeNext;
 
   // When the mesh is modified and faces and half edges are removed from it, we
   // do not actually remove them from the container vectors. Insted, they are
   // marked as disabled which means that the indices can be reused when we need
   // to add new faces and half edges to the mesh. We store the free indices in
   // the following vectors.
-  std::vector<size_t> disabledFaces, disabledHalfEdges;
+  Vec<size_t> disabledFaces, disabledHalfedges;
 
   size_t addFace();
 
-  size_t addHalfEdge();
+  size_t addHalfedge();
 
   // Mark a face as disabled and return a pointer to the points that were on the
   // positive of it.
@@ -206,26 +186,26 @@ class MeshBuilder {
     return std::move(f.pointsOnPositiveSide);
   }
 
-  void disableHalfEdge(size_t heIndex) {
-    HalfEdge& he = halfEdges[heIndex];
-    he.disable();
-    disabledHalfEdges.push_back(heIndex);
+  void disableHalfedge(size_t heIndex) {
+    auto& he = halfedges[heIndex];
+    he.pairedHalfedge = -1;
+    disabledHalfedges.push_back(heIndex);
   }
 
   MeshBuilder() = default;
 
   // Create a mesh with initial tetrahedron ABCD. Dot product of AB with the
   // normal of triangle ABC should be negative.
-  void setup(size_t a, size_t b, size_t c, size_t d);
+  void setup(int a, int b, int c, int d);
 
-  std::array<size_t, 3> getVertexIndicesOfFace(const Face& f) const;
+  std::array<int, 3> getVertexIndicesOfFace(const Face& f) const;
 
-  std::array<size_t, 2> getVertexIndicesOfHalfEdge(const HalfEdge& he) const {
-    return {halfEdges[he.opp].endVertex, he.endVertex};
+  std::array<int, 2> getVertexIndicesOfHalfEdge(const Halfedge& he) const {
+    return {halfedges[he.pairedHalfedge].endVert, he.endVert};
   }
 
-  std::array<size_t, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
-    return {f.he, halfEdges[f.he].next, halfEdges[halfEdges[f.he].next].next};
+  std::array<int, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
+    return {f.he, halfedgeNext[f.he], halfedgeNext[halfedgeNext[f.he]]};
   }
 };
 
@@ -233,16 +213,6 @@ class MeshBuilder {
 
 class HalfEdgeMesh {
  public:
-  struct HalfEdge {
-    size_t endVertex;
-    size_t opp;
-    size_t face;
-    size_t next;
-    HalfEdge(size_t endVertex, size_t opp, size_t face, size_t next)
-        : endVertex(endVertex), opp(opp), face(face), next(next) {}
-    HalfEdge() = default;
-  };
-
   struct Face {
     // Index of one of the half edges of this face
     size_t halfEdgeIndex;
@@ -250,9 +220,10 @@ class HalfEdgeMesh {
     Face(size_t halfEdgeIndex) : halfEdgeIndex(halfEdgeIndex) {}
   };
 
-  std::vector<glm::dvec3> vertices;
+  Vec<glm::dvec3> vertices;
   std::vector<Face> faces;
-  std::vector<HalfEdge> halfEdges;
+  Vec<Halfedge> halfedges;
+  Vec<int> halfedgeNext;
 
   HalfEdgeMesh(const MeshBuilder& builderObject,
                const VecView<glm::dvec3>& vertexData);
@@ -275,27 +246,28 @@ class QuickHull {
 
   double m_epsilon, epsilonSquared, scale;
   bool planar;
-  std::vector<vec3> planarPointCloudTemp;
-  VecView<glm::dvec3> originalVertexData;
+  Vec<vec3> planarPointCloudTemp;
+  VecView<vec3> originalVertexData;
   MeshBuilder mesh;
   std::array<size_t, 6> extremeValues;
   DiagnosticsData diagnostics;
 
   // Temporary variables used during iteration process
-  std::vector<size_t> newFaceIndices;
-  std::vector<size_t> newHalfEdgeIndices;
+  Vec<size_t> newFaceIndices;
+  Vec<size_t> newHalfedgeIndices;
   std::vector<std::unique_ptr<Vec<size_t>>> disabledFacePointVectors;
-  std::vector<size_t> visibleFaces;
-  std::vector<size_t> horizonEdgesData;
+  Vec<size_t> visibleFaces;
+  Vec<size_t> horizonEdgesData;
   struct FaceData {
-    size_t faceIndex;
+    int faceIndex;
     // If the face turns out not to be visible, this half edge will be marked as
     // horizon edge
-    size_t enteredFromHalfEdge;
-    FaceData(size_t fi, size_t he) : faceIndex(fi), enteredFromHalfEdge(he) {}
+    int enteredFromHalfedge;
+    FaceData() {}
+    FaceData(int fi, int he) : faceIndex(fi), enteredFromHalfedge(he) {}
   };
-  std::vector<FaceData> possiblyVisibleFaces;
-  std::deque<size_t> faceList;
+  Vec<FaceData> possiblyVisibleFaces;
+  std::deque<int> faceList;
 
   // Create a half edge mesh representing the base tetrahedron from which the
   // QuickHull iteration proceeds. extremeValues must be properly set up when
@@ -304,7 +276,7 @@ class QuickHull {
 
   // Given a list of half edges, try to rearrange them so that they form a loop.
   // Return true on success.
-  bool reorderHorizonEdges(std::vector<size_t>& horizonEdges);
+  bool reorderHorizonEdges(VecView<size_t>& horizonEdges);
 
   // Find indices of extreme values (max x, min x, max y, min y, max z, min z)
   // for the given point cloud
@@ -330,7 +302,7 @@ class QuickHull {
 
   // This will update mesh from which we create the ConvexHull object that
   // getConvexHull function returns
-  void createConvexHalfEdgeMesh();
+  void createConvexHalfedgeMesh();
 
   // Constructs the convex hull into halfEdges and NewVerts
   ConvexHull buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,

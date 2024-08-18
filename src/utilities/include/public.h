@@ -598,7 +598,6 @@ class Quality {
  *  @brief Custom Exceptions
  * @{
  */
-#ifdef MANIFOLD_DEBUG
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -609,7 +608,6 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
-#endif
 /** @} */
 
 /**
