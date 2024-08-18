@@ -19,13 +19,167 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
-#include <iostream>
 #include <limits>
 
 namespace manifold {
 
 double defaultEps() { return 0.0000001; }
+
+// MathUtils.hpp
+inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
+                                                   const Ray& r) {
+  const glm::dvec3 s = p - r.S;
+  double t = glm::dot(s, r.V);
+  return glm::dot(s, s) - t * t * r.VInvLengthSquared;
+}
+
+inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
+  return glm::dot(p1 - p2, p1 - p2);
+}
+// Note that the unit of distance returned is relative to plane's normal's
+// length (divide by N.getNormalized() if needed to get the "real" distance).
+inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
+  return glm::dot(p.N, v) + p.D;
+}
+
+inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
+                                    const glm::dvec3& c) {
+  // We want to get (a-c).crossProduct(b-c) without constructing temp vectors
+  double x = a.x - c.x;
+  double y = a.y - c.y;
+  double z = a.z - c.z;
+  double rhsx = b.x - c.x;
+  double rhsy = b.y - c.y;
+  double rhsz = b.z - c.z;
+  double px = y * rhsz - z * rhsy;
+  double py = z * rhsx - x * rhsz;
+  double pz = x * rhsy - y * rhsx;
+  return glm::normalize(glm::dvec3(px, py, pz));
+}
+
+size_t MeshBuilder::addFace() {
+  if (disabledFaces.size()) {
+    size_t index = disabledFaces.back();
+    auto& f = faces[index];
+    assert(f.isDisabled());
+    assert(!f.pointsOnPositiveSide);
+    f.mostDistantPointDist = 0;
+    disabledFaces.pop_back();
+    return index;
+  }
+  faces.emplace_back();
+  return faces.size() - 1;
+}
+
+size_t MeshBuilder::addHalfEdge() {
+  if (disabledHalfEdges.size()) {
+    const size_t index = disabledHalfEdges.back();
+    disabledHalfEdges.pop_back();
+    return index;
+  }
+  halfEdges.emplace_back();
+  return halfEdges.size() - 1;
+}
+
+void MeshBuilder::setup(size_t a, size_t b, size_t c, size_t d) {
+  faces.clear();
+  halfEdges.clear();
+  disabledFaces.clear();
+  disabledHalfEdges.clear();
+
+  faces.reserve(4);
+  halfEdges.reserve(12);
+
+  // Create halfedges
+  // AB
+  halfEdges.emplace_back(b, 6, 0, 1);
+  // BC
+  halfEdges.emplace_back(c, 9, 0, 2);
+  // CA
+  halfEdges.emplace_back(a, 3, 0, 0);
+  // AC
+  halfEdges.emplace_back(c, 2, 1, 4);
+  // CD
+  halfEdges.emplace_back(d, 11, 1, 5);
+  // DA
+  halfEdges.emplace_back(a, 7, 1, 3);
+  // BA
+  halfEdges.emplace_back(a, 0, 2, 7);
+  // AD
+  halfEdges.emplace_back(d, 5, 2, 8);
+  // DB
+  halfEdges.emplace_back(b, 10, 2, 6);
+  // CB
+  halfEdges.emplace_back(b, 1, 3, 10);
+  // BD
+  halfEdges.emplace_back(d, 8, 3, 11);
+  // DC
+  halfEdges.emplace_back(c, 4, 3, 9);
+
+  // Create faces
+  faces.emplace_back(0);
+  faces.emplace_back(3);
+  faces.emplace_back(6);
+  faces.emplace_back(9);
+}
+
+std::array<size_t, 3> MeshBuilder::getVertexIndicesOfFace(const Face& f) const {
+  std::array<size_t, 3> v;
+  const HalfEdge* he = &halfEdges[f.he];
+  v[0] = he->endVertex;
+  he = &halfEdges[he->next];
+  v[1] = he->endVertex;
+  he = &halfEdges[he->next];
+  v[2] = he->endVertex;
+  return v;
+}
+
+HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
+                           const VecView<glm::dvec3>& vertexData) {
+  std::unordered_map<size_t, size_t> faceMapping;
+  std::unordered_map<size_t, size_t> halfEdgeMapping;
+  std::unordered_map<size_t, size_t> vertexMapping;
+
+  size_t i = 0;
+  for (const auto& face : builderObject.faces) {
+    if (!face.isDisabled()) {
+      faces.emplace_back(static_cast<size_t>(face.he));
+      faceMapping[i] = faces.size() - 1;
+
+      const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
+      for (const auto heIndex : heIndices) {
+        const size_t vertexIndex = builderObject.halfEdges[heIndex].endVertex;
+        if (vertexMapping.count(vertexIndex) == 0) {
+          vertices.push_back(vertexData[vertexIndex]);
+          vertexMapping[vertexIndex] = vertices.size() - 1;
+        }
+      }
+    }
+    i++;
+  }
+
+  i = 0;
+  for (const auto& halfEdge : builderObject.halfEdges) {
+    if (!halfEdge.isDisabled()) {
+      halfEdges.emplace_back(halfEdge.endVertex, halfEdge.opp, halfEdge.face,
+                             halfEdge.next);
+      halfEdgeMapping[i] = halfEdges.size() - 1;
+    }
+    i++;
+  }
+
+  for (auto& face : faces) {
+    assert(halfEdgeMapping.count(face.halfEdgeIndex) == 1);
+    face.halfEdgeIndex = halfEdgeMapping[face.halfEdgeIndex];
+  }
+
+  for (auto& he : halfEdges) {
+    he.face = faceMapping[he.face];
+    he.opp = halfEdgeMapping[he.opp];
+    he.next = halfEdgeMapping[he.next];
+    he.endVertex = vertexMapping[he.endVertex];
+  }
+}
 
 /*
  * Implementation of the algorithm
@@ -371,7 +525,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
 
       auto& newFace = mesh.faces[newFaceIndex];
 
-      const glm::dvec3 planeNormal = mathutils::getTriangleNormal(
+      const glm::dvec3 planeNormal = getTriangleNormal(
           originalVertexData[A], originalVertexData[B], activePoint);
       newFace.P = Plane(planeNormal, activePoint);
       newFace.he = AB;
@@ -500,9 +654,9 @@ void QuickHull::setupInitialTetrahedron() {
     size_t v[4] = {0, std::min((size_t)1, vertexCount - 1),
                    std::min((size_t)2, vertexCount - 1),
                    std::min((size_t)3, vertexCount - 1)};
-    const glm::dvec3 N = mathutils::getTriangleNormal(originalVertexData[v[0]],
-                                                      originalVertexData[v[1]],
-                                                      originalVertexData[v[2]]);
+    const glm::dvec3 N =
+        getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
+                          originalVertexData[v[2]]);
     const Plane trianglePlane(N, originalVertexData[v[0]]);
     if (trianglePlane.isPointOnPositiveSide(originalVertexData[v[3]])) {
       std::swap(v[0], v[1]);
@@ -517,9 +671,8 @@ void QuickHull::setupInitialTetrahedron() {
     for (size_t j = i + 1; j < 6; j++) {
       // I found a function for squaredDistance but i can't seem to include it
       // like this for some reason
-      const double d =
-          mathutils::getSquaredDistance(originalVertexData[extremeValues[i]],
-                                        originalVertexData[extremeValues[j]]);
+      const double d = getSquaredDistance(originalVertexData[extremeValues[i]],
+                                          originalVertexData[extremeValues[j]]);
       if (d > maxD) {
         maxD = d;
         selectedPoints = {extremeValues[i], extremeValues[j]};
@@ -543,8 +696,8 @@ void QuickHull::setupInitialTetrahedron() {
   size_t maxI = std::numeric_limits<size_t>::max();
   const size_t vCount = originalVertexData.size();
   for (size_t i = 0; i < vCount; i++) {
-    const double distToRay = mathutils::getSquaredDistanceBetweenPointAndRay(
-        originalVertexData[i], r);
+    const double distToRay =
+        getSquaredDistanceBetweenPointAndRay(originalVertexData[i], r);
     if (distToRay > maxD) {
       maxD = distToRay;
       maxI = i;
@@ -592,13 +745,13 @@ void QuickHull::setupInitialTetrahedron() {
   // the point farthest away from the triangle plane.
   maxD = m_epsilon;
   maxI = 0;
-  const glm::dvec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
-                                                    baseTriangleVertices[1],
-                                                    baseTriangleVertices[2]);
+  const glm::dvec3 N =
+      getTriangleNormal(baseTriangleVertices[0], baseTriangleVertices[1],
+                        baseTriangleVertices[2]);
   Plane trianglePlane(N, baseTriangleVertices[0]);
   for (size_t i = 0; i < vCount; i++) {
-    const double d = std::abs(mathutils::getSignedDistanceToPlane(
-        originalVertexData[i], trianglePlane));
+    const double d = std::abs(
+        getSignedDistanceToPlane(originalVertexData[i], trianglePlane));
     if (d > maxD) {
       maxD = d;
       maxI = i;
@@ -609,9 +762,9 @@ void QuickHull::setupInitialTetrahedron() {
     // Well, let's add one extra point to the point cloud so that the convex
     // hull will have volume.
     planar = true;
-    const vec3 N1 = mathutils::getTriangleNormal(baseTriangleVertices[1],
-                                                 baseTriangleVertices[2],
-                                                 baseTriangleVertices[0]);
+    const vec3 N1 =
+        getTriangleNormal(baseTriangleVertices[1], baseTriangleVertices[2],
+                          baseTriangleVertices[0]);
     planarPointCloudTemp.clear();
     planarPointCloudTemp.insert(planarPointCloudTemp.begin(),
                                 originalVertexData.begin(),
@@ -637,7 +790,7 @@ void QuickHull::setupInitialTetrahedron() {
     const glm::dvec3& va = originalVertexData[v[0]];
     const glm::dvec3& vb = originalVertexData[v[1]];
     const glm::dvec3& vc = originalVertexData[v[2]];
-    const glm::dvec3 N1 = mathutils::getTriangleNormal(va, vb, vc);
+    const glm::dvec3 N1 = getTriangleNormal(va, vb, vc);
     const Plane plane(N1, va);
     f.P = plane;
   }
@@ -651,5 +804,41 @@ void QuickHull::setupInitialTetrahedron() {
       }
     }
   }
+}
+
+std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
+  auto r = indexVectorPool.get();
+  r->resize(0);
+  return r;
+}
+
+void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
+  const size_t oldSize = ptr->size();
+  if ((oldSize + 1) * 128 < ptr->capacity()) {
+    // Reduce memory usage! Huge vectors are needed at the beginning of
+    // iteration when faces have many points on their positive side. Later on,
+    // smaller vectors will suffice.
+    ptr.reset(nullptr);
+    return;
+  }
+  indexVectorPool.reclaim(ptr);
+}
+
+bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
+                               size_t pointIndex) {
+  const double D =
+      getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
+  if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
+    if (!f.pointsOnPositiveSide) {
+      f.pointsOnPositiveSide = getIndexVectorFromPool();
+    }
+    f.pointsOnPositiveSide->push_back(pointIndex);
+    if (D > f.mostDistantPointDist) {
+      f.mostDistantPointDist = D;
+      f.mostDistantPoint = pointIndex;
+    }
+    return true;
+  }
+  return false;
 }
 }  // namespace manifold
