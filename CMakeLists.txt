@@ -163,4 +163,12 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
   DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold
 )
+
+if(MANIFOLD_CROSS_SECTION)
+  set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
+endif()
+configure_file(manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
+  DESTINATION lib/pkgconfig)
+
 endif()
