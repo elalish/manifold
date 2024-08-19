@@ -281,7 +281,7 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   auto saturate = [](int c) { return c > 0 ? 1 : 0; };
   exclusive_scan(TransformIterator(counts.begin(), saturate),
                  TransformIterator(counts.end(), saturate), counts.begin(), 0);
-  std::vector<glm::dvec3> vertices(counts.back());
+  Vec<glm::dvec3> vertices(counts.back());
   for_each(autoPolicy(pointCloud.size()), countAt(0_uz),
            countAt(pointCloud.size()), [&](size_t i) {
              if (counts[i + 1] - counts[i] > 0) {

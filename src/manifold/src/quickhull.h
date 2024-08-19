@@ -66,7 +66,7 @@ namespace manifold {
 class ConvexHull {
  public:
   Vec<Halfedge> halfedges;
-  std::vector<glm::dvec3> vertices;
+  Vec<glm::dvec3> vertices;
 };
 
 // Pool.hpp
@@ -242,6 +242,14 @@ struct DiagnosticsData {
 double defaultEps();
 
 class QuickHull {
+  struct FaceData {
+    int faceIndex;
+    // If the face turns out not to be visible, this half edge will be marked as
+    // horizon edge
+    int enteredFromHalfedge;
+    FaceData() {}
+    FaceData(int fi, int he) : faceIndex(fi), enteredFromHalfedge(he) {}
+  };
   using vec3 = glm::dvec3;
 
   double m_epsilon, epsilonSquared, scale;
@@ -255,18 +263,10 @@ class QuickHull {
   // Temporary variables used during iteration process
   Vec<size_t> newFaceIndices;
   Vec<size_t> newHalfedgeIndices;
-  std::vector<std::unique_ptr<Vec<size_t>>> disabledFacePointVectors;
   Vec<size_t> visibleFaces;
   Vec<size_t> horizonEdgesData;
-  struct FaceData {
-    int faceIndex;
-    // If the face turns out not to be visible, this half edge will be marked as
-    // horizon edge
-    int enteredFromHalfedge;
-    FaceData() {}
-    FaceData(int fi, int he) : faceIndex(fi), enteredFromHalfedge(he) {}
-  };
   Vec<FaceData> possiblyVisibleFaces;
+  std::vector<std::unique_ptr<Vec<size_t>>> disabledFacePointVectors;
   std::deque<int> faceList;
 
   // Create a half edge mesh representing the base tetrahedron from which the
