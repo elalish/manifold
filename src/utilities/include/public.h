@@ -24,6 +24,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <stdexcept>
 
 #ifdef MANIFOLD_DEBUG
 #include <iomanip>
