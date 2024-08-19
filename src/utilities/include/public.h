@@ -22,9 +22,9 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
-#include <stdexcept>
 
 #ifdef MANIFOLD_DEBUG
 #include <iomanip>
