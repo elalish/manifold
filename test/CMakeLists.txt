@@ -70,6 +70,7 @@ endif()
 
 if(MANIFOLD_CROSS_SECTION)
   target_link_libraries(${PROJECT_NAME} cross_section)
+  target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_CROSS_SECTION)
 endif()
 
 if(MANIFOLD_EXPORT)
