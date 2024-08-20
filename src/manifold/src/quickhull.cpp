@@ -249,27 +249,28 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   // reorder halfedges
   // Since all faces are not used now (so we should start from 0 and just
   // increment, we can later set the face id as index/3 for each halfedge
-  size_t j = 0;
-  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(mesh.halfedges.size()),
-           [&](size_t i) {
-             if (mesh.halfedges[i].pairedHalfedge < 0) return;
-             if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
-             if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
-             mapping[i] = j;
-             halfedges[j + 0] = mesh.halfedges[i];
+  int j = 0;
+  for_each(
+      autoPolicy(mesh.halfedges.size()), countAt(0_uz),
+      countAt(mesh.halfedges.size()), [&](size_t i) {
+        if (mesh.halfedges[i].pairedHalfedge < 0) return;
+        if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
+        if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
+        int currIndex = AtomicAdd(j, 3);
+        mapping[i] = currIndex;
+        halfedges[currIndex + 0] = mesh.halfedges[i];
 
-             size_t k = mesh.halfedgeNext[i];
-             mapping[k] = j + 1;
-             halfedges[j + 1] = mesh.halfedges[k];
+        size_t k = mesh.halfedgeNext[i];
+        mapping[k] = currIndex + 1;
+        halfedges[currIndex + 1] = mesh.halfedges[k];
 
-             k = mesh.halfedgeNext[k];
-             mapping[k] = j + 2;
-             halfedges[j + 2] = mesh.halfedges[k];
-             halfedges[j + 0].startVert = halfedges[j + 2].endVert;
-             halfedges[j + 1].startVert = halfedges[j + 0].endVert;
-             halfedges[j + 2].startVert = halfedges[j + 1].endVert;
-             j += 3;
-           });
+        k = mesh.halfedgeNext[k];
+        mapping[k] = currIndex + 2;
+        halfedges[currIndex + 2] = mesh.halfedges[k];
+        halfedges[currIndex + 0].startVert = halfedges[currIndex + 2].endVert;
+        halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
+        halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
+      });
   halfedges.resize(j);
   // fix pairedHalfedge id
   for_each(
