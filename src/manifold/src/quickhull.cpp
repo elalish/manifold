@@ -247,11 +247,11 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   Vec<int> faceMap(mesh.faces.size());
 
   // reorder halfedges
-  int j = 0;  // Since all faces are not used now (so we should start from 0
-              // and just increment, we can later set the face id as index/3
-              // for each halfedge)
-  for_each(autoPolicy(mesh.halfedges.size()), countAt(0_uz),
-           countAt(mesh.halfedges.size()), [&](size_t i) {
+  // Since all faces are not used now (so we should start from 0 and just
+  // increment, we can later set the face id as index/3 for each halfedge
+  size_t j = 0;
+  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(mesh.halfedges.size()),
+           [&](size_t i) {
              if (mesh.halfedges[i].pairedHalfedge < 0) return;
              if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
              if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
@@ -268,7 +268,7 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
              halfedges[j + 0].startVert = halfedges[j + 2].endVert;
              halfedges[j + 1].startVert = halfedges[j + 0].endVert;
              halfedges[j + 2].startVert = halfedges[j + 1].endVert;
-             AtomicAdd(j, 3);
+             j += 3;
            });
   halfedges.resize(j);
   // fix pairedHalfedge id
