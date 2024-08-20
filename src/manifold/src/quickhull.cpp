@@ -239,29 +239,7 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
     originalVertexData = pointCloud;
     planarPointCloudTemp.clear();
   }
-  // Reorder halfedges to remove pairedHalfedges and disabled faces
-  // std::vector<int> halfedgeMap(mesh.halfedges.size(), -1);
-  // size_t j=0;
-  // for (size_t index=0;index<mesh.halfedges.size();index++)
-  // {
-  //   if (mesh.halfedges[index].pairedHalfedge < 0) continue;
-  //   if (mesh.faces[mesh.halfedges[index].face].isDisabled()) continue;
-  //   mesh.halfedges[j].startVert = mesh.halfedges[index].startVert;
-  //   mesh.halfedges[j].endVert = mesh.halfedges[index].endVert;
-  //   mesh.halfedges[j].pairedHalfedge = mesh.halfedges[index].pairedHalfedge;
-  //   mesh.halfedges[j].face = mesh.halfedges[index].face;
-  //   mesh.halfedgeNext[j] = mesh.halfedgeNext[index];
-  //   halfedgeMap[index] = j;
-  //   j++;
-  // }
-  // mesh.halfedges.resize(j);
-  // mesh.halfedgeNext.resize(j);
-  // for (size_t index=0;index<mesh.halfedges.size();index++)
-  // {
-  //   mesh.halfedges[index].pairedHalfedge =
-  //   halfedgeMap[mesh.halfedges[index].pairedHalfedge];
-  //   mesh.halfedgeNext[index] = halfedgeMap[mesh.halfedgeNext[index]];
-  // }
+
   // reorder halfedges
   Vec<Halfedge> halfedges(mesh.halfedges.size());
   Vec<int> counts(mesh.halfedges.size(), 0);
