@@ -88,19 +88,6 @@ struct AssignNormals {
   }
 };
 
-struct LinkHalfedges {
-  VecView<Halfedge> halfedges;
-  VecView<const int> ids;
-  const int numEdge;
-
-  void operator()(int i) {
-    const int pair0 = ids[i];
-    const int pair1 = ids[i + numEdge];
-    halfedges[pair0].pairedHalfedge = pair1;
-    halfedges[pair1].pairedHalfedge = pair0;
-  }
-};
-
 struct MarkVerts {
   VecView<int> vert;
 
@@ -685,11 +672,43 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
     return edge[a] < edge[b];
   });
 
+  // Mark opposed triangles for removal
+  const int numEdge = numHalfedge / 2;
+  for (int i = 0; i < numEdge; ++i) {
+    const int pair0 = ids[i];
+    Halfedge h0 = halfedge_[pair0];
+    int k = i + numEdge;
+    while (1) {
+      const int pair1 = ids[k];
+      Halfedge h1 = halfedge_[pair1];
+      if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
+      if (halfedge_[NextHalfedge(pair0)].endVert ==
+          halfedge_[NextHalfedge(pair1)].endVert) {
+        h0.face = -1;
+        h1.face = -1;
+        // Reorder so that remaining edges pair up
+        if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
+        break;
+      }
+      ++k;
+      if (k >= numHalfedge) break;
+    }
+  }
+
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numHalfedge / 2,
-             LinkHalfedges({halfedge_, ids, numHalfedge / 2}));
+  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+    const int pair0 = ids[i];
+    const int pair1 = ids[i + numEdge];
+    if (halfedge_[pair0].face < 0) {
+      halfedge_[pair0] = {-1, -1, -1, -1};
+      halfedge_[pair1] = {-1, -1, -1, -1};
+    } else {
+      halfedge_[pair0].pairedHalfedge = pair1;
+      halfedge_[pair1].pairedHalfedge = pair0;
+    }
+  });
 }
 
 /**

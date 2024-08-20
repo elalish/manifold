@@ -139,11 +139,6 @@ void Manifold::Impl::CleanupTopology() {
 
   {
     ZoneScopedN("DedupeEdge");
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (halfedge_[i].IsForward()) {
-        RemoveIfFolded(i);
-      }
-    }
     Vec<SortEntry> entries;
     entries.reserve(nbEdges / 2);
     for (size_t i = 0; i < nbEdges; ++i) {
