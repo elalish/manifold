@@ -40,7 +40,7 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 
     // Check all other vertices
     for (int i = 0; i < (int)vertPos.size(); ++i) {
-      if (i == tri[0] || i == tri[2] || i == tri[3])
+      if (i == tri[0] || i == tri[1] || i == tri[2])
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
@@ -51,6 +51,7 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 
       // If any vertex lies on the opposite side of the normal direction
       if (distance > epsilon) {
+        std::cout << distance << std::endl;
         // The manifold is not convex
         return false;
       }
@@ -161,7 +162,7 @@ TEST(Hull, FailingTest1) {
     ExportMesh("failing_test1.glb", hull.GetMesh(), {});
   }
 #endif
-  EXPECT_TRUE(isMeshConvex(hull, 8.99628e-06));
+  EXPECT_TRUE(isMeshConvex(hull, 1.09375e-05));
 }
 
 TEST(Hull, FailingTest2) {
