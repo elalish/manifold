@@ -22,6 +22,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -598,7 +599,6 @@ class Quality {
  *  @brief Custom Exceptions
  * @{
  */
-#ifdef MANIFOLD_DEBUG
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -609,7 +609,6 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
-#endif
 /** @} */
 
 /**

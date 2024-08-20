@@ -19,6 +19,7 @@
 #include "manifold.h"
 #include "optional_assert.h"
 #include "polygon.h"
+#include "quickhull.h"
 #include "shared.h"
 #include "sparse.h"
 #include "utils.h"
@@ -189,5 +190,8 @@ struct Manifold::Impl {
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
   void Refine(std::function<int(glm::vec3)>);
+
+  // quickhull.cpp
+  void Hull(const std::vector<glm::vec3>& vertPos);
 };
 }  // namespace manifold

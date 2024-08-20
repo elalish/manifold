@@ -18,56 +18,199 @@
 #include "quickhull.h"
 
 #include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <iostream>
 #include <limits>
 
+namespace manifold {
+
 double defaultEps() { return 0.0000001; }
+
+// MathUtils.hpp
+inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
+                                                   const Ray& r) {
+  const glm::dvec3 s = p - r.S;
+  double t = glm::dot(s, r.V);
+  return glm::dot(s, s) - t * t * r.VInvLengthSquared;
+}
+
+inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
+  return glm::dot(p1 - p2, p1 - p2);
+}
+// Note that the unit of distance returned is relative to plane's normal's
+// length (divide by N.getNormalized() if needed to get the "real" distance).
+inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
+  return glm::dot(p.N, v) + p.D;
+}
+
+inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
+                                    const glm::dvec3& c) {
+  // We want to get (a-c).crossProduct(b-c) without constructing temp vectors
+  double x = a.x - c.x;
+  double y = a.y - c.y;
+  double z = a.z - c.z;
+  double rhsx = b.x - c.x;
+  double rhsy = b.y - c.y;
+  double rhsz = b.z - c.z;
+  double px = y * rhsz - z * rhsy;
+  double py = z * rhsx - x * rhsz;
+  double pz = x * rhsy - y * rhsx;
+  return glm::normalize(glm::dvec3(px, py, pz));
+}
+
+size_t MeshBuilder::addFace() {
+  if (disabledFaces.size()) {
+    size_t index = disabledFaces.back();
+    auto& f = faces[index];
+    ASSERT(f.isDisabled(), logicErr("f should be disabled"));
+    ASSERT(!f.pointsOnPositiveSide,
+           logicErr("f should not be on the positive side"));
+    f.mostDistantPointDist = 0;
+    disabledFaces.pop_back();
+    return index;
+  }
+  faces.emplace_back();
+  return faces.size() - 1;
+}
+
+size_t MeshBuilder::addHalfedge() {
+  if (disabledHalfedges.size()) {
+    const size_t index = disabledHalfedges.back();
+    disabledHalfedges.pop_back();
+    return index;
+  }
+  halfedges.push_back({});
+  halfedgeNext.push_back(0);
+  return halfedges.size() - 1;
+}
+
+void MeshBuilder::setup(int a, int b, int c, int d) {
+  faces.clear();
+  halfedges.clear();
+  halfedgeNext.clear();
+  disabledFaces.clear();
+  disabledHalfedges.clear();
+
+  faces.reserve(4);
+  halfedges.reserve(12);
+
+  // Create halfedges
+  // AB
+  halfedges.push_back({0, b, 6, 0});
+  halfedgeNext.push_back(1);
+  // BC
+  halfedges.push_back({0, c, 9, 0});
+  halfedgeNext.push_back(2);
+  // CA
+  halfedges.push_back({0, a, 3, 0});
+  halfedgeNext.push_back(0);
+  // AC
+  halfedges.push_back({0, c, 2, 1});
+  halfedgeNext.push_back(4);
+  // CD
+  halfedges.push_back({0, d, 11, 1});
+  halfedgeNext.push_back(5);
+  // DA
+  halfedges.push_back({0, a, 7, 1});
+  halfedgeNext.push_back(3);
+  // BA
+  halfedges.push_back({0, a, 0, 2});
+  halfedgeNext.push_back(7);
+  // AD
+  halfedges.push_back({0, d, 5, 2});
+  halfedgeNext.push_back(8);
+  // DB
+  halfedges.push_back({0, b, 10, 2});
+  halfedgeNext.push_back(6);
+  // CB
+  halfedges.push_back({0, b, 1, 3});
+  halfedgeNext.push_back(10);
+  // BD
+  halfedges.push_back({0, d, 8, 3});
+  halfedgeNext.push_back(11);
+  // DC
+  halfedges.push_back({0, c, 4, 3});
+  halfedgeNext.push_back(9);
+
+  // Create faces
+  faces.emplace_back(0);
+  faces.emplace_back(3);
+  faces.emplace_back(6);
+  faces.emplace_back(9);
+}
+
+std::array<int, 3> MeshBuilder::getVertexIndicesOfFace(const Face& f) const {
+  std::array<int, 3> v;
+  size_t index = f.he;
+  auto* he = &halfedges[index];
+  v[0] = he->endVert;
+
+  index = halfedgeNext[index];
+  he = &halfedges[index];
+  v[1] = he->endVert;
+
+  index = halfedgeNext[index];
+  he = &halfedges[index];
+  v[2] = he->endVert;
+  return v;
+}
+
+HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
+                           const VecView<glm::dvec3>& vertexData) {
+  std::unordered_map<size_t, size_t> faceMapping;
+  std::unordered_map<size_t, size_t> halfEdgeMapping;
+  std::unordered_map<size_t, size_t> vertexMapping;
+
+  size_t i = 0;
+  for (const auto& face : builderObject.faces) {
+    if (!face.isDisabled()) {
+      faces.emplace_back(static_cast<size_t>(face.he));
+      faceMapping[i] = faces.size() - 1;
+
+      const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
+      for (const auto heIndex : heIndices) {
+        const auto vertexIndex = builderObject.halfedges[heIndex].endVert;
+        if (vertexMapping.count(vertexIndex) == 0) {
+          vertices.push_back(vertexData[vertexIndex]);
+          vertexMapping[vertexIndex] = vertices.size() - 1;
+        }
+      }
+    }
+    i++;
+  }
+
+  i = 0;
+  for (const auto& halfEdge : builderObject.halfedges) {
+    if (halfEdge.pairedHalfedge != -1) {
+      halfedges.push_back(
+          {halfEdge.endVert, halfEdge.pairedHalfedge, halfEdge.face});
+      halfedgeNext.push_back(builderObject.halfedgeNext[i]);
+      halfEdgeMapping[i] = halfedges.size() - 1;
+    }
+    i++;
+  }
+
+  for (auto& face : faces) {
+    ASSERT(halfEdgeMapping.count(face.halfEdgeIndex) == 1,
+           logicErr("invalid halfedge mapping"));
+    face.halfEdgeIndex = halfEdgeMapping[face.halfEdgeIndex];
+  }
+
+  for (size_t i = 0; i < halfedges.size(); i++) {
+    auto& he = halfedges[i];
+    he.face = faceMapping[he.face];
+    he.pairedHalfedge = halfEdgeMapping[he.pairedHalfedge];
+    halfedgeNext[i] = halfEdgeMapping[halfedgeNext[i]];
+    he.endVert = vertexMapping[he.endVert];
+  }
+}
 
 /*
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::getConvexHull(const std::vector<glm::dvec3>& pointCloud,
-                                    bool CCW, bool useOriginalIndices,
-                                    double epsilon) {
-  VertexDataSource vertexDataSource(pointCloud);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
-}
-
-ConvexHull QuickHull::getConvexHull(const glm::dvec3* vertexData,
-                                    size_t vertexCount, bool CCW,
-                                    bool useOriginalIndices, double epsilon) {
-  VertexDataSource vertexDataSource(vertexData, vertexCount);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
-}
-
-ConvexHull QuickHull::getConvexHull(const double* vertexData,
-                                    size_t vertexCount, bool CCW,
-                                    bool useOriginalIndices, double epsilon) {
-  VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
-  return getConvexHull(vertexDataSource, CCW, useOriginalIndices, epsilon);
-}
-
-HalfEdgeMesh QuickHull::getConvexHullAsMesh(const double* vertexData,
-                                            size_t vertexCount, bool CCW,
-                                            double epsilon) {
-  VertexDataSource vertexDataSource((const vec3*)vertexData, vertexCount);
-  buildMesh(vertexDataSource, CCW, false, epsilon);
-  return HalfEdgeMesh(mesh, originalVertexData);
-}
-
-void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
-                          bool useOriginalIndices, double epsilon) {
-  // CCW is unused for now
-  (void)CCW;
-  // useOriginalIndices is unused for now
-  (void)useOriginalIndices;
-
+ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
+                                double epsilon) {
   if (pointCloud.size() == 0) {
-    mesh = MeshBuilder();
-    return;
+    return ConvexHull();
   }
   originalVertexData = pointCloud;
 
@@ -85,34 +228,94 @@ void QuickHull::buildMesh(const VertexDataSource& pointCloud, bool CCW,
   // The planar case happens when all the points appear to lie on a two
   // dimensional subspace of R^3.
   planar = false;
-  createConvexHalfEdgeMesh();
+  createConvexHalfedgeMesh();
   if (planar) {
-    const size_t extraPointIndex = planarPointCloudTemp.size() - 1;
-    for (auto& he : mesh.halfEdges) {
-      if (he.endVertex == extraPointIndex) {
-        he.endVertex = 0;
+    const int extraPointIndex = planarPointCloudTemp.size() - 1;
+    for (auto& he : mesh.halfedges) {
+      if (he.endVert == extraPointIndex) {
+        he.endVert = 0;
       }
     }
     originalVertexData = pointCloud;
     planarPointCloudTemp.clear();
   }
+
+  // reorder halfedges
+  Vec<Halfedge> halfedges(mesh.halfedges.size());
+  Vec<int> counts(mesh.halfedges.size(), 0);
+  Vec<int> mapping(mesh.halfedges.size());
+  Vec<int> faceMap(mesh.faces.size());
+
+  // reorder halfedges
+  // Since all faces are not used now (so we should start from 0 and just
+  // increment, we can later set the face id as index/3 for each halfedge
+  int j = 0;
+  for_each(
+      autoPolicy(mesh.halfedges.size()), countAt(0_uz),
+      countAt(mesh.halfedges.size()), [&](size_t i) {
+        if (mesh.halfedges[i].pairedHalfedge < 0) return;
+        if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
+        if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
+        int currIndex = AtomicAdd(j, 3);
+        mapping[i] = currIndex;
+        halfedges[currIndex + 0] = mesh.halfedges[i];
+
+        size_t k = mesh.halfedgeNext[i];
+        mapping[k] = currIndex + 1;
+        halfedges[currIndex + 1] = mesh.halfedges[k];
+
+        k = mesh.halfedgeNext[k];
+        mapping[k] = currIndex + 2;
+        halfedges[currIndex + 2] = mesh.halfedges[k];
+        halfedges[currIndex + 0].startVert = halfedges[currIndex + 2].endVert;
+        halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
+        halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
+      });
+  halfedges.resize(j);
+  // fix pairedHalfedge id
+  for_each(
+      autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
+      [&](Halfedge& he) { he.pairedHalfedge = mapping[he.pairedHalfedge]; });
+  counts.resize(pointCloud.size() + 1);
+  fill(counts.begin(), counts.end(), 0);
+
+  // remove unused vertices
+  for_each(autoPolicy(halfedges.size() / 3), countAt(0_uz),
+           countAt(halfedges.size() / 3), [&](size_t i) {
+             AtomicAdd(counts[halfedges[3 * i].startVert], 1);
+             AtomicAdd(counts[halfedges[3 * i + 1].startVert], 1);
+             AtomicAdd(counts[halfedges[3 * i + 2].startVert], 1);
+           });
+  auto saturate = [](int c) { return c > 0 ? 1 : 0; };
+  exclusive_scan(TransformIterator(counts.begin(), saturate),
+                 TransformIterator(counts.end(), saturate), counts.begin(), 0);
+  Vec<glm::dvec3> vertices(counts.back());
+  for_each(autoPolicy(pointCloud.size()), countAt(0_uz),
+           countAt(pointCloud.size()), [&](size_t i) {
+             if (counts[i + 1] - counts[i] > 0) {
+               vertices[counts[i]] = pointCloud[i];
+             }
+           });
+  for_each(autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
+           [&](Halfedge& he) {
+             he.startVert = counts[he.startVert];
+             he.endVert = counts[he.endVert];
+           });
+  // setting face id
+  for (size_t index = 0; index < halfedges.size(); index++) {
+    halfedges[index].face = index / 3;
+  }
+  return ConvexHull{std::move(halfedges), std::move(vertices)};
 }
 
-ConvexHull QuickHull::getConvexHull(const VertexDataSource& pointCloud,
-                                    bool CCW, bool useOriginalIndices,
-                                    double epsilon) {
-  buildMesh(pointCloud, CCW, useOriginalIndices, epsilon);
-  return ConvexHull(mesh, originalVertexData, CCW, useOriginalIndices);
-}
-
-void QuickHull::createConvexHalfEdgeMesh() {
+void QuickHull::createConvexHalfedgeMesh() {
   visibleFaces.clear();
   horizonEdgesData.clear();
   possiblyVisibleFaces.clear();
 
   // Compute base tetrahedron
   setupInitialTetrahedron();
-  assert(mesh.faces.size() == 4);
+  ASSERT(mesh.faces.size() == 4, logicErr("not a tetrahedron"));
 
   // Init face stack with those faces that have points assigned to them
   faceList.clear();
@@ -136,13 +339,14 @@ void QuickHull::createConvexHalfEdgeMesh() {
       iter = 0;
     }
 
-    const size_t topFaceIndex = faceList.front();
+    const auto topFaceIndex = faceList.front();
     faceList.pop_front();
 
     auto& tf = mesh.faces[topFaceIndex];
     tf.inFaceStack = 0;
 
-    assert(!tf.pointsOnPositiveSide || tf.pointsOnPositiveSide->size() > 0);
+    ASSERT(!tf.pointsOnPositiveSide || tf.pointsOnPositiveSide->size() > 0,
+           logicErr("there should be points on the positive side"));
     if (!tf.pointsOnPositiveSide || tf.isDisabled()) {
       continue;
     }
@@ -158,13 +362,12 @@ void QuickHull::createConvexHalfEdgeMesh() {
     horizonEdgesData.clear();
     possiblyVisibleFaces.clear();
     visibleFaces.clear();
-    possiblyVisibleFaces.emplace_back(topFaceIndex,
-                                      std::numeric_limits<size_t>::max());
+    possiblyVisibleFaces.push_back({topFaceIndex, -1});
     while (possiblyVisibleFaces.size()) {
       const auto faceData = possiblyVisibleFaces.back();
       possiblyVisibleFaces.pop_back();
       auto& pvf = mesh.faces[faceData.faceIndex];
-      assert(!pvf.isDisabled());
+      ASSERT(!pvf.isDisabled(), logicErr("pvf should not be disabled"));
 
       if (pvf.visibilityCheckedOnIteration == iter) {
         if (pvf.isVisibleFaceOnCurrentIteration) {
@@ -179,30 +382,33 @@ void QuickHull::createConvexHalfEdgeMesh() {
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
           for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
-            if (mesh.halfEdges[heIndex].opp != faceData.enteredFromHalfEdge) {
-              possiblyVisibleFaces.emplace_back(
-                  mesh.halfEdges[mesh.halfEdges[heIndex].opp].face, heIndex);
+            if (mesh.halfedges[heIndex].pairedHalfedge !=
+                faceData.enteredFromHalfedge) {
+              possiblyVisibleFaces.push_back(
+                  {mesh.halfedges[mesh.halfedges[heIndex].pairedHalfedge].face,
+                   heIndex});
             }
           }
           continue;
         }
-        assert(faceData.faceIndex != topFaceIndex);
+        ASSERT(faceData.faceIndex != topFaceIndex,
+               logicErr("face index invalid"));
       }
 
       // The face is not visible. Therefore, the halfedge we came from is part
       // of the horizon edge.
       pvf.isVisibleFaceOnCurrentIteration = 0;
-      horizonEdgesData.push_back(faceData.enteredFromHalfEdge);
+      horizonEdgesData.push_back(faceData.enteredFromHalfedge);
       // Store which half edge is the horizon edge. The other half edges of the
       // face will not be part of the final mesh so their data slots can by
       // recycled.
       const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
-          mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]);
+          mesh.faces[mesh.halfedges[faceData.enteredFromHalfedge].face]);
       const std::int8_t ind =
-          (halfEdgesMesh[0] == faceData.enteredFromHalfEdge)
+          (halfEdgesMesh[0] == faceData.enteredFromHalfedge)
               ? 0
-              : (halfEdgesMesh[1] == faceData.enteredFromHalfEdge ? 1 : 2);
-      mesh.faces[mesh.halfEdges[faceData.enteredFromHalfEdge].face]
+              : (halfEdgesMesh[1] == faceData.enteredFromHalfedge ? 1 : 2);
+      mesh.faces[mesh.halfedges[faceData.enteredFromHalfedge].face]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
     const size_t horizonEdgeCount = horizonEdgesData.size();
@@ -212,10 +418,19 @@ void QuickHull::createConvexHalfEdgeMesh() {
     // edge for this point and accept a minor degeneration in the convex hull.
     if (!reorderHorizonEdges(horizonEdgesData)) {
       diagnostics.failedHorizonEdges++;
-      std::cerr << "Failed to solve horizon edge." << std::endl;
-      auto it = std::find(tf.pointsOnPositiveSide->begin(),
-                          tf.pointsOnPositiveSide->end(), activePointIndex);
-      tf.pointsOnPositiveSide->erase(it);
+      int change_flag = 0;
+      for (size_t index = 0; index < tf.pointsOnPositiveSide->size(); index++) {
+        if ((*tf.pointsOnPositiveSide)[index] == activePointIndex) {
+          change_flag = 1;
+        } else if (change_flag == 1) {
+          change_flag = 2;
+          (*tf.pointsOnPositiveSide)[index - 1] =
+              (*tf.pointsOnPositiveSide)[index];
+        }
+      }
+      if (change_flag == 1)
+        tf.pointsOnPositiveSide->resize(tf.pointsOnPositiveSide->size() - 1);
+
       if (tf.pointsOnPositiveSide->size() == 0) {
         reclaimToIndexVectorPool(tf.pointsOnPositiveSide);
       }
@@ -227,7 +442,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
     // disabled as well, but we need to remember the points that were on the
     // positive side of them - therefore we save pointers to them.
     newFaceIndices.clear();
-    newHalfEdgeIndices.clear();
+    newHalfedgeIndices.clear();
     disabledFacePointVectors.clear();
     size_t disableCounter = 0;
     for (auto faceIndex : visibleFaces) {
@@ -237,11 +452,11 @@ void QuickHull::createConvexHalfEdgeMesh() {
         if ((disabledFace.horizonEdgesOnCurrentIteration & (1 << j)) == 0) {
           if (disableCounter < horizonEdgeCount * 2) {
             // Use on this iteration
-            newHalfEdgeIndices.push_back(halfEdgesMesh[j]);
+            newHalfedgeIndices.push_back(halfEdgesMesh[j]);
             disableCounter++;
           } else {
             // Mark for reusal on later iteration step
-            mesh.disableHalfEdge(halfEdgesMesh[j]);
+            mesh.disableHalfedge(halfEdgesMesh[j]);
           }
         }
       }
@@ -251,14 +466,14 @@ void QuickHull::createConvexHalfEdgeMesh() {
       auto t = mesh.disableFace(faceIndex);
       if (t) {
         // Because we should not assign point vectors to faces unless needed...
-        assert(t->size());
+        ASSERT(t->size(), logicErr("t should not be empty"));
         disabledFacePointVectors.push_back(std::move(t));
       }
     }
     if (disableCounter < horizonEdgeCount * 2) {
       const size_t newHalfEdgesNeeded = horizonEdgeCount * 2 - disableCounter;
       for (size_t i = 0; i < newHalfEdgesNeeded; i++) {
-        newHalfEdgeIndices.push_back(mesh.addHalfEdge());
+        newHalfedgeIndices.push_back(mesh.addHalfedge());
       }
     }
 
@@ -267,7 +482,7 @@ void QuickHull::createConvexHalfEdgeMesh() {
       const size_t AB = horizonEdgesData[i];
 
       auto horizonEdgeVertexIndices =
-          mesh.getVertexIndicesOfHalfEdge(mesh.halfEdges[AB]);
+          mesh.getVertexIndicesOfHalfEdge(mesh.halfedges[AB]);
       size_t A, B, C;
       A = horizonEdgeVertexIndices[0];
       B = horizonEdgeVertexIndices[1];
@@ -276,37 +491,37 @@ void QuickHull::createConvexHalfEdgeMesh() {
       const size_t newFaceIndex = mesh.addFace();
       newFaceIndices.push_back(newFaceIndex);
 
-      const size_t CA = newHalfEdgeIndices[2 * i + 0];
-      const size_t BC = newHalfEdgeIndices[2 * i + 1];
+      const size_t CA = newHalfedgeIndices[2 * i + 0];
+      const size_t BC = newHalfedgeIndices[2 * i + 1];
 
-      mesh.halfEdges[AB].next = BC;
-      mesh.halfEdges[BC].next = CA;
-      mesh.halfEdges[CA].next = AB;
+      mesh.halfedgeNext[AB] = BC;
+      mesh.halfedgeNext[BC] = CA;
+      mesh.halfedgeNext[CA] = AB;
 
-      mesh.halfEdges[BC].face = newFaceIndex;
-      mesh.halfEdges[CA].face = newFaceIndex;
-      mesh.halfEdges[AB].face = newFaceIndex;
+      mesh.halfedges[BC].face = newFaceIndex;
+      mesh.halfedges[CA].face = newFaceIndex;
+      mesh.halfedges[AB].face = newFaceIndex;
 
-      mesh.halfEdges[CA].endVertex = A;
-      mesh.halfEdges[BC].endVertex = C;
+      mesh.halfedges[CA].endVert = A;
+      mesh.halfedges[BC].endVert = C;
 
       auto& newFace = mesh.faces[newFaceIndex];
 
-      const glm::dvec3 planeNormal = mathutils::getTriangleNormal(
+      const glm::dvec3 planeNormal = getTriangleNormal(
           originalVertexData[A], originalVertexData[B], activePoint);
       newFace.P = Plane(planeNormal, activePoint);
       newFace.he = AB;
 
-      mesh.halfEdges[CA].opp =
-          newHalfEdgeIndices[i > 0 ? i * 2 - 1 : 2 * horizonEdgeCount - 1];
-      mesh.halfEdges[BC].opp =
-          newHalfEdgeIndices[((i + 1) * 2) % (horizonEdgeCount * 2)];
+      mesh.halfedges[CA].pairedHalfedge =
+          newHalfedgeIndices[i > 0 ? i * 2 - 1 : 2 * horizonEdgeCount - 1];
+      mesh.halfedges[BC].pairedHalfedge =
+          newHalfedgeIndices[((i + 1) * 2) % (horizonEdgeCount * 2)];
     }
 
     // Assign points that were on the positive side of the disabled faces to the
     // new faces.
     for (auto& disabledPoints : disabledFacePointVectors) {
-      assert(disabledPoints);
+      ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
       for (const auto& point : *(disabledPoints)) {
         if (point == activePointIndex) {
           continue;
@@ -326,7 +541,8 @@ void QuickHull::createConvexHalfEdgeMesh() {
     for (const auto newFaceIndex : newFaceIndices) {
       auto& newFace = mesh.faces[newFaceIndex];
       if (newFace.pointsOnPositiveSide) {
-        assert(newFace.pointsOnPositiveSide->size() > 0);
+        ASSERT(newFace.pointsOnPositiveSide->size() > 0,
+               logicErr("there should be points on the positive side"));
         if (!newFace.inFaceStack) {
           faceList.push_back(newFaceIndex);
           newFace.inFaceStack = 1;
@@ -376,14 +592,15 @@ std::array<size_t, 6> QuickHull::getExtremeValues() {
   return outIndices;
 }
 
-bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
+bool QuickHull::reorderHorizonEdges(VecView<size_t>& horizonEdges) {
   const size_t horizonEdgeCount = horizonEdges.size();
-  for (size_t i = 0; i < horizonEdgeCount - 1; i++) {
-    const size_t endVertexCheck = mesh.halfEdges[horizonEdges[i]].endVertex;
+  for (size_t i = 0; i + 1 < horizonEdgeCount; i++) {
+    const size_t endVertexCheck = mesh.halfedges[horizonEdges[i]].endVert;
     bool foundNext = false;
     for (size_t j = i + 1; j < horizonEdgeCount; j++) {
       const size_t beginVertex =
-          mesh.halfEdges[mesh.halfEdges[horizonEdges[j]].opp].endVertex;
+          mesh.halfedges[mesh.halfedges[horizonEdges[j]].pairedHalfedge]
+              .endVert;
       if (beginVertex == endVertexCheck) {
         std::swap(horizonEdges[i + 1], horizonEdges[j]);
         foundNext = true;
@@ -394,8 +611,10 @@ bool QuickHull::reorderHorizonEdges(std::vector<size_t>& horizonEdges) {
       return false;
     }
   }
-  assert(mesh.halfEdges[horizonEdges[horizonEdges.size() - 1]].endVertex ==
-         mesh.halfEdges[mesh.halfEdges[horizonEdges[0]].opp].endVertex);
+  ASSERT(mesh.halfedges[horizonEdges[horizonEdges.size() - 1]].endVert ==
+             mesh.halfedges[mesh.halfedges[horizonEdges[0]].pairedHalfedge]
+                 .endVert,
+         logicErr("invalid halfedge"));
   return true;
 }
 
@@ -421,9 +640,9 @@ void QuickHull::setupInitialTetrahedron() {
     size_t v[4] = {0, std::min((size_t)1, vertexCount - 1),
                    std::min((size_t)2, vertexCount - 1),
                    std::min((size_t)3, vertexCount - 1)};
-    const glm::dvec3 N = mathutils::getTriangleNormal(originalVertexData[v[0]],
-                                                      originalVertexData[v[1]],
-                                                      originalVertexData[v[2]]);
+    const glm::dvec3 N =
+        getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
+                          originalVertexData[v[2]]);
     const Plane trianglePlane(N, originalVertexData[v[0]]);
     if (trianglePlane.isPointOnPositiveSide(originalVertexData[v[3]])) {
       std::swap(v[0], v[1]);
@@ -438,9 +657,8 @@ void QuickHull::setupInitialTetrahedron() {
     for (size_t j = i + 1; j < 6; j++) {
       // I found a function for squaredDistance but i can't seem to include it
       // like this for some reason
-      const double d =
-          mathutils::getSquaredDistance(originalVertexData[extremeValues[i]],
-                                        originalVertexData[extremeValues[j]]);
+      const double d = getSquaredDistance(originalVertexData[extremeValues[i]],
+                                          originalVertexData[extremeValues[j]]);
       if (d > maxD) {
         maxD = d;
         selectedPoints = {extremeValues[i], extremeValues[j]};
@@ -453,7 +671,8 @@ void QuickHull::setupInitialTetrahedron() {
                       std::min((size_t)2, vertexCount - 1),
                       std::min((size_t)3, vertexCount - 1));
   }
-  assert(selectedPoints.first != selectedPoints.second);
+  ASSERT(selectedPoints.first != selectedPoints.second,
+         logicErr("degenerate selectedPoints"));
 
   // Find the most distant point to the line between the two chosen extreme
   // points.
@@ -464,8 +683,8 @@ void QuickHull::setupInitialTetrahedron() {
   size_t maxI = std::numeric_limits<size_t>::max();
   const size_t vCount = originalVertexData.size();
   for (size_t i = 0; i < vCount; i++) {
-    const double distToRay = mathutils::getSquaredDistanceBetweenPointAndRay(
-        originalVertexData[i], r);
+    const double distToRay =
+        getSquaredDistanceBetweenPointAndRay(originalVertexData[i], r);
     if (distToRay > maxD) {
       maxD = distToRay;
       maxI = i;
@@ -502,7 +721,8 @@ void QuickHull::setupInitialTetrahedron() {
   }
 
   // These three points form the base triangle for our tetrahedron.
-  assert(selectedPoints.first != maxI && selectedPoints.second != maxI);
+  ASSERT(selectedPoints.first != maxI && selectedPoints.second != maxI,
+         logicErr("degenerate selectedPoints"));
   std::array<size_t, 3> baseTriangle{selectedPoints.first,
                                      selectedPoints.second, maxI};
   const glm::dvec3 baseTriangleVertices[] = {
@@ -513,13 +733,13 @@ void QuickHull::setupInitialTetrahedron() {
   // the point farthest away from the triangle plane.
   maxD = m_epsilon;
   maxI = 0;
-  const glm::dvec3 N = mathutils::getTriangleNormal(baseTriangleVertices[0],
-                                                    baseTriangleVertices[1],
-                                                    baseTriangleVertices[2]);
+  const glm::dvec3 N =
+      getTriangleNormal(baseTriangleVertices[0], baseTriangleVertices[1],
+                        baseTriangleVertices[2]);
   Plane trianglePlane(N, baseTriangleVertices[0]);
   for (size_t i = 0; i < vCount; i++) {
-    const double d = std::abs(mathutils::getSignedDistanceToPlane(
-        originalVertexData[i], trianglePlane));
+    const double d = std::abs(
+        getSignedDistanceToPlane(originalVertexData[i], trianglePlane));
     if (d > maxD) {
       maxD = d;
       maxI = i;
@@ -530,17 +750,14 @@ void QuickHull::setupInitialTetrahedron() {
     // Well, let's add one extra point to the point cloud so that the convex
     // hull will have volume.
     planar = true;
-    const vec3 N1 = mathutils::getTriangleNormal(baseTriangleVertices[1],
-                                                 baseTriangleVertices[2],
-                                                 baseTriangleVertices[0]);
-    planarPointCloudTemp.clear();
-    planarPointCloudTemp.insert(planarPointCloudTemp.begin(),
-                                originalVertexData.begin(),
-                                originalVertexData.end());
+    const vec3 N1 =
+        getTriangleNormal(baseTriangleVertices[1], baseTriangleVertices[2],
+                          baseTriangleVertices[0]);
+    planarPointCloudTemp = Vec<glm::dvec3>(originalVertexData);
     const vec3 extraPoint = N1 + originalVertexData[0];
     planarPointCloudTemp.push_back(extraPoint);
     maxI = planarPointCloudTemp.size() - 1;
-    originalVertexData = VertexDataSource(planarPointCloudTemp);
+    originalVertexData = planarPointCloudTemp;
   }
 
   // Enforce CCW orientation (if user prefers clockwise orientation, swap two
@@ -558,7 +775,7 @@ void QuickHull::setupInitialTetrahedron() {
     const glm::dvec3& va = originalVertexData[v[0]];
     const glm::dvec3& vb = originalVertexData[v[1]];
     const glm::dvec3& vc = originalVertexData[v[2]];
-    const glm::dvec3 N1 = mathutils::getTriangleNormal(va, vb, vc);
+    const glm::dvec3 N1 = getTriangleNormal(va, vb, vc);
     const Plane plane(N1, va);
     f.P = plane;
   }
@@ -573,3 +790,40 @@ void QuickHull::setupInitialTetrahedron() {
     }
   }
 }
+
+std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
+  auto r = indexVectorPool.get();
+  r->resize(0);
+  return r;
+}
+
+void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
+  const size_t oldSize = ptr->size();
+  if ((oldSize + 1) * 128 < ptr->capacity()) {
+    // Reduce memory usage! Huge vectors are needed at the beginning of
+    // iteration when faces have many points on their positive side. Later on,
+    // smaller vectors will suffice.
+    ptr.reset(nullptr);
+    return;
+  }
+  indexVectorPool.reclaim(ptr);
+}
+
+bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
+                               size_t pointIndex) {
+  const double D =
+      getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
+  if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
+    if (!f.pointsOnPositiveSide) {
+      f.pointsOnPositiveSide = getIndexVectorFromPool();
+    }
+    f.pointsOnPositiveSide->push_back(pointIndex);
+    if (D > f.mostDistantPointDist) {
+      f.mostDistantPointDist = D;
+      f.mostDistantPoint = pointIndex;
+    }
+    return true;
+  }
+  return false;
+}
+}  // namespace manifold
