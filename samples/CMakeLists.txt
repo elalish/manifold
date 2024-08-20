@@ -14,17 +14,21 @@
 
 project(samples)
 
-add_library(samples src/bracelet.cpp src/knot.cpp src/menger_sponge.cpp
+add_library(samples src/menger_sponge.cpp
     src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp
     src/gyroid_module.cpp src/condensed_matter.cpp)
+if(MANIFOLD_CROSS_SECTION)
+    target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
+endif()
 
 target_include_directories(samples
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(samples
-    PUBLIC manifold cross_section
-)
+target_link_libraries(samples PUBLIC manifold)
+if(MANIFOLD_CROSS_SECTION)
+  target_link_libraries(${PROJECT_NAME} PUBLIC cross_section)
+endif()
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(samples PUBLIC cxx_std_17)
