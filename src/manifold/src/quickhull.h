@@ -104,6 +104,7 @@ class Plane {
   double sqrNLength;
 
   bool isPointOnPositiveSide(const glm::dvec3& Q) const {
+    ZoneScoped;
     double d = glm::dot(N, Q) + D;
     if (d >= 0) return true;
     return false;
@@ -180,6 +181,7 @@ class MeshBuilder {
   // Mark a face as disabled and return a pointer to the points that were on the
   // positive of it.
   std::unique_ptr<Vec<size_t>> disableFace(size_t faceIndex) {
+    ZoneScoped;
     auto& f = faces[faceIndex];
     f.disable();
     disabledFaces.push_back(faceIndex);
@@ -187,6 +189,7 @@ class MeshBuilder {
   }
 
   void disableHalfedge(size_t heIndex) {
+    ZoneScoped;
     auto& he = halfedges[heIndex];
     he.pairedHalfedge = -1;
     disabledHalfedges.push_back(heIndex);
@@ -201,10 +204,12 @@ class MeshBuilder {
   std::array<int, 3> getVertexIndicesOfFace(const Face& f) const;
 
   std::array<int, 2> getVertexIndicesOfHalfEdge(const Halfedge& he) const {
+    ZoneScoped;
     return {halfedges[he.pairedHalfedge].endVert, he.endVert};
   }
 
   std::array<int, 3> getHalfEdgeIndicesOfFace(const Face& f) const {
+    ZoneScoped;
     return {f.he, halfedgeNext[f.he], halfedgeNext[halfedgeNext[f.he]]};
   }
 };
@@ -324,6 +329,7 @@ class QuickHull {
   //   Convex hull of the point cloud as halfEdge vector and vertex vector
   ConvexHull getConvexHullAsMesh(const Vec<glm::dvec3>& pointCloud, bool CCW,
                                  double epsilon = defaultEps()) {
+    ZoneScoped;
     Vec<glm::dvec3> pointCloudVec(pointCloud);
     QuickHull qh(pointCloudVec);
     return qh.buildMesh(pointCloudVec, CCW, epsilon);
