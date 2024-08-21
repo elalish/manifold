@@ -953,7 +953,7 @@ namespace manifold {
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
   std::vector<ivec3> triangles;
   double updatedPrecision = precision;
-#if MANIFOLD_EXCEPTION
+#ifdef MANIFOLD_EXCEPTIONS
   try {
 #endif
     if (IsConvex(polys, precision)) {  // fast path
@@ -963,7 +963,7 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
       triangles = triangulator.Triangulate();
       updatedPrecision = triangulator.GetPrecision();
     }
-#if MANIFOLD_EXCEPTION
+#ifdef MANIFOLD_EXCEPTIONS
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
