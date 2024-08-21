@@ -256,9 +256,8 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
 
-  // reorder halfedges
-  // Since all faces are not used now (so we should start from 0 and just
-  // increment, we can later set the face id as index/3 for each halfedge
+  // Some faces are disabled and should not go into the halfedge vector, we can
+  // update the face indices of the halfedges at the end using index/3
   int j = 0;
   for_each(
       autoPolicy(mesh.halfedges.size()), countAt(0_uz),
@@ -306,15 +305,13 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
                vertices[counts[i]] = pointCloud[i];
              }
            });
-  for_each(autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
-           [&](Halfedge& he) {
+  for_each(autoPolicy(halfedges.size()), countAt(0_uz),
+           countAt(halfedges.size()), [&](size_t i) {
+             auto& he = halfedges[i];
              he.startVert = counts[he.startVert];
              he.endVert = counts[he.endVert];
+             he.face = i / 3;
            });
-  // setting face id
-  for (size_t index = 0; index < halfedges.size(); index++) {
-    halfedges[index].face = index / 3;
-  }
   return ConvexHull{std::move(halfedges), std::move(vertices)};
 }
 
@@ -439,8 +436,7 @@ void QuickHull::createConvexHalfedgeMesh() {
               (*tf.pointsOnPositiveSide)[index];
         }
       }
-      if (change_flag == 1)
-        tf.pointsOnPositiveSide->resize(tf.pointsOnPositiveSide->size() - 1);
+      if (change_flag == 1) tf.pointsOnPositiveSide->pop_back();
 
       if (tf.pointsOnPositiveSide->size() == 0) {
         reclaimToIndexVectorPool(tf.pointsOnPositiveSide);
