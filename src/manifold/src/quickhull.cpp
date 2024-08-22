@@ -24,7 +24,6 @@ namespace manifold {
 
 double defaultEps() { return 0.0000001; }
 
-// MathUtils.hpp
 inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
                                                    const Ray& r) {
   const glm::dvec3 s = p - r.S;
@@ -241,9 +240,8 @@ ConvexHull QuickHull::buildMesh(bool CCW, double epsilon) {
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
 
-  // reorder halfedges
-  // Since all faces are not used now (so we should start from 0 and just
-  // increment, we can later set the face id as index/3 for each halfedge
+  // Some faces are disabled and should not go into the halfedge vector, we can
+  // update the face indices of the halfedges at the end using index/3
   int j = 0;
   for_each(
       autoPolicy(mesh.halfedges.size()), countAt(0_uz),

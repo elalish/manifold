@@ -69,7 +69,6 @@ class ConvexHull {
   Vec<glm::dvec3> vertices;
 };
 
-// Pool.hpp
 class Pool {
   std::vector<std::unique_ptr<Vec<size_t>>> data;
 
@@ -90,8 +89,6 @@ class Pool {
     return r;
   }
 };
-
-// Plane.hpp
 
 class Plane {
  public:
@@ -116,8 +113,6 @@ class Plane {
       : N(N), D(glm::dot(-N, P)), sqrNLength(glm::dot(N, N)) {}
 };
 
-// Ray.hpp
-
 struct Ray {
   const glm::dvec3 S;
   const glm::dvec3 V;
@@ -126,8 +121,6 @@ struct Ray {
   Ray(const glm::dvec3& S, const glm::dvec3& V)
       : S(S), V(V), VInvLengthSquared(1 / (glm::dot(V, V))) {}
 };
-
-// Mesh.hpp
 
 class MeshBuilder {
  public:
@@ -209,8 +202,6 @@ class MeshBuilder {
   }
 };
 
-// HalfEdgeMesh.hpp
-
 class HalfEdgeMesh {
  public:
   Vec<glm::dvec3> vertices;
@@ -222,8 +213,6 @@ class HalfEdgeMesh {
   HalfEdgeMesh(const MeshBuilder& builderObject,
                const VecView<glm::dvec3>& vertexData);
 };
-
-// QuickHull.hpp
 
 double defaultEps();
 
