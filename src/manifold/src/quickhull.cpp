@@ -205,10 +205,10 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
 /*
  * Implementation of the algorithm
  */
-
-ConvexHull QuickHull::buildMesh(bool CCW, double epsilon) {
+// TODO : Once double PR lands replace glm::vec3 with glm::dvec3
+std::pair<Vec<Halfedge>, Vec<glm::vec3>> QuickHull::buildMesh(double epsilon) {
   if (originalVertexData.size() == 0) {
-    return ConvexHull();
+    return {Vec<Halfedge>(), Vec<glm::vec3>()};
   }
 
   // Very first: find extreme values and use them to compute the scale of the
@@ -298,7 +298,11 @@ ConvexHull QuickHull::buildMesh(bool CCW, double epsilon) {
   for (size_t index = 0; index < halfedges.size(); index++) {
     halfedges[index].face = index / 3;
   }
-  return ConvexHull{std::move(halfedges), std::move(vertices)};
+  // TODO : Once double PR lands remove this code
+  Vec<glm::vec3> verticesFloat(vertices.size());
+  manifold::transform(vertices.begin(), vertices.end(), verticesFloat.begin(),
+                      [](const glm::dvec3& v) { return glm::vec3(v); });
+  return {std::move(halfedges), std::move(verticesFloat)};
 }
 
 void QuickHull::createConvexHalfedgeMesh() {
@@ -819,10 +823,4 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
   return false;
 }
 
-ConvexHull getConvexHullAsMesh(const Vec<glm::dvec3>& pointCloud, bool CCW,
-                               double epsilon) {
-  Vec<glm::dvec3> pointCloudVec(pointCloud);
-  QuickHull qh(pointCloudVec);
-  return qh.buildMesh(CCW, epsilon);
-}
 }  // namespace manifold

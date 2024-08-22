@@ -63,12 +63,6 @@
 
 namespace manifold {
 
-class ConvexHull {
- public:
-  Vec<Halfedge> halfedges;
-  Vec<glm::dvec3> vertices;
-};
-
 class Pool {
   std::vector<std::unique_ptr<Vec<size_t>>> data;
 
@@ -281,21 +275,16 @@ class QuickHull {
   QuickHull(const Vec<glm::dvec3>& pointCloudVec)
       : originalVertexData(VecView(pointCloudVec)) {}
 
-  // Constructs the convex hull into halfEdges and NewVerts
-  ConvexHull buildMesh(bool CCW, double eps);
+  // Computes convex hull for a given point cloud. This function assumes that
+  // the vertex data resides in memory in the following format:
+  // x_0,y_0,z_0,x_1,y_1,z_1,... Params:
+  //   vertexData: pointer to the X component of the first point of the point
+  //   cloud. vertexCount: number of vertices in the point cloud eps: minimum
+  //   distance to a plane to consider a point being on positive side of it (for
+  //   a point cloud with scale 1)
+  // Returns:
+  //   Convex hull of the point cloud as halfEdge vector and vertex vector
+  std::pair<Vec<Halfedge>, Vec<glm::vec3>> buildMesh(double eps = defaultEps());
 };
-
-// Computes convex hull for a given point cloud. This function assumes that
-// the vertex data resides in memory in the following format:
-// x_0,y_0,z_0,x_1,y_1,z_1,... Params:
-//   vertexData: pointer to the X component of the first point of the point
-//   cloud. vertexCount: number of vertices in the point cloud CCW: whether
-//   the output mesh triangles should have CCW orientation eps: minimum
-//   distance to a plane to consider a point being on positive side of it (for
-//   a point cloud with scale 1)
-// Returns:
-//   Convex hull of the point cloud as halfEdge vector and vertex vector
-ConvexHull getConvexHullAsMesh(const Vec<glm::dvec3>& pointCloud, bool CCW,
-                               double epsilon = defaultEps());
 
 }  // namespace manifold

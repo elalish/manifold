@@ -488,13 +488,8 @@ void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
   Vec<glm::dvec3> pointCloudVec(numVert);
   manifold::transform(vertPos.begin(), vertPos.end(), pointCloudVec.begin(),
                       [](const glm::vec3& v) { return glm::dvec3(v); });
-  ConvexHull hull = getConvexHullAsMesh(pointCloudVec, false);
-  // TODO : Once double PR lands, replace this with move
-  vertPos_.resize(hull.vertices.size());
-  manifold::transform(hull.vertices.begin(), hull.vertices.end(),
-                      vertPos_.begin(),
-                      [](const glm::dvec3& v) { return glm::vec3(v); });
-  halfedge_ = std::move(hull.halfedges);
+  QuickHull qh(pointCloudVec);
+  std::tie(halfedge_, vertPos_) = qh.buildMesh();
   meshRelation_.originalID = ReserveIDs(1);
   CalculateBBox();
   SetPrecision(bBox_.Scale() * kTolerance);
