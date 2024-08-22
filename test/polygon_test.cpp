@@ -58,14 +58,6 @@ Polygons Duplicate(Polygons polys) {
 void TestPoly(const Polygons &polys, int expectedNumTri,
               double precision = -1.0) {
   PolygonParams().verbose = options.params.verbose;
-  if (precision < 0.0) {
-    // FIXME: we override the precision to match the old precision value
-    Rect r;
-    for (const auto &poly : polys)
-      for (const auto &pt : poly)
-        r.Union(pt);
-    precision = r.Scale() * 1e-5;
-  }
 
   std::vector<ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys, precision));

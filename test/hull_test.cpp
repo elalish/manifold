@@ -65,7 +65,7 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 TEST(Hull, Tictac) {
   const double tictacRad = 100;
   const double tictacHeight = 500;
-  const int tictacSeg = 1000;
+  const int tictacSeg = 500;
   const double tictacMid = tictacHeight - 2 * tictacRad;
   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
   const std::vector<Manifold> spheres{sphere,

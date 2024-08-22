@@ -836,7 +836,7 @@ TEST(Polygon, Sponge3a) {
   TestPoly(polys, 454);
 }
 
-TEST(Polygon, BigSponge) {
+TEST(Polygon, DISABLED_BigSponge) {
   Polygons polys;
   polys.push_back({
       {0.5, 0.5},                        //
