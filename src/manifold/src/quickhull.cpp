@@ -162,8 +162,8 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
   size_t i = 0;
   for (const auto& face : builderObject.faces) {
     if (!face.isDisabled()) {
-      faces.emplace_back(static_cast<size_t>(face.he));
-      faceMapping[i] = faces.size() - 1;
+      halfEdgeIndexFaces.emplace_back(static_cast<size_t>(face.he));
+      faceMapping[i] = halfEdgeIndexFaces.size() - 1;
 
       const auto heIndices = builderObject.getHalfEdgeIndicesOfFace(face);
       for (const auto heIndex : heIndices) {
@@ -188,10 +188,10 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
     i++;
   }
 
-  for (auto& face : faces) {
-    ASSERT(halfEdgeMapping.count(face.halfEdgeIndex) == 1,
+  for (auto& halfEdgeIndexFace : halfEdgeIndexFaces) {
+    ASSERT(halfEdgeMapping.count(halfEdgeIndexFace) == 1,
            logicErr("invalid halfedge mapping"));
-    face.halfEdgeIndex = halfEdgeMapping[face.halfEdgeIndex];
+    halfEdgeIndexFace = halfEdgeMapping[halfEdgeIndexFace];
   }
 
   for (size_t i = 0; i < halfedges.size(); i++) {
@@ -207,12 +207,10 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
  * Implementation of the algorithm
  */
 
-ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
-                                double epsilon) {
-  if (pointCloud.size() == 0) {
+ConvexHull QuickHull::buildMesh(bool CCW, double epsilon) {
+  if (originalVertexData.size() == 0) {
     return ConvexHull();
   }
-  originalVertexData = pointCloud;
 
   // Very first: find extreme values and use them to compute the scale of the
   // point cloud.
@@ -223,8 +221,6 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   m_epsilon = epsilon * scale;
   epsilonSquared = m_epsilon * m_epsilon;
 
-  // Reset diagnostics
-  diagnostics = DiagnosticsData();
   // The planar case happens when all the points appear to lie on a two
   // dimensional subspace of R^3.
   planar = false;
@@ -236,7 +232,6 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
         he.endVert = 0;
       }
     }
-    originalVertexData = pointCloud;
     planarPointCloudTemp.clear();
   }
 
@@ -276,7 +271,7 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   for_each(
       autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
       [&](Halfedge& he) { he.pairedHalfedge = mapping[he.pairedHalfedge]; });
-  counts.resize(pointCloud.size() + 1);
+  counts.resize(originalVertexData.size() + 1);
   fill(counts.begin(), counts.end(), 0);
 
   // remove unused vertices
@@ -290,10 +285,10 @@ ConvexHull QuickHull::buildMesh(const VecView<glm::dvec3>& pointCloud, bool CCW,
   exclusive_scan(TransformIterator(counts.begin(), saturate),
                  TransformIterator(counts.end(), saturate), counts.begin(), 0);
   Vec<glm::dvec3> vertices(counts.back());
-  for_each(autoPolicy(pointCloud.size()), countAt(0_uz),
-           countAt(pointCloud.size()), [&](size_t i) {
+  for_each(autoPolicy(originalVertexData.size()), countAt(0_uz),
+           countAt(originalVertexData.size()), [&](size_t i) {
              if (counts[i + 1] - counts[i] > 0) {
-               vertices[counts[i]] = pointCloud[i];
+               vertices[counts[i]] = originalVertexData[i];
              }
            });
   for_each(autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
@@ -417,7 +412,7 @@ void QuickHull::createConvexHalfedgeMesh() {
     // numerical instability in which case we give up trying to solve horizon
     // edge for this point and accept a minor degeneration in the convex hull.
     if (!reorderHorizonEdges(horizonEdgesData)) {
-      diagnostics.failedHorizonEdges++;
+      failedHorizonEdges++;
       int change_flag = 0;
       for (size_t index = 0; index < tf.pointsOnPositiveSide->size(); index++) {
         if ((*tf.pointsOnPositiveSide)[index] == activePointIndex) {
@@ -772,11 +767,10 @@ void QuickHull::setupInitialTetrahedron() {
   mesh.setup(baseTriangle[0], baseTriangle[1], baseTriangle[2], maxI);
   for (auto& f : mesh.faces) {
     auto v = mesh.getVertexIndicesOfFace(f);
-    const glm::dvec3& va = originalVertexData[v[0]];
-    const glm::dvec3& vb = originalVertexData[v[1]];
-    const glm::dvec3& vc = originalVertexData[v[2]];
-    const glm::dvec3 N1 = getTriangleNormal(va, vb, vc);
-    const Plane plane(N1, va);
+    const glm::dvec3 N1 =
+        getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
+                          originalVertexData[v[2]]);
+    const Plane plane(N1, originalVertexData[v[0]]);
     f.P = plane;
   }
 
@@ -825,5 +819,12 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
     return true;
   }
   return false;
+}
+
+ConvexHull getConvexHullAsMesh(const Vec<glm::dvec3>& pointCloud, bool CCW,
+                               double epsilon) {
+  Vec<glm::dvec3> pointCloudVec(pointCloud);
+  QuickHull qh(pointCloudVec);
+  return qh.buildMesh(CCW, epsilon);
 }
 }  // namespace manifold
