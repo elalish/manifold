@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <limits>
 
+#include "impl.h"
+
 namespace manifold {
 
 double defaultEps() { return 0.0000001; }
@@ -821,6 +823,29 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
     return true;
   }
   return false;
+}
+
+void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
+  size_t numVert = vertPos.size();
+  if (numVert < 4) {
+    status_ = Error::InvalidConstruction;
+    return;
+  }
+
+  Vec<glm::dvec3> pointCloudVec(numVert);
+  manifold::transform(vertPos.begin(), vertPos.end(), pointCloudVec.begin(),
+                      [](const glm::vec3& v) { return glm::dvec3(v); });
+  QuickHull qh(pointCloudVec);
+  std::tie(halfedge_, vertPos_) = qh.buildMesh();
+  meshRelation_.originalID = ReserveIDs(1);
+  CalculateBBox();
+  SetPrecision(bBox_.Scale() * kTolerance);
+  SplitPinchedVerts();
+  CalculateNormals();
+  InitializeOriginal();
+  CreateFaces({});
+  SimplifyTopology();
+  Finish();
 }
 
 }  // namespace manifold
