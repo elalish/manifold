@@ -27,26 +27,22 @@ double defaultEps() { return 0.0000001; }
 // MathUtils.hpp
 inline double getSquaredDistanceBetweenPointAndRay(const glm::dvec3& p,
                                                    const Ray& r) {
-  ZoneScoped;
   const glm::dvec3 s = p - r.S;
   double t = glm::dot(s, r.V);
   return glm::dot(s, s) - t * t * r.VInvLengthSquared;
 }
 
 inline double getSquaredDistance(const glm::dvec3& p1, const glm::dvec3& p2) {
-  ZoneScoped;
   return glm::dot(p1 - p2, p1 - p2);
 }
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
 inline double getSignedDistanceToPlane(const glm::dvec3& v, const Plane& p) {
-  ZoneScoped;
   return glm::dot(p.N, v) + p.D;
 }
 
 inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
                                     const glm::dvec3& c) {
-  ZoneScoped;
   // We want to get (a-c).crossProduct(b-c) without constructing temp vectors
   double x = a.x - c.x;
   double y = a.y - c.y;
@@ -61,7 +57,6 @@ inline glm::dvec3 getTriangleNormal(const glm::dvec3& a, const glm::dvec3& b,
 }
 
 size_t MeshBuilder::addFace() {
-  ZoneScoped;
   if (disabledFaces.size()) {
     size_t index = disabledFaces.back();
     auto& f = faces[index];
@@ -77,7 +72,6 @@ size_t MeshBuilder::addFace() {
 }
 
 size_t MeshBuilder::addHalfedge() {
-  ZoneScoped;
   if (disabledHalfedges.size()) {
     const size_t index = disabledHalfedges.back();
     disabledHalfedges.pop_back();
@@ -89,7 +83,6 @@ size_t MeshBuilder::addHalfedge() {
 }
 
 void MeshBuilder::setup(int a, int b, int c, int d) {
-  ZoneScoped;
   faces.clear();
   halfedges.clear();
   halfedgeNext.clear();
@@ -145,7 +138,6 @@ void MeshBuilder::setup(int a, int b, int c, int d) {
 }
 
 std::array<int, 3> MeshBuilder::getVertexIndicesOfFace(const Face& f) const {
-  ZoneScoped;
   std::array<int, 3> v;
   size_t index = f.he;
   auto* he = &halfedges[index];
@@ -628,7 +620,6 @@ bool QuickHull::reorderHorizonEdges(VecView<size_t>& horizonEdges) {
 }
 
 double QuickHull::getScale(const std::array<size_t, 6>& extremeValuesInput) {
-  ZoneScoped;
   double s = 0;
   for (size_t i = 0; i < 6; i++) {
     const double* v =
@@ -803,14 +794,12 @@ void QuickHull::setupInitialTetrahedron() {
 }
 
 std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
-  ZoneScoped;
   auto r = indexVectorPool.get();
   r->resize(0);
   return r;
 }
 
 void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
-  ZoneScoped;
   const size_t oldSize = ptr->size();
   if ((oldSize + 1) * 128 < ptr->capacity()) {
     // Reduce memory usage! Huge vectors are needed at the beginning of
@@ -824,7 +813,6 @@ void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
 
 bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
                                size_t pointIndex) {
-  ZoneScoped;
   const double D =
       getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
   if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
