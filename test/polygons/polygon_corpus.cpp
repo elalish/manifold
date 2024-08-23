@@ -2130,7 +2130,7 @@ TEST(Polygon, SquareHoles) {
   TestPoly(polys, 56);
 }
 
-TEST(Polygon, DISABLED_SquareHoles2) {
+TEST(Polygon, SquareHoles2) {
   Polygons polys;
   polys.push_back({
       {-0.388888896, -0.2777777913834},  //

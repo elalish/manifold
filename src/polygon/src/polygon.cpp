@@ -427,28 +427,25 @@ class EarClip {
     // already been removed. The onTop value is 1 if the start.y-value is at the
     // top of the polygon's bounding box, -1 if it's at the bottom, and 0
     // otherwise. This allows proper handling of horizontal edges.
-    std::pair<VertItr, bool> InterpY2X(vec2 start, int onTop,
-                                       double precision) const {
-      const auto none = std::make_pair(left, false);
-      if (pos.y < start.y && right->pos.y >= start.y &&
-          (pos.x > start.x - precision || right->pos.x > start.x - precision)) {
-        return std::make_pair(left->right, true);
-      } else if (onTop != 0 && pos.x > start.x - precision &&
-                 pos.y > start.y - precision && pos.y < start.y + precision &&
-                 Interior(start, precision) >= 0) {
-        if (onTop > 0 && left->pos.x < pos.x &&
-            left->pos.y > start.y - precision) {
-          return none;
+    double InterpY2X(vec2 start, int onTop, double precision) const {
+      if (glm::abs(pos.y - start.y) <= precision) {
+        if (right->pos.y <= start.y + precision || onTop == 1) {
+          return NAN;
+        } else {
+          return pos.x;
         }
-        if (onTop < 0 && right->pos.x < pos.x &&
-            right->pos.y < start.y + precision) {
-          return none;
+      } else if (pos.y < start.y - precision) {
+        if (right->pos.y > start.y + precision) {
+          return pos.x + (start.y - pos.y) * (right->pos.x - pos.x) /
+                             (right->pos.y - pos.y);
+        } else if (right->pos.y < start.y - precision || onTop == -1) {
+          return NAN;
+        } else {
+          return right->pos.x;
         }
-        const VertItr p = pos.x < right->pos.x ? right : left->right;
-        return std::make_pair(p, true);
+      } else {
+        return NAN;
       }
-      // Edge does not cross start.y going up
-      return none;
     }
 
     // This finds the cost of this vert relative to one of the two closed sides
@@ -712,14 +709,15 @@ class EarClip {
     VertItr connector = polygon_.end();
 
     auto CheckEdge = [&](VertItr edge) {
-      const std::pair<VertItr, bool> pair =
-          edge->InterpY2X(start->pos, onTop, precision_);
-      if (pair.second && start->InsideEdge(pair.first, precision_, true) &&
+      const double x = edge->InterpY2X(start->pos, onTop, precision_);
+      if (isfinite(x) && start->InsideEdge(edge, precision_, true) &&
           (connector == polygon_.end() ||
-           (connector->pos.y < pair.first->pos.y
-                ? pair.first->InsideEdge(connector, precision_, false)
-                : !connector->InsideEdge(pair.first, precision_, false)))) {
-        connector = pair.first;
+           CCW({x, start->pos.y}, connector->pos, connector->right->pos,
+               precision_) == 1 ||
+           (connector->pos.y < edge->pos.y
+                ? edge->InsideEdge(connector, precision_, false)
+                : !connector->InsideEdge(edge, precision_, false)))) {
+        connector = edge;
       }
     };
 
@@ -749,16 +747,24 @@ class EarClip {
   // and returns it. It does so by finding any reflex verts inside the triangle
   // containing the best connection and the initial horizontal line.
   VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
-    VertItr best = edge->pos.x > edge->right->pos.x ? edge : edge->right;
-    const double maxX = best->pos.x;
-    const double above = best->pos.y > start->pos.y ? 1 : -1;
+    VertItr connector =
+        edge->pos.x < start->pos.x          ? edge->right
+        : edge->right->pos.x < start->pos.x ? edge
+        : edge->right->pos.y - start->pos.y > start->pos.y - edge->pos.y
+            ? edge
+            : edge->right;
+    if (glm::abs(connector->pos.y - start->pos.y) <= precision_) {
+      return connector;
+    }
+    const double above = connector->pos.y > start->pos.y ? 1 : -1;
 
     auto CheckVert = [&](VertItr vert) {
-      const double inside = above * CCW(start->pos, vert->pos, best->pos, 0);
+      const double inside =
+          above * CCW(start->pos, vert->pos, connector->pos, 0);
       if (vert->pos.x > start->pos.x - precision_ &&
-          vert->pos.x < maxX + precision_ &&
+          vert->pos.x < connector->pos.x + precision_ &&
           vert->pos.y * above > start->pos.y * above - precision_ &&
-          (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
+          (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x)) &&
           vert->InsideEdge(edge, precision_, true) &&
           vert->IsReflex(precision_)) {
         if (vert->pos.y > start->pos.y - precision_ &&
@@ -772,7 +778,7 @@ class EarClip {
             return;
           }
         }
-        best = vert;
+        connector = vert;
       }
     };
 
@@ -780,7 +786,7 @@ class EarClip {
       Loop(first, CheckVert);
     }
 
-    return best;
+    return connector;
   }
 
   // Creates a keyhole between the start vert of a hole and the connector vert
@@ -912,7 +918,7 @@ class EarClip {
 #ifdef MANIFOLD_DEBUG
     if (!params.verbose) return;
     VertItrC v = start;
-    std::cout << "show(array([" << std::endl;
+    std::cout << "show(array([" << std::setprecision(15) << std::endl;
     do {
       std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
                 << v->mesh_idx << ", cost: " << v->cost << std::endl;
@@ -923,7 +929,7 @@ class EarClip {
     std::cout << "]))" << std::endl;
 
     v = start;
-    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
+    std::cout << "polys.push_back({" << std::setprecision(15) << std::endl;
     do {
       std::cout << "    {" << v->pos.x << ", " << v->pos.y << "},  //"
                 << std::endl;
