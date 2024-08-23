@@ -247,7 +247,6 @@ TEST(BooleanComplex, BooleanVolumes) {
 }
 
 TEST(BooleanComplex, Spiral) {
-  ManifoldParams().deterministic = true;
   const int d = 2;
   std::function<Manifold(const int, const double, const double)> spiral =
       [&](const int rec, const double r, const double add) {

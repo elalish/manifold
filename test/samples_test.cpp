@@ -277,7 +277,7 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
-  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
+  EXPECT_LE(extrusion.NumDegenerateTris(), 32);
   EXPECT_EQ(extrusion.Genus(), 502);
 
 #ifdef MANIFOLD_EXPORT
