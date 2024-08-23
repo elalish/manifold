@@ -267,23 +267,20 @@ class QuickHull {
   // the plane. Returns true if the points was on the positive side.
   inline bool addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex);
 
-  // This will update mesh from which we create the ConvexHull object that
-  // getConvexHull function returns
+  // This will create HalfedgeMesh from which we create the ConvexHull object
+  // that buildMesh function returns
   void createConvexHalfedgeMesh();
 
  public:
+  // This function assumes that the pointCloudVec data resides in memory in the
+  // following format: x_0,y_0,z_0,x_1,y_1,z_1,...
   QuickHull(const Vec<glm::dvec3>& pointCloudVec)
       : originalVertexData(VecView(pointCloudVec)) {}
 
-  // Computes convex hull for a given point cloud. This function assumes that
-  // the vertex data resides in memory in the following format:
-  // x_0,y_0,z_0,x_1,y_1,z_1,... Params:
-  //   vertexData: pointer to the X component of the first point of the point
-  //   cloud. vertexCount: number of vertices in the point cloud eps: minimum
-  //   distance to a plane to consider a point being on positive side of it (for
-  //   a point cloud with scale 1)
-  // Returns:
-  //   Convex hull of the point cloud as halfEdge vector and vertex vector
+  // Computes convex hull for a given point cloud. Params: eps: minimum distance
+  // to a plane to consider a point being on positive side of it (for a point
+  // cloud with scale 1) Returns: Convex hull of the point cloud as halfEdge
+  // vector and vertex vector
   std::pair<Vec<Halfedge>, Vec<glm::vec3>> buildMesh(double eps = defaultEps());
 };
 

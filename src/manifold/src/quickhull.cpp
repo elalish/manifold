@@ -825,6 +825,8 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
   return false;
 }
 
+// Wrapper to call the QuickHull algorithm with the given vertex data to build
+// the Impl
 void Manifold::Impl::Hull(const std::vector<glm::vec3>& vertPos) {
   size_t numVert = vertPos.size();
   if (numVert < 4) {
