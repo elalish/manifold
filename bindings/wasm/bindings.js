@@ -644,7 +644,7 @@ Module.setup = function() {
       const z = getValue(vec3Ptr + 16, 'double');
       const vert = [x, y, z];
       return sdf(vert);
-    }, 'fi');
+    }, 'di');
     const out =
         Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, precision);
     removeFunction(wasmFuncPtr);

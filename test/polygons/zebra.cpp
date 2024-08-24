@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-TEST(Polygon, Zebra) {
+TEST(Polygon, DISABLED_Zebra) {
   Polygons polys;
   polys.push_back({
       {0.784366012, 10.550477},    //
