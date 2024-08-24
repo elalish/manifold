@@ -144,6 +144,11 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << precision << std::endl;
   std::cout << e.what() << std::endl;
+  if (triangles.size() > 1000) {
+    std::cout << "Output truncated due to producing " << triangles.size()
+              << " triangles." << std::endl;
+    return;
+  }
   Dump(polys);
   std::cout << "produced this triangulation:" << std::endl;
   for (size_t j = 0; j < triangles.size(); ++j) {
