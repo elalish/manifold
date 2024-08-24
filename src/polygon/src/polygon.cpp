@@ -416,17 +416,10 @@ class EarClip {
       return !left->InsideEdge(left->right, precision, true);
     }
 
-    // This function is the core of finding a proper place to keyhole. It runs
-    // on this Vert, which represents the edge from this to right. It returns
-    // an iterator to the vert to connect to (either this or right) and a bool
-    // denoting if the edge is a valid option for a keyhole (must be upwards and
-    // cross the start.y-value).
-    //
-    // If the edge terminates within the precision band, it checks the next edge
-    // to ensure validity. No while loop is necessary because short edges have
-    // already been removed. The onTop value is 1 if the start.y-value is at the
-    // top of the polygon's bounding box, -1 if it's at the bottom, and 0
-    // otherwise. This allows proper handling of horizontal edges.
+    // Returns the x-value on this edge corresponding to the start.y value,
+    // returning NAN if the edge does not cross the value from below to above,
+    // right of start - all within a precision tolerance. If onTop != 0, this
+    // restricts which end is allowed to terminate within the precision band.
     double InterpY2X(vec2 start, int onTop, double precision) const {
       if (glm::abs(pos.y - start.y) <= precision) {
         if (right->pos.y <= start.y + precision || onTop == 1) {
@@ -731,7 +724,7 @@ class EarClip {
       return;
     }
 
-    connector = FindCloserBridge(start, connector, onTop);
+    connector = FindCloserBridge(start, connector);
 
     JoinPolygons(start, connector);
 
@@ -746,7 +739,7 @@ class EarClip {
   // This converts the initial guess for the keyhole location into the final one
   // and returns it. It does so by finding any reflex verts inside the triangle
   // containing the best connection and the initial horizontal line.
-  VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
+  VertItr FindCloserBridge(VertItr start, VertItr edge) {
     VertItr connector =
         edge->pos.x < start->pos.x          ? edge->right
         : edge->right->pos.x < start->pos.x ? edge
@@ -760,24 +753,12 @@ class EarClip {
 
     auto CheckVert = [&](VertItr vert) {
       const double inside =
-          above * CCW(start->pos, vert->pos, connector->pos, 0);
+          above * CCW(start->pos, vert->pos, connector->pos, precision_);
       if (vert->pos.x > start->pos.x - precision_ &&
-          vert->pos.x < connector->pos.x + precision_ &&
           vert->pos.y * above > start->pos.y * above - precision_ &&
           (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x)) &&
           vert->InsideEdge(edge, precision_, true) &&
           vert->IsReflex(precision_)) {
-        if (vert->pos.y > start->pos.y - precision_ &&
-            vert->pos.y < start->pos.y + precision_) {
-          if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
-              vert->left->pos.y > start->pos.y - precision_) {
-            return;
-          }
-          if (onTop < 0 && vert->right->pos.x < vert->pos.x &&
-              vert->right->pos.y < start->pos.y + precision_) {
-            return;
-          }
-        }
         connector = vert;
       }
     };

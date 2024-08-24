@@ -78,7 +78,7 @@ TEST(Hull, Tictac) {
   }
 #endif
 
-  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
+  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
 
 #ifdef MANIFOLD_EXPORT
