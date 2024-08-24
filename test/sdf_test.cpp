@@ -174,7 +174,7 @@ TEST(SDF, Blobs) {
         }
         return d;
       },
-      {vec3(-5), vec3(5)}, 0.02, 0.5);
+      {vec3(-5), vec3(5)}, 0.05, 0.5);
 
   const int chi = blobs.NumVert() - blobs.NumTri() / 2;
   const int genus = 1 - chi / 2;
