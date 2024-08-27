@@ -480,29 +480,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   Finish();
 }
 
-void Manifold::Impl::Hull(const std::vector<vec3>& vertPos) {
-  size_t numVert = vertPos.size();
-  if (numVert < 4) {
-    status_ = Error::InvalidConstruction;
-    return;
-  }
-
-  // Vec<vec3> pointCloudVec=vertPos;
-  QuickHull qh(vertPos);
-  ConvexHull hull = qh.getConvexHullAsMesh(vertPos, false);
-  vertPos_ = std::move(hull.vertices);
-  halfedge_ = std::move(hull.halfedges);
-  meshRelation_.originalID = ReserveIDs(1);
-  CalculateBBox();
-  SetPrecision(bBox_.Scale() * kTolerance);
-  SplitPinchedVerts();
-  CalculateNormals();
-  InitializeOriginal();
-  CreateFaces({});
-  SimplifyTopology();
-  Finish();
-}
-
 /**
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
