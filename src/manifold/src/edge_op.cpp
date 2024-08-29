@@ -128,17 +128,17 @@ namespace manifold {
 void Manifold::Impl::CleanupTopology() {
   if (!halfedge_.size()) return;
 
-  const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges, 1e5);
-  size_t numFlagged = 0;
-  Vec<uint8_t> bFlags(nbEdges);
-
   // In the case of a very bad triangulation, it is possible to create pinched
   // verts. They must be removed before edge collapse.
   SplitPinchedVerts();
 
-  {
+  while (1) {
     ZoneScopedN("DedupeEdge");
+
+    const size_t nbEdges = halfedge_.size();
+    auto policy = autoPolicy(nbEdges, 1e5);
+    size_t numFlagged = 0;
+
     Vec<SortEntry> entries;
     entries.reserve(nbEdges / 2);
     for (size_t i = 0; i < nbEdges; ++i) {
@@ -149,20 +149,24 @@ void Manifold::Impl::CleanupTopology() {
 
     stable_sort(entries.begin(), entries.end());
     for (size_t i = 0; i < entries.size() - 1; ++i) {
-      if (entries[i].start == entries[i + 1].start &&
-          entries[i].end == entries[i + 1].end) {
+      const int h0 = entries[i].index;
+      const int h1 = entries[i + 1].index;
+      if (halfedge_[h0].startVert == halfedge_[h1].startVert &&
+          halfedge_[h0].endVert == halfedge_[h1].endVert) {
         DedupeEdge(entries[i].index);
         numFlagged++;
       }
     }
-  }
+
+    if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " duplicate edges to split"
-              << std::endl;
-  }
+    if (ManifoldParams().verbose) {
+      std::cout << "found " << numFlagged << " duplicate edges to split"
+                << std::endl;
+    }
 #endif
+  }
 }
 
 /**
