@@ -88,27 +88,6 @@ struct AssignNormals {
   }
 };
 
-struct MarkVerts {
-  VecView<int> vert;
-
-  void operator()(glm::ivec3 triVerts) {
-    for (int i : {0, 1, 2}) {
-      reinterpret_cast<std::atomic<int>*>(&vert[triVerts[i]])
-          ->store(1, std::memory_order_relaxed);
-    }
-  }
-};
-
-struct ReindexTriVerts {
-  VecView<const int> old2new;
-
-  void operator()(glm::ivec3& triVerts) {
-    for (int i : {0, 1, 2}) {
-      triVerts[i] = old2new[triVerts[i]];
-    }
-  }
-};
-
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
@@ -437,7 +416,12 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     MarkFailure(Error::VertexOutOfBounds);
     return;
   }
-  RemoveUnreferencedVerts(triVerts);
+
+  CreateHalfedges(triVerts);
+  if (!IsManifold()) {
+    MarkFailure(Error::NotManifold);
+    return;
+  }
 
   CalculateBBox();
   if (!IsFinite()) {
@@ -445,12 +429,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     return;
   }
   SetPrecision(mesh.precision);
-
-  CreateHalfedges(triVerts);
-  if (!IsManifold()) {
-    MarkFailure(Error::NotManifold);
-    return;
-  }
 
   SplitPinchedVerts();
 
@@ -547,33 +525,40 @@ Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
   CreateFaces();
 }
 
-void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
+void Manifold::Impl::RemoveUnreferencedVerts() {
   ZoneScoped;
-  Vec<int> vertOld2New(NumVert() + 1, 0);
+  Vec<int> vertOld2New(NumVert(), 0);
   auto policy = autoPolicy(NumVert(), 1e5);
-  for_each(policy, triVerts.cbegin(), triVerts.cend(),
-           MarkVerts({vertOld2New.view(1)}));
+  for_each(policy, halfedge_.cbegin(), halfedge_.cend(),
+           [&vertOld2New](Halfedge h) {
+             reinterpret_cast<std::atomic<int>*>(&vertOld2New[h.startVert])
+                 ->store(1, std::memory_order_relaxed);
+           });
 
   const Vec<glm::vec3> oldVertPos = vertPos_;
 
   Vec<size_t> tmpBuffer(oldVertPos.size());
   auto vertIdIter = TransformIterator(countAt(0_uz), [&vertOld2New](size_t i) {
-    if (vertOld2New[i + 1] > 0) return i;
+    if (vertOld2New[i] > 0) return i;
     return std::numeric_limits<size_t>::max();
   });
 
   auto next =
       copy_if(vertIdIter, vertIdIter + tmpBuffer.size(), tmpBuffer.begin(),
               [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  if (next == tmpBuffer.end()) return;
+
   gather(tmpBuffer.begin(), next, oldVertPos.begin(), vertPos_.begin());
 
   vertPos_.resize(std::distance(tmpBuffer.begin(), next));
 
-  inclusive_scan(vertOld2New.begin() + 1, vertOld2New.end(),
-                 vertOld2New.begin() + 1);
+  exclusive_scan(vertOld2New.begin(), vertOld2New.end(), vertOld2New.begin());
 
-  for_each(policy, triVerts.begin(), triVerts.end(),
-           ReindexTriVerts({vertOld2New}));
+  for_each(policy, halfedge_.begin(), halfedge_.end(),
+           [&vertOld2New](Halfedge& h) {
+             h.startVert = vertOld2New[h.startVert];
+             h.endVert = vertOld2New[h.endVert];
+           });
 }
 
 void Manifold::Impl::InitializeOriginal() {
@@ -709,6 +694,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
       halfedge_[pair1].pairedHalfedge = pair0;
     }
   });
+
+  // When opposed triangles are removed, they may strand unreferenced verts.
+  RemoveUnreferencedVerts();
 }
 
 /**

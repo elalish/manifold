@@ -94,7 +94,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces(const std::vector<float>& propertyTolerance = {});
-  void RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts);
+  void RemoveUnreferencedVerts();
   void InitializeOriginal();
   void CreateHalfedges(const Vec<glm::ivec3>& triVerts);
   void CalculateNormals();
