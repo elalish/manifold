@@ -912,7 +912,7 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  */
 Manifold Manifold::Hull(const std::vector<vec3>& pts) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(pts);
+  impl->Hull(Vec<vec3>(pts));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
@@ -920,11 +920,9 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
-  std::vector<vec3> pts;
-  for (auto vertex : GetCsgLeafNode().GetImpl()->vertPos_) {
-    pts.push_back(vertex);
-  }
-  return Hull(pts);
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->Hull(GetCsgLeafNode().GetImpl()->vertPos_);
+  return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
 /**
