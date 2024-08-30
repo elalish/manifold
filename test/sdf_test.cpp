@@ -187,7 +187,7 @@ TEST(SDF, Blobs) {
         }
         return d;
       },
-      {glm::vec3(-5), glm::vec3(5)}, 0.02, 0.5);
+      {glm::vec3(-5), glm::vec3(5)}, 0.05, 0.5);
 
   const int chi = blobs.NumVert() - blobs.NumTri() / 2;
   const int genus = 1 - chi / 2;
