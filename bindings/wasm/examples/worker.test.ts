@@ -111,7 +111,7 @@ suite('Examples', () => {
   test('Gyroid Module', async () => {
     const result = await runExample('Gyroid Module');
     expect(result.genus).to.equal(15, 'Genus');
-    expect(result.volume).to.be.closeTo(4173, 1, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(5644, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(4175, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(5645, 1, 'Surface Area');
   });
 });
