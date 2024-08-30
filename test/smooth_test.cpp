@@ -421,6 +421,8 @@ TEST(Smooth, SDF) {
       sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
       0.00001);
 
+  EXPECT_LT(gyroid.NumTri(), 87000);
+
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
   Manifold smoothed =

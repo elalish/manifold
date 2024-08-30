@@ -34,7 +34,7 @@ struct Layers {
   }
 };
 
-TEST(SDF, Sphere) {
+TEST(SDF, SphereShell) {
   Manifold sphere = Manifold::LevelSet(
       [](glm::vec3 pos) {
         const float r = glm::length(pos);
@@ -42,10 +42,11 @@ TEST(SDF, Sphere) {
       },
       {glm::vec3(-1.1), glm::vec3(1.1)}, 0.01, 0, 0.0001);
 
-  EXPECT_NEAR(sphere.Genus(), 25000, 500);
+  EXPECT_NEAR(sphere.Genus(), 26100, 100);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("sphereSDF.glb", sphere.GetMeshGL(), {});
+  if (options.exportModels)
+    ExportMesh("sphereShellSDF.glb", sphere.GetMeshGL(), {});
 #endif
 }
 

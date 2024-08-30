@@ -27,6 +27,10 @@ using namespace manifold;
 constexpr int kCrossing = -2;
 constexpr int kNone = -1;
 constexpr glm::ivec4 kVoxelOffset(1, 1, 1, 0);
+// Maximum fraction of spacing that a vert can move.
+constexpr float kS = 0.25;
+// Corresponding approximate distance ratio bound.
+constexpr float kD = 1 / kS - 1;
 
 glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
@@ -237,13 +241,13 @@ struct NearSurface {
           break;
         }
         // Approximate bound on vert movement.
-        if (glm::abs(val) > 4 * glm::abs(gridVert.distance) &&
+        if (glm::abs(val) > kD * glm::abs(gridVert.distance) &&
             glm::abs(val) > glm::abs(vMax)) {
           vMax = val;
           closestNeighbor = i;
         }
       } else if (!gridVert.SameSide(valOp) &&
-                 glm::abs(valOp) > 4 * glm::abs(gridVert.distance) &&
+                 glm::abs(valOp) > kD * glm::abs(gridVert.distance) &&
                  glm::abs(valOp) > glm::abs(vMax)) {
         vMax = valOp;
         closestNeighbor = i + 7;
@@ -257,7 +261,7 @@ struct NearSurface {
           gridPos, gridVert.distance, Position(neighborIndex, origin, spacing),
           vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
-      if (glm::all(glm::lessThan(glm::abs(pos - gridPos), 0.2f * spacing))) {
+      if (glm::all(glm::lessThan(glm::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
         vertPos[idx] = pos;
         gridVert.movedVert = idx;
