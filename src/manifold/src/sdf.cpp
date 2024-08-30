@@ -31,7 +31,7 @@ constexpr glm::ivec4 kVoxelOffset(1, 1, 1, 0);
 constexpr float kS = 0.25;
 // Corresponding approximate distance ratio bound.
 constexpr float kD = 1 / kS - 1;
-// Maximum number of opposed verts to allow collapse.
+// Maximum number of opposed verts (of 7) to allow collapse.
 constexpr int kMaxOpposed = 3;
 
 glm::ivec3 TetTri0(int i) {
@@ -255,7 +255,12 @@ struct NearSurface {
       }
     }
 
-    if (closestNeighbor >= 0 && opposedVerts < kMaxOpposed) {
+    // This is where we collapse all the crossing edge verts into this GridVert,
+    // speeding up the algorithm and avoiding poor quality triangles. Without
+    // this step the result is guaranteed 2-manifold, but with this step it can
+    // become an even-manifold with kissing verts. These must be removed in a
+    // post-process: CleanupTopology().
+    if (closestNeighbor >= 0 && opposedVerts <= kMaxOpposed) {
       const glm::vec3 gridPos = Position(gridIndex, origin, spacing);
       const glm::ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
       const glm::vec3 pos = FindSurface(
@@ -451,8 +456,6 @@ namespace manifold {
  * with runtime locks that expect to not be called back by unregistered threads.
  * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
  * active.
- * @return MeshGL This mesh is guaranteed to be manifold and so can always be
- * used as input to the Manifold constructor for further operations.
  */
 Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
                             float edgeLength, float level, float precision,
