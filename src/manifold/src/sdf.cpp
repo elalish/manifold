@@ -222,23 +222,31 @@ struct NearSurface {
     bool keep = false;
     float vMax = 0;
     int closestNeighbor = -1;
-    for (int i = 0; i < 14; ++i) {
-      const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
+    for (int i = 0; i < 7; ++i) {
       const float val =
-          voxels[EncodeIndex(neighborIndex + kVoxelOffset, gridPow)];
+          voxels[EncodeIndex(Neighbor(gridIndex, i) + kVoxelOffset, gridPow)];
+      const float valOp = voxels[EncodeIndex(
+          Neighbor(gridIndex, i + 7) + kVoxelOffset, gridPow)];
 
-      if (gridVert.SameSide(val)) continue;
-
-      if (i < 7) {
+      if (!gridVert.SameSide(val)) {
         gridVert.edgeVerts[i] = kCrossing;
         keep = true;
-      }
-
-      const float v = glm::abs(val);
-      // Approximate bound on vert movement.
-      if (v > 4 * glm::abs(gridVert.distance) && v > glm::abs(vMax)) {
-        vMax = val;
-        closestNeighbor = i;
+        // Don't collapse when there are surfaces on opposite sides.
+        if (!gridVert.SameSide(valOp)) {
+          closestNeighbor = -1;
+          break;
+        }
+        // Approximate bound on vert movement.
+        if (glm::abs(val) > 4 * glm::abs(gridVert.distance) &&
+            glm::abs(val) > glm::abs(vMax)) {
+          vMax = val;
+          closestNeighbor = i;
+        }
+      } else if (!gridVert.SameSide(valOp) &&
+                 glm::abs(valOp) > 4 * glm::abs(gridVert.distance) &&
+                 glm::abs(valOp) > glm::abs(vMax)) {
+        vMax = valOp;
+        closestNeighbor = i + 7;
       }
     }
 

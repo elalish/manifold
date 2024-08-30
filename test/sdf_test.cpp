@@ -35,10 +35,15 @@ struct Layers {
 };
 
 TEST(SDF, Sphere) {
-  Manifold sphere =
-      Manifold::LevelSet([](glm::vec3 pos) { return 1 - glm::length(pos); },
-                         {glm::vec3(-1.1), glm::vec3(1.1)}, 0.01);
-  // Manifold a(sphere);
+  Manifold sphere = Manifold::LevelSet(
+      [](glm::vec3 pos) {
+        const float r = glm::length(pos);
+        return glm::min(1 - r, r - 0.995f);
+      },
+      {glm::vec3(-1.1), glm::vec3(1.1)}, 0.01, 0, 0.0001);
+
+  EXPECT_NEAR(sphere.Genus(), 25000, 500);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("sphereSDF.glb", sphere.GetMeshGL(), {});
 #endif
