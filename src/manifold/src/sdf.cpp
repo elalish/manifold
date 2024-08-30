@@ -31,6 +31,8 @@ constexpr glm::ivec4 kVoxelOffset(1, 1, 1, 0);
 constexpr float kS = 0.25;
 // Corresponding approximate distance ratio bound.
 constexpr float kD = 1 / kS - 1;
+// Maximum number of opposed verts to allow collapse.
+constexpr int kMaxOpposed = 3;
 
 glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
@@ -226,6 +228,7 @@ struct NearSurface {
     bool keep = false;
     float vMax = 0;
     int closestNeighbor = -1;
+    int opposedVerts = 0;
     for (int i = 0; i < 7; ++i) {
       const float val =
           voxels[EncodeIndex(Neighbor(gridIndex, i) + kVoxelOffset, gridPow)];
@@ -235,10 +238,8 @@ struct NearSurface {
       if (!gridVert.SameSide(val)) {
         gridVert.edgeVerts[i] = kCrossing;
         keep = true;
-        // Don't collapse when there are surfaces on opposite sides.
         if (!gridVert.SameSide(valOp)) {
-          closestNeighbor = -1;
-          break;
+          ++opposedVerts;
         }
         // Approximate bound on vert movement.
         if (glm::abs(val) > kD * glm::abs(gridVert.distance) &&
@@ -254,7 +255,7 @@ struct NearSurface {
       }
     }
 
-    if (closestNeighbor >= 0) {
+    if (closestNeighbor >= 0 && opposedVerts < kMaxOpposed) {
       const glm::vec3 gridPos = Position(gridIndex, origin, spacing);
       const glm::ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
       const glm::vec3 pos = FindSurface(

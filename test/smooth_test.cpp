@@ -421,7 +421,7 @@ TEST(Smooth, SDF) {
       sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
       0.00001);
 
-  EXPECT_LT(gyroid.NumTri(), 87000);
+  EXPECT_LT(gyroid.NumTri(), 76000);
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
@@ -444,7 +444,7 @@ TEST(Smooth, SDF) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    ExportMesh("smoothGyroid.glb", out, options2);
+    ExportMesh("smoothGyroid.glb", gyroid.GetMeshGL(), options2);
   }
 #endif
 }
