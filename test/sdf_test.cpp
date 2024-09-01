@@ -34,6 +34,22 @@ struct Layers {
   }
 };
 
+TEST(SDF, SphereShell) {
+  Manifold sphere = Manifold::LevelSet(
+      [](glm::vec3 pos) {
+        const float r = glm::length(pos);
+        return glm::min(1 - r, r - 0.995f);
+      },
+      {glm::vec3(-1.1), glm::vec3(1.1)}, 0.01, 0, 0.0001);
+
+  EXPECT_NEAR(sphere.Genus(), 11500, 1000);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("sphereShellSDF.glb", sphere.GetMeshGL(), {});
+#endif
+}
+
 TEST(SDF, CubeVoid) {
   CubeVoid voidSDF;
 
@@ -51,13 +67,13 @@ TEST(SDF, Bounds) {
   const float size = 4;
   const float edgeLength = 1;
 
-  MeshGL levelSet = MeshGL::LevelSet(
+  Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
-  Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubeVoid.glb", levelSet, {});
+  if (options.exportModels)
+    ExportMesh("cubeVoid.glb", cubeVoid.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
@@ -75,8 +91,8 @@ TEST(SDF, Bounds2) {
   const float size = 4;
   const float edgeLength = 1;
 
-  Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid = Manifold::LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
@@ -99,8 +115,8 @@ TEST(SDF, Surface) {
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid = Manifold::LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
 
   Manifold cube = Manifold::Cube(glm::vec3(size), true);
   cube -= cubeVoid;
@@ -125,8 +141,8 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const float size = 20;
-  Manifold layers(
-      MeshGL::LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  Manifold layers =
+      Manifold::LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -136,14 +152,14 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  MeshGL surface = MeshGL::LevelSet(
+  Manifold surface = Manifold::LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {glm::vec3(-1.75 * glm::pi<float>()), glm::vec3(1.75 * glm::pi<float>())},
       1);
-  Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
+  Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
   EXPECT_EQ(smoothed.Genus(), 38);
@@ -166,7 +182,7 @@ TEST(SDF, Blobs) {
                                   {-2, -3, 2, 2},   //
                                   {1, -1, 1, -2},   //
                                   {-4, -3, -2, 1}};
-  MeshGL blobs = MeshGL::LevelSet(
+  Manifold blobs = Manifold::LevelSet(
       [&balls, blend](glm::vec3 p) {
         float d = 0;
         for (const auto& ball : balls) {
@@ -177,13 +193,13 @@ TEST(SDF, Blobs) {
         }
         return d;
       },
-      {glm::vec3(-5), glm::vec3(5)}, 0.02, 0.5);
+      {glm::vec3(-5), glm::vec3(5)}, 0.05, 0.5);
 
   const int chi = blobs.NumVert() - blobs.NumTri() / 2;
   const int genus = 1 - chi / 2;
   EXPECT_EQ(genus, 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("blobs.glb", blobs, {});
+  if (options.exportModels) ExportMesh("blobs.glb", blobs.GetMeshGL(), {});
 #endif
 }

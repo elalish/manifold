@@ -260,7 +260,7 @@ TEST(Boolean, Coplanar) {
  */
 TEST(Boolean, CoplanarProp) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
-  MeshGL cylinderGL = WithIndexColors(cylinder.GetMesh());
+  MeshGL cylinderGL = WithIndexColors(cylinder.GetMeshGL());
   cylinder = Manifold(cylinderGL);
 
   Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 185);

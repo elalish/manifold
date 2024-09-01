@@ -34,10 +34,10 @@
 using namespace manifold;
 
 namespace {
-ManifoldMeshGL *level_set(void *mem,
-                          float (*sdf_context)(float, float, float, void *),
-                          ManifoldBox *bounds, float edge_length, float level,
-                          float precision, bool seq, void *ctx) {
+ManifoldManifold *level_set(void *mem,
+                            float (*sdf_context)(float, float, float, void *),
+                            ManifoldBox *bounds, float edge_length, float level,
+                            float precision, bool seq, void *ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<float(float, float, float)> sdf =
@@ -45,7 +45,7 @@ ManifoldMeshGL *level_set(void *mem,
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
-  return to_c(new (mem) MeshGL(MeshGL::LevelSet(
+  return to_c(new (mem) Manifold(Manifold::LevelSet(
       fun, *from_c(bounds), edge_length, level, precision, !seq)));
 }
 }  // namespace
@@ -271,14 +271,14 @@ ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(warped));
 }
 
-ManifoldMeshGL *manifold_level_set(void *mem,
-                                   float (*sdf)(float, float, float, void *),
-                                   ManifoldBox *bounds, float edge_length,
-                                   float level, float precision, void *ctx) {
+ManifoldManifold *manifold_level_set(void *mem,
+                                     float (*sdf)(float, float, float, void *),
+                                     ManifoldBox *bounds, float edge_length,
+                                     float level, float precision, void *ctx) {
   return level_set(mem, sdf, bounds, edge_length, level, precision, false, ctx);
 }
 
-ManifoldMeshGL *manifold_level_set_seq(
+ManifoldManifold *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
     float edge_length, float level, float precision, void *ctx) {
   return level_set(mem, sdf, bounds, edge_length, level, precision, true, ctx);

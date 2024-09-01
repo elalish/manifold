@@ -60,11 +60,11 @@ ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
 // using these bindings from a language that has a runtime lock preventing the
 // parallel execution of closures, then you should use manifold_level_set_seq to
 // force sequential execution.
-ManifoldMeshGL *manifold_level_set(void *mem,
-                                   float (*sdf)(float, float, float, void *),
-                                   ManifoldBox *bounds, float edge_length,
-                                   float level, float precision, void *ctx);
-ManifoldMeshGL *manifold_level_set_seq(
+ManifoldManifold *manifold_level_set(void *mem,
+                                     float (*sdf)(float, float, float, void *),
+                                     ManifoldBox *bounds, float edge_length,
+                                     float level, float precision, void *ctx);
+ManifoldManifold *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
     float edge_length, float level, float precision, void *ctx);
 

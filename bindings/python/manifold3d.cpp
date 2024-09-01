@@ -256,10 +256,7 @@ NB_MODULE(manifold3d, m) {
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
-          "scale",
-          [](const Manifold &m, float s) {
-            m.Scale({s, s, s});
-          },
+          "scale", [](const Manifold &self, float s) { self.Scale({s, s, s}); },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -434,6 +431,24 @@ NB_MODULE(manifold3d, m) {
           nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
+          "level_set",
+          [](const std::function<float(float, float, float)> &f,
+             std::vector<float> bounds, float edgeLength, float level = 0.0,
+             float precision = -1) {
+            // Same format as Manifold.bounding_box
+            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
+                         glm::vec3(bounds[3], bounds[4], bounds[5])};
+
+            std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
+              return f(v.x, v.y, v.z);
+            };
+            return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
+                                      precision, false);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("precision") = -1,
+          manifold__level_set__sdf__bounds__edge_length__level__precision__can_parallel)
+      .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
           nb::arg("circular_segments") = 0, nb::arg("center") = false,
@@ -550,46 +565,6 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
-      .def_static(
-          "level_set",
-          [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0,
-             float precision = -1) {
-            // Same format as Manifold.bounding_box
-            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
-                         glm::vec3(bounds[3], bounds[4], bounds[5])};
-
-            std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
-              return f(v.x, v.y, v.z);
-            };
-            return MeshGL::LevelSet(cppToPython, bound, edgeLength, level,
-                                    precision, false);
-          },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
-          nb::arg("level") = 0.0, nb::arg("precision") = -1,
-          "Constructs a level-set Mesh from the input Signed-Distance Function "
-          "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
-          "Cubes, but better for manifoldness). Instead of using a cubic grid, "
-          "it uses a body-centered cubic grid (two shifted cubic grids). This "
-          "means if your function's interior exceeds the given bounds, you "
-          "will see a kind of egg-crate shape closing off the manifold, which "
-          "is due to the underlying grid."
-          "\n\n"
-          ":param f: The signed-distance functor, containing this function "
-          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
-          "signed distance of a given point in R^3. Positive values are "
-          "inside, negative outside."
-          ":param bounds: An axis-aligned box that defines the extent of the "
-          "grid."
-          ":param edgeLength: Approximate maximum edge length of the triangles "
-          "in the final result.  This affects grid spacing, and hence has a "
-          "strong effect on performance."
-          ":param level: You can inset your Mesh by using a positive value, or "
-          "outset it with a negative value."
-          ":param precision: The verts will be within this distance of the "
-          "real surface."
-          ":return Mesh: This mesh is guaranteed to be manifold."
-          "Use Manifold.from_mesh(mesh) to create a Manifold")
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::enum_<Manifold::Error>(m, "Error")
@@ -674,9 +649,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) {
-            self.Scale({s, s});
-          },
+          [](const CrossSection &self, float s) { self.Scale({s, s}); },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."

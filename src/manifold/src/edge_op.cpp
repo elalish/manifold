@@ -89,21 +89,21 @@ struct SwappableEdge {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
     int tri = halfedge[edge].face;
-    glm::ivec3 triedge = TriOf(edge);
+    glm::ivec3 triEdge = TriOf(edge);
     glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
+      v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
     if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
     edge = halfedge[edge].pairedHalfedge;
     tri = halfedge[edge].face;
-    triedge = TriOf(edge);
+    triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
+      v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
     return CCW(v[0], v[1], v[2], precision) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   }
@@ -120,6 +120,54 @@ struct SortEntry {
 }  // namespace
 
 namespace manifold {
+
+/**
+ * Duplicates just enough verts to covert an even-manifold to a proper
+ * 2-manifold, splitting non-manifold verts and edges with too many triangles.
+ */
+void Manifold::Impl::CleanupTopology() {
+  if (!halfedge_.size()) return;
+
+  // In the case of a very bad triangulation, it is possible to create pinched
+  // verts. They must be removed before edge collapse.
+  SplitPinchedVerts();
+
+  while (1) {
+    ZoneScopedN("DedupeEdge");
+
+    const size_t nbEdges = halfedge_.size();
+    auto policy = autoPolicy(nbEdges, 1e5);
+    size_t numFlagged = 0;
+
+    Vec<SortEntry> entries;
+    entries.reserve(nbEdges / 2);
+    for (size_t i = 0; i < nbEdges; ++i) {
+      if (halfedge_[i].IsForward()) {
+        entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
+      }
+    }
+
+    stable_sort(entries.begin(), entries.end());
+    for (size_t i = 0; i < entries.size() - 1; ++i) {
+      const int h0 = entries[i].index;
+      const int h1 = entries[i + 1].index;
+      if (halfedge_[h0].startVert == halfedge_[h1].startVert &&
+          halfedge_[h0].endVert == halfedge_[h1].endVert) {
+        DedupeEdge(entries[i].index);
+        numFlagged++;
+      }
+    }
+
+    if (numFlagged == 0) break;
+
+#ifdef MANIFOLD_DEBUG
+    if (ManifoldParams().verbose) {
+      std::cout << "found " << numFlagged << " duplicate edges to split"
+                << std::endl;
+    }
+#endif
+  }
+}
 
 /**
  * Collapses degenerate triangles by removing edges shorter than precision_ and
@@ -143,45 +191,16 @@ namespace manifold {
 void Manifold::Impl::SimplifyTopology() {
   if (!halfedge_.size()) return;
 
-  const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges, 1e5);
-  size_t numFlagged = 0;
-  Vec<uint8_t> bflags(nbEdges);
-
-  // In the case of a very bad triangulation, it is possible to create pinched
-  // verts. They must be removed before edge collapse.
-  SplitPinchedVerts();
-
-  {
-    ZoneScopedN("DedupeEdge");
-    Vec<SortEntry> entries;
-    entries.reserve(nbEdges / 2);
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (halfedge_[i].IsForward()) {
-        entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
-      }
-    }
-
-    stable_sort(entries.begin(), entries.end());
-    for (size_t i = 0; i < entries.size() - 1; ++i) {
-      if (entries[i].start == entries[i + 1].start &&
-          entries[i].end == entries[i + 1].end) {
-        DedupeEdge(entries[i].index);
-        numFlagged++;
-      }
-    }
-  }
-
-#ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " duplicate edges to split"
-              << std::endl;
-  }
-#endif
+  CleanupTopology();
 
   if (!ManifoldParams().cleanupTriangles) {
     return;
   }
+
+  const size_t nbEdges = halfedge_.size();
+  auto policy = autoPolicy(nbEdges, 1e5);
+  size_t numFlagged = 0;
+  Vec<uint8_t> bFlags(nbEdges);
 
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
@@ -190,9 +209,9 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     ShortEdge se{halfedge_, vertPos_, precision_};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         CollapseEdge(i, scratchBuffer);
         scratchBuffer.resize(0);
         numFlagged++;
@@ -212,9 +231,9 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         CollapseEdge(i, scratchBuffer);
         scratchBuffer.resize(0);
         numFlagged++;
@@ -234,12 +253,12 @@ void Manifold::Impl::SimplifyTopology() {
     numFlagged = 0;
     SwappableEdge se{halfedge_, vertPos_, faceNormal_, precision_};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bflags[i] = se(i); });
+               [&](size_t i) { bFlags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
     for (size_t i = 0; i < nbEdges; ++i) {
-      if (bflags[i]) {
+      if (bFlags[i]) {
         numFlagged++;
         tag++;
         RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);

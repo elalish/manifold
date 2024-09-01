@@ -94,7 +94,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces(const std::vector<float>& propertyTolerance = {});
-  void RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts);
+  void RemoveUnreferencedVerts();
   void InitializeOriginal();
   void CreateHalfedges(const Vec<glm::ivec3>& triVerts);
   void CalculateNormals();
@@ -109,7 +109,7 @@ struct Manifold::Impl {
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
 
-  bool IsEmpty() const { return NumVert() == 0; }
+  bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }
   size_t NumEdge() const { return halfedge_.size() / 2; }
   size_t NumTri() const { return halfedge_.size() / 3; }
@@ -151,6 +151,7 @@ struct Manifold::Impl {
   Polygons Project() const;
 
   // edge_op.cu
+  void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
   void CollapseEdge(int edge, std::vector<int>& edges);

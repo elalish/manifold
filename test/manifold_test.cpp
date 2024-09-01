@@ -452,7 +452,7 @@ TEST(Manifold, Slice) {
 #endif
 
 TEST(Manifold, MeshRelation) {
-  MeshGL gyroidMeshGL = WithIndexColors(Gyroid());
+  MeshGL gyroidMeshGL = WithIndexColors(Gyroid().GetMeshGL());
   Manifold gyroid(gyroidMeshGL);
 
 #ifdef MANIFOLD_EXPORT
