@@ -45,8 +45,8 @@ namespace manifold {
 Manifold GyroidModule(double size, int n) {
   auto gyroid = [&](double level) {
     const double period = glm::two_pi<double>();
-    return Manifold(MeshGL::LevelSet(Gyroid(), {vec3(-period), vec3(period)},
-                                     period / n, level))
+    return Manifold::LevelSet(Gyroid(), {vec3(-period), vec3(period)},
+                              period / n, level)
         .Scale(vec3(size / period));
   };
 

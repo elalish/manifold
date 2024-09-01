@@ -116,10 +116,6 @@ struct MeshGL {
   MeshGL() = default;
   MeshGL(const Mesh& mesh);
 
-  static MeshGL LevelSet(std::function<double(vec3)> sdf, Box bounds,
-                         double edgeLength, double level = 0,
-                         double precision = -1, bool canParallel = true);
-
   bool Merge();
 };
 /** @} */
@@ -184,7 +180,10 @@ class Manifold {
                           vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
-                          double revolveDegrees = 360.0);
+                          double revolveDegrees = 360.0f);
+  static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                           double edgeLength, double level = 0,
+                           double precision = -1, bool canParallel = true);
   ///@}
 
   /** @name Topological

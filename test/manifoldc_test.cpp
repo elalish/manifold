@@ -119,13 +119,12 @@ TEST(CBIND, level_set) {
   // bounding box scaled according to factors used in *sdf
   ManifoldBox *bounds = manifold_box(malloc(manifold_box_size()), -bb * 3,
                                      -bb * 1, -bb * 1, bb * 3, bb * 1, bb * 1);
-  ManifoldMeshGL *sdf_mesh = manifold_level_set(malloc(manifold_meshgl_size()),
-                                                sdf, bounds, 0.5, 0, -1, NULL);
-  ManifoldManifold *sdf_man = manifold_of_meshgl(malloc(sz), sdf_mesh);
-  ManifoldMeshGL *sdf_mesh_context = manifold_level_set(
-      malloc(manifold_meshgl_size()), sdfcontext, bounds, 0.5, 0, -1, context);
+  ManifoldManifold *sdf_man =
+      manifold_level_set(malloc(sz), sdf, bounds, 0.5, 0, -1, NULL);
   ManifoldManifold *sdf_man_context =
-      manifold_of_meshgl(malloc(sz), sdf_mesh_context);
+      manifold_level_set(malloc(sz), sdfcontext, bounds, 0.5, 0, -1, context);
+  ManifoldMeshGL *sdf_mesh =
+      manifold_get_meshgl(malloc(manifold_meshgl_size()), sdf_man);
 
 #ifdef MANIFOLD_EXPORT
   ManifoldExportOptions *options =
@@ -163,7 +162,6 @@ TEST(CBIND, level_set) {
 
   manifold_delete_meshgl(sdf_mesh);
   manifold_delete_manifold(sdf_man);
-  manifold_delete_meshgl(sdf_mesh_context);
   manifold_delete_manifold(sdf_man_context);
   manifold_delete_box(bounds);
   free(context);

@@ -490,6 +490,8 @@ std::vector<Manifold> Manifold::Decompose() const {
                   return vertLabel[halfedge[3 * face].startVert] == i;
                 }) -
         faceNew2Old.begin();
+
+    if (nFace == 0) continue;
     faceNew2Old.resize(nFace);
 
     impl->GatherFaces(*pImpl_, faceNew2Old);

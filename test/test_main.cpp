@@ -138,9 +138,9 @@ struct GyroidSDF {
   }
 };
 
-MeshGL Gyroid() {
+Manifold Gyroid() {
   const double period = glm::two_pi<double>();
-  return MeshGL::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
+  return Manifold::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
 }
 
 Mesh Tet() {
@@ -205,6 +205,9 @@ MeshGL CubeSTL() {
 
 MeshGL WithIndexColors(const MeshGL& in) {
   MeshGL out(in);
+  out.runIndex.clear();
+  out.runTransform.clear();
+  out.faceID.clear();
   out.runOriginalID = {Manifold::ReserveIDs(1)};
   const int numVert = out.NumVert();
   out.numProp = 6;

@@ -575,7 +575,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         if (halfedges[0] < 0) return;
         ivec4 tri3;
         ivec4 edgeOffsets;
-        glm::bvec4 edgeFwd;
+        glm::bvec4 edgeFwd(false);
         for (const int i : {0, 1, 2, 3}) {
           if (halfedges[i] < 0) {
             tri3[i] = -1;

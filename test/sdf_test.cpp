@@ -34,6 +34,22 @@ struct Layers {
   }
 };
 
+TEST(SDF, SphereShell) {
+  Manifold sphere = Manifold::LevelSet(
+      [](vec3 pos) {
+        const double r = glm::length(pos);
+        return glm::min(1 - r, r - 0.995f);
+      },
+      {vec3(-1.1), vec3(1.1)}, 0.01, 0, 0.0001);
+
+  EXPECT_NEAR(sphere.Genus(), 11500, 1000);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("sphereShellSDF.glb", sphere.GetMeshGL(), {});
+#endif
+}
+
 TEST(SDF, CubeVoid) {
   CubeVoid voidSDF;
 
@@ -51,13 +67,13 @@ TEST(SDF, Bounds) {
   const double size = 4;
   const double edgeLength = 1;
 
-  MeshGL levelSet = MeshGL::LevelSet(
+  Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
-  Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const double precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubeVoid.glb", levelSet, {});
+  if (options.exportModels)
+    ExportMesh("cubeVoid.glb", cubeVoid.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
@@ -75,8 +91,8 @@ TEST(SDF, Bounds2) {
   const double size = 4;
   const double edgeLength = 1;
 
-  Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid = Manifold::LevelSet(
+      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
   const double precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
@@ -99,8 +115,8 @@ TEST(SDF, Surface) {
   const double size = 4;
   const double edgeLength = 0.5;
 
-  Manifold cubeVoid(MeshGL::LevelSet(
-      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid = Manifold::LevelSet(
+      CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
 
   Manifold cube = Manifold::Cube(vec3(size), true);
   cube -= cubeVoid;
@@ -125,7 +141,7 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const double size = 20;
-  Manifold layers(MeshGL::LevelSet(Layers(), {vec3(0), vec3(size)}, 1));
+  Manifold layers = Manifold::LevelSet(Layers(), {vec3(0), vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -135,13 +151,13 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  MeshGL surface = MeshGL::LevelSet(
+  Manifold surface = Manifold::LevelSet(
       [](vec3 p) {
-        double mid = std::sin(p.x) + std::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0 : -1.0;
+        double mid = glm::sin(p.x) + glm::sin(p.y);
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {vec3(-1.75 * glm::pi<double>()), vec3(1.75 * glm::pi<double>())}, 1);
-  Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
+  Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
   EXPECT_EQ(smoothed.Genus(), 38);
@@ -154,17 +170,17 @@ TEST(SDF, SineSurface) {
 
 TEST(SDF, Blobs) {
   const double blend = 1;
-  std::vector<vec4> balls = {{0, 0, 0, 2},     //
-                             {1, 2, 3, 2},     //
-                             {-2, 2, -2, 1},   //
-                             {-2, -3, -2, 2},  //
-                             {-3, -1, -3, 1},  //
-                             {2, -3, -2, 2},   //
-                             {-2, 3, 2, 2},    //
-                             {-2, -3, 2, 2},   //
-                             {1, -1, 1, -2},   //
-                             {-4, -3, -2, 1}};
-  MeshGL blobs = MeshGL::LevelSet(
+  std::vector<glm::vec4> balls = {{0, 0, 0, 2},     //
+                                  {1, 2, 3, 2},     //
+                                  {-2, 2, -2, 1},   //
+                                  {-2, -3, -2, 2},  //
+                                  {-3, -1, -3, 1},  //
+                                  {2, -3, -2, 2},   //
+                                  {-2, 3, 2, 2},    //
+                                  {-2, -3, 2, 2},   //
+                                  {1, -1, 1, -2},   //
+                                  {-4, -3, -2, 1}};
+  Manifold blobs = Manifold::LevelSet(
       [&balls, blend](vec3 p) {
         double d = 0;
         for (const auto& ball : balls) {
@@ -181,6 +197,6 @@ TEST(SDF, Blobs) {
   EXPECT_EQ(genus, 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("blobs.glb", blobs, {});
+  if (options.exportModels) ExportMesh("blobs.glb", blobs.GetMeshGL(), {});
 #endif
 }

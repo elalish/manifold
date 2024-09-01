@@ -30,7 +30,7 @@ pip install .
 python -c 'import manifold3d; help(manifold3d)'
 ```
 
-Alternateively you could generate stubs with roughly the same info
+Alternatively you could generate stubs with roughly the same info
 ```
 pip install nanobind-stubgen
 pip install .
