@@ -193,6 +193,6 @@ struct Manifold::Impl {
   void Refine(std::function<int(vec3)>);
 
   // quickhull.cpp
-  void Hull(const Vec<vec3>& vertPos);
+  void Hull(VecView<vec3> vertPos);
 };
 }  // namespace manifold
