@@ -214,7 +214,7 @@ class HullImplCGAL : public HullImpl {
 // (you can pass the specific hull implementation to be tested). Comparing the
 // volume and surface area with CGAL implementation, for various values of
 // rotation
-void MengerTestHull(HullImpl *impl, float rx, float ry, float rz,
+void MengerTestHull(HullImpl *impl, double rx, double ry, double rz,
                     char *implementation) {
   if (impl == NULL) return;
   Manifold sponge = MengerSponge(4);
