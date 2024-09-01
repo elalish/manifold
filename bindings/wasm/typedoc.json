@@ -1,0 +1,6 @@
+// typedoc.json
+{
+  "entryPoints": ["manifold-encapsulated-types.d.ts"],
+  "projectDocuments": ["documents/*.md"],
+  "out": "docs"
+}

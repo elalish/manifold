@@ -3,6 +3,9 @@
   "version": "2.5.1",
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
+  "scripts": {
+    "docs": "npx typedoc"
+  },
   "files": [
     "manifold.js",
     "manifold.wasm",
@@ -35,5 +38,8 @@
   "bugs": {
     "url": "https://github.com/elalish/manifold/issues"
   },
-  "homepage": "https://github.com/elalish/manifold#readme"
+  "homepage": "https://github.com/elalish/manifold#readme",
+  "devDependencies": {
+    "typedoc": "^0.26.6"
+  }
 }
