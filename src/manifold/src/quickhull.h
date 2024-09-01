@@ -273,7 +273,7 @@ class QuickHull {
  public:
   // This function assumes that the pointCloudVec data resides in memory in the
   // following format: x_0,y_0,z_0,x_1,y_1,z_1,...
-  QuickHull(const Vec<vec3>& pointCloudVec)
+  QuickHull(VecView<vec3> pointCloudVec)
       : originalVertexData(VecView(pointCloudVec)) {}
 
   // Computes convex hull for a given point cloud. Params: eps: minimum distance
