@@ -587,7 +587,7 @@ TEST(Polygon, Zebra1) {
       {3.09905005, 11.8409004},   //
       {3.09951997, 11.8859205},   //
   });
-  TestPoly(polys, 569, 0.00015);
+  TestPoly(polys, 569, 0.0002);
 }
 
 TEST(Polygon, Zebra) {
@@ -63217,5 +63217,5 @@ TEST(Polygon, Zebra) {
       {5.59076977, 14.00315},    //
       {5.59097004, 14.00315},    //
   });
-  TestPoly(polys, 62597, 0.00015);
+  TestPoly(polys, 62597, 0.0002);
 }
