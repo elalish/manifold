@@ -221,5 +221,6 @@ TEST(Hull, DisabledFaceTest) {
     ExportMesh("disabledFaceTest.glb", hull.GetMesh(), {});
   }
 #endif
+  EXPECT_TRUE(!hull.IsEmpty());
   EXPECT_TRUE(isMeshConvex(hull));
 }
