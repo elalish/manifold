@@ -187,7 +187,7 @@ TEST(Samples, Bracelet) {
   CheckGL(bracelet);
 
   CrossSection projection(bracelet.Project());
-  projection = projection.Simplify(bracelet.Precision());
+  projection = projection.Simplify(bracelet.BoundingBox().Scale() * 1e-8);
   Rect rect = projection.Bounds();
   Box box = bracelet.BoundingBox();
   EXPECT_FLOAT_EQ(rect.min.x, box.min.x);

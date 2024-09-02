@@ -385,7 +385,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const double volume =
             glm::dot(edges[0], glm::cross(edges[1], edges[2]));
-        ASSERT_LE(volume, area * out.Precision());
+        ASSERT_LE(volume, area * output.precision);
 
         if (checkNormals) {
           vec3 normal;
@@ -408,7 +408,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             const double volumeP =
                 glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
 
-            ASSERT_LE(volumeP, area * out.Precision());
+            ASSERT_LE(volumeP, area * output.precision);
           }
         }
       }

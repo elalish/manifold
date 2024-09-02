@@ -192,7 +192,8 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
       !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
 
   MeshGL out;
-  out.precision = Precision();
+  out.precision = std::max(Precision(), std::numeric_limits<float>::epsilon() *
+                                            BoundingBox().Scale());
   out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
 

@@ -394,7 +394,7 @@ TEST(Polygon, CoincidentHole) {
       {10.053978, -0.80470264},    //
       {9.97876835, -1.0301255},    //
   });
-  TestPoly(polys, 6);
+  TestPoly(polys, 6, 0.0001);
 };
 
 TEST(Polygon, Holes5) {
@@ -570,7 +570,7 @@ TEST(Polygon, Ugly) {
       {2289.28784, 13251.1582},  //
       {2379.03027, 13010.5566},  //
   });
-  TestPoly(polys, 36);
+  TestPoly(polys, 32, 0.14);
 };
 
 TEST(Polygon, Sponge4a) {
@@ -643,7 +643,7 @@ TEST(Polygon, Sponge4a) {
       {0.265432119, -0.0802469105},  //
       {0.261316895, -0.0802469105},  //
   });
-  TestPoly(polys, 64);
+  TestPoly(polys, 64, 4.5e-6);
 };
 
 TEST(Polygon, CoincidentHole2) {
@@ -869,7 +869,7 @@ TEST(Polygon, SpongeThin) {
       {0.314814806, -0.4853681033},  //
       {0.314814806, -0.4753086574},  //
   });
-  TestPoly(polys, 38);
+  TestPoly(polys, 38, 5e-6);
 }
 
 TEST(Polygon, ColinearY) {
@@ -1108,7 +1108,7 @@ TEST(Polygon, Sliver6) {
       {4.37113897e-07, 10},  //
       {10, 0},               //
   });
-  TestPoly(polys, 4);
+  TestPoly(polys, 4, 0.0001);
 }
 
 TEST(Polygon, Sliver7) {
@@ -1360,7 +1360,7 @@ TEST(Polygon, TouchingHole2) {
       {-0.290123463, -0.450617284},  //
       {-0.30155465, -0.450617284},   //
   });
-  TestPoly(polys, 11);
+  TestPoly(polys, 11, 5e-6);
 }
 
 TEST(Polygon, Degenerate) {
@@ -1385,7 +1385,7 @@ TEST(Polygon, Degenerate2) {
       {0.0925925896, -0.314814806826},  //
       {0.0740740597, -0.314814836830},  //
   });
-  TestPoly(polys, 2);
+  TestPoly(polys, 2, 3e-6);
 }
 
 TEST(Polygon, Degenerate3) {
@@ -1410,7 +1410,7 @@ TEST(Polygon, Degenerate4) {
       {4.37113897e-07, 10},           //
       {0.636729717, 9.9442930240},    //
   });
-  TestPoly(polys, 2);
+  TestPoly(polys, 2, 0.0001);
 }
 
 TEST(Polygon, Degenerate5) {
@@ -1494,7 +1494,7 @@ TEST(Polygon, Slit) {
       {25.6563644, 20.359741292},  //
       {25.6467285, 20.361473193},  //
   });
-  TestPoly(polys, 9);
+  TestPoly(polys, 9, 0.0003);
 }
 
 TEST(Polygon, SharedEdge) {
@@ -1662,7 +1662,7 @@ TEST(Polygon, Hole3) {
       {9.41945648, 9.38193321},  //
       {9.41326141, 9.36543179},  //
   });
-  TestPoly(polys, 10);
+  TestPoly(polys, 10, 1e-4);
 }
 
 TEST(Polygon, Separate3) {
@@ -1746,7 +1746,7 @@ TEST(Polygon, Comb) {
       {0.42592591, -0.425925912},        //
       {0.462962955, -0.425925919},       //
   });
-  TestPoly(polys, 37);
+  TestPoly(polys, 37, 5e-6);
 }
 
 TEST(Polygon, Comb2) {
@@ -1792,7 +1792,7 @@ TEST(Polygon, Comb2) {
       {0.5, -0.42592591279},            //
       {-0.5, -0.425925912},             //
   });
-  TestPoly(polys, 37);
+  TestPoly(polys, 37, 5e-6);
 }
 
 TEST(Polygon, PointPoly) {

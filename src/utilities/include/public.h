@@ -42,7 +42,7 @@ namespace manifold {
   return n;
 }
 
-constexpr double kTolerance = 1e-5;
+constexpr double kTolerance = 1e-12;
 
 /** @defgroup Math data structure definitions
  *  @brief Abstract away from glm.
