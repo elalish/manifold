@@ -142,7 +142,7 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
  * connected. Should ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-using SimplePolygon = std::vector<vec2>;
+using SimplePolygon = std::vector<vec2, std::allocator<vec2>>;
 
 /**
  * Set of polygons with holes. Order of contours is arbitrary. Can contain any
@@ -150,7 +150,7 @@ using SimplePolygon = std::vector<vec2>;
  * input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-using Polygons = std::vector<SimplePolygon>;
+using Polygons = std::vector<SimplePolygon, std::allocator<SimplePolygon>>;
 
 /**
  * The triangle-mesh input and output of this library.
