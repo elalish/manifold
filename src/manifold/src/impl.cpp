@@ -30,10 +30,11 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
+void AtomicAddVec3(vec3& target, const vec3& add) {
   for (int i : {0, 1, 2}) {
-    std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
-    float old_val = tar.load(std::memory_order_relaxed);
+    std::atomic<double>& tar =
+        reinterpret_cast<std::atomic<double>&>(target[i]);
+    double old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
                                       std::memory_order_relaxed)) {
     }
@@ -41,28 +42,26 @@ void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
 }
 
 struct Transform4x3 {
-  const glm::mat4x3 transform;
+  const mat4x3 transform;
 
-  glm::vec3 operator()(glm::vec3 position) {
-    return transform * glm::vec4(position, 1.0f);
-  }
+  vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
 struct AssignNormals {
-  VecView<glm::vec3> faceNormal;
-  VecView<glm::vec3> vertNormal;
-  VecView<const glm::vec3> vertPos;
+  VecView<vec3> faceNormal;
+  VecView<vec3> vertNormal;
+  VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
-  const float precision;
+  const double precision;
   const bool calculateTriNormal;
 
   void operator()(const int face) {
-    glm::vec3& triNormal = faceNormal[face];
+    vec3& triNormal = faceNormal[face];
 
-    glm::ivec3 triVerts;
+    ivec3 triVerts;
     for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
 
-    glm::vec3 edge[3];
+    vec3 edge[3];
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
       edge[i] = glm::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
@@ -70,16 +69,16 @@ struct AssignNormals {
 
     if (calculateTriNormal) {
       triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
-      if (isnan(triNormal.x)) triNormal = glm::vec3(0, 0, 1);
+      if (isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     }
 
     // corner angles
-    glm::vec3 phi;
-    float dot = -glm::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+    vec3 phi;
+    double dot = -glm::dot(edge[2], edge[0]);
+    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
     dot = -glm::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
-    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
+    phi[2] = glm::pi<double>() - phi[0] - phi[1];
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -97,15 +96,15 @@ struct UpdateMeshID {
 struct CoplanarEdge {
   VecView<std::pair<int, int>> face2face;
   VecView<std::pair<int, int>> vert2vert;
-  VecView<float> triArea;
+  VecView<double> triArea;
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
+  VecView<const vec3> vertPos;
   VecView<const TriRef> triRef;
-  VecView<const glm::ivec3> triProp;
-  VecView<const float> prop;
-  VecView<const float> propTol;
+  VecView<const ivec3> triProp;
+  VecView<const double> prop;
+  VecView<const double> propTol;
   const int numProp;
-  const float precision;
+  const double precision;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -114,7 +113,7 @@ struct CoplanarEdge {
 
     if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
 
-    const glm::vec3 base = vertPos[edge.startVert];
+    const vec3 base = vertPos[edge.startVert];
     const int baseNum = edgeIdx - 3 * edge.face;
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
 
@@ -123,7 +122,7 @@ struct CoplanarEdge {
       const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
-        if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
+        if (std::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
             propTol[p]) {
           propEqual = false;
           break;
@@ -138,50 +137,48 @@ struct CoplanarEdge {
 
     const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
     const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
-    const glm::vec3 jointVec = vertPos[pair.startVert] - base;
-    const glm::vec3 edgeVec =
+    const vec3 jointVec = vertPos[pair.startVert] - base;
+    const vec3 edgeVec =
         vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
-    const glm::vec3 pairVec =
+    const vec3 pairVec =
         vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
 
-    const float length = glm::max(glm::length(jointVec), glm::length(edgeVec));
-    const float lengthPair =
-        glm::max(glm::length(jointVec), glm::length(pairVec));
-    glm::vec3 normal = glm::cross(jointVec, edgeVec);
-    const float area = glm::length(normal);
-    const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
+    const double lengthPair =
+        std::max(glm::length(jointVec), glm::length(pairVec));
+    vec3 normal = glm::cross(jointVec, edgeVec);
+    const double area = glm::length(normal);
+    const double areaPair = glm::length(glm::cross(pairVec, jointVec));
     triArea[edge.face] = area;
     triArea[pair.face] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
-    const float volume = glm::abs(glm::dot(normal, pairVec));
+    const double volume = std::abs(glm::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > glm::max(area, areaPair) * precision) return;
+    if (volume > std::max(area, areaPair) * precision) return;
 
     // Check property linearity
     if (area > 0) {
       normal /= area;
       for (int i = 0; i < numProp; ++i) {
-        const float scale = precision / propTol[i];
+        const double scale = precision / propTol[i];
 
-        const float baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
-        const float jointProp =
+        const double baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
+        const double jointProp =
             prop[numProp * triProp[pair.face][jointNum] + i];
-        const float edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
-        const float pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
+        const double edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
+        const double pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
 
-        const glm::vec3 iJointVec =
+        const vec3 iJointVec =
             jointVec + normal * scale * (jointProp - baseProp);
-        const glm::vec3 iEdgeVec =
-            edgeVec + normal * scale * (edgeProp - baseProp);
-        const glm::vec3 iPairVec =
-            pairVec + normal * scale * (pairProp - baseProp);
+        const vec3 iEdgeVec = edgeVec + normal * scale * (edgeProp - baseProp);
+        const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
 
-        glm::vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const float areaP = glm::max(
+        vec3 cross = glm::cross(iJointVec, iEdgeVec);
+        const double areaP = std::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const float volumeP = glm::abs(glm::dot(cross, iPairVec));
+        const double volumeP = std::abs(glm::dot(cross, iPairVec));
         // Only operate on consistent triangles
         if (volumeP > areaP * precision) return;
       }
@@ -194,26 +191,26 @@ struct CoplanarEdge {
 struct CheckCoplanarity {
   VecView<int> comp2tri;
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
+  VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const float precision;
+  const double precision;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
     const int referenceTri = comp2tri[component];
     if (referenceTri < 0 || referenceTri == tri) return;
 
-    const glm::vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
-    const glm::vec3 normal = glm::normalize(
+    const vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
+    const vec3 normal = glm::normalize(
         glm::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
                    vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
 
     for (const int i : {0, 1, 2}) {
-      const glm::vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
+      const vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
+      if (std::abs(glm::dot(normal, vert - origin)) > precision) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -233,7 +230,7 @@ int GetLabels(std::vector<int>& components,
   return uf.connectedComponents(components);
 }
 
-void DedupePropVerts(manifold::Vec<glm::ivec3>& triProp,
+void DedupePropVerts(manifold::Vec<ivec3>& triProp,
                      const Vec<std::pair<int, int>>& vert2vert) {
   ZoneScoped;
   std::vector<int> vertLabels;
@@ -378,7 +375,12 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
   }
 
-  *this = Impl(mesh, relation, propertyTolerance, !meshGL.faceID.empty());
+  std::vector<double> propertyToleranceD(propertyTolerance.size());
+  manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
+                      propertyToleranceD.begin(),
+                      [](float v) { return (double)v; });
+
+  *this = Impl(mesh, relation, propertyToleranceD, !meshGL.faceID.empty());
 
   // A Manifold created from an input mesh is never an original - the input is
   // the original.
@@ -391,15 +393,15 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
  * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
-                     const std::vector<float>& propertyTolerance,
+                     const std::vector<double>& propertyTolerance,
                      bool hasFaceIDs)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
                    relation.meshIDtransform};
 
-  Vec<glm::ivec3> triVerts;
+  Vec<ivec3> triVerts;
   for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
-    const glm::ivec3 tri = mesh.triVerts[i];
+    const ivec3 tri = mesh.triVerts[i];
     // Remove topological degenerates
     if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
       triVerts.push_back(tri);
@@ -447,26 +449,26 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
-  std::vector<glm::vec3> vertPos;
-  std::vector<glm::ivec3> triVerts;
+Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
+  std::vector<vec3> vertPos;
+  std::vector<ivec3> triVerts;
   switch (shape) {
     case Shape::Tetrahedron:
-      vertPos = {{-1.0f, -1.0f, 1.0f},
-                 {-1.0f, 1.0f, -1.0f},
-                 {1.0f, -1.0f, -1.0f},
-                 {1.0f, 1.0f, 1.0f}};
+      vertPos = {{-1.0, -1.0, 1.0},
+                 {-1.0, 1.0, -1.0},
+                 {1.0, -1.0, -1.0},
+                 {1.0, 1.0, 1.0}};
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
     case Shape::Cube:
-      vertPos = {{0.0f, 0.0f, 0.0f},  //
-                 {0.0f, 0.0f, 1.0f},  //
-                 {0.0f, 1.0f, 0.0f},  //
-                 {0.0f, 1.0f, 1.0f},  //
-                 {1.0f, 0.0f, 0.0f},  //
-                 {1.0f, 0.0f, 1.0f},  //
-                 {1.0f, 1.0f, 0.0f},  //
-                 {1.0f, 1.0f, 1.0f}};
+      vertPos = {{0.0, 0.0, 0.0},  //
+                 {0.0, 0.0, 1.0},  //
+                 {0.0, 1.0, 0.0},  //
+                 {0.0, 1.0, 1.0},  //
+                 {1.0, 0.0, 0.0},  //
+                 {1.0, 0.0, 1.0},  //
+                 {1.0, 1.0, 0.0},  //
+                 {1.0, 1.0, 1.0}};
       triVerts = {{1, 0, 4}, {2, 4, 0},  //
                   {1, 3, 0}, {3, 1, 5},  //
                   {3, 2, 0}, {3, 7, 2},  //
@@ -475,12 +477,12 @@ Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
                   {7, 3, 5}, {7, 5, 6}};
       break;
     case Shape::Octahedron:
-      vertPos = {{1.0f, 0.0f, 0.0f},   //
-                 {-1.0f, 0.0f, 0.0f},  //
-                 {0.0f, 1.0f, 0.0f},   //
-                 {0.0f, -1.0f, 0.0f},  //
-                 {0.0f, 0.0f, 1.0f},   //
-                 {0.0f, 0.0f, -1.0f}};
+      vertPos = {{1.0, 0.0, 0.0},   //
+                 {-1.0, 0.0, 0.0},  //
+                 {0.0, 1.0, 0.0},   //
+                 {0.0, -1.0, 0.0},  //
+                 {0.0, 0.0, 1.0},   //
+                 {0.0, 0.0, -1.0}};
       triVerts = {{0, 2, 4}, {1, 5, 3},  //
                   {2, 1, 4}, {3, 5, 0},  //
                   {1, 3, 4}, {0, 5, 2},  //
@@ -488,7 +490,7 @@ Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
       break;
   }
   vertPos_ = vertPos;
-  for (auto& v : vertPos_) v = m * glm::vec4(v, 1.0f);
+  for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
   Finish();
   meshRelation_.originalID = ReserveIDs(1);
@@ -506,7 +508,7 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
                  ->store(1, std::memory_order_relaxed);
            });
 
-  const Vec<glm::vec3> oldVertPos = vertPos_;
+  const Vec<vec3> oldVertPos = vertPos_;
 
   Vec<size_t> tmpBuffer(oldVertPos.size());
   auto vertIdIter = TransformIterator(countAt(0_uz), [&vertOld2New](size_t i) {
@@ -546,15 +548,15 @@ void Manifold::Impl::InitializeOriginal() {
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
+void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   ZoneScoped;
-  Vec<float> propertyToleranceD =
-      propertyTolerance.empty() ? Vec<float>(meshRelation_.numProp, kTolerance)
+  Vec<double> propertyToleranceD =
+      propertyTolerance.empty() ? Vec<double>(meshRelation_.numProp, kTolerance)
                                 : propertyTolerance;
 
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
-  Vec<float> triArea(NumTri());
+  Vec<double> triArea(NumTri());
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
@@ -594,7 +596,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
  */
-void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
+void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   ZoneScoped;
   const size_t numTri = triVerts.size();
   const int numHalfedge = 3 * numTri;
@@ -607,16 +609,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   sequence(ids.begin(), ids.end());
   for_each_n(policy, countAt(0), numTri,
              [this, &edge, &triVerts](const int tri) {
-               const glm::ivec3& verts = triVerts[tri];
+               const ivec3& verts = triVerts[tri];
                for (const int i : {0, 1, 2}) {
                  const int j = (i + 1) % 3;
                  const int e = 3 * tri + i;
                  halfedge_[e] = {verts[i], verts[j], -1, tri};
                  // Sort the forward halfedges in front of the backward ones by
                  // setting the highest-order bit.
-                 edge[e] = glm::uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
-                           ((glm::uint64_t)glm::min(verts[i], verts[j])) << 32 |
-                           glm::max(verts[i], verts[j]);
+                 edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
+                           ((uint64_t)std::min(verts[i], verts[j])) << 32 |
+                           std::max(verts[i], verts[j]);
                }
              });
   // Stable sort is required here so that halfedges from the same face are
@@ -693,14 +695,13 @@ void Manifold::Impl::MarkFailure(Error status) {
   status_ = status;
 }
 
-void Manifold::Impl::Warp(std::function<void(glm::vec3&)> warpFunc) {
-  WarpBatch([&warpFunc](VecView<glm::vec3> vecs) {
+void Manifold::Impl::Warp(std::function<void(vec3&)> warpFunc) {
+  WarpBatch([&warpFunc](VecView<vec3> vecs) {
     for_each(ExecutionPolicy::Seq, vecs.begin(), vecs.end(), warpFunc);
   });
 }
 
-void Manifold::Impl::WarpBatch(
-    std::function<void(VecView<glm::vec3>)> warpFunc) {
+void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   warpFunc(vertPos_.view());
   CalculateBBox();
   if (!IsFinite()) {
@@ -715,9 +716,9 @@ void Manifold::Impl::WarpBatch(
   Finish();
 }
 
-Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
+Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
   ZoneScoped;
-  if (transform_ == glm::mat4x3(1.0f)) return *this;
+  if (transform_ == mat4x3(1.0)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
   result.collider_ = collider_;
@@ -729,7 +730,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
 
   result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
-    m.second.transform = transform_ * glm::mat4(m.second.transform);
+    m.second.transform = transform_ * mat4(m.second.transform);
   }
 
   result.vertPos_.resize(NumVert());
@@ -738,19 +739,18 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
             Transform4x3({transform_}));
 
-  glm::mat3 normalTransform = NormalTransform(transform_);
+  mat3 normalTransform = NormalTransform(transform_);
   transform(faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
             TransformNormals({normalTransform}));
   transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
             TransformNormals({normalTransform}));
 
-  const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
+  const bool invert = glm::determinant(mat3(transform_)) < 0;
 
   if (halfedgeTangent_.size() > 0) {
-    for_each_n(
-        policy, countAt(0), halfedgeTangent_.size(),
-        TransformTangents({result.halfedgeTangent_, 0, glm::mat3(transform_),
-                           invert, halfedgeTangent_, halfedge_}));
+    for_each_n(policy, countAt(0), halfedgeTangent_.size(),
+               TransformTangents({result.halfedgeTangent_, 0, mat3(transform_),
+                                  invert, halfedgeTangent_, halfedge_}));
   }
 
   if (invert) {
@@ -764,7 +764,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
 
   result.CalculateBBox();
   // Scale the precision by the norm of the 3x3 portion of the transform.
-  result.precision_ *= SpectralNorm(glm::mat3(transform_));
+  result.precision_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited precision loss and translational precision loss.
   result.SetPrecision(result.precision_);
   return result;
@@ -774,7 +774,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
  * Sets the precision based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetPrecision(float minPrecision) {
+void Manifold::Impl::SetPrecision(double minPrecision) {
   precision_ = MaxPrecision(minPrecision, bBox_);
 }
 
@@ -794,7 +794,7 @@ void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri(), 1e4);
-  fill(vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
+  fill(vertNormal_.begin(), vertNormal_.end(), vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
@@ -804,7 +804,7 @@ void Manifold::Impl::CalculateNormals() {
              AssignNormals({faceNormal_, vertNormal_, vertPos_, halfedge_,
                             precision_, calculateTriNormal}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
-           [](glm::vec3& v) { v = SafeNormalize(v); });
+           [](vec3& v) { v = SafeNormalize(v); });
 }
 
 /**
@@ -865,8 +865,8 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
  * Returns a sparse array of the input vertices that project inside the XY
  * bounding boxes of the faces of this manifold.
  */
-SparseIndices Manifold::Impl::VertexCollisionsZ(
-    VecView<const glm::vec3> vertsIn, bool inverted) const {
+SparseIndices Manifold::Impl::VertexCollisionsZ(VecView<const vec3> vertsIn,
+                                                bool inverted) const {
   ZoneScoped;
   if (inverted)
     return collider_.Collisions<false, true>(vertsIn);

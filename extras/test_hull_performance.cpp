@@ -51,7 +51,7 @@ class HullImpl {
   // actual hull operation, we will measure the time needed to evaluate this
   // function.
   virtual void hull(const manifold::Manifold &input,
-                    const std::vector<glm::vec3> &pts) = 0;
+                    const std::vector<vec3> &pts) = 0;
   virtual ~HullImpl() = default;
 
 #ifdef MANIFOLD_DEBUG
@@ -65,12 +65,12 @@ class HullImpl {
     // Iterate over each triangle
     for (const auto &tri : mesh.triVerts) {
       // Get the vertices of the triangle
-      glm::vec3 v0 = vertPos[tri[0]];
-      glm::vec3 v1 = vertPos[tri[1]];
-      glm::vec3 v2 = vertPos[tri[2]];
+      vec3 v0 = vertPos[tri[0]];
+      vec3 v1 = vertPos[tri[1]];
+      vec3 v2 = vertPos[tri[2]];
 
       // Compute the normal of the triangle
-      glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+      vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
       // Check all other vertices
       for (int i = 0; i < (int)vertPos.size(); ++i) {
@@ -78,7 +78,7 @@ class HullImpl {
           continue;  // Skip vertices of the current triangle
 
         // Get the vertex
-        glm::vec3 v = vertPos[i];
+        vec3 v = vertPos[i];
 
         // Compute the signed distance from the plane
         double distance = glm::dot(normal, v - v0);
@@ -104,7 +104,7 @@ class HullImpl {
 class HullImplOriginal : public HullImpl {
  public:
   void hull(const manifold::Manifold &input,
-            const std::vector<glm::vec3> &pts) override {
+            const std::vector<vec3> &pts) override {
     inputManifold = input;
     auto start = std::chrono::high_resolution_clock::now();
     hullManifold = Manifold::Hull(pts);
@@ -183,7 +183,7 @@ class HullImplCGAL : public HullImpl {
   // This was the code  where I converted the CGAL Hull back to manifold, but I
   // thought that added overhead, so if needed we can also use the functions of
   // the library to print the output as well void hull(const
-  // std::vector<glm::vec3>& pts) {
+  // std::vector<vec3>& pts) {
   //   std::vector<Point> points;
   //   for (const auto &vert : pts) {
   //     points.push_back(Point(vert.x, vert.y, vert.z));
@@ -193,7 +193,7 @@ class HullImplCGAL : public HullImpl {
   //   CGALToManifoldSurfaceMesh(cgalHull, hullManifold);
   // }
   void hull(const manifold::Manifold &input,
-            const std::vector<glm::vec3> &pts) override {
+            const std::vector<vec3> &pts) override {
     inputManifold = input;
     manifoldToCGALSurfaceMesh(inputManifold, cgalInput);
     std::vector<Point> points;
@@ -214,7 +214,7 @@ class HullImplCGAL : public HullImpl {
 // (you can pass the specific hull implementation to be tested). Comparing the
 // volume and surface area with CGAL implementation, for various values of
 // rotation
-void MengerTestHull(HullImpl *impl, float rx, float ry, float rz,
+void MengerTestHull(HullImpl *impl, double rx, double ry, double rz,
                     char *implementation) {
   if (impl == NULL) return;
   Manifold sponge = MengerSponge(4);
@@ -228,7 +228,7 @@ void MengerTestHull(HullImpl *impl, float rx, float ry, float rz,
 void SphereTestHull(HullImpl *impl, char *implementation) {
   if (impl == NULL) return;
   Manifold sphere = Manifold::Sphere(1, 6000);
-  sphere = sphere.Translate(glm::vec3(0.5));
+  sphere = sphere.Translate(vec3(0.5));
   impl->hull(sphere, sphere.GetMesh().vertPos);
 }
 

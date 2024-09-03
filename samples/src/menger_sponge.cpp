@@ -18,15 +18,14 @@ namespace {
 
 using namespace manifold;
 
-void Fractal(std::vector<Manifold>& holes, Manifold& hole, float w,
-             glm::vec2 position, int depth, int maxDepth) {
+void Fractal(std::vector<Manifold>& holes, Manifold& hole, double w,
+             vec2 position, int depth, int maxDepth) {
   w /= 3;
-  holes.push_back(
-      hole.Scale({w, w, 1.0f}).Translate(glm::vec3(position, 0.0f)));
+  holes.push_back(hole.Scale({w, w, 1.0}).Translate(vec3(position, 0.0)));
   if (depth == maxDepth) return;
 
-  glm::vec2 offsets[8] = {{-w, -w}, {-w, 0.0f}, {-w, w}, {0.0f, w},
-                          {w, w},   {w, 0.0f},  {w, -w}, {0.0f, -w}};
+  vec2 offsets[8] = {{-w, -w}, {-w, 0.0}, {-w, w}, {0.0, w},
+                     {w, w},   {w, 0.0},  {w, -w}, {0.0, -w}};
   for (int i = 0; i < 8; ++i) {
     Fractal(holes, hole, w, position + offsets[i], depth + 1, maxDepth);
   }
@@ -42,10 +41,10 @@ namespace manifold {
  * 400,000 triangles!
  */
 Manifold MengerSponge(int n) {
-  Manifold result = Manifold::Cube(glm::vec3(1.0f), true);
+  Manifold result = Manifold::Cube(vec3(1.0), true);
 
   std::vector<Manifold> holes;
-  Fractal(holes, result, 1.0, {0.0f, 0.0f}, 1, n);
+  Fractal(holes, result, 1.0, {0.0, 0.0}, 1, n);
 
   Manifold hole = Manifold::Compose(holes);
 

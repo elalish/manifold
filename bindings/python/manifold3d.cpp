@@ -34,27 +34,27 @@ using namespace manifold;
 template <class T>
 struct glm_name {};
 template <>
-struct glm_name<glm::vec3> {
-  static constexpr char const name[] = "Floatx3";
-  static constexpr char const multi_name[] = "FloatNx3";
+struct glm_name<vec3> {
+  static constexpr char const name[] = "Doublex3";
+  static constexpr char const multi_name[] = "DoubleNx3";
 };
 template <>
-struct glm_name<glm::vec2> {
-  static constexpr char const name[] = "Floatx2";
-  static constexpr char const multi_name[] = "FloatNx2";
+struct glm_name<vec2> {
+  static constexpr char const name[] = "Doublex2";
+  static constexpr char const multi_name[] = "DoubleNx2";
 };
 template <>
-struct glm_name<glm::ivec3> {
+struct glm_name<ivec3> {
   static constexpr char const name[] = "Intx3";
   static constexpr char const multi_name[] = "IntNx3";
 };
 template <>
-struct glm_name<glm::mat4x3> {
-  static constexpr char const name[] = "Float3x4";
+struct glm_name<mat4x3> {
+  static constexpr char const name[] = "Double3x4";
 };
 template <>
-struct glm_name<glm::mat3x2> {
-  static constexpr char const name[] = "Float2x3";
+struct glm_name<mat3x2> {
+  static constexpr char const name[] = "Double2x3";
 };
 
 // handle glm::vecN
@@ -248,7 +248,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("manifolds"), manifold__hull__manifolds)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec3> pts) { return Manifold::Hull(pts); },
+          [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
           nb::arg("pts"), manifold__hull__pts)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
@@ -256,7 +256,8 @@ NB_MODULE(manifold3d, m) {
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
-          "scale", [](const Manifold &self, float s) { self.Scale({s, s, s}); },
+          "scale",
+          [](const Manifold &self, double s) { self.Scale({s, s, s}); },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -264,16 +265,15 @@ NB_MODULE(manifold3d, m) {
       .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
       .def(
           "rotate",
-          [](const Manifold &self, glm::vec3 v) {
+          [](const Manifold &self, vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"), manifold__rotate__v.c_str())
       .def(
           "warp",
-          [](const Manifold &self,
-             std::function<glm::vec3(glm::vec3)> warp_func) {
+          [](const Manifold &self, std::function<vec3(vec3)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.Warp([&warp_func](glm::vec3 &v) { v = warp_func(v); });
+            return self.Warp([&warp_func](vec3 &v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), manifold__warp__warp_func)
       .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
@@ -282,19 +282,18 @@ NB_MODULE(manifold3d, m) {
           "set_properties",
           [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
-                 glm::vec3, const nb::ndarray<nb::numpy, const float,
-                                              nb::c_contig> &)> &f) {
+                 vec3, const nb::ndarray<nb::numpy, const double, nb::c_contig>
+                           &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
-                                                      float *newProps,
-                                                      glm::vec3 v,
-                                                      const float *oldProps) {
+                                                      double *newProps, vec3 v,
+                                                      const double *oldProps) {
               auto result =
-                  f(v, nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                  f(v, nb::ndarray<nb::numpy, const double, nb::c_contig>(
                            oldProps, {static_cast<unsigned long>(oldNumProp)},
                            nb::handle()));
-              nb::ndarray<float, nb::shape<-1>> array;
-              std::vector<float> vec;
+              nb::ndarray<double, nb::shape<-1>> array;
+              std::vector<double> vec;
               if (nb::try_cast(result, array)) {
                 if (array.ndim() != 1 ||
                     array.shape(0) != static_cast<size_t>(newNumProp))
@@ -317,7 +316,7 @@ NB_MODULE(manifold3d, m) {
       .def("min_gap", &Manifold::MinGap, nb::arg("other"),
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
-           "Returns a float between 0 and searchLength.")
+           "Returns a double between 0 and searchLength.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
@@ -329,8 +328,7 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
-      .def("to_mesh", &Manifold::GetMeshGL,
-           nb::arg("normal_idx") = glm::ivec3(0),
+      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
@@ -363,7 +361,7 @@ NB_MODULE(manifold3d, m) {
            manifold__trim_by_plane__normal__origin_offset)
       .def(
           "slice",
-          [](const Manifold &self, float height) {
+          [](const Manifold &self, double height) {
             return CrossSection(self.Slice(height));
           },
           nb::arg("height"), manifold__slice__height)
@@ -386,7 +384,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "smooth",
           [](const MeshGL &mesh, std::vector<size_t> sharpened_edges,
-             std::vector<float> edge_smoothness) {
+             std::vector<double> edge_smoothness) {
             if (sharpened_edges.size() != edge_smoothness.size()) {
               throw std::runtime_error(
                   "sharpened_edges.size() != edge_smoothness.size()");
@@ -407,12 +405,12 @@ NB_MODULE(manifold3d, m) {
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
+      .def_static("cube", &Manifold::Cube, nb::arg("size") = vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",
-          [](const CrossSection &crossSection, float height, int nDivisions,
-             float twistDegrees, glm::vec2 scaleTop) {
+          [](const CrossSection &crossSection, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(crossSection.ToPolygons(), height,
                                      nDivisions, twistDegrees, scaleTop);
           },
@@ -423,7 +421,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "revolve",
           [](const CrossSection &crossSection, int circularSegments,
-             float revolveDegrees) {
+             double revolveDegrees) {
             return Manifold::Revolve(crossSection.ToPolygons(),
                                      circularSegments, revolveDegrees);
           },
@@ -432,14 +430,14 @@ NB_MODULE(manifold3d, m) {
           manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
           "level_set",
-          [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0,
-             float precision = -1) {
+          [](const std::function<double(double, double, double)> &f,
+             std::vector<double> bounds, double edgeLength, double level = 0.0,
+             double precision = -1) {
             // Same format as Manifold.bounding_box
-            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
-                         glm::vec3(bounds[3], bounds[4], bounds[5])};
+            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
+                         vec3(bounds[3], bounds[4], bounds[5])};
 
-            std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
+            std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };
             return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
@@ -624,8 +622,7 @@ NB_MODULE(manifold3d, m) {
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
       .def(nb::init<>(), cross_section__cross_section)
-      .def(nb::init<std::vector<std::vector<glm::vec2>>,
-                    CrossSection::FillRule>(),
+      .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
            nb::arg("contours"),
            nb::arg("fillrule") = CrossSection::FillRule::Positive,
            cross_section__cross_section__contours__fillrule)
@@ -649,7 +646,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) { self.Scale({s, s}); },
+          [](const CrossSection &self, double s) { self.Scale({s, s}); },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
@@ -661,10 +658,9 @@ NB_MODULE(manifold3d, m) {
            cross_section__transform__m)
       .def(
           "warp",
-          [](const CrossSection &self,
-             std::function<glm::vec2(glm::vec2)> warp_func) {
+          [](const CrossSection &self, std::function<vec2(vec2)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.Warp([&warp_func](glm::vec2 &v) { v = warp_func(v); });
+            return self.Warp([&warp_func](vec2 &v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), cross_section__warp__warp_func)
       .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
@@ -688,7 +684,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("cross_sections"), cross_section__hull__cross_sections)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
+          [](std::vector<vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
@@ -699,8 +695,8 @@ NB_MODULE(manifold3d, m) {
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude",
-          [](const CrossSection &self, float height, int nDivisions,
-             float twistDegrees, glm::vec2 scaleTop) {
+          [](const CrossSection &self, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
             return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
                                      twistDegrees, scaleTop);
           },
@@ -711,7 +707,7 @@ NB_MODULE(manifold3d, m) {
       .def(
           "revolve",
           [](const CrossSection &self, int circularSegments,
-             float revolveDegrees) {
+             double revolveDegrees) {
             return Manifold::Revolve(self.ToPolygons(), circularSegments,
                                      revolveDegrees);
           },

@@ -25,8 +25,8 @@ namespace manifold {
  * @param gap Spacing between the two halves to allow sliding.
  * @param nDivisions Number of divisions (both ways) in the screw surface.
  */
-Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
-  const glm::vec3 scale(edgeLength / (2 * sqrt(2)));
+Manifold TetPuzzle(double edgeLength, double gap, int nDivisions) {
+  const vec3 scale(edgeLength / (2 * sqrt(2)));
 
   Manifold tet = Manifold::Tetrahedron().Scale(scale);
 
@@ -34,7 +34,7 @@ Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
   box.push_back({{2, -2}, {2, 2}});
 
   for (int i = 0; i <= nDivisions; ++i) {
-    box[0].push_back({gap / 2, 2 - i * 4.0f / nDivisions});
+    box[0].push_back({gap / 2, 2 - i * 4.0 / nDivisions});
   }
 
   Manifold screw = Manifold::Extrude(box, 2, nDivisions, 270)

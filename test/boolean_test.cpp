@@ -27,7 +27,7 @@ TEST(Boolean, Tetra) {
   tetra = Manifold(tetraGL);
   EXPECT_TRUE(!tetra.IsEmpty());
 
-  Manifold tetra2 = tetra.Translate(glm::vec3(0.5f));
+  Manifold tetra2 = tetra.Translate(vec3(0.5));
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12, 3, 11}});
@@ -36,7 +36,7 @@ TEST(Boolean, Tetra) {
 }
 
 TEST(Boolean, MeshGLRoundTrip) {
-  Manifold cube = Manifold::Cube(glm::vec3(2));
+  Manifold cube = Manifold::Cube(vec3(2));
   ASSERT_GE(cube.OriginalID(), 0);
   const MeshGL original = cube.GetMeshGL();
 
@@ -66,9 +66,9 @@ TEST(Boolean, Normals) {
   const Manifold sphere(sphereGL);
 
   Manifold result =
-      cube.Scale(glm::vec3(100)) -
+      cube.Scale(vec3(100)) -
       (sphere.Rotate(180) -
-       sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
+       sphere.Scale(vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
@@ -112,10 +112,10 @@ TEST(Boolean, EmptyOriginal) {
 }
 
 TEST(Boolean, Mirrored) {
-  Manifold cube = Manifold::Cube(glm::vec3(1)).Scale({1, -1, 1});
+  Manifold cube = Manifold::Cube(vec3(1)).Scale({1, -1, 1});
   EXPECT_TRUE(cube.MatchesTriNormals());
 
-  Manifold cube2 = Manifold::Cube(glm::vec3(1)).Scale({0.5, -1, 0.5});
+  Manifold cube2 = Manifold::Cube(vec3(1)).Scale({0.5, -1, 0.5});
   Manifold result = cube - cube2;
 
   ExpectMeshes(result, {{12, 20}});
@@ -142,7 +142,7 @@ TEST(Boolean, Cubes) {
 }
 
 TEST(Boolean, NoRetainedVerts) {
-  Manifold cube = Manifold::Cube(glm::vec3(1), true);
+  Manifold cube = Manifold::Cube(vec3(1), true);
   Manifold oct = Manifold::Sphere(1, 4);
   EXPECT_NEAR(cube.GetProperties().volume, 1, 0.001);
   EXPECT_NEAR(oct.GetProperties().volume, 1.333, 0.001);
@@ -152,7 +152,7 @@ TEST(Boolean, NoRetainedVerts) {
 TEST(Boolean, PropertiesNoIntersection) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = m0.Translate(glm::vec3(1.5));
+  Manifold m1 = m0.Translate(vec3(1.5));
   Manifold result = m0 + m1;
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV});
@@ -162,7 +162,7 @@ TEST(Boolean, MixedProperties) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
   Manifold m1 = Manifold::Cube();
-  Manifold result = m0 + m1.Translate(glm::vec3(0.5));
+  Manifold result = m0 + m1.Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
 }
@@ -172,9 +172,9 @@ TEST(Boolean, MixedNumProp) {
   Manifold m0(cubeUV);
   Manifold m1 = Manifold::Cube();
   Manifold result =
-      m0 + m1.SetProperties(1, [](float* prop, glm::vec3 p, const float* n) {
+      m0 + m1.SetProperties(1, [](double* prop, vec3 p, const double* n) {
                prop[0] = 1;
-             }).Translate(glm::vec3(0.5));
+             }).Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
 }
@@ -182,8 +182,8 @@ TEST(Boolean, MixedNumProp) {
 TEST(Boolean, UnionDifference) {
   Manifold block = Manifold::Cube({1, 1, 1}, true) - Manifold::Cylinder(1, 0.5);
   Manifold result = block + block.Translate({0, 0, 1});
-  float resultsize = result.GetProperties().volume;
-  float blocksize = block.GetProperties().volume;
+  double resultsize = result.GetProperties().volume;
+  double blocksize = block.GetProperties().volume;
   EXPECT_NEAR(resultsize, blocksize * 2, 0.0001);
 }
 
@@ -197,7 +197,7 @@ TEST(Boolean, TreeTransforms) {
 
 TEST(Boolean, CreatePropertiesSlow) {
   Manifold a = Manifold::Sphere(10, 1024).SetProperties(
-      3, [](float* newprop, glm::vec3 pos, const float* old) {
+      3, [](double* newprop, vec3 pos, const double* old) {
         for (int i = 0; i < 3; i++) newprop[i] = 0;
       });
   Manifold b = Manifold::Sphere(10, 1024).Translate({5, 0, 0});
@@ -214,32 +214,30 @@ TEST(Boolean, SelfSubtract) {
   EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 0.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 0.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0);
 }
 
 TEST(Boolean, Perturb) {
   Mesh tmp;
-  tmp.vertPos = {{0.0f, 0.0f, 0.0f},
-                 {0.0f, 1.0f, 0.0f},
-                 {1.0f, 0.0f, 0.0f},
-                 {0.0f, 0.0f, 1.0f}};
+  tmp.vertPos = {
+      {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}};
   tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   Manifold corner(tmp);
   Manifold empty = corner - corner;
   EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 0.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 0.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0);
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cylinder = Manifold::Cylinder(1.0, 1.0);
   MeshGL cylinderGL = WithPositionColors(cylinder);
   cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 185);
+  Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 48}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
@@ -248,7 +246,7 @@ TEST(Boolean, Coplanar) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
@@ -259,11 +257,11 @@ TEST(Boolean, Coplanar) {
  * Colinear edges are not collapsed like above due to non-coplanar properties.
  */
 TEST(Boolean, CoplanarProp) {
-  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cylinder = Manifold::Cylinder(1.0, 1.0);
   MeshGL cylinderGL = WithIndexColors(cylinder.GetMeshGL());
   cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 185);
+  Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{52, 104, 3, 88}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
@@ -272,7 +270,7 @@ TEST(Boolean, CoplanarProp) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
@@ -281,8 +279,8 @@ TEST(Boolean, CoplanarProp) {
 
 TEST(Boolean, MultiCoplanar) {
   Manifold cube = Manifold::Cube();
-  Manifold first = cube - cube.Translate({0.3f, 0.3f, 0.0f});
-  cube = cube.Translate({-0.3f, -0.3f, 0.0f});
+  Manifold first = cube - cube.Translate({0.3, 0.3, 0.0});
+  cube = cube.Translate({-0.3, -0.3, 0.0});
   Manifold out = first - cube;
   CheckStrictly(out);
   EXPECT_EQ(out.Genus(), -1);
@@ -330,8 +328,8 @@ TEST(Boolean, CornerUnion) {
  * volumes that make sense.
  */
 TEST(Boolean, Split) {
-  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
-  Manifold oct = Manifold::Sphere(1, 4).Translate(glm::vec3(0.0f, 0.0f, 1.0f));
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  Manifold oct = Manifold::Sphere(1, 4).Translate(vec3(0.0, 0.0, 1.0));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   CheckStrictly(splits.first);
   CheckStrictly(splits.second);
@@ -341,17 +339,17 @@ TEST(Boolean, Split) {
 }
 
 TEST(Boolean, SplitByPlane) {
-  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
-  cube = cube.Translate({0.0f, 1.0f, 0.0f});
-  cube = cube.Rotate(90.0f, 0.0f, 0.0f);
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  cube = cube.Translate({0.0, 1.0, 0.0});
+  cube = cube.Rotate(90.0, 0.0, 0.0);
   std::pair<Manifold, Manifold> splits =
-      cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+      cube.SplitByPlane({0.0, 0.0, 1.0}, 1.0);
   CheckStrictly(splits.first);
   CheckStrictly(splits.second);
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 
-  Manifold first = cube.TrimByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+  Manifold first = cube.TrimByPlane({0.0, 0.0, 1.0}, 1.0);
   // Verify trim returns the same result as the first split by checking that
   // their bounding boxes contain each other, thus they are equal.
   EXPECT_TRUE(splits.first.BoundingBox().Contains(first.BoundingBox()));
@@ -359,13 +357,13 @@ TEST(Boolean, SplitByPlane) {
 }
 
 TEST(Boolean, SplitByPlane60) {
-  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
-  cube = cube.Translate({0.0f, 1.0f, 0.0f});
-  cube = cube.Rotate(0.0f, 0.0f, -60.0f);
-  cube = cube.Translate({2.0f, 0.0f, 0.0f});
-  float phi = 30.0f;
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  cube = cube.Translate({0.0, 1.0, 0.0});
+  cube = cube.Rotate(0.0, 0.0, -60.0);
+  cube = cube.Translate({2.0, 0.0, 0.0});
+  double phi = 30.0;
   std::pair<Manifold, Manifold> splits =
-      cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
+      cube.SplitByPlane({sind(phi), -cosd(phi), 0.0}, 1.0);
   CheckStrictly(splits.first);
   CheckStrictly(splits.second);
   EXPECT_NEAR(splits.first.GetProperties().volume,
@@ -376,12 +374,12 @@ TEST(Boolean, SplitByPlane60) {
  * This tests that non-intersecting geometry is properly retained.
  */
 TEST(Boolean, Vug) {
-  Manifold cube = Manifold::Cube(glm::vec3(4.0f), true);
+  Manifold cube = Manifold::Cube(vec3(4.0), true);
   Manifold vug = cube - Manifold::Cube();
 
   EXPECT_EQ(vug.Genus(), -1);
 
-  Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
+  Manifold half = vug.SplitByPlane({0.0, 0.0, 1.0}, -1.0).first;
   CheckStrictly(half);
   EXPECT_EQ(half.Genus(), -1);
 
@@ -392,7 +390,7 @@ TEST(Boolean, Vug) {
 
 TEST(Boolean, Empty) {
   Manifold cube = Manifold::Cube();
-  float cubeVol = cube.GetProperties().volume;
+  double cubeVol = cube.GetProperties().volume;
   Manifold empty;
 
   EXPECT_EQ((cube + empty).GetProperties().volume, cubeVol);
@@ -403,19 +401,19 @@ TEST(Boolean, Empty) {
 
 TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
-  cubes.emplace_back(Manifold::Cube(glm::vec3(3.0f), true));
-  cubes.emplace_back(Manifold::Cube(glm::vec3(2.0f), true));
+  cubes.emplace_back(Manifold::Cube(vec3(3.0), true));
+  cubes.emplace_back(Manifold::Cube(vec3(2.0), true));
   Manifold doubled = Manifold::Compose(cubes);
 
-  Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
+  Manifold cube = Manifold::Cube(vec3(1.0), true);
   EXPECT_FALSE((cube ^= doubled).IsEmpty());
 }
 
 TEST(Boolean, NonIntersecting) {
   Manifold cube1 = Manifold::Cube();
-  float vol1 = cube1.GetProperties().volume;
-  Manifold cube2 = cube1.Scale(glm::vec3(2)).Translate({3, 0, 0});
-  float vol2 = cube2.GetProperties().volume;
+  double vol1 = cube1.GetProperties().volume;
+  Manifold cube2 = cube1.Scale(vec3(2)).Translate({3, 0, 0});
+  double vol2 = cube2.GetProperties().volume;
 
   EXPECT_EQ((cube1 + cube2).GetProperties().volume, vol1 + vol2);
   EXPECT_EQ((cube1 - cube2).GetProperties().volume, vol1);
@@ -426,27 +424,27 @@ TEST(Boolean, Precision) {
   Manifold cube = Manifold::Cube();
   Manifold cube2 = cube;
   Manifold cube3 = cube;
-  float distance = 100;
-  float scale = distance * kTolerance;
-  cube2 = cube2.Scale(glm::vec3(scale)).Translate({distance, 0, 0});
+  double distance = 100;
+  double scale = distance * kTolerance;
+  cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
   ExpectMeshes(cube, {{8, 12}});
 
-  cube3 = cube3.Scale(glm::vec3(2 * scale)).Translate({distance, 0, 0});
+  cube3 = cube3.Scale(vec3(2 * scale)).Translate({distance, 0, 0});
   cube += cube3;
   ExpectMeshes(cube, {{8, 12}, {8, 12}});
 }
 
 TEST(Boolean, Precision2) {
-  float scale = 1000;
-  Manifold cube = Manifold::Cube(glm::vec3(scale));
+  double scale = 1000;
+  Manifold cube = Manifold::Cube(vec3(scale));
   Manifold cube2 = cube;
-  float distance = scale * (1 - kTolerance / 2);
+  double distance = scale * (1 - kTolerance / 2);
 
-  cube2 = cube2.Translate(glm::vec3(-distance));
+  cube2 = cube2.Translate(vec3(-distance));
   EXPECT_TRUE((cube ^ cube2).IsEmpty());
 
-  cube2 = cube2.Translate(glm::vec3(scale * kTolerance));
+  cube2 = cube2.Translate(vec3(scale * kTolerance));
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }

@@ -58,7 +58,9 @@ TEST(Manifold, GetMeshGL) {
   ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
   for (size_t i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
-      ASSERT_EQ(meshGL_out.vertProperties[3 * i + j], mesh_out.vertPos[i][j]);
+      // note: one is float, one is double, they are not equal...
+      ASSERT_FLOAT_EQ(meshGL_out.vertProperties[3 * i + j],
+                      mesh_out.vertPos[i][j]);
     }
   }
   for (size_t i = 0; i < meshGL_out.NumTri(); ++i) {
@@ -101,7 +103,7 @@ TEST(Manifold, InvalidInput2) {
 
 TEST(Manifold, InvalidInput3) {
   Mesh in = Tet();
-  for (glm::ivec3& tri : in.triVerts) {
+  for (ivec3& tri : in.triVerts) {
     for (int i : {0, 1, 2}) {
       if (tri[i] == 2) tri[i] = -2;
     }
@@ -113,7 +115,7 @@ TEST(Manifold, InvalidInput3) {
 
 TEST(Manifold, InvalidInput4) {
   Mesh in = Tet();
-  for (glm::ivec3& tri : in.triVerts) {
+  for (ivec3& tri : in.triVerts) {
     for (int i : {0, 1, 2}) {
       if (tri[i] == 2) tri[i] = 4;
     }
@@ -190,7 +192,7 @@ TEST(Manifold, DecomposeProps) {
  */
 TEST(Manifold, Sphere) {
   int n = 25;
-  Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
+  Manifold sphere = Manifold::Sphere(1.0, 4 * n);
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
@@ -201,11 +203,11 @@ TEST(Manifold, Cylinder) {
 }
 
 TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(glm::vec3(1), true).GetMesh();
+  Mesh cube = Manifold::Cube(vec3(1), true).GetMesh();
   const int nVert = cube.vertPos.size();
   for (int i = 0; i < nVert; ++i) {
-    glm::vec3 v = glm::normalize(cube.vertPos[i]);
-    glm::vec3& n = cube.vertNormal[i];
+    vec3 v = glm::normalize(cube.vertPos[i]);
+    vec3& n = cube.vertNormal[i];
     EXPECT_FLOAT_EQ(v.x, n.x);
     EXPECT_FLOAT_EQ(v.y, n.y);
     EXPECT_FLOAT_EQ(v.z, n.z);
@@ -214,18 +216,18 @@ TEST(Manifold, Normals) {
 
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
-  Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
+  Manifold donut = Manifold::Extrude(polys, 1.0, 3);
   EXPECT_EQ(donut.Genus(), 1);
   auto prop = donut.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 12.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 48.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 12.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 48.0);
 }
 
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
-  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
+  Manifold donut = Manifold::Extrude(polys, 1.0, 0, 0, vec2(0.0));
   EXPECT_EQ(donut.Genus(), 0);
-  EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
+  EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0);
 }
 
 Polygons RotatePolygons(Polygons polys, const int index) {
@@ -247,18 +249,18 @@ TEST(Manifold, Revolve) {
     vug = Manifold::Revolve(rotatedPolys, 48);
     EXPECT_EQ(vug.Genus(), -1);
     auto prop = vug.GetProperties();
-    EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
-    EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+    EXPECT_NEAR(prop.volume, 14.0 * glm::pi<double>(), 0.2);
+    EXPECT_NEAR(prop.surfaceArea, 30.0 * glm::pi<double>(), 0.2);
   }
 }
 
 TEST(Manifold, Revolve2) {
-  Polygons polys = SquareHole(2.0f);
+  Polygons polys = SquareHole(2.0);
   Manifold donutHole = Manifold::Revolve(polys, 48);
   EXPECT_EQ(donutHole.Genus(), 0);
   auto prop = donutHole.GetProperties();
-  EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
-  EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
+  EXPECT_NEAR(prop.volume, 48.0 * glm::pi<double>(), 1.0);
+  EXPECT_NEAR(prop.surfaceArea, 96.0 * glm::pi<double>(), 1.0);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -266,14 +268,14 @@ TEST(Manifold, Revolve3) {
   CrossSection circle = CrossSection::Circle(1, 32);
   Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
   auto prop = sphere.GetProperties();
-  EXPECT_NEAR(prop.volume, 4.0f / 3.0f * glm::pi<float>(), 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>(), 0.15);
+  EXPECT_NEAR(prop.volume, 4.0 / 3.0 * glm::pi<double>(), 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>(), 0.15);
 }
 #endif
 
 TEST(Manifold, PartialRevolveOnYAxis) {
-  Polygons polys = SquareHole(2.0f);
-  Polygons offsetPolys = SquareHole(10.0f);
+  Polygons polys = SquareHole(2.0);
+  Polygons offsetPolys = SquareHole(10.0);
 
   Manifold revolute;
   for (size_t i = 0; i < polys[0].size(); i++) {
@@ -281,16 +283,15 @@ TEST(Manifold, PartialRevolveOnYAxis) {
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     EXPECT_EQ(revolute.Genus(), 1);
     auto prop = revolute.GetProperties();
-    EXPECT_NEAR(prop.volume, 24.0f * glm::pi<float>(), 1.0f);
-    EXPECT_NEAR(
-        prop.surfaceArea,
-        48.0f * glm::pi<float>() + 4.0f * 4.0f * 2.0f - 2.0f * 2.0f * 2.0f,
-        1.0f);
+    EXPECT_NEAR(prop.volume, 24.0 * glm::pi<double>(), 1.0);
+    EXPECT_NEAR(prop.surfaceArea,
+                48.0 * glm::pi<double>() + 4.0 * 4.0 * 2.0 - 2.0 * 2.0 * 2.0,
+                1.0);
   }
 }
 
 TEST(Manifold, PartialRevolveOffset) {
-  Polygons polys = SquareHole(10.0f);
+  Polygons polys = SquareHole(10.0);
 
   Manifold revolute;
   for (size_t i = 0; i < polys[0].size(); i++) {
@@ -298,8 +299,8 @@ TEST(Manifold, PartialRevolveOffset) {
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     auto prop = revolute.GetProperties();
     EXPECT_EQ(revolute.Genus(), 1);
-    EXPECT_NEAR(prop.surfaceArea, 777.0f, 1.0f);
-    EXPECT_NEAR(prop.volume, 376.0f, 1.0f);
+    EXPECT_NEAR(prop.surfaceArea, 777.0, 1.0);
+    EXPECT_NEAR(prop.volume, 376.0, 1.0);
   }
 }
 
@@ -307,7 +308,7 @@ TEST(Manifold, PartialRevolveOffset) {
 TEST(Manifold, Warp) {
   CrossSection square = CrossSection::Square({1, 1});
   Manifold shape =
-      Manifold::Extrude(square.ToPolygons(), 2, 10).Warp([](glm::vec3& v) {
+      Manifold::Extrude(square.ToPolygons(), 2, 10).Warp([](vec3& v) {
         v.x += v.z * v.z;
       });
   auto propBefore = shape.GetProperties();
@@ -321,13 +322,12 @@ TEST(Manifold, Warp) {
 }
 
 TEST(Manifold, Warp2) {
-  CrossSection circle =
-      CrossSection::Circle(5, 20).Translate(glm::vec2(10.0, 10.0));
+  CrossSection circle = CrossSection::Circle(5, 20).Translate(vec2(10.0, 10.0));
 
   Manifold shape =
-      Manifold::Extrude(circle.ToPolygons(), 2, 10).Warp([](glm::vec3& v) {
+      Manifold::Extrude(circle.ToPolygons(), 2, 10).Warp([](vec3& v) {
         int nSegments = 10;
-        double angleStep = 2.0 / 3.0 * glm::pi<float>() / nSegments;
+        double angleStep = 2.0 / 3.0 * glm::pi<double>() / nSegments;
         int zIndex = nSegments - 1 - std::round(v.z);
         double angle = zIndex * angleStep;
         v.z = v.y;
@@ -348,15 +348,14 @@ TEST(Manifold, Warp2) {
 
 TEST(Manifold, WarpBatch) {
   Manifold shape1 =
-      Manifold::Cube({2, 3, 4}).Warp([](glm::vec3& v) { v.x += v.z * v.z; });
+      Manifold::Cube({2, 3, 4}).Warp([](vec3& v) { v.x += v.z * v.z; });
   auto prop1 = shape1.GetProperties();
 
-  Manifold shape2 =
-      Manifold::Cube({2, 3, 4}).WarpBatch([](VecView<glm::vec3> vecs) {
-        for (glm::vec3& v : vecs) {
-          v.x += v.z * v.z;
-        }
-      });
+  Manifold shape2 = Manifold::Cube({2, 3, 4}).WarpBatch([](VecView<vec3> vecs) {
+    for (vec3& v : vecs) {
+      v.x += v.z * v.z;
+    }
+  });
   auto prop2 = shape2.GetProperties();
 
   EXPECT_EQ(prop1.volume, prop2.volume);
@@ -421,21 +420,21 @@ TEST(Manifold, Transform) {
   Manifold cube2 = cube;
   cube = cube.Rotate(30, 40, 50).Scale({6, 5, 4}).Translate({1, 2, 3});
 
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,          //
-               0.0f, cosd(30), sind(30),  //
-               0.0f, -sind(30), cosd(30));
-  glm::mat3 rY(cosd(40), 0.0f, -sind(40),  //
-               0.0f, 1.0f, 0.0f,           //
-               sind(40), 0.0f, cosd(40));
-  glm::mat3 rZ(cosd(50), sind(50), 0.0f,   //
-               -sind(50), cosd(50), 0.0f,  //
-               0.0f, 0.0f, 1.0f);
-  glm::mat3 s = glm::mat3(1.0f);
+  mat3 rX(1.0, 0.0, 0.0,            //
+          0.0, cosd(30), sind(30),  //
+          0.0, -sind(30), cosd(30));
+  mat3 rY(cosd(40), 0.0, -sind(40),  //
+          0.0, 1.0, 0.0,             //
+          sind(40), 0.0, cosd(40));
+  mat3 rZ(cosd(50), sind(50), 0.0,   //
+          -sind(50), cosd(50), 0.0,  //
+          0.0, 0.0, 1.0);
+  mat3 s = mat3(1.0);
   s[0][0] = 6;
   s[1][1] = 5;
   s[2][2] = 4;
-  glm::mat4x3 transform = glm::mat4x3(s * rZ * rY * rX);
-  transform[3] = glm::vec3(1, 2, 3);
+  mat4x3 transform = mat4x3(s * rZ * rY * rX);
+  transform[3] = vec3(1, 2, 3);
   cube2 = cube2.Transform(transform);
 
   Identical(cube.GetMesh(), cube2.GetMesh());
@@ -458,7 +457,7 @@ TEST(Manifold, MeshRelation) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
@@ -486,7 +485,7 @@ TEST(Manifold, MeshRelationRefine) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
 #endif
 }
@@ -512,8 +511,8 @@ void CheckCube(const MeshGL& cubeSTL) {
   EXPECT_EQ(cube.NumPropVert(), 24);
 
   auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+  EXPECT_FLOAT_EQ(prop.volume, 1.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
 }
 
 TEST(Manifold, Merge) {
@@ -592,7 +591,7 @@ TEST(Manifold, MirrorUnion) {
 
   auto vol_a = a.GetProperties().volume;
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
-  EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
+  EXPECT_TRUE(a.Mirror(vec3(0)).IsEmpty());
 }
 
 TEST(Manifold, MirrorUnion2) {
@@ -606,12 +605,12 @@ TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
   auto empty_circ = CrossSection::Circle(-2.);
-  auto empty_sq = CrossSection::Square(glm::vec2(0.0f));
+  auto empty_sq = CrossSection::Square(vec2(0.0));
 
   EXPECT_EQ(Manifold::Sphere(0).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(2, -5).Status(), invalid);
-  EXPECT_EQ(Manifold::Cube(glm::vec3(0.0f)).Status(), invalid);
+  EXPECT_EQ(Manifold::Cube(vec3(0.0)).Status(), invalid);
   EXPECT_EQ(Manifold::Cube({-1, 1, 1}).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(circ.ToPolygons(), 0.).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(empty_circ.ToPolygons(), 10.).Status(), invalid);
@@ -629,7 +628,7 @@ TEST(Manifold, MultiCompose) {
 }
 
 TEST(Manifold, MergeDegenerates) {
-  MeshGL cube = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();
   MeshGL squash;
   squash.vertProperties = cube.vertProperties;
   squash.triVerts = cube.triVerts;

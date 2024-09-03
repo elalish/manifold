@@ -8,7 +8,7 @@
 TEST(CBIND, sphere) {
   int n = 25;
   size_t sz = manifold_manifold_size();
-  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 4 * n);
+  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0, 4 * n);
 
   EXPECT_EQ(manifold_status(sphere), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_num_tri(sphere), n * n * 8);
@@ -18,19 +18,19 @@ TEST(CBIND, sphere) {
 
 TEST(CBIND, warp_translation) {
   size_t sz = manifold_manifold_size();
-  ManifoldVec3 (*warp)(float, float, float, void *) = [](float x, float y,
-                                                         float z, void *) {
-    ManifoldVec3 v = {x + 15.0f, y, z};
+  ManifoldVec3 (*warp)(double, double, double, void *) = [](double x, double y,
+                                                            double z, void *) {
+    ManifoldVec3 v = {x + 15.0, y, z};
     return v;
   };
-  float *context = (float *)malloc(1 * sizeof(float));
-  context[0] = 15.0f;
-  ManifoldVec3 (*warpcontext)(
-      float, float, float, void *) = [](float x, float y, float z, void *ctx) {
-    ManifoldVec3 v = {x + ((float *)ctx)[0], y, z};
-    return v;
-  };
-  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 100);
+  double *context = (double *)malloc(1 * sizeof(double));
+  context[0] = 15.0;
+  ManifoldVec3 (*warpcontext)(double, double, double, void *) =
+      [](double x, double y, double z, void *ctx) {
+        ManifoldVec3 v = {x + ((double *)ctx)[0], y, z};
+        return v;
+      };
+  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0, 100);
   ManifoldManifold *trans = manifold_translate(malloc(sz), sphere, 15., 0., 0.);
   ManifoldManifold *warped = manifold_warp(malloc(sz), sphere, warp, NULL);
   ManifoldManifold *diff = manifold_difference(malloc(sz), trans, warped);
@@ -86,36 +86,36 @@ TEST(CBIND, warp_translation) {
 TEST(CBIND, level_set) {
   size_t sz = manifold_manifold_size();
   // can't convert lambda with captures to funptr
-  float (*sdf)(float, float, float, void *) = [](float x, float y, float z,
-                                                 void *ctx) {
-    const float radius = 15;
-    const float xscale = 3;
-    const float yscale = 1;
-    const float zscale = 1;
-    float xs = x / xscale;
-    float ys = y / yscale;
-    float zs = z / zscale;
+  double (*sdf)(double, double, double, void *) = [](double x, double y,
+                                                     double z, void *ctx) {
+    const double radius = 15;
+    const double xscale = 3;
+    const double yscale = 1;
+    const double zscale = 1;
+    double xs = x / xscale;
+    double ys = y / yscale;
+    double zs = z / zscale;
     return radius - sqrtf(xs * xs + ys * ys + zs * zs);
   };
-  float *context = (float *)malloc(4 * sizeof(float));
-  context[0] = 15.0f;
-  context[1] = 3.0f;
-  context[2] = 1.0f;
-  context[3] = 1.0f;
-  float (*sdfcontext)(float, float, float, void *) = [](float x, float y,
-                                                        float z, void *ctx) {
-    float *context = (float *)ctx;
-    const float radius = context[0];
-    const float xscale = context[1];
-    const float yscale = context[2];
-    const float zscale = context[3];
-    float xs = x / xscale;
-    float ys = y / yscale;
-    float zs = z / zscale;
+  double *context = (double *)malloc(4 * sizeof(double));
+  context[0] = 15.0;
+  context[1] = 3.0;
+  context[2] = 1.0;
+  context[3] = 1.0;
+  double (*sdfcontext)(double, double, double,
+                       void *) = [](double x, double y, double z, void *ctx) {
+    double *context = (double *)ctx;
+    const double radius = context[0];
+    const double xscale = context[1];
+    const double yscale = context[2];
+    const double zscale = context[3];
+    double xs = x / xscale;
+    double ys = y / yscale;
+    double zs = z / zscale;
     return radius - sqrtf(xs * xs + ys * ys + zs * zs);
   };
 
-  const float bb = 30;  // (radius * 2)
+  const double bb = 30;  // (radius * 2)
   // bounding box scaled according to factors used in *sdf
   ManifoldBox *bounds = manifold_box(malloc(manifold_box_size()), -bb * 3,
                                      -bb * 1, -bb * 1, bb * 3, bb * 1, bb * 1);
@@ -138,15 +138,15 @@ TEST(CBIND, level_set) {
   EXPECT_EQ(manifold_status(sdf_man_context), MANIFOLD_NO_ERROR);
 
   // Analytic calculations for volume and surface area
-  float a = context[0] * context[1];
-  float b = context[0] * context[2];
-  float c = context[0] * context[3];
-  float s = 4.0f * glm::pi<float>() *
-            std::pow(((std::pow(a * b, 1.6f) + std::pow(a * c, 1.6f) +
-                       std::pow(b * c, 1.6f)) /
-                      3.0f),
-                     1.0f / 1.6f);
-  float v = 4.0f * glm::pi<float>() / 3.0f * a * b * c;
+  double a = context[0] * context[1];
+  double b = context[0] * context[2];
+  double c = context[0] * context[3];
+  double s = 4.0 * glm::pi<double>() *
+             std::pow(((std::pow(a * b, 1.6) + std::pow(a * c, 1.6) +
+                        std::pow(b * c, 1.6)) /
+                       3.0),
+                      1.0 / 1.6);
+  double v = 4.0 * glm::pi<double>() / 3.0 * a * b * c;
 
   // Numerical calculations for volume and surface area
   ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
@@ -168,27 +168,27 @@ TEST(CBIND, level_set) {
 }
 
 TEST(CBIND, properties) {
-  void (*props)(float *, ManifoldVec3, const float *,
-                void *) = [](float *new_prop, ManifoldVec3 position,
-                             const float *old_prop, void *ctx) {
+  void (*props)(double *, ManifoldVec3, const double *,
+                void *) = [](double *new_prop, ManifoldVec3 position,
+                             const double *old_prop, void *ctx) {
     new_prop[0] =
         glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
-        5.0f;
+        5.0;
   };
-  float *context = (float *)malloc(1 * sizeof(float));
-  context[0] = 5.0f;
-  void (*propscontext)(float *, ManifoldVec3, const float *,
-                       void *) = [](float *new_prop, ManifoldVec3 position,
-                                    const float *old_prop, void *ctx) {
+  double *context = (double *)malloc(1 * sizeof(double));
+  context[0] = 5.0;
+  void (*propscontext)(double *, ManifoldVec3, const double *,
+                       void *) = [](double *new_prop, ManifoldVec3 position,
+                                    const double *old_prop, void *ctx) {
     new_prop[0] =
         glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
-        ((float *)ctx)[0];
+        ((double *)ctx)[0];
   };
 
   ManifoldManifold *cube =
-      manifold_cube(malloc(manifold_manifold_size()), 1.0f, 1.0f, 1.0f, 1);
+      manifold_cube(malloc(manifold_manifold_size()), 1.0, 1.0, 1.0, 1);
   ManifoldManifold *cube_props = manifold_set_properties(
       malloc(manifold_manifold_size()), cube, 1, props, NULL);
   ManifoldManifold *cube_props_context = manifold_set_properties(
@@ -228,7 +228,7 @@ TEST(CBIND, extrude) {
 TEST(CBIND, compose_decompose) {
   size_t sz = manifold_manifold_size();
 
-  ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0f, 100);
+  ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0, 100);
   ManifoldManifold *s2 = manifold_translate(malloc(sz), s1, 2., 2., 2.);
   ManifoldManifoldVec *ss =
       manifold_manifold_vec(malloc(manifold_manifold_vec_size()), 2);

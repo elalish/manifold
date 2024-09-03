@@ -154,8 +154,8 @@ class HashTable {
     return used_.load(std::memory_order_relaxed) * 2 > Size();
   }
 
-  float FilledFraction() const {
-    return static_cast<float>(used_.load(std::memory_order_relaxed)) / Size();
+  double FilledFraction() const {
+    return static_cast<double>(used_.load(std::memory_order_relaxed)) / Size();
   }
 
   Vec<V>& GetValueStore() { return values_; }

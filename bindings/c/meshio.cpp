@@ -45,11 +45,11 @@ ManifoldMaterial *manifold_material(void *mem) {
   return to_c(new (mem) manifold::Material());
 }
 
-void manifold_material_set_roughness(ManifoldMaterial *mat, float roughness) {
+void manifold_material_set_roughness(ManifoldMaterial *mat, double roughness) {
   from_c(mat)->roughness = roughness;
 }
 
-void manifold_material_set_metalness(ManifoldMaterial *mat, float metalness) {
+void manifold_material_set_metalness(ManifoldMaterial *mat, double metalness) {
   from_c(mat)->metalness = metalness;
 }
 

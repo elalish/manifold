@@ -21,6 +21,18 @@
 #include "utils.h"
 #include "vec.h"
 
+namespace {
+template <typename T>
+inline bool FirstFinite(T v) {
+  return std::isfinite(v[0]);
+}
+
+template <>
+inline bool FirstFinite<double>(double v) {
+  return std::isfinite(v);
+}
+}  // namespace
+
 namespace manifold {
 
 /** @ingroup Private */
@@ -155,25 +167,13 @@ class SparseIndices {
   }
 
   template <typename T>
-  struct firstFinite {
-    VecView<T> v;
-
-    bool Finite(float v) const { return isfinite(v); }
-    bool Finite(glm::vec2 v) const { return isfinite(v[0]); }
-    bool Finite(glm::vec3 v) const { return isfinite(v[0]); }
-    bool Finite(glm::vec4 v) const { return isfinite(v[0]); }
-
-    bool operator()(const int i) const { return Finite(v[i]); }
-  };
-
-  template <typename T>
   size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
     DEBUG_ASSERT(x.size() == size(), userErr,
                  "Different number of values than indicies!");
 
     Vec<int> new2Old(v.size());
     size_t size = copy_if(countAt(0_uz), countAt(v.size()), new2Old.begin(),
-                          firstFinite<T>({v})) -
+                          [&v](size_t i) { return FirstFinite(v[i]); }) -
                   new2Old.begin();
     new2Old.resize(size);
 

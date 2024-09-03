@@ -26,70 +26,70 @@ using namespace manifold;
 
 constexpr int kCrossing = -2;
 constexpr int kNone = -1;
-constexpr glm::ivec4 kVoxelOffset(1, 1, 1, 0);
+constexpr ivec4 kVoxelOffset(1, 1, 1, 0);
 // Maximum fraction of spacing that a vert can move.
-constexpr float kS = 0.25;
+constexpr double kS = 0.25;
 // Corresponding approximate distance ratio bound.
-constexpr float kD = 1 / kS - 1;
+constexpr double kD = 1 / kS - 1;
 // Maximum number of opposed verts (of 7) to allow collapse.
 constexpr int kMaxOpposed = 3;
 
-glm::ivec3 TetTri0(int i) {
-  constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
-                                      {0, 3, 4},     //
-                                      {0, 1, 5},     //
-                                      {1, 5, 3},     //
-                                      {1, 4, 2},     //
-                                      {1, 0, 3},     //
-                                      {2, 5, 0},     //
-                                      {5, 3, 2},     //
-                                      {2, 3, 5},     //
-                                      {0, 5, 2},     //
-                                      {3, 0, 1},     //
-                                      {2, 4, 1},     //
-                                      {3, 5, 1},     //
-                                      {5, 1, 0},     //
-                                      {4, 3, 0},     //
-                                      {-1, -1, -1}};
+ivec3 TetTri0(int i) {
+  constexpr ivec3 tetTri0[16] = {{-1, -1, -1},  //
+                                 {0, 3, 4},     //
+                                 {0, 1, 5},     //
+                                 {1, 5, 3},     //
+                                 {1, 4, 2},     //
+                                 {1, 0, 3},     //
+                                 {2, 5, 0},     //
+                                 {5, 3, 2},     //
+                                 {2, 3, 5},     //
+                                 {0, 5, 2},     //
+                                 {3, 0, 1},     //
+                                 {2, 4, 1},     //
+                                 {3, 5, 1},     //
+                                 {5, 1, 0},     //
+                                 {4, 3, 0},     //
+                                 {-1, -1, -1}};
   return tetTri0[i];
 }
 
-glm::ivec3 TetTri1(int i) {
-  constexpr glm::ivec3 tetTri1[16] = {{-1, -1, -1},  //
-                                      {-1, -1, -1},  //
-                                      {-1, -1, -1},  //
-                                      {3, 4, 1},     //
-                                      {-1, -1, -1},  //
-                                      {3, 2, 1},     //
-                                      {0, 4, 2},     //
-                                      {-1, -1, -1},  //
-                                      {-1, -1, -1},  //
-                                      {2, 4, 0},     //
-                                      {1, 2, 3},     //
-                                      {-1, -1, -1},  //
-                                      {1, 4, 3},     //
-                                      {-1, -1, -1},  //
-                                      {-1, -1, -1},  //
-                                      {-1, -1, -1}};
+ivec3 TetTri1(int i) {
+  constexpr ivec3 tetTri1[16] = {{-1, -1, -1},  //
+                                 {-1, -1, -1},  //
+                                 {-1, -1, -1},  //
+                                 {3, 4, 1},     //
+                                 {-1, -1, -1},  //
+                                 {3, 2, 1},     //
+                                 {0, 4, 2},     //
+                                 {-1, -1, -1},  //
+                                 {-1, -1, -1},  //
+                                 {2, 4, 0},     //
+                                 {1, 2, 3},     //
+                                 {-1, -1, -1},  //
+                                 {1, 4, 3},     //
+                                 {-1, -1, -1},  //
+                                 {-1, -1, -1},  //
+                                 {-1, -1, -1}};
   return tetTri1[i];
 }
 
-glm::ivec4 Neighbor(glm::ivec4 base, int i) {
-  constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
-                                        {1, 0, 0, 0},     //
-                                        {0, 1, 0, 0},     //
-                                        {0, 0, 1, 0},     //
-                                        {-1, 0, 0, 1},    //
-                                        {0, -1, 0, 1},    //
-                                        {0, 0, -1, 1},    //
-                                        {-1, -1, -1, 1},  //
-                                        {-1, 0, 0, 0},    //
-                                        {0, -1, 0, 0},    //
-                                        {0, 0, -1, 0},    //
-                                        {0, -1, -1, 1},   //
-                                        {-1, 0, -1, 1},   //
-                                        {-1, -1, 0, 1}};
-  glm::ivec4 neighborIndex = base + neighbors[i];
+ivec4 Neighbor(ivec4 base, int i) {
+  constexpr ivec4 neighbors[14] = {{0, 0, 0, 1},     //
+                                   {1, 0, 0, 0},     //
+                                   {0, 1, 0, 0},     //
+                                   {0, 0, 1, 0},     //
+                                   {-1, 0, 0, 1},    //
+                                   {0, -1, 0, 1},    //
+                                   {0, 0, -1, 1},    //
+                                   {-1, -1, -1, 1},  //
+                                   {-1, 0, 0, 0},    //
+                                   {0, -1, 0, 0},    //
+                                   {0, 0, -1, 0},    //
+                                   {0, -1, -1, 1},   //
+                                   {-1, 0, -1, 1},   //
+                                   {-1, -1, 0, 1}};
+  ivec4 neighborIndex = base + neighbors[i];
   if (neighborIndex.w == 2) {
     neighborIndex += 1;
     neighborIndex.w = 0;
@@ -97,14 +97,14 @@ glm::ivec4 Neighbor(glm::ivec4 base, int i) {
   return neighborIndex;
 }
 
-Uint64 EncodeIndex(glm::ivec4 gridPos, glm::ivec3 gridPow) {
+Uint64 EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
   return static_cast<Uint64>(gridPos.w) | static_cast<Uint64>(gridPos.z) << 1 |
          static_cast<Uint64>(gridPos.y) << (1 + gridPow.z) |
          static_cast<Uint64>(gridPos.x) << (1 + gridPow.z + gridPow.y);
 }
 
-glm::ivec4 DecodeIndex(Uint64 idx, glm::ivec3 gridPow) {
-  glm::ivec4 gridPos;
+ivec4 DecodeIndex(Uint64 idx, ivec3 gridPow) {
+  ivec4 gridPos;
   gridPos.w = idx & 1;
   idx = idx >> 1;
   gridPos.z = idx & ((1 << gridPow.z) - 1);
@@ -115,33 +115,30 @@ glm::ivec4 DecodeIndex(Uint64 idx, glm::ivec3 gridPow) {
   return gridPos;
 }
 
-glm::vec3 Position(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing) {
-  return origin +
-         spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
+vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
+  return origin + spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
-float BoundedSDF(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing,
-                 glm::ivec3 gridSize, float level,
-                 std::function<float(glm::vec3)> sdf) {
-  auto Min = [](glm::ivec3 p) { return glm::min(p.x, glm::min(p.y, p.z)); };
+double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
+                  double level, std::function<double(vec3)> sdf) {
+  auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
 
-  const glm::ivec3 xyz(gridIndex);
+  const ivec3 xyz(gridIndex);
   const int lowerBoundDist = Min(xyz);
   const int upperBoundDist = Min(gridSize - xyz);
-  const int boundDist = glm::min(lowerBoundDist, upperBoundDist - gridIndex.w);
+  const int boundDist = std::min(lowerBoundDist, upperBoundDist - gridIndex.w);
 
   if (boundDist < 0) {
-    return 0.0f;
+    return 0.0;
   }
-  const float d = sdf(Position(gridIndex, origin, spacing)) - level;
-  return boundDist == 0 ? glm::min(d, 0.0f) : d;
+  const double d = sdf(Position(gridIndex, origin, spacing)) - level;
+  return boundDist == 0 ? std::min(d, 0.0) : d;
 }
 
 // Simplified ITP root finding algorithm - same worst-case performance as
 // bisection, better average performance.
-inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
-                             float tol, float level,
-                             std::function<float(glm::vec3)> sdf) {
+inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1, double tol,
+                        double level, std::function<double(vec3)> sdf) {
   if (d0 == 0) {
     return pos0;
   } else if (d1 == 0) {
@@ -150,17 +147,17 @@ inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
 
   // Sole tuning parameter, k: (0, 1) - smaller value gets better median
   // performance, but also hits the worst case more often.
-  const float k = 0.1;
-  const float check = 2 * tol / glm::length(pos0 - pos1);
-  float frac = 1;
-  float biFrac = 1;
+  const double k = 0.1;
+  const double check = 2 * tol / glm::length(pos0 - pos1);
+  double frac = 1;
+  double biFrac = 1;
   while (frac > check) {
-    const float t = glm::mix(d0 / (d0 - d1), 0.5f, k);
-    const float r = biFrac / frac - 0.5;
-    const float x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+    const double t = glm::mix(d0 / (d0 - d1), 0.5, k);
+    const double r = biFrac / frac - 0.5;
+    const double x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
-    const glm::vec3 mid = glm::mix(pos0, pos1, x);
-    const float d = sdf(mid) - level;
+    const vec3 mid = glm::mix(pos0, pos1, x);
+    const double d = sdf(mid) - level;
 
     if ((d > 0) == (d0 > 0)) {
       d0 = d;
@@ -184,13 +181,13 @@ inline glm::vec3 FindSurface(glm::vec3 pos0, float d0, glm::vec3 pos1, float d1,
  * contributes only a single movedVert and all crossing edgeVerts refer to that.
  */
 struct GridVert {
-  float distance = NAN;
+  double distance = NAN;
   int movedVert = kNone;
   int edgeVerts[7] = {kNone, kNone, kNone, kNone, kNone, kNone, kNone};
 
   inline bool HasMoved() const { return movedVert >= 0; }
 
-  inline bool SameSide(float dist) const {
+  inline bool SameSide(double dist) const {
     return (dist > 0) == (distance > 0);
   }
 
@@ -202,37 +199,37 @@ struct GridVert {
 };
 
 struct NearSurface {
-  VecView<glm::vec3> vertPos;
+  VecView<vec3> vertPos;
   VecView<int> vertIndex;
   HashTableD<GridVert> gridVerts;
-  VecView<const float> voxels;
-  const std::function<float(glm::vec3)> sdf;
-  const glm::vec3 origin;
-  const glm::ivec3 gridSize;
-  const glm::ivec3 gridPow;
-  const glm::vec3 spacing;
-  const float level;
-  const float tol;
+  VecView<const double> voxels;
+  const std::function<double(vec3)> sdf;
+  const vec3 origin;
+  const ivec3 gridSize;
+  const ivec3 gridPow;
+  const vec3 spacing;
+  const double level;
+  const double tol;
 
   inline void operator()(Uint64 index) {
     ZoneScoped;
     if (gridVerts.Full()) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(index, gridPow);
+    const ivec4 gridIndex = DecodeIndex(index, gridPow);
 
-    if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
+    if (glm::any(glm::greaterThan(ivec3(gridIndex), gridSize))) return;
 
     GridVert gridVert;
     gridVert.distance = voxels[EncodeIndex(gridIndex + kVoxelOffset, gridPow)];
 
     bool keep = false;
-    float vMax = 0;
+    double vMax = 0;
     int closestNeighbor = -1;
     int opposedVerts = 0;
     for (int i = 0; i < 7; ++i) {
-      const float val =
+      const double val =
           voxels[EncodeIndex(Neighbor(gridIndex, i) + kVoxelOffset, gridPow)];
-      const float valOp = voxels[EncodeIndex(
+      const double valOp = voxels[EncodeIndex(
           Neighbor(gridIndex, i + 7) + kVoxelOffset, gridPow)];
 
       if (!gridVert.SameSide(val)) {
@@ -261,11 +258,11 @@ struct NearSurface {
     // become an even-manifold with kissing verts. These must be removed in a
     // post-process: CleanupTopology().
     if (closestNeighbor >= 0 && opposedVerts <= kMaxOpposed) {
-      const glm::vec3 gridPos = Position(gridIndex, origin, spacing);
-      const glm::ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
-      const glm::vec3 pos = FindSurface(
-          gridPos, gridVert.distance, Position(neighborIndex, origin, spacing),
-          vMax, tol, level, sdf);
+      const vec3 gridPos = Position(gridIndex, origin, spacing);
+      const ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
+      const vec3 pos = FindSurface(gridPos, gridVert.distance,
+                                   Position(neighborIndex, origin, spacing),
+                                   vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
       if (glm::all(glm::lessThan(glm::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
@@ -285,17 +282,17 @@ struct NearSurface {
 };
 
 struct ComputeVerts {
-  VecView<glm::vec3> vertPos;
+  VecView<vec3> vertPos;
   VecView<int> vertIndex;
   HashTableD<GridVert> gridVerts;
-  VecView<const float> voxels;
-  const std::function<float(glm::vec3)> sdf;
-  const glm::vec3 origin;
-  const glm::ivec3 gridSize;
-  const glm::ivec3 gridPow;
-  const glm::vec3 spacing;
-  const float level;
-  const float tol;
+  VecView<const double> voxels;
+  const std::function<double(vec3)> sdf;
+  const vec3 origin;
+  const ivec3 gridSize;
+  const ivec3 gridPow;
+  const vec3 spacing;
+  const double level;
+  const double tol;
 
   void operator()(int idx) {
     ZoneScoped;
@@ -306,17 +303,17 @@ struct ComputeVerts {
 
     if (gridVert.HasMoved()) return;
 
-    const glm::ivec4 gridIndex = DecodeIndex(baseKey, gridPow);
+    const ivec4 gridIndex = DecodeIndex(baseKey, gridPow);
 
-    const glm::vec3 position = Position(gridIndex, origin, spacing);
+    const vec3 position = Position(gridIndex, origin, spacing);
 
     // These seven edges are uniquely owned by this gridVert; any of them
     // which intersect the surface create a vert.
     for (int i = 0; i < 7; ++i) {
-      const glm::ivec4 neighborIndex = Neighbor(gridIndex, i);
+      const ivec4 neighborIndex = Neighbor(gridIndex, i);
       const GridVert& neighbor = gridVerts[EncodeIndex(neighborIndex, gridPow)];
 
-      const float val =
+      const double val =
           isfinite(neighbor.distance)
               ? neighbor.distance
               : voxels[EncodeIndex(neighborIndex + kVoxelOffset, gridPow)];
@@ -337,21 +334,21 @@ struct ComputeVerts {
 };
 
 struct BuildTris {
-  VecView<glm::ivec3> triVerts;
+  VecView<ivec3> triVerts;
   VecView<int> triIndex;
   const HashTableD<GridVert> gridVerts;
-  const glm::ivec3 gridPow;
+  const ivec3 gridPow;
 
-  void CreateTri(const glm::ivec3& tri, const int edges[6]) {
+  void CreateTri(const ivec3& tri, const int edges[6]) {
     if (tri[0] < 0) return;
-    const glm::ivec3 verts(edges[tri[0]], edges[tri[1]], edges[tri[2]]);
+    const ivec3 verts(edges[tri[0]], edges[tri[1]], edges[tri[2]]);
     if (verts[0] == verts[1] || verts[1] == verts[2] || verts[2] == verts[0])
       return;
     int idx = AtomicAdd(triIndex[0], 1);
     triVerts[idx] = verts;
   }
 
-  void CreateTris(const glm::ivec4& tet, const int edges[6]) {
+  void CreateTris(const ivec4& tet, const int edges[6]) {
     const int i = (tet[0] > 0 ? 1 : 0) + (tet[1] > 0 ? 2 : 0) +
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
     CreateTri(TetTri0(i), edges);
@@ -364,9 +361,9 @@ struct BuildTris {
     if (baseKey == kOpen) return;
 
     const GridVert& base = gridVerts.At(idx);
-    const glm::ivec4 baseIndex = DecodeIndex(baseKey, gridPow);
+    const ivec4 baseIndex = DecodeIndex(baseKey, gridPow);
 
-    glm::ivec4 leadIndex = baseIndex;
+    ivec4 leadIndex = baseIndex;
     if (leadIndex.w == 0)
       leadIndex.w = 1;
     else {
@@ -376,8 +373,8 @@ struct BuildTris {
 
     // This GridVert is in charge of the 6 tetrahedra surrounding its edge in
     // the (1,1,1) direction (edge 0).
-    glm::ivec4 tet(base.NeighborInside(0), base.Inside(), -2, -2);
-    glm::ivec4 thisIndex = baseIndex;
+    ivec4 tet(base.NeighborInside(0), base.Inside(), -2, -2);
+    ivec4 thisIndex = baseIndex;
     thisIndex.x += 1;
 
     GridVert thisVert = gridVerts[EncodeIndex(thisIndex, gridPow)];
@@ -439,7 +436,7 @@ namespace manifold {
  * the manifold, which is due to the underlying grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
- * `float operator()(glm::vec3 point)`, which returns the
+ * `double operator()(vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
  * negative outside.
  * @param bounds An axis-aligned box that defines the extent of the grid.
@@ -457,22 +454,22 @@ namespace manifold {
  * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
  * active.
  */
-Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
-                            float edgeLength, float level, float precision,
+Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                            double edgeLength, double level, double precision,
                             bool canParallel) {
   if (precision <= 0) {
-    precision = std::numeric_limits<float>::infinity();
+    precision = std::numeric_limits<double>::infinity();
   }
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
 
-  const glm::vec3 dim = bounds.Size();
-  const glm::ivec3 gridSize(dim / edgeLength + 1.0f);
-  const glm::vec3 spacing = dim / (glm::vec3(gridSize - 1));
+  const vec3 dim = bounds.Size();
+  const ivec3 gridSize(dim / edgeLength + 1.0);
+  const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const glm::ivec3 gridPow(glm::log2(gridSize + 2) + 1);
-  const Uint64 maxIndex = EncodeIndex(glm::ivec4(gridSize + 2, 1), gridPow);
+  const ivec3 gridPow(glm::log2(gridSize + 2) + 1);
+  const Uint64 maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
   // that expect to not be called back by unregistered threads. This allows
@@ -480,8 +477,8 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
   // active.
   const auto pol = canParallel ? autoPolicy(maxIndex) : ExecutionPolicy::Seq;
 
-  const glm::vec3 origin = bounds.min;
-  Vec<float> voxels(maxIndex);
+  const vec3 origin = bounds.min;
+  Vec<double> voxels(maxIndex);
   for_each_n(
       pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
@@ -489,30 +486,29 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
                                  origin, spacing, gridSize, level, sdf);
       });
 
-  size_t tableSize = glm::min(
+  size_t tableSize = std::min(
       2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0_uz),
-               EncodeIndex(glm::ivec4(gridSize, 1), gridPow),
+    for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
                NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                             gridSize, gridPow, spacing, level, precision}));
 
     if (gridVerts.Full()) {  // Resize HashTable
-      const glm::vec3 lastVert = vertPos[index[0] - 1];
+      const vec3 lastVert = vertPos[index[0] - 1];
       const Uint64 lastIndex =
-          EncodeIndex(glm::ivec4((lastVert - origin) / spacing, 1), gridPow);
-      const float ratio = static_cast<float>(maxIndex) / lastIndex;
+          EncodeIndex(ivec4((lastVert - origin) / spacing, 1), gridPow);
+      const double ratio = static_cast<double>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
       else
         tableSize *= ratio;
       gridVerts = HashTable<GridVert>(tableSize);
-      vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
+      vertPos = Vec<vec3>(gridVerts.Size() * 7);
     } else {  // Success
       for_each_n(
           pol, countAt(0), gridVerts.Size(),
@@ -523,7 +519,7 @@ Manifold Manifold::LevelSet(std::function<float(glm::vec3)> sdf, Box bounds,
     }
   }
 
-  Vec<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
+  Vec<ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
   Vec<int> index(1, 0);
   for_each_n(pol, countAt(0), gridVerts.Size(),

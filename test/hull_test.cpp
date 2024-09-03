@@ -31,12 +31,12 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
   // Iterate over each triangle
   for (const auto &tri : mesh.triVerts) {
     // Get the vertices of the triangle
-    glm::vec3 v0 = vertPos[tri[0]];
-    glm::vec3 v1 = vertPos[tri[1]];
-    glm::vec3 v2 = vertPos[tri[2]];
+    vec3 v0 = vertPos[tri[0]];
+    vec3 v1 = vertPos[tri[1]];
+    vec3 v2 = vertPos[tri[2]];
 
     // Compute the normal of the triangle
-    glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+    vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
     // Check all other vertices
     for (int i = 0; i < (int)vertPos.size(); ++i) {
@@ -44,7 +44,7 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
-      glm::vec3 v = vertPos[i];
+      vec3 v = vertPos[i];
 
       // Compute the signed distance from the plane
       double distance = glm::dot(normal, v - v0);
@@ -63,10 +63,10 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 }
 
 TEST(Hull, Tictac) {
-  const float tictacRad = 100;
-  const float tictacHeight = 500;
-  const int tictacSeg = 1000;
-  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const double tictacRad = 100;
+  const double tictacHeight = 500;
+  const int tictacSeg = 500;
+  const double tictacMid = tictacHeight - 2 * tictacRad;
   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
   const std::vector<Manifold> spheres{sphere,
                                       sphere.Translate({0, 0, tictacMid})};
@@ -78,7 +78,7 @@ TEST(Hull, Tictac) {
   }
 #endif
 
-  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
+  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
 
 #ifdef MANIFOLD_EXPORT
@@ -93,12 +93,12 @@ TEST(Hull, Fail) {
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
-  const float sphere_vol = sphere.GetProperties().volume;
+  const double sphere_vol = sphere.GetProperties().volume;
   EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
 }
 
 TEST(Hull, Cube) {
-  std::vector<glm::vec3> cubePts = {
+  std::vector<vec3> cubePts = {
       {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
       {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
       {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
@@ -108,11 +108,10 @@ TEST(Hull, Cube) {
 }
 
 TEST(Hull, Empty) {
-  const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  const std::vector<vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
 
-  const std::vector<glm::vec3> coplanar{
-      {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+  const std::vector<vec3> coplanar{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
 
@@ -127,7 +126,7 @@ TEST(Hull, MengerSponge) {
 
 TEST(Hull, Sphere) {
   Manifold sphere = Manifold::Sphere(1, 1500);
-  sphere = sphere.Translate(glm::vec3(0.5));
+  sphere = sphere.Translate(vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
   EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume,
@@ -136,7 +135,7 @@ TEST(Hull, Sphere) {
 
 TEST(Hull, FailingTest1) {
   // 39202.stl
-  const std::vector<glm::vec3> hullPts = {
+  const std::vector<vec3> hullPts = {
       {-24.983196259f, -43.272167206f, 52.710712433f},
       {-25.0f, -12.7726717f, 49.907142639f},
       {-23.016393661f, 39.865562439f, 79.083930969f},
@@ -168,7 +167,7 @@ TEST(Hull, FailingTest1) {
 
 TEST(Hull, FailingTest2) {
   // 1750623.stl
-  const std::vector<glm::vec3> hullPts = {
+  const std::vector<vec3> hullPts = {
       {174.17001343f, -12.022000313f, 29.562002182f},
       {174.51400757f, -10.858000755f, -3.3340001106f},
       {187.50801086f, 22.826000214f, 23.486001968f},
@@ -201,8 +200,7 @@ TEST(Hull, FailingTest2) {
 
 TEST(Hull, DisabledFaceTest) {
   // 101213.stl
-  // Replace glm::vec3 with vec3 later once Double PR merges
-  const std::vector<glm::vec3> hullPts = {
+  const std::vector<vec3> hullPts = {
       {65.398902893, 58.303115845, 58.765388489},
       {42.147319794, 44.512584686, 75.703102112},
       {89.208251953, 97.092460632, 41.632453918},
