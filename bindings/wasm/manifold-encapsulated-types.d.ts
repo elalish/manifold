@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import { Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3 } from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -25,18 +25,46 @@ import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedF
 export function triangulate(polygons: Polygons, precision?: number): Vec3[];
 
 /**
- * @name Defaults
- * These static properties control how circular shapes are quantized by
- * default on construction. If circularSegments is specified, it takes
- * precedence. If it is zero, then instead the minimum is used of the segments
- * calculated based on edge length and angle, rounded up to the nearest
- * multiple of four. To get numbers not divisible by four, circularSegments
- * must be specified.
+ * Sets an angle constraint the default number of circular segments for the
+ * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link Manifold.sphere}, and
+ * {@link Manifold.revolve} constructors. The number of segments will be rounded up
+ * to the nearest factor of four.
+ *
+ * @param angle The minimum angle in degrees between consecutive segments. The
+ * angle will increase if the the segments hit the minimum edge length.
+ * Default is 10 degrees.
  */
-///@{
 export function setMinCircularAngle(angle: number): void;
+
+/**
+  * Sets a length constraint the default number of circular segments for the
+  * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link Manifold.sphere}, and
+  * {@link Manifold.revolve} constructors. The number of segments will be rounded up
+  * to the nearest factor of four.
+  *
+  * @param length The minimum length of segments. The length will
+  * increase if the the segments hit the minimum angle. Default is 1.0.
+  */
 export function setMinCircularEdgeLength(length: number): void;
+
+/**
+ * Sets the default number of circular segments for the
+ * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link Manifold.sphere}, and
+ * {@link Manifold.revolve} constructors. Overrides the edge length and angle
+ * constraints and sets the number of segments to exactly this value.
+ *
+ * @param number Number of circular segments. Default is 0, meaning no
+ * constraint is applied.
+ */
 export function setCircularSegments(segments: number): void;
+
+/**
+ * Determine the result of the {@link setMinCircularAngle},
+ * {@link setMinCircularEdgeLength}, and {@link setCircularSegments} defaults.
+ *
+ * @param radius For a given radius of circle, determine how many default
+ * segments there will be.
+ */
 export function getCircularSegments(radius: number): number;
 export function resetToCircularDefaults(): void;
 ///@}
@@ -57,7 +85,7 @@ export class CrossSection {
 
   // Shapes
 
-  static square(size?: Vec2|number, center?: boolean): CrossSection;
+  static square(size?: Vec2 | number, center?: boolean): CrossSection;
 
   static circle(radius: number, circularSegments?: number): CrossSection;
 
@@ -80,8 +108,8 @@ export class CrossSection {
    * as opposed to resting on the XY plane as is default.
    */
   extrude(
-      height: number, nDivisions?: number, twistDegrees?: number,
-      scaleTop?: Vec2|number, center?: boolean): Manifold;
+    height: number, nDivisions?: number, twistDegrees?: number,
+    scaleTop?: Vec2 | number, center?: boolean): Manifold;
 
   /**
    * Constructs a manifold by revolving this cross-section around its Y-axis and
@@ -128,7 +156,7 @@ export class CrossSection {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec2|number): CrossSection;
+  scale(v: Vec2 | number): CrossSection;
 
 
   /**
@@ -172,8 +200,8 @@ export class CrossSection {
    * defaults according to the radius.
    */
   offset(
-      delta: number, joinType?: JoinType, miterLimit?: number,
-      circularSegments?: number): CrossSection;
+    delta: number, joinType?: JoinType, miterLimit?: number,
+    circularSegments?: number): CrossSection;
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
@@ -198,50 +226,50 @@ export class CrossSection {
   /**
    * Boolean union
    */
-  add(other: CrossSection|Polygons): CrossSection;
+  add(other: CrossSection | Polygons): CrossSection;
 
   /**
    * Boolean difference
    */
-  subtract(other: CrossSection|Polygons): CrossSection;
+  subtract(other: CrossSection | Polygons): CrossSection;
 
   /**
    * Boolean intersection
    */
-  intersect(other: CrossSection|Polygons): CrossSection;
+  intersect(other: CrossSection | Polygons): CrossSection;
 
   /**
    * Boolean union of the cross-sections a and b
    */
-  static union(a: CrossSection|Polygons, b: CrossSection|Polygons):
-      CrossSection;
+  static union(a: CrossSection | Polygons, b: CrossSection | Polygons):
+    CrossSection;
 
   /**
    * Boolean difference of the cross-section b from the cross-section a
    */
-  static difference(a: CrossSection|Polygons, b: CrossSection|Polygons):
-      CrossSection;
+  static difference(a: CrossSection | Polygons, b: CrossSection | Polygons):
+    CrossSection;
 
   /**
    * Boolean intersection of the cross-sections a and b
    */
-  static intersection(a: CrossSection|Polygons, b: CrossSection|Polygons):
-      CrossSection;
+  static intersection(a: CrossSection | Polygons, b: CrossSection | Polygons):
+    CrossSection;
 
   /**
    * Boolean union of a list of cross-sections
    */
-  static union(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static union(polygons: (CrossSection | Polygons)[]): CrossSection;
 
   /**
    * Boolean difference of the tail of a list of cross-sections from its head
    */
-  static difference(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static difference(polygons: (CrossSection | Polygons)[]): CrossSection;
 
   /**
    * Boolean intersection of a list of cross-sections
    */
-  static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static intersection(polygons: (CrossSection | Polygons)[]): CrossSection;
 
   // Convex Hulls
 
@@ -253,7 +281,7 @@ export class CrossSection {
   /**
    * Compute the convex hull of all points in a list of polygons/cross-sections.
    */
-  static hull(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static hull(polygons: (CrossSection | Polygons)[]): CrossSection;
 
   // Topological Operations
 
@@ -261,7 +289,7 @@ export class CrossSection {
    * Construct a CrossSection from a vector of other Polygons (batch
    * boolean union).
    */
-  static compose(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static compose(polygons: (CrossSection | Polygons)[]): CrossSection;
 
   /**
    * This operation returns a vector of CrossSections that are topologically
@@ -357,7 +385,7 @@ export class Manifold {
    * @param size The X, Y, and Z dimensions of the box.
    * @param center Set to true to shift the center to the origin.
    */
-  static cube(size?: Vec3|number, center?: boolean): Manifold;
+  static cube(size?: Vec3 | number, center?: boolean): Manifold;
 
   /**
    * A convenience constructor for the common case of extruding a circle. Can
@@ -373,8 +401,8 @@ export class Manifold {
    * origin at the bottom.
    */
   static cylinder(
-      height: number, radiusLow: number, radiusHigh?: number,
-      circularSegments?: number, center?: boolean): Manifold;
+    height: number, radiusLow: number, radiusHigh?: number,
+    circularSegments?: number, center?: boolean): Manifold;
 
   /**
    * Constructs a geodesic sphere of a given radius.
@@ -409,9 +437,9 @@ export class Manifold {
    * as opposed to resting on the XY plane as is default.
    */
   static extrude(
-      polygons: CrossSection|Polygons, height: number, nDivisions?: number,
-      twistDegrees?: number, scaleTop?: Vec2|number,
-      center?: boolean): Manifold;
+    polygons: CrossSection | Polygons, height: number, nDivisions?: number,
+    twistDegrees?: number, scaleTop?: Vec2 | number,
+    center?: boolean): Manifold;
 
   /**
    * Constructs a manifold from a set of polygons/cross-section by revolving
@@ -426,8 +454,8 @@ export class Manifold {
    * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
    */
   static revolve(
-      polygons: CrossSection|Polygons, circularSegments?: number,
-      revolveDegrees?: number): Manifold;
+    polygons: CrossSection | Polygons, circularSegments?: number,
+    revolveDegrees?: number): Manifold;
 
   // Mesh Conversion
 
@@ -499,8 +527,8 @@ export class Manifold {
    * will require more sdf evaluations per output vertex.
    */
   static levelSet(
-      sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-      level?: number, precision?: number): Manifold;
+    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+    level?: number, precision?: number): Manifold;
 
   // Transformations
 
@@ -541,7 +569,7 @@ export class Manifold {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec3|number): Manifold;
+  scale(v: Vec3 | number): Manifold;
 
   /**
    * Mirror this Manifold over the plane described by the unit form of the given
@@ -631,9 +659,9 @@ export class Manifold {
    * @param propFunc A function that modifies the properties of a given vertex.
    */
   setProperties(
-      numProp: number,
-      propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
-      Manifold;
+    numProp: number,
+    propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
+    Manifold;
 
   /**
    * Curvature is the inverse of the radius of curvature, and signed such that
@@ -778,7 +806,7 @@ export class Manifold {
    * Compute the convex hull of all points contained within a set of Manifolds
    * and point vectors.
    */
-  static hull(points: (Manifold|Vec3)[]): Manifold;
+  static hull(points: (Manifold | Vec3)[]): Manifold;
 
   // Topological Operations
 
@@ -940,19 +968,89 @@ export interface MeshOptions {
   halfedgeTangent?: Float32Array;
 }
 
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly. This may not be manifold since the verts are duplicated
+ * along property boundaries that do not match. The additional merge vectors
+ * store this missing information, allowing the manifold to be reconstructed.
+ */
 export class Mesh {
   constructor(options: MeshOptions);
+  /** 
+    * Number of properties per vertex, always >= 3.
+  */
   numProp: number;
+  /**
+   * Flat, GL-style interleaved list of all vertex properties: propVal =
+   * vertProperties[vert * numProp + propIdx]. The first three properties are
+   * always the position x, y, z.
+   */
   vertProperties: Float32Array;
+  /**
+   * The vertex indices of the three triangle corners in CCW (from the outside)
+     order, for each triangle.
+  */
   triVerts: Uint32Array;
+  /**
+   * Optional: A list of only the vertex indicies that need to be merged to
+     reconstruct the manifold.
+  */
   mergeFromVert: Uint32Array;
+  /**
+   * Optional: The same length as mergeFromVert, and the corresponding value
+     contains the vertex to merge with. It will have an identical position, but
+     the other properties may differ.
+  */
   mergeToVert: Uint32Array;
+  /**
+   * Optional: Indicates runs of triangles that correspond to a particular
+     input mesh instance. The runs encompass all of triVerts and are sorted
+     by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
+     triVerts[runIndex[i+1]]. All runIndex values are divisible by 3. Returned
+     runIndex will always be 1 longer than runOriginalID, but same length is
+     also allowed as input: triVerts.size() will be automatically appended in
+     this case.
+  */
   runIndex: Uint32Array;
+  /**
+   * Optional: The OriginalID of the mesh this triangle run came from. This ID
+     is ideal for reapplying materials to the output mesh. Multiple runs may
+     have the same ID, e.g. representing different copies of the same input
+     mesh. If you create an input MeshGL that you want to be able to reference
+     as one or more originals, be sure to set unique values from ReserveIDs().
+  */
   runOriginalID: Uint32Array;
+  /**
+   * Optional: For each run, a 3x4 transform is stored representing how the
+     corresponding original mesh was transformed to create this triangle run.
+     This matrix is stored in column-major order and the length of the overall
+     vector is 12 * runOriginalID.size().
+  */
   runTransform: Float32Array;
+  /**
+   * Optional: Length NumTri, contains an ID of the source face this triangle
+     comes from. When auto-generated, this ID will be a triangle index into the
+     original mesh. All neighboring coplanar triangles from that input mesh
+     will refer to a single triangle of that group as the faceID. When
+     supplying faceIDs, ensure that triangles with the same ID are in fact
+     coplanar and have consistent properties (within some tolerance) or the
+     output will be surprising.
+  */
   faceID: Uint32Array;
+  /*
+    * Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+     non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
+     as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
+     Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
+  */
   halfedgeTangent: Float32Array;
+  /**
+   *  Number of triangles
+  */
   get numTri(): number;
+  /**
+   *  Number of property vertices
+   */
   get numVert(): number;
   get numRun(): number;
   merge(): boolean;
