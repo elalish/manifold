@@ -88,8 +88,23 @@ export class CrossSection {
 
   // Shapes
 
+  /**
+   * Constructs a square with the given XY dimensions. By default it is
+   * positioned in the first quadrant, touching the origin. If any dimensions in
+   * size are negative, or if all are zero, an empty Manifold will be returned.
+   *
+   * @param size The X, and Y dimensions of the square.
+   * @param center Set to true to shift the center to the origin.
+   */
   static square(size?: Vec2|number, center?: boolean): CrossSection;
 
+  /**
+   * Constructs a circle of a given radius.
+   *
+   * @param radius Radius of the circle. Must be positive.
+   * @param circularSegments Number of segments along its diameter. Default is
+   * calculated by the static Quality defaults according to the radius.
+   */
   static circle(radius: number, circularSegments?: number): CrossSection;
 
   // Extrusions (2d to 3d manifold)
@@ -359,6 +374,30 @@ export class CrossSection {
   delete(): void;
 }
 
+/**
+ * This library's internal representation of an oriented, 2-manifold, triangle
+ * mesh - a simple boundary-representation of a solid object. Use this class to
+ * store and operate on solids, and use MeshGL for input and output, or
+ * potentially Mesh if only basic geometry is required.
+ *
+ * In addition to storing geometric data, a Manifold can also store an arbitrary
+ * number of vertex properties. These could be anything, e.g. normals, UV
+ * coordinates, colors, etc, but this library is completely agnostic. All
+ * properties are merely float values indexed by channel number. It is up to the
+ * user to associate channel numbers with meaning.
+ *
+ * Manifold allows vertex properties to be shared for efficient storage, or to
+ * have multiple property verts associated with a single geometric vertex,
+ * allowing sudden property changes, e.g. at Boolean intersections, without
+ * sacrificing manifoldness.
+ *
+ * Manifolds also keep track of their relationships to their inputs, via
+ * OriginalIDs and the faceIDs and transforms accessible through MeshGL. This
+ * allows object-level properties to be re-associated with the output after many
+ * operations, particularly useful for materials. Since separate object's
+ * properties are not mixed, there is no requirement that channels have
+ * consistent meaning between different inputs.
+ */
 export class Manifold {
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
@@ -895,7 +934,7 @@ export class Manifold {
   getProperties(): Properties;
 
 
-  /*
+  /**
    * Returns the minimum gap between two manifolds. Returns a float between
    * 0 and searchLength.
    */
@@ -1040,7 +1079,7 @@ export class Mesh {
      output will be surprising.
   */
   faceID: Uint32Array;
-  /*
+  /**
     * Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
      non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
      as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
