@@ -197,3 +197,28 @@ TEST(Hull, FailingTest2) {
 #endif
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
 }
+
+TEST(Hull, DisabledFaceTest) {
+  // 101213.stl
+  const std::vector<vec3> hullPts = {
+      {65.398902893, 58.303115845, 58.765388489},
+      {42.147319794, 44.512584686, 75.703102112},
+      {89.208251953, 97.092460632, 41.632453918},
+      {69.860748291, 69.860748291, 56.492958069},
+      {45.375354767, 39.067985535, 64.844772339},
+      {26.555616379, 18.671405792, 81.067504883},
+      {88.179382324, 81.083595276, 43.981628418},
+      {51.823883057, 50.247039795, 70.359062195},
+      {58.489616394, 72.681190491, 51.274829865},
+      {110, 10, 65},
+      {29.590316772, 20.917686462, 73.143547058},
+      {101.61526489, 98.461585999, 30.909877777}};
+  auto hull = Manifold::Hull(hullPts);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("disabledFaceTest.glb", hull.GetMesh(), {});
+  }
+#endif
+  EXPECT_TRUE(!hull.IsEmpty());
+  EXPECT_TRUE(isMeshConvex(hull));
+}
