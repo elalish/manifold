@@ -69,3 +69,4 @@ void CheckGL(const Manifold& manifold);
 #ifdef MANIFOLD_EXPORT
 Manifold ReadMesh(const std::string& filename);
 #endif
+void RegisterPolygonTests();

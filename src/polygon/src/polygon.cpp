@@ -123,7 +123,7 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
 
 void Dump(const PolygonsIdx &polys) {
   for (auto poly : polys) {
-    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
+    std::cout << "polys.push_back({" << std::setprecision(15) << std::endl;
     for (auto v : poly) {
       std::cout << "    {" << v.pos.x << ", " << v.pos.y << "},  //"
                 << std::endl;
