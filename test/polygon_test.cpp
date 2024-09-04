@@ -128,6 +128,7 @@ void RegisterPolygonTests() {
                          "zebra3.txt"};
 
   std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
   for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
 }
