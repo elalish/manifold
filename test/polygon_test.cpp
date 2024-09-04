@@ -127,8 +127,12 @@ void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
                          "zebra3.txt"};
 
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
   std::string file = __FILE__;
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
   for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+#endif
 }
