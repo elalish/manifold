@@ -277,7 +277,7 @@ constexpr inline uint32_t SpreadBits3(uint32_t v) {
 /** @ingroup Private */
 class Collider {
  public:
-  Collider(){};
+  Collider() {};
 
   Collider(const VecView<const Box>& leafBB,
            const VecView<const uint32_t>& leafMorton) {
