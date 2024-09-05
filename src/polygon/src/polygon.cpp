@@ -121,15 +121,15 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
                geometryErr, "triangulation is not entirely CCW!");
 }
 
-void Dump(const PolygonsIdx &polys) {
+void Dump(const PolygonsIdx &polys, double precision) {
+  std::cout << "Polygon 0 " << precision << " " << polys.size() << std::endl;
   for (auto poly : polys) {
-    std::cout << "polys.push_back({" << std::setprecision(15) << std::endl;
+    std::cout << poly.size() << std::endl;
     for (auto v : poly) {
-      std::cout << "    {" << v.pos.x << ", " << v.pos.y << "},  //"
-                << std::endl;
+      std::cout << v.pos.x << " " << v.pos.y << std::endl;
     }
-    std::cout << "});" << std::endl;
   }
+  std::cout << "# ... " << std::endl;
   for (auto poly : polys) {
     std::cout << "show(array([" << std::endl;
     for (auto v : poly) {
@@ -144,12 +144,12 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << precision << std::endl;
   std::cout << e.what() << std::endl;
-  if (triangles.size() > 1000) {
+  if (triangles.size() > 1000 && !PolygonParams().verbose) {
     std::cout << "Output truncated due to producing " << triangles.size()
               << " triangles." << std::endl;
     return;
   }
-  Dump(polys);
+  Dump(polys, precision);
   std::cout << "produced this triangulation:" << std::endl;
   for (size_t j = 0; j < triangles.size(); ++j) {
     std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
