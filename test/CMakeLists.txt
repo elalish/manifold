@@ -86,7 +86,7 @@ target_precompile_headers(${PROJECT_NAME} INTERFACE test.h)
 
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
-    "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind")
+    "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons")
 endif()
 
 if(MSVC)
