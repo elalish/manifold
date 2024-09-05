@@ -368,12 +368,13 @@ Module.setup = function() {
     }
 
     position(vert) {
-      return this.vertProperties.subarray(numProp * vert, numProp * vert + 3);
+      return this.vertProperties.subarray(
+          this.numProp * vert, this.numProp * vert + 3);
     }
 
     extras(vert) {
       return this.vertProperties.subarray(
-          numProp * vert + 3, numProp * (vert + 1));
+          this.numProp * vert + 3, this.numProp * (vert + 1));
     }
 
     tangent(halfedge) {
