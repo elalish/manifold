@@ -184,7 +184,7 @@ jobs:
       shell: bash
       run: |
         cd build/bin/Release
-        ./manifold_test.exe --gtest_filter=-Polygon.Zebra*
+        ./manifold_test.exe
         cd ../../
     - name: test cmake consumer
       run: |
