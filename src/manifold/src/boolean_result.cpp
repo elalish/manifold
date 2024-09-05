@@ -50,13 +50,13 @@ struct AbsSum {
 };
 
 struct DuplicateVerts {
-  VecView<glm::vec3> vertPosR;
+  VecView<vec3> vertPosR;
   VecView<const int> inclusion;
   VecView<const int> vertR;
-  VecView<const glm::vec3> vertPosP;
+  VecView<const vec3> vertPosP;
 
   void operator()(const int vert) {
-    const int n = glm::abs(inclusion[vert]);
+    const int n = std::abs(inclusion[vert]);
     for (int i = 0; i < n; ++i) {
       vertPosR[vertR[vert] + i] = vertPosP[vert];
     }
@@ -70,9 +70,9 @@ struct CountVerts {
 
   void operator()(const Halfedge &edge) {
     if (atomic)
-      AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
+      AtomicAdd(count[edge.face], std::abs(inclusion[edge.startVert]));
     else
-      count[edge.face] += glm::abs(inclusion[edge.startVert]);
+      count[edge.face] += std::abs(inclusion[edge.startVert]);
   }
 };
 
@@ -87,7 +87,7 @@ struct CountNewVerts {
   void operator()(const int idx) {
     int edgeP = pq.Get(idx, inverted);
     int faceQ = pq.Get(idx, !inverted);
-    int inclusion = glm::abs(i12[idx]);
+    int inclusion = std::abs(i12[idx]);
 
     if (atomic) {
       AtomicAdd(countQ[faceQ], inclusion);
@@ -178,7 +178,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 
   if (invertQ) {
     gather(next, end,
-           TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>()),
+           TransformIterator(inQ.faceNormal_.begin(), Negate<vec3>()),
            outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   } else {
     gather(next, end, inQ.faceNormal_.begin(),
@@ -195,7 +195,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 
 struct EdgePos {
   int vert;
-  float edgePos;
+  double edgePos;
   bool isStart;
 };
 
@@ -236,8 +236,8 @@ void AddNewEdgeVerts(
                         pairHasher(keyLeft), &edgesNew[keyLeft])};
     for (const auto &tuple : edges) {
       lock(std::get<1>(tuple));
-      for (int j = 0; j < glm::abs(inclusion); ++j)
-        std::get<2>(tuple)->push_back({vert + j, 0.0f, std::get<0>(tuple)});
+      for (int j = 0; j < std::abs(inclusion); ++j)
+        std::get<2>(tuple)->push_back({vert + j, 0.0, std::get<0>(tuple)});
       unlock(std::get<1>(tuple));
       direction = !direction;
     }
@@ -303,7 +303,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
   Vec<Halfedge> &halfedgeR = outR.halfedge_;
-  const Vec<glm::vec3> &vertPosP = inP.vertPos_;
+  const Vec<vec3> &vertPosP = inP.vertPos_;
   const Vec<Halfedge> &halfedgeP = inP.halfedge_;
 
   for (auto &value : edgesP) {
@@ -316,7 +316,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
 
     const int vStart = halfedge.startVert;
     const int vEnd = halfedge.endVert;
-    const glm::vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
+    const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
       edge.edgePos = glm::dot(outR.vertPos_[edge.vert], edgeVec);
@@ -326,7 +326,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     EdgePos edgePos = {vP2R[vStart],
                        glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
-    for (int j = 0; j < glm::abs(inclusion); ++j) {
+    for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
@@ -334,7 +334,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     inclusion = i03[vEnd];
     edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
-    for (int j = 0; j < glm::abs(inclusion); ++j) {
+    for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
@@ -379,7 +379,7 @@ void AppendNewEdges(
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
   Vec<Halfedge> &halfedgeR = outR.halfedge_;
-  Vec<glm::vec3> &vertPosR = outR.vertPos_;
+  Vec<vec3> &vertPosR = outR.vertPos_;
 
   for (auto &value : edgesNew) {
     const int faceP = value.first.first;
@@ -390,7 +390,7 @@ void AppendNewEdges(
     for (auto edge : edgePos) {
       bbox.Union(vertPosR[edge.vert]);
     }
-    const glm::vec3 size = bbox.Size();
+    const vec3 size = bbox.Size();
     // Order the points along their longest dimension.
     const int i = (size.x > size.y && size.x > size.z) ? 0
                   : size.y > size.z                    ? 1
@@ -460,7 +460,7 @@ struct DuplicateHalfedges {
     const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
 
-    for (int i = 0; i < glm::abs(inclusion); ++i) {
+    for (int i = 0; i < std::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
       int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardEdge;
@@ -523,15 +523,15 @@ void UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
 }
 
 struct Barycentric {
-  VecView<glm::vec3> uvw;
+  VecView<vec3> uvw;
   VecView<const TriRef> ref;
-  VecView<const glm::vec3> vertPosP;
-  VecView<const glm::vec3> vertPosQ;
-  VecView<const glm::vec3> vertPosR;
+  VecView<const vec3> vertPosP;
+  VecView<const vec3> vertPosQ;
+  VecView<const vec3> vertPosR;
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
   VecView<const Halfedge> halfedgeR;
-  const float precision;
+  const double precision;
 
   void operator()(const int tri) {
     const TriRef refPQ = ref[tri];
@@ -542,7 +542,7 @@ struct Barycentric {
     const auto &vertPos = PQ ? vertPosP : vertPosQ;
     const auto &halfedge = PQ ? halfedgeP : halfedgeQ;
 
-    glm::mat3 triPos;
+    mat3 triPos;
     for (const int j : {0, 1, 2})
       triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
 
@@ -558,20 +558,20 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   ZoneScoped;
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
-  const int numProp = glm::max(numPropP, numPropQ);
+  const int numProp = std::max(numPropP, numPropQ);
   outR.meshRelation_.numProp = numProp;
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
   outR.meshRelation_.triProperties.resize(numTri);
 
-  Vec<glm::vec3> bary(outR.halfedge_.size());
+  Vec<vec3> bary(outR.halfedge_.size());
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
                           inQ.vertPos_, outR.vertPos_, inP.halfedge_,
                           inQ.halfedge_, outR.halfedge_, outR.precision_}));
 
-  using Entry = std::pair<glm::ivec3, int>;
+  using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
   std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
   std::vector<int> propMissIdx[2];
@@ -590,15 +590,15 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
     const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto &properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const glm::ivec3 &triProp = oldNumProp == 0 ? glm::ivec3(-1)
-                                : PQ ? inP.meshRelation_.triProperties[ref.tri]
-                                     : inQ.meshRelation_.triProperties[ref.tri];
+    const ivec3 &triProp = oldNumProp == 0 ? ivec3(-1)
+                           : PQ ? inP.meshRelation_.triProperties[ref.tri]
+                                : inQ.meshRelation_.triProperties[ref.tri];
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
-      const glm::vec3 &uvw = bary[3 * tri + i];
+      const vec3 &uvw = bary[3 * tri + i];
 
-      glm::ivec4 key(PQ, idMissProp, -1, -1);
+      ivec4 key(PQ, idMissProp, -1, -1);
       if (oldNumProp > 0) {
         int edge = -2;
         for (const int j : {0, 1, 2}) {
@@ -615,8 +615,8 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
           key[1] = vert;
-          key[2] = glm::min(p0, p1);
-          key[3] = glm::max(p0, p1);
+          key[2] = std::min(p0, p1);
+          key[3] = std::max(p0, p1);
         } else if (edge == -2) {
           key[1] = vert;
         }
@@ -634,20 +634,20 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
         auto &bin = propIdx[key.y];
         bool bFound = false;
         for (const auto &b : bin) {
-          if (b.first == glm::ivec3(key.x, key.z, key.w)) {
+          if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
             outR.meshRelation_.triProperties[tri][i] = b.second;
             break;
           }
         }
         if (bFound) continue;
-        bin.push_back(std::make_pair(glm::ivec3(key.x, key.z, key.w), idx));
+        bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
       outR.meshRelation_.triProperties[tri][i] = idx++;
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
-          glm::vec3 oldProps;
+          vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] = properties[oldNumProp * triProp[j] + p];
           outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
@@ -732,7 +732,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   if (numVertR == 0) return outR;
 
-  outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
+  outR.precision_ = std::max(inP_.precision_, inQ_.precision_);
 
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].

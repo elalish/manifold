@@ -19,37 +19,38 @@
 namespace {
 using namespace manifold;
 using namespace glm;
+using manifold::vec3;
 
-constexpr float AtomicRadiusN2 = 0.65;
-constexpr float BondPairN2 = 1.197;
-constexpr float AtomicRadiusSi = 1.1;
-constexpr float LatticeCellSizeSi = 5.4309;
-constexpr float fccOffset = 0.25;
-constexpr float AtomicRadiusC = 0.7;
-constexpr float LatticeCellSizeC = 3.65;
-constexpr float cellLenA = 2.464;
-constexpr float cellLenB = cellLenA;
-constexpr float cellLenC = 6.711;
-constexpr float cellAngleA = 90;
-constexpr float cellAngleB = cellAngleA;
-constexpr float cellAngleC = 120;
-constexpr float LayerSeperationC = 3.364;
+constexpr double AtomicRadiusN2 = 0.65;
+constexpr double BondPairN2 = 1.197;
+constexpr double AtomicRadiusSi = 1.1;
+constexpr double LatticeCellSizeSi = 5.4309;
+constexpr double fccOffset = 0.25;
+constexpr double AtomicRadiusC = 0.7;
+constexpr double LatticeCellSizeC = 3.65;
+constexpr double cellLenA = 2.464;
+constexpr double cellLenB = cellLenA;
+constexpr double cellLenC = 6.711;
+constexpr double cellAngleA = 90;
+constexpr double cellAngleB = cellAngleA;
+constexpr double cellAngleC = 120;
+constexpr double LayerSeperationC = 3.364;
 
-Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1}, float ar1 = 1.0,
-              float ar2 = 2.0) {
-  float cyR = std::min(ar1, ar2) / 5.0;
-  float dist = length(p1 - p2);
-  vec3 cyC = (p1 + p2) / 2.0f;
-  float beta = degrees(acos((p1.z - p2.z) / dist));
-  float gamma = degrees(atan2(p1.y - p2.y, p1.x - p2.x));
+Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1},
+              double ar1 = 1.0, double ar2 = 2.0) {
+  double cyR = std::min(ar1, ar2) / 5.0;
+  double dist = length(p1 - p2);
+  vec3 cyC = (p1 + p2) / 2.0;
+  double beta = degrees(acos((p1.z - p2.z) / dist));
+  double gamma = degrees(atan2(p1.y - p2.y, p1.x - p2.x));
   vec3 rot = {0.0, beta, gamma};
   return Manifold::Cylinder(dist, cyR, -1, fn, true)
       .Rotate(rot.x, rot.y, rot.z)
       .Translate(cyC);
 }
 
-Manifold bondPair(int fn, float d = 0.0, float ar = 1.0) {
-  float axD = pow(d, 1.0 / 3.0);
+Manifold bondPair(int fn, double d = 0.0, double ar = 1.0) {
+  double axD = pow(d, 1.0 / 3.0);
   vec3 p1 = {+axD, -axD, -axD};
   vec3 p2 = {-axD, +axD, +axD};
   Manifold sphere = Manifold::Sphere(ar, fn);
@@ -57,11 +58,11 @@ Manifold bondPair(int fn, float d = 0.0, float ar = 1.0) {
 }
 
 Manifold hexagonalClosePacked(int fn, vec3 dst = {1.0, 1.0, 1.0},
-                              float ar = 1.0) {
+                              double ar = 1.0) {
   std::vector<Manifold> parts;
   vec3 p1 = {0, 0, 0};
   parts.push_back(Manifold::Sphere(ar, fn));
-  float baseAg = 30;
+  double baseAg = 30;
   vec3 ag = {baseAg, baseAg + 120, baseAg + 240};
   vec3 points[] = {{cosd(ag.x) * dst.x, sind(ag.x) * dst.x, 0},
                    {cosd(ag.y) * dst.y, sind(ag.y) * dst.y, 0},
@@ -73,11 +74,11 @@ Manifold hexagonalClosePacked(int fn, vec3 dst = {1.0, 1.0, 1.0},
   return Manifold::BatchBoolean(parts, OpType::Add);
 }
 
-Manifold fccDiamond(int fn, float ar = 1.0, float unitCell = 2.0,
-                    float fccOffset = 0.25) {
+Manifold fccDiamond(int fn, double ar = 1.0, double unitCell = 2.0,
+                    double fccOffset = 0.25) {
   std::vector<Manifold> parts;
-  float huc = unitCell / 2.0;
-  float od = fccOffset * unitCell;
+  double huc = unitCell / 2.0;
+  double od = fccOffset * unitCell;
   vec3 interstitial[] = {
       {+od, +od, +od}, {+od, -od, -od}, {-od, +od, -od}, {-od, -od, +od}};
   vec3 corners[] = {{+huc, +huc, +huc},
@@ -105,14 +106,14 @@ Manifold fccDiamond(int fn, float ar = 1.0, float unitCell = 2.0,
   return Manifold::BatchBoolean(parts, OpType::Add);
 }
 
-Manifold SiCell(int fn, float x = 1.0, float y = 1.0, float z = 1.0) {
+Manifold SiCell(int fn, double x = 1.0, double y = 1.0, double z = 1.0) {
   return fccDiamond(fn, AtomicRadiusSi, LatticeCellSizeSi, fccOffset)
       .Translate({LatticeCellSizeSi * x, LatticeCellSizeSi * y,
                   LatticeCellSizeSi * z});
 }
 
-Manifold SiN2Cell(int fn, float x = 1.0, float y = 1.0, float z = 1.0) {
-  float n2Offset = LatticeCellSizeSi / 8;
+Manifold SiN2Cell(int fn, double x = 1.0, double y = 1.0, double z = 1.0) {
+  double n2Offset = LatticeCellSizeSi / 8;
   return bondPair(fn, BondPairN2, AtomicRadiusN2)
              .Translate({LatticeCellSizeSi * x - n2Offset,
                          LatticeCellSizeSi * y + n2Offset,
@@ -132,7 +133,7 @@ Manifold GraphiteCell(int fn, vec3 xyz = {1.0, 1.0, 1.0}) {
 namespace manifold {
 Manifold CondensedMatter(int fn) {
   std::vector<Manifold> parts;
-  float siOffset = 3.0 * LatticeCellSizeSi / 8.0;
+  double siOffset = 3.0 * LatticeCellSizeSi / 8.0;
   for (int x = -3; x <= 3; x++)
     for (int y = -1; y <= 2; y++)
       parts.push_back(
@@ -141,9 +142,9 @@ Manifold CondensedMatter(int fn) {
               .Translate({0, -siOffset, 0})
               .Rotate(0, 0, 45));
 
-  float xyPlane[] = {-2, -1, 0, +1, +2};
-  for (float x : xyPlane)
-    for (float y : xyPlane) parts.push_back(SiN2Cell(fn, x, y, 1));
+  double xyPlane[] = {-2, -1, 0, +1, +2};
+  for (double x : xyPlane)
+    for (double y : xyPlane) parts.push_back(SiN2Cell(fn, x, y, 1));
   return Manifold::BatchBoolean(parts, OpType::Add);
 }
 }  // namespace manifold

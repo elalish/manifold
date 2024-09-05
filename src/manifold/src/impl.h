@@ -31,30 +31,30 @@ namespace manifold {
 struct Manifold::Impl {
   struct Relation {
     int originalID = -1;
-    glm::mat4x3 transform = glm::mat4x3(1);
+    mat4x3 transform = mat4x3(1);
     bool backSide = false;
   };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
     int numProp = 0;
-    Vec<float> properties;
+    Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
-    Vec<glm::ivec3> triProperties;
+    Vec<ivec3> triProperties;
   };
   struct BaryIndices {
     int tri, start4, end4;
   };
 
   Box bBox_;
-  float precision_ = -1;
+  double precision_ = -1;
   Error status_ = Error::NoError;
-  Vec<glm::vec3> vertPos_;
+  Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
-  Vec<glm::vec3> vertNormal_;
-  Vec<glm::vec3> faceNormal_;
-  Vec<glm::vec4> halfedgeTangent_;
+  Vec<vec3> vertNormal_;
+  Vec<vec3> faceNormal_;
+  Vec<vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
 
@@ -63,11 +63,11 @@ struct Manifold::Impl {
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
-  Impl(Shape, const glm::mat4x3 = glm::mat4x3(1));
+  Impl(Shape, const mat4x3 = mat4x3(1));
 
   Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<float>& propertyTolerance = {},
+       const std::vector<double>& propertyTolerance = {},
        bool hasFaceIDs = false);
 
   inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
@@ -93,23 +93,23 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces(const std::vector<float>& propertyTolerance = {});
-  void RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts);
+  void CreateFaces(const std::vector<double>& propertyTolerance = {});
+  void RemoveUnreferencedVerts();
   void InitializeOriginal();
-  void CreateHalfedges(const Vec<glm::ivec3>& triVerts);
+  void CreateHalfedges(const Vec<ivec3>& triVerts);
   void CalculateNormals();
   void IncrementMeshIDs();
 
   void Update();
   void MarkFailure(Error status);
-  void Warp(std::function<void(glm::vec3&)> warpFunc);
-  void WarpBatch(std::function<void(VecView<glm::vec3>)> warpFunc);
-  Impl Transform(const glm::mat4x3& transform) const;
+  void Warp(std::function<void(vec3&)> warpFunc);
+  void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
+  Impl Transform(const mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
-  SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
+  SparseIndices VertexCollisionsZ(VecView<const vec3> vertsIn,
                                   bool inverted = false) const;
 
-  bool IsEmpty() const { return NumVert() == 0; }
+  bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }
   size_t NumEdge() const { return halfedge_.size() / 2; }
   size_t NumTri() const { return halfedge_.size() / 3; }
@@ -124,18 +124,18 @@ struct Manifold::Impl {
   void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
   bool IsFinite() const;
-  bool IsIndexInBounds(VecView<const glm::ivec3> triVerts) const;
-  void SetPrecision(float minPrecision = -1);
+  bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
+  void SetPrecision(double minPrecision = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
-  float MinGap(const Impl& other, float searchLength) const;
+  double MinGap(const Impl& other, double searchLength) const;
 
   // sort.cu
   void Finish();
   void SortVerts();
-  void ReindexVerts(const Vec<int>& vertNew2Old, int numOldVert);
+  void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
   void CompactProps();
   void GetFaceBoxMorton(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) const;
   void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
@@ -146,11 +146,12 @@ struct Manifold::Impl {
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
-                            glm::mat3x2 projection) const;
-  Polygons Slice(float height) const;
+                            mat3x2 projection) const;
+  Polygons Slice(double height) const;
   Polygons Project() const;
 
   // edge_op.cu
+  void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
   void CollapseEdge(int edge, std::vector<int>& edges);
@@ -161,37 +162,37 @@ struct Manifold::Impl {
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
-  void CollapseTri(const glm::ivec3& triEdge);
+  void CollapseTri(const ivec3& triEdge);
   void SplitPinchedVerts();
 
   // subdivision.cpp
   int GetNeighbor(int tri) const;
-  glm::ivec4 GetHalfedges(int tri) const;
+  ivec4 GetHalfedges(int tri) const;
   BaryIndices GetIndices(int halfedge) const;
   void FillRetainedVerts(Vec<Barycentric>& vertBary) const;
-  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
+  Vec<Barycentric> Subdivide(std::function<int(vec3)>);
 
   // smoothing.cpp
   bool IsInsideQuad(int halfedge) const;
   bool IsMarkedInsideQuad(int halfedge) const;
-  glm::vec3 GetNormal(int halfedge, int normalIdx) const;
-  glm::vec4 TangentFromNormal(const glm::vec3& normal, int halfedge) const;
+  vec3 GetNormal(int halfedge, int normalIdx) const;
+  vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
   Vec<int> VertFlatFace(const Vec<bool>&) const;
   Vec<int> VertHalfedge() const;
-  std::vector<Smoothness> SharpenEdges(float minSharpAngle,
-                                       float minSmoothness) const;
-  void SharpenTangent(int halfedge, float smoothness);
-  void SetNormals(int normalIdx, float minSharpAngle);
+  std::vector<Smoothness> SharpenEdges(double minSharpAngle,
+                                       double minSmoothness) const;
+  void SharpenTangent(int halfedge, double smoothness);
+  void SetNormals(int normalIdx, double minSharpAngle);
   void LinearizeFlatTangents();
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
-  void Refine(std::function<int(glm::vec3)>);
+  void Refine(std::function<int(vec3)>);
 
   // quickhull.cpp
-  void Hull(const std::vector<glm::vec3>& vertPos);
+  void Hull(VecView<vec3> vertPos);
 };
 }  // namespace manifold

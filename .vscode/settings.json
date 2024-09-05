@@ -148,7 +148,9 @@
     "halfedge",
     "halfedges",
     "Tris",
-    "Verts"
+    "Verts",
+    "Voxel",
+    "voxels"
   ],
   "javascript.format.semicolons": "insert",
   "[python]": {

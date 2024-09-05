@@ -23,45 +23,44 @@ using namespace manifold;
 namespace {
 
 // These two functions (Interpolate and Intersect) are the only places where
-// floating-point operations take place in the whole Boolean function. These are
-// carefully designed to minimize rounding error and to eliminate it at edge
+// doubleing-point operations take place in the whole Boolean function. These
+// are carefully designed to minimize rounding error and to eliminate it at edge
 // cases to ensure consistency.
 
-glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
-  const float dxL = x - pL.x;
-  const float dxR = x - pR.x;
+vec2 Interpolate(vec3 pL, vec3 pR, double x) {
+  const double dxL = x - pL.x;
+  const double dxR = x - pR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
                "Boolean manifold error: not in domain");
   const bool useL = fabs(dxL) < fabs(dxR);
-  const glm::vec3 dLR = pR - pL;
-  const float lambda = (useL ? dxL : dxR) / dLR.x;
+  const vec3 dLR = pR - pL;
+  const double lambda = (useL ? dxL : dxR) / dLR.x;
   if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
-    return glm::vec2(pL.y, pL.z);
-  glm::vec2 yz;
-  yz[0] = (useL ? pL.y : pR.y) + lambda * dLR.y;
-  yz[1] = (useL ? pL.z : pR.z) + lambda * dLR.z;
+    return vec2(pL.y, pL.z);
+  vec2 yz;
+  yz[0] = fma(lambda, dLR.y, useL ? pL.y : pR.y);
+  yz[1] = fma(lambda, dLR.z, useL ? pL.z : pR.z);
   return yz;
 }
 
-glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
-                    const glm::vec3 &qL, const glm::vec3 &qR) {
-  const float dyL = qL.y - pL.y;
-  const float dyR = qR.y - pR.y;
+vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
+  const double dyL = qL.y - pL.y;
+  const double dyR = qR.y - pR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
                "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
-  const float dx = pR.x - pL.x;
-  float lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!isfinite(lambda)) lambda = 0.0f;
-  glm::vec4 xyzz;
-  xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
-  const float pDy = pR.y - pL.y;
-  const float qDy = qR.y - qL.y;
+  const double dx = pR.x - pL.x;
+  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
+  if (!isfinite(lambda)) lambda = 0.0;
+  vec4 xyzz;
+  xyzz.x = fma(lambda, dx, useL ? pL.x : pR.x);
+  const double pDy = pR.y - pL.y;
+  const double qDy = qR.y - qL.y;
   const bool useP = fabs(pDy) < fabs(qDy);
-  xyzz.y = (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y)) +
-           lambda * (useP ? pDy : qDy);
-  xyzz.z = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
-  xyzz.w = (useL ? qL.z : qR.z) + lambda * (qR.z - qL.z);
+  xyzz.y = fma(lambda, useP ? pDy : qDy,
+               useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y));
+  xyzz.z = fma(lambda, pR.z - pL.z, useL ? pL.z : pR.z);
+  xyzz.w = fma(lambda, qR.z - qL.z, useL ? qL.z : qR.z);
   return xyzz;
 }
 
@@ -101,33 +100,33 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p1q1;
 }
 
-inline bool Shadows(float p, float q, float dir) {
+inline bool Shadows(double p, double q, double dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-inline std::pair<int, glm::vec2> Shadow01(
-    const int p0, const int q1, VecView<const glm::vec3> vertPosP,
-    VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
-    const float expandP, VecView<const glm::vec3> normalP, const bool reverse) {
+inline std::pair<int, vec2> Shadow01(
+    const int p0, const int q1, VecView<const vec3> vertPosP,
+    VecView<const vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
+    const double expandP, VecView<const vec3> normalP, const bool reverse) {
   const int q1s = halfedgeQ[q1].startVert;
   const int q1e = halfedgeQ[q1].endVert;
-  const float p0x = vertPosP[p0].x;
-  const float q1sx = vertPosQ[q1s].x;
-  const float q1ex = vertPosQ[q1e].x;
+  const double p0x = vertPosP[p0].x;
+  const double q1sx = vertPosQ[q1s].x;
+  const double q1ex = vertPosQ[q1e].x;
   int s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
                           Shadows(q1ex, p0x, expandP * normalP[q1e].x)
                     : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
                           Shadows(p0x, q1sx, expandP * normalP[p0].x);
-  glm::vec2 yz01(NAN);
+  vec2 yz01(NAN);
 
   if (s01 != 0) {
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
-      glm::vec3 diff = vertPosQ[q1s] - vertPosP[p0];
-      const float start2 = glm::dot(diff, diff);
+      vec3 diff = vertPosQ[q1s] - vertPosP[p0];
+      const double start2 = glm::dot(diff, diff);
       diff = vertPosQ[q1e] - vertPosP[p0];
-      const float end2 = glm::dot(diff, diff);
-      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
+      const double end2 = glm::dot(diff, diff);
+      const double dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
       if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
     } else {
       if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
@@ -176,25 +175,25 @@ size_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
 }
 
 struct Kernel11 {
-  VecView<glm::vec4> xyzz;
+  VecView<vec4> xyzz;
   VecView<int> s;
-  VecView<const glm::vec3> vertPosP;
-  VecView<const glm::vec3> vertPosQ;
+  VecView<const vec3> vertPosP;
+  VecView<const vec3> vertPosQ;
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
-  const float expandP;
-  VecView<const glm::vec3> normalP;
+  const double expandP;
+  VecView<const vec3> normalP;
   const SparseIndices &p1q1;
 
   void operator()(const size_t idx) {
     const int p1 = p1q1.Get(idx, false);
     const int q1 = p1q1.Get(idx, true);
-    glm::vec4 &xyzz11 = xyzz[idx];
+    vec4 &xyzz11 = xyzz[idx];
     int &s11 = s[idx];
 
     // For pRL[k], qRL[k], k==0 is the left and k==1 is the right.
     int k = 0;
-    glm::vec3 pRL[2], qRL[2];
+    vec3 pRL[2], qRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows = false;
@@ -205,14 +204,14 @@ struct Kernel11 {
       const auto syz01 = Shadow01(p0[i], q1, vertPosP, vertPosQ, halfedgeQ,
                                   expandP, normalP, false);
       const int s01 = syz01.first;
-      const glm::vec2 yz01 = syz01.second;
+      const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
       if (isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
           pRL[k] = vertPosP[p0[i]];
-          qRL[k] = glm::vec3(pRL[k].x, yz01);
+          qRL[k] = vec3(pRL[k].x, yz01);
           ++k;
         }
       }
@@ -223,45 +222,45 @@ struct Kernel11 {
       const auto syz10 = Shadow01(q0[i], p1, vertPosQ, vertPosP, halfedgeP,
                                   expandP, normalP, true);
       const int s10 = syz10.first;
-      const glm::vec2 yz10 = syz10.second;
+      const vec2 yz10 = syz10.second;
       // If the value is NaN, then these do not overlap.
       if (isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
           shadows = s10 != 0;
           qRL[k] = vertPosQ[q0[i]];
-          pRL[k] = glm::vec3(qRL[k].x, yz10);
+          pRL[k] = vec3(qRL[k].x, yz10);
           ++k;
         }
       }
     }
 
     if (s11 == 0) {  // No intersection
-      xyzz11 = glm::vec4(NAN);
+      xyzz11 = vec4(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
       const int p1e = halfedgeP[p1].endVert;
-      glm::vec3 diff = vertPosP[p1s] - glm::vec3(xyzz11);
-      const float start2 = glm::dot(diff, diff);
-      diff = vertPosP[p1e] - glm::vec3(xyzz11);
-      const float end2 = glm::dot(diff, diff);
-      const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+      vec3 diff = vertPosP[p1s] - vec3(xyzz11);
+      const double start2 = glm::dot(diff, diff);
+      diff = vertPosP[p1e] - vec3(xyzz11);
+      const double end2 = glm::dot(diff, diff);
+      const double dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
 
       if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
     }
   }
 };
 
-std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
-                                              const Manifold::Impl &inP,
-                                              const Manifold::Impl &inQ,
-                                              float expandP) {
+std::tuple<Vec<int>, Vec<vec4>> Shadow11(SparseIndices &p1q1,
+                                         const Manifold::Impl &inP,
+                                         const Manifold::Impl &inQ,
+                                         double expandP) {
   ZoneScoped;
   Vec<int> s11(p1q1.size());
-  Vec<glm::vec4> xyzz11(p1q1.size());
+  Vec<vec4> xyzz11(p1q1.size());
 
   for_each_n(autoPolicy(p1q1.size(), 1e4), countAt(0_uz), p1q1.size(),
              Kernel11({xyzz11, s11, inP.vertPos_, inQ.vertPos_, inP.halfedge_,
@@ -274,12 +273,12 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
 
 struct Kernel02 {
   VecView<int> s;
-  VecView<float> z;
-  VecView<const glm::vec3> vertPosP;
+  VecView<double> z;
+  VecView<const vec3> vertPosP;
   VecView<const Halfedge> halfedgeQ;
-  VecView<const glm::vec3> vertPosQ;
-  const float expandP;
-  VecView<const glm::vec3> vertNormalP;
+  VecView<const vec3> vertPosQ;
+  const double expandP;
+  VecView<const vec3> vertNormalP;
   const SparseIndices &p0q2;
   const bool forward;
 
@@ -287,19 +286,19 @@ struct Kernel02 {
     const int p0 = p0q2.Get(idx, !forward);
     const int q2 = p0q2.Get(idx, forward);
     int &s02 = s[idx];
-    float &z02 = z[idx];
+    double &z02 = z[idx];
 
     // For yzzLR[k], k==0 is the left and k==1 is the right.
     int k = 0;
-    glm::vec3 yzzRL[2];
+    vec3 yzzRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows = false;
     int closestVert = -1;
-    float minMetric = std::numeric_limits<float>::infinity();
+    double minMetric = std::numeric_limits<double>::infinity();
     s02 = 0;
 
-    const glm::vec3 posP = vertPosP[p0];
+    const vec3 posP = vertPosP[p0];
     for (const int i : {0, 1, 2}) {
       const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgeQ[q1];
@@ -307,8 +306,8 @@ struct Kernel02 {
 
       if (!forward) {
         const int qVert = halfedgeQ[q1F].startVert;
-        const glm::vec3 diff = posP - vertPosQ[qVert];
-        const float metric = glm::dot(diff, diff);
+        const vec3 diff = posP - vertPosQ[qVert];
+        const double metric = glm::dot(diff, diff);
         if (metric < minMetric) {
           minMetric = metric;
           closestVert = qVert;
@@ -318,13 +317,13 @@ struct Kernel02 {
       const auto syz01 = Shadow01(p0, q1F, vertPosP, vertPosQ, halfedgeQ,
                                   expandP, vertNormalP, !forward);
       const int s01 = syz01.first;
-      const glm::vec2 yz01 = syz01.second;
+      const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
       if (isfinite(yz01[0])) {
         s02 += s01 * (forward == edge.IsForward() ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
-          yzzRL[k++] = glm::vec3(yz01[0], yz01[1], yz01[1]);
+          yzzRL[k++] = vec3(yz01[0], yz01[1], yz01[1]);
         }
       }
     }
@@ -333,7 +332,7 @@ struct Kernel02 {
       z02 = NAN;
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
-      glm::vec3 vertPos = vertPosP[p0];
+      vec3 vertPos = vertPosP[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
@@ -346,13 +345,13 @@ struct Kernel02 {
   }
 };
 
-std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
-                                          const Manifold::Impl &inQ,
-                                          SparseIndices &p0q2, bool forward,
-                                          float expandP) {
+std::tuple<Vec<int>, Vec<double>> Shadow02(const Manifold::Impl &inP,
+                                           const Manifold::Impl &inQ,
+                                           SparseIndices &p0q2, bool forward,
+                                           double expandP) {
   ZoneScoped;
   Vec<int> s02(p0q2.size());
-  Vec<float> z02(p0q2.size());
+  Vec<double> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
   for_each_n(autoPolicy(p0q2.size(), 1e4), countAt(0_uz), p0q2.size(),
@@ -366,16 +365,16 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
 
 struct Kernel12 {
   VecView<int> x;
-  VecView<glm::vec3> v;
+  VecView<vec3> v;
   VecView<const int64_t> p0q2;
   VecView<const int> s02;
-  VecView<const float> z02;
+  VecView<const double> z02;
   VecView<const int64_t> p1q1;
   VecView<const int> s11;
-  VecView<const glm::vec4> xyzz11;
+  VecView<const vec4> xyzz11;
   VecView<const Halfedge> halfedgesP;
   VecView<const Halfedge> halfedgesQ;
-  VecView<const glm::vec3> vertPosP;
+  VecView<const vec3> vertPosP;
   const bool forward;
   const SparseIndices &p1q2;
 
@@ -383,12 +382,12 @@ struct Kernel12 {
     int p1 = p1q2.Get(idx, !forward);
     int q2 = p1q2.Get(idx, forward);
     int &x12 = x[idx];
-    glm::vec3 &v12 = v[idx];
+    vec3 &v12 = v[idx];
 
     // For xzyLR-[k], k==0 is the left and k==1 is the right.
     int k = 0;
-    glm::vec3 xzyLR0[2];
-    glm::vec3 xzyLR1[2];
+    vec3 xzyLR0[2];
+    vec3 xzyLR1[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows = false;
@@ -428,7 +427,7 @@ struct Kernel12 {
         x12 -= s * (edge.IsForward() ? 1 : -1);
         if (k < 2 && (k == 0 || (s != 0) != shadows)) {
           shadows = s != 0;
-          const glm::vec4 xyzz = xyzz11[idx];
+          const vec4 xyzz = xyzz11[idx];
           xzyLR0[k][0] = xyzz.x;
           xzyLR0[k][1] = xyzz.z;
           xzyLR0[k][2] = xyzz.y;
@@ -441,11 +440,10 @@ struct Kernel12 {
     }
 
     if (x12 == 0) {  // No intersection
-      v12 = glm::vec3(NAN);
+      v12 = vec3(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
-      const glm::vec4 xzyy =
-          Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+      const vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];
       v12.y = xzyy[2];
       v12.z = xzyy[1];
@@ -453,14 +451,14 @@ struct Kernel12 {
   }
 };
 
-std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
+std::tuple<Vec<int>, Vec<vec3>> Intersect12(
     const Manifold::Impl &inP, const Manifold::Impl &inQ, const Vec<int> &s02,
     const SparseIndices &p0q2, const Vec<int> &s11, const SparseIndices &p1q1,
-    const Vec<float> &z02, const Vec<glm::vec4> &xyzz11, SparseIndices &p1q2,
+    const Vec<double> &z02, const Vec<vec4> &xyzz11, SparseIndices &p1q2,
     bool forward) {
   ZoneScoped;
   Vec<int> x12(p1q2.size());
-  Vec<glm::vec3> v12(p1q2.size());
+  Vec<vec3> v12(p1q2.size());
 
   for_each_n(
       autoPolicy(p1q2.size(), 1e4), countAt(0_uz), p1q2.size(),
@@ -547,19 +545,19 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Build up XY-projection intersection of two edges, including the z-value for
   // each edge, keeping only those whose intersection exists.
   Vec<int> s11;
-  Vec<glm::vec4> xyzz11;
+  Vec<vec4> xyzz11;
   std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_);
   PRINT("s11 size = " << s11.size());
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
   // fall inside the triangle.
   Vec<int> s02;
-  Vec<float> z02;
+  Vec<double> z02;
   std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_);
   PRINT("s02 size = " << s02.size());
 
   Vec<int> s20;
-  Vec<float> z20;
+  Vec<double> z20;
   std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_);
   PRINT("s20 size = " << s20.size());
 

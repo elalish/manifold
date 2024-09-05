@@ -99,7 +99,7 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
     .WithSeeds(SeedProvider);
 
 static std::vector<TestCase> TestCases;
-void TestPoly(Polygons polys, int _unused, float precision = -1.0f) {
+void TestPoly(Polygons polys, int _unused, float precision = -1.0) {
   TestCases.push_back({polys, precision});
 }
 
@@ -113,7 +113,7 @@ void TestPoly(Polygons polys, int _unused, float precision = -1.0f) {
 std::vector<TestCase> SeedProvider() {
   std::vector<TestCase> TestCases;
   auto TestPoly = [&TestCases](Polygons polys, int _unused,
-                               float precision = -1.0f) {
+                               float precision = -1.0) {
     TestCases.push_back({polys, precision});
   };
 

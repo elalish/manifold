@@ -13,7 +13,11 @@
       "args": [
         "--gtest_break_on_failure",
         "--gtest_catch_exceptions=0",
-        "--gtest_filter=SDF.Gyroid"
+<<<<<<< HEAD
+        "--gtest_filter=Polygon.MultiMerge"
+=======
+        "--gtest_filter=Samples.GyroidModule"
+>>>>>>> fbf07bf92a1d8cb380aec321f920d1db5d772f20
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

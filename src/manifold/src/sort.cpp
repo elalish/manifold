@@ -33,21 +33,21 @@ struct Extrema {
   }
 
   int MaxOrMinus(int a, int b) const {
-    return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
+    return std::min(a, b) < 0 ? -1 : std::max(a, b);
   }
 
   Halfedge operator()(Halfedge a, Halfedge b) const {
     MakeForward(a);
     MakeForward(b);
-    a.startVert = glm::min(a.startVert, b.startVert);
-    a.endVert = glm::max(a.endVert, b.endVert);
+    a.startVert = std::min(a.startVert, b.startVert);
+    a.endVert = std::max(a.endVert, b.endVert);
     a.face = MaxOrMinus(a.face, b.face);
     a.pairedHalfedge = MaxOrMinus(a.pairedHalfedge, b.pairedHalfedge);
     return a;
   }
 };
 
-uint32_t MortonCode(glm::vec3 position, Box bBox) {
+uint32_t MortonCode(vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
   if (isnan(position.x)) return kNoCode;
@@ -68,7 +68,7 @@ struct Reindex {
 struct MarkProp {
   VecView<int> keep;
 
-  void operator()(glm::ivec3 triProp) {
+  void operator()(ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
       reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
           ->store(1, std::memory_order_relaxed);
@@ -79,7 +79,7 @@ struct MarkProp {
 struct ReindexProps {
   VecView<const int> old2new;
 
-  void operator()(glm::ivec3& triProp) {
+  void operator()(ivec3& triProp) {
     for (const int i : {0, 1, 2}) {
       triProp[i] = old2new[triProp[i]];
     }
@@ -88,9 +88,9 @@ struct ReindexProps {
 
 struct ReindexFace {
   VecView<Halfedge> halfedge;
-  VecView<glm::vec4> halfedgeTangent;
+  VecView<vec4> halfedgeTangent;
   VecView<const Halfedge> oldHalfedge;
-  VecView<const glm::vec4> oldHalfedgeTangent;
+  VecView<const vec4> oldHalfedgeTangent;
   VecView<const int> faceNew2Old;
   VecView<const int> faceOld2New;
 
@@ -202,11 +202,11 @@ void Manifold::Impl::SortVerts() {
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const int newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
-                                      [&vertMorton](const int vert) {
-                                        return vertMorton[vert] == kNoCode;
-                                      }) -
-                         vertNew2Old.begin();
+  const auto newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
+                                       [&vertMorton](const int vert) {
+                                         return vertMorton[vert] == kNoCode;
+                                       }) -
+                          vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
   Permute(vertPos_, vertNew2Old);
@@ -221,7 +221,8 @@ void Manifold::Impl::SortVerts() {
  * vertNew2Old. This may be a subset, so the total number of original verts is
  * also given.
  */
-void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
+void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
+                                  size_t oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
@@ -237,7 +238,7 @@ void Manifold::Impl::CompactProps() {
   ZoneScoped;
   if (meshRelation_.numProp == 0) return;
 
-  const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  const auto numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
@@ -246,7 +247,7 @@ void Manifold::Impl::CompactProps() {
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  Vec<float> oldProp = meshRelation_.properties;
+  Vec<double> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
   const int numProp = meshRelation_.numProp;
   auto& properties = meshRelation_.properties;
@@ -284,11 +285,10 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                  return;
                }
 
-               glm::vec3 center(0.0f);
+               vec3 center(0.0);
 
                for (const int i : {0, 1, 2}) {
-                 const glm::vec3 pos =
-                     vertPos_[halfedge_[3 * face + i].startVert];
+                 const vec3 pos = vertPos_[halfedge_[3 * face + i].startVert];
                  center += pos;
                  faceBox[face].Union(pos);
                }
@@ -333,7 +333,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
  */
 void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   ZoneScoped;
-  const int numTri = faceNew2Old.size();
+  const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
   if (meshRelation_.triProperties.size() == NumTri())
@@ -341,10 +341,10 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
-  Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
+  Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
-  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -356,7 +356,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
 
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   ZoneScoped;
-  const int numTri = faceNew2Old.size();
+  const auto numTri = faceNew2Old.size();
 
   meshRelation_.triRef.resize(numTri);
   gather(faceNew2Old.begin(), faceNew2Old.end(),
@@ -382,7 +382,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   }
 
   Vec<int> faceOld2New(old.NumTri());
-  scatter(countAt(0), countAt(numTri), faceNew2Old.begin(),
+  scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
@@ -455,7 +455,7 @@ bool MeshGL::Merge() {
     return false;
   }
 
-  const int numOpenVert = openEdges.size();
+  const auto numOpenVert = openEdges.size();
   Vec<int> openVerts(numOpenVert);
   int i = 0;
   for (const auto& edge : openEdges) {
@@ -469,13 +469,13 @@ bool MeshGL::Merge() {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
     auto minMax = manifold::transform_reduce(
         iPos.begin(), iPos.end(),
-        std::make_pair(std::numeric_limits<float>::infinity(),
-                       -std::numeric_limits<float>::infinity()),
+        std::make_pair(std::numeric_limits<double>::infinity(),
+                       -std::numeric_limits<double>::infinity()),
         [](auto a, auto b) {
-          return std::make_pair(glm::min(a.first, b.first),
-                                glm::max(a.second, b.second));
+          return std::make_pair(std::min(a.first, b.first),
+                                std::max(a.second, b.second));
         },
-        [](float f) { return std::make_pair(f, f); });
+        [](double f) { return std::make_pair(f, f); });
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }
@@ -490,12 +490,12 @@ bool MeshGL::Merge() {
              [&vertMorton, &vertBox, &openVerts, &bBox, this](const int i) {
                int vert = openVerts[i];
 
-               const glm::vec3 center(vertProperties[numProp * vert],
-                                      vertProperties[numProp * vert + 1],
-                                      vertProperties[numProp * vert + 2]);
+               const vec3 center(vertProperties[numProp * vert],
+                                 vertProperties[numProp * vert + 1],
+                                 vertProperties[numProp * vert + 2]);
 
-               vertBox[i].min = center - precision / 2;
-               vertBox[i].max = center + precision / 2;
+               vertBox[i].min = center - (double)precision / 2;
+               vertBox[i].max = center + (double)precision / 2;
 
                vertMorton[i] = MortonCode(center, bBox);
              });

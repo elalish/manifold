@@ -27,11 +27,11 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = Manifold::Sphere(1.0f, 12);
+  Manifold sphere = Manifold::Sphere(1.0, 12);
   MeshGL sphereGL = WithPositionColors(sphere);
   sphere = Manifold(sphereGL);
 
-  Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
+  Manifold sphere2 = sphere.Translate(vec3(0.5));
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144, 3, 110}});
@@ -44,7 +44,7 @@ TEST(BooleanComplex, Sphere) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels)
     ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
 #endif
@@ -54,7 +54,7 @@ TEST(BooleanComplex, MeshRelation) {
   MeshGL gyroidMeshGL = WithPositionColors(Gyroid());
   Manifold gyroid(gyroidMeshGL);
 
-  Manifold gyroid2 = gyroid.Translate(glm::vec3(2.0f));
+  Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
@@ -65,7 +65,7 @@ TEST(BooleanComplex, MeshRelation) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels)
     ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
 #endif
@@ -82,7 +82,7 @@ TEST(BooleanComplex, MeshRelation) {
 
 TEST(BooleanComplex, Cylinders) {
   Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 12);
-  float arrays1[][12] = {
+  double arrays1[][12] = {
       {0, 0, 1, 3,    //
        -1, 0, 0, 3,   //
        0, -1, 0, 6},  //
@@ -109,7 +109,7 @@ TEST(BooleanComplex, Cylinders) {
        0, 0, 1, 4,    //
        0, -1, 0, 6},  //
   };
-  float arrays2[][12] = {
+  double arrays2[][12] = {
       {1, 0, 0, 3,    //
        0, 0, 1, 2,    //
        0, -1, 0, 6},  //
@@ -142,7 +142,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m1;
   for (auto& array : arrays1) {
-    glm::mat4x3 mat;
+    mat4x3 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -153,7 +153,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m2;
   for (auto& array : arrays2) {
-    glm::mat4x3 mat;
+    mat4x3 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -198,7 +198,7 @@ TEST(BooleanComplex, Subtract) {
 TEST(BooleanComplex, Close) {
   PolygonParams().processOverlaps = true;
 
-  const float r = 10;
+  const double r = 10;
   Manifold a = Manifold::Sphere(r, 256);
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
@@ -206,10 +206,10 @@ TEST(BooleanComplex, Close) {
     result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
   }
   auto prop = result.GetProperties();
-  const float tol = 0.004;
-  EXPECT_NEAR(prop.volume, (4.0f / 3.0f) * glm::pi<float>() * r * r * r,
+  const double tol = 0.004;
+  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * glm::pi<double>() * r * r * r,
               tol * r * r * r);
-  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>() * r * r, tol * r * r);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
@@ -219,7 +219,7 @@ TEST(BooleanComplex, Close) {
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
-  glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f));
+  mat4 m = glm::translate(mat4(1.0), vec3(1.0));
 
   // Define solids which volumes are easy to compute w/ bit arithmetics:
   // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
@@ -227,9 +227,9 @@ TEST(BooleanComplex, BooleanVolumes) {
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
   auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      glm::mat4x3(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0, 0))));
+      mat4x3(glm::translate(mat4(1.0), vec3(1.0, 0, 0))));
   auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      glm::mat4x3(glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0, 0))));
+      mat4x3(glm::translate(mat4(1.0), vec3(3.0, 0, 0))));
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 
@@ -247,14 +247,13 @@ TEST(BooleanComplex, BooleanVolumes) {
 }
 
 TEST(BooleanComplex, Spiral) {
-  ManifoldParams().deterministic = true;
   const int d = 2;
-  std::function<Manifold(const int, const float, const float)> spiral =
-      [&](const int rec, const float r, const float add) {
-        const float rot = 360.0f / (glm::pi<float>() * r * 2) * d;
-        const float rNext = r + add / 360 * rot;
+  std::function<Manifold(const int, const double, const double)> spiral =
+      [&](const int rec, const double r, const double add) {
+        const double rot = 360.0 / (glm::pi<double>() * r * 2) * d;
+        const double rNext = r + add / 360 * rot;
         const Manifold cube =
-            Manifold::Cube(glm::vec3(1), true).Translate({0, r, 0});
+            Manifold::Cube(vec3(1), true).Translate({0, r, 0});
         if (rec > 0)
           return spiral(rec - 1, rNext, add).Rotate(0, 0, rot) + cube;
         return cube;
@@ -268,40 +267,37 @@ TEST(BooleanComplex, Sweep) {
   PolygonParams().processOverlaps = true;
 
   // generate the minimum equivalent positive angle
-  auto minPosAngle = [](float angle) {
-    float div = angle / glm::two_pi<float>();
-    float wholeDiv = floor(div);
-    return angle - wholeDiv * glm::two_pi<float>();
+  auto minPosAngle = [](double angle) {
+    double div = angle / glm::two_pi<double>();
+    double wholeDiv = floor(div);
+    return angle - wholeDiv * glm::two_pi<double>();
   };
 
   // calculate determinant
-  auto det = [](glm::vec2 v1, glm::vec2 v2) {
-    return v1.x * v2.y - v1.y * v2.x;
-  };
+  auto det = [](vec2 v1, vec2 v2) { return v1.x * v2.y - v1.y * v2.x; };
 
   // generate sweep profile
   auto generateProfile = []() {
-    float filletRadius = 2.5;
-    float filletWidth = 5;
+    double filletRadius = 2.5;
+    double filletWidth = 5;
     int numberOfArcPoints = 10;
-    glm::vec2 arcCenterPoint =
-        glm::vec2(filletWidth - filletRadius, filletRadius);
-    std::vector<glm::vec2> arcPoints;
+    vec2 arcCenterPoint = vec2(filletWidth - filletRadius, filletRadius);
+    std::vector<vec2> arcPoints;
 
     for (int i = 0; i < numberOfArcPoints; i++) {
-      float angle = i * glm::pi<float>() / numberOfArcPoints;
-      float y = arcCenterPoint.y - cos(angle) * filletRadius;
-      float x = arcCenterPoint.x + sin(angle) * filletRadius;
-      arcPoints.push_back(glm::vec2(x, y));
+      double angle = i * glm::pi<double>() / numberOfArcPoints;
+      double y = arcCenterPoint.y - cos(angle) * filletRadius;
+      double x = arcCenterPoint.x + sin(angle) * filletRadius;
+      arcPoints.push_back(vec2(x, y));
     }
 
-    std::vector<glm::vec2> profile;
-    profile.push_back(glm::vec2(0, 0));
-    profile.push_back(glm::vec2(filletWidth - filletRadius, 0));
+    std::vector<vec2> profile;
+    profile.push_back(vec2(0, 0));
+    profile.push_back(vec2(filletWidth - filletRadius, 0));
     for (int i = 0; i < numberOfArcPoints; i++) {
       profile.push_back(arcPoints[i]);
     }
-    profile.push_back(glm::vec2(0, filletWidth));
+    profile.push_back(vec2(0, filletWidth));
 
     CrossSection profileCrossSection = CrossSection(profile);
     return profileCrossSection;
@@ -309,10 +305,11 @@ TEST(BooleanComplex, Sweep) {
 
   CrossSection profile = generateProfile();
 
-  auto partialRevolve = [minPosAngle, profile](float startAngle, float endAngle,
+  auto partialRevolve = [minPosAngle, profile](double startAngle,
+                                               double endAngle,
                                                int nSegmentsPerRotation) {
-    float posEndAngle = minPosAngle(endAngle);
-    float totalAngle = 0;
+    double posEndAngle = minPosAngle(endAngle);
+    double totalAngle = 0;
     if (startAngle < 0 && endAngle < 0 && startAngle < endAngle) {
       totalAngle = endAngle - startAngle;
     } else {
@@ -320,15 +317,15 @@ TEST(BooleanComplex, Sweep) {
     }
 
     int nSegments =
-        ceil(totalAngle / glm::two_pi<float>() * nSegmentsPerRotation + 1);
+        ceil(totalAngle / glm::two_pi<double>() * nSegmentsPerRotation + 1);
     if (nSegments < 2) {
       nSegments = 2;
     }
 
-    float angleStep = totalAngle / (nSegments - 1);
-    auto warpFunc = [nSegments, angleStep, startAngle](glm::vec3& vertex) {
-      float zIndex = nSegments - 1 - vertex.z;
-      float angle = zIndex * angleStep + startAngle;
+    double angleStep = totalAngle / (nSegments - 1);
+    auto warpFunc = [nSegments, angleStep, startAngle](vec3& vertex) {
+      double zIndex = nSegments - 1 - vertex.z;
+      double angle = zIndex * angleStep + startAngle;
 
       // transform
       vertex.z = vertex.y;
@@ -340,27 +337,27 @@ TEST(BooleanComplex, Sweep) {
         .Warp(warpFunc);
   };
 
-  auto cutterPrimitives = [det, partialRevolve, profile](
-                              glm::vec2 p1, glm::vec2 p2, glm::vec2 p3) {
-    glm::vec2 diff = p2 - p1;
-    glm::vec2 vec1 = p1 - p2;
-    glm::vec2 vec2 = p3 - p2;
-    float determinant = det(vec1, vec2);
+  auto cutterPrimitives = [det, partialRevolve, profile](vec2 p1, vec2 p2,
+                                                         vec2 p3) {
+    vec2 diff = p2 - p1;
+    vec2 vec1 = p1 - p2;
+    vec2 vec2 = p3 - p2;
+    double determinant = det(vec1, vec2);
 
-    float startAngle = atan2(vec1.x, -vec1.y);
-    float endAngle = atan2(-vec2.x, vec2.y);
+    double startAngle = atan2(vec1.x, -vec1.y);
+    double endAngle = atan2(-vec2.x, vec2.y);
 
-    Manifold round = partialRevolve(startAngle, endAngle, 20)
-                         .Translate(glm::vec3(p2.x, p2.y, 0));
+    Manifold round =
+        partialRevolve(startAngle, endAngle, 20).Translate(vec3(p2.x, p2.y, 0));
 
-    float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
-    float angle = atan2(diff.y, diff.x);
+    double distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+    double angle = atan2(diff.y, diff.x);
     Manifold extrusionPrimitive =
         Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
-            .Translate(glm::vec3(distance, 0, 0))
-            .Rotate(0, 0, angle * 180 / glm::pi<float>())
-            .Translate(glm::vec3(p1.x, p1.y, 0));
+            .Translate(vec3(distance, 0, 0))
+            .Rotate(0, 0, angle * 180 / glm::pi<double>())
+            .Translate(vec3(p1.x, p1.y, 0));
 
     std::vector<Manifold> result;
 
@@ -374,105 +371,105 @@ TEST(BooleanComplex, Sweep) {
     return result;
   };
 
-  auto scalePath = [](std::vector<glm::vec2> path, float scale) {
-    std::vector<glm::vec2> newPath;
-    for (glm::vec2 point : path) {
+  auto scalePath = [](std::vector<vec2> path, double scale) {
+    std::vector<vec2> newPath;
+    for (vec2 point : path) {
       newPath.push_back(scale * point);
     }
     return newPath;
   };
 
-  std::vector<glm::vec2> pathPoints = {
-      glm::vec2(-21.707751473606564, 10.04202769267855),
-      glm::vec2(-21.840846948218307, 9.535474475521578),
-      glm::vec2(-21.940954413815387, 9.048287386171369),
-      glm::vec2(-22.005569458385835, 8.587741145234093),
-      glm::vec2(-22.032187669917704, 8.16111047331591),
-      glm::vec2(-22.022356960178296, 7.755456475810721),
-      glm::vec2(-21.9823319178086, 7.356408291345673),
-      glm::vec2(-21.91208498286602, 6.964505631629036),
-      glm::vec2(-21.811437268778267, 6.579251589515578),
-      glm::vec2(-21.68020988897306, 6.200149257860059),
-      glm::vec2(-21.51822395687812, 5.82670172951726),
-      glm::vec2(-21.254086890521585, 5.336709200579579),
-      glm::vec2(-21.01963533308061, 4.974523796623895),
-      glm::vec2(-20.658228140926262, 4.497743844638198),
-      glm::vec2(-20.350337020134603, 4.144115181723373),
-      glm::vec2(-19.9542029967, 3.7276501717684054),
-      glm::vec2(-20.6969129296381, 3.110639833377638),
-      glm::vec2(-21.026318197401537, 2.793796378245609),
-      glm::vec2(-21.454710558515973, 2.3418076758544806),
-      glm::vec2(-21.735944543382722, 2.014266362004704),
-      glm::vec2(-21.958999535447845, 1.7205197644485681),
-      glm::vec2(-22.170169612837164, 1.3912359628761894),
-      glm::vec2(-22.376940405634056, 1.0213515348242117),
-      glm::vec2(-22.62545385249271, 0.507889651991388),
-      glm::vec2(-22.77620002102207, 0.13973666928102288),
-      glm::vec2(-22.8689989640578, -0.135962138067232),
-      glm::vec2(-22.974385239894364, -0.5322784681448909),
-      glm::vec2(-23.05966775687304, -0.9551466941218276),
-      glm::vec2(-23.102914137841445, -1.2774406685179822),
-      glm::vec2(-23.14134824916783, -1.8152432718003662),
-      glm::vec2(-23.152085124298473, -2.241104719188421),
-      glm::vec2(-23.121576743285054, -2.976332948223073),
-      glm::vec2(-23.020491352156856, -3.6736813934577914),
-      glm::vec2(-22.843552165110886, -4.364810769710428),
-      glm::vec2(-22.60334013490563, -5.033012850282157),
-      glm::vec2(-22.305015243491663, -5.67461444847819),
-      glm::vec2(-21.942709324216615, -6.330962778427178),
-      glm::vec2(-21.648491707764062, -6.799117771996025),
-      glm::vec2(-21.15330508818782, -7.496539096945377),
-      glm::vec2(-21.10687739725184, -7.656798276710632),
-      glm::vec2(-21.01253055778545, -8.364144493707382),
-      glm::vec2(-20.923211927856293, -8.782280691344269),
-      glm::vec2(-20.771325204062215, -9.258087073404687),
-      glm::vec2(-20.554404009259198, -9.72613360625344),
-      glm::vec2(-20.384050989017144, -9.985885743112847),
-      glm::vec2(-20.134404839253612, -10.263023004626703),
-      glm::vec2(-19.756998832033442, -10.613109670467736),
-      glm::vec2(-18.83161393127597, -15.68768837402245),
-      glm::vec2(-19.155593463785983, -17.65410871259763),
-      glm::vec2(-17.930304365744544, -19.005810988385562),
-      glm::vec2(-16.893408103100064, -19.50558228186199),
-      glm::vec2(-16.27514960757635, -19.8288501942628),
-      glm::vec2(-15.183033464853374, -20.47781203017123),
-      glm::vec2(-14.906850387751492, -20.693472553142833),
-      glm::vec2(-14.585198957236713, -21.015257964547136),
-      glm::vec2(-11.013839210807205, -34.70394287828328),
-      glm::vec2(-8.79778020674896, -36.17434400175442),
-      glm::vec2(-7.850491148257242, -36.48835987119041),
-      glm::vec2(-6.982497182376991, -36.74546968896842),
-      glm::vec2(-6.6361688522576, -36.81653354539242),
-      glm::vec2(-6.0701080598244035, -36.964332993204),
-      glm::vec2(-5.472439187922815, -37.08824838436714),
-      glm::vec2(-4.802871164820756, -37.20127157090685),
-      glm::vec2(-3.6605994233344745, -37.34427653957914),
-      glm::vec2(-1.7314396363710867, -37.46415201430501),
-      glm::vec2(-0.7021130485987349, -37.5),
-      glm::vec2(0.01918509410483974, -37.49359541901704),
-      glm::vec2(1.2107837650065625, -37.45093992812552),
-      glm::vec2(3.375529069920302, 32.21823383780513),
-      glm::vec2(1.9041980552754056, 32.89839543047101),
-      glm::vec2(1.4107184651094313, 33.16556804736585),
-      glm::vec2(1.1315552947605065, 33.34344755450097),
-      glm::vec2(0.8882931135353977, 33.52377699790175),
-      glm::vec2(0.6775397019893341, 33.708817857198056),
-      glm::vec2(0.49590284067753837, 33.900831612019715),
-      glm::vec2(0.2291596803839543, 34.27380625039597),
-      glm::vec2(0.03901816126171688, 34.66402375075138),
-      glm::vec2(-0.02952797094655369, 34.8933309389416),
-      glm::vec2(-0.0561772851849209, 35.044928843125824),
-      glm::vec2(-0.067490756643705, 35.27129875796868),
-      glm::vec2(-0.05587453990569748, 35.42204271802184),
-      glm::vec2(0.013497378362074697, 35.72471438137191),
-      glm::vec2(0.07132375113026912, 35.877348797053145),
-      glm::vec2(0.18708820875448923, 36.108917464873215),
-      glm::vec2(0.39580614140195136, 36.424415957998825),
-      glm::vec2(0.8433687814267005, 36.964365016108914),
-      glm::vec2(0.7078417131710703, 37.172455373435916),
-      glm::vec2(0.5992848016685662, 37.27482757003058),
-      glm::vec2(0.40594743344375905, 37.36664006036318),
-      glm::vec2(0.1397973410299913, 37.434752779117005)};
+  std::vector<vec2> pathPoints = {
+      vec2(-21.707751473606564, 10.04202769267855),
+      vec2(-21.840846948218307, 9.535474475521578),
+      vec2(-21.940954413815387, 9.048287386171369),
+      vec2(-22.005569458385835, 8.587741145234093),
+      vec2(-22.032187669917704, 8.16111047331591),
+      vec2(-22.022356960178296, 7.755456475810721),
+      vec2(-21.9823319178086, 7.356408291345673),
+      vec2(-21.91208498286602, 6.964505631629036),
+      vec2(-21.811437268778267, 6.579251589515578),
+      vec2(-21.68020988897306, 6.200149257860059),
+      vec2(-21.51822395687812, 5.82670172951726),
+      vec2(-21.254086890521585, 5.336709200579579),
+      vec2(-21.01963533308061, 4.974523796623895),
+      vec2(-20.658228140926262, 4.497743844638198),
+      vec2(-20.350337020134603, 4.144115181723373),
+      vec2(-19.9542029967, 3.7276501717684054),
+      vec2(-20.6969129296381, 3.110639833377638),
+      vec2(-21.026318197401537, 2.793796378245609),
+      vec2(-21.454710558515973, 2.3418076758544806),
+      vec2(-21.735944543382722, 2.014266362004704),
+      vec2(-21.958999535447845, 1.7205197644485681),
+      vec2(-22.170169612837164, 1.3912359628761894),
+      vec2(-22.376940405634056, 1.0213515348242117),
+      vec2(-22.62545385249271, 0.507889651991388),
+      vec2(-22.77620002102207, 0.13973666928102288),
+      vec2(-22.8689989640578, -0.135962138067232),
+      vec2(-22.974385239894364, -0.5322784681448909),
+      vec2(-23.05966775687304, -0.9551466941218276),
+      vec2(-23.102914137841445, -1.2774406685179822),
+      vec2(-23.14134824916783, -1.8152432718003662),
+      vec2(-23.152085124298473, -2.241104719188421),
+      vec2(-23.121576743285054, -2.976332948223073),
+      vec2(-23.020491352156856, -3.6736813934577914),
+      vec2(-22.843552165110886, -4.364810769710428),
+      vec2(-22.60334013490563, -5.033012850282157),
+      vec2(-22.305015243491663, -5.67461444847819),
+      vec2(-21.942709324216615, -6.330962778427178),
+      vec2(-21.648491707764062, -6.799117771996025),
+      vec2(-21.15330508818782, -7.496539096945377),
+      vec2(-21.10687739725184, -7.656798276710632),
+      vec2(-21.01253055778545, -8.364144493707382),
+      vec2(-20.923211927856293, -8.782280691344269),
+      vec2(-20.771325204062215, -9.258087073404687),
+      vec2(-20.554404009259198, -9.72613360625344),
+      vec2(-20.384050989017144, -9.985885743112847),
+      vec2(-20.134404839253612, -10.263023004626703),
+      vec2(-19.756998832033442, -10.613109670467736),
+      vec2(-18.83161393127597, -15.68768837402245),
+      vec2(-19.155593463785983, -17.65410871259763),
+      vec2(-17.930304365744544, -19.005810988385562),
+      vec2(-16.893408103100064, -19.50558228186199),
+      vec2(-16.27514960757635, -19.8288501942628),
+      vec2(-15.183033464853374, -20.47781203017123),
+      vec2(-14.906850387751492, -20.693472553142833),
+      vec2(-14.585198957236713, -21.015257964547136),
+      vec2(-11.013839210807205, -34.70394287828328),
+      vec2(-8.79778020674896, -36.17434400175442),
+      vec2(-7.850491148257242, -36.48835987119041),
+      vec2(-6.982497182376991, -36.74546968896842),
+      vec2(-6.6361688522576, -36.81653354539242),
+      vec2(-6.0701080598244035, -36.964332993204),
+      vec2(-5.472439187922815, -37.08824838436714),
+      vec2(-4.802871164820756, -37.20127157090685),
+      vec2(-3.6605994233344745, -37.34427653957914),
+      vec2(-1.7314396363710867, -37.46415201430501),
+      vec2(-0.7021130485987349, -37.5),
+      vec2(0.01918509410483974, -37.49359541901704),
+      vec2(1.2107837650065625, -37.45093992812552),
+      vec2(3.375529069920302, 32.21823383780513),
+      vec2(1.9041980552754056, 32.89839543047101),
+      vec2(1.4107184651094313, 33.16556804736585),
+      vec2(1.1315552947605065, 33.34344755450097),
+      vec2(0.8882931135353977, 33.52377699790175),
+      vec2(0.6775397019893341, 33.708817857198056),
+      vec2(0.49590284067753837, 33.900831612019715),
+      vec2(0.2291596803839543, 34.27380625039597),
+      vec2(0.03901816126171688, 34.66402375075138),
+      vec2(-0.02952797094655369, 34.8933309389416),
+      vec2(-0.0561772851849209, 35.044928843125824),
+      vec2(-0.067490756643705, 35.27129875796868),
+      vec2(-0.05587453990569748, 35.42204271802184),
+      vec2(0.013497378362074697, 35.72471438137191),
+      vec2(0.07132375113026912, 35.877348797053145),
+      vec2(0.18708820875448923, 36.108917464873215),
+      vec2(0.39580614140195136, 36.424415957998825),
+      vec2(0.8433687814267005, 36.964365016108914),
+      vec2(0.7078417131710703, 37.172455373435916),
+      vec2(0.5992848016685662, 37.27482757003058),
+      vec2(0.40594743344375905, 37.36664006036318),
+      vec2(0.1397973410299913, 37.434752779117005)};
 
   int numPoints = pathPoints.size();
   pathPoints = scalePath(pathPoints, 0.9);

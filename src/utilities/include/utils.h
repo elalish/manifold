@@ -64,12 +64,12 @@ struct Timer {
 #endif
 
 inline int Next3(int i) {
-  constexpr glm::ivec3 next3(1, 2, 0);
+  constexpr ivec3 next3(1, 2, 0);
   return next3[i];
 }
 
 inline int Prev3(int i) {
-  constexpr glm::ivec3 prev3(2, 0, 1);
+  constexpr ivec3 prev3(2, 0, 1);
   return prev3[i];
 }
 

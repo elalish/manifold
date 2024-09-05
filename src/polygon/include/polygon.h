@@ -28,7 +28,7 @@ namespace manifold {
  */
 struct PolyVert {
   /// X-Y position
-  glm::vec2 pos;
+  vec2 pos;
   /// ID or index into another vertex vector
   int idx;
 };
@@ -36,15 +36,14 @@ struct PolyVert {
 using SimplePolygonIdx = std::vector<PolyVert>;
 using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
-std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
-                                       float precision = -1);
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
+                                  double precision = -1);
 /** @} */
 
 /** @ingroup Connections
  *  @{
  */
-std::vector<glm::ivec3> Triangulate(const Polygons &polygons,
-                                    float precision = -1);
+std::vector<ivec3> Triangulate(const Polygons &polygons, double precision = -1);
 
 ExecutionParams &PolygonParams();
 /** @} */

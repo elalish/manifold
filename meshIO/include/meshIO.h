@@ -29,22 +29,22 @@ namespace manifold {
  */
 struct Material {
   /// Roughness value between 0 (shiny) and 1 (matte).
-  float roughness = 0.2;
+  double roughness = 0.2;
   /// Metalness value, generally either 0 (dielectric) or 1 (metal).
-  float metalness = 1;
+  double metalness = 1;
   /// Color (RGBA) multiplier to apply to the whole mesh (each value between 0
   /// and 1).
-  glm::vec4 color = glm::vec4(1.0f);
+  vec4 color = vec4(1.0);
   /// Optional: If non-empty, must match Mesh.vertPos. Provides an RGBA color
   /// for each vertex, linearly interpolated across triangles. Colors are
   /// linear, not sRGB. Only used with Mesh export, not MeshGL.
-  std::vector<glm::vec4> vertColor;
+  std::vector<vec4> vertColor;
   /// For MeshGL export, gives the property indicies where the normal channels
   /// can be found. Must be >= 3, since the first three are position.
-  glm::ivec3 normalChannels = glm::ivec3(-1);
+  ivec3 normalChannels = ivec3(-1);
   /// For MeshGL export, gives the property indicies where the color channels
   /// can be found. Any index < 0 will output all 1.0 for that channel.
-  glm::ivec4 colorChannels = glm::ivec4(-1);
+  ivec4 colorChannels = ivec4(-1);
 };
 
 /**
