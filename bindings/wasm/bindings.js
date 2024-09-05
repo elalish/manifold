@@ -368,7 +368,8 @@ Module.setup = function() {
     }
 
     position(vert) {
-      return this.vertProperties.subarray(this.numProp * vert, this.numProp * vert + 3);
+      return this.vertProperties.subarray(
+          this.numProp * vert, this.numProp * vert + 3);
     }
 
     extras(vert) {
