@@ -79,6 +79,8 @@ int main(int argc, char** argv) {
   manifold::PolygonParams().processOverlaps = false;
 
   FrameMarkEnd(name);
+
+  RegisterPolygonTests();
   return RUN_ALL_TESTS();
 }
 
