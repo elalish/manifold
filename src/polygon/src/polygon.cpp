@@ -14,6 +14,7 @@
 
 #include "manifold/polygon.h"
 
+#include <functional>
 #include <map>
 #include <set>
 
