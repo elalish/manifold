@@ -31,7 +31,6 @@
 #include "meshIO.h"
 #include "samples.h"
 using namespace std;
-using namespace glm;
 using namespace manifold;
 
 // Epick = Exact predicates Inexact constructions. Seems fair to use to compare

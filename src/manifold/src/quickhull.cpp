@@ -520,16 +520,21 @@ void QuickHull::createConvexHalfedgeMesh() {
     // new faces.
     for (auto& disabledPoints : disabledFacePointVectors) {
       ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
-      for (const auto& point : *(disabledPoints)) {
-        if (point == activePointIndex) {
-          continue;
-        }
-        for (size_t j = 0; j < horizonEdgeCount; j++) {
-          if (addPointToFace(mesh.faces[newFaceIndices[j]], point)) {
-            break;
-          }
-        }
-      }
+      Vec<int> pointCheck(disabledPoints->size(), 0);
+      for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(horizonEdgeCount),
+               [&](size_t j) {
+                 for_each(autoPolicy(disabledPoints->size()), countAt(0_uz),
+                          countAt(disabledPoints->size()),
+                          [&](size_t pointIndex) {
+                            const auto& point = (*disabledPoints)[pointIndex];
+                            if (point == activePointIndex ||
+                                pointCheck[pointIndex] != 0) {
+                              return;
+                            }
+                            addPointToFace(mesh.faces[newFaceIndices[j]], point,
+                                           pointCheck[pointIndex]);
+                          });
+               });
       // The points are no longer needed: we can move them to the vector pool
       // for reuse.
       reclaimToIndexVectorPool(disabledPoints);
@@ -782,13 +787,15 @@ void QuickHull::setupInitialTetrahedron() {
 
   // Finally we assign a face for each vertex outside the tetrahedron (vertices
   // inside the tetrahedron have no role anymore)
-  for (size_t i = 0; i < vCount; i++) {
-    for (auto& face : mesh.faces) {
-      if (addPointToFace(face, i)) {
-        break;
-      }
-    }
-  }
+  Vec<int> pointMutex(vCount, 0);
+  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(mesh.faces.size()),
+           [&](size_t j) {
+             for_each(autoPolicy(vCount), countAt(0_uz), countAt(vCount),
+                      [&](size_t i) {
+                        if (pointMutex[i] != 0) return;
+                        addPointToFace(mesh.faces[j], i, pointMutex[i]);
+                      });
+           });
 }
 
 std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
@@ -809,11 +816,22 @@ void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
   indexVectorPool.reclaim(ptr);
 }
 
-bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
-                               size_t pointIndex) {
+void QuickHull::addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex,
+                               int& pointMutex) {
   const double D =
       getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
   if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
+    // Only adds point to 1 face
+
+    // Use when ExecutionPolicy::Par
+    // if (AtomicAdd(pointMutex,1)!=0)
+    // return true;
+
+    // For ExecutionPolicy::Seq
+    pointMutex = 1;
+
+    // Ensures atomic addition of point to face
+    f.faceMutex->lock();
     if (!f.pointsOnPositiveSide) {
       f.pointsOnPositiveSide = getIndexVectorFromPool();
     }
@@ -822,9 +840,10 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
       f.mostDistantPointDist = D;
       f.mostDistantPoint = pointIndex;
     }
-    return true;
+    f.faceMutex->unlock();
+    return;
   }
-  return false;
+  return;
 }
 
 // Wrapper to call the QuickHull algorithm with the given vertex data to build

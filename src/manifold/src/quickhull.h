@@ -126,6 +126,7 @@ class MeshBuilder {
     size_t visibilityCheckedOnIteration = 0;
     std::uint8_t isVisibleFaceOnCurrentIteration : 1;
     std::uint8_t inFaceStack : 1;
+    std::recursive_mutex* faceMutex = new std::recursive_mutex();
     // Bit for each half edge assigned to this face, each being 0 or 1 depending
     // on whether the edge belongs to horizon edge
     std::uint8_t horizonEdgesOnCurrentIteration : 3;
@@ -264,7 +265,8 @@ class QuickHull {
 
   // Associates a point with a face if the point resides on the positive side of
   // the plane. Returns true if the points was on the positive side.
-  inline bool addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex);
+  inline void addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex,
+                             int& pointMutex);
 
   // This will create HalfedgeMesh from which we create the ConvexHull object
   // that buildMesh function returns
