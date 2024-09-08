@@ -16,9 +16,9 @@
 
 #include <vector>
 
+#include "manifold/common.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
-#include "manifold/common.h"
 #include "manifold/types.h"
 
 ManifoldManifold *to_c(manifold::Manifold *m) {

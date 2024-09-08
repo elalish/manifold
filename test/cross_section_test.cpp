@@ -18,9 +18,9 @@
 
 #include <vector>
 
+#include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
-#include "manifold/common.h"
 #include "test.h"
 
 using namespace manifold;

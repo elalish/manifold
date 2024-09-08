@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #pragma once
-#include "manifold/parallel.h"
 #include "manifold/common.h"
+#include "manifold/parallel.h"
 #include "manifold/sparse.h"
 #include "manifold/utils.h"
 #include "manifold/vec.h"
@@ -277,7 +277,7 @@ constexpr inline uint32_t SpreadBits3(uint32_t v) {
 /** @ingroup Private */
 class Collider {
  public:
-  Collider() {};
+  Collider(){};
 
   Collider(const VecView<const Box>& leafBB,
            const VecView<const uint32_t>& leafMorton) {

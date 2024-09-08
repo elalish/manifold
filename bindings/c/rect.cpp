@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold/common.h"
 #include "manifold/conv.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
-#include "manifold/common.h"
 #include "manifold/types.h"
 
 #ifdef __cplusplus

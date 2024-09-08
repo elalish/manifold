@@ -15,9 +15,9 @@
 #pragma once
 #include <math.h>
 
+#include "manifold/common.h"
 #include "manifold/optional_assert.h"
 #include "manifold/parallel.h"
-#include "manifold/common.h"
 #include "manifold/utils.h"
 #include "manifold/vec.h"
 

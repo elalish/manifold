@@ -17,8 +17,8 @@
 
 #include <vector>
 
-#include "manifold/cross_section.h"
 #include "helpers.cpp"
+#include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 

@@ -26,8 +26,8 @@
 #include <algorithm>
 #include <numeric>
 
-#include "manifold/iters.h"
 #include "manifold/common.h"
+#include "manifold/iters.h"
 namespace manifold {
 
 enum class ExecutionPolicy {

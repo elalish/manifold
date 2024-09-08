@@ -16,8 +16,8 @@
 #include <ostream>
 
 #include "gtest/gtest.h"
-#include "manifold/manifold.h"
 #include "manifold/common.h"
+#include "manifold/manifold.h"
 
 #ifdef MANIFOLD_EXPORT
 #include "manifold/meshIO.h"

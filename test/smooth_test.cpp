@@ -18,9 +18,9 @@
 #include "manifold/cross_section.h"
 #endif
 #include "manifold/manifold.h"
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "manifold/tri_dist.h"
 
 using namespace manifold;
 

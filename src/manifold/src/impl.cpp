@@ -20,10 +20,10 @@
 #include <numeric>
 
 #include "manifold/hashtable.h"
-#include "mesh_fixes.h"
 #include "manifold/parallel.h"
 #include "manifold/svd.h"
 #include "manifold/tri_dist.h"
+#include "mesh_fixes.h"
 
 namespace {
 using namespace manifold;
