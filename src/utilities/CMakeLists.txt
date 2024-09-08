@@ -76,4 +76,6 @@ install(FILES
     include/manifold/vec_view.h
     include/manifold/tri_dist.h
     include/manifold/optional_assert.h
+    include/manifold/iters.h
+    include/manifold/parallel.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
