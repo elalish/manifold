@@ -126,7 +126,7 @@ class MeshBuilder {
     size_t visibilityCheckedOnIteration = 0;
     std::uint8_t isVisibleFaceOnCurrentIteration : 1;
     std::uint8_t inFaceStack : 1;
-    std::recursive_mutex* faceMutex = new std::recursive_mutex();
+    std::mutex* faceMutex = new std::mutex();
     // Bit for each half edge assigned to this face, each being 0 or 1 depending
     // on whether the edge belongs to horizon edge
     std::uint8_t horizonEdgesOnCurrentIteration : 3;
@@ -226,6 +226,7 @@ class QuickHull {
   MeshBuilder mesh;
   std::array<size_t, 6> extremeValues;
   size_t failedHorizonEdges = 0;
+  std::mutex PoolMutex;
 
   // Temporary variables used during iteration process
   Vec<size_t> newFaceIndices;
