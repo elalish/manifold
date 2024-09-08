@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #pragma once
-#include "par.h"
-#include "public.h"
-#include "sparse.h"
-#include "utils.h"
-#include "vec.h"
+#include "manifold/parallel.h"
+#include "manifold/common.h"
+#include "manifold/sparse.h"
+#include "manifold/utils.h"
+#include "manifold/vec.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>

@@ -18,7 +18,7 @@
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 using namespace fuzztest;
 

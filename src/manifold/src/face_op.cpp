@@ -20,7 +20,7 @@
 #include <unordered_set>
 
 #include "impl.h"
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 namespace manifold {
 

@@ -19,7 +19,7 @@
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
-#include "par.h"
+#include "manifold/parallel.h"
 #include "quickhull.h"
 
 namespace {

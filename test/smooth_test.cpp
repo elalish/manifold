@@ -15,12 +15,12 @@
 #include <algorithm>
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
-#include "manifold.h"
+#include "manifold/manifold.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
+#include "manifold/tri_dist.h"
 
 using namespace manifold;
 

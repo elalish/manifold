@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 #include <map>
 #include <set>
 
-#include "collider.h"
-#include "optional_assert.h"
-#include "utils.h"
+#include "manifold/collider.h"
+#include "manifold/optional_assert.h"
+#include "manifold/utils.h"
 
 namespace {
 using namespace manifold;

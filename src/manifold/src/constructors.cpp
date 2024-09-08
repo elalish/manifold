@@ -14,8 +14,8 @@
 
 #include "csg_tree.h"
 #include "impl.h"
-#include "par.h"
-#include "polygon.h"
+#include "manifold/parallel.h"
+#include "manifold/polygon.h"
 
 namespace manifold {
 /**

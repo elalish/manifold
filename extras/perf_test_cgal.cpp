@@ -21,7 +21,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 using namespace manifold;
 

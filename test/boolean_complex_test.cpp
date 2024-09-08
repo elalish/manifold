@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
-#include "manifold.h"
-#include "polygon.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "meshIO.h"
+#include "manifold/meshIO.h"
 
 #include <algorithm>
 #include <iostream>
@@ -22,7 +22,7 @@
 #include "assimp/material.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
-#include "optional_assert.h"
+#include "manifold/optional_assert.h"
 
 #ifndef AI_MATKEY_ROUGHNESS_FACTOR
 #include "assimp/pbrmaterial.h"

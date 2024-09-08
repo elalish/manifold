@@ -13,8 +13,8 @@
 // limitations under the License.
 #include <algorithm>
 
-#include "manifold.h"
-#include "polygon.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "test.h"
 
 // we need to call some tracy API to establish the connection

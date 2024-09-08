@@ -16,8 +16,8 @@
 #include <functional>
 #include <memory>
 
-#include "public.h"
-#include "vec_view.h"
+#include "manifold/common.h"
+#include "manifold/vec_view.h"
 
 namespace manifold {
 

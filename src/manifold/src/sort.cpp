@@ -16,7 +16,7 @@
 #include <set>
 
 #include "impl.h"
-#include "par.h"
+#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;

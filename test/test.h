@@ -16,11 +16,11 @@
 #include <ostream>
 
 #include "gtest/gtest.h"
-#include "manifold.h"
-#include "public.h"
+#include "manifold/manifold.h"
+#include "manifold/common.h"
 
 #ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
+#include "manifold/meshIO.h"
 #endif
 
 // somehow gcc11 + gtest 1.11.0 is unable to print ivec3

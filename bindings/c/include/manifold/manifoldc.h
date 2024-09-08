@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "types.h"
+#include "manifold/types.h"
 
 #ifdef __cplusplus
 #include <cstdint>

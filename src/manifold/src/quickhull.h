@@ -59,7 +59,7 @@
 #include <vector>
 
 #include "shared.h"
-#include "vec.h"
+#include "manifold/vec.h"
 
 namespace manifold {
 

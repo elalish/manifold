@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold.h"
-#include "polygon.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;

@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "conv.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/conv.h"
+#include "manifold/manifold.h"
+#include "manifold/common.h"
+#include "manifold/types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 ManifoldBox *manifold_box(void *mem, double x1, double y1, double z1, double x2,
                           double y2, double z2) {
   auto p1 = vec3(x1, y1, z1);
@@ -96,3 +99,6 @@ int manifold_box_does_overlap_box(ManifoldBox *a, ManifoldBox *b) {
 }
 
 int manifold_box_is_finite(ManifoldBox *b) { return from_c(b)->IsFinite(); }
+#ifdef __cplusplus
+}
+#endif

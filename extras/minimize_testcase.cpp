@@ -6,8 +6,8 @@
 #include <execution>
 #endif
 
-#include "polygon.h"
-#include "utils.h"
+#include "manifold/polygon.h"
+#include "manifold/utils.h"
 
 using namespace manifold;
 
