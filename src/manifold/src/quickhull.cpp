@@ -521,7 +521,7 @@ void QuickHull::createConvexHalfedgeMesh() {
     for (auto& disabledPoints : disabledFacePointVectors) {
       ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
       Vec<int> pointCheck(disabledPoints->size(), 0);
-      for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(horizonEdgeCount),
+      for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(horizonEdgeCount),
                [&](size_t j) {
                  for_each(ExecutionPolicy::Par, countAt(0_uz),
                           countAt(disabledPoints->size()),
@@ -776,19 +776,22 @@ void QuickHull::setupInitialTetrahedron() {
   // Create a tetrahedron half edge mesh and compute planes defined by each
   // triangle
   mesh.setup(baseTriangle[0], baseTriangle[1], baseTriangle[2], maxI);
-  for (auto& f : mesh.faces) {
-    auto v = mesh.getVertexIndicesOfFace(f);
-    const vec3 N1 =
-        getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
-                          originalVertexData[v[2]]);
-    const Plane plane(N1, originalVertexData[v[0]]);
-    f.P = plane;
-  }
+  // Here too?
+  for_each(autoPolicy(mesh.faces.size()), countAt(0_uz),
+           countAt(mesh.faces.size()), [&](size_t faceIndex) {
+             auto& f = mesh.faces[faceIndex];
+             auto v = mesh.getVertexIndicesOfFace(f);
+             const vec3 N1 = getTriangleNormal(originalVertexData[v[0]],
+                                               originalVertexData[v[1]],
+                                               originalVertexData[v[2]]);
+             const Plane plane(N1, originalVertexData[v[0]]);
+             f.P = plane;
+           });
 
   // Finally we assign a face for each vertex outside the tetrahedron (vertices
   // inside the tetrahedron have no role anymore)
   Vec<int> pointMutex(vCount, 0);
-  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(mesh.faces.size()),
+  for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(mesh.faces.size()),
            [&](size_t j) {
              for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(vCount),
                       [&](size_t i) {
@@ -824,10 +827,10 @@ void QuickHull::addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex,
     // Only adds point to 1 face
 
     // Use when ExecutionPolicy::Par
-    // if (AtomicAdd(pointMutex, 1) != 0) return;
+    if (AtomicAdd(pointMutex, 1) != 0) return;
 
     // For ExecutionPolicy::Seq
-    pointMutex = 1;
+    // pointMutex = 1;
 
     // Ensures atomic addition of point to face
     f.faceMutex->lock();
