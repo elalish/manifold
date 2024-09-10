@@ -267,7 +267,7 @@ class QuickHull {
   // Associates a point with a face if the point resides on the positive side of
   // the plane. Returns true if the points was on the positive side.
   inline void addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex,
-                             std::unique_ptr<std::atomic<bool>>& pointMutex);
+                             std::atomic<bool>& pointMutex);
 
   // This will create HalfedgeMesh from which we create the ConvexHull object
   // that buildMesh function returns
