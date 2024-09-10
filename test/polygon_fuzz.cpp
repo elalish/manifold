@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #include <atomic>
+#include <fstream>
 #include <future>
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 using namespace fuzztest;
 
@@ -99,25 +100,43 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
     .WithSeeds(SeedProvider);
 
 static std::vector<TestCase> TestCases;
-void TestPoly(Polygons polys, int _unused, float precision = -1.0f) {
+void TestPoly(Polygons polys, int _unused, float precision = -1.0) {
   TestCases.push_back({polys, precision});
 }
 
-// ----------------------------------------------------------------------------
-//                        UGLY HACK FOR SEED REUSE
-// ----------------------------------------------------------------------------
-
-#undef TEST
-#define TEST(_unused1, _unused2)
-
 std::vector<TestCase> SeedProvider() {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  auto f = std::ifstream(dir + "/polygons/" + "polygon_corpus.txt");
+  // for each test:
+  //   test name, expectedNumTri, precision, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double precision, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
   std::vector<TestCase> TestCases;
-  auto TestPoly = [&TestCases](Polygons polys, int _unused,
-                               float precision = -1.0f) {
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> precision >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
     TestCases.push_back({polys, precision});
-  };
-
-#include "polygon_corpus.cpp"
-
+  }
+  f.close();
   return TestCases;
 }

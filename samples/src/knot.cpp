@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #include "samples.h"
 
 namespace {
@@ -38,8 +38,8 @@ namespace manifold {
  * @param linearSegments Number of segments along the length of the knot.
  * Default makes roughly square facets.
  */
-Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
-                   float threadRadius, int circularSegments,
+Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
+                   double threadRadius, int circularSegments,
                    int linearSegments) {
   int kLoops = gcd(p, q);
   p /= kLoops;
@@ -52,28 +52,27 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   CrossSection circle = CrossSection::Circle(1., n).Translate({2, 0});
   Manifold knot = Manifold::Revolve(circle.ToPolygons(), m);
 
-  knot =
-      knot.Warp([p, q, majorRadius, minorRadius, threadRadius](glm::vec3& v) {
-        float psi = q * atan2(v.x, v.y);
-        float theta = psi * p / q;
-        glm::vec2 xy = glm::vec2(v);
-        float x1 = sqrt(glm::dot(xy, xy));
-        float phi = atan2(x1 - 2, v.z);
-        v = glm::vec3(cos(phi), 0.0f, sin(phi));
-        v *= threadRadius;
-        float r = majorRadius + minorRadius * cos(theta);
-        v = glm::rotateX(v, -float(atan2(p * minorRadius, q * r)));
-        v.x += minorRadius;
-        v = glm::rotateY(v, theta);
-        v.x += majorRadius;
-        v = glm::rotateZ(v, psi);
-      });
+  knot = knot.Warp([p, q, majorRadius, minorRadius, threadRadius](vec3& v) {
+    double psi = q * atan2(v.x, v.y);
+    double theta = psi * p / q;
+    vec2 xy = vec2(v);
+    double x1 = sqrt(glm::dot(xy, xy));
+    double phi = atan2(x1 - 2, v.z);
+    v = vec3(cos(phi), 0.0, sin(phi));
+    v *= threadRadius;
+    double r = majorRadius + minorRadius * cos(theta);
+    v = glm::rotateX(v, -double(atan2(p * minorRadius, q * r)));
+    v.x += minorRadius;
+    v = glm::rotateY(v, theta);
+    v.x += majorRadius;
+    v = glm::rotateZ(v, psi);
+  });
 
   if (kLoops > 1) {
     std::vector<Manifold> knots;
-    for (float k = 0; k < kLoops; ++k) {
+    for (double k = 0; k < kLoops; ++k) {
       knots.push_back(
-          knot.Rotate(0, 0, 360.0f * (k / kLoops) * (q / float(p))));
+          knot.Rotate(0, 0, 360.0 * (k / kLoops) * (q / double(p))));
     }
     knot = Manifold::Compose(knots);
   }

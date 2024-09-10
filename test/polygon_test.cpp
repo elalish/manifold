@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 #include <algorithm>
+#include <fstream>
 #include <limits>
-#include <random>
 
 #include "test.h"
 
@@ -26,7 +26,7 @@ using namespace manifold;
 
 Polygons Turn180(Polygons polys) {
   for (SimplePolygon &poly : polys) {
-    for (glm::vec2 &vert : poly) {
+    for (vec2 &vert : poly) {
       vert *= -1;
     }
   }
@@ -34,20 +34,20 @@ Polygons Turn180(Polygons polys) {
 }
 
 Polygons Duplicate(Polygons polys) {
-  float xMin = std::numeric_limits<float>::infinity();
-  float xMax = -std::numeric_limits<float>::infinity();
+  double xMin = std::numeric_limits<double>::infinity();
+  double xMax = -std::numeric_limits<double>::infinity();
   for (SimplePolygon &poly : polys) {
-    for (glm::vec2 &vert : poly) {
+    for (vec2 &vert : poly) {
       xMin = std::min(xMin, vert.x);
       xMax = std::max(xMax, vert.x);
     }
   }
-  const float shift = xMax - xMin;
+  const double shift = xMax - xMin;
 
   const int nPolys = polys.size();
   for (int i = 0; i < nPolys; ++i) {
     SimplePolygon poly = polys[i];
-    for (glm::vec2 &vert : poly) {
+    for (vec2 &vert : poly) {
       vert.x += shift;
     }
     polys.push_back(poly);
@@ -56,10 +56,10 @@ Polygons Duplicate(Polygons polys) {
 }
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
-              float precision = -1.0f) {
+              double precision = -1.0) {
   PolygonParams().verbose = options.params.verbose;
 
-  std::vector<glm::ivec3> triangles;
+  std::vector<ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
@@ -71,9 +71,68 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 
   PolygonParams().verbose = false;
 }
+
+class PolygonTestFixture : public testing::Test {
+ public:
+  Polygons polys;
+  double precision;
+  int expectedNumTri;
+  explicit PolygonTestFixture(Polygons polys, double precision,
+                              int expectedNumTri)
+      : polys(polys), precision(precision), expectedNumTri(expectedNumTri) {}
+  void TestBody() { TestPoly(polys, expectedNumTri, precision); }
+};
+
+void RegisterPolygonTestsFile(const std::string &filename) {
+  auto f = std::ifstream(filename);
+  EXPECT_TRUE(f.is_open());
+
+  // for each test:
+  //   test name, expectedNumTri, precision, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double precision, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> precision >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
+    testing::RegisterTest(
+        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> PolygonTestFixture * {
+          return new PolygonTestFixture(polys, precision, expectedNumTri);
+        });
+  }
+  f.close();
+}
 }  // namespace
 
-#include "polygons/polygon_corpus.cpp"
-#include "polygons/sponge.cpp"
-#include "polygons/zebra.cpp"
-#include "polygons/zebra3.cpp"
+void RegisterPolygonTests() {
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+#endif
+}

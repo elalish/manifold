@@ -14,12 +14,15 @@
 
 #include <vector>
 
-#include "conv.h"
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/conv.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 ManifoldCrossSection *manifold_cross_section_empty(void *mem) {
   return to_c(new (mem) CrossSection());
 }
@@ -74,13 +77,13 @@ void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec *csv,
   return from_c(csv)->push_back(*from_c(cs));
 }
 
-ManifoldCrossSection *manifold_cross_section_square(void *mem, float x, float y,
-                                                    int center) {
-  auto cs = CrossSection::Square(glm::vec2(x, y), center);
+ManifoldCrossSection *manifold_cross_section_square(void *mem, double x,
+                                                    double y, int center) {
+  auto cs = CrossSection::Square(vec2(x, y), center);
   return to_c(new (mem) CrossSection(cs));
 }
 
-ManifoldCrossSection *manifold_cross_section_circle(void *mem, float radius,
+ManifoldCrossSection *manifold_cross_section_circle(void *mem, double radius,
                                                     int circular_segments) {
   auto cs = CrossSection::Circle(radius, circular_segments);
   return to_c(new (mem) CrossSection(cs));
@@ -145,49 +148,49 @@ ManifoldCrossSection *manifold_cross_section_hull_polygons(
 
 ManifoldCrossSection *manifold_cross_section_translate(void *mem,
                                                        ManifoldCrossSection *cs,
-                                                       float x, float y) {
-  auto translated = from_c(cs)->Translate(glm::vec2(x, y));
+                                                       double x, double y) {
+  auto translated = from_c(cs)->Translate(vec2(x, y));
   return to_c(new (mem) CrossSection(translated));
 }
 
 ManifoldCrossSection *manifold_cross_section_rotate(void *mem,
                                                     ManifoldCrossSection *cs,
-                                                    float deg) {
+                                                    double deg) {
   auto rotated = from_c(cs)->Rotate(deg);
   return to_c(new (mem) CrossSection(rotated));
 }
 
 ManifoldCrossSection *manifold_cross_section_scale(void *mem,
                                                    ManifoldCrossSection *cs,
-                                                   float x, float y) {
-  auto scaled = from_c(cs)->Scale(glm::vec2(x, y));
+                                                   double x, double y) {
+  auto scaled = from_c(cs)->Scale(vec2(x, y));
   return to_c(new (mem) CrossSection(scaled));
 }
 
 ManifoldCrossSection *manifold_cross_section_mirror(void *mem,
                                                     ManifoldCrossSection *cs,
-                                                    float ax_x, float ax_y) {
-  auto mirrored = from_c(cs)->Mirror(glm::vec2(ax_x, ax_y));
+                                                    double ax_x, double ax_y) {
+  auto mirrored = from_c(cs)->Mirror(vec2(ax_x, ax_y));
   return to_c(new (mem) CrossSection(mirrored));
 }
 
 ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        ManifoldCrossSection *cs,
-                                                       float x1, float y1,
-                                                       float x2, float y2,
-                                                       float x3, float y3) {
-  auto mat = glm::mat3x2(x1, y1, x2, y2, x3, y3);
+                                                       double x1, double y1,
+                                                       double x2, double y2,
+                                                       double x3, double y3) {
+  auto mat = mat3x2(x1, y1, x2, y2, x3, y3);
   auto transformed = from_c(cs)->Transform(mat);
   return to_c(new (mem) CrossSection(transformed));
 }
 
 ManifoldCrossSection *manifold_cross_section_warp(
     void *mem, ManifoldCrossSection *cs,
-    ManifoldVec2 (*fun)(float, float, void *), void *ctx) {
+    ManifoldVec2 (*fun)(double, double, void *), void *ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
-  std::function<ManifoldVec2(float, float)> f2 = std::bind(fun, _1, _2, ctx);
-  std::function<void(glm::vec2 & v)> warp = [f2](glm::vec2 &v) {
+  std::function<ManifoldVec2(double, double)> f2 = std::bind(fun, _1, _2, ctx);
+  std::function<void(vec2 & v)> warp = [f2](vec2 &v) {
     v = from_c(f2(v.x, v.y));
   };
   auto warped = from_c(cs)->Warp(warp);
@@ -248,3 +251,6 @@ ManifoldCrossSectionVec *manifold_cross_section_decompose(
   auto comps = from_c(cs)->Decompose();
   return to_c(new (mem) CrossSectionVec(comps));
 }
+#ifdef __cplusplus
+}
+#endif

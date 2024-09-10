@@ -12,33 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #include "samples.h"
 
 namespace {
 
 using namespace manifold;
 
-Manifold Base(float width, float radius, float decorRadius, float twistRadius,
-              int nDecor, float innerRadius, float outerRadius, float cut,
-              int nCut, int nDivision) {
+Manifold Base(double width, double radius, double decorRadius,
+              double twistRadius, int nDecor, double innerRadius,
+              double outerRadius, double cut, int nCut, int nDivision) {
   Manifold base = Manifold::Cylinder(width, radius + twistRadius / 2);
 
   CrossSection circle =
       CrossSection::Circle(decorRadius, nDivision).Translate({twistRadius, 0});
   Manifold decor = Manifold::Extrude(circle.ToPolygons(), width, nDivision, 180)
-                       .Scale({1.0f, 0.5f, 1.0f})
-                       .Translate({0.0f, radius, 0.0f});
+                       .Scale({1.0, 0.5, 1.0})
+                       .Translate({0.0, radius, 0.0});
 
   for (int i = 0; i < nDecor; ++i) {
-    base += decor.Rotate(0, 0, (360.0f / nDecor) * i);
+    base += decor.Rotate(0, 0, (360.0 / nDecor) * i);
   }
 
   Polygons stretch(1);
-  float dPhiRad = 2 * glm::pi<float>() / nCut;
-  glm::vec2 p0(outerRadius, 0.0f);
-  glm::vec2 p1(innerRadius, -cut);
-  glm::vec2 p2(innerRadius, cut);
+  double dPhiRad = 2 * glm::pi<double>() / nCut;
+  vec2 p0(outerRadius, 0.0);
+  vec2 p1(innerRadius, -cut);
+  vec2 p2(innerRadius, cut);
   for (int i = 0; i < nCut; ++i) {
     stretch[0].push_back(glm::rotate(p0, dPhiRad * i));
     stretch[0].push_back(glm::rotate(p1, dPhiRad * i));
@@ -72,15 +72,15 @@ namespace manifold {
  * @param nCut The number of cuts that enable stretching.
  * @param nDivision the number of divisions along the width.
  */
-Manifold StretchyBracelet(float radius, float height, float width,
-                          float thickness, int nDecor, int nCut,
+Manifold StretchyBracelet(double radius, double height, double width,
+                          double thickness, int nDecor, int nCut,
                           int nDivision) {
-  float twistRadius = glm::pi<float>() * radius / nDecor;
-  float decorRadius = twistRadius * 1.5;
-  float outerRadius = radius + (decorRadius + twistRadius) * 0.5;
-  float innerRadius = outerRadius - height;
-  float cut = 0.5 * (glm::pi<float>() * 2 * innerRadius / nCut - thickness);
-  float adjThickness = 0.5 * thickness * height / cut;
+  double twistRadius = glm::pi<double>() * radius / nDecor;
+  double decorRadius = twistRadius * 1.5;
+  double outerRadius = radius + (decorRadius + twistRadius) * 0.5;
+  double innerRadius = outerRadius - height;
+  double cut = 0.5 * (glm::pi<double>() * 2 * innerRadius / nCut - thickness);
+  double adjThickness = 0.5 * thickness * height / cut;
 
   return Base(width, radius, decorRadius, twistRadius, nDecor,
               innerRadius + thickness, outerRadius + adjThickness,

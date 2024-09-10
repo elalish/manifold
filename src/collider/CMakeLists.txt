@@ -16,7 +16,7 @@ project (collider)
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE
-    $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
+    $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE utilities)
 target_compile_options(${PROJECT_NAME} INTERFACE ${MANIFOLD_FLAGS})

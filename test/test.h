@@ -16,14 +16,14 @@
 #include <ostream>
 
 #include "gtest/gtest.h"
-#include "manifold.h"
-#include "public.h"
+#include "manifold/common.h"
+#include "manifold/manifold.h"
 
 #ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
+#include "manifold/meshIO.h"
 #endif
 
-// somehow gcc11 + gtest 1.11.0 is unable to print glm::ivec3
+// somehow gcc11 + gtest 1.11.0 is unable to print ivec3
 namespace glm {
 inline void PrintTo(const ivec3& point, std::ostream* os) {
   *os << "(" << point.x << "," << point.y << "," << point.x << ")";
@@ -45,10 +45,10 @@ struct MeshSize {
   int numPropVert = numVert;
 };
 
-Polygons SquareHole(float xOffset = 0.0);
+Polygons SquareHole(double xOffset = 0.0);
 Mesh Csaszar();
 Mesh Tet();
-MeshGL Gyroid();
+Manifold Gyroid();
 MeshGL TetGL();
 MeshGL CubeSTL();
 MeshGL CubeUV();
@@ -69,3 +69,4 @@ void CheckGL(const Manifold& manifold);
 #ifdef MANIFOLD_EXPORT
 Manifold ReadMesh(const std::string& filename);
 #endif
+void RegisterPolygonTests();

@@ -15,12 +15,12 @@
 #include <algorithm>
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
-#include "manifold.h"
+#include "manifold/manifold.h"
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 using namespace manifold;
 
@@ -38,7 +38,7 @@ TEST(Smooth, Tetrahedron) {
   float maxMeanCurvature = 0;
   for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
   EXPECT_NEAR(maxMeanCurvature, 4.73, 0.01);
 
@@ -54,16 +54,16 @@ TEST(Smooth, RefineQuads) {
           .RefineToLength(0.05);
   EXPECT_EQ(cylinder.NumTri(), 16892);
   auto prop = cylinder.GetProperties();
-  EXPECT_NEAR(prop.volume, 2 * glm::pi<float>(), 0.003);
-  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.004);
+  EXPECT_NEAR(prop.volume, 2 * glm::pi<double>(), 0.003);
+  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<double>(), 0.004);
   const MeshGL out = cylinder.GetMeshGL();
   CheckGL(out);
 
   const MeshGL baseline = WithPositionColors(cylinder);
   float maxDiff = 0;
   for (size_t i = 0; i < out.vertProperties.size(); ++i) {
-    maxDiff = glm::max(
-        maxDiff, glm::abs(out.vertProperties[i] - baseline.vertProperties[i]));
+    maxDiff = std::max(
+        maxDiff, std::abs(out.vertProperties[i] - baseline.vertProperties[i]));
   }
   // This has a wide tolerance because the triangle colors on the ends are still
   // being stretched out into circular arcs, which introduces unavoidable error.
@@ -122,7 +122,7 @@ TEST(Smooth, ToLength) {
   float maxMeanCurvature = 0;
   for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
   EXPECT_NEAR(maxMeanCurvature, 1.67, 0.01);
 
@@ -135,7 +135,7 @@ TEST(Smooth, ToLength) {
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
+  double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
@@ -143,13 +143,12 @@ TEST(Smooth, Sphere) {
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     Mesh out = smoothed.GetMesh();
-    auto bounds =
-        std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
-                            [](const glm::vec3& a, const glm::vec3& b) {
-                              return glm::dot(a, a) < glm::dot(b, b);
-                            });
-    float min = glm::length(*bounds.first);
-    float max = glm::length(*bounds.second);
+    auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
+                                      [](const vec3& a, const vec3& b) {
+                                        return glm::dot(a, a) < glm::dot(b, b);
+                                      });
+    double min = glm::length(*bounds.first);
+    double max = glm::length(*bounds.second);
     EXPECT_NEAR(min, 1, precision[i]);
     EXPECT_NEAR(max, 1, precision[i]);
   }
@@ -191,11 +190,11 @@ TEST(Smooth, Manual) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     interp = interp.CalculateCurvature(-1, 0).SetProperties(
-        3, [](float* newProp, glm::vec3 pos, const float* oldProp) {
-          const glm::vec3 red(1, 0, 0);
-          const glm::vec3 purple(1, 0, 1);
-          glm::vec3 color =
-              glm::mix(purple, red, glm::smoothstep(0.0f, 2.0f, oldProp[0]));
+        3, [](double* newProp, vec3 pos, const double* oldProp) {
+          const vec3 red(1, 0, 0);
+          const vec3 purple(1, 0, 1);
+          vec3 color =
+              glm::mix(purple, red, glm::smoothstep(0.0, 2.0, oldProp[0]));
           for (const int i : {0, 1, 2}) newProp[i] = color[i];
         });
     const MeshGL out = interp.GetMeshGL();
@@ -240,14 +239,14 @@ TEST(Smooth, Csaszar) {
     options.mat.roughness = 0.1;
 
     options.mat.vertColor.resize(csaszar.NumVert());
-    const glm::vec4 blue(0, 0, 1, 1);
-    const glm::vec4 yellow(1, 1, 0, 1);
+    const vec4 blue(0, 0, 1, 1);
+    const vec4 yellow(1, 1, 0, 1);
     for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
-        const glm::vec3& uvw = {0.5, 0.5, 0.0};
-        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+        const vec3& uvw = {0.5, 0.5, 0.0};
+        const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
         options.mat.vertColor[out.triVerts[tri][i]] =
-            glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
+            glm::mix(yellow, blue, glm::smoothstep(0.0, 0.2, alpha));
       }
     }
     ExportMesh("smoothCsaszar.glb", out, options);
@@ -255,20 +254,19 @@ TEST(Smooth, Csaszar) {
 #endif
 }
 
-glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
-  const glm::vec3 dir = glm::normalize(tangent);
+vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
+  const vec3 dir = glm::normalize(tangent);
 
-  float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
+  double weight = std::abs(glm::dot(dir, glm::normalize(edgeVec)));
   if (weight == 0) {
     weight = 1;
   }
   // Quadratic weighted bezier for circular interpolation
-  const glm::vec4 bz2 =
-      weight * glm::vec4(dir * glm::length(edgeVec) / (2 * weight), 1);
+  const vec4 bz2 = weight * vec4(dir * glm::length(edgeVec) / (2 * weight), 1);
   // Equivalent cubic weighted bezier
-  const glm::vec4 bz3 = glm::mix(glm::vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
+  const vec4 bz3 = glm::mix(vec4(0, 0, 0, 1), bz2, 2 / 3.0);
   // Convert from homogeneous form to geometric form
-  return glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+  return vec4(vec3(bz3) / bz3.w, bz3.w);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -284,21 +282,21 @@ TEST(Smooth, Torus) {
   torusMesh.halfedgeTangent.resize(3 * numTri);
   for (int tri = 0; tri < numTri; ++tri) {
     for (const int i : {0, 1, 2}) {
-      glm::vec4& tangent = torusMesh.halfedgeTangent[3 * tri + i];
-      const glm::vec3 v = torusMesh.vertPos[torusMesh.triVerts[tri][i]];
-      const glm::vec3 edge =
+      vec4& tangent = torusMesh.halfedgeTangent[3 * tri + i];
+      const vec3 v = torusMesh.vertPos[torusMesh.triVerts[tri][i]];
+      const vec3 edge =
           torusMesh.vertPos[torusMesh.triVerts[tri][(i + 1) % 3]] - v;
       if (edge.z == 0) {
-        glm::vec3 tan(v.y, -v.x, 0);
+        vec3 tan(v.y, -v.x, 0);
         tan *= glm::sign(glm::dot(tan, edge));
         tangent = CircularTangent(tan, edge);
-      } else if (glm::abs(glm::determinant(
-                     glm::mat2(glm::vec2(v), glm::vec2(edge)))) < kTolerance) {
-        const float theta = glm::asin(v.z);
-        glm::vec2 xy(v);
-        const float r = glm::length(xy);
-        xy = xy / r * v.z * (r > 2 ? -1.0f : 1.0f);
-        glm::vec3 tan(xy.x, xy.y, glm::cos(theta));
+      } else if (std::abs(glm::determinant(mat2(vec2(v), vec2(edge)))) <
+                 kTolerance) {
+        const double theta = std::asin(v.z);
+        vec2 xy(v);
+        const double r = glm::length(xy);
+        xy = xy / r * v.z * (r > 2 ? -1.0 : 1.0);
+        vec3 tan(xy.x, xy.y, std::cos(theta));
         tan *= glm::sign(glm::dot(tan, edge));
         tangent = CircularTangent(tan, edge);
       } else {
@@ -314,14 +312,14 @@ TEST(Smooth, Torus) {
   MeshGL out = smooth.GetMeshGL();
   float maxMeanCurvature = 0;
   for (size_t i = 0; i < out.vertProperties.size(); i += 7) {
-    glm::vec3 v(out.vertProperties[i], out.vertProperties[i + 1],
-                out.vertProperties[i + 2]);
-    glm::vec3 p(v.x, v.y, 0);
-    p = glm::normalize(p) * 2.0f;
-    float r = glm::length(v - p);
+    vec3 v(out.vertProperties[i], out.vertProperties[i + 1],
+           out.vertProperties[i + 2]);
+    vec3 p(v.x, v.y, 0);
+    p = glm::normalize(p) * 2.0;
+    double r = glm::length(v - p);
     ASSERT_NEAR(r, 1, 0.006);
     maxMeanCurvature =
-        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i + 3]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i + 3]));
   }
   EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
@@ -336,91 +334,90 @@ TEST(Smooth, Torus) {
 #endif
 
 TEST(Smooth, SineSurface) {
-  MeshGL surface = MeshGL::LevelSet(
-      [](glm::vec3 p) {
-        float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
-      },
-      {glm::vec3(-2 * glm::pi<float>() + 0.2),
-       glm::vec3(0 * glm::pi<float>() - 0.2)},
-      1);
+  Manifold surface =
+      Manifold::LevelSet(
+          [](vec3 p) {
+            double mid = glm::sin(p.x) + glm::sin(p.y);
+            return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0 : -1.0;
+          },
+          {vec3(-2 * glm::pi<double>() + 0.2),
+           vec3(0 * glm::pi<double>() - 0.2)},
+          1)
+          .AsOriginal();
 
   Manifold smoothed =
-      Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
+      surface.CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
   EXPECT_NEAR(prop.volume, 8.09, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 30.93, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
-  EXPECT_FLOAT_EQ(
-      smoothed.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
-      prop.volume);
+  EXPECT_NEAR(smoothed.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+              prop.volume, 1e-5);
 
-  Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
+  Manifold smoothed1 = surface.SmoothOut(50).Refine(8);
   auto prop1 = smoothed1.GetProperties();
   EXPECT_FLOAT_EQ(prop1.volume, prop.volume);
   EXPECT_FLOAT_EQ(prop1.surfaceArea, prop.surfaceArea);
   EXPECT_EQ(smoothed1.Genus(), 0);
-  EXPECT_FLOAT_EQ(
-      smoothed1.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
-      prop1.volume);
+  EXPECT_NEAR(smoothed1.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+              prop1.volume, 1e-5);
 
-  Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
+  Manifold smoothed2 = surface.SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
   EXPECT_NEAR(prop2.volume, 9.00, 0.01);
   EXPECT_NEAR(prop2.surfaceArea, 33.52, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
   EXPECT_NEAR(smoothed2.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
-              prop2.volume, 0.001);
+              prop2.volume, 1e-3);
 
-  Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
+  Manifold smoothed3 = surface.SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
   EXPECT_NEAR(prop3.volume, 8.44, 0.01);
   EXPECT_NEAR(prop3.surfaceArea, 31.73, 0.02);
   EXPECT_EQ(smoothed3.Genus(), 0);
-  EXPECT_FLOAT_EQ(
-      smoothed3.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
-      prop3.volume);
+  EXPECT_NEAR(smoothed3.TrimByPlane({0, 1, 1}, -3.19487).GetProperties().volume,
+              prop3.volume, 1e-5);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
     // options2.faceted = false;
     // options2.mat.normalChannels = {3, 4, 5};
-    ExportMesh("smoothSineSurface.glb", smoothed2.GetMeshGL(), options2);
+    ExportMesh("smoothSineSurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif
 }
 
 TEST(Smooth, SDF) {
-  const float r = 10;
-  const float extra = 2;
+  const double r = 10;
+  const double extra = 2;
 
-  auto sphericalGyroid = [r](glm::vec3 p) {
-    const float gyroid =
+  auto sphericalGyroid = [r](vec3 p) {
+    const double gyroid =
         cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
-    const float d = glm::min(0.0f, r - glm::length(p));
-    return gyroid - d * d;
+    const double d = glm::min(0.0, r - glm::length(p));
+    return gyroid - d * d / 2;
   };
 
-  auto gradient = [r](glm::vec3 pos) {
-    const float rad = glm::length(pos);
-    const float d = glm::min(0.0f, r - rad) / (rad > 0 ? rad : 1);
-    const glm::vec3 sphereGrad = 2 * d * pos;
-    const glm::vec3 gyroidGrad(
-        cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
-        cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
-        cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
+  auto gradient = [r](vec3 pos) {
+    const double rad = glm::length(pos);
+    const double d = glm::min(0.0, r - rad) / (rad > 0 ? rad : 1);
+    const vec3 sphereGrad = d * pos;
+    const vec3 gyroidGrad(cos(pos.z) * cos(pos.x) - sin(pos.x) * sin(pos.y),
+                          cos(pos.x) * cos(pos.y) - sin(pos.y) * sin(pos.z),
+                          cos(pos.y) * cos(pos.z) - sin(pos.z) * sin(pos.x));
     return gyroidGrad + sphereGrad;
   };
 
-  auto error = [sphericalGyroid](float* newProp, glm::vec3 pos,
-                                 const float* oldProp) {
-    newProp[0] = glm::abs(sphericalGyroid(pos));
+  auto error = [sphericalGyroid](double* newProp, vec3 pos,
+                                 const double* oldProp) {
+    newProp[0] = std::abs(sphericalGyroid(pos));
   };
 
-  Manifold gyroid(MeshGL::LevelSet(
-      sphericalGyroid, {glm::vec3(-r - extra), glm::vec3(r + extra)}, 0.5, 0,
-      0.00001));
+  Manifold gyroid = Manifold::LevelSet(
+      sphericalGyroid, {vec3(-r - extra), vec3(r + extra)}, 0.5, 0, 0.00001);
+
+  EXPECT_LT(gyroid.NumTri(), 76000);
 
   Manifold interpolated = gyroid.Refine(3).SetProperties(1, error);
 
@@ -428,8 +425,8 @@ TEST(Smooth, SDF) {
       gyroid
           .SetProperties(
               3,
-              [gradient](float* newProp, glm::vec3 pos, const float* oldProp) {
-                const glm::vec3 normal = -glm::normalize(gradient(pos));
+              [gradient](double* newProp, vec3 pos, const double* oldProp) {
+                const vec3 normal = -glm::normalize(gradient(pos));
                 for (const int i : {0, 1, 2}) newProp[i] = normal[i];
               })
           .SmoothByNormals(0)
@@ -437,13 +434,13 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.033);
-  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.068);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.026);
+  EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    ExportMesh("smoothGyroid.glb", out, options2);
+    ExportMesh("smoothGyroid.glb", gyroid.GetMeshGL(), options2);
   }
 #endif
 }

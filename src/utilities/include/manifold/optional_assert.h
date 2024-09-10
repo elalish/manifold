@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "public.h"
 #ifdef MANIFOLD_EXCEPTIONS
 #include <stdexcept>
 #endif

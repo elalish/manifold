@@ -16,10 +16,10 @@
 #include <cstring>
 #include <vector>
 
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
@@ -36,9 +36,9 @@ ManifoldMeshGL *to_c(manifold::MeshGL *m);
 ManifoldBox *to_c(manifold::Box *m);
 ManifoldRect *to_c(manifold::Rect *m);
 ManifoldError to_c(manifold::Manifold::Error error);
-ManifoldVec2 to_c(glm::vec2 v);
-ManifoldVec3 to_c(glm::vec3 v);
-ManifoldIVec3 to_c(glm::ivec3 v);
+ManifoldVec2 to_c(vec2 v);
+ManifoldVec3 to_c(vec3 v);
+ManifoldIVec3 to_c(ivec3 v);
 ManifoldProperties to_c(manifold::Properties p);
 
 const manifold::Manifold *from_c(ManifoldManifold *m);
@@ -54,14 +54,14 @@ CrossSection::FillRule from_c(ManifoldFillRule fillrule);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
 const manifold::Box *from_c(ManifoldBox *m);
 const manifold::Rect *from_c(ManifoldRect *r);
-glm::vec2 from_c(ManifoldVec2 v);
-glm::vec3 from_c(ManifoldVec3 v);
-glm::ivec3 from_c(ManifoldIVec3 v);
-glm::vec4 from_c(ManifoldVec4 v);
+vec2 from_c(ManifoldVec2 v);
+vec3 from_c(ManifoldVec3 v);
+ivec3 from_c(ManifoldIVec3 v);
+vec4 from_c(ManifoldVec4 v);
 
-std::vector<glm::vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length);
-std::vector<glm::ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length);
-std::vector<glm::vec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length);
+std::vector<vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length);
+std::vector<ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length);
+std::vector<vec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length);
 
 template <typename T>
 std::vector<T> vector_of_array(T *ts, size_t length) {
