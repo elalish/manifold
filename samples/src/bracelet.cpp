@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #include "samples.h"
 
 namespace {

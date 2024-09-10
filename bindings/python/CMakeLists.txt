@@ -51,7 +51,7 @@ set(DOCSTRING_DEPS
   ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/sort.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cross_section/src/cross_section.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../src/polygon/src/polygon.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/public.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/manifold/common.h
   )
 add_custom_command(
   OUTPUT autogen_docstrings.inl

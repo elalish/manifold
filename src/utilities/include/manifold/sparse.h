@@ -15,11 +15,11 @@
 #pragma once
 #include <math.h>
 
-#include "optional_assert.h"
-#include "par.h"
-#include "public.h"
-#include "utils.h"
-#include "vec.h"
+#include "manifold/common.h"
+#include "manifold/optional_assert.h"
+#include "manifold/parallel.h"
+#include "manifold/utils.h"
+#include "manifold/vec.h"
 
 namespace {
 template <typename T>

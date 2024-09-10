@@ -16,7 +16,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "impl.h"
-#include "par.h"
+#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;

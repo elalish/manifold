@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "conv.h"
+#include "manifold/conv.h"
 
 #include <vector>
 
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
 ManifoldManifold *to_c(manifold::Manifold *m) {
   return reinterpret_cast<ManifoldManifold *>(m);

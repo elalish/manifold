@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 namespace manifold {
 

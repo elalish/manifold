@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 #include <algorithm>
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 namespace {
 

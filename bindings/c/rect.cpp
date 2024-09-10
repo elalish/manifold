@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "conv.h"
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/conv.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 ManifoldRect *manifold_rect(void *mem, double x1, double y1, double x2,
                             double y2) {
   auto p1 = vec2(x1, y1);
@@ -100,3 +103,6 @@ int manifold_rect_does_overlap_rect(ManifoldRect *a, ManifoldRect *r) {
 int manifold_rect_is_empty(ManifoldRect *r) { return from_c(r)->IsEmpty(); }
 
 int manifold_rect_is_finite(ManifoldRect *r) { return from_c(r)->IsFinite(); }
+#ifdef __cplusplus
+}
+#endif

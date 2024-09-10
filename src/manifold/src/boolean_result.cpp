@@ -30,7 +30,7 @@ template <typename K, typename V>
 using concurrent_map = std::map<K, V>;
 #endif
 #include "boolean3.h"
-#include "par.h"
+#include "manifold/parallel.h"
 
 using namespace manifold;
 

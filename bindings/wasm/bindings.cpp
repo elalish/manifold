@@ -17,10 +17,10 @@
 
 #include <vector>
 
-#include "cross_section.h"
 #include "helpers.cpp"
-#include "manifold.h"
-#include "polygon.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 
 using namespace emscripten;
 using namespace manifold;

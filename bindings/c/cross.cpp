@@ -14,12 +14,15 @@
 
 #include <vector>
 
-#include "conv.h"
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/conv.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 ManifoldCrossSection *manifold_cross_section_empty(void *mem) {
   return to_c(new (mem) CrossSection());
 }
@@ -248,3 +251,6 @@ ManifoldCrossSectionVec *manifold_cross_section_decompose(
   auto comps = from_c(cs)->Decompose();
   return to_c(new (mem) CrossSectionVec(comps));
 }
+#ifdef __cplusplus
+}
+#endif

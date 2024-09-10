@@ -16,10 +16,10 @@
 #include <cstring>
 #include <vector>
 
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;

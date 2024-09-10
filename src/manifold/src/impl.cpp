@@ -19,11 +19,11 @@
 #include <map>
 #include <numeric>
 
-#include "hashtable.h"
+#include "manifold/hashtable.h"
+#include "manifold/parallel.h"
+#include "manifold/svd.h"
+#include "manifold/tri_dist.h"
 #include "mesh_fixes.h"
-#include "par.h"
-#include "svd.h"
-#include "tri_dist.h"
 
 namespace {
 using namespace manifold;

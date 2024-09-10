@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 
 #include <gtest/gtest.h>
 
 #include <vector>
 
-#include "manifold.h"
-#include "polygon.h"
-#include "public.h"
+#include "manifold/common.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;

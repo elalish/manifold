@@ -11,7 +11,8 @@ target_link_libraries(testing PRIVATE manifold)
 EOT
 
 cat <<EOT >> test.cpp
-#include "manifold.h"
+#include "manifold/manifold.h"
+#include "manifold/parallel.h"
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
