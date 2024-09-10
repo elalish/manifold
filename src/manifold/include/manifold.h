@@ -162,7 +162,7 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
+  Manifold(const MeshGL&);
   Manifold(const Mesh&);
 
   static Manifold Smooth(const MeshGL&,
@@ -234,7 +234,7 @@ class Manifold {
    */
   ///@{
   int OriginalID() const;
-  Manifold AsOriginal() const;
+  Manifold AsOriginal(const std::vector<double>& propertyTolerance = {}) const;
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 

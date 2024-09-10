@@ -109,18 +109,9 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * runs.
  *
  * @param meshGL The input MeshGL.
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * properties in the [-1, 1] range.
  */
-Manifold::Manifold(const MeshGL& meshGL,
-                   const std::vector<float>& propertyTolerance)
-    : pNode_(std::make_shared<CsgLeafNode>(
-          std::make_shared<Impl>(meshGL, propertyTolerance))) {}
+Manifold::Manifold(const MeshGL& meshGL)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
 
 /**
  * Convert a Mesh into a Manifold. Will return an empty Manifold
@@ -425,12 +416,21 @@ int Manifold::OriginalID() const {
  * collapses those edges. In the process the relation to ancestor meshes is lost
  * and this new Manifold is marked an original. Properties are preserved, so if
  * they do not match across an edge, that edge will be kept.
+ *
+ * @param propertyTolerance A vector of precision values for each property
+ * beyond position. If specified, the propertyTolerance vector must have size =
+ * numProp - 3. This is the amount of interpolation error allowed before two
+ * neighboring triangles are considered to be on a property boundary edge.
+ * Property boundary edges will be retained across operations even if the
+ * triangles are coplanar. Defaults to 1e-5, which works well for most
+ * single-precision properties in the [-1, 1] range.
  */
-Manifold Manifold::AsOriginal() const {
+Manifold Manifold::AsOriginal(
+    const std::vector<double>& propertyTolerance) const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   newImpl->meshRelation_.originalID = ReserveIDs(1);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces();
+  newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
@@ -615,7 +615,8 @@ Manifold Manifold::SetProperties(
   }
 
   pImpl->meshRelation_.numProp = numProp;
-  pImpl->CreateFaces();
+  pImpl->meshRelation_.originalID = ReserveIDs(1);
+  pImpl->InitializeOriginal();
   pImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }

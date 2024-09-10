@@ -302,7 +302,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
                         meanIdx}));
 
-  CreateFaces();
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
   Finish();
 }
 

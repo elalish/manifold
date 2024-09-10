@@ -52,10 +52,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
-  // Don't allow any triangle merging.
-  std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
-  std::shared_ptr<Impl> impl =
-      std::make_shared<Impl>(meshGL, propertyTolerance);
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
   return Manifold(impl);
 }

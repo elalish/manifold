@@ -995,7 +995,6 @@ void Manifold::Impl::Refine(std::function<int(vec3)> edgeDivisions) {
     // being non-coplanar, and hence not being related to the original faces.
     meshRelation_.originalID = ReserveIDs(1);
     InitializeOriginal();
-    CreateFaces();
   }
 
   halfedgeTangent_.resize(0);

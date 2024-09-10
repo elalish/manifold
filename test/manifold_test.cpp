@@ -78,9 +78,8 @@ TEST(Manifold, Empty) {
 }
 
 TEST(Manifold, ValidInput) {
-  std::vector<float> propTol = {0.1, 0.2};
   MeshGL tetGL = TetGL();
-  Manifold tet(tetGL, propTol);
+  Manifold tet(tetGL);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
 }

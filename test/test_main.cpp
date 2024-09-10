@@ -228,18 +228,18 @@ MeshGL WithPositionColors(const Manifold& in) {
   const Box bbox = in.BoundingBox();
   const vec3 size = bbox.Size();
 
-  Manifold out = in.SetProperties(
-      3, [bbox, size](double* prop, vec3 pos, const double* oldProp) {
-        for (int i : {0, 1, 2}) {
-          prop[i] = (pos[i] - bbox.min[i]) / size[i];
-        }
-      });
+  Manifold out = in.SetProperties(3, [bbox, size](double* prop, vec3 pos,
+                                                  const double* oldProp) {
+                     for (int i : {0, 1, 2}) {
+                       prop[i] = (pos[i] - bbox.min[i]) / size[i];
+                     }
+                   }).AsOriginal();
 
   MeshGL outGL = out.GetMeshGL();
-  outGL.runIndex.clear();
+  // outGL.runIndex.clear();
   outGL.runOriginalID.clear();
   outGL.runTransform.clear();
-  outGL.faceID.clear();
+  // outGL.faceID.clear();
   outGL.runOriginalID = {Manifold::ReserveIDs(1)};
   return outGL;
 }

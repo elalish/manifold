@@ -167,6 +167,7 @@ ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
                                    int circular_segments);
 ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms);
 ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m);
+
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
 
 // Manifold Info

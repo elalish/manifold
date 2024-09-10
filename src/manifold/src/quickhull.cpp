@@ -830,14 +830,11 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
 
   QuickHull qh(vertPos);
   std::tie(halfedge_, vertPos_) = qh.buildMesh();
-  meshRelation_.originalID = ReserveIDs(1);
   CalculateBBox();
   SetPrecision(bBox_.Scale() * kTolerance);
-  SplitPinchedVerts();
   CalculateNormals();
+  meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
-  CreateFaces({});
-  SimplifyTopology();
   Finish();
 }
 

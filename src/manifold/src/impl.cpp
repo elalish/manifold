@@ -251,8 +251,7 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
-Manifold::Impl::Impl(const MeshGL& meshGL,
-                     std::vector<float> propertyTolerance) {
+Manifold::Impl::Impl(const MeshGL& meshGL) {
   Mesh mesh;
   mesh.precision = meshGL.precision;
   const auto numVert = meshGL.NumVert();
@@ -375,12 +374,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
   }
 
-  std::vector<double> propertyToleranceD(propertyTolerance.size());
-  manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
-                      propertyToleranceD.begin(),
-                      [](float v) { return (double)v; });
-
-  *this = Impl(mesh, relation, propertyToleranceD, !meshGL.faceID.empty());
+  *this = Impl(mesh, relation);
 
   // A Manifold created from an input mesh is never an original - the input is
   // the original.
@@ -392,9 +386,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
  * and set an Error Status if the Mesh is not manifold or otherwise invalid.
  * TODO: update halfedgeTangent during SimplifyTopology.
  */
-Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
-                     const std::vector<double>& propertyTolerance,
-                     bool hasFaceIDs)
+Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
                    relation.meshIDtransform};
@@ -437,9 +429,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   CalculateNormals();
 
   InitializeOriginal();
-  if (!hasFaceIDs) {
-    CreateFaces(propertyTolerance);
-  }
 
   SimplifyTopology();
   Finish();
@@ -550,9 +539,11 @@ void Manifold::Impl::InitializeOriginal() {
 
 void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   ZoneScoped;
+  constexpr double kDefaultPropTolerance = 1e-5;
   Vec<double> propertyToleranceD =
-      propertyTolerance.empty() ? Vec<double>(meshRelation_.numProp, kTolerance)
-                                : propertyTolerance;
+      propertyTolerance.empty()
+          ? Vec<double>(meshRelation_.numProp, kDefaultPropTolerance)
+          : propertyTolerance;
 
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
@@ -712,7 +703,8 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
   SetPrecision();
-  CreateFaces();
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
   Finish();
 }
 

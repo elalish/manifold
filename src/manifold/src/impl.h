@@ -65,10 +65,8 @@ struct Manifold::Impl {
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat4x3 = mat4x3(1));
 
-  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
-  Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<double>& propertyTolerance = {},
-       bool hasFaceIDs = false);
+  Impl(const MeshGL&);
+  Impl(const Mesh&, const MeshRelationD& relation);
 
   inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
     int current = halfedge;
