@@ -170,7 +170,7 @@ struct Manifold::Impl {
   ivec4 GetHalfedges(int tri) const;
   BaryIndices GetIndices(int halfedge) const;
   void FillRetainedVerts(Vec<Barycentric>& vertBary) const;
-  Vec<Barycentric> Subdivide(std::function<int(vec3)>);
+  Vec<Barycentric> Subdivide(std::function<int(vec3, vec4, vec4)>);
 
   // smoothing.cpp
   bool IsInsideQuad(int halfedge) const;
@@ -190,7 +190,7 @@ struct Manifold::Impl {
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
-  void Refine(std::function<int(vec3)>);
+  void Refine(std::function<int(vec3, vec4, vec4)>);
 
   // quickhull.cpp
   void Hull(VecView<vec3> vertPos);

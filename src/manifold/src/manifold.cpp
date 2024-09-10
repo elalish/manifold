@@ -733,7 +733,8 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
 Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (n > 1) {
-    pImpl->Refine([n](vec3 edge) { return n - 1; });
+    pImpl->Refine(
+        [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -751,9 +752,42 @@ Manifold Manifold::Refine(int n) const {
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine([length](vec3 edge) {
+  pImpl->Refine([length](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
     return static_cast<int>(glm::length(edge) / length);
   });
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Increase the density of the mesh by splitting each edge into pieces such that
+ * any point on the resulting triangles is roughly within precision of the
+ * smoothly curved surface defined by the tangent vectors. This means tightly
+ * curving regions will be divided more finely than smoother regions. If
+ * halfedgeTangents are not present, the result will simply be a copy of the
+ * original. Quads will ignore their interior triangle bisector.
+ *
+ * @param precision The desired maximum distance between the faceted mesh
+ * produced and the exact smoothly curving surface. All vertices are exactly on
+ * the surface, within rounding error.
+ */
+Manifold Manifold::RefineToPrecision(double precision) const {
+  precision = std::abs(precision);
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (!pImpl->halfedgeTangent_.empty()) {
+    pImpl->Refine([precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
+      const vec3 edgeNorm = glm::normalize(edge);
+      // Weight heuristic
+      const vec3 tStart = vec3(tangentStart) * tangentStart.w;
+      const vec3 tEnd = vec3(tangentEnd) * tangentEnd.w;
+      // Perpendicular to edge
+      const vec3 start = tStart - edgeNorm * glm::dot(edgeNorm, tStart);
+      const vec3 end = tEnd - edgeNorm * glm::dot(edgeNorm, tEnd);
+      // Circular arc result plus heuristic term for non-circular curves
+      const double d = 0.5 * (glm::length(start) + glm::length(end)) +
+                       glm::length(start - end);
+      return static_cast<int>(3 * d / (4 * precision));
+    });
+  }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 

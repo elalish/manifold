@@ -476,7 +476,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
  * (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
-    std::function<int(vec3)> edgeDivisions) {
+    std::function<int(vec3, vec4, vec4)> edgeDivisions) {
   Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
   const int numVert = NumVert();
   const int numEdge = edges.size();
@@ -499,12 +499,19 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   for_each_n(policy, countAt(0), numEdge,
              [&edgeAdded, &edges, edgeDivisions, this](const int i) {
                const TmpEdge edge = edges[i];
-               if (IsMarkedInsideQuad(edge.halfedgeIdx)) {
+               const int hIdx = edge.halfedgeIdx;
+               if (IsMarkedInsideQuad(hIdx)) {
                  edgeAdded[i] = 0;
                  return;
                }
                const vec3 vec = vertPos_[edge.first] - vertPos_[edge.second];
-               edgeAdded[i] = edgeDivisions(vec);
+               const vec4 tangent0 =
+                   halfedgeTangent_.empty() ? vec4(0) : halfedgeTangent_[hIdx];
+               const vec4 tangent1 =
+                   halfedgeTangent_.empty()
+                       ? vec4(0)
+                       : halfedgeTangent_[halfedge_[hIdx].pairedHalfedge];
+               edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
              });
 
   Vec<int> edgeOffset(numEdge);

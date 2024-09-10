@@ -473,8 +473,7 @@ TEST(Manifold, MeshRelationTransform) {
 }
 
 TEST(Manifold, MeshRelationRefine) {
-  const Mesh in = Csaszar();
-  MeshGL inGL = WithIndexColors(in);
+  MeshGL inGL = WithIndexColors(Csaszar());
   Manifold csaszar(inGL);
 
   RelatedGL(csaszar, {inGL});
@@ -487,6 +486,22 @@ TEST(Manifold, MeshRelationRefine) {
   opt.mat.roughness = 1;
   opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
+#endif
+}
+
+TEST(Manifold, MeshRelationRefinePrecision) {
+  MeshGL inGL = WithPositionColors(Csaszar());
+  Manifold csaszar = Manifold::Smooth(inGL);
+
+  csaszar = csaszar.RefineToPrecision(0.1);
+  ExpectMeshes(csaszar, {{9019, 18038, 3}});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  if (options.exportModels)
+    ExportMesh("csaszarSmooth.glb", csaszar.GetMeshGL(), opt);
 #endif
 }
 
