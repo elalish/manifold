@@ -241,11 +241,10 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   Vec<Halfedge> halfedges(mesh.halfedges.size());
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
-  auto halfedgeCheck =
-      std::make_unique<std::vector<std::atomic<bool>>>(mesh.halfedges.size());
+  std::vector<std::atomic<bool>> halfedgeCheck(mesh.halfedges.size());
   for_each(autoPolicy(mesh.halfedges.size()), countAt(0_uz),
            countAt(mesh.halfedges.size()),
-           [&](size_t i) { (*halfedgeCheck)[i].store(false); });
+           [&](size_t i) { halfedgeCheck[i].store(false); });
   // Some faces are disabled and should not go into the halfedge vector, we can
   // update the face indices of the halfedges at the end using index/3
   int j = 0;
@@ -254,7 +253,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
       countAt(mesh.halfedges.size()), [&](size_t i) {
         if (mesh.halfedges[i].pairedHalfedge < 0) return;
         if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
-        if ((*halfedgeCheck)[mesh.halfedges[i].face].exchange(true)) return;
+        if (halfedgeCheck[mesh.halfedges[i].face].exchange(true)) return;
         int currIndex = AtomicAdd(j, 3);
         mapping[i] = currIndex;
         halfedges[currIndex + 0] = mesh.halfedges[i];
@@ -523,11 +522,10 @@ void QuickHull::createConvexHalfedgeMesh() {
     // new faces.
     for (auto& disabledPoints : disabledFacePointVectors) {
       ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
-      auto pointCheck = std::make_unique<std::vector<std::atomic<bool>>>(
-          disabledPoints->size());
+      std::vector<std::atomic<bool>> pointCheck(disabledPoints->size());
       for_each(autoPolicy(disabledPoints->size()), countAt(0_uz),
                countAt(disabledPoints->size()),
-               [&](size_t i) { (*pointCheck)[i].store(false); });
+               [&](size_t i) { pointCheck[i].store(false); });
       for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(horizonEdgeCount),
                [&](size_t j) {
                  for_each(ExecutionPolicy::Par, countAt(0_uz),
@@ -535,11 +533,11 @@ void QuickHull::createConvexHalfedgeMesh() {
                           [&](size_t pointIndex) {
                             const auto& point = (*disabledPoints)[pointIndex];
                             if (point == activePointIndex ||
-                                (*pointCheck)[pointIndex].load()) {
+                                pointCheck[pointIndex].load()) {
                               return;
                             }
                             addPointToFace(mesh.faces[newFaceIndices[j]], point,
-                                           (*pointCheck)[pointIndex]);
+                                           pointCheck[pointIndex]);
                           });
                });
       // The points are no longer needed: we can move them to the vector pool
@@ -797,15 +795,15 @@ void QuickHull::setupInitialTetrahedron() {
 
   // Finally we assign a face for each vertex outside the tetrahedron (vertices
   // inside the tetrahedron have no role anymore)
-  auto pointMutex = std::make_unique<std::vector<std::atomic<bool>>>(vCount);
+  std::vector<std::atomic<bool>> pointMutex(vCount);
   for_each(autoPolicy(vCount), countAt(0_uz), countAt(vCount),
-           [&](size_t i) { (*pointMutex)[i].store(false); });
+           [&](size_t i) { pointMutex[i].store(false); });
   for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(mesh.faces.size()),
            [&](size_t j) {
              for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(vCount),
                       [&](size_t i) {
-                        if ((*pointMutex)[i].load()) return;
-                        addPointToFace(mesh.faces[j], i, (*pointMutex)[i]);
+                        if (pointMutex[i].load()) return;
+                        addPointToFace(mesh.faces[j], i, pointMutex[i]);
                       });
            });
 }
