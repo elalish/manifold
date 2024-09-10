@@ -32,7 +32,6 @@ jobs:
         
     - name: Deploy Javascript Docs to Github Pages
       run: |
-        mkdir public
         cd bindings/wasm
         npm install
         npm run docs
