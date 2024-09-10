@@ -25,19 +25,56 @@ import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedF
 export function triangulate(polygons: Polygons, precision?: number): Vec3[];
 
 /**
- * @name Defaults
- * These static properties control how circular shapes are quantized by
- * default on construction. If circularSegments is specified, it takes
- * precedence. If it is zero, then instead the minimum is used of the segments
- * calculated based on edge length and angle, rounded up to the nearest
- * multiple of four. To get numbers not divisible by four, circularSegments
- * must be specified.
+ * Sets an angle constraint the default number of circular segments for the
+ * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
+ * Manifold.sphere}, and
+ * {@link Manifold.revolve} constructors. The number of segments will be rounded
+ * up to the nearest factor of four.
+ *
+ * @param angle The minimum angle in degrees between consecutive segments. The
+ * angle will increase if the the segments hit the minimum edge length.
+ * Default is 10 degrees.
  */
-///@{
 export function setMinCircularAngle(angle: number): void;
+
+/**
+ * Sets a length constraint the default number of circular segments for the
+ * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
+ * Manifold.sphere}, and
+ * {@link Manifold.revolve} constructors. The number of segments will be rounded
+ * up to the nearest factor of four.
+ *
+ * @param length The minimum length of segments. The length will
+ * increase if the the segments hit the minimum angle. Default is 1.0.
+ */
 export function setMinCircularEdgeLength(length: number): void;
+
+/**
+ * Sets the default number of circular segments for the
+ * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
+ * Manifold.sphere}, and
+ * {@link Manifold.revolve} constructors. Overrides the edge length and angle
+ * constraints and sets the number of segments to exactly this value.
+ *
+ * @param segments Number of circular segments. Default is 0, meaning no
+ * constraint is applied.
+ */
 export function setCircularSegments(segments: number): void;
+
+/**
+ * Determine the result of the {@link setMinCircularAngle},
+ * {@link setMinCircularEdgeLength}, and {@link setCircularSegments} defaults.
+ *
+ * @param radius For a given radius of circle, determine how many default
+ * segments there will be.
+ */
 export function getCircularSegments(radius: number): number;
+
+/**
+ * Resets the circular construction parameters to their defaults if
+ * {@link setMinCircularAngle}, {@link setMinCircularEdgeLength}, or {@link
+ * setCircularSegments} have been called.
+ */
 export function resetToCircularDefaults(): void;
 ///@}
 
@@ -53,12 +90,27 @@ export class CrossSection {
    * @param fillRule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  constructor(polygons: Polygons, fillRule?: FillRule);
+  constructor(contours: Polygons, fillRule?: FillRule);
 
   // Shapes
 
+  /**
+   * Constructs a square with the given XY dimensions. By default it is
+   * positioned in the first quadrant, touching the origin. If any dimensions in
+   * size are negative, or if all are zero, an empty Manifold will be returned.
+   *
+   * @param size The X, and Y dimensions of the square.
+   * @param center Set to true to shift the center to the origin.
+   */
   static square(size?: Vec2|number, center?: boolean): CrossSection;
 
+  /**
+   * Constructs a circle of a given radius.
+   *
+   * @param radius Radius of the circle. Must be positive.
+   * @param circularSegments Number of segments along its diameter. Default is
+   * calculated by the static Quality defaults according to the radius.
+   */
   static circle(radius: number, circularSegments?: number): CrossSection;
 
   // Extrusions (2d to 3d manifold)
@@ -120,7 +172,7 @@ export class CrossSection {
    *
    * @param degrees degrees about the Z-axis to rotate.
    */
-  rotate(v: number): CrossSection;
+  rotate(degrees: number): CrossSection;
 
   /**
    * Scale this CrossSection in space. This operation can be chained. Transforms
@@ -139,7 +191,7 @@ export class CrossSection {
    *
    * @param ax the axis to be mirrored over
    */
-  mirror(v: Vec2): CrossSection;
+  mirror(ax: Vec2): CrossSection;
 
   /**
    * Move the vertices of this CrossSection (creating a new one) according to
@@ -283,7 +335,7 @@ export class CrossSection {
    * @param fillRule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  static ofPolygons(polygons: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(contours: Polygons, fillRule?: FillRule): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.
@@ -328,6 +380,30 @@ export class CrossSection {
   delete(): void;
 }
 
+/**
+ * This library's internal representation of an oriented, 2-manifold, triangle
+ * mesh - a simple boundary-representation of a solid object. Use this class to
+ * store and operate on solids, and use MeshGL for input and output, or
+ * potentially Mesh if only basic geometry is required.
+ *
+ * In addition to storing geometric data, a Manifold can also store an arbitrary
+ * number of vertex properties. These could be anything, e.g. normals, UV
+ * coordinates, colors, etc, but this library is completely agnostic. All
+ * properties are merely float values indexed by channel number. It is up to the
+ * user to associate channel numbers with meaning.
+ *
+ * Manifold allows vertex properties to be shared for efficient storage, or to
+ * have multiple property verts associated with a single geometric vertex,
+ * allowing sudden property changes, e.g. at Boolean intersections, without
+ * sacrificing manifoldness.
+ *
+ * Manifolds also keep track of their relationships to their inputs, via
+ * OriginalIDs and the faceIDs and transforms accessible through MeshGL. This
+ * allows object-level properties to be re-associated with the output after many
+ * operations, particularly useful for materials. Since separate object's
+ * properties are not mixed, there is no requirement that channels have
+ * consistent meaning between different inputs.
+ */
 export class Manifold {
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
@@ -551,7 +627,7 @@ export class Manifold {
    *
    * @param normal The normal vector of the plane to be mirrored over
    */
-  mirror(v: Vec3): Manifold;
+  mirror(normal: Vec3): Manifold;
 
   /**
    * This function does not change the topology, but allows the vertices to be
@@ -864,7 +940,7 @@ export class Manifold {
   getProperties(): Properties;
 
 
-  /*
+  /**
    * Returns the minimum gap between two manifolds. Returns a float between
    * 0 and searchLength.
    */
@@ -940,25 +1016,159 @@ export interface MeshOptions {
   halfedgeTangent?: Float32Array;
 }
 
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly. This may not be manifold since the verts are duplicated
+ * along property boundaries that do not match. The additional merge vectors
+ * store this missing information, allowing the manifold to be reconstructed.
+ */
 export class Mesh {
   constructor(options: MeshOptions);
+
+  /**
+   * Number of properties per vertex, always >= 3.
+   */
   numProp: number;
+
+  /**
+   * Flat, GL-style interleaved list of all vertex properties: propVal =
+   * vertProperties[vert * numProp + propIdx]. The first three properties are
+   * always the position x, y, z.
+   */
   vertProperties: Float32Array;
+
+  /**
+   * The vertex indices of the three triangle corners in CCW (from the outside)
+   * order, for each triangle.
+   */
   triVerts: Uint32Array;
+
+  /**
+   * Optional: A list of only the vertex indicies that need to be merged to
+   * reconstruct the manifold.
+   */
   mergeFromVert: Uint32Array;
+
+  /**
+   * Optional: The same length as mergeFromVert, and the corresponding value
+   * contains the vertex to merge with. It will have an identical position, but
+   * the other properties may differ.
+   */
   mergeToVert: Uint32Array;
+
+  /**
+   * Optional: Indicates runs of triangles that correspond to a particular
+   * input mesh instance. The runs encompass all of triVerts and are sorted
+   * by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
+   * triVerts[runIndex[i+1]]. All runIndex values are divisible by 3. Returned
+   * runIndex will always be 1 longer than runOriginalID, but same length is
+   * also allowed as input: triVerts.size() will be automatically appended in
+   * this case.
+   */
   runIndex: Uint32Array;
+
+  /**
+   * Optional: The OriginalID of the mesh this triangle run came from. This ID
+   * is ideal for reapplying materials to the output mesh. Multiple runs may
+   * have the same ID, e.g. representing different copies of the same input
+   * mesh. If you create an input MeshGL that you want to be able to reference
+   * as one or more originals, be sure to set unique values from ReserveIDs().
+   */
   runOriginalID: Uint32Array;
+
+  /**
+   * Optional: For each run, a 3x4 transform is stored representing how the
+   * corresponding original mesh was transformed to create this triangle run.
+   * This matrix is stored in column-major order and the length of the overall
+   * vector is 12 * runOriginalID.size().
+   */
   runTransform: Float32Array;
+
+  /**
+   * Optional: Length NumTri, contains an ID of the source face this triangle
+   * comes from. When auto-generated, this ID will be a triangle index into the
+   * original mesh. All neighboring coplanar triangles from that input mesh
+   * will refer to a single triangle of that group as the faceID. When
+   * supplying faceIDs, ensure that triangles with the same ID are in fact
+   * coplanar and have consistent properties (within some tolerance) or the
+   * output will be surprising.
+   */
   faceID: Uint32Array;
+
+  /**
+   * Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+   * non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
+   * as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
+   * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
+   */
   halfedgeTangent: Float32Array;
+
+  /**
+   * Number of triangles
+   */
   get numTri(): number;
+
+  /**
+   * Number of property vertices
+   */
   get numVert(): number;
+
+  /**
+   * Number of triangle runs. Each triangle run is a set of consecutive
+   * triangles that all come from the same instance of the same input mesh.
+   */
   get numRun(): number;
+
+  /**
+   * Updates the mergeFromVert and mergeToVert vectors in order to create a
+   * manifold solid. If the MeshGL is already manifold, no change will occur and
+   * the function will return false. Otherwise, this will merge verts along open
+   * edges within precision (the maximum of the MeshGL precision and the
+   * baseline bounding-box precision), keeping any from the existing merge
+   * vectors.
+   *
+   * There is no guarantee the result will be manifold - this is a best-effort
+   * helper function designed primarily to aid in the case where a manifold
+   * multi-material MeshGL was produced, but its merge vectors were lost due to
+   * a round-trip through a file format. Constructing a Manifold from the result
+   * will report a Status if it is not manifold.
+   */
   merge(): boolean;
+
+  /**
+   * Gets the three vertex indices of this triangle in CCW order.
+   *
+   * @param tri triangle index.
+   */
   verts(tri: number): SealedUint32Array<3>;
+
+  /**
+   * Gets the x, y, z position of this vertex.
+   *
+   * @param vert vertex index.
+   */
   position(vert: number): SealedFloat32Array<3>;
+
+  /**
+   * Gets any other properties associated with this vertex.
+   *
+   * @param vert vertex index.
+   */
   extras(vert: number): Float32Array;
+
+  /**
+   * Gets the tangent vector starting at verts(tri)[j] pointing to the next
+   * Bezier point along the CCW edge. The fourth value is its weight.
+   *
+   * @param halfedge halfedge index: 3 * tri + j, where j is 0, 1, or 2.
+   */
   tangent(halfedge: number): SealedFloat32Array<4>;
+
+  /**
+   * Gets the column-major 4x4 matrix transform from the original mesh to these
+   * related triangles.
+   *
+   * @param run triangle run index.
+   */
   transform(run: number): Mat4;
 }

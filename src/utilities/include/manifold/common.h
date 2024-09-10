@@ -598,6 +598,11 @@ class Quality {
     return std::max(nSeg, 3);
   }
 
+  /**
+   * Resets the circular construction parameters to their defaults if
+   * SetMinCircularAngle, SetMinCircularEdgeLength, or SetCircularSegments have
+   * been called.
+   */
   static void ResetToDefaults() {
     circularSegments_ = DEFAULT_SEGMENTS;
     circularAngle_ = DEFAULT_ANGLE;
