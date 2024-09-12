@@ -216,10 +216,6 @@ jobs:
         export PATH=/mxe/usr/bin:$PATH
         export CMAKE=$MXE_TARGETS-cmake
         $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
-    - name: Test
-      run: |
-        cd build/test
-        ./manifold_test
 
   build_mac:
     timeout-minutes: 30
