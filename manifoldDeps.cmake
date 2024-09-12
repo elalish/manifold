@@ -3,7 +3,7 @@ include(GNUInstallDirs)
 find_package(PkgConfig QUIET)
 
 if(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(threads QUIET)
+    find_package(Threads REQUIRED)
     find_package(TBB QUIET)
     if(APPLE)
         find_package(oneDPL QUIET)
