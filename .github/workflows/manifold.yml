@@ -209,7 +209,12 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        export MXE_TARGETS=x86_64-w64-mingw32.static.posix
+        export MXEDIR=$HOME/openscad_deps/mxe
+        export MXETARGETDIR=$MXEDIR/usr/$MXE_TARGETS
+        export PATH=$MXEDIR/usr/bin:$PATH
+        export CMAKE=$MXE_TARGETS-cmake
+        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
