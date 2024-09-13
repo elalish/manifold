@@ -51,7 +51,6 @@ bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
 
       // If any vertex lies on the opposite side of the normal direction
       if (distance > epsilon) {
-        std::cout << distance << std::endl;
         // The manifold is not convex
         return false;
       }

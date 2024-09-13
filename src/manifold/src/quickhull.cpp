@@ -155,6 +155,7 @@ std::array<int, 3> MeshBuilder::getVertexIndicesOfFace(const Face& f) const {
 
 HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
                            const VecView<vec3>& vertexData) {
+  ZoneScoped;
   std::unordered_map<size_t, size_t> faceMapping;
   std::unordered_map<size_t, size_t> halfEdgeMapping;
   std::unordered_map<size_t, size_t> vertexMapping;
@@ -206,7 +207,9 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
 /*
  * Implementation of the algorithm
  */
+
 std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
+  ZoneScoped;
   if (originalVertexData.size() == 0) {
     return {Vec<Halfedge>(), Vec<vec3>()};
   }
@@ -236,10 +239,12 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
 
   // reorder halfedges
   Vec<Halfedge> halfedges(mesh.halfedges.size());
-  Vec<int> counts(mesh.halfedges.size(), 0);
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
-
+  std::vector<std::atomic<bool>> halfedgeCheck(mesh.halfedges.size());
+  for_each(autoPolicy(mesh.halfedges.size()), countAt(0_uz),
+           countAt(mesh.halfedges.size()),
+           [&](size_t i) { halfedgeCheck[i].store(false); });
   // Some faces are disabled and should not go into the halfedge vector, we can
   // update the face indices of the halfedges at the end using index/3
   int j = 0;
@@ -248,7 +253,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
       countAt(mesh.halfedges.size()), [&](size_t i) {
         if (mesh.halfedges[i].pairedHalfedge < 0) return;
         if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
-        if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
+        if (halfedgeCheck[mesh.halfedges[i].face].exchange(true)) return;
         int currIndex = AtomicAdd(j, 3);
         mapping[i] = currIndex;
         halfedges[currIndex + 0] = mesh.halfedges[i];
@@ -269,7 +274,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   for_each(
       autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
       [&](Halfedge& he) { he.pairedHalfedge = mapping[he.pairedHalfedge]; });
-  counts.resize(originalVertexData.size() + 1);
+  Vec<int> counts(originalVertexData.size() + 1);
   fill(counts.begin(), counts.end(), 0);
 
   // remove unused vertices
@@ -289,10 +294,12 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
                vertices[counts[i]] = originalVertexData[i];
              }
            });
-  for_each(autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
-           [&](Halfedge& he) {
+  for_each(autoPolicy(halfedges.size()), countAt(0_uz),
+           countAt(halfedges.size()), [&](size_t i) {
+             auto& he = halfedges[i];
              he.startVert = counts[he.startVert];
              he.endVert = counts[he.endVert];
+             he.face = i / 3;
            });
   // setting face id
   for (size_t index = 0; index < halfedges.size(); index++) {
@@ -302,6 +309,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
 }
 
 void QuickHull::createConvexHalfedgeMesh() {
+  ZoneScoped;
   visibleFaces.clear();
   horizonEdgesData.clear();
   possiblyVisibleFaces.clear();
@@ -421,8 +429,7 @@ void QuickHull::createConvexHalfedgeMesh() {
               (*tf.pointsOnPositiveSide)[index];
         }
       }
-      if (change_flag == 1)
-        tf.pointsOnPositiveSide->resize(tf.pointsOnPositiveSide->size() - 1);
+      if (change_flag == 1) tf.pointsOnPositiveSide->pop_back();
 
       if (tf.pointsOnPositiveSide->size() == 0) {
         reclaimToIndexVectorPool(tf.pointsOnPositiveSide);
@@ -515,16 +522,24 @@ void QuickHull::createConvexHalfedgeMesh() {
     // new faces.
     for (auto& disabledPoints : disabledFacePointVectors) {
       ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
-      for (const auto& point : *(disabledPoints)) {
-        if (point == activePointIndex) {
-          continue;
-        }
-        for (size_t j = 0; j < horizonEdgeCount; j++) {
-          if (addPointToFace(mesh.faces[newFaceIndices[j]], point)) {
-            break;
-          }
-        }
-      }
+      std::vector<std::atomic<bool>> pointCheck(disabledPoints->size());
+      for_each(autoPolicy(disabledPoints->size()), countAt(0_uz),
+               countAt(disabledPoints->size()),
+               [&](size_t i) { pointCheck[i].store(false); });
+      for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(horizonEdgeCount),
+               [&](size_t j) {
+                 for_each(ExecutionPolicy::Par, countAt(0_uz),
+                          countAt(disabledPoints->size()),
+                          [&](size_t pointIndex) {
+                            const auto& point = (*disabledPoints)[pointIndex];
+                            if (point == activePointIndex ||
+                                pointCheck[pointIndex].load()) {
+                              return;
+                            }
+                            addPointToFace(mesh.faces[newFaceIndices[j]], point,
+                                           pointCheck[pointIndex]);
+                          });
+               });
       // The points are no longer needed: we can move them to the vector pool
       // for reuse.
       reclaimToIndexVectorPool(disabledPoints);
@@ -553,6 +568,7 @@ void QuickHull::createConvexHalfedgeMesh() {
  */
 
 std::array<size_t, 6> QuickHull::getExtremeValues() {
+  ZoneScoped;
   std::array<size_t, 6> outIndices{0, 0, 0, 0, 0, 0};
   double extremeVals[6] = {originalVertexData[0].x, originalVertexData[0].x,
                            originalVertexData[0].y, originalVertexData[0].y,
@@ -586,6 +602,7 @@ std::array<size_t, 6> QuickHull::getExtremeValues() {
 }
 
 bool QuickHull::reorderHorizonEdges(VecView<size_t>& horizonEdges) {
+  ZoneScoped;
   const size_t horizonEdgeCount = horizonEdges.size();
   for (size_t i = 0; i + 1 < horizonEdgeCount; i++) {
     const size_t endVertexCheck = mesh.halfedges[horizonEdges[i]].endVert;
@@ -626,6 +643,7 @@ double QuickHull::getScale(const std::array<size_t, 6>& extremeValuesInput) {
 }
 
 void QuickHull::setupInitialTetrahedron() {
+  ZoneScoped;
   const size_t vertexCount = originalVertexData.size();
 
   // If we have at most 4 points, just return a degenerate tetrahedron:
@@ -763,24 +781,31 @@ void QuickHull::setupInitialTetrahedron() {
   // Create a tetrahedron half edge mesh and compute planes defined by each
   // triangle
   mesh.setup(baseTriangle[0], baseTriangle[1], baseTriangle[2], maxI);
-  for (auto& f : mesh.faces) {
-    auto v = mesh.getVertexIndicesOfFace(f);
-    const vec3 N1 =
-        getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
-                          originalVertexData[v[2]]);
-    const Plane plane(N1, originalVertexData[v[0]]);
-    f.P = plane;
-  }
+  // Here too?
+  for_each(autoPolicy(mesh.faces.size()), countAt(0_uz),
+           countAt(mesh.faces.size()), [&](size_t faceIndex) {
+             auto& f = mesh.faces[faceIndex];
+             auto v = mesh.getVertexIndicesOfFace(f);
+             const vec3 N1 = getTriangleNormal(originalVertexData[v[0]],
+                                               originalVertexData[v[1]],
+                                               originalVertexData[v[2]]);
+             const Plane plane(N1, originalVertexData[v[0]]);
+             f.P = plane;
+           });
 
   // Finally we assign a face for each vertex outside the tetrahedron (vertices
   // inside the tetrahedron have no role anymore)
-  for (size_t i = 0; i < vCount; i++) {
-    for (auto& face : mesh.faces) {
-      if (addPointToFace(face, i)) {
-        break;
-      }
-    }
-  }
+  std::vector<std::atomic<bool>> pointMutex(vCount);
+  for_each(autoPolicy(vCount), countAt(0_uz), countAt(vCount),
+           [&](size_t i) { pointMutex[i].store(false); });
+  for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(mesh.faces.size()),
+           [&](size_t j) {
+             for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(vCount),
+                      [&](size_t i) {
+                        if (pointMutex[i].load()) return;
+                        addPointToFace(mesh.faces[j], i, pointMutex[i]);
+                      });
+           });
 }
 
 std::unique_ptr<Vec<size_t>> QuickHull::getIndexVectorFromPool() {
@@ -801,22 +826,36 @@ void QuickHull::reclaimToIndexVectorPool(std::unique_ptr<Vec<size_t>>& ptr) {
   indexVectorPool.reclaim(ptr);
 }
 
-bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
-                               size_t pointIndex) {
+void QuickHull::addPointToFace(typename MeshBuilder::Face& f, size_t pointIndex,
+                               std::atomic<bool>& pointMutex) {
   const double D =
       getSignedDistanceToPlane(originalVertexData[pointIndex], f.P);
   if (D > 0 && D * D > epsilonSquared * f.P.sqrNLength) {
+    // Only adds point to 1 face
+
+    // Use when ExecutionPolicy::Par
+    // if (AtomicAdd(pointMutex, 1) != 0) return;
+    if (pointMutex.exchange(true)) return;
+
+    // For ExecutionPolicy::Seq
+    // pointMutex = 1;
+
+    // Ensures atomic addition of point to face
+    f.faceMutex->lock();
     if (!f.pointsOnPositiveSide) {
+      PoolMutex.lock();
       f.pointsOnPositiveSide = getIndexVectorFromPool();
+      PoolMutex.unlock();
     }
     f.pointsOnPositiveSide->push_back(pointIndex);
     if (D > f.mostDistantPointDist) {
       f.mostDistantPointDist = D;
       f.mostDistantPoint = pointIndex;
     }
-    return true;
+    f.faceMutex->unlock();
+    return;
   }
-  return false;
+  return;
 }
 
 // Wrapper to call the QuickHull algorithm with the given vertex data to build
