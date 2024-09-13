@@ -20,7 +20,6 @@
 
 #include "manifold/common.h"
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;
@@ -40,7 +39,7 @@ TEST(CrossSection, MirrorUnion) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_mirror_union.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_mirror_union.glb", result.GetMeshGL(), {});
 #endif
 
   EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
@@ -55,7 +54,7 @@ TEST(CrossSection, RoundOffset) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_round_offset.glb", result.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
@@ -176,7 +175,7 @@ TEST(CrossSection, Hull) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     auto circ_tri_ex = Manifold::Extrude(circ_tri.ToPolygons(), 10);
-    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMesh(), {});
+    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMeshGL(), {});
   }
 #endif
 

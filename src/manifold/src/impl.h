@@ -65,7 +65,183 @@ struct Manifold::Impl {
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat4x3 = mat4x3(1));
 
-  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
+  template <typename Precision>
+  Impl(const MeshGLP<Precision>& meshGL,
+       std::vector<Precision> propertyTolerance) {
+    const auto numVert = meshGL.NumVert();
+    const auto numTri = meshGL.NumTri();
+
+    if (meshGL.numProp < 3) {
+      MarkFailure(Error::MissingPositionProperties);
+      return;
+    }
+
+    if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
+      MarkFailure(Error::MergeVectorsDifferentLengths);
+      return;
+    }
+
+    if (!meshGL.runTransform.empty() &&
+        12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
+      MarkFailure(Error::TransformWrongLength);
+      return;
+    }
+
+    if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
+        meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
+        meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
+      MarkFailure(Error::RunIndexWrongLength);
+      return;
+    }
+
+    if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
+      MarkFailure(Error::FaceIDWrongLength);
+      return;
+    }
+
+    std::vector<int> prop2vert(numVert);
+    std::iota(prop2vert.begin(), prop2vert.end(), 0);
+    for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+      const int from = meshGL.mergeFromVert[i];
+      const int to = meshGL.mergeToVert[i];
+      if (from >= static_cast<int>(numVert) ||
+          to >= static_cast<int>(numVert)) {
+        MarkFailure(Error::MergeIndexOutOfBounds);
+        return;
+      }
+      prop2vert[from] = to;
+    }
+
+    Vec<TriRef> triRef;
+    Vec<ivec3> triProperties;
+    if (meshGL.numProp > 3) {
+      triProperties.resize(numTri);
+      for (size_t i = 0; i < numTri; ++i) {
+        for (const size_t j : {0, 1, 2}) {
+          triProperties[i][j] = meshGL.triVerts[3 * i + j];
+        }
+      }
+    }
+
+    const auto numProp = meshGL.numProp - 3;
+    meshRelation_.numProp = numProp;
+    meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    // This will have unreferenced duplicate positions that will be removed by
+    // Impl::RemoveUnreferencedVerts().
+    vertPos_.resize(meshGL.NumVert());
+
+    for (size_t i = 0; i < meshGL.NumVert(); ++i) {
+      for (const int j : {0, 1, 2})
+        vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
+      for (size_t j = 0; j < numProp; ++j)
+        meshRelation_.properties[i * numProp + j] =
+            meshGL.vertProperties[meshGL.numProp * i + 3 + j];
+    }
+
+    halfedgeTangent_.resize(meshGL.halfedgeTangent.size() / 4);
+    for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
+      for (const int j : {0, 1, 2, 3})
+        halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
+    }
+
+    if (meshGL.runOriginalID.empty()) {
+      // FIXME: should we do this?
+      meshRelation_.originalID = Impl::ReserveIDs(1);
+    } else {
+      std::vector<uint32_t> runIndex = meshGL.runIndex;
+      const uint32_t runEnd = meshGL.triVerts.size();
+      if (runIndex.empty()) {
+        runIndex = {0, runEnd};
+      } else if (runIndex.size() == meshGL.runOriginalID.size()) {
+        runIndex.push_back(runEnd);
+      }
+      triRef.resize(meshGL.NumTri());
+      const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
+      for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
+        const int meshID = startID + i;
+        const int originalID = meshGL.runOriginalID[i];
+        for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
+          TriRef& ref = triRef[tri];
+          ref.meshID = meshID;
+          ref.originalID = originalID;
+          ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+        }
+
+        if (meshGL.runTransform.empty()) {
+          meshRelation_.meshIDtransform[meshID] = {originalID};
+        } else {
+          const Precision* m = meshGL.runTransform.data() + 12 * i;
+          meshRelation_.meshIDtransform[meshID] = {
+              originalID,
+              {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9],
+               m[10], m[11]}};
+        }
+      }
+    }
+
+    Vec<ivec3> triVerts;
+    triVerts.reserve(numTri);
+    for (size_t i = 0; i < numTri; ++i) {
+      ivec3 tri;
+      for (const size_t j : {0, 1, 2}) {
+        const int vert = meshGL.triVerts[3 * i + j];
+        if (vert < 0 || vert >= static_cast<int>(numVert)) {
+          MarkFailure(Error::VertexOutOfBounds);
+          return;
+        }
+        tri[j] = prop2vert[vert];
+        // FIXME: do we need this check?
+        if (tri[j] < 0 || tri[j] >= static_cast<int>(numVert)) {
+          MarkFailure(Error::VertexOutOfBounds);
+          return;
+        }
+      }
+      if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
+        triVerts.push_back(tri);
+        if (triRef.size() > 0) {
+          meshRelation_.triRef.push_back(triRef[i]);
+        }
+        if (triProperties.size() > 0) {
+          meshRelation_.triProperties.push_back(triProperties[i]);
+        }
+      }
+    }
+
+    std::vector<double> propertyToleranceD(propertyTolerance.size());
+    manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
+                        propertyToleranceD.begin(),
+                        [](Precision v) { return (double)v; });
+
+    CreateHalfedges(triVerts);
+    if (!IsManifold()) {
+      MarkFailure(Error::NotManifold);
+      return;
+    }
+
+    CalculateBBox();
+    if (!IsFinite()) {
+      MarkFailure(Error::NonFiniteVertex);
+      return;
+    }
+    SetPrecision(meshGL.precision);
+
+    SplitPinchedVerts();
+
+    CalculateNormals();
+
+    InitializeOriginal();
+    if (meshGL.faceID.empty()) {
+      CreateFaces(propertyToleranceD);
+    }
+
+    SimplifyTopology();
+    Finish();
+
+    // A Manifold created from an input mesh is never an original - the input is
+    // the original.
+    meshRelation_.originalID = -1;
+  }
+
   Impl(const Mesh&, const MeshRelationD& relation,
        const std::vector<double>& propertyTolerance = {},
        bool hasFaceIDs = false);

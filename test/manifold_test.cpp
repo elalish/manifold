@@ -473,7 +473,7 @@ TEST(Manifold, MeshRelationTransform) {
 }
 
 TEST(Manifold, MeshRelationRefine) {
-  const Mesh in = Csaszar();
+  const MeshGL in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
   Manifold csaszar(inGL);
 
@@ -586,7 +586,7 @@ TEST(Manifold, MirrorUnion) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("manifold_mirror_union.glb", result.GetMesh(), {});
+    ExportMesh("manifold_mirror_union.glb", result.GetMeshGL(), {});
 #endif
 
   auto vol_a = a.GetProperties().volume;

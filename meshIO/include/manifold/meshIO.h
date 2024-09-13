@@ -58,10 +58,7 @@ struct ExportOptions {
   Material mat = {};
 };
 
-Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
-
-void ExportMesh(const std::string& filename, const Mesh& mesh,
-                const ExportOptions& options);
+MeshGL ImportMesh(const std::string& filename, bool forceCleanup = false);
 
 void ExportMesh(const std::string& filename, const MeshGL& mesh,
                 const ExportOptions& options);

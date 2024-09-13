@@ -212,7 +212,7 @@ TEST(BooleanComplex, Close) {
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
+  if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;
@@ -499,7 +499,7 @@ TEST(BooleanComplex, Sweep) {
 
   EXPECT_NEAR(prop.volume, 3757, 1);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMesh(), {});
+  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;

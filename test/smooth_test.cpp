@@ -18,15 +18,13 @@
 #include "manifold/cross_section.h"
 #endif
 #include "manifold/manifold.h"
-#include "manifold/tri_dist.h"
-#include "samples.h"
 #include "test.h"
 
 using namespace manifold;
 
 TEST(Smooth, Tetrahedron) {
   Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = Manifold::Smooth(tet.GetMesh());
+  Manifold smooth = Manifold::Smooth(tet.GetMeshGL());
   int n = 100;
   smooth = smooth.Refine(n);
   ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
@@ -43,7 +41,7 @@ TEST(Smooth, Tetrahedron) {
   EXPECT_NEAR(maxMeanCurvature, 4.73, 0.01);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
+  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMeshGL(), {});
 #endif
 }
 
@@ -111,7 +109,7 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
-  Manifold smooth = Manifold::Smooth(cone.GetMesh());
+  Manifold smooth = Manifold::Smooth(cone.GetMeshGL64());
   smooth = smooth.RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   auto prop = smooth.GetProperties();
@@ -128,7 +126,7 @@ TEST(Smooth, ToLength) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("smoothToLength.glb", smooth.GetMesh(), {});
+    ExportMesh("smoothToLength.glb", smooth.GetMeshGL(), {});
 #endif
 }
 #endif
@@ -139,7 +137,7 @@ TEST(Smooth, Sphere) {
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
+    Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     Mesh out = smoothed.GetMesh();
@@ -166,13 +164,13 @@ TEST(Smooth, Normals) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("smoothNormals.glb", byNormals.GetMesh(), {});
+    ExportMesh("smoothNormals.glb", byNormals.GetMeshGL(), {});
 #endif
 }
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
-  const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
+  const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
   Mesh smooth = Manifold::Smooth(oct).GetMesh();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[6].w = 0;
@@ -207,7 +205,7 @@ TEST(Smooth, Manual) {
 }
 
 TEST(Smooth, Mirrored) {
-  const Mesh tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMesh();
+  const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMeshGL();
   Manifold smooth = Manifold::Smooth(tet);
   Manifold mirror = smooth.Scale({-2, 2, 2}).Refine(10);
   smooth = smooth.Refine(10).Scale({2, 2, 2});
@@ -219,7 +217,7 @@ TEST(Smooth, Mirrored) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("smoothMirrored.glb", mirror.GetMesh(), {});
+    ExportMesh("smoothMirrored.glb", mirror.GetMeshGL(), {});
 #endif
 }
 
@@ -233,7 +231,7 @@ TEST(Smooth, Csaszar) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    const Mesh out = csaszar.GetMesh();
+    const MeshGL out = csaszar.GetMeshGL();
     ExportOptions options;
     options.faceted = false;
     options.mat.roughness = 0.1;
@@ -245,7 +243,7 @@ TEST(Smooth, Csaszar) {
       for (int i : {0, 1, 2}) {
         const vec3& uvw = {0.5, 0.5, 0.0};
         const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
-        options.mat.vertColor[out.triVerts[tri][i]] =
+        options.mat.vertColor[out.triVerts[3 * tri + i]] =
             glm::mix(yellow, blue, glm::smoothstep(0.0, 0.2, alpha));
       }
     }

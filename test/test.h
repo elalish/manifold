@@ -46,7 +46,7 @@ struct MeshSize {
 };
 
 Polygons SquareHole(double xOffset = 0.0);
-Mesh Csaszar();
+MeshGL Csaszar();
 Mesh Tet();
 Manifold Gyroid();
 MeshGL TetGL();
