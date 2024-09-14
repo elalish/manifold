@@ -110,6 +110,17 @@ struct MeshGLP {
   MeshGLP() = default;
 
   bool Merge();
+
+  vec3 GetVertPos(size_t i) const {
+    size_t offset = i * numProp;
+    return vec3(vertProperties[offset], vertProperties[offset + 1],
+                vertProperties[offset + 2]);
+  }
+
+  ivec3 GetTriVerts(size_t i) const {
+    size_t offset = 3 * i;
+    return ivec3(triVerts[offset], triVerts[offset + 1], triVerts[offset + 2]);
+  }
 };
 
 /**

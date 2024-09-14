@@ -101,11 +101,11 @@ TEST(CrossSection, Transform) {
   auto b = sq.Transform(mat3x2(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
-  auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMesh();
-  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMesh(), ex_b);
+  auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL();
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMeshGL(), ex_b);
 
   // same transformations are applied in b_copy (giving same result)
-  Identical(ex_b, Manifold::Extrude(b_copy.ToPolygons(), 1.).GetMesh());
+  Identical(ex_b, Manifold::Extrude(b_copy.ToPolygons(), 1.).GetMeshGL());
 }
 
 TEST(CrossSection, Warp) {
@@ -118,8 +118,6 @@ TEST(CrossSection, Warp) {
 
   EXPECT_EQ(sq.NumVert(), 4);
   EXPECT_EQ(sq.NumContour(), 1);
-  // Identical(Manifold::Extrude(a, 1.).GetMesh(),
-  //           Manifold::Extrude(b, 1.).GetMesh());
 }
 
 TEST(CrossSection, Decompose) {
@@ -134,12 +132,12 @@ TEST(CrossSection, Decompose) {
   EXPECT_EQ(decomp[0].NumContour(), 2);
   EXPECT_EQ(decomp[1].NumContour(), 2);
 
-  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMesh(),
-            Manifold::Extrude(decomp[0].ToPolygons(), 1.).GetMesh());
-  Identical(Manifold::Extrude(b.ToPolygons(), 1.).GetMesh(),
-            Manifold::Extrude(decomp[1].ToPolygons(), 1.).GetMesh());
-  Identical(Manifold::Extrude(ab.ToPolygons(), 1.).GetMesh(),
-            Manifold::Extrude(recomp.ToPolygons(), 1.).GetMesh());
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(decomp[0].ToPolygons(), 1.).GetMeshGL());
+  Identical(Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(decomp[1].ToPolygons(), 1.).GetMeshGL());
+  Identical(Manifold::Extrude(ab.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(recomp.ToPolygons(), 1.).GetMeshGL());
 }
 
 TEST(CrossSection, FillRule) {

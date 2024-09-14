@@ -192,7 +192,7 @@ TEST(BooleanComplex, Subtract) {
   Manifold second(secondMesh);
 
   first -= second;
-  first.GetMesh();
+  first.GetMeshGL();
 }
 
 TEST(BooleanComplex, Close) {

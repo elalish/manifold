@@ -47,7 +47,6 @@ struct MeshSize {
 
 Polygons SquareHole(double xOffset = 0.0);
 MeshGL Csaszar();
-Mesh Tet();
 Manifold Gyroid();
 MeshGL TetGL();
 MeshGL CubeSTL();
@@ -58,7 +57,7 @@ MeshGL WithNormals(const Manifold& in);
 float GetMaxProperty(const MeshGL& mesh, int channel);
 float GetMinProperty(const MeshGL& mesh, int channel);
 void CheckFinite(const MeshGL& mesh);
-void Identical(const Mesh& mesh1, const Mesh& mesh2);
+void Identical(const MeshGL& mesh1, const MeshGL& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
 void ExpectMeshes(const Manifold& manifold,
