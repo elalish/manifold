@@ -624,6 +624,8 @@ Manifold Manifold::WarpBatch(
  * removal of channels. Note: undefined behavior will result if you read past
  * the number of input properties or write past the number of output properties.
  *
+ * If propFunc is a nullptr, this function will just set the channel to zeroes.
+ *
  * @param numProp The new number of properties per vertex.
  * @param propFunc A function that modifies the properties of a given vertex.
  */
@@ -653,11 +655,20 @@ Manifold Manifold::SetProperties(
     } else {
       pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
-    for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
-               UpdateProperties({pImpl->meshRelation_.properties.data(),
-                                 numProp, oldProperties.data(), oldNumProp,
-                                 pImpl->vertPos_.data(), triProperties.data(),
-                                 pImpl->halfedge_.data(), propFunc}));
+    if (propFunc != nullptr)
+      for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
+                 UpdateProperties({pImpl->meshRelation_.properties.data(),
+                                   numProp, oldProperties.data(), oldNumProp,
+                                   pImpl->vertPos_.data(), triProperties.data(),
+                                   pImpl->halfedge_.data(), propFunc}));
+    else
+      for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+                 UpdateProperties(
+                     {pImpl->meshRelation_.properties.data(), numProp,
+                      oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
+                      triProperties.data(), pImpl->halfedge_.data(),
+                      [](double* newProp, vec3 position,
+                         const double* oldProp) { *newProp = 0; }}));
   }
 
   pImpl->meshRelation_.numProp = numProp;
