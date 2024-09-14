@@ -68,8 +68,8 @@ struct Manifold::Impl {
   template <typename Precision>
   Impl(const MeshGLP<Precision>& meshGL,
        std::vector<Precision> propertyTolerance) {
-    const auto numVert = meshGL.NumVert();
-    const auto numTri = meshGL.NumTri();
+    const uint32_t numVert = meshGL.NumVert();
+    const uint32_t numTri = meshGL.NumTri();
 
     if (meshGL.numProp < 3) {
       MarkFailure(Error::MissingPositionProperties);
@@ -102,25 +102,13 @@ struct Manifold::Impl {
     std::vector<int> prop2vert(numVert);
     std::iota(prop2vert.begin(), prop2vert.end(), 0);
     for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const int from = meshGL.mergeFromVert[i];
-      const int to = meshGL.mergeToVert[i];
-      if (from >= static_cast<int>(numVert) ||
-          to >= static_cast<int>(numVert)) {
+      const uint32_t from = meshGL.mergeFromVert[i];
+      const uint32_t to = meshGL.mergeToVert[i];
+      if (from >= numVert || to >= numVert) {
         MarkFailure(Error::MergeIndexOutOfBounds);
         return;
       }
       prop2vert[from] = to;
-    }
-
-    Vec<TriRef> triRef;
-    Vec<ivec3> triProperties;
-    if (meshGL.numProp > 3) {
-      triProperties.resize(numTri);
-      for (size_t i = 0; i < numTri; ++i) {
-        for (const size_t j : {0, 1, 2}) {
-          triProperties[i][j] = meshGL.triVerts[3 * i + j];
-        }
-      }
     }
 
     const auto numProp = meshGL.numProp - 3;
@@ -144,8 +132,10 @@ struct Manifold::Impl {
         halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
     }
 
+    Vec<TriRef> triRef;
     if (meshGL.runOriginalID.empty()) {
-      // FIXME: should we do this?
+      // FIXME: This affects Impl::InitializeOriginal, and removing this
+      // apparently make things fail. Not sure if this is expected.
       meshRelation_.originalID = Impl::ReserveIDs(1);
     } else {
       std::vector<uint32_t> runIndex = meshGL.runIndex;
@@ -184,25 +174,22 @@ struct Manifold::Impl {
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 tri;
       for (const size_t j : {0, 1, 2}) {
-        const int vert = meshGL.triVerts[3 * i + j];
-        if (vert < 0 || vert >= static_cast<int>(numVert)) {
+        uint32_t vert = meshGL.triVerts[3 * i + j];
+        if (vert >= numVert) {
           MarkFailure(Error::VertexOutOfBounds);
           return;
         }
         tri[j] = prop2vert[vert];
-        // FIXME: do we need this check?
-        if (tri[j] < 0 || tri[j] >= static_cast<int>(numVert)) {
-          MarkFailure(Error::VertexOutOfBounds);
-          return;
-        }
       }
       if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
         triVerts.push_back(tri);
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
         }
-        if (triProperties.size() > 0) {
-          meshRelation_.triProperties.push_back(triProperties[i]);
+        if (numProp > 0) {
+          meshRelation_.triProperties.push_back(
+              ivec3(meshGL.triVerts[3 * i], meshGL.triVerts[3 * i + 1],
+                    meshGL.triVerts[3 * i + 2]));
         }
       }
     }
