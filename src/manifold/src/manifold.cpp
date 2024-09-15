@@ -655,20 +655,16 @@ Manifold Manifold::SetProperties(
     } else {
       pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
-    if (propFunc != nullptr)
-      for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
-                 UpdateProperties({pImpl->meshRelation_.properties.data(),
-                                   numProp, oldProperties.data(), oldNumProp,
-                                   pImpl->vertPos_.data(), triProperties.data(),
-                                   pImpl->halfedge_.data(), propFunc}));
-    else
-      for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
-                 UpdateProperties(
-                     {pImpl->meshRelation_.properties.data(), numProp,
-                      oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
-                      triProperties.data(), pImpl->halfedge_.data(),
-                      [](double* newProp, vec3 position,
-                         const double* oldProp) { *newProp = 0; }}));
+    for_each_n(
+        propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
+        countAt(0), NumTri(),
+        UpdateProperties(
+            {pImpl->meshRelation_.properties.data(), numProp,
+             oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
+             triProperties.data(), pImpl->halfedge_.data(),
+             propFunc == nullptr ? [](double* newProp, vec3 position,
+                                      const double* oldProp) { *newProp = 0; }
+                                 : propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;

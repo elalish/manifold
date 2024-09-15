@@ -110,7 +110,7 @@ TEST(Manifold, InvalidInput5) {
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
 }
 
-TEST(Manifold, InvalidInput7) {
+TEST(Manifold, InvalidInput6) {
   MeshGL tetGL = TetGL();
   tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
   Manifold tet(tetGL);
@@ -341,7 +341,6 @@ TEST(Manifold, WarpBatch) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Project) {
-  // TODO
   MeshGL input;
   input.numProp = 3;
   input.vertProperties = {0,    0,       0,     //
