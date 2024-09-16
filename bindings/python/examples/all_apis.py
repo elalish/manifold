@@ -19,9 +19,18 @@ def all_cross_section():
     c = CrossSection([poly])
     c = CrossSection() + c
     a = c.area()
+    c = CrossSection.batch_boolean(
+        [
+            CrossSection.circle(1),
+            CrossSection.square((3, 3)),
+            CrossSection.circle(3).translate((1, 1)),
+        ],
+        OpType.Add,
+    )
     c = CrossSection.batch_hull([c, c.translate((1, 0))])
     b = c.bounds()
     c = CrossSection.circle(1)
+    c = CrossSection.compose([c, c.translate((1, 0))])
     cs = c.decompose()
     m = c.extrude(1)
     c = c.hull()
@@ -49,13 +58,25 @@ def all_manifold():
     m = Manifold(mesh)
     m = Manifold() + m
     m = m.as_original()
+    m = Manifold.batch_boolean(
+        [
+            Manifold.cylinder(4, 1),
+            Manifold.cube((3, 2, 1)),
+            Manifold.cylinder(5, 3).translate((1, 1, 1)),
+        ],
+        OpType.Add,
+    )
     m = Manifold.batch_hull([m, m.translate((0, 0, 1))])
     b = m.bounding_box()
     m = m.calculate_curvature(4, 5)
+    m = m.calculate_normals(0)
+    m = m.smooth_by_normals(0)
     m = Manifold.compose([m, m.translate((5, 0, 0))])
     m = Manifold.cube((1, 1, 1))
     m = Manifold.cylinder(1, 1)
     ms = m.decompose()
+    m = Manifold.extrude(CrossSection.circle(1), 1)
+    m = Manifold.revolve(CrossSection.circle(1))
     g = m.genus()
     a = m.surface_area()
     v = m.volume()
@@ -72,6 +93,8 @@ def all_manifold():
     p = m.precision()
     c = m.project()
     m = m.refine(2)
+    m = m.refine_to_length(0.1)
+    m = m.smooth_out()
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
     m = m.set_properties(3, lambda pos, prop: pos)
@@ -83,11 +106,15 @@ def all_manifold():
     e = m.status()
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
+    ok = mesh.merge()
     m = m.transform([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
     m = m.translate((0, 0, 0))
     m = m.trim_by_plane((0, 0, 1), 0)
     m = m.warp(lambda p: (p[0] + 1, p[1] / 2, p[2] * 2))
     m = m.warp_batch(lambda ps: ps * [1, 0.5, 2] + [1, 0, 0])
+    m = Manifold.cube()
+    m2 = Manifold.cube().translate([2, 0, 0])
+    d = m.min_gap(m2, 2)
 
 
 def run():

@@ -1,8 +1,8 @@
 from os.path import dirname
-from hashlib import md5
 import re
 
 base = dirname(dirname(dirname(__file__)))
+
 
 def snake_case(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
@@ -10,20 +10,20 @@ def snake_case(name):
 
 def python_param_modifier(comment):
     # p = f":{snake_case(m[0][1:])}:"
-    comment = re.sub(r"@(param \w+)", lambda m: f':{snake_case(m[1])}:', comment)
+    comment = re.sub(r"@(param \w+)", lambda m: f":{snake_case(m[1])}:", comment)
     # python API renames `MeshGL` to `Mesh`
-    comment = re.sub('mesh_gl', 'mesh', comment)
-    comment = re.sub('MeshGL', 'Mesh', comment)
+    comment = re.sub("mesh_gl", "mesh", comment)
+    comment = re.sub("MeshGL", "Mesh", comment)
     return comment
 
 
 def method_key(name):
-    name = re.sub("\+", "_plus", name)
-    name = re.sub("\-", "_minus", name)
-    name = re.sub("\^", "_xor", name)
-    name = re.sub("\=", "_eq", name)
-    name = re.sub("\:", "_", name)
-    name = re.sub("\~", "destroy_", name)
+    name = re.sub(r"\+", "_plus", name)
+    name = re.sub(r"\-", "_minus", name)
+    name = re.sub(r"\^", "_xor", name)
+    name = re.sub(r"\=", "_eq", name)
+    name = re.sub(r"\:", "_", name)
+    name = re.sub(r"\~", "destroy_", name)
     return name
 
 
@@ -90,15 +90,17 @@ def select_functions(s):
 
 collect(f"{base}/src/manifold/src/manifold.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/manifold/src/constructors.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/manifold/src/sort.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/manifold/src/sdf.cpp", lambda s: method_re.search(s))
 collect(
     f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
 )
 collect(f"{base}/src/polygon/src/polygon.cpp", select_functions)
-collect(f"{base}/src/utilities/include/public.h", select_functions)
+collect(f"{base}/src/utilities/include/manifold/common.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 
-gen_h = f"autogen_docstrings.inl"
+gen_h = "autogen_docstrings.inl"
 with open(gen_h, "w") as f:
     f.write("#pragma once\n\n")
     f.write("// --- AUTO GENERATED ---\n")

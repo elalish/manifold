@@ -13,28 +13,24 @@
 # limitations under the License.
 
 project (cross_section)
-
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
+target_include_directories(${PROJECT_NAME} PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 
-target_include_directories(${PROJECT_NAME}
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
-)
-target_link_libraries( ${PROJECT_NAME}
-    PUBLIC utilities Clipper2
-)
+if(TARGET Clipper2::Clipper2)
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC utilities
+        PRIVATE Clipper2::Clipper2)
+else()
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC utilities
+        PRIVATE Clipper2)
+endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
-install(
-  TARGETS ${PROJECT_NAME}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
-  COMPONENT runtime
-)
-install(
-  DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
-  COMPONENT devel
-)
-
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/manifold/cross_section.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})

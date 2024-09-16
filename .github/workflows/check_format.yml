@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: DoozyX/clang-format-lint-action@v0.14
+    - uses: actions/checkout@v4
+    - uses: DoozyX/clang-format-lint-action@v0.18
       with:
         source: '.'
         exclude: '*/third_party'
         extensions: 'h,cpp,js,ts,html'
-        clangFormatVersion: 11
+        clangFormatVersion: 18
     - uses: psf/black@stable
       with:
         options: "--check --verbose"

@@ -1,9 +1,0 @@
-[submodule "src/third_party/clipper2"]
-	path = src/third_party/clipper2
-	url = https://github.com/AngusJohnson/clipper2
-[submodule "src/third_party/quickhull"]
-	path = src/third_party/quickhull
-	url = https://github.com/akuukka/quickhull
-[submodule "bindings/python/third_party/nanobind"]
-	path = bindings/python/third_party/nanobind
-	url = https://github.com/wjakob/nanobind

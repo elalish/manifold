@@ -107,12 +107,12 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
   const manifoldPrimitive =
       mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
 
-  let vertPropArray: number[] = [];
-  let triVertArray: number[] = [];
+  let vertPropArray = Array<number>();
+  let triVertArray = Array<number>();
   const runIndexArray = [0];
-  const mergeFromVertArray = [];
-  const mergeToVertArray = [];
-  const runProperties: Properties[] = [];
+  const mergeFromVertArray = Array<number>();
+  const mergeToVertArray = Array<number>();
+  const runProperties = Array<Properties>();
   if (manifoldPrimitive != null) {
     const numVert = primitives[0].getAttribute('POSITION')!.getCount();
     const foundAttribute = attributes.map((a) => attributeDefs[a].type == null);
@@ -150,7 +150,7 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
     const mergeTo = manifoldPrimitive.getMergeValues()?.getArray() ?? [];
-    const vert2merge = new Map();
+    const vert2merge = new Map<number, number>();
     for (const [i, idx] of mergeTriVert.entries()) {
       vert2merge.set(triVertArray[idx], mergeTo[i]);
     }
@@ -218,8 +218,8 @@ export function writeMesh(
   const manifoldExtension = doc.createExtension(EXTManifold);
 
   const mesh = doc.createMesh();
-  const runIndex = [];
-  const attributeUnion: Attribute[] = [];
+  const runIndex = Array<number>();
+  const attributeUnion = Array<Attribute>();
   const primitive2attributes = new Map<Primitive, Attribute[]>();
   const numRun = manifoldMesh.runIndex.length - 1;
   let lastID = -1;
@@ -323,8 +323,8 @@ export function writeMesh(
   manifoldPrimitive.setRunIndex(runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
-  const ind = [];
-  const val = [];
+  const ind = Array<number>();
+  const val = Array<number>();
   if (manifoldMesh.mergeFromVert && manifoldMesh.mergeToVert) {
     for (const [i, from] of manifoldMesh.mergeFromVert.entries()) {
       vert2merge[from] = manifoldMesh.mergeToVert[i];

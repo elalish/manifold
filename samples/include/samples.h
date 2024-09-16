@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 namespace manifold {
 
@@ -34,23 +34,24 @@ namespace manifold {
  *  @{
  */
 
-Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
-                   float threadRadius, int circularSegments = 0,
+Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
+                   double threadRadius, int circularSegments = 0,
                    int linearSegments = 0);
 
-Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
-                          float width = 15.0f, float thickness = 0.4f,
+Manifold StretchyBracelet(double radius = 30.0, double height = 8.0,
+                          double width = 15.0, double thickness = 0.4,
                           int nDecor = 20, int nCut = 27, int nDivision = 30);
 
 Manifold MengerSponge(int n = 3);
 
-Manifold RoundedFrame(float edgeLength, float radius, int circularSegments = 0);
+Manifold RoundedFrame(double edgeLength, double radius,
+                      int circularSegments = 0);
 
-Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
+Manifold TetPuzzle(double edgeLength, double gap, int nDivisions);
 
 Manifold Scallop();
 
-Manifold GyroidModule(float size = 20, int n = 20);
+Manifold GyroidModule(double size = 20, int n = 20);
 
 Manifold CondensedMatter(int fn = 16);
 /** @} */  // end of Samples

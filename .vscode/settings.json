@@ -108,16 +108,27 @@
     "latch": "cpp",
     "semaphore": "cpp",
     "span": "cpp",
-    "__sso_allocator": "cpp"
+    "__sso_allocator": "cpp",
+    "source_location": "cpp",
+    "format": "cpp",
+    "numbers": "cpp",
+    "ranges": "cpp",
+    "stop_token": "cpp",
+    "execution": "cpp",
+    "csetjmp": "cpp",
+    "cuchar": "cpp",
+    "propagate_const": "cpp",
+    "scoped_allocator": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,
   "cmake.configureArgs": [
     "-DBUILD_SHARED_LIBS=ON",
     "-DMANIFOLD_CBIND=ON",
+    "-DMANIFOLD_PYBIND=ON",
     "-DMANIFOLD_EXPORT=ON",
     "-DMANIFOLD_DEBUG=ON",
-    "-DMANIFOLD_USE_CUDA=OFF",
+    "-DMANIFOLD_EXCEPTIONS=ON",
     "-DMANIFOLD_PAR=TBB",
     "-DCODE_COVERAGE=OFF",
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
@@ -138,7 +149,9 @@
     "halfedges",
     "Minkowski",
     "Tris",
-    "Verts"
+    "Verts",
+    "Voxel",
+    "voxels"
   ],
   "javascript.format.semicolons": "insert",
   "[python]": {

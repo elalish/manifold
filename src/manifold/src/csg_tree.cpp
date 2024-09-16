@@ -24,18 +24,18 @@
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
+#include "manifold/parallel.h"
 #include "mesh_fixes.h"
-#include "par.h"
 
 constexpr int kParallelThreshold = 4096;
 
 namespace {
 using namespace manifold;
 struct Transform4x3 {
-  const glm::mat4x3 transform;
+  mat4x3 transform;
 
-  glm::vec3 operator()(glm::vec3 position) {
-    return transform * glm::vec4(position, 1.0f);
+  vec3 operator()(vec3 position) const {
+    return transform * vec4(position, 1.0);
   }
 };
 
@@ -56,7 +56,7 @@ struct UpdateHalfedge {
 struct UpdateTriProp {
   const int nextProp;
 
-  glm::ivec3 operator()(glm::ivec3 tri) {
+  ivec3 operator()(ivec3 tri) {
     tri += nextProp;
     return tri;
   }
@@ -74,7 +74,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   VecView<const Box> boxes;
   const size_t i;
-  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
+  bool operator()(size_t j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 
 using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
@@ -111,30 +111,30 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
   return std::make_shared<CsgOpNode>(children, op);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Translate(const glm::vec3 &t) const {
-  glm::mat4x3 transform(1.0f);
+std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
+  mat4x3 transform(1.0);
   transform[3] += t;
   return Transform(transform);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Scale(const glm::vec3 &v) const {
-  glm::mat4x3 transform(1.0f);
+std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
+  mat4x3 transform(1.0);
   for (int i : {0, 1, 2}) transform[i] *= v;
   return Transform(transform);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Rotate(float xDegrees, float yDegrees,
-                                         float zDegrees) const {
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
-               0.0f, cosd(xDegrees), sind(xDegrees),  //
-               0.0f, -sind(xDegrees), cosd(xDegrees));
-  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
-               0.0f, 1.0f, 0.0f,                       //
-               sind(yDegrees), 0.0f, cosd(yDegrees));
-  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
-               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
-               0.0f, 0.0f, 1.0f);
-  glm::mat4x3 transform(rZ * rY * rX);
+std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
+                                         double zDegrees) const {
+  mat3 rX(1.0, 0.0, 0.0,                        //
+          0.0, cosd(xDegrees), sind(xDegrees),  //
+          0.0, -sind(xDegrees), cosd(xDegrees));
+  mat3 rY(cosd(yDegrees), 0.0, -sind(yDegrees),  //
+          0.0, 1.0, 0.0,                         //
+          sind(yDegrees), 0.0, cosd(yDegrees));
+  mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0,   //
+          -sind(zDegrees), cosd(zDegrees), 0.0,  //
+          0.0, 0.0, 1.0);
+  mat4x3 transform(rZ * rY * rX);
   return Transform(transform);
 }
 
@@ -144,25 +144,25 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_)
     : pImpl_(pImpl_) {}
 
 CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
-                         glm::mat4x3 transform_)
+                         mat4x3 transform_)
     : pImpl_(pImpl_), transform_(transform_) {}
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
-  if (transform_ == glm::mat4x3(1.0f)) return pImpl_;
+  if (transform_ == mat4x3(1.0)) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
-  transform_ = glm::mat4x3(1.0f);
+  transform_ = mat4x3(1.0);
   return pImpl_;
 }
 
-glm::mat4x3 CsgLeafNode::GetTransform() const { return transform_; }
+mat4x3 CsgLeafNode::GetTransform() const { return transform_; }
 
 std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
   return std::make_shared<CsgLeafNode>(*this);
 }
 
-std::shared_ptr<CsgNode> CsgLeafNode::Transform(const glm::mat4x3 &m) const {
-  return std::make_shared<CsgLeafNode>(pImpl_, m * glm::mat4(transform_));
+std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat4x3 &m) const {
+  return std::make_shared<CsgLeafNode>(pImpl_, m * mat4(transform_));
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
@@ -173,7 +173,7 @@ CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 Manifold::Impl CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
   ZoneScoped;
-  float precision = -1;
+  double precision = -1;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
@@ -184,14 +184,14 @@ Manifold::Impl CsgLeafNode::Compose(
   std::vector<int> propVertIndices;
   int numPropOut = 0;
   for (auto &node : nodes) {
-    float nodeOldScale = node->pImpl_->bBox_.Scale();
-    float nodeNewScale =
+    double nodeOldScale = node->pImpl_->bBox_.Scale();
+    double nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
-    float nodePrecision = node->pImpl_->precision_;
-    nodePrecision *= glm::max(1.0f, nodeNewScale / nodeOldScale);
-    nodePrecision = glm::max(nodePrecision, kTolerance * nodeNewScale);
-    if (!glm::isfinite(nodePrecision)) nodePrecision = -1;
-    precision = glm::max(precision, nodePrecision);
+    double nodePrecision = node->pImpl_->precision_;
+    nodePrecision *= std::max(1.0, nodeNewScale / nodeOldScale);
+    nodePrecision = std::max(nodePrecision, kTolerance * nodeNewScale);
+    if (!std::isfinite(nodePrecision)) nodePrecision = -1;
+    precision = std::max(precision, nodePrecision);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -201,7 +201,7 @@ Manifold::Impl CsgLeafNode::Compose(
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
     const int numProp = node->pImpl_->NumProp();
-    numPropOut = glm::max(numPropOut, numProp);
+    numPropOut = std::max(numPropOut, numProp);
     numPropVert +=
         numProp == 0 ? 1
                      : node->pImpl_->meshRelation_.properties.size() / numProp;
@@ -232,12 +232,11 @@ Manifold::Impl CsgLeafNode::Compose(
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &propVertIndices,
        numPropOut, &combined, policy](int i) {
         auto &node = nodes[i];
-        copy(policy, node->pImpl_->halfedgeTangent_.begin(),
+        copy(node->pImpl_->halfedgeTangent_.begin(),
              node->pImpl_->halfedgeTangent_.end(),
              combined.halfedgeTangent_.begin() + edgeIndices[i]);
         transform(
-            policy, node->pImpl_->halfedge_.begin(),
-            node->pImpl_->halfedge_.end(),
+            node->pImpl_->halfedge_.begin(), node->pImpl_->halfedge_.end(),
             combined.halfedge_.begin() + edgeIndices[i],
             UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
 
@@ -246,78 +245,73 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.meshRelation_.triProperties.begin() + triIndices[i];
           if (node->pImpl_->NumProp() > 0) {
             auto &triProp = node->pImpl_->meshRelation_.triProperties;
-            transform(policy, triProp.begin(), triProp.end(), start,
+            transform(triProp.begin(), triProp.end(), start,
                       UpdateTriProp({propVertIndices[i]}));
 
             const int numProp = node->pImpl_->NumProp();
             auto &oldProp = node->pImpl_->meshRelation_.properties;
             auto &newProp = combined.meshRelation_.properties;
             for (int p = 0; p < numProp; ++p) {
-              strided_range<Vec<float>::IterC> oldRange(oldProp.begin() + p,
-                                                        oldProp.end(), numProp);
-              strided_range<Vec<float>::Iter> newRange(
+              auto oldRange =
+                  StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
+              auto newRange = StridedRange(
                   newProp.begin() + numPropOut * propVertIndices[i] + p,
                   newProp.end(), numPropOut);
-              copy(policy, oldRange.begin(), oldRange.end(), newRange.begin());
+              copy(oldRange.begin(), oldRange.end(), newRange.begin());
             }
           } else {
             // point all triangles at single new property of zeros.
-            fill(policy, start, start + node->pImpl_->NumTri(),
-                 glm::ivec3(propVertIndices[i]));
+            fill(start, start + node->pImpl_->NumTri(),
+                 ivec3(propVertIndices[i]));
           }
         }
 
-        if (node->transform_ == glm::mat4x3(1.0f)) {
-          copy(policy, node->pImpl_->vertPos_.begin(),
-               node->pImpl_->vertPos_.end(),
+        if (node->transform_ == mat4x3(1.0)) {
+          copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
-          copy(policy, node->pImpl_->faceNormal_.begin(),
+          copy(node->pImpl_->faceNormal_.begin(),
                node->pImpl_->faceNormal_.end(),
                combined.faceNormal_.begin() + triIndices[i]);
         } else {
           // no need to apply the transform to the node, just copy the vertices
           // and face normals and apply transform on the fly
-          auto vertPosBegin = thrust::make_transform_iterator(
+          auto vertPosBegin = TransformIterator(
               node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
-          glm::mat3 normalTransform =
-              glm::inverse(glm::transpose(glm::mat3(node->transform_)));
-          auto faceNormalBegin = thrust::make_transform_iterator(
-              node->pImpl_->faceNormal_.begin(),
-              TransformNormals({normalTransform}));
-          copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
+          mat3 normalTransform =
+              glm::inverse(glm::transpose(mat3(node->transform_)));
+          auto faceNormalBegin =
+              TransformIterator(node->pImpl_->faceNormal_.begin(),
+                                TransformNormals({normalTransform}));
+          copy_n(vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
-          copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
+          copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
-          const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
-          for_each_n(policy,
-                     zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
-                         countAt(0)),
-                     node->pImpl_->halfedgeTangent_.size(),
-                     TransformTangents{glm::mat3(node->transform_), invert,
-                                       node->pImpl_->halfedgeTangent_,
+          const bool invert = glm::determinant(mat3(node->transform_)) < 0;
+          for_each_n(policy, countAt(0), node->pImpl_->halfedgeTangent_.size(),
+                     TransformTangents{combined.halfedgeTangent_,
+                                       edgeIndices[i], mat3(node->transform_),
+                                       invert, node->pImpl_->halfedgeTangent_,
                                        node->pImpl_->halfedge_});
           if (invert)
-            for_each_n(policy,
-                       zip(combined.meshRelation_.triRef.begin(),
-                           countAt(triIndices[i])),
-                       node->pImpl_->NumTri(), FlipTris({combined.halfedge_}));
+            for_each_n(policy, countAt(triIndices[i]), node->pImpl_->NumTri(),
+                       FlipTris({combined.halfedge_}));
         }
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
         // unique meshIDs.
         const int offset = i * Manifold::Impl::meshIDCounter_;
-        transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
+        transform(node->pImpl_->meshRelation_.triRef.begin(),
                   node->pImpl_->meshRelation_.triRef.end(),
                   combined.meshRelation_.triRef.begin() + triIndices[i],
                   UpdateMeshIDs({offset}));
       });
 
-  for (int i = 0; i < nodes.size(); i++) {
+  for (size_t i = 0; i < nodes.size(); i++) {
     auto &node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
-    for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
+    for (const auto &pair : node->pImpl_->meshRelation_.meshIDtransform) {
       combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
     }
   }
@@ -353,7 +347,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
 
   auto isReused = [](const auto &node) { return node->impl_.UseCount() > 1; };
 
-  auto copyChildren = [&](const auto &list, const glm::mat4x3 &transform) {
+  auto copyChildren = [&](const auto &list, const mat4x3 &transform) {
     for (const auto &child : list) {
       children.push_back(child->Transform(transform));
     }
@@ -391,10 +385,10 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   return std::make_shared<CsgOpNode>(children, op);
 }
 
-std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
+std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat4x3 &m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
-  node->transform_ = m * glm::mat4(transform_);
+  node->transform_ = m * mat4(transform_);
   node->op_ = op_;
   return node;
 }
@@ -457,8 +451,8 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ZoneScoped;
   auto getImplPtr = GetImplPtr();
-  ASSERT(operation != OpType::Subtract, logicErr,
-         "BatchBoolean doesn't support Difference.");
+  DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
+               "BatchBoolean doesn't support Difference.");
   // common cases
   if (results.size() == 0) return std::make_shared<Manifold::Impl>();
   if (results.size() == 1)
@@ -537,16 +531,16 @@ void CsgOpNode::BatchUnion() const {
   // with O(n^2) complexity to take too long.
   // If the number of children exceeded this limit, we will operate on chunks
   // with size kMaxUnionSize.
-  constexpr int kMaxUnionSize = 1000;
+  constexpr size_t kMaxUnionSize = 1000;
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
   while (children_.size() > 1) {
-    const int start = (children_.size() > kMaxUnionSize)
-                          ? (children_.size() - kMaxUnionSize)
-                          : 0;
+    const size_t start = (children_.size() > kMaxUnionSize)
+                             ? (children_.size() - kMaxUnionSize)
+                             : 0;
     Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
-    for (int i = start; i < children_.size(); i++) {
+    for (size_t i = start; i < children_.size(); i++) {
       boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
                           ->GetImpl()
                           ->bBox_);
@@ -645,6 +639,6 @@ bool CsgOpNode::IsOp(OpType op) {
   }
 }
 
-glm::mat4x3 CsgOpNode::GetTransform() const { return transform_; }
+mat4x3 CsgOpNode::GetTransform() const { return transform_; }
 
 }  // namespace manifold

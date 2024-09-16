@@ -12,27 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 
 #include <gtest/gtest.h>
 
 #include <vector>
 
-#include "glm/geometric.hpp"
-#include "manifold.h"
-#include "polygon.h"
-#include "public.h"
+#include "manifold/common.h"
+#include "manifold/manifold.h"
 #include "test.h"
-
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
 
 using namespace manifold;
 
 TEST(CrossSection, Square) {
   auto a = Manifold::Cube({5, 5, 5});
-  auto b = Manifold::Extrude(CrossSection::Square({5, 5}), 5);
+  auto b = Manifold::Extrude(CrossSection::Square({5, 5}).ToPolygons(), 5);
 
   EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
 }
@@ -41,26 +35,26 @@ TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
   auto cross = a + b + b.Mirror({1, 1});
-  auto result = Manifold::Extrude(cross, 5.);
+  auto result = Manifold::Extrude(cross.ToPolygons(), 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_mirror_union.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_mirror_union.glb", result.GetMeshGL(), {});
 #endif
 
   EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
-  EXPECT_TRUE(a.Mirror(glm::vec2(0)).IsEmpty());
+  EXPECT_TRUE(a.Mirror(vec2(0)).IsEmpty());
 }
 
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
   auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
-  auto result = Manifold::Extrude(rounded, 5.);
+  auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_round_offset.glb", result.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
@@ -75,8 +69,8 @@ TEST(CrossSection, Empty) {
 }
 
 TEST(CrossSection, Rect) {
-  float w = 10;
-  float h = 5;
+  double w = 10;
+  double h = 5;
   auto rect = Rect({0, 0}, {w, h});
   CrossSection cross(rect);
   auto area = rect.Area();
@@ -94,38 +88,36 @@ TEST(CrossSection, Transform) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Rotate(45).Scale({2, 3}).Translate({4, 5});
 
-  glm::mat3x3 trans(1.0f, 0.0f, 0.0f,  //
-                    0.0f, 1.0f, 0.0f,  //
-                    4.0f, 5.0f, 1.0f);
-  glm::mat3x3 rot(cosd(45), sind(45), 0.0f,   //
-                  -sind(45), cosd(45), 0.0f,  //
-                  0.0f, 0.0f, 1.0f);
-  glm::mat3x3 scale(2.0f, 0.0f, 0.0f,  //
-                    0.0f, 3.0f, 0.0f,  //
-                    0.0f, 0.0f, 1.0f);
+  mat3 trans(1.0, 0.0, 0.0,  //
+             0.0, 1.0, 0.0,  //
+             4.0, 5.0, 1.0);
+  mat3 rot(cosd(45), sind(45), 0.0,   //
+           -sind(45), cosd(45), 0.0,  //
+           0.0, 0.0, 1.0);
+  mat3 scale(2.0, 0.0, 0.0,  //
+             0.0, 3.0, 0.0,  //
+             0.0, 0.0, 1.0);
 
-  auto b = sq.Transform(glm::mat3x2(trans * scale * rot));
+  auto b = sq.Transform(mat3x2(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
-  auto ex_b = Manifold::Extrude(b, 1.).GetMesh();
-  Identical(Manifold::Extrude(a, 1.).GetMesh(), ex_b);
+  auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL();
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMeshGL(), ex_b);
 
   // same transformations are applied in b_copy (giving same result)
-  Identical(ex_b, Manifold::Extrude(b_copy, 1.).GetMesh());
+  Identical(ex_b, Manifold::Extrude(b_copy.ToPolygons(), 1.).GetMeshGL());
 }
 
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](glm::vec2 &v) {
+  auto b = sq.Warp([](vec2 &v) {
     v.x = v.x * 2 + 4;
     v.y = v.y * 3 + 5;
   });
 
   EXPECT_EQ(sq.NumVert(), 4);
   EXPECT_EQ(sq.NumContour(), 1);
-  // Identical(Manifold::Extrude(a, 1.).GetMesh(),
-  //           Manifold::Extrude(b, 1.).GetMesh());
 }
 
 TEST(CrossSection, Decompose) {
@@ -140,12 +132,12 @@ TEST(CrossSection, Decompose) {
   EXPECT_EQ(decomp[0].NumContour(), 2);
   EXPECT_EQ(decomp[1].NumContour(), 2);
 
-  Identical(Manifold::Extrude(a, 1.).GetMesh(),
-            Manifold::Extrude(decomp[0], 1.).GetMesh());
-  Identical(Manifold::Extrude(b, 1.).GetMesh(),
-            Manifold::Extrude(decomp[1], 1.).GetMesh());
-  Identical(Manifold::Extrude(ab, 1.).GetMesh(),
-            Manifold::Extrude(recomp, 1.).GetMesh());
+  Identical(Manifold::Extrude(a.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(decomp[0].ToPolygons(), 1.).GetMeshGL());
+  Identical(Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(decomp[1].ToPolygons(), 1.).GetMeshGL());
+  Identical(Manifold::Extrude(ab.ToPolygons(), 1.).GetMeshGL(),
+            Manifold::Extrude(recomp.ToPolygons(), 1.).GetMeshGL());
 }
 
 TEST(CrossSection, FillRule) {
@@ -180,8 +172,8 @@ TEST(CrossSection, Hull) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    auto circ_tri_ex = Manifold::Extrude(circ_tri, 10);
-    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMesh(), {});
+    auto circ_tri_ex = Manifold::Extrude(circ_tri.ToPolygons(), 10);
+    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMeshGL(), {});
   }
 #endif
 
@@ -190,4 +182,22 @@ TEST(CrossSection, Hull) {
   EXPECT_FLOAT_EQ(
       circ_area * 2.5,
       (CrossSection::BatchBoolean(circs, OpType::Add) - tri).Area());
+}
+
+TEST(CrossSection, HullError) {
+  auto rounded_rectangle = [](double x, double y, double radius, int segments) {
+    auto circ = CrossSection::Circle(radius, segments);
+    std::vector<CrossSection> vl{};
+    vl.push_back(circ.Translate(vec2{radius, radius}));
+    vl.push_back(circ.Translate(vec2{x - radius, radius}));
+    vl.push_back(circ.Translate(vec2{x - radius, y - radius}));
+    vl.push_back(circ.Translate(vec2{radius, y - radius}));
+    return CrossSection::Hull(vl);
+  };
+  auto rr = rounded_rectangle(51, 36, 9.0, 36);
+
+  auto rr_area = rr.Area();
+  auto rr_verts = rr.NumVert();
+  EXPECT_FLOAT_EQ(rr_area, 1765.1790375559026);
+  EXPECT_FLOAT_EQ(rr_verts, 40);
 }

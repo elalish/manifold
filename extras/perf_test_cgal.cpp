@@ -21,7 +21,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 using namespace manifold;
 
@@ -40,7 +40,7 @@ typedef CGAL::SM_Vertex_index Vertex;
 void manifoldToCGALSurfaceMesh(Manifold &manifold, TriangleMesh &cgalMesh) {
   auto maniMesh = manifold.GetMesh();
 
-  const int n = maniMesh.vertPos.size();
+  const size_t n = maniMesh.vertPos.size();
   std::vector<Vertex> vertices(n);
   for (size_t i = 0; i < n; i++) {
     auto &vert = maniMesh.vertPos[i];
@@ -57,7 +57,7 @@ void manifoldToCGALSurfaceMesh(Manifold &manifold, TriangleMesh &cgalMesh) {
 int main(int argc, char **argv) {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
-    Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
+    Manifold sphere2 = sphere.Translate(vec3(0.5));
 
     TriangleMesh cgalSphere, cgalSphere2;
     manifoldToCGALSurfaceMesh(sphere, cgalSphere);

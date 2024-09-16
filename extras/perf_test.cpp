@@ -15,14 +15,14 @@
 #include <chrono>
 #include <iostream>
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 using namespace manifold;
 
 int main(int argc, char **argv) {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
-    Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
+    Manifold sphere2 = sphere.Translate(vec3(0.5));
     auto start = std::chrono::high_resolution_clock::now();
     Manifold diff = sphere - sphere2;
     diff.NumTri();

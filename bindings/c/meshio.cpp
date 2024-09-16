@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "meshIO.h"
+#include "manifold/meshIO.h"
 
-#include "conv.h"
-#include "types.h"
+#include "manifold/conv.h"
+#include "manifold/types.h"
 
 // C <-> C++ conversions
 
@@ -45,11 +45,11 @@ ManifoldMaterial *manifold_material(void *mem) {
   return to_c(new (mem) manifold::Material());
 }
 
-void manifold_material_set_roughness(ManifoldMaterial *mat, float roughness) {
+void manifold_material_set_roughness(ManifoldMaterial *mat, double roughness) {
   from_c(mat)->roughness = roughness;
 }
 
-void manifold_material_set_metalness(ManifoldMaterial *mat, float metalness) {
+void manifold_material_set_metalness(ManifoldMaterial *mat, double metalness) {
   from_c(mat)->metalness = metalness;
 }
 
@@ -88,7 +88,7 @@ void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
 ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
                                        int force_cleanup) {
   auto m = manifold::ImportMesh(std::string(filename), force_cleanup);
-  return to_c(new (mem) manifold::MeshGL(m));
+  return to_c(new (mem) MeshGL(m));
 }
 
 // memory size

@@ -16,8 +16,9 @@
 #include <string>
 
 #include "autogen_docstrings.inl"  // generated in build folder
-#include "cross_section.h"
-#include "manifold.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
@@ -26,8 +27,6 @@
 #include "nanobind/stl/pair.h"
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
-#include "polygon.h"
-#include "sdf.h"
 
 namespace nb = nanobind;
 using namespace manifold;
@@ -35,27 +34,27 @@ using namespace manifold;
 template <class T>
 struct glm_name {};
 template <>
-struct glm_name<glm::vec3> {
-  static constexpr char const name[] = "Floatx3";
-  static constexpr char const multi_name[] = "FloatNx3";
+struct glm_name<vec3> {
+  static constexpr char const name[] = "Doublex3";
+  static constexpr char const multi_name[] = "DoubleNx3";
 };
 template <>
-struct glm_name<glm::vec2> {
-  static constexpr char const name[] = "Floatx2";
-  static constexpr char const multi_name[] = "FloatNx2";
+struct glm_name<vec2> {
+  static constexpr char const name[] = "Doublex2";
+  static constexpr char const multi_name[] = "DoubleNx2";
 };
 template <>
-struct glm_name<glm::ivec3> {
+struct glm_name<ivec3> {
   static constexpr char const name[] = "Intx3";
   static constexpr char const multi_name[] = "IntNx3";
 };
 template <>
-struct glm_name<glm::mat4x3> {
-  static constexpr char const name[] = "Float3x4";
+struct glm_name<mat4x3> {
+  static constexpr char const name[] = "Double3x4";
 };
 template <>
-struct glm_name<glm::mat3x2> {
-  static constexpr char const name[] = "Float2x3";
+struct glm_name<mat3x2> {
+  static constexpr char const name[] = "Double2x3";
 };
 
 // handle glm::vecN
@@ -68,7 +67,7 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
     int size = PyObject_Size(src.ptr());  // negative on failure
     if (size != N) return false;
     make_caster<T> t_cast;
-    for (size_t i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++) {
       if (!t_cast.from_python(src[i], flags, cleanup)) return false;
       value[i] = t_cast.value;
     }
@@ -92,11 +91,11 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     int rows = PyObject_Size(src.ptr());  // negative on failure
     if (rows != R) return false;
-    for (size_t i = 0; i < R; i++) {
+    for (int i = 0; i < R; i++) {
       const nb::object &slice = src[i];
       int cols = PyObject_Size(slice.ptr());  // negative on failure
       if (cols != C) return false;
-      for (size_t j = 0; j < C; j++) {
+      for (int j = 0; j < C; j++) {
         make_caster<T> t_cast;
         if (!t_cast.from_python(slice[j], flags, cleanup)) return false;
         value[j][i] = t_cast.value;
@@ -107,7 +106,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   static handle from_cpp(glm_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
@@ -124,25 +123,25 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
 template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
-  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
+  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
   NB_TYPE_CASTER(std::vector<glm_type>,
                  const_name(glm_name<glm_type>::multi_name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     make_caster<numpy_type> arr_cast;
     if (arr_cast.from_python(src, flags, cleanup)) {
-      int num_vec = arr_cast.value.shape(0);
+      size_t num_vec = arr_cast.value.shape(0);
       value.resize(num_vec);
-      for (int i = 0; i < num_vec; i++) {
+      for (size_t i = 0; i < num_vec; i++) {
         for (int j = 0; j < N; j++) {
           value[i][j] = arr_cast.value(i, j);
         }
       }
     } else {
-      int num_vec = PyObject_Size(src.ptr());  // negative on failure
-      if (num_vec < 0) return false;
+      size_t num_vec = PyObject_Size(src.ptr());  // negative on failure
+      if (num_vec == static_cast<size_t>(-1)) return false;
       value.resize(num_vec);
-      for (int i = 0; i < num_vec; i++) {
+      for (size_t i = 0; i < num_vec; i++) {
         make_caster<glm_type> vec_cast;
         if (!vec_cast.from_python(src[i], flags, cleanup)) return false;
         value[i] = vec_cast.value;
@@ -154,14 +153,14 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
-    for (int i = 0; i < num_vec; i++) {
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
+    for (size_t i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
       }
     }
     numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
+    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
                         cleanup);
   }
 };
@@ -170,7 +169,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
 template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
-  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
+  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
   NB_TYPE_CASTER(manifold::VecView<glm_type>,
                  const_name(glm_name<glm_type>::multi_name));
 
@@ -178,9 +177,9 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
     make_caster<numpy_type> arr_cast;
     if (!arr_cast.from_python(src, flags, cleanup)) return false;
     // TODO try 2d iterators if numpy cast fails
-    int num_vec = arr_cast.value.shape(0);
+    size_t num_vec = arr_cast.value.shape(0);
     if (num_vec != value.size()) return false;
-    for (int i = 0; i < num_vec; i++) {
+    for (size_t i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         value[i][j] = arr_cast.value(i, j);
       }
@@ -189,11 +188,12 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
   }
   static handle from_cpp(Value vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
+    // do we have ownership issue here?
     size_t num_vec = vec.size();
     static_assert(sizeof(vec[0]) == (N * sizeof(T)),
                   "VecView -> numpy requires packed structs");
-    numpy_type arr{&vec[0], {num_vec, N}};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
+    numpy_type arr{&vec[0], {num_vec, N}, nb::handle()};
+    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
                         cleanup);
   }
 };
@@ -248,7 +248,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("manifolds"), manifold__hull__manifolds)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec3> pts) { return Manifold::Hull(pts); },
+          [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
           nb::arg("pts"), manifold__hull__pts)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
@@ -257,9 +257,7 @@ NB_MODULE(manifold3d, m) {
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
-          [](const Manifold &m, float s) {
-            m.Scale({s, s, s});
-          },
+          [](const Manifold &self, double s) { self.Scale({s, s, s}); },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -267,32 +265,38 @@ NB_MODULE(manifold3d, m) {
       .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
       .def(
           "rotate",
-          [](const Manifold &self, glm::vec3 v) {
+          [](const Manifold &self, vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"), manifold__rotate__v.c_str())
-      .def("warp", &Manifold::Warp, nb::arg("warp_func"),
-           manifold__warp__warp_func)
+      .def(
+          "warp",
+          [](const Manifold &self, std::function<vec3(vec3)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.Warp([&warp_func](vec3 &v) { v = warp_func(v); });
+          },
+          nb::arg("warp_func"), manifold__warp__warp_func)
       .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
            manifold__warp_batch__warp_func)
       .def(
           "set_properties",
           [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
-                 glm::vec3, const nb::ndarray<nb::numpy, const float,
-                                              nb::c_contig> &)> &f) {
+                 vec3, const nb::ndarray<nb::numpy, const double, nb::c_contig>
+                           &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
-                                                      float *newProps,
-                                                      glm::vec3 v,
-                                                      const float *oldProps) {
+                                                      double *newProps, vec3 v,
+                                                      const double *oldProps) {
               auto result =
-                  f(v, nb::ndarray<nb::numpy, const float, nb::c_contig>(
-                           oldProps, {static_cast<unsigned long>(oldNumProp)}));
-              nb::ndarray<float, nb::shape<nb::any>> array;
-              std::vector<float> vec;
+                  f(v, nb::ndarray<nb::numpy, const double, nb::c_contig>(
+                           oldProps, {static_cast<unsigned long>(oldNumProp)},
+                           nb::handle()));
+              nb::ndarray<double, nb::shape<-1>> array;
+              std::vector<double> vec;
               if (nb::try_cast(result, array)) {
-                if (array.ndim() != 1 || array.shape(0) != newNumProp)
+                if (array.ndim() != 1 ||
+                    array.shape(0) != static_cast<size_t>(newNumProp))
                   throw std::runtime_error("Invalid vector shape, expected (" +
                                            std::to_string(newNumProp) + ")");
                 for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
@@ -309,9 +313,22 @@ NB_MODULE(manifold3d, m) {
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
+      .def("min_gap", &Manifold::MinGap, nb::arg("other"),
+           nb::arg("search_length"),
+           "Returns the minimum gap between two manifolds."
+           "Returns a double between 0 and searchLength.")
+      .def("calculate_normals", &Manifold::CalculateNormals,
+           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
+           manifold__calculate_normals__normal_idx__min_sharp_angle)
+      .def("smooth_by_normals", &Manifold::SmoothByNormals,
+           nb::arg("normal_idx"), manifold__smooth_by_normals__normal_idx)
+      .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
+           nb::arg("min_smoothness") = 0,
+           manifold__smooth_out__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
-      .def("to_mesh", &Manifold::GetMeshGL,
-           nb::arg("normal_idx") = glm::ivec3(0),
+      .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
+           manifold__refine_to_length__length)
+      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
@@ -346,9 +363,18 @@ NB_MODULE(manifold3d, m) {
            manifold__minkowski_sum__other)
       .def("minkowski_difference", &Manifold::MinkowskiDifference,
            nb::arg("other"), manifold__minkowski_difference__other)
-      .def("slice", &Manifold::Slice, nb::arg("height"),
-           manifold__slice__height)
-      .def("project", &Manifold::Project, manifold__project)
+      .def(
+          "slice",
+          [](const Manifold &self, double height) {
+            return CrossSection(self.Slice(height));
+          },
+          nb::arg("height"), manifold__slice__height)
+      .def(
+          "project",
+          [](const Manifold &self) {
+            return CrossSection(self.Project()).Simplify(self.Precision());
+          },
+          manifold__project)
       .def("status", &Manifold::Status, manifold__status)
       .def(
           "bounding_box",
@@ -361,14 +387,14 @@ NB_MODULE(manifold3d, m) {
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
           "smooth",
-          [](const MeshGL &mesh, std::vector<int> sharpened_edges,
-             std::vector<float> edge_smoothness) {
+          [](const MeshGL &mesh, std::vector<size_t> sharpened_edges,
+             std::vector<double> edge_smoothness) {
             if (sharpened_edges.size() != edge_smoothness.size()) {
               throw std::runtime_error(
                   "sharpened_edges.size() != edge_smoothness.size()");
             }
             std::vector<Smoothness> vec(sharpened_edges.size());
-            for (int i = 0; i < vec.size(); i++) {
+            for (size_t i = 0; i < vec.size(); i++) {
               vec[i] = {sharpened_edges[i], edge_smoothness[i]};
             }
             return Manifold::Smooth(mesh, vec);
@@ -377,11 +403,53 @@ NB_MODULE(manifold3d, m) {
           nb::arg("edge_smoothness") = nb::list(),
           // todo params slightly diff
           manifold__smooth__mesh_gl__sharpened_edges)
+      .def_static("batch_boolean", &Manifold::BatchBoolean,
+                  nb::arg("manifolds"), nb::arg("op"),
+                  manifold__batch_boolean__manifolds__op)
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
+      .def_static("cube", &Manifold::Cube, nb::arg("size") = vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
+      .def_static(
+          "extrude",
+          [](const CrossSection &crossSection, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
+            return Manifold::Extrude(crossSection.ToPolygons(), height,
+                                     nDivisions, twistDegrees, scaleTop);
+          },
+          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
+      .def_static(
+          "revolve",
+          [](const CrossSection &crossSection, int circularSegments,
+             double revolveDegrees) {
+            return Manifold::Revolve(crossSection.ToPolygons(),
+                                     circularSegments, revolveDegrees);
+          },
+          nb::arg("crossSection"), nb::arg("circular_segments") = 0,
+          nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+      .def_static(
+          "level_set",
+          [](const std::function<double(double, double, double)> &f,
+             std::vector<double> bounds, double edgeLength, double level = 0.0,
+             double precision = -1) {
+            // Same format as Manifold.bounding_box
+            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
+                         vec3(bounds[3], bounds[4], bounds[5])};
+
+            std::function<double(vec3)> cppToPython = [&f](vec3 v) {
+              return f(v.x, v.y, v.z);
+            };
+            return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
+                                      precision, false);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("precision") = -1,
+          manifold__level_set__sdf__bounds__edge_length__level__precision__can_parallel)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
@@ -399,59 +467,59 @@ NB_MODULE(manifold3d, m) {
           // affect the original array passed into the function
           "__init__",
           [](MeshGL *self,
-             nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::c_contig>
-                 &vertProp,
-             nb::ndarray<uint32_t, nb::shape<nb::any, 3>, nb::c_contig>
-                 &triVerts,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             nb::ndarray<float, nb::shape<-1, -1>, nb::c_contig> &vertProp,
+             nb::ndarray<uint32_t, nb::shape<-1, 3>, nb::c_contig> &triVerts,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &mergeFromVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &mergeToVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
-                                             nb::c_contig>> &runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             const std::optional<
+                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>> &runIndex,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &runOriginalID,
-             std::optional<nb::ndarray<float, nb::shape<nb::any, 4, 3>,
+             std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>> &runTransform,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
-                                             nb::c_contig>> &faceID,
-             const std::optional<nb::ndarray<float, nb::shape<nb::any, 3, 4>,
+             const std::optional<
+                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>> &faceID,
+             const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>> &halfedgeTangent,
              float precision) {
-    new (self) MeshGL();
-    MeshGL &out = *self;
-    out.numProp = vertProp.shape(1);
-    out.vertProperties = toVector<float>(vertProp.data(), vertProp.size());
+            new (self) MeshGL();
+            MeshGL &out = *self;
+            out.numProp = vertProp.shape(1);
+            out.vertProperties =
+                toVector<float>(vertProp.data(), vertProp.size());
 
-    out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
+            out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
 
-    if (mergeFromVert.has_value())
-      out.mergeFromVert =
-          toVector<uint32_t>(mergeFromVert->data(), mergeFromVert->size());
+            if (mergeFromVert.has_value())
+              out.mergeFromVert = toVector<uint32_t>(mergeFromVert->data(),
+                                                     mergeFromVert->size());
 
-    if (mergeToVert.has_value())
-      out.mergeToVert =
-          toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
+            if (mergeToVert.has_value())
+              out.mergeToVert =
+                  toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
 
-    if (runIndex.has_value())
-      out.runIndex = toVector<uint32_t>(runIndex->data(), runIndex->size());
+            if (runIndex.has_value())
+              out.runIndex =
+                  toVector<uint32_t>(runIndex->data(), runIndex->size());
 
-    if (runOriginalID.has_value())
-      out.runOriginalID =
-          toVector<uint32_t>(runOriginalID->data(), runOriginalID->size());
+            if (runOriginalID.has_value())
+              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
+                                                     runOriginalID->size());
 
-    if (runTransform.has_value()) {
-      out.runTransform =
-          toVector<float>(runTransform->data(), runTransform->size());
-    }
+            if (runTransform.has_value()) {
+              out.runTransform =
+                  toVector<float>(runTransform->data(), runTransform->size());
+            }
 
-    if (faceID.has_value())
-      out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
+            if (faceID.has_value())
+              out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
 
-    if (halfedgeTangent.has_value()) {
-      out.halfedgeTangent =
-          toVector<float>(halfedgeTangent->data(), halfedgeTangent->size());
-    }
+            if (halfedgeTangent.has_value()) {
+              out.halfedgeTangent = toVector<float>(halfedgeTangent->data(),
+                                                    halfedgeTangent->size());
+            }
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
           nb::arg("merge_from_vert") = nb::none(),
@@ -461,69 +529,45 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_transform") = nb::none(),
           nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("precision") = 0)
-      .def_prop_ro("vert_properties",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.vertProperties.data(),
-        {self.vertProperties.size() / self.numProp, self.numProp});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("tri_verts",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const int, nb::c_contig>(
-        self.triVerts.data(), {self.triVerts.size() / 3, 3});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("run_transform",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.runTransform.data(), {self.runTransform.size() / 12, 4, 3});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("halfedge_tangent",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.halfedgeTangent.data(), {self.halfedgeTangent.size() / 12, 3, 4});
-                   }, nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "vert_properties",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.vertProperties.data(),
+                {self.vertProperties.size() / self.numProp, self.numProp},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "tri_verts",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const int, nb::c_contig>(
+                self.triVerts.data(), {self.triVerts.size() / 3, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "run_transform",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.runTransform.data(), {self.runTransform.size() / 12, 4, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "halfedge_tangent",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.halfedgeTangent.data(),
+                {self.halfedgeTangent.size() / 12, 3, 4}, nb::handle());
+          },
+          nb::rv_policy::reference_internal)
       .def_ro("merge_from_vert", &MeshGL::mergeFromVert)
       .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
-      .def_static(
-          "level_set", 
-          [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0) {
-                // Same format as Manifold.bounding_box
-                Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
-                            glm::vec3(bounds[3], bounds[4], bounds[5])};
-
-                std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
-                  return f(v.x, v.y, v.z);
-                };
-                Mesh result = LevelSet(cppToPython, bound, edgeLength, level, false);
-                return MeshGL(result);
-          },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
-          nb::arg("level") = 0.0,
-          "Constructs a level-set Mesh from the input Signed-Distance Function "
-          "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
-          "Cubes, but better for manifoldness). Instead of using a cubic grid, "
-          "it uses a body-centered cubic grid (two shifted cubic grids). This "
-          "means if your function's interior exceeds the given bounds, you "
-          "will see a kind of egg-crate shape closing off the manifold, which "
-          "is due to the underlying grid."
-          "\n\n"
-          ":param f: The signed-distance functor, containing this function "
-          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
-          "signed distance of a given point in R^3. Positive values are "
-          "inside, negative outside."
-          ":param bounds: An axis-aligned box that defines the extent of the "
-          "grid."
-          ":param edgeLength: Approximate maximum edge length of the triangles "
-          "in the final result.  This affects grid spacing, and hence has a "
-          "strong effect on performance."
-          ":param level: You can inset your Mesh by using a positive value, or "
-          "outset it with a negative value."
-          ":return Mesh: This mesh is guaranteed to be manifold."
-          "Use Manifold.from_mesh(mesh) to create a Manifold");
+      .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
@@ -569,6 +613,11 @@ NB_MODULE(manifold3d, m) {
           "joins would exceed a given maximum miter distance (relative to the "
           "offset distance), these are 'squared' instead.");
 
+  nb::enum_<OpType>(m, "OpType", "Operation types for batch_boolean")
+      .value("Add", OpType::Add)
+      .value("Subtract", OpType::Subtract)
+      .value("Intersect", OpType::Intersect);
+
   nb::class_<CrossSection>(
       m, "CrossSection",
       "Two-dimensional cross sections guaranteed to be without "
@@ -577,8 +626,7 @@ NB_MODULE(manifold3d, m) {
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
       .def(nb::init<>(), cross_section__cross_section)
-      .def(nb::init<std::vector<std::vector<glm::vec2>>,
-                    CrossSection::FillRule>(),
+      .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
            nb::arg("contours"),
            nb::arg("fillrule") = CrossSection::FillRule::Positive,
            cross_section__cross_section__contours__fillrule)
@@ -602,9 +650,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, float s) {
-            self.Scale({s, s});
-          },
+          [](const CrossSection &self, double s) { self.Scale({s, s}); },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
@@ -614,8 +660,13 @@ NB_MODULE(manifold3d, m) {
            cross_section__mirror__ax)
       .def("transform", &CrossSection::Transform, nb::arg("m"),
            cross_section__transform__m)
-      .def("warp", &CrossSection::Warp, nb::arg("warp_func"),
-           cross_section__warp__warp_func)
+      .def(
+          "warp",
+          [](const CrossSection &self, std::function<vec2(vec2)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.Warp([&warp_func](vec2 &v) { v = warp_func(v); });
+          },
+          nb::arg("warp_func"), cross_section__warp__warp_func)
       .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
            cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
@@ -637,18 +688,36 @@ NB_MODULE(manifold3d, m) {
           nb::arg("cross_sections"), cross_section__hull__cross_sections)
       .def_static(
           "hull_points",
-          [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
+          [](std::vector<vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
+      .def_static("batch_boolean", &CrossSection::BatchBoolean,
+                  nb::arg("cross_sections"), nb::arg("op"),
+                  cross_section__batch_boolean__cross_sections__op)
+      .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
+                  cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
-          "extrude", &Manifold::Extrude, nb::arg("height"),
-          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          "extrude",
+          [](const CrossSection &self, double height, int nDivisions,
+             double twistDegrees, vec2 scaleTop) {
+            return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
+                                     twistDegrees, scaleTop);
+          },
+          nb::arg("height"), nb::arg("n_divisions") = 0,
+          nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
-      .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
-           nb::arg("revolve_degrees") = 360.0,
-           manifold__revolve__cross_section__circular_segments__revolve_degrees)
+      .def(
+          "revolve",
+          [](const CrossSection &self, int circularSegments,
+             double revolveDegrees) {
+            return Manifold::Revolve(self.ToPolygons(), circularSegments,
+                                     revolveDegrees);
+          },
+          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)

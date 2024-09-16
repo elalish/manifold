@@ -1,14 +1,23 @@
 {
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "C/C++: clang++ build and debug active file",
+      "name": "manifold test",
       "type": "cppdbg",
+      "MIMode": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=Manifold.NonConvexNonConvexMinkowski"
+        "--gtest_catch_exceptions=0",
+<<<<<<< HEAD
+        "--gtest_filter=Polygon.MultiMerge"
+=======
+        "--gtest_filter=Samples.GyroidModule"
+>>>>>>> fbf07bf92a1d8cb380aec321f920d1db5d772f20
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",
@@ -18,9 +27,7 @@
           "value": "2"
         }
       ],
-      "externalConsole": false,
-      "MIMode": "lldb",
-      "preLaunchTask": "C/C++: clang++ build active file"
+      "externalConsole": false
     }
   ]
 }

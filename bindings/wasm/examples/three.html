@@ -35,83 +35,21 @@
 </head>
 
 <body>
-  <p>This demonstrates the minimum code to connect Manifold to a three.js rendering. A slightly more complex example
-    involving GLTF export and &lt;model-viewer&gt; can be found <a href="model-viewer.html">here</a>. </p>
+  <p>This example demonstrates interop between Manifold and Three.js with minimal code - please open dev tools to
+    inspect the source. Here we generate two multi-material Three.js meshes and convert them to Manifolds while building
+    a mapping from material to Manifold ID. Then Boolean operations are performed on the Manifolds and the result is
+    converted back to a Three.js mesh using the material mapping. The input cube has half red faces and half
+    normal-shaded, while the icosahedron has half blue faces and half normal-shaded. The resulting mesh has three
+    materials, since one (normal-shaded) was common between the input models.</p>
+  <p>A slightly more complex example involving our library for GLTF import/export and &lt;model-viewer&gt; can be found
+    <a href="model-viewer.html">here</a>. </p>
   <select>
-    <option value="difference" selected>Difference</option>
+    <option value="union" selected>Union</option>
+    <option value="difference">Difference</option>
     <option value="intersection">Intersection</option>
-    <option value="union">Union</option>
   </select><br />
   <canvas id="output"></canvas>
 </body>
-<script type="module">
-  import * as THREE from 'three';
-  import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-  import Module from './built/manifold.js';
-
-  const wasm = await Module();
-  wasm.setup();
-
-  const { Manifold, Mesh } = wasm;
-
-  // we have manifold module, let's do some three.js
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
-  camera.position.z = 1;
-
-  const scene = new THREE.Scene();
-  const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
-    flatShading: true
-  }));
-  scene.add(mesh);
-
-  const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
-
-  const manifold_1 = Manifold.cube([0.2, 0.2, 0.2], true);
-  const manifold_2 = new Manifold(geometry2mesh(icosahedron));
-
-  const csg = function (operation) {
-    mesh.geometry?.dispose();
-    mesh.geometry = mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
-  };
-
-  document.querySelector('select').onchange = function (event) {
-    csg(event.target.value);
-  };
-
-  csg('difference');
-
-  const output = document.querySelector("#output");
-  const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
-  const dim = output.getBoundingClientRect();
-  renderer.setSize(dim.width, dim.height);
-  renderer.setAnimationLoop(function (time) {
-    mesh.rotation.x = time / 2000;
-    mesh.rotation.y = time / 1000;
-    renderer.render(scene, camera);
-  });
-
-  // functions to convert between three.js and wasm
-  function geometry2mesh(geometry) {
-    const vertProperties = geometry.attributes.position.array;
-    const triVerts = geometry.index.array;
-    return new Mesh({ numProp: 3, vertProperties, triVerts });
-  }
-
-  function mesh2geometry(mesh) {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertProperties, 3));
-    geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
-    return geometry;
-  }
-
-  // most of three.js geometries aren't manifolds, so...
-  function simplify(geometry) {
-    delete geometry.attributes.normal;
-    delete geometry.attributes.uv;
-    const simplified = mergeVertices(geometry);
-    simplified.computeVertexNormals();
-    return simplified;
-  }
-</script>
+<script type="module" src="three.ts"></script>
 
 </html>

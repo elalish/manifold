@@ -6,24 +6,23 @@
 #include <execution>
 #endif
 
-#include "polygon.h"
-#include "utils.h"
+#include "manifold/polygon.h"
+#include "manifold/utils.h"
 
 using namespace manifold;
 
-inline float cross(glm::vec2 p, glm::vec2 q) { return p.x * q.y - p.y * q.x; }
+inline double cross(vec2 p, vec2 q) { return p.x * q.y - p.y * q.x; }
 
 // return true if p intersects with q
 // note that we don't care about collinear, intersection in the ends etc.
 // https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
-inline bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1,
-                      float precision) {
-  glm::vec2 r = p1 - p0;
-  glm::vec2 s = q1 - q0;
+inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
+  vec2 r = p1 - p0;
+  vec2 s = q1 - q0;
   // allow some error in the intersection point
-  float epsilon_r = 2.0 * precision / glm::length(r);
-  float epsilon_s = 2.0 * precision / glm::length(s);
-  float rxs = cross(r, s);
+  double epsilon_r = 2.0 * precision / glm::length(r);
+  double epsilon_s = 2.0 * precision / glm::length(s);
+  double rxs = cross(r, s);
   // in case they are nearly collinear, ignore them...
   // this is to avoid treating degenerate triangles as intersecting
   //
@@ -32,8 +31,8 @@ inline bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1,
   if (rxs < kTolerance && rxs > -kTolerance) {
     return false;
   }
-  float u = cross(q0 - p0, r) / rxs;
-  float t = cross(q0 - p0, s) / rxs;
+  double u = cross(q0 - p0, r) / rxs;
+  double t = cross(q0 - p0, s) / rxs;
   // we only care about intersection in the middle of both lines, excluding
   // their ends
   if (epsilon_r <= u && u <= (1 - epsilon_r) &&  //
@@ -43,11 +42,11 @@ inline bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1,
     // perturbation along r/s is not enough.
     //
     // in that case, apply perturbation perpendicular to r
-    glm::vec2 r_orth = glm::normalize(glm::vec2(-r.y, r.x)) * precision;
-    float u1 = cross(q0 - p0 + r_orth, r) / rxs;
-    float u2 = cross(q0 - p0 - r_orth, r) / rxs;
-    float t1 = cross(q0 - p0 + r_orth, s) / rxs;
-    float t2 = cross(q0 - p0 - r_orth, s) / rxs;
+    vec2 r_orth = glm::normalize(vec2(-r.y, r.x)) * precision;
+    double u1 = cross(q0 - p0 + r_orth, r) / rxs;
+    double u2 = cross(q0 - p0 - r_orth, r) / rxs;
+    double t1 = cross(q0 - p0 + r_orth, s) / rxs;
+    double t2 = cross(q0 - p0 - r_orth, s) / rxs;
     return 0 <= u1 && u1 <= 1 &&  //
            0 <= t1 && t1 <= 1 &&  //
            0 <= u2 && u2 <= 1 &&  //
@@ -61,20 +60,20 @@ inline bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1,
 // check if removing point j in polygon i will introduce self-intersection
 // this checks if the new edge j-1 <-> j+1 intersects with any other edges,
 // assuming the original polygon does not contain self-intersection
-bool safeToRemove(const Polygons &polys, int i, int j, float precision) {
+bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
   if (polys[i].size() == 3) return false;
-  glm::vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
-  glm::vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
-  for (int k = 0; k < polys.size(); k++) {
+  vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
+  vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
+  for (size_t k = 0; k < polys.size(); k++) {
     auto ll = [&](size_t l) {
       return l == (polys[k].size() - 1) ? 0 : (l + 1);
     };
-    const glm::vec2 *polysk = polys[k].data();
+    const vec2 *polysk = polys[k].data();
     if (!std::all_of(
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
             std::execution::par,
 #endif
-            countAt((size_t)0), countAt(polys[k].size()), [=](size_t l) {
+            countAt(0_uz), countAt(polys[k].size()), [=](size_t l) {
               if (i == k && (l == j || ll(l) == j)) return true;
               return !intersect(prev, next, polysk[l], polysk[ll(l)],
                                 precision);
@@ -84,8 +83,8 @@ bool safeToRemove(const Polygons &polys, int i, int j, float precision) {
   return true;
 }
 
-std::pair<int, int> findIndex(const Polygons &polys, int i) {
-  int outer = 0;
+std::pair<int, int> findIndex(const Polygons &polys, size_t i) {
+  size_t outer = 0;
   while (i >= polys[outer].size()) i -= polys[outer++].size();
   return std::make_pair(outer, i);
 }
@@ -93,32 +92,32 @@ std::pair<int, int> findIndex(const Polygons &polys, int i) {
 void Dump(const Polygons &polys) {
   for (const SimplePolygon &poly : polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
-    for (const glm::vec2 v : poly) {
+    for (const vec2 v : poly) {
       std::cout << "    {" << v.x << ", " << v.y << "},  //" << std::endl;
     }
     std::cout << "});" << std::endl;
   }
   for (const SimplePolygon &poly : polys) {
     std::cout << "show(array([" << std::endl;
-    for (const glm::vec2 v : poly) {
+    for (const vec2 v : poly) {
       std::cout << "  [" << v.x << ", " << v.y << "]," << std::endl;
     }
     std::cout << "]))" << std::endl;
   }
 }
 
-void DumpTriangulation(const Polygons &polys, float precision) {
+void DumpTriangulation(const Polygons &polys, double precision) {
   ExecutionParams oldParams = PolygonParams();
   manifold::PolygonParams().processOverlaps = true;
-  std::vector<glm::ivec3> result = Triangulate(polys);
+  std::vector<ivec3> result = Triangulate(polys);
   PolygonParams() = oldParams;
-  for (const glm::ivec3 &tri : result) {
+  for (const ivec3 &tri : result) {
     std::pair<int, int> xid = findIndex(polys, tri.x);
     std::pair<int, int> yid = findIndex(polys, tri.y);
     std::pair<int, int> zid = findIndex(polys, tri.z);
-    glm::vec2 x = polys[xid.first][xid.second];
-    glm::vec2 y = polys[yid.first][yid.second];
-    glm::vec2 z = polys[zid.first][zid.second];
+    vec2 x = polys[xid.first][xid.second];
+    vec2 y = polys[yid.first][yid.second];
+    vec2 z = polys[zid.first][zid.second];
     printf("show(array([[%.7f, %.7f], [%.7f, %.7f], [%.7f, %.7f]]))\n", x.x,
            x.y, y.x, y.y, z.x, z.y);
     if (CCW(x, y, z, precision) == -1) {
@@ -130,7 +129,7 @@ void DumpTriangulation(const Polygons &polys, float precision) {
 // x direction ray
 // idk which direction, but it is a fixed direction...
 // https://stackoverflow.com/questions/11716268/point-in-polygon-algorithm
-bool rayHit(glm::vec2 point, glm::vec2 q0, glm::vec2 q1) {
+bool rayHit(vec2 point, vec2 q0, vec2 q1) {
   return ((q0.y >= point.y) != (q1.y >= point.y)) &&
          (point.x <= (q1.x - q0.x) * (point.y - q0.y) / (q1.y - q0.y) + q0.x);
 }
@@ -139,11 +138,11 @@ bool rayHit(glm::vec2 point, glm::vec2 q0, glm::vec2 q1) {
 // this enumerates over the first point in all other polygons,
 // and check if they are inside the current polygon
 // this algorithm assumes that polygons are non-intersecting
-std::vector<int> getChildren(const Polygons &polys, int i) {
+std::vector<int> getChildren(const Polygons &polys, size_t i) {
   std::vector<int> results;
-  for (int j = 0; j < polys.size(); j++) {
+  for (size_t j = 0; j < polys.size(); j++) {
     if (i == j) continue;
-    glm::vec2 point = polys[j][0];
+    vec2 point = polys[j][0];
     auto k1 = [&](size_t k) {
       return k == (polys[i].size() - 1) ? 0 : (k + 1);
     };
@@ -163,7 +162,7 @@ std::vector<int> getChildren(const Polygons &polys, int i) {
 // 1. the updated polys is still valid (no overlapping edges, correct winding
 // direction)
 // 2. same error in triangulation (either geometryErr or overlapping triangles)
-void simplify(Polygons &polys, float precision = -1) {
+void simplify(Polygons &polys, double precision = -1) {
   bool removedSomething = true;
   std::string msg;
   while (removedSomething) {
@@ -173,7 +172,7 @@ void simplify(Polygons &polys, float precision = -1) {
 
     removedSomething = false;
     // try to remove simple polygons
-    for (int i = 0; i < polys.size(); i++) {
+    for (size_t i = 0; i < polys.size(); i++) {
       std::vector<int> children = getChildren(polys, i);
       // if there are children, we can't remove it or we will mess up with
       // winding direction...
@@ -181,7 +180,7 @@ void simplify(Polygons &polys, float precision = -1) {
       SimplePolygon poly = std::move(polys[i]);
       polys.erase(polys.begin() + i);
       try {
-        std::vector<glm::ivec3> result = Triangulate(polys, precision);
+        std::vector<ivec3> result = Triangulate(polys, precision);
         polys.insert(polys.begin() + i, std::move(poly));
       } catch (geometryErr &e) {
         if (msg.size() > 0 && msg.compare(e.what()) != 0) {
@@ -195,9 +194,9 @@ void simplify(Polygons &polys, float precision = -1) {
       }
     }
 
-    for (int i = 0; i < polys.size(); i++) {
+    for (size_t i = 0; i < polys.size(); i++) {
       std::vector<int> children = getChildren(polys, i);
-      for (int j = 0; j < polys[i].size(); j++) {
+      for (size_t j = 0; j < polys[i].size(); j++) {
         // removed vertex cannot change inclusion relation
         // we just check if the vertex
         // x: intersects with j0, j (original edge 1)
@@ -205,8 +204,8 @@ void simplify(Polygons &polys, float precision = -1) {
         // z: intersects with j0, j1 (new edge)
         // if (x ^ y ^ z) is true, it means that the count % 2 is changed,
         // and we changed inclusion relation, so vertex j cannot be removed
-        int j0 = j == 0 ? polys[i].size() - 1 : j - 1;
-        int j1 = j == polys[i].size() - 1 ? 0 : j + 1;
+        size_t j0 = j == 0 ? polys[i].size() - 1 : j - 1;
+        size_t j1 = j == polys[i].size() - 1 ? 0 : j + 1;
         if (std::any_of(children.begin(), children.end(), [&](int k) {
               return rayHit(polys[k][0], polys[i][j0], polys[i][j]) ^
                      rayHit(polys[k][0], polys[i][j], polys[i][j1]) ^
@@ -216,10 +215,10 @@ void simplify(Polygons &polys, float precision = -1) {
 
         // removed vertex cannot introduce intersection
         if (!safeToRemove(polys, i, j, precision)) continue;
-        glm::vec2 removed = polys[i][j];
+        vec2 removed = polys[i][j];
         polys[i].erase(polys[i].begin() + j);
         try {
-          std::vector<glm::ivec3> result = Triangulate(polys, precision);
+          std::vector<ivec3> result = Triangulate(polys, precision);
           polys[i].insert(polys[i].begin() + j, removed);
         } catch (geometryErr &e) {
           if (msg.size() > 0 && msg.compare(e.what()) != 0) {
@@ -239,9 +238,9 @@ void simplify(Polygons &polys, float precision = -1) {
 }
 
 struct Edge {
-  glm::vec2 west;  // -x side vertex
-  glm::vec2 east;  // +x side vertex
-  size_t i, j;     // indices of origin vertex
+  vec2 west;    // -x side vertex
+  vec2 east;    // +x side vertex
+  size_t i, j;  // indices of origin vertex
   bool operator<(const Edge &other) const {
     return west.x < other.west.x ||
            (west.x == other.west.x && east.x < other.east.x);
@@ -254,7 +253,7 @@ struct Edge {
   }
 };
 
-int isValid(const Polygons &polys, float precision = -1) {
+int isValid(const Polygons &polys, double precision = -1) {
   size_t numEdge = 0;
   for (const SimplePolygon &poly : polys) numEdge += poly.size();
   std::vector<Edge> edges;
@@ -313,12 +312,12 @@ int main(int argc, char **argv) {
   }
   std::ifstream fin(argv[1]);
   std::string line;
-  float precision = -1;
+  double precision = -1;
   Polygons polys;
   SimplePolygon poly;
   // search for precision first
   while (std::getline(fin, line)) {
-    int index = line.find("Precision = ");
+    size_t index = line.find("Precision = ");
     if (index != std::string::npos) {
       std::istringstream iss(line.substr(index + 12));
       if (!(iss >> precision)) {
@@ -333,7 +332,7 @@ int main(int argc, char **argv) {
   while (std::getline(fin, line)) {
     if (line.length() > 5 && line.substr(0, 5).compare("    {") == 0) {
       std::istringstream iss(line.substr(5));
-      float x, y;
+      double x, y;
       if (!(iss >> x)) {
         std::cerr << "Error parsing coordinate:" << std::endl;
         std::cerr << "Line: " << line << std::endl;
@@ -345,7 +344,7 @@ int main(int argc, char **argv) {
         std::cerr << "Line: " << line << std::endl;
         return 1;
       }
-      poly.push_back(glm::vec2(x, y));
+      poly.push_back(vec2(x, y));
     } else if (line.length() >= 3 && line.substr(0, 3).compare("});") == 0) {
       if (poly.size() < 3) {
         std::cerr << "Error: empty/invalid polygon" << std::endl;
@@ -364,9 +363,9 @@ int main(int argc, char **argv) {
   }
 
   if (precision == -1) {
-    float bound = 0;
+    double bound = 0;
     for (const SimplePolygon &poly : polys) {
-      for (const glm::vec2 &pt : poly) {
+      for (const vec2 &pt : poly) {
         bound = glm::max(bound, glm::abs(pt.x));
         bound = glm::max(bound, glm::abs(pt.y));
       }
