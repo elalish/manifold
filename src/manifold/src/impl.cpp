@@ -45,13 +45,13 @@ struct Transform4x3 {
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
+template <bool calculateTriNormal>
 struct AssignNormals {
   VecView<vec3> faceNormal;
   VecView<vec3> vertNormal;
   VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
   const double precision;
-  const bool calculateTriNormal;
 
   void operator()(const int face) {
     vec3& triNormal = faceNormal[face];
@@ -657,9 +657,14 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  for_each_n(policy, countAt(0), NumTri(),
-             AssignNormals({faceNormal_, vertNormal_, vertPos_, halfedge_,
-                            precision_, calculateTriNormal}));
+  if (calculateTriNormal)
+    for_each_n(policy, countAt(0), NumTri(),
+               AssignNormals<true>({faceNormal_, vertNormal_, vertPos_,
+                                    halfedge_, precision_}));
+  else
+    for_each_n(policy, countAt(0), NumTri(),
+               AssignNormals<false>({faceNormal_, vertNormal_, vertPos_,
+                                     halfedge_, precision_}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            [](vec3& v) { v = SafeNormalize(v); });
 }
