@@ -403,18 +403,18 @@ TEST(Boolean, NonConvexConvexMinkowski) {
 TEST(Boolean, NonConvexNonConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
-  PolygonParams().processOverlaps = true;
+  ManifoldParams().processOverlaps = true;
 
   Manifold tet = Manifold::Tetrahedron();
-  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(glm::vec3(1));
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
-  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(glm::vec3(0.5)));
+  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)));
   EXPECT_NEAR(sum.GetProperties().volume, 8.65625f, 1e-5);
   EXPECT_NEAR(sum.GetProperties().surfaceArea, 31.176914f, 1e-5);
   EXPECT_EQ(sum.Genus(), -5);
 
   Manifold difference =
-      nonConvex.MinkowskiDifference(nonConvex.Scale(glm::vec3(0.1)));
+      nonConvex.MinkowskiDifference(nonConvex.Scale(vec3(0.1)));
   EXPECT_NEAR(difference.GetProperties().volume, 0.81554f, 1e-5);
   EXPECT_NEAR(difference.GetProperties().surfaceArea, 6.95045f, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
@@ -424,7 +424,7 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
 #endif
 
   ManifoldParams().deterministic = oldDeterministic;
-  PolygonParams().processOverlaps = false;
+  ManifoldParams().processOverlaps = false;
 }
 
 /**

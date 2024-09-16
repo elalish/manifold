@@ -703,19 +703,21 @@ bool Manifold::Impl::IsConvex(float tolerance) const {
   if (genus != 0) return false;
 
   // Iterate across all edges; return false if any edges are concave
-  bool anyConcave = false;
   const Impl* pImpl = this;
+  const size_t nbEdges = halfedge_.size();
+  auto policy = autoPolicy(nbEdges, 1e5);
+  bool anyConcave = false;
   for_each_n(
-      countAt(0), halfedge_.size(), [&anyConcave, &pImpl, &tolerance](int idx) {
+      policy, countAt(0), nbEdges, [&anyConcave, &pImpl, &tolerance](int idx) {
         Halfedge edge = pImpl->halfedge_[idx];
         if (!edge.IsForward()) return;
 
-        const glm::vec3 normal0 = pImpl->faceNormal_[edge.face];
-        const glm::vec3 normal1 =
+        const vec3 normal0 = pImpl->faceNormal_[edge.face];
+        const vec3 normal1 =
             pImpl->faceNormal_[pImpl->halfedge_[edge.pairedHalfedge].face];
         if (glm::all(glm::equal(normal0, normal1))) return;
 
-        const glm::vec3 edgeVec =
+        const vec3 edgeVec =
             pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
         const bool convex =
             glm::dot(edgeVec, glm::cross(normal0, normal1)) > tolerance;

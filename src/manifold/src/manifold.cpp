@@ -967,13 +967,13 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {
     std::vector<Manifold> simpleHull;
-    for (glm::vec3 vertex : aImpl->vertPos_) {
+    for (vec3 vertex : aImpl->vertPos_) {
       simpleHull.push_back(b.Translate(vertex));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
     // Convex - Non-Convex Minkowski: Slower
   } else if ((inset || !aConvex) && bConvex) {
-    std::vector<std::vector<Manifold>> composedParts;
+    /*std::vector<std::vector<Manifold>> composedParts;
     for (size_t face = 0; face < aImpl->NumTri(); face++) {
       composedParts.push_back(
           {b.Translate(
@@ -984,12 +984,22 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
                aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2].startVert])});
     }
     std::vector<Manifold> newHulls(composedParts.size());
-    thrust::for_each_n(
-        thrust::host, zip(composedParts.begin(), newHulls.begin()),
+    auto policy = autoPolicy(composedParts.size(), 100);
+    for_each_n(policy, std::zip(composedParts.begin(), newHulls.begin()),
         composedParts.size(),
         [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
           thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
-        });
+        });*/
+    std::vector < Manifold > newHulls;
+    for (size_t face = 0; face < aImpl->NumTri(); face++) {
+      newHulls.push_back(Manifold::Hull(
+          {b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
+           b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 1].startVert]),
+           b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2].startVert])}));
+    }
     composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
     // Non-Convex - Non-Convex Minkowski: Very Slow
   } else if (!aConvex && !bConvex) {
