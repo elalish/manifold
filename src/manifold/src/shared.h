@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "par.h"
-#include "sparse.h"
-#include "utils.h"
-#include "vec.h"
+#include "manifold/parallel.h"
+#include "manifold/sparse.h"
+#include "manifold/utils.h"
+#include "manifold/vec.h"
 
 namespace manifold {
 

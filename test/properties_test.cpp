@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-
-#include "manifold.h"
+#include "manifold/manifold.h"
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 using namespace manifold;
 

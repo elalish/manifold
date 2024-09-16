@@ -23,7 +23,6 @@ typedef struct ManifoldCrossSection ManifoldCrossSection;
 typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
-typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;

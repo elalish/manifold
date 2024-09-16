@@ -16,11 +16,11 @@
 #include <ostream>
 
 #include "gtest/gtest.h"
-#include "manifold.h"
-#include "public.h"
+#include "manifold/common.h"
+#include "manifold/manifold.h"
 
 #ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
+#include "manifold/meshIO.h"
 #endif
 
 // somehow gcc11 + gtest 1.11.0 is unable to print ivec3
@@ -46,8 +46,7 @@ struct MeshSize {
 };
 
 Polygons SquareHole(double xOffset = 0.0);
-Mesh Csaszar();
-Mesh Tet();
+MeshGL Csaszar();
 Manifold Gyroid();
 MeshGL TetGL();
 MeshGL CubeSTL();
@@ -58,7 +57,7 @@ MeshGL WithNormals(const Manifold& in);
 float GetMaxProperty(const MeshGL& mesh, int channel);
 float GetMinProperty(const MeshGL& mesh, int channel);
 void CheckFinite(const MeshGL& mesh);
-void Identical(const Mesh& mesh1, const Mesh& mesh2);
+void Identical(const MeshGL& mesh1, const MeshGL& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
 void ExpectMeshes(const Manifold& manifold,
@@ -69,3 +68,4 @@ void CheckGL(const Manifold& manifold);
 #ifdef MANIFOLD_EXPORT
 Manifold ReadMesh(const std::string& filename);
 #endif
+void RegisterPolygonTests();

@@ -96,7 +96,7 @@ collect(
     f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
 )
 collect(f"{base}/src/polygon/src/polygon.cpp", select_functions)
-collect(f"{base}/src/utilities/include/public.h", select_functions)
+collect(f"{base}/src/utilities/include/manifold/common.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 

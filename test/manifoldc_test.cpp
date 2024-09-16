@@ -1,9 +1,9 @@
-#include "manifoldc.h"
+#include "manifold/manifoldc.h"
 
 #include "gtest/gtest.h"
-#include "manifold.h"
-#include "polygon.h"
-#include "types.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
+#include "manifold/types.h"
 
 TEST(CBIND, sphere) {
   int n = 25;

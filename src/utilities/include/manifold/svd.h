@@ -24,12 +24,9 @@
 // Modified from https://github.com/wi-re/tbtSVD, removing CUDA dependence and
 // approximate inverse square roots.
 
-#include <algorithm>
 #include <cmath>
-#include <tuple>
-#include <utility>
 
-#include "public.h"
+#include "manifold/common.h"
 
 namespace {
 using manifold::mat3;

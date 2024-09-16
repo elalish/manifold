@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 
 #include <algorithm>
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 namespace {
 
@@ -42,31 +42,12 @@ int NumUnique(const std::vector<T>& in) {
  * This tests that turning a mesh into a manifold and returning it to a mesh
  * produces a consistent result.
  */
-TEST(Manifold, GetMesh) {
-  Manifold manifold = Manifold::Sphere(1);
-  Mesh mesh_out = manifold.GetMesh();
-  Manifold manifold2(mesh_out);
-  Mesh mesh_out2 = manifold2.GetMesh();
-  Identical(mesh_out, mesh_out2);
-}
-
 TEST(Manifold, GetMeshGL) {
   Manifold manifold = Manifold::Sphere(1);
-  Mesh mesh_out = manifold.GetMesh();
-  MeshGL meshGL_out = manifold.GetMeshGL();
-  ASSERT_EQ(meshGL_out.NumVert(), mesh_out.vertPos.size());
-  ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
-  for (size_t i = 0; i < meshGL_out.NumVert(); ++i) {
-    for (const int j : {0, 1, 2}) {
-      // note: one is float, one is double, they are not equal...
-      ASSERT_FLOAT_EQ(meshGL_out.vertProperties[3 * i + j],
-                      mesh_out.vertPos[i][j]);
-    }
-  }
-  for (size_t i = 0; i < meshGL_out.NumTri(); ++i) {
-    for (const int j : {0, 1, 2})
-      ASSERT_EQ(meshGL_out.triVerts[3 * i + j], mesh_out.triVerts[i][j]);
-  }
+  auto mesh_out = manifold.GetMeshGL();
+  Manifold manifold2(mesh_out);
+  auto mesh_out2 = manifold2.GetMeshGL();
+  Identical(mesh_out, mesh_out2);
 }
 
 TEST(Manifold, Empty) {
@@ -85,27 +66,25 @@ TEST(Manifold, ValidInput) {
 }
 
 TEST(Manifold, InvalidInput1) {
-  Mesh in = Tet();
-  in.vertPos[2][1] = NAN;
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NonFiniteVertex);
 }
 
 TEST(Manifold, InvalidInput2) {
-  Mesh in = Tet();
-  std::swap(in.triVerts[2][1], in.triVerts[2][2]);
+  MeshGL in = TetGL();
+  std::swap(in.triVerts[2 * 3 + 1], in.triVerts[2 * 3 + 2]);
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
 }
 
 TEST(Manifold, InvalidInput3) {
-  Mesh in = Tet();
-  for (ivec3& tri : in.triVerts) {
-    for (int i : {0, 1, 2}) {
-      if (tri[i] == 2) tri[i] = -2;
-    }
+  MeshGL in = TetGL();
+  for (uint32_t& triVert : in.triVerts) {
+    if (triVert == 2) triVert = -2;
   }
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
@@ -113,15 +92,13 @@ TEST(Manifold, InvalidInput3) {
 }
 
 TEST(Manifold, InvalidInput4) {
-  Mesh in = Tet();
-  for (ivec3& tri : in.triVerts) {
-    for (int i : {0, 1, 2}) {
-      if (tri[i] == 2) tri[i] = 4;
-    }
+  MeshGL in = TetGL();
+  for (uint32_t& triVert : in.triVerts) {
+    if (triVert == 2) triVert = 4;
   }
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
+  EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
 }
 
 TEST(Manifold, InvalidInput5) {
@@ -132,7 +109,7 @@ TEST(Manifold, InvalidInput5) {
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
 }
 
-TEST(Manifold, InvalidInput7) {
+TEST(Manifold, InvalidInput6) {
   MeshGL tetGL = TetGL();
   tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
   Manifold tet(tetGL);
@@ -363,47 +340,85 @@ TEST(Manifold, WarpBatch) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Project) {
-  Mesh input;
-  input.vertPos = {{0, 0, 0},
-                   {-2, -0.7, -0.1},
-                   {-2, -0.7, 0},
-                   {-1.9, -0.7, -0.1},
-                   {-1.9, -0.6901, -0.1},
-                   {-1.9, -0.7, 0},
-                   {-1.9, -0.6901, 0},
-                   {-2, -1, 3},
-                   {-1.9, -1, 3},
-                   {-2, -1, 4},
-                   {-1.9, -1, 4},
-                   {-1.9, -0.6901, 3},
-                   {-1.9, -0.6901, 4},
-                   {-1.7, -0.6901, 3},
-                   {-1.7, -0.6901, 3.2},
-                   {-2, 0, -0.1},
-                   {-2, 0, 0},
-                   {-2, 0, 3},
-                   {-2, 0, 4},
-                   {-1.7, 0, 3},
-                   {-1.7, 0, 3.2},
-                   {-1, -0.6901, -0.1},
-                   {-1, -0.6901, 0},
-                   {-1, -0.6901, 3.2},
-                   {-1, -0.6901, 4},
-                   {-1, 0, -0.1},
-                   {-1, 0, 0},
-                   {-1, 0, 3.2},
-                   {-1, 0, 4}};
-  input.triVerts = {
-      {1, 3, 2},    {1, 4, 3},    {2, 3, 5},    {5, 6, 2},    {3, 4, 6},
-      {5, 3, 6},    {6, 4, 21},   {26, 22, 25}, {21, 25, 22}, {25, 15, 26},
-      {26, 6, 22},  {21, 4, 25},  {21, 22, 6},  {16, 26, 15}, {16, 6, 26},
-      {4, 15, 25},  {15, 1, 16},  {16, 2, 6},   {4, 1, 15},   {1, 2, 16},
-      {12, 14, 23}, {12, 13, 14}, {12, 11, 13}, {18, 9, 12},  {11, 7, 17},
-      {7, 9, 18},   {17, 7, 18},  {13, 11, 19}, {17, 18, 20}, {19, 11, 17},
-      {19, 17, 20}, {14, 13, 20}, {18, 12, 24}, {20, 13, 19}, {20, 18, 27},
-      {12, 10, 11}, {24, 12, 23}, {9, 10, 12},  {9, 8, 10},   {8, 11, 10},
-      {8, 7, 11},   {8, 9, 7},    {14, 20, 27}, {24, 28, 18}, {27, 18, 28},
-      {23, 14, 27}, {24, 23, 28}, {28, 23, 27}};
+  MeshGL input;
+  input.numProp = 3;
+  input.vertProperties = {0,    0,       0,     //
+                          -2,   -0.7,    -0.1,  //
+                          -2,   -0.7,    0,     //
+                          -1.9, -0.7,    -0.1,  //
+                          -1.9, -0.6901, -0.1,  //
+                          -1.9, -0.7,    0,     //
+                          -1.9, -0.6901, 0,     //
+                          -2,   -1,      3,     //
+                          -1.9, -1,      3,     //
+                          -2,   -1,      4,     //
+                          -1.9, -1,      4,     //
+                          -1.9, -0.6901, 3,     //
+                          -1.9, -0.6901, 4,     //
+                          -1.7, -0.6901, 3,     //
+                          -1.7, -0.6901, 3.2,   //
+                          -2,   0,       -0.1,  //
+                          -2,   0,       0,     //
+                          -2,   0,       3,     //
+                          -2,   0,       4,     //
+                          -1.7, 0,       3,     //
+                          -1.7, 0,       3.2,   //
+                          -1,   -0.6901, -0.1,  //
+                          -1,   -0.6901, 0,     //
+                          -1,   -0.6901, 3.2,   //
+                          -1,   -0.6901, 4,     //
+                          -1,   0,       -0.1,  //
+                          -1,   0,       0,     //
+                          -1,   0,       3.2,   //
+                          -1,   0,       4};
+  input.triVerts = {1,  3,  2,   //
+                    1,  4,  3,   //
+                    2,  3,  5,   //
+                    5,  6,  2,   //
+                    3,  4,  6,   //
+                    5,  3,  6,   //
+                    6,  4,  21,  //
+                    26, 22, 25,  //
+                    21, 25, 22,  //
+                    25, 15, 26,  //
+                    26, 6,  22,  //
+                    21, 4,  25,  //
+                    21, 22, 6,   //
+                    16, 26, 15,  //
+                    16, 6,  26,  //
+                    4,  15, 25,  //
+                    15, 1,  16,  //
+                    16, 2,  6,   //
+                    4,  1,  15,  //
+                    1,  2,  16,  //
+                    12, 14, 23,  //
+                    12, 13, 14,  //
+                    12, 11, 13,  //
+                    18, 9,  12,  //
+                    11, 7,  17,  //
+                    7,  9,  18,  //
+                    17, 7,  18,  //
+                    13, 11, 19,  //
+                    17, 18, 20,  //
+                    19, 11, 17,  //
+                    19, 17, 20,  //
+                    14, 13, 20,  //
+                    18, 12, 24,  //
+                    20, 13, 19,  //
+                    20, 18, 27,  //
+                    12, 10, 11,  //
+                    24, 12, 23,  //
+                    9,  10, 12,  //
+                    9,  8,  10,  //
+                    8,  11, 10,  //
+                    8,  7,  11,  //
+                    8,  9,  7,   //
+                    14, 20, 27,  //
+                    24, 28, 18,  //
+                    27, 18, 28,  //
+                    23, 14, 27,  //
+                    24, 23, 28,  //
+                    28, 23, 27};
   Manifold in(input);
   CrossSection projected = in.Project();
   EXPECT_NEAR(projected.Area(), 0.72, 0.01);
@@ -436,7 +451,7 @@ TEST(Manifold, Transform) {
   transform[3] = vec3(1, 2, 3);
   cube2 = cube2.Transform(transform);
 
-  Identical(cube.GetMesh(), cube2.GetMesh());
+  Identical(cube.GetMeshGL(), cube2.GetMeshGL());
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -472,7 +487,7 @@ TEST(Manifold, MeshRelationTransform) {
 }
 
 TEST(Manifold, MeshRelationRefine) {
-  const Mesh in = Csaszar();
+  const MeshGL in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
   Manifold csaszar(inGL);
 
@@ -537,29 +552,31 @@ TEST(Manifold, Merge) {
 }
 
 TEST(Manifold, PinchedVert) {
-  Mesh shape;
-  shape.vertPos = {{0, 0, 0},         //
-                   {1, 1, 0},         //
-                   {1, -1, 0},        //
-                   {-0.00001, 0, 0},  //
-                   {-1, -1, -0},      //
-                   {-1, 1, 0},        //
-                   {0, 0, 2},         //
-                   {0, 0, -2}};
-  shape.triVerts = {{0, 2, 6},  //
-                    {2, 1, 6},  //
-                    {1, 0, 6},  //
-                    {4, 3, 6},  //
-                    {3, 5, 6},  //
-                    {5, 4, 6},  //
-                    {2, 0, 4},  //
-                    {0, 3, 4},  //
-                    {3, 0, 1},  //
-                    {3, 1, 5},  //
-                    {7, 2, 4},  //
-                    {7, 4, 5},  //
-                    {7, 5, 1},  //
-                    {7, 1, 2}};
+  // TODO
+  MeshGL shape;
+  shape.numProp = 3;
+  shape.vertProperties = {0,        0,  0,   //
+                          1,        1,  0,   //
+                          1,        -1, 0,   //
+                          -0.00001, 0,  0,   //
+                          -1,       -1, -0,  //
+                          -1,       1,  0,   //
+                          0,        0,  2,   //
+                          0,        0,  -2};
+  shape.triVerts = {0, 2, 6,  //
+                    2, 1, 6,  //
+                    1, 0, 6,  //
+                    4, 3, 6,  //
+                    3, 5, 6,  //
+                    5, 4, 6,  //
+                    2, 0, 4,  //
+                    0, 3, 4,  //
+                    3, 0, 1,  //
+                    3, 1, 5,  //
+                    7, 2, 4,  //
+                    7, 4, 5,  //
+                    7, 5, 1,  //
+                    7, 1, 2};
   Manifold touch(shape);
   EXPECT_FALSE(touch.IsEmpty());
   EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
@@ -585,7 +602,7 @@ TEST(Manifold, MirrorUnion) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("manifold_mirror_union.glb", result.GetMesh(), {});
+    ExportMesh("manifold_mirror_union.glb", result.GetMeshGL(), {});
 #endif
 
   auto vol_a = a.GetProperties().volume;

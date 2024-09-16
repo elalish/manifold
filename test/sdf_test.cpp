@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold.h"
+#include "manifold/manifold.h"
 #include "test.h"
 
 using namespace manifold;
@@ -123,7 +123,7 @@ TEST(SDF, Surface) {
   Box bounds = cube.BoundingBox();
   const double precision = cube.Precision();
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
+  if (options.exportModels) ExportMesh("cube.gltf", cube.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
@@ -143,7 +143,7 @@ TEST(SDF, Resize) {
   const double size = 20;
   Manifold layers = Manifold::LevelSet(Layers(), {vec3(0), vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
+  if (options.exportModels) ExportMesh("layers.gltf", layers.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);

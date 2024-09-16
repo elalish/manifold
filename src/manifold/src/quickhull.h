@@ -58,8 +58,8 @@
 #include <deque>
 #include <vector>
 
+#include "manifold/vec.h"
 #include "shared.h"
-#include "vec.h"
 
 namespace manifold {
 

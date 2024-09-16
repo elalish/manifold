@@ -16,7 +16,7 @@
 #include <set>
 
 #include "impl.h"
-#include "par.h"
+#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -111,6 +111,119 @@ struct ReindexFace {
     }
   }
 };
+
+template <typename Precision>
+bool MergeMeshGLP(MeshGLP<Precision>& mesh) {
+  ZoneScoped;
+  std::multiset<std::pair<int, int>> openEdges;
+
+  std::vector<int> merge(mesh.NumVert());
+  std::iota(merge.begin(), merge.end(), 0);
+  for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
+    merge[mesh.mergeFromVert[i]] = mesh.mergeToVert[i];
+  }
+
+  const auto numVert = mesh.NumVert();
+  const auto numTri = mesh.NumTri();
+  const int next[3] = {1, 2, 0};
+  for (size_t tri = 0; tri < numTri; ++tri) {
+    for (int i : {0, 1, 2}) {
+      auto edge = std::make_pair(merge[mesh.triVerts[3 * tri + next[i]]],
+                                 merge[mesh.triVerts[3 * tri + i]]);
+      auto it = openEdges.find(edge);
+      if (it == openEdges.end()) {
+        std::swap(edge.first, edge.second);
+        openEdges.insert(edge);
+      } else {
+        openEdges.erase(it);
+      }
+    }
+  }
+  if (openEdges.empty()) {
+    return false;
+  }
+
+  const auto numOpenVert = openEdges.size();
+  Vec<int> openVerts(numOpenVert);
+  int i = 0;
+  for (const auto& edge : openEdges) {
+    const int vert = edge.first;
+    openVerts[i++] = vert;
+  }
+
+  Vec<Precision> vertPropD(mesh.vertProperties);
+  Box bBox;
+  for (const int i : {0, 1, 2}) {
+    auto iPos =
+        StridedRange(vertPropD.begin() + i, vertPropD.end(), mesh.numProp);
+    auto minMax = manifold::transform_reduce(
+        iPos.begin(), iPos.end(),
+        std::make_pair(std::numeric_limits<double>::infinity(),
+                       -std::numeric_limits<double>::infinity()),
+        [](auto a, auto b) {
+          return std::make_pair(std::min(a.first, b.first),
+                                std::max(a.second, b.second));
+        },
+        [](double f) { return std::make_pair(f, f); });
+    bBox.min[i] = minMax.first;
+    bBox.max[i] = minMax.second;
+  }
+  mesh.precision = MaxPrecision(mesh.precision, bBox);
+  if (mesh.precision < 0) return false;
+  auto policy = autoPolicy(numOpenVert, 1e5);
+  Vec<Box> vertBox(numOpenVert);
+  Vec<uint32_t> vertMorton(numOpenVert);
+
+  for_each_n(policy, countAt(0), numOpenVert,
+             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh](const int i) {
+               int vert = openVerts[i];
+
+               const vec3 center(mesh.vertProperties[mesh.numProp * vert],
+                                 mesh.vertProperties[mesh.numProp * vert + 1],
+                                 mesh.vertProperties[mesh.numProp * vert + 2]);
+
+               vertBox[i].min = center - mesh.precision / 2.0;
+               vertBox[i].max = center + mesh.precision / 2.0;
+
+               vertMorton[i] = MortonCode(center, bBox);
+             });
+
+  Vec<int> vertNew2Old(numOpenVert);
+  sequence(vertNew2Old.begin(), vertNew2Old.end());
+
+  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
+              [&vertMorton](const int& a, const int& b) {
+                return vertMorton[a] < vertMorton[b];
+              });
+
+  Permute(vertMorton, vertNew2Old);
+  Permute(vertBox, vertNew2Old);
+  Permute(openVerts, vertNew2Old);
+  Collider collider(vertBox, vertMorton);
+  SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
+
+  UnionFind<> uf(numVert);
+  for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
+    uf.unionXY(static_cast<int>(mesh.mergeFromVert[i]),
+               static_cast<int>(mesh.mergeToVert[i]));
+  }
+  for (size_t i = 0; i < toMerge.size(); ++i) {
+    uf.unionXY(openVerts[toMerge.Get(i, false)],
+               openVerts[toMerge.Get(i, true)]);
+  }
+
+  mesh.mergeToVert.clear();
+  mesh.mergeFromVert.clear();
+  for (size_t v = 0; v < numVert; ++v) {
+    const size_t mergeTo = uf.find(v);
+    if (mergeTo != v) {
+      mesh.mergeFromVert.push_back(v);
+      mesh.mergeToVert.push_back(mergeTo);
+    }
+  }
+
+  return true;
+}
 }  // namespace
 
 namespace manifold {
@@ -392,23 +505,22 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
                           old.halfedgeTangent_, faceNew2Old, faceOld2New}));
 }
 
-/// Constructs a position-only MeshGL from the input Mesh.
-MeshGL::MeshGL(const Mesh& mesh) {
-  numProp = 3;
-  precision = mesh.precision;
-  vertProperties.resize(numProp * mesh.vertPos.size());
-  for (size_t i = 0; i < mesh.vertPos.size(); ++i) {
-    for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
-  }
-  triVerts.resize(3 * mesh.triVerts.size());
-  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
-    for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
-  }
-  halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
-  for (size_t i = 0; i < mesh.halfedgeTangent.size(); ++i) {
-    for (int j : {0, 1, 2, 3})
-      halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
-  }
+/**
+ * Updates the mergeFromVert and mergeToVert vectors in order to create a
+ * manifold solid. If the MeshGL is already manifold, no change will occur and
+ * the function will return false. Otherwise, this will merge verts along open
+ * edges within precision (the maximum of the MeshGL precision and the baseline
+ * bounding-box precision), keeping any from the existing merge vectors.
+ *
+ * There is no guarantee the result will be manifold - this is a best-effort
+ * helper function designed primarily to aid in the case where a manifold
+ * multi-material MeshGL was produced, but its merge vectors were lost due to a
+ * round-trip through a file format. Constructing a Manifold from the result
+ * will report a Status if it is not manifold.
+ */
+template <>
+bool MeshGL::Merge() {
+  return MergeMeshGLP(*this);
 }
 
 /**
@@ -424,117 +536,8 @@ MeshGL::MeshGL(const Mesh& mesh) {
  * round-trip through a file format. Constructing a Manifold from the result
  * will report a Status if it is not manifold.
  */
-bool MeshGL::Merge() {
-  ZoneScoped;
-  std::multiset<std::pair<int, int>> openEdges;
-
-  std::vector<int> merge(NumVert());
-  std::iota(merge.begin(), merge.end(), 0);
-  for (size_t i = 0; i < mergeFromVert.size(); ++i) {
-    merge[mergeFromVert[i]] = mergeToVert[i];
-  }
-
-  const auto numVert = NumVert();
-  const auto numTri = NumTri();
-  const int next[3] = {1, 2, 0};
-  for (size_t tri = 0; tri < numTri; ++tri) {
-    for (int i : {0, 1, 2}) {
-      auto edge = std::make_pair(merge[triVerts[3 * tri + next[i]]],
-                                 merge[triVerts[3 * tri + i]]);
-      auto it = openEdges.find(edge);
-      if (it == openEdges.end()) {
-        std::swap(edge.first, edge.second);
-        openEdges.insert(edge);
-      } else {
-        openEdges.erase(it);
-      }
-    }
-  }
-
-  if (openEdges.empty()) {
-    return false;
-  }
-
-  const auto numOpenVert = openEdges.size();
-  Vec<int> openVerts(numOpenVert);
-  int i = 0;
-  for (const auto& edge : openEdges) {
-    const int vert = edge.first;
-    openVerts[i++] = vert;
-  }
-
-  Vec<float> vertPropD(vertProperties);
-  Box bBox;
-  for (const int i : {0, 1, 2}) {
-    auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = manifold::transform_reduce(
-        iPos.begin(), iPos.end(),
-        std::make_pair(std::numeric_limits<double>::infinity(),
-                       -std::numeric_limits<double>::infinity()),
-        [](auto a, auto b) {
-          return std::make_pair(std::min(a.first, b.first),
-                                std::max(a.second, b.second));
-        },
-        [](double f) { return std::make_pair(f, f); });
-    bBox.min[i] = minMax.first;
-    bBox.max[i] = minMax.second;
-  }
-  precision = MaxPrecision(precision, bBox);
-  if (precision < 0) return false;
-
-  auto policy = autoPolicy(numOpenVert, 1e5);
-  Vec<Box> vertBox(numOpenVert);
-  Vec<uint32_t> vertMorton(numOpenVert);
-
-  for_each_n(policy, countAt(0), numOpenVert,
-             [&vertMorton, &vertBox, &openVerts, &bBox, this](const int i) {
-               int vert = openVerts[i];
-
-               const vec3 center(vertProperties[numProp * vert],
-                                 vertProperties[numProp * vert + 1],
-                                 vertProperties[numProp * vert + 2]);
-
-               vertBox[i].min = center - (double)precision / 2;
-               vertBox[i].max = center + (double)precision / 2;
-
-               vertMorton[i] = MortonCode(center, bBox);
-             });
-
-  Vec<int> vertNew2Old(numOpenVert);
-  sequence(vertNew2Old.begin(), vertNew2Old.end());
-
-  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
-              [&vertMorton](const int& a, const int& b) {
-                return vertMorton[a] < vertMorton[b];
-              });
-
-  Permute(vertMorton, vertNew2Old);
-  Permute(vertBox, vertNew2Old);
-  Permute(openVerts, vertNew2Old);
-
-  Collider collider(vertBox, vertMorton);
-  SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
-
-  UnionFind<> uf(numVert);
-  for (size_t i = 0; i < mergeFromVert.size(); ++i) {
-    uf.unionXY(static_cast<int>(mergeFromVert[i]),
-               static_cast<int>(mergeToVert[i]));
-  }
-  for (size_t i = 0; i < toMerge.size(); ++i) {
-    uf.unionXY(openVerts[toMerge.Get(i, false)],
-               openVerts[toMerge.Get(i, true)]);
-  }
-
-  mergeToVert.clear();
-  mergeFromVert.clear();
-  for (size_t v = 0; v < numVert; ++v) {
-    const size_t mergeTo = uf.find(v);
-    if (mergeTo != v) {
-      mergeFromVert.push_back(v);
-      mergeToVert.push_back(mergeTo);
-    }
-  }
-
-  return true;
+template <>
+bool MeshGL64::Merge() {
+  return MergeMeshGLP(*this);
 }
 }  // namespace manifold

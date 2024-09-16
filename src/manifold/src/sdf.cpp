@@ -14,12 +14,12 @@
 
 #include <glm/gtc/integer.hpp>
 
-#include "hashtable.h"
 #include "impl.h"
-#include "manifold.h"
-#include "par.h"
-#include "utils.h"
-#include "vec.h"
+#include "manifold/hashtable.h"
+#include "manifold/manifold.h"
+#include "manifold/parallel.h"
+#include "manifold/utils.h"
+#include "manifold/vec.h"
 
 namespace {
 using namespace manifold;
@@ -428,12 +428,13 @@ namespace manifold {
  */
 
 /**
- * Constructs a level-set MeshGL from the input Signed-Distance Function (SDF).
- * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
- * for manifoldness). Instead of using a cubic grid, it uses a body-centered
- * cubic grid (two shifted cubic grids). This means if your function's interior
- * exceeds the given bounds, you will see a kind of egg-crate shape closing off
- * the manifold, which is due to the underlying grid.
+ * Constructs a level-set manifold from the input Signed-Distance Function
+ * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
+ * better for manifoldness). Instead of using a cubic grid, it uses a
+ * body-centered cubic grid (two shifted cubic grids). This means if your
+ * function's interior exceeds the given bounds, you will see a kind of
+ * egg-crate shape closing off the manifold, which is due to the underlying
+ * grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
  * `double operator()(vec3 point)`, which returns the

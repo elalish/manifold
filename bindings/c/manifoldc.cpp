@@ -12,24 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <conv.h>
-#include <cross_section.h>
-#include <manifold.h>
-#include <manifoldc.h>
-#include <public.h>
+#include "manifold/manifoldc.h"
 
 #include <vector>
 
-#include "box.cpp"
-#include "cross.cpp"
-#include "include/conv.h"
-#include "include/types.h"
-#include "rect.cpp"
-#include "types.h"
-
-#ifdef MANIFOLD_EXPORT
-#include "meshio.cpp"
-#endif
+#include "manifold/common.h"
+#include "manifold/conv.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
 using namespace manifold;
 

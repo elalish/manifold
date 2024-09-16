@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #ifdef MANIFOLD_CROSS_SECTION
-#include "cross_section.h"
+#include "manifold/cross_section.h"
 #endif
-#include "manifold.h"
-#include "polygon.h"
+#include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;
@@ -192,7 +192,7 @@ TEST(BooleanComplex, Subtract) {
   Manifold second(secondMesh);
 
   first -= second;
-  first.GetMesh();
+  first.GetMeshGL();
 }
 
 TEST(BooleanComplex, Close) {
@@ -212,7 +212,7 @@ TEST(BooleanComplex, Close) {
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
+  if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;
@@ -499,7 +499,7 @@ TEST(BooleanComplex, Sweep) {
 
   EXPECT_NEAR(prop.volume, 3757, 1);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMesh(), {});
+  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;

@@ -14,10 +14,10 @@
 
 #include <algorithm>
 
-#include "manifold.h"
+#include "manifold/manifold.h"
+#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 using namespace manifold;
 
@@ -74,7 +74,7 @@ TEST(Hull, Tictac) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
+    ExportMesh("tictac_hull.glb", tictac.GetMeshGL(), {});
   }
 #endif
 
@@ -86,7 +86,7 @@ TEST(Hull, Fail) {
   Manifold body = ReadMesh("hull-body.glb");
   Manifold mask = ReadMesh("hull-mask.glb");
   Manifold ret = body - mask;
-  MeshGL mesh = ret.GetMesh();
+  MeshGL mesh = ret.GetMeshGL();
 }
 #endif
 
@@ -159,7 +159,7 @@ TEST(Hull, FailingTest1) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("failing_test1.glb", hull.GetMesh(), {});
+    ExportMesh("failing_test1.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(isMeshConvex(hull, 1.09375e-05));
@@ -192,7 +192,7 @@ TEST(Hull, FailingTest2) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("failing_test2.glb", hull.GetMesh(), {});
+    ExportMesh("failing_test2.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
@@ -216,7 +216,7 @@ TEST(Hull, DisabledFaceTest) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("disabledFaceTest.glb", hull.GetMesh(), {});
+    ExportMesh("disabledFaceTest.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(!hull.IsEmpty());

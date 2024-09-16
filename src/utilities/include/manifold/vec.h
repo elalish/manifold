@@ -20,8 +20,8 @@
 #define TracyFreeS(ptr, n) (void)0
 #endif
 
-#include "par.h"
-#include "vec_view.h"
+#include "manifold/parallel.h"
+#include "manifold/vec_view.h"
 
 namespace manifold {
 

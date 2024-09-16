@@ -184,7 +184,7 @@ jobs:
       shell: bash
       run: |
         cd build/bin/Release
-        ./manifold_test.exe --gtest_filter=-Polygon.Zebra*
+        ./manifold_test.exe
         cd ../../
     - name: test cmake consumer
       run: |
@@ -209,11 +209,13 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
-    - name: Test
-      run: |
-        cd build/test
-        ./manifold_test
+        export MXEDIR=/mxe
+        export MXE_TARGETS=x86_64-w64-mingw32.static.posix
+        export MXEDIR=$HOME/openscad_deps/mxe
+        export MXETARGETDIR=$MXEDIR/usr/$MXE_TARGETS
+        export PATH=/mxe/usr/bin:$PATH
+        export CMAKE=$MXE_TARGETS-cmake
+        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
 
   build_mac:
     timeout-minutes: 30

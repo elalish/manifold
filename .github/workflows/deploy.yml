@@ -29,6 +29,13 @@ jobs:
         pr: ${{github.event.pull_request.number}}
         name: wasm
         path: ./public
+        
+    - name: Deploy Javascript Docs to Github Pages
+      run: |
+        cd bindings/wasm
+        npm install
+        npm run docs
+        mv ./docs ../../public/jsdocs
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3

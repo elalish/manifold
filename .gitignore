@@ -112,6 +112,7 @@ node_modules/
 bindings/wasm/examples/built
 bindings/wasm/examples/dist
 bindings/wasm/examples/public/manifold*
+bindings/wasm/docs
 __pycache__
 .vscode/c_cpp_properties.json
 *.sublime-project

@@ -16,10 +16,10 @@
 #include <cstring>
 #include <vector>
 
-#include "cross_section.h"
-#include "manifold.h"
-#include "public.h"
-#include "types.h"
+#include "manifold/common.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
+#include "manifold/types.h"
 
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
@@ -31,7 +31,6 @@ ManifoldCrossSection *to_c(manifold::CrossSection *cs);
 ManifoldCrossSectionVec *to_c(CrossSectionVec *csv);
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *p);
 ManifoldPolygons *to_c(manifold::Polygons *ps);
-ManifoldMesh *to_c(manifold::Mesh *m);
 ManifoldMeshGL *to_c(manifold::MeshGL *m);
 ManifoldBox *to_c(manifold::Box *m);
 ManifoldRect *to_c(manifold::Rect *m);
@@ -47,7 +46,6 @@ const manifold::CrossSection *from_c(ManifoldCrossSection *cs);
 CrossSectionVec *from_c(ManifoldCrossSectionVec *csv);
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m);
 const manifold::Polygons *from_c(ManifoldPolygons *m);
-const manifold::Mesh *from_c(ManifoldMesh *m);
 const manifold::MeshGL *from_c(ManifoldMeshGL *m);
 OpType from_c(ManifoldOpType op);
 CrossSection::FillRule from_c(ManifoldFillRule fillrule);

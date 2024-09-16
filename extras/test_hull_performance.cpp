@@ -27,8 +27,8 @@
 #include <random>
 #include <sstream>  // For string manipulation
 
-#include "manifold.h"
-#include "meshIO.h"
+#include "manifold/manifold.h"
+#include "manifold/meshIO.h"
 #include "samples.h"
 using namespace std;
 using namespace glm;

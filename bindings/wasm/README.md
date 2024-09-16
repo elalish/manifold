@@ -4,11 +4,11 @@
 ## [ManifoldCAD.org](https://manifoldcad.org)
 If you like OpenSCAD / OpenJSCAD, you might also like ManifoldCAD - our own solid modelling web app based on this package. 
 
-![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
+![A metallic Menger sponge](https://manifoldcad.org/samples/models/mengerSponge3.webp "A metallic Menger sponge")
 
 # Manifold
 
-[**High-level Documentation**](https://elalish.blogspot.com/search/label/Manifold) | [**API Documentation**](https://elalish.github.io/manifold/docs/html/modules.html) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Web Examples**](https://elalish.github.io/manifold/model-viewer.html)
+[**TS Documentation**](https://manifoldcad.org/jsdocs) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://manifoldcad.org/model-viewer.html)
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 

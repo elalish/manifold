@@ -598,6 +598,11 @@ class Quality {
     return std::max(nSeg, 3);
   }
 
+  /**
+   * Resets the circular construction parameters to their defaults if
+   * SetMinCircularAngle, SetMinCircularEdgeLength, or SetCircularSegments have
+   * been called.
+   */
   static void ResetToDefaults() {
     circularSegments_ = DEFAULT_SEGMENTS;
     circularAngle_ = DEFAULT_ANGLE;
@@ -689,11 +694,13 @@ inline std::ostream& operator<<(std::ostream& stream, const mat4x3& mat) {
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", " << "max: " << box.max;
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", " << "max: " << box.max;
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
 }
 
 /**

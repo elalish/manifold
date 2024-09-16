@@ -53,15 +53,9 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} INTERFACE
-    $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
+    $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
-
-# if(NOT MSVC)
-# target_precompile_headers(${PROJECT_NAME} INTERFACE
-#     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/par.h>
-#     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/public.h>)
-# endif()
 
 if(MANIFOLD_EXCEPTIONS)
     target_compile_options(${PROJECT_NAME} INTERFACE
@@ -78,5 +72,10 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
 install(FILES
-    include/public.h include/vec_view.h include/tri_dist.h include/optional_assert.h
+    include/manifold/common.h
+    include/manifold/vec_view.h
+    include/manifold/tri_dist.h
+    include/manifold/optional_assert.h
+    include/manifold/iters.h
+    include/manifold/parallel.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "polygon.h"
+#include "manifold/polygon.h"
 
 #include <algorithm>
+#include <fstream>
 #include <limits>
-#include <random>
 
 #include "test.h"
 
@@ -71,9 +71,68 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 
   PolygonParams().verbose = false;
 }
+
+class PolygonTestFixture : public testing::Test {
+ public:
+  Polygons polys;
+  double precision;
+  int expectedNumTri;
+  explicit PolygonTestFixture(Polygons polys, double precision,
+                              int expectedNumTri)
+      : polys(polys), precision(precision), expectedNumTri(expectedNumTri) {}
+  void TestBody() { TestPoly(polys, expectedNumTri, precision); }
+};
+
+void RegisterPolygonTestsFile(const std::string &filename) {
+  auto f = std::ifstream(filename);
+  EXPECT_TRUE(f.is_open());
+
+  // for each test:
+  //   test name, expectedNumTri, precision, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double precision, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> precision >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
+    testing::RegisterTest(
+        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> PolygonTestFixture * {
+          return new PolygonTestFixture(polys, precision, expectedNumTri);
+        });
+  }
+  f.close();
+}
 }  // namespace
 
-#include "polygons/polygon_corpus.cpp"
-#include "polygons/sponge.cpp"
-#include "polygons/zebra.cpp"
-#include "polygons/zebra3.cpp"
+void RegisterPolygonTests() {
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+#endif
+}
