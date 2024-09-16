@@ -990,7 +990,7 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
         [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
           thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
         });*/
-    std::vector < Manifold > newHulls;
+    std::vector <Manifold> newHulls;
     for (size_t face = 0; face < aImpl->NumTri(); face++) {
       newHulls.push_back(Manifold::Hull(
           {b.Translate(
