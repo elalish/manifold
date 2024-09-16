@@ -109,8 +109,7 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
-  Manifold smooth = Manifold::Smooth(cone.GetMeshGL64());
-  smooth = smooth.RefineToLength(0.1);
+  Manifold smooth = cone.AsOriginal().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 4604, 1);
