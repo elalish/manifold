@@ -65,7 +65,170 @@ struct Manifold::Impl {
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat4x3 = mat4x3(1));
 
-  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
+  template <typename Precision>
+  Impl(const MeshGLP<Precision>& meshGL,
+       std::vector<Precision> propertyTolerance) {
+    const uint32_t numVert = meshGL.NumVert();
+    const uint32_t numTri = meshGL.NumTri();
+
+    if (meshGL.numProp < 3) {
+      MarkFailure(Error::MissingPositionProperties);
+      return;
+    }
+
+    if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
+      MarkFailure(Error::MergeVectorsDifferentLengths);
+      return;
+    }
+
+    if (!meshGL.runTransform.empty() &&
+        12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
+      MarkFailure(Error::TransformWrongLength);
+      return;
+    }
+
+    if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
+        meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
+        meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
+      MarkFailure(Error::RunIndexWrongLength);
+      return;
+    }
+
+    if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
+      MarkFailure(Error::FaceIDWrongLength);
+      return;
+    }
+
+    std::vector<int> prop2vert(numVert);
+    std::iota(prop2vert.begin(), prop2vert.end(), 0);
+    for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+      const uint32_t from = meshGL.mergeFromVert[i];
+      const uint32_t to = meshGL.mergeToVert[i];
+      if (from >= numVert || to >= numVert) {
+        MarkFailure(Error::MergeIndexOutOfBounds);
+        return;
+      }
+      prop2vert[from] = to;
+    }
+
+    const auto numProp = meshGL.numProp - 3;
+    meshRelation_.numProp = numProp;
+    meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    // This will have unreferenced duplicate positions that will be removed by
+    // Impl::RemoveUnreferencedVerts().
+    vertPos_.resize(meshGL.NumVert());
+
+    for (size_t i = 0; i < meshGL.NumVert(); ++i) {
+      for (const int j : {0, 1, 2})
+        vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
+      for (size_t j = 0; j < numProp; ++j)
+        meshRelation_.properties[i * numProp + j] =
+            meshGL.vertProperties[meshGL.numProp * i + 3 + j];
+    }
+
+    halfedgeTangent_.resize(meshGL.halfedgeTangent.size() / 4);
+    for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
+      for (const int j : {0, 1, 2, 3})
+        halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
+    }
+
+    Vec<TriRef> triRef;
+    if (meshGL.runOriginalID.empty()) {
+      // FIXME: This affects Impl::InitializeOriginal, and removing this
+      // apparently make things fail. Not sure if this is expected.
+      meshRelation_.originalID = Impl::ReserveIDs(1);
+    } else {
+      std::vector<uint32_t> runIndex = meshGL.runIndex;
+      const uint32_t runEnd = meshGL.triVerts.size();
+      if (runIndex.empty()) {
+        runIndex = {0, runEnd};
+      } else if (runIndex.size() == meshGL.runOriginalID.size()) {
+        runIndex.push_back(runEnd);
+      }
+      triRef.resize(meshGL.NumTri());
+      const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
+      for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
+        const int meshID = startID + i;
+        const int originalID = meshGL.runOriginalID[i];
+        for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
+          TriRef& ref = triRef[tri];
+          ref.meshID = meshID;
+          ref.originalID = originalID;
+          ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+        }
+
+        if (meshGL.runTransform.empty()) {
+          meshRelation_.meshIDtransform[meshID] = {originalID};
+        } else {
+          const Precision* m = meshGL.runTransform.data() + 12 * i;
+          meshRelation_.meshIDtransform[meshID] = {
+              originalID,
+              {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9],
+               m[10], m[11]}};
+        }
+      }
+    }
+
+    Vec<ivec3> triVerts;
+    triVerts.reserve(numTri);
+    for (size_t i = 0; i < numTri; ++i) {
+      ivec3 tri;
+      for (const size_t j : {0, 1, 2}) {
+        uint32_t vert = meshGL.triVerts[3 * i + j];
+        if (vert >= numVert) {
+          MarkFailure(Error::VertexOutOfBounds);
+          return;
+        }
+        tri[j] = prop2vert[vert];
+      }
+      if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
+        triVerts.push_back(tri);
+        if (triRef.size() > 0) {
+          meshRelation_.triRef.push_back(triRef[i]);
+        }
+        if (numProp > 0) {
+          meshRelation_.triProperties.push_back(
+              ivec3(meshGL.triVerts[3 * i], meshGL.triVerts[3 * i + 1],
+                    meshGL.triVerts[3 * i + 2]));
+        }
+      }
+    }
+
+    std::vector<double> propertyToleranceD(propertyTolerance.size());
+    manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
+                        propertyToleranceD.begin(),
+                        [](Precision v) { return (double)v; });
+
+    CreateHalfedges(triVerts);
+    if (!IsManifold()) {
+      MarkFailure(Error::NotManifold);
+      return;
+    }
+
+    CalculateBBox();
+    if (!IsFinite()) {
+      MarkFailure(Error::NonFiniteVertex);
+      return;
+    }
+    SetPrecision(meshGL.precision);
+
+    SplitPinchedVerts();
+
+    CalculateNormals();
+
+    InitializeOriginal();
+    if (meshGL.faceID.empty()) {
+      CreateFaces(propertyToleranceD);
+    }
+
+    SimplifyTopology();
+    Finish();
+
+    // A Manifold created from an input mesh is never an original - the input is
+    // the original.
+    meshRelation_.originalID = -1;
+  }
+
   Impl(const Mesh&, const MeshRelationD& relation,
        const std::vector<double>& propertyTolerance = {},
        bool hasFaceIDs = false);

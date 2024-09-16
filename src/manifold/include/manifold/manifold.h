@@ -37,13 +37,8 @@ class CsgLeafNode;
  *  @{
  */
 
-/**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly. This may not be manifold since the verts are duplicated
- * along property boundaries that do not match. The additional merge vectors
- * store this missing information, allowing the manifold to be reconstructed.
- */
-struct MeshGL {
+template <typename Precision>
+struct MeshGLP {
   /// Number of property vertices
   uint32_t NumVert() const {
     ASSERT(vertProperties.size() / numProp <
@@ -58,13 +53,12 @@ struct MeshGL {
            std::out_of_range("mesh too large for MeshGL"));
     return triVerts.size() / 3;
   };
-
   /// Number of properties per vertex, always >= 3.
   uint32_t numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
-  std::vector<float> vertProperties;
+  std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
   std::vector<uint32_t> triVerts;
@@ -93,7 +87,7 @@ struct MeshGL {
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
   /// vector is 12 * runOriginalID.size().
-  std::vector<float> runTransform;
+  std::vector<Precision> runTransform;
   /// Optional: Length NumTri, contains an ID of the source face this triangle
   /// comes from. When auto-generated, this ID will be a triangle index into the
   /// original mesh. All neighboring coplanar triangles from that input mesh
@@ -106,18 +100,37 @@ struct MeshGL {
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
-  std::vector<float> halfedgeTangent;
+  std::vector<Precision> halfedgeTangent;
   /// The absolute precision of the vertex positions, based on accrued rounding
   /// errors. When creating a Manifold, the precision used will be the maximum
   /// of this and a baseline precision from the size of the bounding box. Any
   /// edge shorter than precision may be collapsed.
-  float precision = 0;
+  Precision precision = 0;
 
-  MeshGL() = default;
-  MeshGL(const Mesh& mesh);
+  MeshGLP() = default;
 
   bool Merge();
+
+  vec3 GetVertPos(size_t i) const {
+    size_t offset = i * numProp;
+    return vec3(vertProperties[offset], vertProperties[offset + 1],
+                vertProperties[offset + 2]);
+  }
+
+  ivec3 GetTriVerts(size_t i) const {
+    size_t offset = 3 * i;
+    return ivec3(triVerts[offset], triVerts[offset + 1], triVerts[offset + 2]);
+  }
 };
+
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly. This may not be manifold since the verts are duplicated
+ * along property boundaries that do not match. The additional merge vectors
+ * store this missing information, allowing the manifold to be reconstructed.
+ */
+using MeshGL = MeshGLP<float>;
+using MeshGL64 = MeshGLP<double>;
 /** @} */
 
 /** @defgroup Core
@@ -164,10 +177,11 @@ class Manifold {
 
   Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
   Manifold(const Mesh&);
+  Manifold(const MeshGL64&, const std::vector<double>& propertyTolerance = {});
 
   static Manifold Smooth(const MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
-  static Manifold Smooth(const Mesh&,
+  static Manifold Smooth(const MeshGL64&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
@@ -200,6 +214,7 @@ class Manifold {
   ///@{
   Mesh GetMesh() const;
   MeshGL GetMeshGL(ivec3 normalIdx = ivec3(0)) const;
+  MeshGL64 GetMeshGL64(ivec3 normalIdx = ivec3(0)) const;
   bool IsEmpty() const;
   enum class Error {
     NoError,
@@ -257,7 +272,6 @@ class Manifold {
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
-  // Manifold RefineToPrecision(double);
   ///@}
 
   /** @name Boolean

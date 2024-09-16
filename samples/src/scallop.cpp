@@ -27,29 +27,35 @@ Manifold Scallop() {
   constexpr int wiggles = 12;
   constexpr double sharpness = 0.8;
 
-  Mesh scallop;
+  MeshGL64 scallop;
   std::vector<Smoothness> sharpenedEdges;
-  scallop.vertPos = {{-offset, 0, height}, {-offset, 0, -height}};
+  scallop.numProp = 3;
+  scallop.vertProperties = {-offset, 0, height, -offset, 0, -height};
 
   const double delta = glm::pi<double>() / wiggles;
   for (int i = 0; i < 2 * wiggles; ++i) {
     double theta = (i - wiggles) * delta;
     double amp = 0.5 * height * glm::max(glm::cos(0.8 * theta), 0.0);
 
-    scallop.vertPos.push_back({radius * glm::cos(theta),
-                               radius * glm::sin(theta),
-                               amp * (i % 2 == 0 ? 1 : -1)});
+    scallop.vertProperties.insert(
+        scallop.vertProperties.end(),
+        {radius * glm::cos(theta), radius * glm::sin(theta),
+         amp * (i % 2 == 0 ? 1 : -1)});
     int j = i + 1;
     if (j == 2 * wiggles) j = 0;
 
     double smoothness = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
-    size_t halfedge = 3 * scallop.triVerts.size() + 1;
+    size_t halfedge = scallop.triVerts.size() + 1;
     sharpenedEdges.push_back({halfedge, smoothness});
-    scallop.triVerts.push_back({0, 2 + i, 2 + j});
+    scallop.triVerts.insert(
+        scallop.triVerts.end(),
+        {0, static_cast<uint32_t>(2 + i), static_cast<uint32_t>(2 + j)});
 
-    halfedge = 3 * scallop.triVerts.size() + 1;
+    halfedge = scallop.triVerts.size() + 1;
     sharpenedEdges.push_back({halfedge, smoothness});
-    scallop.triVerts.push_back({1, 2 + j, 2 + i});
+    scallop.triVerts.insert(
+        scallop.triVerts.end(),
+        {1, static_cast<uint32_t>(2 + j), static_cast<uint32_t>(2 + i)});
   }
 
   return Manifold::Smooth(scallop, sharpenedEdges);

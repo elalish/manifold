@@ -45,10 +45,6 @@ ManifoldPolygons *to_c(manifold::Polygons *m) {
   return reinterpret_cast<ManifoldPolygons *>(m);
 }
 
-ManifoldMesh *to_c(manifold::Mesh *m) {
-  return reinterpret_cast<ManifoldMesh *>(m);
-}
-
 ManifoldMeshGL *to_c(manifold::MeshGL *m) {
   return reinterpret_cast<ManifoldMeshGL *>(m);
 }
@@ -150,10 +146,6 @@ const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m) {
 
 const manifold::Polygons *from_c(ManifoldPolygons *m) {
   return reinterpret_cast<manifold::Polygons const *>(m);
-}
-
-const manifold::Mesh *from_c(ManifoldMesh *m) {
-  return reinterpret_cast<manifold::Mesh const *>(m);
 }
 
 const manifold::MeshGL *from_c(ManifoldMeshGL *m) {

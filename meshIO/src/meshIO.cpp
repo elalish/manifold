@@ -112,7 +112,7 @@ namespace manifold {
  * manifoldness. However it is always done for STLs, as they cannot possibly be
  * manifold without this step.
  */
-Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
+MeshGL ImportMesh(const std::string& filename, bool forceCleanup) {
   std::string ext = filename.substr(filename.find_last_of(".") + 1);
   const bool isYup = ext == "glb" || ext == "gltf";
 
@@ -143,20 +143,26 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
 
   DEBUG_ASSERT(scene, userErr, importer.GetErrorString());
 
-  Mesh mesh_out;
+  MeshGL mesh_out;
+  mesh_out.numProp = 3;
   for (size_t i = 0; i < scene->mNumMeshes; ++i) {
     const aiMesh* mesh_i = scene->mMeshes[i];
     for (size_t j = 0; j < mesh_i->mNumVertices; ++j) {
       const aiVector3D vert = mesh_i->mVertices[j];
-      mesh_out.vertPos.push_back(isYup ? vec3(vert.z, vert.x, vert.y)
-                                       : vec3(vert.x, vert.y, vert.z));
+      if (isYup)
+        mesh_out.vertProperties.insert(mesh_out.vertProperties.end(),
+                                       {vert.z, vert.x, vert.y});
+      else
+        mesh_out.vertProperties.insert(mesh_out.vertProperties.end(),
+                                       {vert.x, vert.y, vert.z});
     }
     for (size_t j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
       DEBUG_ASSERT(face.mNumIndices == 3, userErr,
                    "Non-triangular face in " + filename);
-      mesh_out.triVerts.emplace_back(face.mIndices[0], face.mIndices[1],
-                                     face.mIndices[2]);
+      mesh_out.triVerts.insert(
+          mesh_out.triVerts.end(),
+          {face.mIndices[0], face.mIndices[1], face.mIndices[2]});
     }
   }
   return mesh_out;

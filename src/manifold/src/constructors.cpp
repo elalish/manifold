@@ -71,7 +71,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  * No higher-order derivatives are considered, as the interpolation is
  * independent per triangle, only sharing constraints on their boundaries.
  *
- * @param mesh input Mesh.
+ * @param meshGL input MeshGL.
  * @param sharpenedEdges If desired, you can supply a vector of sharpened
  * halfedges, which should in general be a small subset of all halfedges. Order
  * of entries doesn't matter, as each one specifies the desired smoothness
@@ -88,14 +88,16 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-Manifold Manifold::Smooth(const Mesh& mesh,
+Manifold Manifold::Smooth(const MeshGL64& meshGL64,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
+  DEBUG_ASSERT(meshGL64.halfedgeTangent.empty(), std::runtime_error,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
-  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
+  // Don't allow any triangle merging.
+  std::vector<double> propertyTolerance(meshGL64.numProp - 3, -1);
+  std::shared_ptr<Impl> impl =
+      std::make_shared<Impl>(meshGL64, propertyTolerance);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
   return Manifold(impl);
 }

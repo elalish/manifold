@@ -88,7 +88,7 @@ void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
 ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
                                        int force_cleanup) {
   auto m = manifold::ImportMesh(std::string(filename), force_cleanup);
-  return to_c(new (mem) manifold::MeshGL(m));
+  return to_c(new (mem) MeshGL(m));
 }
 
 // memory size

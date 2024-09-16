@@ -47,7 +47,7 @@ std::vector<int> EdgePairs(const Mesh in) {
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMesh(), {});
+  if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
 #endif
   CheckNormals(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
@@ -61,7 +61,7 @@ TEST(Samples, Knot13) {
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMesh(), {});
+  if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMeshGL(), {});
 #endif
   CheckNormals(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
@@ -100,7 +100,7 @@ TEST(Samples, Scallop) {
     }
     options.faceted = true;
     options.mat.roughness = 0.5;
-    ExportMesh("scallopFacets.glb", in, options);
+    ExportMesh("scallopFacets.glb", scallop.GetMeshGL(), options);
   }
 #endif
 
@@ -146,7 +146,7 @@ TEST(Samples, TetPuzzle) {
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   puzzle = puzzle.Transform(RotateUp({1, -1, -1}));
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMesh(), {});
+  if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMeshGL(), {});
 #endif
 }
 
@@ -161,7 +161,7 @@ TEST(Samples, FrameReduced) {
   CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("roundedFrameReduced.glb", frame.GetMesh(), {});
+    ExportMesh("roundedFrameReduced.glb", frame.GetMeshGL(), {});
 #endif
 }
 
@@ -172,7 +172,8 @@ TEST(Samples, Frame) {
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("roundedFrame.glb", frame.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("roundedFrame.glb", frame.GetMeshGL(), {});
 #endif
 }
 
@@ -207,7 +208,8 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(extrusion.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("bracelet.glb", bracelet.GetMeshGL(), {});
 #endif
 }
 
@@ -232,7 +234,7 @@ TEST(Samples, GyroidModule) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("gyroidModule.glb", gyroid.GetMesh(), {});
+    ExportMesh("gyroidModule.glb", gyroid.GetMeshGL(), {});
 #endif
 }
 #endif
@@ -246,7 +248,7 @@ TEST(Samples, Sponge1) {
   CheckGL(sponge);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
+    ExportMesh("mengerSponge1.glb", sponge.GetMeshGL(), {});
 #endif
 }
 
@@ -282,14 +284,16 @@ TEST(Samples, Sponge4) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
+    ExportMesh("mengerHalf.glb", cutSponge.first.GetMeshGL(), {});
 
-    const Mesh out = sponge.GetMesh();
+    const MeshGL out = sponge.GetMeshGL();
     ExportOptions options;
     options.faceted = true;
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
-    for (const vec3 pos : out.vertPos) {
+    for (size_t i = 0; i < out.vertProperties.size(); i += out.numProp) {
+      vec3 pos = {out.vertProperties[i], out.vertProperties[i + 1],
+                  out.vertProperties[i + 2]};
       options.mat.vertColor.push_back(vec4(0.5 * (pos + 0.5), 1.0));
     }
     ExportMesh("mengerSponge.glb", out, options);
