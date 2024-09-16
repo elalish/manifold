@@ -114,4 +114,11 @@ suite('Examples', () => {
     expect(result.volume).to.be.closeTo(4175, 1, 'Volume');
     expect(result.surfaceArea).to.be.closeTo(5645, 1, 'Surface Area');
   });
+
+  test('Swiss Cheese', async () => {
+    const result = await runExample('Swiss Cheese');
+    expect(result.genus).to.equal(-33, 'Genus');
+    expect(result.volume).to.be.closeTo(976320, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(73253, 1, 'Surface Area');
+  });
 });

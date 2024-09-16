@@ -550,7 +550,55 @@ export const examples = {
         0, 0, size / Math.sqrt(2)
       ]);
       return result;
-    }
+    },
+
+    SwissCheese: function() {
+      // A "swiss cheese" block that demonstrates `slice`-ing out a layer
+      const { cube, sphere } = Manifold;
+
+      const size = [ 100, 100, 100 ];
+      const radius = 5;
+      const numHoles = 50;
+
+      // Simple random number generator that allows us to control the seed 
+      // https://stackoverflow.com/a/47593316
+      function splitmix32(a) {
+      return function() {
+        a |= 0;
+        a = a + 0x9e3779b9 | 0;
+        let t = a ^ a >>> 16;
+        t = Math.imul(t, 0x21f0aaad);
+        t = t ^ t >>> 15;
+        t = Math.imul(t, 0x735a2d97);
+        return ((t = t ^ t >>> 15) >>> 0) / 4294967296;
+        }
+      }
+
+      const prng = splitmix32(987654321)
+      // Switch to this to get a random seed
+      //const prng = splitmix32((Math.random()*2**32)>>>0)
+
+      function rand(min, max) {
+        return prng() * (max-min) + min;
+      }
+
+      const holes = new Array(numHoles).fill(0).map((_, i) => {
+        const center = size.map(s => rand(0, s));
+        return sphere(radius).translate(center);
+      });
+
+      const block = cube(size);
+      const swiss = block.subtract(Manifold.union(holes));
+
+      const slice = swiss.slice(size[2]/2)
+        .extrude(2) // extrude the slice a bit so that it renders
+        .translate(0, 0, size[2]/2); // and positioned where it strated
+
+      // And render the target slice inside the block
+      const result = Manifold.union(only(slice), swiss);
+
+      return result;
+    },
   },
 
   functionBodies: new Map()
