@@ -420,7 +420,7 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("minkowski.glb", sum.GetMesh(), {});
+  if (options.exportModels) ExportMesh("minkowski.glb", sum.GetMeshGL(), {});
 #endif
 
   ManifoldParams().deterministic = oldDeterministic;
