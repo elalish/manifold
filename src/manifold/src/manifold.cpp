@@ -1025,7 +1025,8 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   }
   return Manifold::BatchBoolean(composedHulls, inset
                                                    ? manifold::OpType::Subtract
-                                                   : manifold::OpType::Add);
+                                                   : manifold::OpType::Add)
+      .AsOriginal();
 }
 
 /**
