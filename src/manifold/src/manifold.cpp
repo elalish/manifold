@@ -477,8 +477,6 @@ Manifold Manifold::AsOriginal(
   newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
   newImpl->Finish();
-  newImpl->InitializeOriginal();
-  newImpl->CreateFaces(propertyTolerance);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
