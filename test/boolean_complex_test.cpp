@@ -996,4 +996,11 @@ TEST(BooleanComplex, CraycloudBool) {
   EXPECT_TRUE(res.IsEmpty());
 }
 
+TEST(BooleanComplex, HullMask) {
+  Manifold body = ReadMesh("hull-body.glb");
+  Manifold mask = ReadMesh("hull-mask.glb");
+  Manifold ret = body - mask;
+  MeshGL mesh = ret.GetMeshGL();
+}
+
 #endif

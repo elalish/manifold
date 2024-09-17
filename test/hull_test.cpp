@@ -81,15 +81,6 @@ TEST(Hull, Tictac) {
   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
 
-#ifdef MANIFOLD_EXPORT
-TEST(Hull, Fail) {
-  Manifold body = ReadMesh("hull-body.glb");
-  Manifold mask = ReadMesh("hull-mask.glb");
-  Manifold ret = body - mask;
-  MeshGL mesh = ret.GetMeshGL();
-}
-#endif
-
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
