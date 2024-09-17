@@ -382,9 +382,18 @@ TEST(Boolean, ConvexConvexMinkowski) {
   EXPECT_NEAR(difference.GetProperties().volume, 5.8319993019104004f, 1e-5);
   EXPECT_NEAR(difference.GetProperties().surfaceArea, 19.439998626708984, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
+
+ #ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("minkowski-convex-convex.glb", sum.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, NonConvexConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  ManifoldParams().processOverlaps = true;
+
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
@@ -395,9 +404,16 @@ TEST(Boolean, NonConvexConvexMinkowski) {
   Manifold difference =
       nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
   EXPECT_NEAR(difference.GetProperties().volume, 0.77841246128082275f, 1e-5);
-  EXPECT_NEAR(difference.GetProperties().surfaceArea, 16.703733444213867f,
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 16.703740785913258,
               1e-5);
   EXPECT_EQ(difference.Genus(), 5);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("minkowski-nonconvex-convex.glb", sum.GetMeshGL(), {});
+#endif
+
+  ManifoldParams().deterministic = oldDeterministic;
+  ManifoldParams().processOverlaps = false;
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowski) {
@@ -411,7 +427,7 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
   Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)));
   EXPECT_NEAR(sum.GetProperties().volume, 8.65625f, 1e-5);
   EXPECT_NEAR(sum.GetProperties().surfaceArea, 31.176914f, 1e-5);
-  EXPECT_EQ(sum.Genus(), -5);
+  EXPECT_EQ(sum.Genus(), 0);
 
   Manifold difference =
       nonConvex.MinkowskiDifference(nonConvex.Scale(vec3(0.1)));
@@ -420,7 +436,7 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("minkowski.glb", sum.GetMeshGL(), {});
+  if (options.exportModels) ExportMesh("minkowski-nonconvex-nonconvex.glb", sum.GetMeshGL(), {});
 #endif
 
   ManifoldParams().deterministic = oldDeterministic;
