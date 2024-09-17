@@ -58,6 +58,7 @@ TEST(Smooth, RefineQuads) {
   CheckGL(out);
 
   const MeshGL baseline = WithPositionColors(cylinder);
+  EXPECT_EQ(out.NumVert(), baseline.NumVert());
   float maxDiff = 0;
   for (size_t i = 0; i < out.vertProperties.size(); ++i) {
     maxDiff = std::max(

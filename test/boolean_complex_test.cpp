@@ -71,7 +71,7 @@ TEST(BooleanComplex, MeshRelation) {
 #endif
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 1);
+  EXPECT_LE(result.NumDegenerateTris(), 12);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 226, 1);

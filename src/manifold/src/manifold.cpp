@@ -477,6 +477,8 @@ Manifold Manifold::AsOriginal(
   newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
   newImpl->Finish();
+  newImpl->InitializeOriginal();
+  newImpl->CreateFaces(propertyTolerance);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
@@ -643,13 +645,12 @@ Manifold Manifold::SetProperties(
     if (triProperties.size() == 0) {
       const int numTri = NumTri();
       triProperties.resize(numTri);
-      int idx = 0;
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
-          triProperties[i][j] = idx++;
+          triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;
         }
       }
-      pImpl->meshRelation_.properties = Vec<double>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * NumVert(), 0);
     } else {
       pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
@@ -666,9 +667,6 @@ Manifold Manifold::SetProperties(
   }
 
   pImpl->meshRelation_.numProp = numProp;
-  pImpl->meshRelation_.originalID = ReserveIDs(1);
-  pImpl->InitializeOriginal();
-  pImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
