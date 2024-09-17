@@ -272,7 +272,6 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);
@@ -417,7 +416,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);

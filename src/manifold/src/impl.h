@@ -132,11 +132,7 @@ struct Manifold::Impl {
     }
 
     Vec<TriRef> triRef;
-    if (meshGL.runOriginalID.empty()) {
-      // FIXME: This affects Impl::InitializeOriginal, and removing this
-      // apparently make things fail. Not sure if this is expected.
-      meshRelation_.originalID = Impl::ReserveIDs(1);
-    } else {
+    if (!meshGL.runOriginalID.empty()) {
       std::vector<uint32_t> runIndex = meshGL.runIndex;
       const uint32_t runEnd = meshGL.triVerts.size();
       if (runIndex.empty()) {
@@ -210,7 +206,9 @@ struct Manifold::Impl {
 
     CalculateNormals();
 
-    InitializeOriginal();
+    if (meshGL.runOriginalID.empty()) {
+      InitializeOriginal();
+    }
 
     SimplifyTopology();
     Finish();

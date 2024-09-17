@@ -833,7 +833,6 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   CalculateBBox();
   SetPrecision(bBox_.Scale() * kTolerance);
   CalculateNormals();
-  meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
   Finish();
 }

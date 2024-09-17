@@ -301,7 +301,7 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * @param mesh The input Mesh.
  */
 Manifold::Manifold(const Mesh& mesh) {
-  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
+  Impl::MeshRelationD relation;
   pNode_ =
       std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
 }
@@ -472,7 +472,6 @@ int Manifold::OriginalID() const {
 Manifold Manifold::AsOriginal(
     const std::vector<double>& propertyTolerance) const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  newImpl->meshRelation_.originalID = ReserveIDs(1);
   newImpl->InitializeOriginal();
   newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
