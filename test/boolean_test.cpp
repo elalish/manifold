@@ -391,8 +391,8 @@ TEST(Boolean, ConvexConvexMinkowski) {
 
 TEST(Boolean, NonConvexConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
-  //ManifoldParams().deterministic = true;
-  //ManifoldParams().processOverlaps = true;
+  ManifoldParams().deterministic = true;
+  ManifoldParams().processOverlaps = true;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
@@ -412,14 +412,14 @@ TEST(Boolean, NonConvexConvexMinkowski) {
     ExportMesh("minkowski-nonconvex-convex.glb", sum.GetMeshGL(), {});
 #endif
 
-  //ManifoldParams().deterministic = oldDeterministic;
-  //ManifoldParams().processOverlaps = false;
+  ManifoldParams().deterministic = oldDeterministic;
+  ManifoldParams().processOverlaps = false;
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
-  //ManifoldParams().deterministic = true;
-  //ManifoldParams().processOverlaps = true;
+  ManifoldParams().deterministic = true;
+  ManifoldParams().processOverlaps = true;
 
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
@@ -440,8 +440,8 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
     ExportMesh("minkowski-nonconvex-nonconvex.glb", sum.GetMeshGL(), {});
 #endif
 
-  //ManifoldParams().deterministic = oldDeterministic;
-  //ManifoldParams().processOverlaps = false;
+  ManifoldParams().deterministic = oldDeterministic;
+  ManifoldParams().processOverlaps = false;
 }
 
 /**
