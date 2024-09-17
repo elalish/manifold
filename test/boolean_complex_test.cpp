@@ -340,10 +340,10 @@ TEST(BooleanComplex, TriangulationFail) {
     3, 5, 6, //
     4, 6, 5};
   // clang-format on
-
+  auto gl = (Manifold(m) + Manifold(m2)).GetMeshGL();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("trifail.glb", (Manifold(m) + Manifold(m2)).GetMeshGL(), {});
+    ExportMesh("trifail.glb", gl, {});
 #endif
 }
 
