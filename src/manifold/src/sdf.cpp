@@ -530,7 +530,6 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->CreateHalfedges(triVerts);
   pImpl_->CleanupTopology();
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }

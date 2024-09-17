@@ -294,9 +294,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   CalculateNormals();
 
   InitializeOriginal();
-  if (!hasFaceIDs) {
-    CreateFaces(propertyTolerance);
-  }
 
   SimplifyTopology();
   Finish();
@@ -350,7 +347,6 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
   Finish();
-  meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
   CreateFaces();
 }
@@ -392,9 +388,8 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
 }
 
 void Manifold::Impl::InitializeOriginal() {
-  const int meshID = meshRelation_.originalID;
-  // Don't initialize if it's not an original
-  if (meshID < 0) return;
+  const int meshID = ReserveIDs(1);
+  meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
@@ -407,9 +402,11 @@ void Manifold::Impl::InitializeOriginal() {
 
 void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   ZoneScoped;
+  constexpr double kDefaultPropTolerance = 1e-5;
   Vec<double> propertyToleranceD =
-      propertyTolerance.empty() ? Vec<double>(meshRelation_.numProp, kTolerance)
-                                : propertyTolerance;
+      propertyTolerance.empty()
+          ? Vec<double>(meshRelation_.numProp, kDefaultPropTolerance)
+          : propertyTolerance;
 
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
@@ -569,7 +566,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
   SetPrecision();
-  CreateFaces();
+  InitializeOriginal();
   Finish();
 }
 

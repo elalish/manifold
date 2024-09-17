@@ -230,13 +230,7 @@ MeshGL WithPositionColors(const Manifold& in) {
         }
       });
 
-  MeshGL outGL = out.GetMeshGL();
-  outGL.runIndex.clear();
-  outGL.runOriginalID.clear();
-  outGL.runTransform.clear();
-  outGL.faceID.clear();
-  outGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  return outGL;
+  return out.GetMeshGL();
 }
 
 MeshGL WithNormals(const Manifold& in) {

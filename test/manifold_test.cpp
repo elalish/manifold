@@ -59,9 +59,8 @@ TEST(Manifold, Empty) {
 }
 
 TEST(Manifold, ValidInput) {
-  std::vector<float> propTol = {0.1, 0.2};
   MeshGL tetGL = TetGL();
-  Manifold tet(tetGL, propTol);
+  Manifold tet(tetGL);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
 }
@@ -521,6 +520,7 @@ TEST(Manifold, MeshGLRoundTrip) {
 
 void CheckCube(const MeshGL& cubeSTL) {
   Manifold cube(cubeSTL);
+  cube = cube.AsOriginal();
   EXPECT_EQ(cube.NumTri(), 12);
   EXPECT_EQ(cube.NumVert(), 8);
   EXPECT_EQ(cube.NumPropVert(), 24);
@@ -540,6 +540,7 @@ TEST(Manifold, Merge) {
   EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
 
   EXPECT_TRUE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
   CheckCube(cubeSTL);
 
   EXPECT_FALSE(cubeSTL.Merge());

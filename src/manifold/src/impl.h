@@ -66,8 +66,7 @@ struct Manifold::Impl {
   Impl(Shape, const mat4x3 = mat4x3(1));
 
   template <typename Precision>
-  Impl(const MeshGLP<Precision>& meshGL,
-       std::vector<Precision> propertyTolerance) {
+  Impl(const MeshGLP<Precision>& meshGL) {
     const uint32_t numVert = meshGL.NumVert();
     const uint32_t numTri = meshGL.NumTri();
 
@@ -133,11 +132,7 @@ struct Manifold::Impl {
     }
 
     Vec<TriRef> triRef;
-    if (meshGL.runOriginalID.empty()) {
-      // FIXME: This affects Impl::InitializeOriginal, and removing this
-      // apparently make things fail. Not sure if this is expected.
-      meshRelation_.originalID = Impl::ReserveIDs(1);
-    } else {
+    if (!meshGL.runOriginalID.empty()) {
       std::vector<uint32_t> runIndex = meshGL.runIndex;
       const uint32_t runEnd = meshGL.triVerts.size();
       if (runIndex.empty()) {
@@ -194,11 +189,6 @@ struct Manifold::Impl {
       }
     }
 
-    std::vector<double> propertyToleranceD(propertyTolerance.size());
-    manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
-                        propertyToleranceD.begin(),
-                        [](Precision v) { return (double)v; });
-
     CreateHalfedges(triVerts);
     if (!IsManifold()) {
       MarkFailure(Error::NotManifold);
@@ -216,9 +206,8 @@ struct Manifold::Impl {
 
     CalculateNormals();
 
-    InitializeOriginal();
-    if (meshGL.faceID.empty()) {
-      CreateFaces(propertyToleranceD);
+    if (meshGL.runOriginalID.empty()) {
+      InitializeOriginal();
     }
 
     SimplifyTopology();

@@ -52,10 +52,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
-  // Don't allow any triangle merging.
-  std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
-  std::shared_ptr<Impl> impl =
-      std::make_shared<Impl>(meshGL, propertyTolerance);
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
   return Manifold(impl);
 }
@@ -94,10 +91,7 @@ Manifold Manifold::Smooth(const MeshGL64& meshGL64,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
-  // Don't allow any triangle merging.
-  std::vector<double> propertyTolerance(meshGL64.numProp - 3, -1);
-  std::shared_ptr<Impl> impl =
-      std::make_shared<Impl>(meshGL64, propertyTolerance);
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
   return Manifold(impl);
 }
@@ -278,7 +272,6 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);
@@ -423,7 +416,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);
