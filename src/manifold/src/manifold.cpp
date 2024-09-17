@@ -977,8 +977,7 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
     std::vector<Manifold> newHulls(numTri);
     auto policy = autoPolicy(numTri, 100);
     for_each_n(
-        policy, countAt(0), numTri,
-        [&newHulls, &b, &aImpl](const int face) {
+        policy, countAt(0), numTri, [&newHulls, &b, &aImpl](const int face) {
           newHulls[face] = Manifold::Hull(
               {b.Translate(
                    aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
