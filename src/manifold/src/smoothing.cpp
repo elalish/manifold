@@ -994,9 +994,7 @@ void Manifold::Impl::Refine(
                InterpTri({vertPos_, vertBary, &old}));
     // Make original since the subdivided faces have been warped into
     // being non-coplanar, and hence not being related to the original faces.
-    meshRelation_.originalID = ReserveIDs(1);
     InitializeOriginal();
-    CreateFaces();
   }
 
   halfedgeTangent_.resize(0);

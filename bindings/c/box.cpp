@@ -14,7 +14,6 @@
 
 #include "manifold/common.h"
 #include "manifold/conv.h"
-#include "manifold/manifold.h"
 #include "manifold/types.h"
 
 #ifdef __cplusplus

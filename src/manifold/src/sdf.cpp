@@ -428,12 +428,13 @@ namespace manifold {
  */
 
 /**
- * Constructs a level-set MeshGL from the input Signed-Distance Function (SDF).
- * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
- * for manifoldness). Instead of using a cubic grid, it uses a body-centered
- * cubic grid (two shifted cubic grids). This means if your function's interior
- * exceeds the given bounds, you will see a kind of egg-crate shape closing off
- * the manifold, which is due to the underlying grid.
+ * Constructs a level-set manifold from the input Signed-Distance Function
+ * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
+ * better for manifoldness). Instead of using a cubic grid, it uses a
+ * body-centered cubic grid (two shifted cubic grids). This means if your
+ * function's interior exceeds the given bounds, you will see a kind of
+ * egg-crate shape closing off the manifold, which is due to the underlying
+ * grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
  * `double operator()(vec3 point)`, which returns the
@@ -529,7 +530,6 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->CreateHalfedges(triVerts);
   pImpl_->CleanupTopology();
   pImpl_->Finish();
-  pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }

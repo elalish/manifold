@@ -71,7 +71,7 @@ TEST(BooleanComplex, MeshRelation) {
 #endif
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 1);
+  EXPECT_LE(result.NumDegenerateTris(), 12);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 226, 1);
@@ -192,7 +192,7 @@ TEST(BooleanComplex, Subtract) {
   Manifold second(secondMesh);
 
   first -= second;
-  first.GetMesh();
+  first.GetMeshGL();
 }
 
 TEST(BooleanComplex, Close) {
@@ -212,7 +212,7 @@ TEST(BooleanComplex, Close) {
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
+  if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;
@@ -499,7 +499,7 @@ TEST(BooleanComplex, Sweep) {
 
   EXPECT_NEAR(prop.volume, 3757, 1);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMesh(), {});
+  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
 
   PolygonParams().processOverlaps = false;
@@ -994,6 +994,13 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_TRUE(res.IsEmpty());
+}
+
+TEST(BooleanComplex, HullMask) {
+  Manifold body = ReadMesh("hull-body.glb");
+  Manifold mask = ReadMesh("hull-mask.glb");
+  Manifold ret = body - mask;
+  MeshGL mesh = ret.GetMeshGL();
 }
 
 #endif

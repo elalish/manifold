@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;
@@ -137,7 +136,7 @@ TEST(Boolean, Cubes) {
   EXPECT_NEAR(prop.surfaceArea, 9.2, 0.01);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubes.glb", result.GetMesh(), {});
+  if (options.exportModels) ExportMesh("cubes.glb", result.GetMeshGL(), {});
 #endif
 }
 
@@ -299,7 +298,7 @@ TEST(Boolean, FaceUnion) {
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMesh(), {});
+  if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMeshGL(), {});
 #endif
 }
 

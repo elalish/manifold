@@ -20,7 +20,6 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "manifold/parallel.h"
-#include "quickhull.h"
 
 namespace {
 using namespace manifold;
@@ -57,143 +56,23 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double zDeg = glm::degrees(std::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
-}  // namespace
 
-namespace manifold {
-
-/**
- * Construct an empty Manifold.
- *
- */
-Manifold::Manifold() : pNode_{std::make_shared<CsgLeafNode>()} {}
-Manifold::~Manifold() = default;
-Manifold::Manifold(Manifold&&) noexcept = default;
-Manifold& Manifold::operator=(Manifold&&) noexcept = default;
-
-Manifold::Manifold(const Manifold& other) : pNode_(other.pNode_) {}
-
-Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
-
-Manifold::Manifold(std::shared_ptr<Impl> pImpl_)
-    : pNode_(std::make_shared<CsgLeafNode>(pImpl_)) {}
-
-Manifold Manifold::Invalid() {
-  auto pImpl_ = std::make_shared<Impl>();
-  pImpl_->status_ = Error::InvalidConstruction;
-  return Manifold(pImpl_);
-}
-
-Manifold& Manifold::operator=(const Manifold& other) {
-  if (this != &other) {
-    pNode_ = other.pNode_;
-  }
-  return *this;
-}
-
-CsgLeafNode& Manifold::GetCsgLeafNode() const {
-  if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
-    pNode_ = pNode_->ToLeafNode();
-  }
-  return *std::static_pointer_cast<CsgLeafNode>(pNode_);
-}
-
-/**
- * Convert a MeshGL into a Manifold, retaining its properties and merging only
- * the positions according to the merge vectors. Will return an empty Manifold
- * and set an Error Status if the result is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
- *
- * All fields are read, making this structure suitable for a lossless round-trip
- * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
- * unique originalID for each material, and sort the materials into triangle
- * runs.
- *
- * @param meshGL The input MeshGL.
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * properties in the [-1, 1] range.
- */
-Manifold::Manifold(const MeshGL& meshGL,
-                   const std::vector<float>& propertyTolerance)
-    : pNode_(std::make_shared<CsgLeafNode>(
-          std::make_shared<Impl>(meshGL, propertyTolerance))) {}
-
-/**
- * Convert a Mesh into a Manifold. Will return an empty Manifold
- * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
- *
- * @param mesh The input Mesh.
- */
-Manifold::Manifold(const Mesh& mesh) {
-  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
-  pNode_ =
-      std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
-}
-
-/**
- * This returns a Mesh of simple vectors of vertices and triangles suitable for
- * saving or other operations outside of the context of this library.
- */
-Mesh Manifold::GetMesh() const {
+template <typename Precision>
+MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
+                                 ivec3 normalIdx) {
   ZoneScoped;
-  const Impl& impl = *GetCsgLeafNode().GetImpl();
-
-  Mesh result;
-  result.precision = Precision();
-  result.vertPos.insert(result.vertPos.end(), impl.vertPos_.begin(),
-                        impl.vertPos_.end());
-  result.vertNormal.insert(result.vertNormal.end(), impl.vertNormal_.begin(),
-                           impl.vertNormal_.end());
-  result.halfedgeTangent.insert(result.halfedgeTangent.end(),
-                                impl.halfedgeTangent_.begin(),
-                                impl.halfedgeTangent_.end());
-
-  result.triVerts.resize(NumTri());
-  auto& triVerts = result.triVerts;
-  const auto& halfedges = impl.halfedge_;
-  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [&triVerts, &halfedges](const int tri) {
-               for (int i : {0, 1, 2}) {
-                 triVerts[tri][i] = halfedges[3 * tri + i].startVert;
-               }
-             });
-
-  return result;
-}
-
-/**
- * The most complete output of this library, returning a MeshGL that is designed
- * to easily push into a renderer, including all interleaved vertex properties
- * that may have been input. It also includes relations to all the input meshes
- * that form a part of this result and the transforms applied to each.
- *
- * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
- */
-MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
-  ZoneScoped;
-  const Impl& impl = *GetCsgLeafNode().GetImpl();
-
-  const int numProp = NumProp();
-  const int numVert = NumPropVert();
-  const int numTri = NumTri();
+  const int numProp = impl.NumProp();
+  const int numVert = impl.NumPropVert();
+  const int numTri = impl.NumTri();
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
   const bool updateNormals =
       !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
 
-  MeshGL out;
-  out.precision = std::max(Precision(), std::numeric_limits<float>::epsilon() *
-                                            BoundingBox().Scale());
+  MeshGLP<Precision> out;
+  out.precision =
+      std::max(impl.precision_,
+               std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
   out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
 
@@ -206,7 +85,6 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
     out.halfedgeTangent[4 * i + 2] = t.z;
     out.halfedgeTangent[4 * i + 3] = t.w;
   }
-
   // Sort the triangles into runs
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
@@ -222,10 +100,10 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
   }
 
   std::vector<mat3> runNormalTransform;
-
   auto addRun = [updateNormals, isOriginal](
-                    MeshGL& out, std::vector<mat3>& runNormalTransform, int tri,
-                    const Impl::Relation& rel) {
+                    MeshGLP<Precision>& out,
+                    std::vector<mat3>& runNormalTransform, int tri,
+                    const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
     if (updateNormals) {
@@ -253,7 +131,7 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
     if (meshID != lastID) {
-      Impl::Relation rel;
+      manifold::Manifold::Impl::Relation rel;
       auto it = meshIDtransform.find(meshID);
       if (it != meshIDtransform.end()) rel = it->second;
       addRun(out, runNormalTransform, tri, rel);
@@ -278,7 +156,6 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
     }
     return out;
   }
-
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
   std::vector<std::vector<ivec2>> vertPropPair(impl.NumVert());
@@ -336,6 +213,164 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
     }
   }
   return out;
+}
+}  // namespace
+
+namespace manifold {
+
+/**
+ * Construct an empty Manifold.
+ *
+ */
+Manifold::Manifold() : pNode_{std::make_shared<CsgLeafNode>()} {}
+Manifold::~Manifold() = default;
+Manifold::Manifold(Manifold&&) noexcept = default;
+Manifold& Manifold::operator=(Manifold&&) noexcept = default;
+
+Manifold::Manifold(const Manifold& other) : pNode_(other.pNode_) {}
+
+Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
+
+Manifold::Manifold(std::shared_ptr<Impl> pImpl_)
+    : pNode_(std::make_shared<CsgLeafNode>(pImpl_)) {}
+
+Manifold Manifold::Invalid() {
+  auto pImpl_ = std::make_shared<Impl>();
+  pImpl_->status_ = Error::InvalidConstruction;
+  return Manifold(pImpl_);
+}
+
+Manifold& Manifold::operator=(const Manifold& other) {
+  if (this != &other) {
+    pNode_ = other.pNode_;
+  }
+  return *this;
+}
+
+CsgLeafNode& Manifold::GetCsgLeafNode() const {
+  if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
+    pNode_ = pNode_->ToLeafNode();
+  }
+  return *std::static_pointer_cast<CsgLeafNode>(pNode_);
+}
+
+/**
+ * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * the positions according to the merge vectors. Will return an empty Manifold
+ * and set an Error Status if the result is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
+ *
+ * All fields are read, making this structure suitable for a lossless round-trip
+ * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * unique originalID for each material, and sort the materials into triangle
+ * runs.
+ *
+ * @param meshGL The input MeshGL.
+ */
+Manifold::Manifold(const MeshGL& meshGL)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
+
+/**
+ * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * the positions according to the merge vectors. Will return an empty Manifold
+ * and set an Error Status if the result is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
+ *
+ * All fields are read, making this structure suitable for a lossless round-trip
+ * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * unique originalID for each material, and sort the materials into triangle
+ * runs.
+ *
+ * @param meshGL The input MeshGL.
+ * @param propertyTolerance A vector of precision values for each property
+ * beyond position. If specified, the propertyTolerance vector must have size =
+ * numProp - 3. This is the amount of interpolation error allowed before two
+ * neighboring triangles are considered to be on a property boundary edge.
+ * Property boundary edges will be retained across operations even if the
+ * triangles are coplanar. Defaults to 1e-5, which works well for most
+ * properties in the [-1, 1] range.
+ */
+Manifold::Manifold(const MeshGL64& meshGL64)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
+
+/**
+ * Convert a Mesh into a Manifold. Will return an empty Manifold
+ * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
+ *
+ * @param mesh The input Mesh.
+ */
+Manifold::Manifold(const Mesh& mesh) {
+  Impl::MeshRelationD relation;
+  pNode_ =
+      std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
+}
+
+/**
+ * This returns a Mesh of simple vectors of vertices and triangles suitable for
+ * saving or other operations outside of the context of this library.
+ */
+Mesh Manifold::GetMesh() const {
+  ZoneScoped;
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
+
+  Mesh result;
+  result.precision = Precision();
+  result.vertPos.insert(result.vertPos.end(), impl.vertPos_.begin(),
+                        impl.vertPos_.end());
+  result.vertNormal.insert(result.vertNormal.end(), impl.vertNormal_.begin(),
+                           impl.vertNormal_.end());
+  result.halfedgeTangent.insert(result.halfedgeTangent.end(),
+                                impl.halfedgeTangent_.begin(),
+                                impl.halfedgeTangent_.end());
+
+  result.triVerts.resize(NumTri());
+  auto& triVerts = result.triVerts;
+  const auto& halfedges = impl.halfedge_;
+  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
+             [&triVerts, &halfedges](const int tri) {
+               for (int i : {0, 1, 2}) {
+                 triVerts[tri][i] = halfedges[3 * tri + i].startVert;
+               }
+             });
+
+  return result;
+}
+
+/**
+ * The most complete output of this library, returning a MeshGL that is designed
+ * to easily push into a renderer, including all interleaved vertex properties
+ * that may have been input. It also includes relations to all the input meshes
+ * that form a part of this result and the transforms applied to each.
+ *
+ * @param normalIdx If the original MeshGL inputs that formed this manifold had
+ * properties corresponding to normal vectors, you can specify which property
+ * channels these are (x, y, z), which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. Each channel must be >= 3 and < numProp, and all original
+ * MeshGLs must use the same channels for their normals.
+ */
+MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
+  return GetMeshGLImpl<float>(impl, normalIdx);
+}
+
+/**
+ * The most complete output of this library, returning a MeshGL that is designed
+ * to easily push into a renderer, including all interleaved vertex properties
+ * that may have been input. It also includes relations to all the input meshes
+ * that form a part of this result and the transforms applied to each.
+ *
+ * @param normalIdx If the original MeshGL inputs that formed this manifold had
+ * properties corresponding to normal vectors, you can specify which property
+ * channels these are (x, y, z), which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. Each channel must be >= 3 and < numProp, and all original
+ * MeshGLs must use the same channels for their normals.
+ */
+MeshGL64 Manifold::GetMeshGL64(ivec3 normalIdx) const {
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
+  return GetMeshGLImpl<double>(impl, normalIdx);
 }
 
 /**
@@ -425,12 +460,20 @@ int Manifold::OriginalID() const {
  * collapses those edges. In the process the relation to ancestor meshes is lost
  * and this new Manifold is marked an original. Properties are preserved, so if
  * they do not match across an edge, that edge will be kept.
+ *
+ * @param propertyTolerance A vector of precision values for each property
+ * beyond position. If specified, the propertyTolerance vector must have size =
+ * numProp - 3. This is the amount of interpolation error allowed before two
+ * neighboring triangles are considered to be on a property boundary edge.
+ * Property boundary edges will be retained across operations even if the
+ * triangles are coplanar. Defaults to 1e-5, which works well for most
+ * single-precision properties in the [-1, 1] range.
  */
-Manifold Manifold::AsOriginal() const {
+Manifold Manifold::AsOriginal(
+    const std::vector<double>& propertyTolerance) const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  newImpl->meshRelation_.originalID = ReserveIDs(1);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces();
+  newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
@@ -578,6 +621,8 @@ Manifold Manifold::WarpBatch(
  * removal of channels. Note: undefined behavior will result if you read past
  * the number of input properties or write past the number of output properties.
  *
+ * If propFunc is a nullptr, this function will just set the channel to zeroes.
+ *
  * @param numProp The new number of properties per vertex.
  * @param propFunc A function that modifies the properties of a given vertex.
  */
@@ -597,26 +642,28 @@ Manifold Manifold::SetProperties(
     if (triProperties.size() == 0) {
       const int numTri = NumTri();
       triProperties.resize(numTri);
-      int idx = 0;
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
-          triProperties[i][j] = idx++;
+          triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;
         }
       }
-      pImpl->meshRelation_.properties = Vec<double>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * NumVert(), 0);
     } else {
       pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
-    for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
-               UpdateProperties({pImpl->meshRelation_.properties.data(),
-                                 numProp, oldProperties.data(), oldNumProp,
-                                 pImpl->vertPos_.data(), triProperties.data(),
-                                 pImpl->halfedge_.data(), propFunc}));
+    for_each_n(
+        propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
+        countAt(0), NumTri(),
+        UpdateProperties(
+            {pImpl->meshRelation_.properties.data(), numProp,
+             oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
+             triProperties.data(), pImpl->halfedge_.data(),
+             propFunc == nullptr ? [](double* newProp, vec3 position,
+                                      const double* oldProp) { *newProp = 0; }
+                                 : propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;
-  pImpl->CreateFaces();
-  pImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 

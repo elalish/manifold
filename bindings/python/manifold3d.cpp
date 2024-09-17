@@ -233,9 +233,8 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL &, const std::vector<float> &>(),
-           nb::arg("mesh"), nb::arg("property_tolerance") = nb::list(),
-           manifold__manifold__mesh_gl__property_tolerance)
+      .def(nb::init<const MeshGL &>(), nb::arg("mesh"),
+           manifold__manifold__mesh_gl)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
@@ -348,7 +347,9 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
+      .def("as_original", &Manifold::AsOriginal,
+           nb::arg("property_tolerance") = nb::list(),
+           manifold__as_original__property_tolerance)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),

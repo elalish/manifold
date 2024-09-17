@@ -17,12 +17,10 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
-#include <numeric>
 
 #include "manifold/hashtable.h"
 #include "manifold/parallel.h"
 #include "manifold/svd.h"
-#include "manifold/tri_dist.h"
 #include "mesh_fixes.h"
 
 namespace {
@@ -47,13 +45,13 @@ struct Transform4x3 {
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
+template <bool calculateTriNormal>
 struct AssignNormals {
   VecView<vec3> faceNormal;
   VecView<vec3> vertNormal;
   VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
   const double precision;
-  const bool calculateTriNormal;
 
   void operator()(const int face) {
     vec3& triNormal = faceNormal[face];
@@ -251,147 +249,6 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
-Manifold::Impl::Impl(const MeshGL& meshGL,
-                     std::vector<float> propertyTolerance) {
-  Mesh mesh;
-  mesh.precision = meshGL.precision;
-  const auto numVert = meshGL.NumVert();
-  const auto numTri = meshGL.NumTri();
-
-  if (meshGL.numProp < 3) {
-    MarkFailure(Error::MissingPositionProperties);
-    return;
-  }
-
-  mesh.triVerts.resize(numTri);
-  if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
-    MarkFailure(Error::MergeVectorsDifferentLengths);
-    return;
-  }
-
-  if (!meshGL.runTransform.empty() &&
-      12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
-    MarkFailure(Error::TransformWrongLength);
-    return;
-  }
-
-  if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
-      meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
-      meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
-    MarkFailure(Error::RunIndexWrongLength);
-    return;
-  }
-
-  if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
-    MarkFailure(Error::FaceIDWrongLength);
-    return;
-  }
-
-  std::vector<int> prop2vert(numVert);
-  std::iota(prop2vert.begin(), prop2vert.end(), 0);
-  for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-    const int from = meshGL.mergeFromVert[i];
-    const int to = meshGL.mergeToVert[i];
-    if (from >= static_cast<int>(numVert) || to >= static_cast<int>(numVert)) {
-      MarkFailure(Error::MergeIndexOutOfBounds);
-      return;
-    }
-    prop2vert[from] = to;
-  }
-  for (size_t i = 0; i < numTri; ++i) {
-    for (const size_t j : {0, 1, 2}) {
-      const int vert = meshGL.triVerts[3 * i + j];
-      if (vert < 0 || vert >= static_cast<int>(numVert)) {
-        MarkFailure(Error::VertexOutOfBounds);
-        return;
-      }
-      mesh.triVerts[i][j] = prop2vert[vert];
-    }
-  }
-
-  MeshRelationD relation;
-
-  if (meshGL.numProp > 3) {
-    relation.triProperties.resize(numTri);
-    for (size_t i = 0; i < numTri; ++i) {
-      for (const size_t j : {0, 1, 2}) {
-        relation.triProperties[i][j] = meshGL.triVerts[3 * i + j];
-      }
-    }
-  }
-
-  const auto numProp = meshGL.numProp - 3;
-  relation.numProp = numProp;
-  relation.properties.resize(meshGL.NumVert() * numProp);
-  // This will have unreferenced duplicate positions that will be removed by
-  // Impl::RemoveUnreferencedVerts().
-  mesh.vertPos.resize(meshGL.NumVert());
-
-  for (size_t i = 0; i < meshGL.NumVert(); ++i) {
-    for (const int j : {0, 1, 2})
-      mesh.vertPos[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
-    for (size_t j = 0; j < numProp; ++j)
-      relation.properties[i * numProp + j] =
-          meshGL.vertProperties[meshGL.numProp * i + 3 + j];
-  }
-
-  mesh.halfedgeTangent.resize(meshGL.halfedgeTangent.size() / 4);
-  for (size_t i = 0; i < mesh.halfedgeTangent.size(); ++i) {
-    for (const int j : {0, 1, 2, 3})
-      mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
-  }
-
-  if (meshGL.runOriginalID.empty()) {
-    relation.originalID = Impl::ReserveIDs(1);
-  } else {
-    std::vector<uint32_t> runIndex = meshGL.runIndex;
-    const uint32_t runEnd = meshGL.triVerts.size();
-    if (runIndex.empty()) {
-      runIndex = {0, runEnd};
-    } else if (runIndex.size() == meshGL.runOriginalID.size()) {
-      runIndex.push_back(runEnd);
-    }
-    relation.triRef.resize(meshGL.NumTri());
-    const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
-    for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
-      const int meshID = startID + i;
-      const int originalID = meshGL.runOriginalID[i];
-      for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
-        TriRef& ref = relation.triRef[tri];
-        ref.meshID = meshID;
-        ref.originalID = originalID;
-        ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
-      }
-
-      if (meshGL.runTransform.empty()) {
-        relation.meshIDtransform[meshID] = {originalID};
-      } else {
-        const float* m = meshGL.runTransform.data() + 12 * i;
-        relation.meshIDtransform[meshID] = {
-            originalID,
-            {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
-             m[11]}};
-      }
-    }
-  }
-
-  std::vector<double> propertyToleranceD(propertyTolerance.size());
-  manifold::transform(propertyTolerance.begin(), propertyTolerance.end(),
-                      propertyToleranceD.begin(),
-                      [](float v) { return (double)v; });
-
-  *this = Impl(mesh, relation, propertyToleranceD, !meshGL.faceID.empty());
-
-  // A Manifold created from an input mesh is never an original - the input is
-  // the original.
-  meshRelation_.originalID = -1;
-}
-
-/**
- * Create a manifold from an input triangle Mesh. Will return an empty Manifold
- * and set an Error Status if the Mesh is not manifold or otherwise invalid.
- * TODO: update halfedgeTangent during SimplifyTopology.
- */
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<double>& propertyTolerance,
                      bool hasFaceIDs)
@@ -437,9 +294,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   CalculateNormals();
 
   InitializeOriginal();
-  if (!hasFaceIDs) {
-    CreateFaces(propertyTolerance);
-  }
 
   SimplifyTopology();
   Finish();
@@ -493,7 +347,6 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
   Finish();
-  meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
   CreateFaces();
 }
@@ -535,9 +388,8 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
 }
 
 void Manifold::Impl::InitializeOriginal() {
-  const int meshID = meshRelation_.originalID;
-  // Don't initialize if it's not an original
-  if (meshID < 0) return;
+  const int meshID = ReserveIDs(1);
+  meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
@@ -550,9 +402,11 @@ void Manifold::Impl::InitializeOriginal() {
 
 void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   ZoneScoped;
+  constexpr double kDefaultPropTolerance = 1e-5;
   Vec<double> propertyToleranceD =
-      propertyTolerance.empty() ? Vec<double>(meshRelation_.numProp, kTolerance)
-                                : propertyTolerance;
+      propertyTolerance.empty()
+          ? Vec<double>(meshRelation_.numProp, kDefaultPropTolerance)
+          : propertyTolerance;
 
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
@@ -614,8 +468,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
                  const int j = (i + 1) % 3;
                  const int e = 3 * tri + i;
                  halfedge_[e] = {verts[i], verts[j], -1, tri};
-                 // Sort the forward halfedges in front of the backward ones by
-                 // setting the highest-order bit.
+                 // Sort the forward halfedges in front of the backward ones
+                 // by setting the highest-order bit.
                  edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
                            ((uint64_t)std::min(verts[i], verts[j])) << 32 |
                            std::max(verts[i], verts[j]);
@@ -712,7 +566,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
   SetPrecision();
-  CreateFaces();
+  InitializeOriginal();
   Finish();
 }
 
@@ -800,9 +654,14 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  for_each_n(policy, countAt(0), NumTri(),
-             AssignNormals({faceNormal_, vertNormal_, vertPos_, halfedge_,
-                            precision_, calculateTriNormal}));
+  if (calculateTriNormal)
+    for_each_n(policy, countAt(0), NumTri(),
+               AssignNormals<true>({faceNormal_, vertNormal_, vertPos_,
+                                    halfedge_, precision_}));
+  else
+    for_each_n(policy, countAt(0), NumTri(),
+               AssignNormals<false>({faceNormal_, vertNormal_, vertPos_,
+                                     halfedge_, precision_}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            [](vec3& v) { v = SafeNormalize(v); });
 }

@@ -301,9 +301,6 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
                         oldProperties, halfedge_, vertMeanCurvature,
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
                         meanIdx}));
-
-  CreateFaces();
-  Finish();
 }
 
 /**

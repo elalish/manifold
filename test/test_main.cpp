@@ -101,29 +101,30 @@ Polygons SquareHole(double xOffset) {
   return polys;
 }
 
-Mesh Csaszar() {
-  Mesh csaszar;
-  csaszar.vertPos = {{-20, -20, -10},  //
-                     {-20, 20, -15},   //
-                     {-5, -8, 8},      //
-                     {0, 0, 30},       //
-                     {5, 8, 8},        //
-                     {20, -20, -15},   //
-                     {20, 20, -10}};
-  csaszar.triVerts = {{1, 3, 6},  //
-                      {1, 6, 5},  //
-                      {2, 5, 6},  //
-                      {0, 2, 6},  //
-                      {0, 6, 4},  //
-                      {3, 4, 6},  //
-                      {1, 2, 3},  //
-                      {1, 4, 2},  //
-                      {1, 0, 4},  //
-                      {1, 5, 0},  //
-                      {3, 5, 4},  //
-                      {0, 5, 3},  //
-                      {0, 3, 2},  //
-                      {2, 4, 5}};
+MeshGL Csaszar() {
+  MeshGL csaszar;
+  csaszar.numProp = 3;
+  csaszar.vertProperties = {-20, -20, -10,  //
+                            -20, 20,  -15,  //
+                            -5,  -8,  8,    //
+                            0,   0,   30,   //
+                            5,   8,   8,    //
+                            20,  -20, -15,  //
+                            20,  20,  -10};
+  csaszar.triVerts = {1, 3, 6,  //
+                      1, 6, 5,  //
+                      2, 5, 6,  //
+                      0, 2, 6,  //
+                      0, 6, 4,  //
+                      3, 4, 6,  //
+                      1, 2, 3,  //
+                      1, 4, 2,  //
+                      1, 0, 4,  //
+                      1, 5, 0,  //
+                      3, 5, 4,  //
+                      0, 5, 3,  //
+                      0, 3, 2,  //
+                      2, 4, 5};
   return csaszar;
 }
 
@@ -143,14 +144,6 @@ struct GyroidSDF {
 Manifold Gyroid() {
   const double period = glm::two_pi<double>();
   return Manifold::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
-}
-
-Mesh Tet() {
-  Mesh tet;
-  tet.vertPos = {
-      {-1.0, -1.0, 1.0}, {-1.0, 1.0, -1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}};
-  tet.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
-  return tet;
 }
 
 MeshGL TetGL() {
@@ -237,13 +230,7 @@ MeshGL WithPositionColors(const Manifold& in) {
         }
       });
 
-  MeshGL outGL = out.GetMeshGL();
-  outGL.runIndex.clear();
-  outGL.runOriginalID.clear();
-  outGL.runTransform.clear();
-  outGL.faceID.clear();
-  outGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  return outGL;
+  return out.GetMeshGL();
 }
 
 MeshGL WithNormals(const Manifold& in) {
@@ -320,15 +307,32 @@ void CheckFinite(const MeshGL& mesh) {
   }
 }
 
-void Identical(const Mesh& mesh1, const Mesh& mesh2) {
-  ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
-  for (size_t i = 0; i < mesh1.vertPos.size(); ++i)
-    for (int j : {0, 1, 2})
-      ASSERT_NEAR(mesh1.vertPos[i][j], mesh2.vertPos[i][j], 0.0001);
+void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
+  ASSERT_EQ(mesh1.vertProperties.size() / mesh1.numProp,
+            mesh2.vertProperties.size() / mesh2.numProp);
+  for (size_t i = 0; i < mesh1.vertProperties.size() / mesh1.numProp; ++i)
+    ASSERT_LE(glm::length(mesh1.GetVertPos(i) - mesh2.GetVertPos(i)), 0.0001);
 
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
-  for (size_t i = 0; i < mesh1.triVerts.size(); ++i)
-    ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
+
+  // reorder faces
+  std::vector<ivec3> triVerts1(mesh1.triVerts.size() / 3);
+  std::vector<ivec3> triVerts2(mesh1.triVerts.size() / 3);
+
+  for (size_t i = 0; i < triVerts1.size(); ++i) {
+    triVerts1[i] = ivec3(mesh1.triVerts[3 * i], mesh1.triVerts[3 * i + 1],
+                         mesh1.triVerts[3 * i + 2]);
+    triVerts2[i] = ivec3(mesh2.triVerts[3 * i], mesh2.triVerts[3 * i + 1],
+                         mesh2.triVerts[3 * i + 2]);
+  }
+  auto comp = [](const ivec3& a, const ivec3& b) {
+    return a.x < b.x || (a.x == b.x && a.y < b.y) ||
+           (a.x == b.x && a.y == b.y && a.z < b.z);
+  };
+  std::sort(triVerts1.begin(), triVerts1.end(), comp);
+  std::sort(triVerts2.begin(), triVerts2.end(), comp);
+  for (size_t i = 0; i < triVerts1.size(); ++i)
+    ASSERT_EQ(triVerts1[i], triVerts2[i]);
 }
 
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,

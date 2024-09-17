@@ -74,21 +74,12 @@ TEST(Hull, Tictac) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
+    ExportMesh("tictac_hull.glb", tictac.GetMeshGL(), {});
   }
 #endif
 
   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
-
-#ifdef MANIFOLD_EXPORT
-TEST(Hull, Fail) {
-  Manifold body = ReadMesh("hull-body.glb");
-  Manifold mask = ReadMesh("hull-mask.glb");
-  Manifold ret = body - mask;
-  MeshGL mesh = ret.GetMesh();
-}
-#endif
 
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
@@ -109,10 +100,10 @@ TEST(Hull, Cube) {
 
 TEST(Hull, Empty) {
   const std::vector<vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(tooFew).AsOriginal().IsEmpty());
 
   const std::vector<vec3> coplanar{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(coplanar).AsOriginal().IsEmpty());
 }
 
 TEST(Hull, MengerSponge) {
@@ -159,7 +150,7 @@ TEST(Hull, FailingTest1) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("failing_test1.glb", hull.GetMesh(), {});
+    ExportMesh("failing_test1.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(isMeshConvex(hull, 1.09375e-05));
@@ -192,7 +183,7 @@ TEST(Hull, FailingTest2) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("failing_test2.glb", hull.GetMesh(), {});
+    ExportMesh("failing_test2.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
@@ -216,7 +207,7 @@ TEST(Hull, DisabledFaceTest) {
   auto hull = Manifold::Hull(hullPts);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("disabledFaceTest.glb", hull.GetMesh(), {});
+    ExportMesh("disabledFaceTest.glb", hull.GetMeshGL(), {});
   }
 #endif
   EXPECT_TRUE(!hull.IsEmpty());
