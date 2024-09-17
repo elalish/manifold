@@ -973,22 +973,20 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
     composedHulls.push_back(Manifold::Hull(simpleHull));
     // Convex - Non-Convex Minkowski: Slower
   } else if ((inset || !aConvex) && bConvex) {
-    std::vector<std::vector<Manifold>> composedParts;
-    for (size_t face = 0; face < aImpl->NumTri(); face++) {
-      composedParts.push_back(
-          {b.Translate(
-               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
-           b.Translate(
-               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 1].startVert]),
-           b.Translate(
-               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2].startVert])});
-    }
-    std::vector<Manifold> newHulls(composedParts.size());
-    auto policy = autoPolicy(composedParts.size(), 100);
-    for_each_n(policy, countAt(0), composedParts.size(),
-               [&newHulls, &composedParts](const int part) {
-                 newHulls[part] = Manifold::Hull(composedParts[part]);
-               });
+    const size_t numTri = aImpl->NumTri();
+    std::vector<Manifold> newHulls(numTri);
+    auto policy = autoPolicy(numTri, 100);
+    for_each_n(
+        policy, countAt(0), numTri,
+        [&newHulls, &b, &aImpl](const int face) {
+          newHulls[face] = Manifold::Hull(
+              {b.Translate(
+                   aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
+               b.Translate(
+                   aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 1].startVert]),
+               b.Translate(aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2]
+                                               .startVert])});
+        });
     composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
     // Non-Convex - Non-Convex Minkowski: Very Slow
   } else if (!aConvex && !bConvex) {
@@ -1000,12 +998,12 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
                                                   -bImpl->faceNormal_[bFace]));
         if (coplanar) continue;  // Skip Coplanar Triangles
 
-        auto a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
-        auto a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
-        auto a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
-        auto b1 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
-        auto b2 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
-        auto b3 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
+        vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
+        vec3 a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
+        vec3 a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
+        vec3 b1 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
+        vec3 b2 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
+        vec3 b3 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
         composedHulls.push_back(
             Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
                             a2 + b3, a3 + b1, a3 + b2, a3 + b3}));
