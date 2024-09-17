@@ -301,10 +301,6 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
                         oldProperties, halfedge_, vertMeanCurvature,
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
                         meanIdx}));
-
-  meshRelation_.originalID = ReserveIDs(1);
-  InitializeOriginal();
-  Finish();
 }
 
 /**
