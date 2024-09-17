@@ -264,16 +264,15 @@ TEST(BooleanComplex, Spiral) {
 
 TEST(BooleanComplex, TriangulationFail) {
   // clang-format off
-  MeshGL64 m;
-  m.precision = 2e-12;
+  MeshGL m;
   m.vertProperties = {
     0.75, -1, -1, //
     0.75, -1, -0.25, //
-    0.75, -0.666666666666667, 0.0833333333333333, //
+    0.75, -0.667, 0.083, //
     0.75, -0.25, -1, //
-    0.75, 0.0833333333333333, -0.666666666666667, //
-    0.833333333333333, 0.5, -0.166666666666667, //
-    0.75, 0.0416666716337204, 0.0416666716337204, //
+    0.75, 0.083, -0.667, //
+    0.833, 0.5, -0.167, //
+    0.75, 0.0417, 0.0417, //
     0.75, 0.5, 0.25, //
     0.75, 0.25, 0.5, //
     1.25, -1, -1, //
@@ -318,8 +317,7 @@ TEST(BooleanComplex, TriangulationFail) {
     7, 11, 17, //
     7, 17, 16, //
     12, 16, 17};
-  MeshGL64 m2;
-  m2.precision = 2e-12;
+  MeshGL m2;
   m2.vertProperties = {
     0.75, 0, 0.75, //
     0.75, 0.25, 0.5, //
@@ -340,11 +338,14 @@ TEST(BooleanComplex, TriangulationFail) {
     3, 5, 6, //
     4, 6, 5};
   // clang-format on
-  auto gl = (Manifold(m) + Manifold(m2)).GetMeshGL();
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("trifail.glb", gl, {});
+    ExportMesh("trifail.glb",
+               Manifold::Compose({Manifold(m), Manifold(m2)}).GetMeshGL(), {});
 #endif
+
+  auto gl = (Manifold(m) + Manifold(m2)).GetMeshGL();
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
