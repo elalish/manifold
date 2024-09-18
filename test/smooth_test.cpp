@@ -136,10 +136,8 @@ TEST(Smooth, Sphere) {
   double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
-    // Refine(odd) puts a center point in the triangle, which is the worst case.
+    // Refine(3*x) makes a center point, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
-    // Refine(3*x) puts a center point in the triangle, which is the worst
-    // case.
     Mesh out = smoothed.GetMesh();
     auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
                                       [](const vec3& a, const vec3& b) {
@@ -150,6 +148,22 @@ TEST(Smooth, Sphere) {
     EXPECT_NEAR(min, 1, precision[i]);
     EXPECT_NEAR(max, 1, precision[i]);
   }
+}
+
+TEST(Smooth, Precision) {
+  const double precision = 0.05;
+  Manifold sphere = Manifold::Sphere(1, 8);
+  // Refine(3*x) makes a center point, which is the worst case.
+  Manifold smoothed = sphere.SmoothOut().RefineToPrecision(precision).Refine(3);
+  Mesh out = smoothed.GetMesh();
+  auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
+                                    [](const vec3& a, const vec3& b) {
+                                      return glm::dot(a, a) < glm::dot(b, b);
+                                    });
+  double min = glm::length(*bounds.first);
+  double max = glm::length(*bounds.second);
+  EXPECT_NEAR(min, 1 - precision, 0.02);
+  EXPECT_NEAR(max, 1, 1e-4);
 }
 
 TEST(Smooth, Normals) {
