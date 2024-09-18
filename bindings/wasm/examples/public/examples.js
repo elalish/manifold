@@ -51,6 +51,34 @@ export const examples = {
       return result;
     },
 
+    Auger: function() {
+      const outerRadius = 20;
+      const beadRadius = 2;
+      const height = 40;
+      const twist = 90;
+
+      const {revolve, sphere, union, extrude} = Manifold;
+      const {circle} = CrossSection;
+      setMinCircularEdgeLength(0.1);
+
+      const bead1 =
+          revolve(circle(beadRadius).translate([outerRadius, 0]), 50, 90)
+              .add(sphere(beadRadius).translate([outerRadius, 0, 0]))
+              .translate([0, -outerRadius, 0]);
+
+      const beads = [];
+      for (let i = 0; i < 3; i++) {
+        beads.push(bead1.rotate(0, 0, 120 * i));
+      }
+      const bead = union(beads);
+
+      const auger = extrude(bead.slice(0), height, 50, twist);
+
+      const result =
+          auger.add(bead).add(bead.translate(0, 0, height).rotate(0, 0, twist));
+      return result;
+    },
+
     TetrahedronPuzzle: function() {
       // A tetrahedron cut into two identical halves that can screw together as
       // a puzzle. This demonstrates how redundant points along a polygon can be
@@ -550,7 +578,7 @@ export const examples = {
         0, 0, size / Math.sqrt(2)
       ]);
       return result;
-    }
+    },
   },
 
   functionBodies: new Map()

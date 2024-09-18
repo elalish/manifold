@@ -26,7 +26,7 @@ jobs:
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
-        pr: ${{github.event.pull_request.number}}
+        event: push
         name: wasm
         path: ./public
         

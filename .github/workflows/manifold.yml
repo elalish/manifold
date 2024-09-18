@@ -153,7 +153,7 @@ jobs:
         cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v4
-      if: matrix.exception == 'ON'
+      if: matrix.exception == 'ON' && github.event_name == 'push'
       with:
         name: wasm
         path: bindings/wasm/examples/dist/
