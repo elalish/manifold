@@ -278,7 +278,7 @@ vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
   const Halfedge edge = halfedge_[halfedge];
   const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
   const vec3 edgeNormal =
-      faceNormal_[edge.face] + faceNormal_[halfedge_[edge.pairedHalfedge].face];
+      faceNormal_[halfedge / 3] + faceNormal_[edge.pairedHalfedge / 3];
   vec3 dir = glm::cross(glm::cross(edgeNormal, edgeVec), normal);
   return CircularTangent(dir, edgeVec);
 }
@@ -292,10 +292,10 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   if (halfedgeTangent_.size() > 0) {
     return halfedgeTangent_[halfedge].w < 0;
   }
-  const int tri = halfedge_[halfedge].face;
+  const int tri = halfedge / 3;
   const TriRef ref = meshRelation_.triRef[tri];
   const int pair = halfedge_[halfedge].pairedHalfedge;
-  const int pairTri = halfedge_[pair].face;
+  const int pairTri = pair / 3;
   const TriRef pairRef = meshRelation_.triRef[pairTri];
   if (!ref.SameFace(pairRef)) return false;
 
@@ -352,7 +352,7 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
                ivec3 faceTris = {-1, -1, -1};
                for (const int j : {0, 1, 2}) {
                  const int neighborTri =
-                     halfedge_[halfedge_[3 * tri + j].pairedHalfedge].face;
+                     halfedge_[3 * tri + j].pairedHalfedge / 3;
                  const TriRef& jRef = meshRelation_.triRef[neighborTri];
                  if (jRef.SameFace(ref)) {
                    ++faceNeighbors;
@@ -514,11 +514,11 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         // Length number of normals
         std::vector<vec3> normals;
         int current = startEdge;
-        int prevFace = halfedge_[current].face;
+        int prevFace = current / 3;
 
         do {  // find a sharp edge to start on
           int next = NextHalfedge(halfedge_[current].pairedHalfedge);
-          const int face = halfedge_[next].face;
+          const int face = next / 3;
 
           const double dihedral = glm::degrees(
               std::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
@@ -545,7 +545,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
             endEdge,
             [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
               if (IsInsideQuad(current)) {
-                return FaceEdge({halfedge_[current].face, vec3(NAN)});
+                return FaceEdge({current / 3, vec3(NAN)});
               }
               const int vert = halfedge_[current].endVert;
               vec3 pos = vertPos_[vert];
@@ -563,7 +563,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                     normal, halfedge_[current].pairedHalfedge));
               }
               return FaceEdge(
-                  {halfedge_[current].face, SafeNormalize(pos - centerPos)});
+                  {current / 3, SafeNormalize(pos - centerPos)});
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
                 int current, const FaceEdge& here, FaceEdge& next) {

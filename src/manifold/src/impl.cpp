@@ -108,16 +108,18 @@ struct CoplanarEdge {
   void operator()(const int edgeIdx) {
     const Halfedge edge = halfedge[edgeIdx];
     const Halfedge pair = halfedge[edge.pairedHalfedge];
+    const int edgeFace = edgeIdx / 3;
+    const int pairFace = edge.pairedHalfedge / 3;
 
-    if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
+    if (triRef[edgeFace].meshID != triRef[pairFace].meshID) return;
 
     const vec3 base = vertPos[edge.startVert];
-    const int baseNum = edgeIdx - 3 * edge.face;
-    const int jointNum = edge.pairedHalfedge - 3 * pair.face;
+    const int baseNum = edgeIdx - 3 * edgeFace;
+    const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
     if (numProp > 0) {
-      const int prop0 = triProp[edge.face][baseNum];
-      const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
+      const int prop0 = triProp[edgeFace][baseNum];
+      const int prop1 = triProp[pairFace][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
         if (std::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
@@ -137,9 +139,9 @@ struct CoplanarEdge {
     const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
     const vec3 jointVec = vertPos[pair.startVert] - base;
     const vec3 edgeVec =
-        vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
+        vertPos[halfedge[3 * edgeFace + edgeNum].startVert] - base;
     const vec3 pairVec =
-        vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
+        vertPos[halfedge[3 * pairFace + pairNum].startVert] - base;
 
     const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
     const double lengthPair =
@@ -147,8 +149,8 @@ struct CoplanarEdge {
     vec3 normal = glm::cross(jointVec, edgeVec);
     const double area = glm::length(normal);
     const double areaPair = glm::length(glm::cross(pairVec, jointVec));
-    triArea[edge.face] = area;
-    triArea[pair.face] = areaPair;
+    triArea[edgeFace] = area;
+    triArea[pairFace] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
@@ -162,11 +164,11 @@ struct CoplanarEdge {
       for (int i = 0; i < numProp; ++i) {
         const double scale = precision / propTol[i];
 
-        const double baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
+        const double baseProp = prop[numProp * triProp[edgeFace][baseNum] + i];
         const double jointProp =
-            prop[numProp * triProp[pair.face][jointNum] + i];
-        const double edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
-        const double pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
+            prop[numProp * triProp[pairFace][jointNum] + i];
+        const double edgeProp = prop[numProp * triProp[edgeFace][edgeNum] + i];
+        const double pairProp = prop[numProp * triProp[pairFace][pairNum] + i];
 
         const vec3 iJointVec =
             jointVec + normal * scale * (jointProp - baseProp);
@@ -182,7 +184,7 @@ struct CoplanarEdge {
       }
     }
 
-    face2face[edgeIdx] = std::make_pair(edge.face, pair.face);
+    face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
 };
 
@@ -496,8 +498,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.face = -1;
-        h1.face = -1;
+        // FIXME: this actually does nothing
+        // h0.face = -1;
+        // h1.face = -1;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -513,13 +516,13 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].face < 0) {
-      halfedge_[pair0] = {-1, -1, -1, -1};
-      halfedge_[pair1] = {-1, -1, -1, -1};
-    } else {
-      halfedge_[pair0].pairedHalfedge = pair1;
-      halfedge_[pair1].pairedHalfedge = pair0;
-    }
+    // if (halfedge_[pair0].face < 0) {
+    //   halfedge_[pair0] = {-1, -1, -1, -1};
+    //   halfedge_[pair1] = {-1, -1, -1, -1};
+    // } else {
+    halfedge_[pair0].pairedHalfedge = pair1;
+    halfedge_[pair1].pairedHalfedge = pair0;
+    // }
   });
 
   // When opposed triangles are removed, they may strand unreferenced verts.

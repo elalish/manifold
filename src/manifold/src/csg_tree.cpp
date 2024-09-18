@@ -48,7 +48,6 @@ struct UpdateHalfedge {
     edge.startVert += nextVert;
     edge.endVert += nextVert;
     edge.pairedHalfedge += nextEdge;
-    edge.face += nextFace;
     return edge;
   }
 };
