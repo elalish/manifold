@@ -51,6 +51,34 @@ export const examples = {
       return result;
     },
 
+    Auger: function() {
+      const outerRadius = 20;
+      const beadRadius = 2;
+      const height = 40;
+      const twist = 90;
+
+      const {revolve, sphere, union, extrude} = Manifold;
+      const {circle} = CrossSection;
+      setMinCircularEdgeLength(0.1);
+
+      const bead1 =
+          revolve(circle(beadRadius).translate([outerRadius, 0]), 50, 90)
+              .add(sphere(beadRadius).translate([outerRadius, 0, 0]))
+              .translate([0, -outerRadius, 0]);
+
+      const beads = [];
+      for (let i = 0; i < 3; i++) {
+        beads.push(bead1.rotate(0, 0, 120 * i));
+      }
+      const bead = union(beads);
+
+      const auger = extrude(bead.slice(0), height, 50, twist);
+
+      const result =
+          auger.add(bead).add(bead.translate(0, 0, height).rotate(0, 0, twist));
+      return result;
+    },
+
     TetrahedronPuzzle: function() {
       // A tetrahedron cut into two identical halves that can screw together as
       // a puzzle. This demonstrates how redundant points along a polygon can be
@@ -549,55 +577,6 @@ export const examples = {
       const result = gyroidModule.rotate([-45, 0, 90]).translate([
         0, 0, size / Math.sqrt(2)
       ]);
-      return result;
-    },
-
-    SwissCheese: function() {
-      // A "swiss cheese" block that demonstrates `slice`-ing out a layer
-      const {cube, sphere} = Manifold;
-
-      const size = [100, 100, 100];
-      const radius = 5;
-      const numHoles = 50;
-
-      // Simple random number generator that allows us to control the seed
-      // https://stackoverflow.com/a/47593316
-      function splitmix32(a) {
-        return function() {
-          a |= 0;
-          a = a + 0x9e3779b9 | 0;
-          let t = a ^ a >>> 16;
-          t = Math.imul(t, 0x21f0aaad);
-          t = t ^ t >>> 15;
-          t = Math.imul(t, 0x735a2d97);
-          return ((t = t ^ t >>> 15) >>> 0) / 4294967296;
-        }
-      }
-
-      const prng = splitmix32(987654321)
-      // Switch to this to get a random seed
-      // const prng = splitmix32((Math.random()*2**32)>>>0)
-
-      function rand(min, max) {
-        return prng() * (max - min) + min;
-      }
-
-      const holes = new Array(numHoles).fill(0).map((_, i) => {
-        const center = size.map(s => rand(0, s));
-        return sphere(radius).translate(center);
-      });
-
-      const block = cube(size);
-      const swiss = block.subtract(Manifold.union(holes));
-
-      const slice =
-          swiss.slice(size[2] / 2)
-              .extrude(2)  // extrude the slice a bit so that it renders
-              .translate(0, 0, size[2] / 2);  // and positioned where it strated
-
-      // And render the target slice inside the block
-      const result = Manifold.union(only(slice), swiss);
-
       return result;
     },
   },
