@@ -507,8 +507,8 @@ TEST(Manifold, MeshRelationRefinePrecision) {
   MeshGL inGL = WithPositionColors(Csaszar());
   Manifold csaszar = Manifold::Smooth(inGL);
 
-  csaszar = csaszar.RefineToPrecision(0.1);
-  ExpectMeshes(csaszar, {{9019, 18038, 3}});
+  csaszar = csaszar.RefineToPrecision(0.5);
+  ExpectMeshes(csaszar, {{9360, 18720, 3}});
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;

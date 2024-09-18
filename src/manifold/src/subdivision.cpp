@@ -476,7 +476,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
  * (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
-    std::function<int(vec3, vec4, vec4)> edgeDivisions) {
+    std::function<int(vec3, vec4, vec4)> edgeDivisions, bool keepInterior) {
   Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
   const int numVert = NumVert();
   const int numEdge = edges.size();
@@ -513,6 +513,37 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                        : halfedgeTangent_[halfedge_[hIdx].pairedHalfedge];
                edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
              });
+
+  if (keepInterior) {
+    Vec<int> tmp(numEdge);
+    for_each_n(
+        policy, countAt(0), numEdge,
+        [&tmp, &edgeAdded, &edges, &half2Edge, this](const int i) {
+          tmp[i] = edgeAdded[i];
+          const TmpEdge edge = edges[i];
+          int hIdx = edge.halfedgeIdx;
+          if (IsMarkedInsideQuad(hIdx)) return;
+
+          const int thisAdded = tmp[i];
+          auto Added = [&edgeAdded, &half2Edge, thisAdded](int hIdx) {
+            int longest = 0;
+            int total = 0;
+            for (int j : {0, 1, 2}) {
+              const int added = edgeAdded[half2Edge[hIdx]];
+              longest = glm::max(longest, added);
+              total += added;
+              hIdx = NextHalfedge(hIdx);
+            }
+            const int minExtra = longest * 0.2 + 1;
+            const int extra = 2 * longest + minExtra - total;
+            return extra > 0 ? (extra * (longest - thisAdded)) / longest : 0;
+          };
+
+          tmp[i] +=
+              glm::max(Added(hIdx), Added(halfedge_[hIdx].pairedHalfedge));
+        });
+    edgeAdded.swap(tmp);
+  }
 
   Vec<int> edgeOffset(numEdge);
   exclusive_scan(edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
