@@ -57,9 +57,9 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 
-template <typename Precision>
-MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
-                                 ivec3 normalIdx) {
+template <typename Precision, typename I>
+MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
+                                    ivec3 normalIdx) {
   ZoneScoped;
   const int numProp = impl.NumProp();
   const int numVert = impl.NumPropVert();
@@ -69,7 +69,7 @@ MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   const bool updateNormals =
       !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
 
-  MeshGLP<Precision> out;
+  MeshGLP<Precision, I> out;
   out.precision =
       std::max(impl.precision_,
                std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
@@ -101,7 +101,7 @@ MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   std::vector<mat3> runNormalTransform;
   auto addRun = [updateNormals, isOriginal](
-                    MeshGLP<Precision>& out,
+                    MeshGLP<Precision, I>& out,
                     std::vector<mat3>& runNormalTransform, int tri,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
@@ -352,7 +352,7 @@ Mesh Manifold::GetMesh() const {
  */
 MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<float>(impl, normalIdx);
+  return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
 
 /**
@@ -370,7 +370,7 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
  */
 MeshGL64 Manifold::GetMeshGL64(ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<double>(impl, normalIdx);
+  return GetMeshGLImpl<double, size_t>(impl, normalIdx);
 }
 
 /**

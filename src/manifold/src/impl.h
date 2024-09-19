@@ -65,8 +65,8 @@ struct Manifold::Impl {
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat4x3 = mat4x3(1));
 
-  template <typename Precision>
-  Impl(const MeshGLP<Precision>& meshGL) {
+  template <typename Precision, typename I>
+  Impl(const MeshGLP<Precision, I>& meshGL) {
     const uint32_t numVert = meshGL.NumVert();
     const uint32_t numTri = meshGL.NumTri();
 
@@ -169,7 +169,7 @@ struct Manifold::Impl {
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 tri;
       for (const size_t j : {0, 1, 2}) {
-        uint32_t vert = meshGL.triVerts[3 * i + j];
+        uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
         if (vert >= numVert) {
           MarkFailure(Error::VertexOutOfBounds);
           return;
@@ -183,8 +183,9 @@ struct Manifold::Impl {
         }
         if (numProp > 0) {
           meshRelation_.triProperties.push_back(
-              ivec3(meshGL.triVerts[3 * i], meshGL.triVerts[3 * i + 1],
-                    meshGL.triVerts[3 * i + 2]));
+              ivec3((uint32_t)meshGL.triVerts[3 * i],
+                    (uint32_t)meshGL.triVerts[3 * i + 1],
+                    (uint32_t)meshGL.triVerts[3 * i + 2]));
         }
       }
     }
