@@ -570,6 +570,10 @@ Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
   if (transform_ == mat4x3(1.0)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
+  if (status_ != Manifold::Error::NoError) {
+    result.status_ = status_;
+    return result;
+  }
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.precision_ = precision_;
