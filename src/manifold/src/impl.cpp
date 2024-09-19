@@ -498,9 +498,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        // FIXME: this actually does nothing
-        // h0.face = -1;
-        // h1.face = -1;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -516,13 +513,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    // if (halfedge_[pair0].face < 0) {
-    //   halfedge_[pair0] = {-1, -1, -1, -1};
-    //   halfedge_[pair1] = {-1, -1, -1, -1};
-    // } else {
     halfedge_[pair0].pairedHalfedge = pair1;
     halfedge_[pair1].pairedHalfedge = pair0;
-    // }
   });
 
   // When opposed triangles are removed, they may strand unreferenced verts.

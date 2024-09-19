@@ -314,10 +314,6 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
              he.startVert = counts[he.startVert];
              he.endVert = counts[he.endVert];
            });
-  // setting face id
-  // for (size_t index = 0; index < halfedges.size(); index++) {
-  //   halfedges[index].face = index / 3;
-  // }
   return {std::move(halfedges), std::move(vertices)};
 }
 

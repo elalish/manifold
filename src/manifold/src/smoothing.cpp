@@ -562,8 +562,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                 pos += vec3(TangentFromNormal(
                     normal, halfedge_[current].pairedHalfedge));
               }
-              return FaceEdge(
-                  {current / 3, SafeNormalize(pos - centerPos)});
+              return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
                 int current, const FaceEdge& here, FaceEdge& next) {
