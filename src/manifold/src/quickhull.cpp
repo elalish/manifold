@@ -78,6 +78,7 @@ size_t MeshBuilder::addHalfedge() {
     return index;
   }
   halfedges.push_back({});
+  halfedgeToFace.push_back(0);
   halfedgeNext.push_back(0);
   return halfedges.size() - 1;
 }
@@ -85,6 +86,7 @@ size_t MeshBuilder::addHalfedge() {
 void MeshBuilder::setup(int a, int b, int c, int d) {
   faces.clear();
   halfedges.clear();
+  halfedgeToFace.clear();
   halfedgeNext.clear();
   disabledFaces.clear();
   disabledHalfedges.clear();
@@ -94,40 +96,52 @@ void MeshBuilder::setup(int a, int b, int c, int d) {
 
   // Create halfedges
   // AB
-  halfedges.push_back({0, b, 6, 0});
+  halfedges.push_back({0, b, 6});
+  halfedgeToFace.push_back(0);
   halfedgeNext.push_back(1);
   // BC
-  halfedges.push_back({0, c, 9, 0});
+  halfedges.push_back({0, c, 9});
+  halfedgeToFace.push_back(0);
   halfedgeNext.push_back(2);
   // CA
-  halfedges.push_back({0, a, 3, 0});
+  halfedges.push_back({0, a, 3});
+  halfedgeToFace.push_back(0);
   halfedgeNext.push_back(0);
   // AC
-  halfedges.push_back({0, c, 2, 1});
+  halfedges.push_back({0, c, 2});
+  halfedgeToFace.push_back(1);
   halfedgeNext.push_back(4);
   // CD
-  halfedges.push_back({0, d, 11, 1});
+  halfedges.push_back({0, d, 11});
+  halfedgeToFace.push_back(1);
   halfedgeNext.push_back(5);
   // DA
-  halfedges.push_back({0, a, 7, 1});
+  halfedges.push_back({0, a, 7});
+  halfedgeToFace.push_back(1);
   halfedgeNext.push_back(3);
   // BA
-  halfedges.push_back({0, a, 0, 2});
+  halfedges.push_back({0, a, 0});
+  halfedgeToFace.push_back(2);
   halfedgeNext.push_back(7);
   // AD
-  halfedges.push_back({0, d, 5, 2});
+  halfedges.push_back({0, d, 5});
+  halfedgeToFace.push_back(2);
   halfedgeNext.push_back(8);
   // DB
-  halfedges.push_back({0, b, 10, 2});
+  halfedges.push_back({0, b, 10});
+  halfedgeToFace.push_back(2);
   halfedgeNext.push_back(6);
   // CB
-  halfedges.push_back({0, b, 1, 3});
+  halfedges.push_back({0, b, 1});
+  halfedgeToFace.push_back(3);
   halfedgeNext.push_back(10);
   // BD
-  halfedges.push_back({0, d, 8, 3});
+  halfedges.push_back({0, d, 8});
+  halfedgeToFace.push_back(3);
   halfedgeNext.push_back(11);
   // DC
-  halfedges.push_back({0, c, 4, 3});
+  halfedges.push_back({0, c, 4});
+  halfedgeToFace.push_back(3);
   halfedgeNext.push_back(9);
 
   // Create faces
@@ -180,8 +194,9 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
   i = 0;
   for (const auto& halfEdge : builderObject.halfedges) {
     if (halfEdge.pairedHalfedge != -1) {
-      halfedges.push_back(
-          {halfEdge.endVert, halfEdge.pairedHalfedge, halfEdge.face});
+      halfedges.push_back({halfEdge.endVert, halfEdge.pairedHalfedge,
+                           builderObject.halfedgeToFace[i]});
+      halfedgeToFace.push_back(builderObject.halfedgeToFace[i]);
       halfedgeNext.push_back(builderObject.halfedgeNext[i]);
       halfEdgeMapping[i] = halfedges.size() - 1;
     }
@@ -196,7 +211,7 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
 
   for (size_t i = 0; i < halfedges.size(); i++) {
     auto& he = halfedges[i];
-    he.face = faceMapping[he.face];
+    halfedgeToFace[i] = faceMapping[halfedgeToFace[i]];
     he.pairedHalfedge = halfEdgeMapping[he.pairedHalfedge];
     halfedgeNext[i] = halfEdgeMapping[halfedgeNext[i]];
     he.endVert = vertexMapping[he.endVert];
@@ -236,6 +251,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
 
   // reorder halfedges
   Vec<Halfedge> halfedges(mesh.halfedges.size());
+  Vec<int> halfedgeToFace(mesh.halfedges.size());
   Vec<int> counts(mesh.halfedges.size(), 0);
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
@@ -247,24 +263,28 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
       autoPolicy(mesh.halfedges.size()), countAt(0_uz),
       countAt(mesh.halfedges.size()), [&](size_t i) {
         if (mesh.halfedges[i].pairedHalfedge < 0) return;
-        if (mesh.faces[mesh.halfedges[i].face].isDisabled()) return;
-        if (AtomicAdd(counts[mesh.halfedges[i].face], 1) > 0) return;
+        if (mesh.faces[mesh.halfedgeToFace[i]].isDisabled()) return;
+        if (AtomicAdd(counts[mesh.halfedgeToFace[i]], 1) > 0) return;
         int currIndex = AtomicAdd(j, 3);
         mapping[i] = currIndex;
         halfedges[currIndex + 0] = mesh.halfedges[i];
+        halfedgeToFace[currIndex + 0] = mesh.halfedgeToFace[i];
 
         size_t k = mesh.halfedgeNext[i];
         mapping[k] = currIndex + 1;
         halfedges[currIndex + 1] = mesh.halfedges[k];
+        halfedgeToFace[currIndex + 1] = mesh.halfedgeToFace[k];
 
         k = mesh.halfedgeNext[k];
         mapping[k] = currIndex + 2;
         halfedges[currIndex + 2] = mesh.halfedges[k];
+        halfedgeToFace[currIndex + 2] = mesh.halfedgeToFace[k];
         halfedges[currIndex + 0].startVert = halfedges[currIndex + 2].endVert;
         halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
         halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
       });
   halfedges.resize(j);
+  halfedgeToFace.resize(j);
   // fix pairedHalfedge id
   for_each(
       autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
@@ -294,10 +314,6 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
              he.startVert = counts[he.startVert];
              he.endVert = counts[he.endVert];
            });
-  // setting face id
-  for (size_t index = 0; index < halfedges.size(); index++) {
-    halfedges[index].face = index / 3;
-  }
   return {std::move(halfedges), std::move(vertices)};
 }
 
@@ -378,7 +394,7 @@ void QuickHull::createConvexHalfedgeMesh() {
             if (mesh.halfedges[heIndex].pairedHalfedge !=
                 faceData.enteredFromHalfedge) {
               possiblyVisibleFaces.push_back(
-                  {mesh.halfedges[mesh.halfedges[heIndex].pairedHalfedge].face,
+                  {mesh.halfedgeToFace[mesh.halfedges[heIndex].pairedHalfedge],
                    heIndex});
             }
           }
@@ -396,12 +412,12 @@ void QuickHull::createConvexHalfedgeMesh() {
       // face will not be part of the final mesh so their data slots can by
       // recycled.
       const auto halfEdgesMesh = mesh.getHalfEdgeIndicesOfFace(
-          mesh.faces[mesh.halfedges[faceData.enteredFromHalfedge].face]);
+          mesh.faces[mesh.halfedgeToFace[faceData.enteredFromHalfedge]]);
       const std::int8_t ind =
           (halfEdgesMesh[0] == faceData.enteredFromHalfedge)
               ? 0
               : (halfEdgesMesh[1] == faceData.enteredFromHalfedge ? 1 : 2);
-      mesh.faces[mesh.halfedges[faceData.enteredFromHalfedge].face]
+      mesh.faces[mesh.halfedgeToFace[faceData.enteredFromHalfedge]]
           .horizonEdgesOnCurrentIteration |= (1 << ind);
     }
     const size_t horizonEdgeCount = horizonEdgesData.size();
@@ -491,9 +507,9 @@ void QuickHull::createConvexHalfedgeMesh() {
       mesh.halfedgeNext[BC] = CA;
       mesh.halfedgeNext[CA] = AB;
 
-      mesh.halfedges[BC].face = newFaceIndex;
-      mesh.halfedges[CA].face = newFaceIndex;
-      mesh.halfedges[AB].face = newFaceIndex;
+      mesh.halfedgeToFace[BC] = newFaceIndex;
+      mesh.halfedgeToFace[CA] = newFaceIndex;
+      mesh.halfedgeToFace[AB] = newFaceIndex;
 
       mesh.halfedges[CA].endVert = A;
       mesh.halfedges[BC].endVert = C;

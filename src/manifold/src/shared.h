@@ -206,8 +206,7 @@ struct ReindexEdge {
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
   return stream << "startVert = " << edge.startVert
                 << ", endVert = " << edge.endVert
-                << ", pairedHalfedge = " << edge.pairedHalfedge
-                << ", face = " << edge.face;
+                << ", pairedHalfedge = " << edge.pairedHalfedge;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {

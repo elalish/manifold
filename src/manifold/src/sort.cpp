@@ -23,30 +23,6 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
-struct Extrema {
-  void MakeForward(Halfedge& a) const {
-    if (!a.IsForward()) {
-      int tmp = a.startVert;
-      a.startVert = a.endVert;
-      a.endVert = tmp;
-    }
-  }
-
-  int MaxOrMinus(int a, int b) const {
-    return std::min(a, b) < 0 ? -1 : std::max(a, b);
-  }
-
-  Halfedge operator()(Halfedge a, Halfedge b) const {
-    MakeForward(a);
-    MakeForward(b);
-    a.startVert = std::min(a.startVert, b.startVert);
-    a.endVert = std::max(a.endVert, b.endVert);
-    a.face = MaxOrMinus(a.face, b.face);
-    a.pairedHalfedge = MaxOrMinus(a.pairedHalfedge, b.pairedHalfedge);
-    return a;
-  }
-};
-
 uint32_t MortonCode(vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
@@ -99,7 +75,6 @@ struct ReindexFace {
     for (const int i : {0, 1, 2}) {
       const int oldEdge = 3 * oldFace + i;
       Halfedge edge = oldHalfedge[oldEdge];
-      edge.face = newFace;
       const int pairedFace = edge.pairedHalfedge / 3;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
@@ -256,21 +231,33 @@ void Manifold::Impl::Finish() {
                "Not an even number of faces after sorting faces!");
 
 #ifdef MANIFOLD_DEBUG
+  auto MaxOrMinus = [](int a, int b) {
+    return std::min(a, b) < 0 ? -1 : std::max(a, b);
+  };
+  int face = 0;
   Halfedge extrema = {0, 0, 0, 0};
-  extrema = reduce(halfedge_.begin(), halfedge_.end(), extrema, Extrema());
-#endif
-
+  for (size_t i = 0; i < halfedge_.size(); i++) {
+    Halfedge e = halfedge_[i];
+    if (!e.IsForward()) std::swap(e.startVert, e.endVert);
+    extrema.startVert = std::min(extrema.startVert, e.startVert);
+    extrema.endVert = std::min(extrema.endVert, e.endVert);
+    extrema.pairedHalfedge =
+        MaxOrMinus(extrema.pairedHalfedge, e.pairedHalfedge);
+    face = MaxOrMinus(face, i / 3);
+  }
   DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
                "Vertex index is negative!");
   DEBUG_ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
                "Vertex index exceeds number of verts!");
-  DEBUG_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
-  DEBUG_ASSERT(extrema.face < static_cast<int>(NumTri()), topologyErr,
-               "Face index exceeds number of faces!");
   DEBUG_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
                "Halfedge index is negative!");
   DEBUG_ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()),
                topologyErr, "Halfedge index exceeds number of halfedges!");
+  DEBUG_ASSERT(face >= 0, topologyErr, "Face index is negative!");
+  DEBUG_ASSERT(face < static_cast<int>(NumTri()), topologyErr,
+               "Face index exceeds number of faces!");
+#endif
+
   DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||
                    meshRelation_.triRef.size() == 0,
                logicErr, "Mesh Relation doesn't fit!");
