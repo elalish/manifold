@@ -493,8 +493,10 @@ ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m) {
   return to_c(new (mem) Manifold(orig));
 }
 
-int manifold_original_id(ManifoldManifold *m) {
-  return from_c(m)->OriginalID();
+size_t manifold_original_id(ManifoldManifold *m, bool *is_original) {
+  auto id = from_c(m)->OriginalID();
+  *is_original = id.has_value();
+  return id.value_or(0);
 }
 
 int manifold_is_empty(ManifoldManifold *m) { return from_c(m)->IsEmpty(); }
@@ -504,10 +506,10 @@ ManifoldError manifold_status(ManifoldManifold *m) {
   return to_c(error);
 }
 
-int manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
-int manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
-int manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
-int manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
+size_t manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
+size_t manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
+size_t manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
+size_t manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
 
 ManifoldProperties manifold_get_properties(ManifoldManifold *m) {
   return to_c(from_c(m)->GetProperties());
@@ -522,7 +524,7 @@ double manifold_precision(ManifoldManifold *m) {
   return from_c(m)->Precision();
 }
 
-uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
+size_t manifold_reserve_ids(size_t n) { return Manifold::ReserveIDs(n); }
 
 ManifoldManifold *manifold_set_properties(
     void *mem, ManifoldManifold *m, int num_prop,

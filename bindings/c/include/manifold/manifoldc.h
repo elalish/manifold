@@ -174,16 +174,16 @@ ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
 
 int manifold_is_empty(ManifoldManifold *m);
 ManifoldError manifold_status(ManifoldManifold *m);
-int manifold_num_vert(ManifoldManifold *m);
-int manifold_num_edge(ManifoldManifold *m);
-int manifold_num_tri(ManifoldManifold *m);
+size_t manifold_num_vert(ManifoldManifold *m);
+size_t manifold_num_edge(ManifoldManifold *m);
+size_t manifold_num_tri(ManifoldManifold *m);
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
 double manifold_precision(ManifoldManifold *m);
-int manifold_genus(ManifoldManifold *m);
+size_t manifold_genus(ManifoldManifold *m);
 ManifoldProperties manifold_get_properties(ManifoldManifold *m);
 int manifold_get_circular_segments(double radius);
-int manifold_original_id(ManifoldManifold *m);
-uint32_t manifold_reserve_ids(uint32_t n);
+size_t manifold_original_id(ManifoldManifold *m, bool *is_original);
+size_t manifold_reserve_ids(size_t n);
 ManifoldManifold *manifold_set_properties(
     void *mem, ManifoldManifold *m, int num_prop,
     void (*fun)(double *new_prop, ManifoldVec3 position, const double *old_prop,

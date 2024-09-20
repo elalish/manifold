@@ -203,7 +203,7 @@ MeshGL WithIndexColors(const MeshGL& in) {
   out.runIndex.clear();
   out.runTransform.clear();
   out.faceID.clear();
-  out.runOriginalID = {Manifold::ReserveIDs(1)};
+  out.runOriginalID = {static_cast<uint32_t>(Manifold::ReserveIDs(1))};
   const int numVert = out.NumVert();
   out.numProp = 6;
   out.vertProperties.resize(6 * numVert);
@@ -236,7 +236,7 @@ MeshGL WithPositionColors(const Manifold& in) {
 MeshGL WithNormals(const Manifold& in) {
   const Mesh mesh = in.GetMesh();
   MeshGL out;
-  out.runOriginalID = {Manifold::ReserveIDs(1)};
+  out.runOriginalID = {static_cast<uint32_t>(Manifold::ReserveIDs(1))};
   out.numProp = 6;
   out.vertProperties.resize(out.numProp * mesh.vertPos.size());
   for (size_t i = 0; i < mesh.vertPos.size(); ++i) {

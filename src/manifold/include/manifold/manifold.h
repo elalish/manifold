@@ -15,6 +15,7 @@
 #pragma once
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -44,7 +45,7 @@ struct MeshGLP {
   /// Number of triangles
   I NumTri() const { return triVerts.size() / 3; };
   /// Number of properties per vertex, always >= 3.
-  uint32_t numProp = 3;
+  I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
@@ -66,13 +67,13 @@ struct MeshGLP {
   /// runIndex will always be 1 longer than runOriginalID, but same length is
   /// also allowed as input: triVerts.size() will be automatically appended in
   /// this case.
-  std::vector<uint32_t> runIndex;
+  std::vector<I> runIndex;
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
   /// is ideal for reapplying materials to the output mesh. Multiple runs may
   /// have the same ID, e.g. representing different copies of the same input
   /// mesh. If you create an input MeshGL that you want to be able to reference
   /// as one or more originals, be sure to set unique values from ReserveIDs().
-  std::vector<uint32_t> runOriginalID;
+  std::vector<I> runOriginalID;
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
@@ -222,14 +223,14 @@ class Manifold {
     InvalidConstruction,
   };
   Error Status() const;
-  int NumVert() const;
-  int NumEdge() const;
-  int NumTri() const;
-  int NumProp() const;
-  int NumPropVert() const;
+  size_t NumVert() const;
+  size_t NumEdge() const;
+  size_t NumTri() const;
+  size_t NumProp() const;
+  size_t NumPropVert() const;
   Box BoundingBox() const;
   double Precision() const;
-  int Genus() const;
+  size_t Genus() const;
   Properties GetProperties() const;
   double MinGap(const Manifold& other, double searchLength) const;
   ///@}
@@ -239,9 +240,9 @@ class Manifold {
    * of reapplying mesh properties.
    */
   ///@{
-  int OriginalID() const;
+  std::optional<size_t> OriginalID() const;
   Manifold AsOriginal(const std::vector<double>& propertyTolerance = {}) const;
-  static uint32_t ReserveIDs(uint32_t);
+  static size_t ReserveIDs(size_t);
   ///@}
 
   /** @name Modification
@@ -305,8 +306,8 @@ class Manifold {
    */
   ///@{
   bool MatchesTriNormals() const;
-  int NumDegenerateTris() const;
-  int NumOverlaps(const Manifold& second) const;
+  size_t NumDegenerateTris() const;
+  size_t NumOverlaps(const Manifold& second) const;
   ///@}
 
   struct Impl;

@@ -391,25 +391,31 @@ Manifold::Error Manifold::Status() const {
 /**
  * The number of vertices in the Manifold.
  */
-int Manifold::NumVert() const { return GetCsgLeafNode().GetImpl()->NumVert(); }
+size_t Manifold::NumVert() const {
+  return GetCsgLeafNode().GetImpl()->NumVert();
+}
 /**
  * The number of edges in the Manifold.
  */
-int Manifold::NumEdge() const { return GetCsgLeafNode().GetImpl()->NumEdge(); }
+size_t Manifold::NumEdge() const {
+  return GetCsgLeafNode().GetImpl()->NumEdge();
+}
 /**
  * The number of triangles in the Manifold.
  */
-int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
+size_t Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
 /**
  * The number of properties per vertex in the Manifold.
  */
-int Manifold::NumProp() const { return GetCsgLeafNode().GetImpl()->NumProp(); }
+size_t Manifold::NumProp() const {
+  return GetCsgLeafNode().GetImpl()->NumProp();
+}
 /**
  * The number of property vertices in the Manifold. This will always be >=
  * NumVert, as some physical vertices may be duplicated to account for different
  * properties on different neighboring triangles.
  */
-int Manifold::NumPropVert() const {
+size_t Manifold::NumPropVert() const {
   return GetCsgLeafNode().GetImpl()->NumPropVert();
 }
 
@@ -434,7 +440,7 @@ double Manifold::Precision() const {
  * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
  * mesh, so it is best to call Decompose() first.
  */
-int Manifold::Genus() const {
+size_t Manifold::Genus() const {
   int chi = NumVert() - NumEdge() + NumTri();
   return 1 - chi / 2;
 }
@@ -449,10 +455,12 @@ Properties Manifold::GetProperties() const {
 /**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
- * returns -1.
+ * returns an empty optional.
  */
-int Manifold::OriginalID() const {
-  return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
+std::optional<size_t> Manifold::OriginalID() const {
+  auto id = GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
+  if (id >= 0) return std::make_optional(static_cast<size_t>(id));
+  return {};
 }
 
 /**
@@ -484,9 +492,7 @@ Manifold Manifold::AsOriginal(
  * triangles that can be looked up after further operations. Assign to
  * MeshGL.runOriginalID vector.
  */
-uint32_t Manifold::ReserveIDs(uint32_t n) {
-  return Manifold::Impl::ReserveIDs(n);
-}
+size_t Manifold::ReserveIDs(size_t n) { return Manifold::Impl::ReserveIDs(n); }
 
 /**
  * The triangle normal vectors are saved over the course of operations rather
@@ -502,7 +508,7 @@ bool Manifold::MatchesTriNormals() const {
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.
  */
-int Manifold::NumDegenerateTris() const {
+size_t Manifold::NumDegenerateTris() const {
   return GetCsgLeafNode().GetImpl()->NumDegenerateTris();
 }
 
@@ -512,7 +518,7 @@ int Manifold::NumDegenerateTris() const {
  *
  * @param other A Manifold to overlap with.
  */
-int Manifold::NumOverlaps(const Manifold& other) const {
+size_t Manifold::NumOverlaps(const Manifold& other) const {
   SparseIndices overlaps = GetCsgLeafNode().GetImpl()->EdgeCollisions(
       *other.GetCsgLeafNode().GetImpl());
   int num_overlaps = overlaps.size();

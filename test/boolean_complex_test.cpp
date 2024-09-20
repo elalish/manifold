@@ -930,8 +930,8 @@ TEST(BooleanComplex, InterpolatedNormals) {
   b.mergeFromVert = {3, 5, 6, 7, 8, 9, 12, 13, 14, 16, 18, 19, 20, 21, 22, 23};
   b.mergeToVert = {0, 1, 0, 2, 4, 1, 11, 2, 11, 4, 10, 10, 17, 17, 15, 15};
 
-  a.runOriginalID = {Manifold::ReserveIDs(1)};
-  b.runOriginalID = {Manifold::ReserveIDs(1)};
+  a.runOriginalID = {static_cast<uint32_t>(Manifold::ReserveIDs(1))};
+  b.runOriginalID = {static_cast<uint32_t>(Manifold::ReserveIDs(1))};
 
   Manifold aManifold(a);
   Manifold bManifold(b);

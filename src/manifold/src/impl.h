@@ -58,8 +58,8 @@ struct Manifold::Impl {
   MeshRelationD meshRelation_;
   Collider collider_;
 
-  static std::atomic<uint32_t> meshIDCounter_;
-  static uint32_t ReserveIDs(uint32_t);
+  static std::atomic<size_t> meshIDCounter_;
+  static size_t ReserveIDs(size_t);
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
@@ -133,15 +133,15 @@ struct Manifold::Impl {
 
     Vec<TriRef> triRef;
     if (!meshGL.runOriginalID.empty()) {
-      std::vector<uint32_t> runIndex = meshGL.runIndex;
-      const uint32_t runEnd = meshGL.triVerts.size();
+      auto runIndex = meshGL.runIndex;
+      const auto runEnd = meshGL.triVerts.size();
       if (runIndex.empty()) {
-        runIndex = {0, runEnd};
+        runIndex = {0, static_cast<I>(runEnd)};
       } else if (runIndex.size() == meshGL.runOriginalID.size()) {
         runIndex.push_back(runEnd);
       }
       triRef.resize(meshGL.NumTri());
-      const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
+      const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
       for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
         const int meshID = startID + i;
         const int originalID = meshGL.runOriginalID[i];
@@ -183,9 +183,9 @@ struct Manifold::Impl {
         }
         if (numProp > 0) {
           meshRelation_.triProperties.push_back(
-              ivec3((uint32_t)meshGL.triVerts[3 * i],
-                    (uint32_t)meshGL.triVerts[3 * i + 1],
-                    (uint32_t)meshGL.triVerts[3 * i + 2]));
+              ivec3(static_cast<uint32_t>(meshGL.triVerts[3 * i]),
+                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 1]),
+                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 2])));
         }
       }
     }
