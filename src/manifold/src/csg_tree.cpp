@@ -483,9 +483,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
           continue;
         }
         group.run([&, a, b]() {
-          const Manifold::Impl *aImpl = getImplPtr(a);
-          const Manifold::Impl *bImpl = getImplPtr(b);
-          Boolean3 boolean(*aImpl, *bImpl, operation);
+          Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
           queue.emplace(
               std::make_shared<Manifold::Impl>(boolean.Result(operation)));
           return group.run(process);
