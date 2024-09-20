@@ -87,7 +87,7 @@ TEST(Samples, Scallop) {
     ExportOptions options;
     const int numVert = scallop.NumVert();
     const int numHalfedge = 3 * scallop.NumTri();
-    for (int i = 0; i < scallop.NumVert(); ++i) {
+    for (size_t i = 0; i < scallop.NumVert(); ++i) {
       options.mat.vertColor.push_back({0, 0, 1, 1});
     }
     for (int i = 0; i < numHalfedge; ++i) {
