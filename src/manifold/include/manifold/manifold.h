@@ -73,7 +73,7 @@ struct MeshGLP {
   /// have the same ID, e.g. representing different copies of the same input
   /// mesh. If you create an input MeshGL that you want to be able to reference
   /// as one or more originals, be sure to set unique values from ReserveIDs().
-  std::vector<I> runOriginalID;
+  std::vector<uint32_t> runOriginalID;
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
@@ -230,7 +230,7 @@ class Manifold {
   size_t NumPropVert() const;
   Box BoundingBox() const;
   double Precision() const;
-  size_t Genus() const;
+  int Genus() const;
   Properties GetProperties() const;
   double MinGap(const Manifold& other, double searchLength) const;
   ///@}
@@ -240,9 +240,9 @@ class Manifold {
    * of reapplying mesh properties.
    */
   ///@{
-  std::optional<size_t> OriginalID() const;
+  int OriginalID() const;
   Manifold AsOriginal(const std::vector<double>& propertyTolerance = {}) const;
-  static size_t ReserveIDs(size_t);
+  static uint32_t ReserveIDs(uint32_t);
   ///@}
 
   /** @name Modification

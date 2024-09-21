@@ -58,8 +58,8 @@ struct Manifold::Impl {
   MeshRelationD meshRelation_;
   Collider collider_;
 
-  static std::atomic<size_t> meshIDCounter_;
-  static size_t ReserveIDs(size_t);
+  static std::atomic<uint32_t> meshIDCounter_;
+  static uint32_t ReserveIDs(uint32_t);
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };

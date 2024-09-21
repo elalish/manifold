@@ -245,9 +245,9 @@ void DedupePropVerts(manifold::Vec<ivec3>& triProp,
 
 namespace manifold {
 
-std::atomic<size_t> Manifold::Impl::meshIDCounter_(1);
+std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
-size_t Manifold::Impl::ReserveIDs(size_t n) {
+uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 

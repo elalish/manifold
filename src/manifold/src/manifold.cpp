@@ -440,7 +440,7 @@ double Manifold::Precision() const {
  * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
  * mesh, so it is best to call Decompose() first.
  */
-size_t Manifold::Genus() const {
+int Manifold::Genus() const {
   int chi = NumVert() - NumEdge() + NumTri();
   return 1 - chi / 2;
 }
@@ -455,12 +455,10 @@ Properties Manifold::GetProperties() const {
 /**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
- * returns an empty optional.
+ * returns -1.
  */
-std::optional<size_t> Manifold::OriginalID() const {
-  auto id = GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
-  if (id >= 0) return std::make_optional(static_cast<size_t>(id));
-  return {};
+int Manifold::OriginalID() const {
+  return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
 }
 
 /**
@@ -479,7 +477,13 @@ std::optional<size_t> Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal(
     const std::vector<double>& propertyTolerance) const {
-  auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto newImpl = std::make_shared<Impl>();
+    newImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(newImpl));
+  }
+  auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
@@ -492,7 +496,9 @@ Manifold Manifold::AsOriginal(
  * triangles that can be looked up after further operations. Assign to
  * MeshGL.runOriginalID vector.
  */
-size_t Manifold::ReserveIDs(size_t n) { return Manifold::Impl::ReserveIDs(n); }
+uint32_t Manifold::ReserveIDs(uint32_t n) {
+  return Manifold::Impl::ReserveIDs(n);
+}
 
 /**
  * The triangle normal vectors are saved over the course of operations rather
@@ -601,7 +607,13 @@ Manifold Manifold::Mirror(vec3 normal) const {
  * @param warpFunc A function that modifies a given vertex position.
  */
 Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto pImpl = std::make_shared<Impl>();
+    pImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  }
+  auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -615,7 +627,13 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
  */
 Manifold Manifold::WarpBatch(
     std::function<void(VecView<vec3>)> warpFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto pImpl = std::make_shared<Impl>();
+    pImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  }
+  auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->WarpBatch(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
