@@ -20,11 +20,7 @@ let package = Package(
             name: "manifold",
             dependencies: ["glm", "Clipper2"],
             path: "src",
-            publicHeadersPath: "manifold/include",
-            cxxSettings: [.headerSearchPath("collider/include"),
-                          .headerSearchPath("cross_section/include"),
-                          .headerSearchPath("polygon/include"),
-                          .headerSearchPath("utilities/include")]
+            publicHeadersPath: "include"
         )
     ],
     cxxLanguageStandard: .cxx20

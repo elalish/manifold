@@ -1,0 +1,24 @@
+{
+  "originHash" : "a1d7099091da1685ddf8f93ffc52f05b84fab2679861fe610116d2e59b3e0dd9",
+  "pins" : [
+    {
+      "identity" : "clipper2",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/audulus/Clipper2",
+      "state" : {
+        "branch" : "spm",
+        "revision" : "73a65374f4fec1682bf6af8855e177aa1b02ea3c"
+      }
+    },
+    {
+      "identity" : "glm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/audulus/glm",
+      "state" : {
+        "branch" : "spm",
+        "revision" : "ad839f90fcd1e630ae134d12b0f21c1d80c58271"
+      }
+    }
+  ],
+  "version" : 3
+}
