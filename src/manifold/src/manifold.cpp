@@ -57,9 +57,9 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 
-template <typename Precision>
-MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
-                                 ivec3 normalIdx) {
+template <typename Precision, typename I>
+MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
+                                    ivec3 normalIdx) {
   ZoneScoped;
   const int numProp = impl.NumProp();
   const int numVert = impl.NumPropVert();
@@ -69,7 +69,7 @@ MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   const bool updateNormals =
       !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
 
-  MeshGLP<Precision> out;
+  MeshGLP<Precision, I> out;
   out.precision =
       std::max(impl.precision_,
                std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
@@ -101,7 +101,7 @@ MeshGLP<Precision> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   std::vector<mat3> runNormalTransform;
   auto addRun = [updateNormals, isOriginal](
-                    MeshGLP<Precision>& out,
+                    MeshGLP<Precision, I>& out,
                     std::vector<mat3>& runNormalTransform, int tri,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
@@ -352,7 +352,7 @@ Mesh Manifold::GetMesh() const {
  */
 MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<float>(impl, normalIdx);
+  return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
 
 /**
@@ -370,7 +370,7 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
  */
 MeshGL64 Manifold::GetMeshGL64(ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<double>(impl, normalIdx);
+  return GetMeshGLImpl<double, size_t>(impl, normalIdx);
 }
 
 /**
@@ -391,25 +391,31 @@ Manifold::Error Manifold::Status() const {
 /**
  * The number of vertices in the Manifold.
  */
-int Manifold::NumVert() const { return GetCsgLeafNode().GetImpl()->NumVert(); }
+size_t Manifold::NumVert() const {
+  return GetCsgLeafNode().GetImpl()->NumVert();
+}
 /**
  * The number of edges in the Manifold.
  */
-int Manifold::NumEdge() const { return GetCsgLeafNode().GetImpl()->NumEdge(); }
+size_t Manifold::NumEdge() const {
+  return GetCsgLeafNode().GetImpl()->NumEdge();
+}
 /**
  * The number of triangles in the Manifold.
  */
-int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
+size_t Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
 /**
  * The number of properties per vertex in the Manifold.
  */
-int Manifold::NumProp() const { return GetCsgLeafNode().GetImpl()->NumProp(); }
+size_t Manifold::NumProp() const {
+  return GetCsgLeafNode().GetImpl()->NumProp();
+}
 /**
  * The number of property vertices in the Manifold. This will always be >=
  * NumVert, as some physical vertices may be duplicated to account for different
  * properties on different neighboring triangles.
  */
-int Manifold::NumPropVert() const {
+size_t Manifold::NumPropVert() const {
   return GetCsgLeafNode().GetImpl()->NumPropVert();
 }
 
@@ -471,7 +477,13 @@ int Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal(
     const std::vector<double>& propertyTolerance) const {
-  auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto newImpl = std::make_shared<Impl>();
+    newImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(newImpl));
+  }
+  auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->CreateFaces(propertyTolerance);
   newImpl->SimplifyTopology();
@@ -502,7 +514,7 @@ bool Manifold::MatchesTriNormals() const {
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.
  */
-int Manifold::NumDegenerateTris() const {
+size_t Manifold::NumDegenerateTris() const {
   return GetCsgLeafNode().GetImpl()->NumDegenerateTris();
 }
 
@@ -512,7 +524,7 @@ int Manifold::NumDegenerateTris() const {
  *
  * @param other A Manifold to overlap with.
  */
-int Manifold::NumOverlaps(const Manifold& other) const {
+size_t Manifold::NumOverlaps(const Manifold& other) const {
   SparseIndices overlaps = GetCsgLeafNode().GetImpl()->EdgeCollisions(
       *other.GetCsgLeafNode().GetImpl());
   int num_overlaps = overlaps.size();
@@ -595,7 +607,13 @@ Manifold Manifold::Mirror(vec3 normal) const {
  * @param warpFunc A function that modifies a given vertex position.
  */
 Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto pImpl = std::make_shared<Impl>();
+    pImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  }
+  auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -609,7 +627,13 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
  */
 Manifold Manifold::WarpBatch(
     std::function<void(VecView<vec3>)> warpFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError) {
+    auto pImpl = std::make_shared<Impl>();
+    pImpl->status_ = oldImpl->status_;
+    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  }
+  auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->WarpBatch(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }

@@ -479,7 +479,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     Vec<int> faceNew2Old(NumTri());
     const auto& halfedge = pImpl_->halfedge_;
     const int nFace =
-        copy_if(countAt(0), countAt(NumTri()), faceNew2Old.begin(),
+        copy_if(countAt(0_uz), countAt(NumTri()), faceNew2Old.begin(),
                 [i, &vertLabel, &halfedge](int face) {
                   return vertLabel[halfedge[3 * face].startVert] == i;
                 }) -

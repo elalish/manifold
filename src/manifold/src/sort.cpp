@@ -87,8 +87,8 @@ struct ReindexFace {
   }
 };
 
-template <typename Precision>
-bool MergeMeshGLP(MeshGLP<Precision>& mesh) {
+template <typename Precision, typename I>
+bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   ZoneScoped;
   std::multiset<std::pair<int, int>> openEdges;
 
