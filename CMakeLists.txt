@@ -176,7 +176,7 @@ if(MANIFOLD_CROSS_SECTION)
 endif()
 configure_file(manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
-  DESTINATION lib/pkgconfig)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 endif()
 
