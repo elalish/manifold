@@ -515,6 +515,12 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
 
   if (keepInterior) {
+    // Triangles where the greatest number of divisions exceeds the sum of the
+    // other two sides will be triangulated as a strip, since if the sub-edges
+    // were all equal length it would be degenerate. This leads to poor results
+    // with RefineToPrecision, so we avoid this case by adding some extra
+    // divisions to the short sides so that the triangulation has some thickness
+    // and creates more interior facets.
     Vec<int> tmp(numEdge);
     for_each_n(
         policy, countAt(0), numEdge,
@@ -534,6 +540,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
               total += added;
               hIdx = NextHalfedge(hIdx);
               if (IsMarkedInsideQuad(hIdx)) {
+                // No extra on quads
                 longest = 0;
                 total = 1;
                 break;

@@ -825,8 +825,8 @@ Manifold Manifold::RefineToPrecision(double precision) const {
         [precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
           const vec3 edgeNorm = glm::normalize(edge);
           // Weight heuristic
-          const vec3 tStart = vec3(tangentStart);  // * tangentStart.w;
-          const vec3 tEnd = vec3(tangentEnd);      // * tangentEnd.w;
+          const vec3 tStart = vec3(tangentStart);
+          const vec3 tEnd = vec3(tangentEnd);
           // Perpendicular to edge
           const vec3 start = tStart - edgeNorm * glm::dot(edgeNorm, tStart);
           const vec3 end = tEnd - edgeNorm * glm::dot(edgeNorm, tEnd);

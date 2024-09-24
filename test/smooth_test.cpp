@@ -155,7 +155,8 @@ TEST(Smooth, Precision) {
   // Tests face precision of refinement
   const double precision = 0.001;
   const double radius = 10;
-  Manifold cylinder = Manifold::Cylinder(10, radius, radius, 8);
+  const double height = 10;
+  Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
   Manifold smoothed = cylinder.SmoothOut().RefineToPrecision(precision);
   // Makes an edge bisector, which is the worst case.
   Mesh out = smoothed.Refine(2).GetMesh();
@@ -164,12 +165,15 @@ TEST(Smooth, Precision) {
       [radius](const vec3& a, const vec3& b) {
         const vec2 a1(a);
         const vec2 b1(b);
-        const double ra = (std::abs(a.z) < 0.001 || std::abs(a.z - 10) < 0.001)
-                              ? radius
-                              : glm::dot(a1, a1);
-        const double rb = (std::abs(b.z) < 0.001 || std::abs(b.z - 10) < 0.001)
-                              ? radius
-                              : glm::dot(b1, b1);
+        // Ignore end caps.
+        const double ra =
+            (std::abs(a.z) < 0.001 || std::abs(a.z - height) < 0.001)
+                ? radius
+                : glm::dot(a1, a1);
+        const double rb =
+            (std::abs(b.z) < 0.001 || std::abs(b.z - height) < 0.001)
+                ? radius
+                : glm::dot(b1, b1);
         return ra < rb;
       });
   double min = glm::length(vec2(*bounds.first));
@@ -179,7 +183,7 @@ TEST(Smooth, Precision) {
   EXPECT_EQ(smoothed.NumTri(), 7984);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("refineSphere.glb", smoothed.GetMeshGL(), {});
+    ExportMesh("refineCylinder.glb", smoothed.GetMeshGL(), {});
 #endif
 }
 
