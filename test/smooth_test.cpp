@@ -133,6 +133,7 @@ TEST(Smooth, ToLength) {
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
+  // Tests vertex precision of interpolation
   double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
@@ -151,19 +152,35 @@ TEST(Smooth, Sphere) {
 }
 
 TEST(Smooth, Precision) {
-  const double precision = 0.05;
-  Manifold sphere = Manifold::Sphere(1, 8);
-  // Refine(3*x) makes a center point, which is the worst case.
-  Manifold smoothed = sphere.SmoothOut().RefineToPrecision(precision).Refine(3);
-  Mesh out = smoothed.GetMesh();
-  auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
-                                    [](const vec3& a, const vec3& b) {
-                                      return glm::dot(a, a) < glm::dot(b, b);
-                                    });
-  double min = glm::length(*bounds.first);
-  double max = glm::length(*bounds.second);
-  EXPECT_NEAR(min, 1 - precision, 0.02);
-  EXPECT_NEAR(max, 1, 1e-4);
+  // Tests face precision of refinement
+  const double precision = 0.001;
+  const double radius = 10;
+  Manifold cylinder = Manifold::Cylinder(10, radius, radius, 8);
+  Manifold smoothed = cylinder.SmoothOut().RefineToPrecision(precision);
+  // Makes an edge bisector, which is the worst case.
+  Mesh out = smoothed.Refine(2).GetMesh();
+  auto bounds = std::minmax_element(
+      out.vertPos.begin(), out.vertPos.end(),
+      [radius](const vec3& a, const vec3& b) {
+        const vec2 a1(a);
+        const vec2 b1(b);
+        const double ra = (std::abs(a.z) < 0.001 || std::abs(a.z - 10) < 0.001)
+                              ? radius
+                              : glm::dot(a1, a1);
+        const double rb = (std::abs(b.z) < 0.001 || std::abs(b.z - 10) < 0.001)
+                              ? radius
+                              : glm::dot(b1, b1);
+        return ra < rb;
+      });
+  double min = glm::length(vec2(*bounds.first));
+  double max = glm::length(vec2(*bounds.second));
+  EXPECT_NEAR(min, radius - precision, 1e-4);
+  EXPECT_NEAR(max, radius, 1e-8);
+  EXPECT_EQ(smoothed.NumTri(), 7984);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("refineSphere.glb", smoothed.GetMeshGL(), {});
+#endif
 }
 
 TEST(Smooth, Normals) {

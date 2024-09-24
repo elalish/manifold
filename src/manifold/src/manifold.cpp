@@ -825,15 +825,15 @@ Manifold Manifold::RefineToPrecision(double precision) const {
         [precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
           const vec3 edgeNorm = glm::normalize(edge);
           // Weight heuristic
-          const vec3 tStart = vec3(tangentStart) * tangentStart.w;
-          const vec3 tEnd = vec3(tangentEnd) * tangentEnd.w;
+          const vec3 tStart = vec3(tangentStart);  // * tangentStart.w;
+          const vec3 tEnd = vec3(tangentEnd);      // * tangentEnd.w;
           // Perpendicular to edge
           const vec3 start = tStart - edgeNorm * glm::dot(edgeNorm, tStart);
           const vec3 end = tEnd - edgeNorm * glm::dot(edgeNorm, tEnd);
           // Circular arc result plus heuristic term for non-circular curves
           const double d = 0.5 * (glm::length(start) + glm::length(end)) +
                            glm::length(start - end);
-          return static_cast<int>(3 * d / (4 * precision));
+          return static_cast<int>(std::sqrt(3 * d / (4 * precision)));
         },
         true);
   }

@@ -525,7 +525,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           if (IsMarkedInsideQuad(hIdx)) return;
 
           const int thisAdded = tmp[i];
-          auto Added = [&edgeAdded, &half2Edge, thisAdded](int hIdx) {
+          auto Added = [&edgeAdded, &half2Edge, thisAdded, this](int hIdx) {
             int longest = 0;
             int total = 0;
             for (int j : {0, 1, 2}) {
@@ -533,6 +533,11 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
               longest = glm::max(longest, added);
               total += added;
               hIdx = NextHalfedge(hIdx);
+              if (IsMarkedInsideQuad(hIdx)) {
+                longest = 0;
+                total = 1;
+                break;
+              }
             }
             const int minExtra = longest * 0.2 + 1;
             const int extra = 2 * longest + minExtra - total;
