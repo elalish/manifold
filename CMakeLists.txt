@@ -88,6 +88,13 @@ if(MANIFOLD_PYBIND)
   else()
     find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
   endif()
+  if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
+    set(MANIFOLD_PYBIND_STUBGEN ON)
+  else()
+    # stubgen does not support version less than 3.11
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("Python version too old, stub will not be generated")
+  endif()
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
