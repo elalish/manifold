@@ -256,7 +256,9 @@ NB_MODULE(manifold3d, m) {
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
-          [](const Manifold &self, double s) { self.Scale({s, s, s}); },
+          [](const Manifold &self, double s) {
+            self.Scale({s, s, s});
+          },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -327,7 +329,8 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
-      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
+      .def("to_mesh", &Manifold::GetMeshGL,
+           nb::arg("normal_idx") = std::make_tuple(0, 0, 0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
@@ -406,7 +409,8 @@ NB_MODULE(manifold3d, m) {
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube, nb::arg("size") = vec3{1, 1, 1},
+      .def_static("cube", &Manifold::Cube,
+                  nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",
@@ -647,7 +651,9 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, double s) { self.Scale({s, s}); },
+          [](const CrossSection &self, double s) {
+            self.Scale({s, s});
+          },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."

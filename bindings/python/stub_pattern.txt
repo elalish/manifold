@@ -1,0 +1,13 @@
+manifold3d.__prefix__:
+  import numpy as np
+  from typing import Literal, TypeVar, Union
+
+  N = TypeVar('N', bound=np.generic)
+  DoubleNx2 = np.ndarray[tuple[N, Literal[2]], np.dtype[np.double]]
+  Doublex2 = Union[np.ndarray[tuple[Literal[2]], np.dtype[np.double]], tuple[float, float], list[float]]
+  Doublex3 = Union[np.ndarray[tuple[Literal[3]], np.dtype[np.double]], tuple[float, float, float], list[float]]
+  Double2x3 = np.ndarray[tuple[Literal[2], Literal[3]], np.dtype[np.double]]
+  Double3x4 = np.ndarray[tuple[Literal[3], Literal[4]], np.dtype[np.double]]
+  DoubleNx3 = np.ndarray[tuple[N, Literal[3]], np.dtype[np.double]]
+  Intx3 = Union[np.ndarray[tuple[Literal[3]], np.dtype[np.integer]], tuple[int, int, int], list[int]]
+  IntNx3 = np.ndarray[tuple[N, Literal[3]], np.dtype[np.integer]]
