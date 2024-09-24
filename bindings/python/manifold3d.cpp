@@ -327,6 +327,8 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
+      .def("refine_to_precision", &Manifold::RefineToPrecision,
+           nb::arg("precision"), manifold__refine_to_precision__precision)
       .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
