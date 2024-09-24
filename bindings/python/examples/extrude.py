@@ -1,6 +1,7 @@
 from manifold3d import CrossSection, Manifold
 import numpy as np
 
+
 def run():
     # create a polygon
     polygon_points = np.array([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
