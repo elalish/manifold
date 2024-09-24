@@ -24,7 +24,7 @@ using namespace manifold;
 // Check if the mesh remains convex after adding new faces
 bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
   // Get the mesh from the manifold
-  MeshGL mesh = hullManifold.GetMeshGL();
+  MeshGL64 mesh = hullManifold.GetMeshGL64();
 
   const auto numTri = mesh.NumTri();
   const auto numVert = mesh.NumVert();
@@ -33,17 +33,10 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
   // Iterate over each triangle
   for (int t = 0; t < numTri; ++t) {
     // Get the vertices of the triangle
-    ivec3 tri(mesh.triVerts[3 * t], mesh.triVerts[3 * t + 1],
-              mesh.triVerts[3 * t + 2]);
-    vec3 v0(mesh.vertProperties[numProp * tri[0]],
-            mesh.vertProperties[numProp * tri[0] + 1],
-            mesh.vertProperties[numProp * tri[0] + 2]);
-    vec3 v1(mesh.vertProperties[numProp * tri[1]],
-            mesh.vertProperties[numProp * tri[1] + 1],
-            mesh.vertProperties[numProp * tri[1] + 2]);
-    vec3 v2(mesh.vertProperties[numProp * tri[2]],
-            mesh.vertProperties[numProp * tri[2] + 1],
-            mesh.vertProperties[numProp * tri[2] + 2]);
+    auto tri = mesh.GetTriVerts(t);
+    vec3 v0 = mesh.GetVertPos(tri[0]);
+    vec3 v1 = mesh.GetVertPos(tri[1]);
+    vec3 v2 = mesh.GetVertPos(tri[2]);
 
     // Compute the normal of the triangle
     vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
@@ -54,9 +47,7 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
-      vec3 v(mesh.vertProperties[numProp * i],
-             mesh.vertProperties[numProp * i + 1],
-             mesh.vertProperties[numProp * i + 2]);
+      vec3 v = mesh.GetVertPos(i);
 
       // Compute the signed distance from the plane
       double distance = glm::dot(normal, v - v0);

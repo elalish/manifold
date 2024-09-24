@@ -140,15 +140,13 @@ TEST(Smooth, Sphere) {
     Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
-    MeshGL out = smoothed.GetMeshGL();
+    MeshGL64 out = smoothed.GetMeshGL64();
     const int numVert = out.NumVert();
     const int numProp = out.numProp;
     double maxR2 = 0;
     double minR2 = 2;
     for (int v = 0; v < numVert; ++v) {
-      const vec3 a(out.vertProperties[numProp * v],
-                   out.vertProperties[numProp * v + 1],
-                   out.vertProperties[numProp * v + 2]);
+      const vec3 a = out.GetVertPos(v);
       const double r2 = dot(a, a);
       maxR2 = std::max(maxR2, r2);
       minR2 = std::min(minR2, r2);
