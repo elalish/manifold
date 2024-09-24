@@ -17,8 +17,6 @@ jobs:
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19
       - uses: actions/upload-artifact@v4
@@ -31,8 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - name: Build SDist
       run: pipx run build --sdist
     - name: Confirm SDist can be built
