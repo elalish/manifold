@@ -77,7 +77,7 @@ install(
   COMPONENT bindings
 )
 install(
-  FILES py.typed manifold3d.pyi
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
   LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}
   COMPONENT bindings
 )
@@ -88,7 +88,7 @@ install(
   COMPONENT bindings
 )
 install(
-  FILES py.typed manifold3d.pyi
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
   LIBRARY DESTINATION ${Python_SITEARCH}
   COMPONENT bindings
 )
