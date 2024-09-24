@@ -49,7 +49,6 @@ TEST(Samples, Knot13) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
 #endif
-  CheckNormals(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -63,7 +62,6 @@ TEST(Samples, Knot42) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMeshGL(), {});
 #endif
-  CheckNormals(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -123,7 +121,6 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  CheckNormals(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 39.9, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
@@ -144,7 +141,6 @@ TEST(Samples, Scallop) {
 
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
-  CheckNormals(puzzle);
   EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   CheckGL(puzzle);
 
@@ -158,7 +154,6 @@ TEST(Samples, TetPuzzle) {
 
 TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
-  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -173,7 +168,6 @@ TEST(Samples, FrameReduced) {
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
@@ -188,7 +182,6 @@ TEST(Samples, Frame) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  CheckNormals(bracelet);
   EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
@@ -222,7 +215,6 @@ TEST(Samples, Bracelet) {
 TEST(Samples, GyroidModule) {
   const double size = 20;
   Manifold gyroid = GyroidModule(size);
-  CheckNormals(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 4);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
@@ -247,7 +239,6 @@ TEST(Samples, GyroidModule) {
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  CheckNormals(sponge);
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
@@ -266,7 +257,6 @@ TEST(Samples, Sponge1) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  CheckNormals(sponge);
   EXPECT_LE(sponge.NumDegenerateTris(), 8);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);

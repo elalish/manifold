@@ -61,7 +61,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
-void CheckNormals(const Manifold& manifold);
 void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold);
 #ifdef MANIFOLD_EXPORT

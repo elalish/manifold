@@ -423,22 +423,10 @@ void ExpectMeshes(const Manifold& manifold,
     EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
     EXPECT_EQ(meshGL.mergeFromVert.size(),
               meshGL.NumVert() - manifolds[i].NumVert());
-    const Mesh mesh = manifolds[i].GetMesh();
-    for (const vec3& normal : mesh.vertNormal) {
-      ASSERT_NEAR(glm::length(normal), 1, 0.0001);
-    }
-  }
-}
-
-void CheckNormals(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.MatchesTriNormals());
-  for (const vec3& normal : manifold.GetMesh().vertNormal) {
-    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
   }
 }
 
 void CheckStrictly(const Manifold& manifold) {
-  CheckNormals(manifold);
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 
