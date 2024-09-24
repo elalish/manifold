@@ -31,7 +31,7 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
   const auto numProp = mesh.numProp;
 
   // Iterate over each triangle
-  for (int t = 0; t < numTri; ++t) {
+  for (size_t t = 0; t < numTri; ++t) {
     // Get the vertices of the triangle
     auto tri = mesh.GetTriVerts(t);
     vec3 v0 = mesh.GetVertPos(tri[0]);
@@ -42,7 +42,7 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
     vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
     // Check all other vertices
-    for (int i = 0; i < numVert; ++i) {
+    for (size_t i = 0; i < numVert; ++i) {
       if (i == tri[0] || i == tri[1] || i == tri[2])
         continue;  // Skip vertices of the current triangle
 
