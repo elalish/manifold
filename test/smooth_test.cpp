@@ -162,7 +162,7 @@ TEST(Smooth, Precision) {
   Mesh out = smoothed.Refine(2).GetMesh();
   auto bounds = std::minmax_element(
       out.vertPos.begin(), out.vertPos.end(),
-      [radius](const vec3& a, const vec3& b) {
+      [radius, height](const vec3& a, const vec3& b) {
         const vec2 a1(a);
         const vec2 b1(b);
         // Ignore end caps.
