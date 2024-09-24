@@ -284,12 +284,11 @@ TEST(Smooth, Torus) {
 
   // Create correct toroidal halfedge tangents - SmoothOut() is too generic to
   // do this perfectly.
-  torusMesh.halfedgeTangent.resize(3 * numTri);
+  torusMesh.halfedgeTangent.resize(4 * 3 * numTri);
   for (int tri = 0; tri < numTri; ++tri) {
     const auto triVerts = torusMesh.GetTriVerts(tri);
     for (const int i : {0, 1, 2}) {
-      const int e = 3 * tri + i;
-      vec4 tangent = torusMesh.GetTangent(e);
+      vec4 tangent;
       const vec3 v = torusMesh.GetVertPos(triVerts[i]);
       const vec3 v1 = torusMesh.GetVertPos(triVerts[(i + 1) % 3]);
       const vec3 edge = v1 - v;
@@ -309,6 +308,7 @@ TEST(Smooth, Torus) {
       } else {
         tangent = {0, 0, 0, -1};
       }
+      const int e = 3 * tri + i;
       for (const int j : {0, 1, 2, 3})
         torusMesh.halfedgeTangent[4 * e + j] = tangent[j];
     }
