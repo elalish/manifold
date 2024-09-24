@@ -251,56 +251,6 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
-Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
-                     const std::vector<double>& propertyTolerance,
-                     bool hasFaceIDs)
-    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-  meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
-                   relation.meshIDtransform};
-
-  Vec<ivec3> triVerts;
-  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
-    const ivec3 tri = mesh.triVerts[i];
-    // Remove topological degenerates
-    if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
-      triVerts.push_back(tri);
-      if (relation.triRef.size() > 0) {
-        meshRelation_.triRef.push_back(relation.triRef[i]);
-      }
-      if (relation.triProperties.size() > 0) {
-        meshRelation_.triProperties.push_back(relation.triProperties[i]);
-      }
-    }
-  }
-
-  if (!IsIndexInBounds(triVerts)) {
-    MarkFailure(Error::VertexOutOfBounds);
-    return;
-  }
-
-  CreateHalfedges(triVerts);
-  if (!IsManifold()) {
-    MarkFailure(Error::NotManifold);
-    return;
-  }
-
-  CalculateBBox();
-  if (!IsFinite()) {
-    MarkFailure(Error::NonFiniteVertex);
-    return;
-  }
-  SetPrecision(mesh.precision);
-
-  SplitPinchedVerts();
-
-  CalculateNormals();
-
-  InitializeOriginal();
-
-  SimplifyTopology();
-  Finish();
-}
-
 /**
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.

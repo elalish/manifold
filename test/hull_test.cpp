@@ -22,29 +22,41 @@
 using namespace manifold;
 
 // Check if the mesh remains convex after adding new faces
-bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
+bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
   // Get the mesh from the manifold
-  manifold::Mesh mesh = hullManifold.GetMesh();
+  MeshGL mesh = hullManifold.GetMeshGL();
 
-  const auto &vertPos = mesh.vertPos;
+  const auto numTri = mesh.NumTri();
+  const auto numVert = mesh.NumVert();
+  const auto numProp = mesh.numProp;
 
   // Iterate over each triangle
-  for (const auto &tri : mesh.triVerts) {
+  for (int t = 0; t < numTri; ++t) {
     // Get the vertices of the triangle
-    vec3 v0 = vertPos[tri[0]];
-    vec3 v1 = vertPos[tri[1]];
-    vec3 v2 = vertPos[tri[2]];
+    ivec3 tri(mesh.triVerts[3 * t], mesh.triVerts[3 * t + 1],
+              mesh.triVerts[3 * t + 2]);
+    vec3 v0(mesh.vertProperties[numProp * tri[0]],
+            mesh.vertProperties[numProp * tri[0] + 1],
+            mesh.vertProperties[numProp * tri[0] + 2]);
+    vec3 v1(mesh.vertProperties[numProp * tri[1]],
+            mesh.vertProperties[numProp * tri[1] + 1],
+            mesh.vertProperties[numProp * tri[1] + 2]);
+    vec3 v2(mesh.vertProperties[numProp * tri[2]],
+            mesh.vertProperties[numProp * tri[2] + 1],
+            mesh.vertProperties[numProp * tri[2] + 2]);
 
     // Compute the normal of the triangle
     vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
     // Check all other vertices
-    for (int i = 0; i < (int)vertPos.size(); ++i) {
+    for (int i = 0; i < numVert; ++i) {
       if (i == tri[0] || i == tri[1] || i == tri[2])
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
-      vec3 v = vertPos[i];
+      vec3 v(mesh.vertProperties[numProp * i],
+             mesh.vertProperties[numProp * i + 1],
+             mesh.vertProperties[numProp * i + 2]);
 
       // Compute the signed distance from the plane
       double distance = glm::dot(normal, v - v0);

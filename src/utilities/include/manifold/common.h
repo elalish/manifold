@@ -153,31 +153,6 @@ using SimplePolygon = std::vector<vec2>;
 using Polygons = std::vector<SimplePolygon>;
 
 /**
- * The triangle-mesh input and output of this library.
- */
-struct Mesh {
-  /// Required: The X-Y-Z positions of all vertices.
-  std::vector<vec3> vertPos;
-  /// Required: The vertex indices of the three triangle corners in CCW (from
-  /// the outside) order, for each triangle.
-  std::vector<ivec3> triVerts;
-  /// Optional: The X-Y-Z normal vectors of each vertex. If non-empty, must have
-  /// the same length as vertPos. If empty, these will be calculated
-  /// automatically.
-  std::vector<vec3> vertNormal;
-  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
-  /// non-empty, must be exactly three times as long as Mesh.triVerts. Indexed
-  /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
-  /// the CCW edge. If empty, mesh is faceted.
-  std::vector<vec4> halfedgeTangent;
-  /// The absolute precision of the vertex positions, based on accrued rounding
-  /// errors. When creating a Manifold, the precision used will be the maximum
-  /// of this and a baseline precision from the size of the bounding box. Any
-  /// edge shorter than precision may be collapsed.
-  double precision = 0;
-};
-
-/**
  * Defines which edges to sharpen and how much for the Manifold.Smooth()
  * constructor.
  */

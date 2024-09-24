@@ -53,7 +53,6 @@ MeshGL CubeSTL();
 MeshGL CubeUV();
 MeshGL WithIndexColors(const MeshGL& in);
 MeshGL WithPositionColors(const Manifold& in);
-MeshGL WithNormals(const Manifold& in);
 float GetMaxProperty(const MeshGL& mesh, int channel);
 float GetMinProperty(const MeshGL& mesh, int channel);
 void CheckFinite(const MeshGL& mesh);

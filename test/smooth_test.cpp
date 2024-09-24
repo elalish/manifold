@@ -140,15 +140,21 @@ TEST(Smooth, Sphere) {
     Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
-    Mesh out = smoothed.GetMesh();
-    auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
-                                      [](const vec3& a, const vec3& b) {
-                                        return glm::dot(a, a) < glm::dot(b, b);
-                                      });
-    double min = glm::length(*bounds.first);
-    double max = glm::length(*bounds.second);
-    EXPECT_NEAR(min, 1, precision[i]);
-    EXPECT_NEAR(max, 1, precision[i]);
+    MeshGL out = smoothed.GetMeshGL();
+    const int numVert = out.NumVert();
+    const int numProp = out.numProp;
+    double maxR2 = 0;
+    double minR2 = 2;
+    for (int v = 0; v < numVert; ++v) {
+      const vec3 a(out.vertProperties[numProp * v],
+                   out.vertProperties[numProp * v + 1],
+                   out.vertProperties[numProp * v + 2]);
+      const double r2 = dot(a, a);
+      maxR2 = std::max(maxR2, r2);
+      minR2 = std::min(minR2, r2);
+    }
+    EXPECT_NEAR(std::sqrt(minR2), 1, precision[i]);
+    EXPECT_NEAR(std::sqrt(maxR2), 1, precision[i]);
   }
 }
 
@@ -171,12 +177,12 @@ TEST(Smooth, Normals) {
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
-  Mesh smooth = Manifold::Smooth(oct).GetMesh();
+  MeshGL smooth = Manifold::Smooth(oct).GetMeshGL();
   // Sharpen the edge from vert 4 to 5
-  smooth.halfedgeTangent[6].w = 0;
-  smooth.halfedgeTangent[22].w = 0;
-  smooth.halfedgeTangent[16].w = 0;
-  smooth.halfedgeTangent[18].w = 0;
+  smooth.halfedgeTangent[4 * 6 + 3] = 0;
+  smooth.halfedgeTangent[4 * 22 + 3] = 0;
+  smooth.halfedgeTangent[4 * 16 + 3] = 0;
+  smooth.halfedgeTangent[4 * 18 + 3] = 0;
   Manifold interp(smooth);
   interp = interp.Refine(100);
 
@@ -269,21 +275,24 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Torus) {
-  Mesh torusMesh =
+  MeshGL64 torusMesh =
       Manifold::Revolve(
           CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
-          .GetMesh();
-  const int numTri = torusMesh.triVerts.size();
+          .GetMeshGL64();
+  const int numTri = torusMesh.NumTri();
+  const int numProp = torusMesh.numProp;
 
   // Create correct toroidal halfedge tangents - SmoothOut() is too generic to
   // do this perfectly.
   torusMesh.halfedgeTangent.resize(3 * numTri);
   for (int tri = 0; tri < numTri; ++tri) {
+    const auto triVerts = torusMesh.GetTriVerts(tri);
     for (const int i : {0, 1, 2}) {
-      vec4& tangent = torusMesh.halfedgeTangent[3 * tri + i];
-      const vec3 v = torusMesh.vertPos[torusMesh.triVerts[tri][i]];
-      const vec3 edge =
-          torusMesh.vertPos[torusMesh.triVerts[tri][(i + 1) % 3]] - v;
+      const int e = 3 * tri + i;
+      vec4 tangent = torusMesh.GetTangent(e);
+      const vec3 v = torusMesh.GetVertPos(triVerts[i]);
+      const vec3 v1 = torusMesh.GetVertPos(triVerts[(i + 1) % 3]);
+      const vec3 edge = v1 - v;
       if (edge.z == 0) {
         vec3 tan(v.y, -v.x, 0);
         tan *= glm::sign(glm::dot(tan, edge));
@@ -300,6 +309,8 @@ TEST(Smooth, Torus) {
       } else {
         tangent = {0, 0, 0, -1};
       }
+      for (const int j : {0, 1, 2, 3})
+        torusMesh.halfedgeTangent[4 * e + j] = tangent[j];
     }
   }
 

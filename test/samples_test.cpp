@@ -22,14 +22,14 @@
 
 using namespace manifold;
 
-std::vector<int> EdgePairs(const Mesh in) {
-  const int numHalfedge = 3 * in.triVerts.size();
+std::vector<int> EdgePairs(const MeshGL in) {
+  const int numHalfedge = 3 * in.NumTri();
   std::vector<int> edgePair(numHalfedge);
 
   std::map<std::pair<int, int>, int> halfedgeLink;
   for (int i = 0; i < numHalfedge; ++i) {
-    std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
-                                             in.triVerts[i / 3][(i + 1) % 3]);
+    std::pair<int, int> key = std::make_pair(
+        in.triVerts[i], in.triVerts[(i + 1) % 3 == 0 ? i - 2 : i + 1]);
     if (key.first > key.second) std::swap(key.first, key.second);
     const auto result = halfedgeLink.emplace(std::make_pair(key, i));
     if (!result.second) {
@@ -81,22 +81,28 @@ TEST(Samples, Scallop) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    Mesh in = scallop.GetMesh();
+    MeshGL in = scallop.GetMeshGL();
     std::vector<int> edgePair = EdgePairs(in);
 
     ExportOptions options;
     const int numVert = scallop.NumVert();
     const int numHalfedge = 3 * scallop.NumTri();
+    const int numProp = in.numProp;
     for (size_t i = 0; i < scallop.NumVert(); ++i) {
       options.mat.vertColor.push_back({0, 0, 1, 1});
     }
     for (int i = 0; i < numHalfedge; ++i) {
-      const int vert = in.triVerts[i / 3][i % 3];
-      in.vertPos.push_back(in.vertPos[vert] + vec3(in.halfedgeTangent[i]) *
-                                                  in.halfedgeTangent[i].w);
+      const int vert = in.triVerts[i];
+      for (int j : {0, 1, 2}) {
+        in.vertProperties.push_back(in.vertProperties[numProp * vert + j] +
+                                    in.halfedgeTangent[4 * i + j] *
+                                        in.halfedgeTangent[4 * i + 3]);
+      }
       options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
-      in.triVerts.push_back({vert, numVert + i, numVert + j});
+      in.triVerts.push_back(vert);
+      in.triVerts.push_back(numVert + i);
+      in.triVerts.push_back(numVert + j);
     }
     options.faceted = true;
     options.mat.roughness = 0.5;

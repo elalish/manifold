@@ -219,10 +219,6 @@ struct Manifold::Impl {
     meshRelation_.originalID = -1;
   }
 
-  Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<double>& propertyTolerance = {},
-       bool hasFaceIDs = false);
-
   inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
     int current = halfedge;
     do {
