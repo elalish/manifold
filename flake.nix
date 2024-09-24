@@ -51,10 +51,6 @@
                 "-DBUILD_SHARED_LIBS=ON"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
               ];
-              prePatch = ''
-                substituteInPlace bindings/python/CMakeLists.txt \
-                  --replace 'DESTINATION ''${Python_SITEARCH}' 'DESTINATION "${placeholder "out"}/${pkgs.python3.sitePackages}"'
-              '';
               checkPhase = ''
                 cd test
                 ./manifold_test
