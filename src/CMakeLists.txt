@@ -12,10 +12,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(utilities)
-add_subdirectory(collider)
-if(MANIFOLD_CROSS_SECTION)
-    add_subdirectory(cross_section)
+project(manifold)
+
+add_library(${PROJECT_NAME} INTERFACE)
+message("Parallel Backend: ${MANIFOLD_PAR}")
+
+include(FetchContent)
+if (TRACY_ENABLE)
+    include(FetchContent)
+    FetchContent_Declare(tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.10
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
 endif()
-add_subdirectory(polygon)
-add_subdirectory(manifold)
+
+if(MANIFOLD_PAR STREQUAL "TBB")
+    target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
+    if(TARGET TBB::tbb)
+        target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)
+    else()
+        target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${TBB_INCLUDE_DIRS}>)
+        target_link_libraries(${PROJECT_NAME} INTERFACE ${TBB_LINK_LIBRARIES})
+    endif()
+    if(APPLE)
+        if(oneDPL_FOUND)
+            target_link_libraries(${PROJECT_NAME} INTERFACE oneDPL)
+        else()
+            message(WARNING "oneDPL not found, sequential implementation is used instead")
+        endif()
+    endif()
+elseif(MANIFOLD_PAR STREQUAL "NONE")
+    set(MANIFOLD_PAR "CPP")
+else()
+    message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
+        "Should be \"TBB\" or \"NONE\"")
+endif()
+
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
+
+if(MANIFOLD_EXCEPTIONS)
+    target_compile_options(${PROJECT_NAME} INTERFACE
+        -DMANIFOLD_EXCEPTIONS=1
+    )
+endif()
+
+if(MANIFOLD_DEBUG)
+    target_compile_options(${PROJECT_NAME}
+        INTERFACE -DMANIFOLD_DEBUG)
+endif()
+
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES
+    include/manifold/common.h
+    include/manifold/vec_view.h
+    include/manifold/tri_dist.h
+    include/manifold/optional_assert.h
+    include/manifold/iters.h
+    include/manifold/parallel.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
