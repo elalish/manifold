@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.18)
 project(testing LANGUAGES CXX)
 find_package(manifold "2.5.1" REQUIRED)
 add_executable(testing test.cpp)
-target_link_libraries(testing PRIVATE manifold)
+target_link_libraries(testing PRIVATE manifold::manifold)
 EOT
 
 cat <<EOT > test.cpp
