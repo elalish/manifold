@@ -53,7 +53,9 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
                "rather than Smooth().");
 
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  const Vec<bool> internalEdges = impl->InternalEdges();
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges),
+                       internalEdges);
   return Manifold(impl);
 }
 
@@ -92,7 +94,9 @@ Manifold Manifold::Smooth(const MeshGL64& meshGL64,
                "rather than Smooth().");
 
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  const Vec<bool> internalEdges = impl->InternalEdges();
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges),
+                       internalEdges);
   return Manifold(impl);
 }
 
@@ -273,7 +277,6 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 
@@ -417,7 +420,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 

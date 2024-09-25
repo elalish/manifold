@@ -90,157 +90,6 @@ struct UpdateMeshID {
 
   void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
 };
-
-struct CoplanarEdge {
-  VecView<std::pair<int, int>> face2face;
-  VecView<std::pair<int, int>> vert2vert;
-  VecView<double> triArea;
-  VecView<const Halfedge> halfedge;
-  VecView<const vec3> vertPos;
-  VecView<const TriRef> triRef;
-  VecView<const ivec3> triProp;
-  VecView<const double> prop;
-  VecView<const double> propTol;
-  const int numProp;
-  const double precision;
-
-  // FIXME: race condition
-  void operator()(const int edgeIdx) {
-    const Halfedge edge = halfedge[edgeIdx];
-    const Halfedge pair = halfedge[edge.pairedHalfedge];
-    const int edgeFace = edgeIdx / 3;
-    const int pairFace = edge.pairedHalfedge / 3;
-
-    if (triRef[edgeFace].meshID != triRef[pairFace].meshID) return;
-
-    const vec3 base = vertPos[edge.startVert];
-    const int baseNum = edgeIdx - 3 * edgeFace;
-    const int jointNum = edge.pairedHalfedge - 3 * pairFace;
-
-    if (numProp > 0) {
-      const int prop0 = triProp[edgeFace][baseNum];
-      const int prop1 = triProp[pairFace][jointNum == 2 ? 0 : jointNum + 1];
-      bool propEqual = true;
-      for (int p = 0; p < numProp; ++p) {
-        if (std::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
-            propTol[p]) {
-          propEqual = false;
-          break;
-        }
-      }
-      if (propEqual) {
-        vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
-      }
-    }
-
-    if (!edge.IsForward()) return;
-
-    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
-    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
-    const vec3 jointVec = vertPos[pair.startVert] - base;
-    const vec3 edgeVec =
-        vertPos[halfedge[3 * edgeFace + edgeNum].startVert] - base;
-    const vec3 pairVec =
-        vertPos[halfedge[3 * pairFace + pairNum].startVert] - base;
-
-    const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
-    const double lengthPair =
-        std::max(glm::length(jointVec), glm::length(pairVec));
-    vec3 normal = glm::cross(jointVec, edgeVec);
-    const double area = glm::length(normal);
-    const double areaPair = glm::length(glm::cross(pairVec, jointVec));
-    triArea[edgeFace] = area;
-    triArea[pairFace] = areaPair;
-    // Don't link degenerate triangles
-    if (area < length * precision || areaPair < lengthPair * precision) return;
-
-    const double volume = std::abs(glm::dot(normal, pairVec));
-    // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * precision) return;
-
-    // Check property linearity
-    if (area > 0) {
-      normal /= area;
-      for (int i = 0; i < numProp; ++i) {
-        const double scale = precision / propTol[i];
-
-        const double baseProp = prop[numProp * triProp[edgeFace][baseNum] + i];
-        const double jointProp =
-            prop[numProp * triProp[pairFace][jointNum] + i];
-        const double edgeProp = prop[numProp * triProp[edgeFace][edgeNum] + i];
-        const double pairProp = prop[numProp * triProp[pairFace][pairNum] + i];
-
-        const vec3 iJointVec =
-            jointVec + normal * scale * (jointProp - baseProp);
-        const vec3 iEdgeVec = edgeVec + normal * scale * (edgeProp - baseProp);
-        const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
-
-        vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const double areaP = std::max(
-            glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const double volumeP = std::abs(glm::dot(cross, iPairVec));
-        // Only operate on consistent triangles
-        if (volumeP > areaP * precision) return;
-      }
-    }
-
-    face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
-  }
-};
-
-struct CheckCoplanarity {
-  VecView<int> comp2tri;
-  VecView<const Halfedge> halfedge;
-  VecView<const vec3> vertPos;
-  std::vector<int>* components;
-  const double precision;
-
-  void operator()(int tri) {
-    const int component = (*components)[tri];
-    const int referenceTri = comp2tri[component];
-    if (referenceTri < 0 || referenceTri == tri) return;
-
-    const vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
-    const vec3 normal = glm::normalize(
-        glm::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
-                   vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
-
-    for (const int i : {0, 1, 2}) {
-      const vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
-      // If any component vertex is not coplanar with the component's reference
-      // triangle, unmark the entire component so that none of its triangles are
-      // marked coplanar.
-      if (std::abs(glm::dot(normal, vert - origin)) > precision) {
-        reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
-            ->store(-1, std::memory_order_relaxed);
-        break;
-      }
-    }
-  }
-};
-
-int GetLabels(std::vector<int>& components,
-              const Vec<std::pair<int, int>>& edges, int numNodes) {
-  UnionFind<> uf(numNodes);
-  for (auto edge : edges) {
-    if (edge.first == -1 || edge.second == -1) continue;
-    uf.unionXY(edge.first, edge.second);
-  }
-
-  return uf.connectedComponents(components);
-}
-
-void DedupePropVerts(manifold::Vec<ivec3>& triProp,
-                     const Vec<std::pair<int, int>>& vert2vert) {
-  ZoneScoped;
-  std::vector<int> vertLabels;
-  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
-
-  std::vector<int> label2vert(numLabels);
-  for (size_t v = 0; v < vert2vert.size(); ++v) label2vert[vertLabels[v]] = v;
-  for (auto& prop : triProp)
-    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
-}
 }  // namespace
 
 namespace manifold {
@@ -350,7 +199,6 @@ Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeOriginal();
-  CreateFaces();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -400,53 +248,6 @@ void Manifold::Impl::InitializeOriginal() {
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
-}
-
-void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
-  ZoneScoped;
-  constexpr double kDefaultPropTolerance = 1e-5;
-  Vec<double> propertyToleranceD =
-      propertyTolerance.empty()
-          ? Vec<double>(meshRelation_.numProp, kDefaultPropTolerance)
-          : propertyTolerance;
-
-  Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
-  Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
-  Vec<double> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-             CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
-                           meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.properties, propertyToleranceD,
-                           meshRelation_.numProp, precision_}));
-
-  if (meshRelation_.triProperties.size() > 0) {
-    DedupePropVerts(meshRelation_.triProperties, vert2vert);
-  }
-
-  std::vector<int> components;
-  const int numComponent = GetLabels(components, face2face, NumTri());
-
-  Vec<int> comp2tri(numComponent, -1);
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    const int comp = components[tri];
-    const int current = comp2tri[comp];
-    if (current < 0 || triArea[tri] > triArea[current]) {
-      comp2tri[comp] = tri;
-      triArea[comp] = triArea[tri];
-    }
-  }
-
-  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
-             CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, precision_}));
-
-  Vec<TriRef>& triRef = meshRelation_.triRef;
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    const int referenceTri = comp2tri[components[tri]];
-    if (referenceTri >= 0) {
-      triRef[tri].tri = referenceTri;
-    }
-  }
 }
 
 /**
@@ -730,6 +531,64 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(VecView<const vec3> vertsIn,
     return collider_.Collisions<false, true>(vertsIn);
   else
     return collider_.Collisions<false, false>(vertsIn);
+}
+
+bool Manifold::Impl::Internal(int halfedge) const {
+  const Halfedge edge = halfedge_[halfedge];
+  const Halfedge pair = halfedge_[edge.pairedHalfedge];
+  const int edgeFace = halfedge / 3;
+  const int pairFace = edge.pairedHalfedge / 3;
+
+  if (meshRelation_.triRef[edgeFace].meshID !=
+      meshRelation_.triRef[pairFace].meshID)
+    return false;
+
+  const vec3 base = vertPos_[edge.startVert];
+  const int baseNum = halfedge - 3 * edgeFace;
+  const int jointNum = edge.pairedHalfedge - 3 * pairFace;
+
+  const ivec3 triProp0 = meshRelation_.triProperties[edgeFace];
+  const ivec3 triProp1 = meshRelation_.triProperties[pairFace];
+  if (triProp0[baseNum] != triProp1[Next3(jointNum)] ||
+      triProp0[Next3(baseNum)] != triProp1[jointNum])
+    return false;
+
+  const int edgeNum = Prev3(baseNum);
+  const int pairNum = Prev3(jointNum);
+  const vec3 jointVec = vertPos_[pair.startVert] - base;
+  const vec3 edgeVec =
+      vertPos_[halfedge_[3 * edgeFace + edgeNum].startVert] - base;
+  const vec3 pairVec =
+      vertPos_[halfedge_[3 * pairFace + pairNum].startVert] - base;
+
+  const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
+  const double lengthPair =
+      std::max(glm::length(jointVec), glm::length(pairVec));
+  vec3 normal = glm::cross(jointVec, edgeVec);
+  const double area = glm::length(normal);
+  const double areaPair = glm::length(glm::cross(pairVec, jointVec));
+  // Don't link degenerate triangles
+  // if (area < length * precision_ || areaPair < lengthPair *
+  // precision_)
+  //   return;
+
+  const double volume = std::abs(glm::dot(normal, pairVec));
+  // Only operate on coplanar triangles
+  return volume < std::max(area, areaPair) * precision_;
+}
+
+Vec<bool> Manifold::Impl::InternalEdges() const {
+  Vec<bool> edgeInternal(halfedge_.size(), false);
+  for_each_n(autoPolicy(halfedge_.size()), countAt(0), halfedge_.size(),
+             [this, &edgeInternal](size_t h) {
+               const Halfedge edge = halfedge_[h];
+               if (!edge.IsForward()) return;
+
+               const bool internal = Internal(h);
+               edgeInternal[h] = internal;
+               edgeInternal[edge.pairedHalfedge] = internal;
+             });
+  return edgeInternal;
 }
 
 }  // namespace manifold

@@ -246,7 +246,6 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces(const std::vector<double>& propertyTolerance = {});
   void RemoveUnreferencedVerts();
   void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triVerts);
@@ -261,6 +260,8 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const vec3> vertsIn,
                                   bool inverted = false) const;
+  bool Internal(int halfedge) const;
+  Vec<bool> InternalEdges() const;
 
   bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }
@@ -326,23 +327,24 @@ struct Manifold::Impl {
   Vec<Barycentric> Subdivide(std::function<int(vec3)>);
 
   // smoothing.cpp
-  bool IsInsideQuad(int halfedge) const;
+  bool IsInsideQuad(int halfedge, const Vec<bool>& internalEdges) const;
   bool IsMarkedInsideQuad(int halfedge) const;
   vec3 GetNormal(int halfedge, int normalIdx) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
-  Vec<bool> FlatFaces() const;
-  Vec<int> VertFlatFace(const Vec<bool>&) const;
+  Vec<bool> FlatFaces(const Vec<bool>& internalEdges) const;
+  Vec<int> VertFlatFace(const Vec<bool>&, const Vec<bool>& internalEdges) const;
   Vec<int> VertHalfedge() const;
   std::vector<Smoothness> SharpenEdges(double minSharpAngle,
                                        double minSmoothness) const;
   void SharpenTangent(int halfedge, double smoothness);
-  void SetNormals(int normalIdx, double minSharpAngle);
+  void SetNormals(int normalIdx, double minSharpAngle,
+                  const Vec<bool>& internalEdges);
   void LinearizeFlatTangents();
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
-  void CreateTangents(int normalIdx);
-  void CreateTangents(std::vector<Smoothness>);
+  void CreateTangents(int normalIdx, const Vec<bool>& internalEdges);
+  void CreateTangents(std::vector<Smoothness>, const Vec<bool>& internalEdges);
   void Refine(std::function<int(vec3)>);
 
   // quickhull.cpp

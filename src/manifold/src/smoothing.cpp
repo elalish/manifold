@@ -288,30 +288,21 @@ vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
  * defined by its two triangles referring to the same face, and those triangles
  * having no further face neighbors beyond.
  */
-bool Manifold::Impl::IsInsideQuad(int halfedge) const {
+bool Manifold::Impl::IsInsideQuad(int halfedge,
+                                  const Vec<bool>& internalEdges) const {
   if (halfedgeTangent_.size() > 0) {
     return halfedgeTangent_[halfedge].w < 0;
   }
-  const int tri = halfedge / 3;
-  const TriRef ref = meshRelation_.triRef[tri];
   const int pair = halfedge_[halfedge].pairedHalfedge;
-  const int pairTri = pair / 3;
-  const TriRef pairRef = meshRelation_.triRef[pairTri];
-  if (!ref.SameFace(pairRef)) return false;
-
-  auto SameFace = [this](int halfedge, const TriRef& ref) {
-    return ref.SameFace(
-        meshRelation_.triRef[halfedge_[halfedge].pairedHalfedge / 3]);
-  };
-
+  if (!internalEdges[halfedge]) return false;
   int neighbor = NextHalfedge(halfedge);
-  if (SameFace(neighbor, ref)) return false;
+  if (internalEdges[neighbor]) return false;
   neighbor = NextHalfedge(neighbor);
-  if (SameFace(neighbor, ref)) return false;
+  if (internalEdges[neighbor]) return false;
   neighbor = NextHalfedge(pair);
-  if (SameFace(neighbor, pairRef)) return false;
+  if (internalEdges[neighbor]) return false;
   neighbor = NextHalfedge(neighbor);
-  if (SameFace(neighbor, pairRef)) return false;
+  if (internalEdges[neighbor]) return false;
   return true;
 }
 
@@ -342,19 +333,17 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
 
 // Find faces containing at least 3 triangles - these will not have
 // interpolated normals - all their vert normals must match their face normal.
-Vec<bool> Manifold::Impl::FlatFaces() const {
+Vec<bool> Manifold::Impl::FlatFaces(const Vec<bool>& internalEdges) const {
   const int numTri = NumTri();
   Vec<bool> triIsFlatFace(numTri, false);
   for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri,
-             [this, &triIsFlatFace](const int tri) {
-               const TriRef& ref = meshRelation_.triRef[tri];
+             [this, &triIsFlatFace, &internalEdges](const int tri) {
                int faceNeighbors = 0;
                ivec3 faceTris = {-1, -1, -1};
                for (const int j : {0, 1, 2}) {
                  const int neighborTri =
                      halfedge_[3 * tri + j].pairedHalfedge / 3;
-                 const TriRef& jRef = meshRelation_.triRef[neighborTri];
-                 if (jRef.SameFace(ref)) {
+                 if (internalEdges[3 * tri + j]) {
                    ++faceNeighbors;
                    faceTris[j] = neighborTri;
                  }
@@ -374,15 +363,14 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
 // Returns a vector of length numVert that has a tri that is part of a
 // neighboring flat face if there is only one flat face. If there are none it
 // gets -1, and if there are more than one it gets -2.
-Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
+Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces,
+                                      const Vec<bool>& internalEdges) const {
   Vec<int> vertFlatFace(NumVert(), -1);
-  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1});
   for (size_t tri = 0; tri < NumTri(); ++tri) {
     if (flatFaces[tri]) {
       for (const int j : {0, 1, 2}) {
         const int vert = halfedge_[3 * tri + j].startVert;
-        if (vertRef[vert].SameFace(meshRelation_.triRef[tri])) continue;
-        vertRef[vert] = meshRelation_.triRef[tri];
+        if (internalEdges[3 * tri + j]) continue;
         vertFlatFace[vert] = vertFlatFace[vert] == -1 ? tri : -2;
       }
     }
@@ -433,15 +421,16 @@ void Manifold::Impl::SharpenTangent(int halfedge, double smoothness) {
  * does, this method fills in vertex properties, unshared across edges that
  * are bent more than minSharpAngle.
  */
-void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
+void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle,
+                                const Vec<bool>& internalEdges) {
   if (IsEmpty()) return;
   if (normalIdx < 0) return;
 
   const int oldNumProp = NumProp();
   const int numTri = NumTri();
 
-  Vec<bool> triIsFlatFace = FlatFaces();
-  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<bool> triIsFlatFace = FlatFaces(internalEdges);
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace, internalEdges);
   Vec<int> vertNumSharp(NumVert(), 0);
   for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
@@ -456,8 +445,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     } else {
       const bool faceSplit =
           triIsFlatFace[tri1] != triIsFlatFace[tri2] ||
-          (triIsFlatFace[tri1] && triIsFlatFace[tri2] &&
-           !meshRelation_.triRef[tri1].SameFace(meshRelation_.triRef[tri2]));
+          (triIsFlatFace[tri1] && triIsFlatFace[tri2] && !internalEdges[e]);
       if (vertFlatFace[halfedge_[e].startVert] == -2 && faceSplit) {
         ++vertNumSharp[halfedge_[e].startVert];
       }
@@ -525,8 +513,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           if (dihedral > minSharpAngle ||
               triIsFlatFace[face] != triIsFlatFace[prevFace] ||
               (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
-               !meshRelation_.triRef[face].SameFace(
-                   meshRelation_.triRef[prevFace]))) {
+               !internalEdges[current])) {
             break;
           }
           current = next;
@@ -543,8 +530,9 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         // calculate pseudo-normals between each sharp edge
         ForVert<FaceEdge>(
             endEdge,
-            [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
-              if (IsInsideQuad(current)) {
+            [this, centerPos, &vertNumSharp, &vertFlatFace,
+             &internalEdges](int current) {
+              if (IsInsideQuad(current, internalEdges)) {
                 return FaceEdge({current / 3, vec3(NAN)});
               }
               const int vert = halfedge_[current].endVert;
@@ -564,15 +552,14 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
               }
               return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
             },
-            [this, &triIsFlatFace, &normals, &group, minSharpAngle](
-                int current, const FaceEdge& here, FaceEdge& next) {
+            [this, &triIsFlatFace, &normals, &group, &internalEdges,
+             minSharpAngle](int current, const FaceEdge& here, FaceEdge& next) {
               const double dihedral = glm::degrees(std::acos(
                   glm::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
                   triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
                   (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
-                   !meshRelation_.triRef[here.face].SameFace(
-                       meshRelation_.triRef[next.face]))) {
+                   !internalEdges[current])) {
                 normals.push_back(vec3(0));
               }
               group.push_back(normals.size() - 1);
@@ -765,7 +752,8 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
  * discontinuities in the normals, the tangent vectors are zero-length, allowing
  * the shape to form a sharp corner with minimal oscillation.
  */
-void Manifold::Impl::CreateTangents(int normalIdx) {
+void Manifold::Impl::CreateTangents(int normalIdx,
+                                    const Vec<bool>& internalEdges) {
   ZoneScoped;
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
@@ -776,7 +764,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
       autoPolicy(numVert, 1e4), vertHalfedge.begin(), numVert,
-      [this, &tangent, &fixedHalfedge, normalIdx](int e) {
+      [this, &tangent, &fixedHalfedge, &internalEdges, normalIdx](int e) {
         struct FlatNormal {
           bool isFlatFace;
           vec3 normal;
@@ -792,9 +780,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               return FlatNormal(
                   {glm::dot(diff, diff) < kTolerance * kTolerance, normal});
             },
-            [&faceEdges, &tangent, &fixedHalfedge, this](
+            [&faceEdges, &tangent, &fixedHalfedge, &internalEdges, this](
                 int halfedge, const FlatNormal& here, const FlatNormal& next) {
-              if (IsInsideQuad(halfedge)) {
+              if (IsInsideQuad(halfedge, internalEdges)) {
                 tangent[halfedge] = {0, 0, 0, -1};
                 return;
               }
@@ -850,7 +838,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
  * curvature there, while the tangents of the sharp edges themselves are aligned
  * for continuity.
  */
-void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
+void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
+                                    const Vec<bool>& internalEdges) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(0);
@@ -858,8 +847,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
   Vec<int> vertHalfedge = VertHalfedge();
-  Vec<bool> triIsFlatFace = FlatFaces();
-  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<bool> triIsFlatFace = FlatFaces(internalEdges);
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace, internalEdges);
   Vec<vec3> vertNormal = vertNormal_;
   for (size_t v = 0; v < NumVert(); ++v) {
     if (vertFlatFace[v] >= 0) {
@@ -868,9 +857,9 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   }
 
   for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
-             [&tangent, &vertNormal, this](const int edgeIdx) {
+             [&tangent, &vertNormal, &internalEdges, this](const int edgeIdx) {
                tangent[edgeIdx] =
-                   IsInsideQuad(edgeIdx)
+                   IsInsideQuad(edgeIdx, internalEdges)
                        ? vec4(0, 0, 0, -1)
                        : TangentFromNormal(
                              vertNormal[halfedge_[edgeIdx].startVert], edgeIdx);
@@ -883,8 +872,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     if (!triIsFlatFace[tri]) continue;
     for (const int j : {0, 1, 2}) {
       const int tri2 = halfedge_[3 * tri + j].pairedHalfedge / 3;
-      if (!triIsFlatFace[tri2] ||
-          !meshRelation_.triRef[tri].SameFace(meshRelation_.triRef[tri2])) {
+      if (!triIsFlatFace[tri2] || !internalEdges[3 * tri + j]) {
         sharpenedEdges.push_back({3 * tri + j, 0});
       }
     }

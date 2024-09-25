@@ -58,27 +58,6 @@ struct ShortEdge {
   }
 };
 
-struct FlagEdge {
-  VecView<const Halfedge> halfedge;
-  VecView<const TriRef> triRef;
-
-  bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
-    // Flag redundant edges - those where the startVert is surrounded by only
-    // two original triangles.
-    const TriRef ref0 = triRef[edge / 3];
-    int current = NextHalfedge(halfedge[edge].pairedHalfedge);
-    const TriRef ref1 = triRef[current / 3];
-    while (current != edge) {
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-      int tri = current / 3;
-      const TriRef ref = triRef[tri];
-      if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) return false;
-    }
-    return true;
-  }
-};
-
 struct SwappableEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
@@ -228,10 +207,19 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     ZoneScopedN("CollapseFlaggedEdge");
+    const Vec<bool> internalEdges = InternalEdges();
     numFlagged = 0;
-    FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bFlags[i] = se(i); });
+               [this, &internalEdges, &bFlags](size_t edge) {
+                 if (halfedge_[edge].pairedHalfedge < 0) return;
+                 // Flag redundant edges - those where the startVert is
+                 // surrounded by only two original triangles.
+                 int numExternal = 0;
+                 ForVert(edge, [&numExternal, &internalEdges](int current) {
+                   numExternal += internalEdges[current] ? 0 : 1;
+                 });
+                 bFlags[edge] = numExternal < 3;
+               });
     for (size_t i = 0; i < nbEdges; ++i) {
       if (bFlags[i]) {
         CollapseEdge(i, scratchBuffer);
@@ -487,6 +475,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
+    int numInternal = 0;
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
       vec3 pNext = vertPos_[halfedge_[current].endVert];
@@ -495,18 +484,13 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       const mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if (!ref.SameFace(refCheck)) {
-        refCheck = triRef[edge / 3];
-        if (!ref.SameFace(refCheck)) {
-          return;
-        } else {
-          // Don't collapse if the edges separating the faces are not colinear
-          // (can happen when the two faces are coplanar).
-          if (CCW(projection * pOld, projection * pLast, projection * pNew,
-                  precision_) != 0)
-            return;
-        }
-      }
+      numInternal += Internal(current) ? 1 : 0;
+      if (numInternal > 2) return;
+      // Don't collapse if the edges separating the faces are not colinear
+      // (can happen when the two faces are coplanar).
+      if (CCW(projection * pOld, projection * pLast, projection * pNew,
+              precision_) != 0)
+        return;
 
       // Don't collapse edge if it would cause a triangle to invert.
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
@@ -535,9 +519,9 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
-      if (triRef[tri].SameFace(triRef[tri0])) {
+      if (triProp[tri][vIdx] == triProp[tri0][Prev3(triVert0)]) {
         triProp[tri][vIdx] = triProp[tri0][triVert0];
-      } else if (triRef[tri].SameFace(triRef[tri1])) {
+      } else if (triProp[tri][vIdx] == triProp[tri1][Next3(triVert1)]) {
         triProp[tri][vIdx] = triProp[tri1][triVert1];
       }
     }
