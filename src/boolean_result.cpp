@@ -671,11 +671,22 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
   if (inP_.IsEmpty()) {
+    if (inP_.status_ != Manifold::Error::NoError ||
+        inQ_.status_ != Manifold::Error::NoError) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::InvalidConstruction;
+      return impl;
+    }
     if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
   } else if (inQ_.IsEmpty()) {
+    if (inQ_.status_ != Manifold::Error::NoError) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::InvalidConstruction;
+      return impl;
+    }
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }

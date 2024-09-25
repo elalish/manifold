@@ -239,7 +239,7 @@ TEST(Smooth, Csaszar) {
     options.mat.vertColor.resize(csaszar.NumVert());
     const vec4 blue(0, 0, 1, 1);
     const vec4 yellow(1, 1, 0, 1);
-    for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
+    for (size_t tri = 0; tri < csaszar.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
         const vec3& uvw = {0.5, 0.5, 0.0};
         const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
