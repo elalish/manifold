@@ -235,7 +235,7 @@ void Manifold::Impl::Finish() {
     return std::min(a, b) < 0 ? -1 : std::max(a, b);
   };
   int face = 0;
-  Halfedge extrema = {0, 0, 0, 0};
+  Halfedge extrema = {0, 0, 0};
   for (size_t i = 0; i < halfedge_.size(); i++) {
     Halfedge e = halfedge_[i];
     if (!e.IsForward()) std::swap(e.startVert, e.endVert);
