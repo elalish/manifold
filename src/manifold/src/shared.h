@@ -47,6 +47,9 @@ inline int NextHalfedge(int current) {
 struct HalfedgeIndex {
   int ix;
 
+  // For now, implicit conversion from int
+  HalfedgeIndex(int ix) : ix(ix) {}
+
   bool operator==(const HalfedgeIndex& rhs) const { return ix == rhs.ix; }
   bool operator!=(const HalfedgeIndex& rhs) const { return ix != rhs.ix; }
   HalfedgeIndex operator+(int rhs) const { return {ix + rhs}; }
