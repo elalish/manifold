@@ -23,7 +23,7 @@ using namespace manifold;
 namespace {
 
 // These two functions (Interpolate and Intersect) are the only places where
-// doubleing-point operations take place in the whole Boolean function. These
+// floating-point operations take place in the whole Boolean function. These
 // are carefully designed to minimize rounding error and to eliminate it at edge
 // cases to ensure consistency.
 
