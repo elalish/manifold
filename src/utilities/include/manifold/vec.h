@@ -28,7 +28,7 @@ namespace manifold {
 /** @addtogroup Private
  *  @{
  */
-template <typename T>
+template <typename T, typename Ix = size_t>
 class Vec;
 
 /*
@@ -39,8 +39,8 @@ class Vec;
  * implementation that did not consider things like non-trivial
  * constructor/destructor, please keep T trivial.
  */
-template <typename T>
-class Vec : public VecView<T> {
+template <typename T, typename Ix>
+class Vec : public VecView<T, Ix> {
  public:
   Vec() {}
 
