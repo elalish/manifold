@@ -51,12 +51,12 @@ class VecView {
   operator VecView<const T>() const { return {ptr_, size_}; }
 
   inline const T &operator[](Ix i) const {
-    ASSERT(i < size_, std::out_of_range("Vec out of range"));
+    ASSERT(GetIndex(i) < size_, std::out_of_range("Vec out of range"));
     return ptr_[GetIndex(i)];
   }
 
   inline T &operator[](Ix i) {
-    ASSERT(i < size_, std::out_of_range("Vec out of range"));
+    ASSERT(GetIndex(i) < size_, std::out_of_range("Vec out of range"));
     return ptr_[GetIndex(i)];
   }
 
