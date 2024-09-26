@@ -19,11 +19,16 @@
 namespace manifold {
 
 /**
+ * Override this for a custom index type. e.g. HalfedgeIndex
+ */
+inline size_t GetIndex(size_t x) { return x; }
+
+/**
  * View for Vec, can perform offset operation.
  * This will be invalidated when the original vector is dropped or changes
  * length. Roughly equivalent to std::span<T> from c++20
  */
-template <typename T>
+template <typename T, typename Ix = size_t>
 class VecView {
  public:
   using Iter = T *;
@@ -45,14 +50,14 @@ class VecView {
   // allows conversion to a const VecView
   operator VecView<const T>() const { return {ptr_, size_}; }
 
-  inline const T &operator[](size_t i) const {
+  inline const T &operator[](Ix i) const {
     ASSERT(i < size_, std::out_of_range("Vec out of range"));
-    return ptr_[i];
+    return ptr_[GetIndex(i)];
   }
 
-  inline T &operator[](size_t i) {
+  inline T &operator[](Ix i) {
     ASSERT(i < size_, std::out_of_range("Vec out of range"));
-    return ptr_[i];
+    return ptr_[GetIndex(i)];
   }
 
   IterC cbegin() const { return ptr_; }
