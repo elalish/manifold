@@ -49,10 +49,24 @@ struct HalfedgeIndex {
 
   // For now, implicit conversion from int
   HalfedgeIndex(int ix) : ix(ix) {}
+  HalfedgeIndex(const HalfedgeIndex& other) : ix(other.ix) {}
+  HalfedgeIndex() : ix(-1) {}
 
   bool operator==(const HalfedgeIndex& rhs) const { return ix == rhs.ix; }
+  bool operator==(int rhs) const { return ix == rhs; }
   bool operator!=(const HalfedgeIndex& rhs) const { return ix != rhs.ix; }
+  bool operator!=(int rhs) const { return ix != rhs; }
   HalfedgeIndex operator+(int rhs) const { return {ix + rhs}; }
+  HalfedgeIndex operator+=(int rhs) {
+    ix += rhs;
+    return *this;
+  }
+  HalfedgeIndex operator/(int rhs) const {
+    DEBUG_ASSERT(rhs == 3, logicErr, "Not dividing face index by 3");
+    return {ix / rhs};
+  }
+
+  operator int() const { return ix; }
 
   // Index of next halfedge about the triangle.
   HalfedgeIndex Next() const {
@@ -61,6 +75,9 @@ struct HalfedgeIndex {
     if (current.ix % 3 == 0) current.ix -= 3;
     return current;
   }
+
+  bool IsNull() const { return ix == -1; }
+  bool IsNotNull() const { return ix != -1; }
 };
 
 inline size_t GetIndex(HalfedgeIndex ix) { return ix.ix; }
