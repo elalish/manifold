@@ -376,7 +376,7 @@ void AppendNewEdges(
     Vec<TriRef> &halfedgeRef, const Vec<int> &facePQ2R, const int numFaceP) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  Vec<Halfedge> &halfedgeR = outR.halfedge_;
+  auto &halfedgeR = outR.halfedge_;
   Vec<vec3> &vertPosR = outR.vertPos_;
 
   for (auto &value : edgesNew) {
