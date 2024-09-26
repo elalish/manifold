@@ -193,7 +193,7 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
 
   i = 0;
   for (const auto& halfEdge : builderObject.halfedges) {
-    if (halfEdge.pairedHalfedge != -1) {
+    if (halfEdge.pairedHalfedge.IsNotNull()) {
       halfedges.push_back({halfEdge.endVert, halfEdge.pairedHalfedge,
                            builderObject.halfedgeToFace[i]});
       halfedgeToFace.push_back(builderObject.halfedgeToFace[i]);

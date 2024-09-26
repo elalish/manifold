@@ -81,7 +81,7 @@ struct CopyFaceEdges {
       const int q1 = 3 * q2 + j;
       const Halfedge edge = halfedgesQ[q1];
       int a = pX;
-      int b = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      int b = edge.IsForward() ? q1 : edge.pairedHalfedge.ix;
       if (inverted) std::swap(a, b);
       pXq1.Set(idx + static_cast<size_t>(j), a, b);
     }
@@ -302,7 +302,7 @@ struct Kernel02 {
     for (const int i : {0, 1, 2}) {
       const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgeQ[q1];
-      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge.ix;
 
       if (!forward) {
         const int qVert = halfedgeQ[q1F].startVert;
@@ -416,7 +416,7 @@ struct Kernel12 {
     for (const int i : {0, 1, 2}) {
       const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
-      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge.ix;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
       const size_t idx = monobound_quaternary_search(p1q1, key);

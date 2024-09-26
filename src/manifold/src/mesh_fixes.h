@@ -29,7 +29,7 @@ struct TransformTangents {
 
   void operator()(const int edgeOut) {
     const int edgeIn =
-        invert ? halfedge[FlipHalfedge(edgeOut)].pairedHalfedge : edgeOut;
+        invert ? halfedge[FlipHalfedge(edgeOut)].pairedHalfedge.ix : edgeOut;
     tangent[edgeOut + edgeOffset] =
         vec4(transform * vec3(oldTangents[edgeIn]), oldTangents[edgeIn].w);
   }
