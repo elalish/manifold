@@ -440,9 +440,7 @@ struct DuplicateHalfedges {
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
-      int tmp = halfedge.startVert;
-      halfedge.startVert = halfedge.endVert;
-      halfedge.endVert = tmp;
+      std::swap(halfedge.startVert, halfedge.endVert);
     }
     halfedge.startVert = vP2R[halfedge.startVert];
     halfedge.endVert = vP2R[halfedge.endVert];
