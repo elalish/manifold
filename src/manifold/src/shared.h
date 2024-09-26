@@ -53,6 +53,14 @@ struct HalfedgeIndex {
   bool operator==(const HalfedgeIndex& rhs) const { return ix == rhs.ix; }
   bool operator!=(const HalfedgeIndex& rhs) const { return ix != rhs.ix; }
   HalfedgeIndex operator+(int rhs) const { return {ix + rhs}; }
+
+  // Index of next halfedge about the triangle.
+  HalfedgeIndex Next() const {
+    HalfedgeIndex current = *this;
+    ++current.ix;
+    if (current.ix % 3 == 0) current.ix -= 3;
+    return current;
+  }
 };
 
 inline size_t GetIndex(HalfedgeIndex ix) { return ix.ix; }
