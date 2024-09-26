@@ -302,9 +302,9 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  Vec<Halfedge> &halfedgeR = outR.halfedge_;
+  auto &halfedgeR = outR.halfedge_;
   const Vec<vec3> &vertPosP = inP.vertPos_;
-  const Vec<Halfedge> &halfedgeP = inP.halfedge_;
+  const auto &halfedgeP = inP.halfedge_;
 
   for (auto &value : edgesP) {
     const int edgeP = value.first;
