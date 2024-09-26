@@ -117,6 +117,16 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
 }
 
 /**
+ * @brief Type-safety for half-edge indices.
+ *
+ */
+struct HalfedgeIndex {
+  int ix;
+};
+
+inline size_t GetIndex(HalfedgeIndex ix) { return ix.ix; }
+
+/**
  * The fundamental component of the halfedge data structure used for storing and
  * operating on the Manifold.
  */
