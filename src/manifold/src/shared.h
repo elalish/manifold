@@ -40,6 +40,27 @@ inline int NextHalfedge(int current) {
   return current;
 }
 
+/**
+ * @brief Type-safety for half-edge indices.
+ *
+ */
+struct HalfedgeIndex {
+  int ix;
+
+  bool operator==(const HalfedgeIndex& rhs) const { return ix == rhs.ix; }
+  bool operator!=(const HalfedgeIndex& rhs) const { return ix != rhs.ix; }
+  HalfedgeIndex operator+(int rhs) const { return {ix + rhs}; }
+};
+
+inline size_t GetIndex(HalfedgeIndex ix) { return ix.ix; }
+
+// XXX: should be a member function on HalfedgeIndex
+inline HalfedgeIndex NextHalfedge(HalfedgeIndex current) {
+  ++current.ix;
+  if (current.ix % 3 == 0) current.ix -= 3;
+  return current;
+}
+
 inline mat3 NormalTransform(const mat4x3& transform) {
   return glm::inverse(glm::transpose(mat3(transform)));
 }
@@ -115,16 +136,6 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
     return uvw;
   }
 }
-
-/**
- * @brief Type-safety for half-edge indices.
- *
- */
-struct HalfedgeIndex {
-  int ix;
-};
-
-inline size_t GetIndex(HalfedgeIndex ix) { return ix.ix; }
 
 /**
  * The fundamental component of the halfedge data structure used for storing and
