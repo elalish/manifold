@@ -286,7 +286,7 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
   for (size_t i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
+    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1});
   return edges;
 }
 
@@ -440,9 +440,7 @@ struct DuplicateHalfedges {
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
-      int tmp = halfedge.startVert;
-      halfedge.startVert = halfedge.endVert;
-      halfedge.endVert = tmp;
+      std::swap(halfedge.startVert, halfedge.endVert);
     }
     halfedge.startVert = vP2R[halfedge.startVert];
     halfedge.endVert = vP2R[halfedge.endVert];
@@ -463,7 +461,7 @@ struct DuplicateHalfedges {
 
       halfedgesR[forwardEdge] = halfedge;
       halfedgesR[backwardEdge] = {halfedge.endVert, halfedge.startVert,
-                                  forwardEdge, faceRight};
+                                  forwardEdge};
       halfedgeRef[forwardEdge] = forwardRef;
       halfedgeRef[backwardEdge] = backwardRef;
 
