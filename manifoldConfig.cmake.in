@@ -1,6 +1,19 @@
+# Compute the installation prefix relative to this file, so
+# we can have the subsequent find_package calls first check
+# for bundled dependencies.
+get_filename_component(_FIND_ROOT "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+if(_FIND_ROOT STREQUAL "/")
+  set(_FIND_ROOT "")
+endif()
+
+set(glm_ROOT "${_FIND_ROOT}")
 find_package(glm REQUIRED)
 set(MANIFOLD_CROSS_SECTION "@MANIFOLD_CROSS_SECTION@")
 if(MANIFOLD_CROSS_SECTION)
+	set(Clipper2_ROOT "${_FIND_ROOT}")
 	find_package(Clipper2 REQUIRED)
 endif()
 set(MANIFOLD_PAR "@MANIFOLD_PAR@")
