@@ -41,8 +41,8 @@ option(MANIFOLD_POLYGON "Build Polygon support" ON)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
-cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "MANIFOLD_CROSS_SECTION;EMSCRIPTEN" OFF)
-cmake_dependent_option(MANIFOLD_PYBIND "Build python bindings" OFF "MANIFOLD_CROSS_SECTION" OFF)
+option(MANIFOLD_PYBIND "Build python bindings" OFF)
+cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "EMSCRIPTEN" OFF)
 
 # Set some option values in the CMake cache
 if(NOT MANIFOLD_FLAGS)
