@@ -75,7 +75,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     )
 endif()
 
-target_link_libraries(manifold3d PRIVATE manifold polygon cross_section)
+target_link_libraries(manifold3d PRIVATE manifold)
 target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
 target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
@@ -83,12 +83,12 @@ set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 message(Python_EXECUTABLE = ${Python_EXECUTABLE})
 # ideally we should generate a dependency file from python...
 set(DOCSTRING_DEPS
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/manifold.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/constructors.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/sort.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cross_section/src/cross_section.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/polygon/src/polygon.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/manifold/common.h
+  ${CMAKE_SOURCE_DIR}/src/manifold.cpp
+  ${CMAKE_SOURCE_DIR}/src/constructors.cpp
+  ${CMAKE_SOURCE_DIR}/src/sort.cpp
+  ${CMAKE_SOURCE_DIR}/src/cross_section.cpp
+  ${CMAKE_SOURCE_DIR}/src/polygon.cpp
+  ${CMAKE_SOURCE_DIR}/include/manifold/common.h
   )
 add_custom_command(
   OUTPUT autogen_docstrings.inl
