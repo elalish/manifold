@@ -58,6 +58,14 @@ set(MANIFOLD_C_BINDING_SRCS
 list(APPEND MANIFOLD_SRCS ${MANIFOLD_C_BINDING_SRCS})
 
 if(MANIFOLD_CROSS_SECTION)
+	if (NOT Clipper2_FOUND)
+		set(CLIPPER2_SRCS
+			other/Clipper2/src/clipper.engine.cpp
+			other/Clipper2/src/clipper.offset.cpp
+			other/Clipper2/src/clipper.rectclip.cpp
+			)
+		list(APPEND MANIFOLD_SRCS ${CLIPPER2_SRCS})
+	endif()
 	list(APPEND MANIFOLD_SRCS cross_section.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/cross_section.h)
 endif()
@@ -72,21 +80,29 @@ if(MANIFOLD_POLYGON)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/polygon.h)
 endif()
 
+#Include directories
+set(MANIFOLD_INCLUDE_DIRS
+	${CMAKE_SOURCE_DIR}/include
+	)
+
 # Dependency libraries
 set(MANIFOLD_LIBS glm::glm)
+
 if(MANIFOLD_CROSS_SECTION)
 	if(TARGET Clipper2::Clipper2)
 		list(APPEND MANIFOLD_LIBS Clipper2::Clipper2)
 	else()
-		list(APPEND MANIFOLD_LIBS Clipper2)
+		list(APPEND MANIFOLD_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/other/Clipper2/include)
 	endif()
 endif()
+
 if(MANIFOLD_PAR STREQUAL "TBB")
 	if (NOT APPLE)
 		if(TARGET TBB::tbb)
 			list(APPEND MANIFOLD_LIBS TBB::tbb)
 		else()
 			list(APPEND MANIFOLD_LIBS ${TBB_LINK_LIBRARIES})
+			list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
 		endif()
 	else()
 		if(oneDPL_FOUND)
@@ -95,14 +111,6 @@ if(MANIFOLD_PAR STREQUAL "TBB")
 			message(WARNING "oneDPL not found, sequential implementation is used instead")
 		endif()
 	endif()
-endif()
-
-#Include directories
-set(MANIFOLD_INCLUDE_DIRS
-	${CMAKE_SOURCE_DIR}/include
-	)
-if(TBB_INCLUDE_DIRS)
-	list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
 endif()
 
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
@@ -119,6 +127,9 @@ target_include_directories(manifold
 	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
 	PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 	)
+if(MANIFOLD_CROSS_SECTION)
+	target_compile_definitions(manifold PUBLIC CLIPPER2_MAX_DECIMAL_PRECISION=8)
+endif()
 if(MANIFOLD_EXCEPTIONS)
 	target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
 endif()
