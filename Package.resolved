@@ -1,5 +1,5 @@
 {
-  "originHash" : "901e0bae4da1f7f4fbef3b93426983bda80047d658efcd9730e185ce553af2aa",
+  "originHash" : "3e2f64f29576d5c20d33a6b24091e7d829288ea5ac3d2f3c511a81a1b60bbab2",
   "pins" : [
     {
       "identity" : "clipper2",
@@ -20,12 +20,12 @@
       }
     },
     {
-      "identity" : "onetbb",
+      "identity" : "tbb-spm",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/audulus/oneTBB",
+      "location" : "https://github.com/audulus/tbb-spm",
       "state" : {
-        "branch" : "spm",
-        "revision" : "b597dfb31989aff7cf981d5872f504c7b4c4d13a"
+        "branch" : "main",
+        "revision" : "5b7e50f890cbe03f1fa9cc1e6b1606cf1c347d2b"
       }
     }
   ],

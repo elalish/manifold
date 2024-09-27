@@ -14,12 +14,12 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/audulus/glm", branch: "spm"),
         .package(url: "https://github.com/audulus/Clipper2", branch: "spm"),
-        .package(url: "https://github.com/audulus/oneTBB", branch: "spm"),
+        .package(url: "https://github.com/audulus/tbb-spm", branch: "main"),
     ],
     targets: [
         .target(
             name: "manifold",
-            dependencies: ["glm", "Clipper2", "oneTBB"],
+            dependencies: ["glm", "Clipper2", .product(name: "tbb", package: "tbb-spm")],
             path: "src",
             publicHeadersPath: "include",
             cxxSettings: [
