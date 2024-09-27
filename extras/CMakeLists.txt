@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(extras)
+if(NOT MANIFOLD_TEST)
+	return()
+endif()
 
 add_executable(perfTest perf_test.cpp)
 target_link_libraries(perfTest manifold)
@@ -60,3 +62,4 @@ if(BUILD_TEST_CGAL)
     target_compile_options(testHullPerformance PRIVATE ${MANIFOLD_FLAGS})
     target_compile_features(testHullPerformance PUBLIC cxx_std_17)
 endif()
+

@@ -17,7 +17,7 @@
 #include <atomic>
 
 #include "manifold/common.h"
-#include "manifold/vec.h"
+#include "./vec.h"
 
 namespace {
 typedef unsigned long long int Uint64;

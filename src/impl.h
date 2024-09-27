@@ -15,13 +15,13 @@
 #pragma once
 #include <map>
 
-#include "manifold/collider.h"
+#include "./collider.h"
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 #include "manifold/polygon.h"
-#include "manifold/sparse.h"
-#include "manifold/utils.h"
-#include "manifold/vec.h"
+#include "./sparse.h"
+#include "./utils.h"
+#include "./vec.h"
 #include "quickhull.h"
 #include "shared.h"
 

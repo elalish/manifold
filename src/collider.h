@@ -15,9 +15,9 @@
 #pragma once
 #include "manifold/common.h"
 #include "manifold/parallel.h"
-#include "manifold/sparse.h"
-#include "manifold/utils.h"
-#include "manifold/vec.h"
+#include "./sparse.h"
+#include "./utils.h"
+#include "./vec.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>

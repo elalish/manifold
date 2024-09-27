@@ -18,9 +18,9 @@
 #include <atomic>
 #include <map>
 
-#include "manifold/hashtable.h"
+#include "./hashtable.h"
 #include "manifold/parallel.h"
-#include "manifold/svd.h"
+#include "./svd.h"
 #include "mesh_fixes.h"
 
 namespace {

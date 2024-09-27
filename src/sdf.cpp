@@ -15,11 +15,11 @@
 #include <glm/gtc/integer.hpp>
 
 #include "impl.h"
-#include "manifold/hashtable.h"
+#include "./hashtable.h"
 #include "manifold/manifold.h"
 #include "manifold/parallel.h"
-#include "manifold/utils.h"
-#include "manifold/vec.h"
+#include "./utils.h"
+#include "./vec.h"
 
 namespace {
 using namespace manifold;

@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(samples)
+if (NOT MANIFOLD_TEST)
+	return()
+endif()
 
 add_library(samples src/menger_sponge.cpp
     src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp
@@ -22,12 +24,12 @@ if(MANIFOLD_CROSS_SECTION)
 endif()
 
 target_include_directories(samples
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(samples PUBLIC manifold)
 if(MANIFOLD_CROSS_SECTION)
-  target_link_libraries(${PROJECT_NAME} PUBLIC cross_section)
+  target_link_libraries(samples PUBLIC cross_section)
 endif()
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})

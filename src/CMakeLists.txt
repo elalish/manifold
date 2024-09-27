@@ -12,148 +12,120 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(utilities INTERFACE)
-message("Parallel Backend: ${MANIFOLD_PAR}")
+# For private headers
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
-include(FetchContent)
-if (TRACY_ENABLE)
-    include(FetchContent)
-    FetchContent_Declare(tracy
-        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-        GIT_TAG v0.10
-        GIT_SHALLOW TRUE
-        GIT_PROGRESS TRUE
-    )
-    FetchContent_MakeAvailable(tracy)
-    target_link_libraries(utilities INTERFACE TracyClient)
-endif()
-
-if(MANIFOLD_PAR STREQUAL "TBB")
-    target_compile_options(utilities INTERFACE -DMANIFOLD_PAR='T')
-    if(TARGET TBB::tbb)
-        target_link_libraries(utilities INTERFACE TBB::tbb)
-    else()
-        target_include_directories(utilities INTERFACE $<BUILD_INTERFACE:${TBB_INCLUDE_DIRS}>)
-        target_link_libraries(utilities INTERFACE ${TBB_LINK_LIBRARIES})
-    endif()
-    if(APPLE)
-        if(oneDPL_FOUND)
-            target_link_libraries(utilities INTERFACE oneDPL)
-        else()
-            message(WARNING "oneDPL not found, sequential implementation is used instead")
-        endif()
-    endif()
-elseif(MANIFOLD_PAR STREQUAL "NONE")
-    set(MANIFOLD_PAR "CPP")
-else()
-    message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
-        "Should be \"TBB\" or \"NONE\"")
-endif()
-
-target_include_directories(utilities INTERFACE
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(utilities INTERFACE glm::glm)
-
-if(MANIFOLD_EXCEPTIONS)
-    target_compile_options(utilities INTERFACE
-        -DMANIFOLD_EXCEPTIONS=1
-    )
-endif()
-
-if(MANIFOLD_DEBUG)
-    target_compile_options(utilities
-        INTERFACE -DMANIFOLD_DEBUG)
-endif()
-
-target_compile_features(utilities INTERFACE cxx_std_17)
-
-install(TARGETS utilities EXPORT manifoldTargets)
-
-add_library(collider INTERFACE)
-target_include_directories(collider INTERFACE
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(collider INTERFACE utilities)
-target_compile_options(collider INTERFACE ${MANIFOLD_FLAGS})
-target_compile_features(collider INTERFACE cxx_std_17)
-
-
+set(MANIFOLD_SRCS
+	boolean3.cpp
+	boolean_result.cpp
+	constructors.cpp
+	csg_tree.cpp
+	edge_op.cpp
+	face_op.cpp
+	impl.cpp
+	manifold.cpp
+	properties.cpp
+	quickhull.cpp
+	sdf.cpp
+	smoothing.cpp
+	sort.cpp
+	subdivision.cpp
+	)
+set(MANIFOLD_PRIVATE_HDRS
+	boolean3.h
+	collider.h
+	csg_tree.h
+	hashtable.h
+	impl.h
+	mesh_fixes.h
+	quickhull.h
+	shared.h
+	sparse.h
+	svd.h
+	utils.h
+	vec.h
+	)
 if(MANIFOLD_CROSS_SECTION)
-	file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-	add_library(cross_section ${SOURCE_FILES})
-	target_include_directories(cross_section PUBLIC
-		$<INSTALL_INTERFACE:include>
-		$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+	list(APPEND MANIFOLD_SRCS cross_section.cpp)
+	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/cross_section.h)
+endif()
+if(MANIFOLD_EXPORT)
+	list(APPEND MANIFOLD_SRCS meshIO.cpp)
+	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/meshIO.h)
+endif()
+if(MANIFOLD_POLYGON)
+	list(APPEND MANIFOLD_SRCS polygon.cpp)
+	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/polygon.h)
+endif()
 
+# Dependency libraries
+set(MANIFOLD_LIBS glm::glm)
+if(MANIFOLD_CROSS_SECTION)
 	if(TARGET Clipper2::Clipper2)
-		target_link_libraries(cross_section
-			PUBLIC utilities
-			PRIVATE Clipper2::Clipper2)
+		list(APPEND MANIFOLD_LIBS Clipper2::Clipper2)
 	else()
-		target_link_libraries(cross_section
-			PUBLIC utilities
-			PRIVATE Clipper2)
+		list(APPEND MANIFOLD_LIBS Clipper2)
 	endif()
-
-	target_compile_options(cross_section PRIVATE ${MANIFOLD_FLAGS})
-	target_compile_features(cross_section PUBLIC cxx_std_17)
-
-	install(TARGETS cross_section EXPORT manifoldTargets)
+endif()
+if(MANIFOLD_PAR STREQUAL "TBB")
+	if (NOT APPLE)
+		if(TARGET TBB::tbb)
+			list(APPEND MANIFOLD_LIBS TBB::tbb)
+		else()
+			list(APPEND MANIFOLD_LIBS ${TBB_LINK_LIBRARIES})
+		endif()
+	else()
+		if(oneDPL_FOUND)
+			list(APPEND MANIFOLD_LIBS oneDPL)
+		else()
+			message(WARNING "oneDPL not found, sequential implementation is used instead")
+		endif()
+	endif()
 endif()
 
-
-if (MANIFOLD_POLYGON)
-	file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-	add_library(polygon ${SOURCE_FILES})
-	target_include_directories(polygon PUBLIC
-		$<INSTALL_INTERFACE:include>
-		$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-	target_link_libraries(polygon 
-		PUBLIC utilities 
-		PRIVATE $<BUILD_INTERFACE:collider>
-		)
-
-	target_compile_options(polygon PRIVATE ${MANIFOLD_FLAGS})
-	target_compile_features(polygon PUBLIC cxx_std_17)
-
-	install(TARGETS polygon EXPORT manifoldTargets)
+#Include directories
+set(MANIFOLD_INCLUDE_DIRS
+	${CMAKE_SOURCE_DIR}/include
+	)
+if(TBB_INCLUDE_DIRS)
+	list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
 endif()
 
-
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(manifold ${SOURCE_FILES})
-
-target_include_directories(manifold PUBLIC
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(manifold
-    PUBLIC utilities
-    PRIVATE $<BUILD_INTERFACE:collider> polygon ${MANIFOLD_INCLUDE}
-)
-
+add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
+set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
+set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
+target_link_libraries(manifold PRIVATE ${MANIFOLD_LIBS})
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
-
-target_compile_features(manifold
-    PUBLIC cxx_std_17
-)
+target_include_directories(manifold PRIVATE ${MANIFOLD_INCLUDE_DIRS})
+if(MANIFOLD_EXCEPTIONS)
+	target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
+endif()
+if(MANIFOLD_DEBUG)
+	target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)
+endif()
+if(MANIFOLD_EXPORT)
+	target_link_libraries(meshIO PRIVATE assimp::assimp)
+endif()
+target_compile_features(manifold PUBLIC cxx_std_17)
+if(MANIFOLD_PAR STREQUAL "TBB")
+	target_compile_options(manifold INTERFACE -DMANIFOLD_PAR='T')
+endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
 
-if (MANIFOLD_EXPORT)
-	add_library(meshIO src/meshIO.cpp)
-
-	target_include_directories(meshIO PUBLIC
-		$<INSTALL_INTERFACE:include>
-		$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-
-	target_link_libraries(meshIO
-		PUBLIC manifold
-		PRIVATE assimp::assimp
-		)
-
-	target_compile_options(meshIO PRIVATE ${MANIFOLD_FLAGS})
-	target_compile_features(meshIO PUBLIC cxx_std_17)
-
-	install(TARGETS meshIO EXPORT manifoldTargets)
+# Tracy Support
+if (MANIFOLD_DOWNLOADS)
+	include(FetchContent)
+	if (TRACY_ENABLE)
+		include(FetchContent)
+		FetchContent_Declare(tracy
+			GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+			GIT_TAG v0.10
+			GIT_SHALLOW TRUE
+			GIT_PROGRESS TRUE
+			)
+		FetchContent_MakeAvailable(tracy)
+		target_link_libraries(manifold INTERFACE TracyClient)
+	endif()
 endif()
+

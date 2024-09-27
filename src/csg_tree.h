@@ -14,7 +14,7 @@
 
 #pragma once
 #include "manifold/manifold.h"
-#include "manifold/utils.h"
+#include "./utils.h"
 
 namespace manifold {
 

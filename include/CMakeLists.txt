@@ -8,19 +8,19 @@ set(MANIFOLD_PUBLIC_HDR
 	manifold/vec_view.h
 	)
 
-if (POLYGON_ENABLED)
-	list(APPEND MANIFOLD_PUBLIC_HDRS manifold/polygon.h)
-endif()
-
-if (MESHIO_ENABLED)
-	list(APPEND MANIFOLD_PUBLIC_HDRS manifold/meshIO.h)
-endif()
-
-if (CROSSSECTION_ENABLED)
+if (MANIFOLD_CROSS_SECTION)
 	list(APPEND MANIFOLD_PUBLIC_HDRS manifold/cross_section.h)
 endif()
 
+if (MANIFOLD_EXPORT)
+	list(APPEND MANIFOLD_PUBLIC_HDRS manifold/meshIO.h)
+endif()
+
+if (MANIFOLD_POLYGON)
+	list(APPEND MANIFOLD_PUBLIC_HDRS manifold/polygon.h)
+endif()
+
 install(FILES ${MANIFOLD_PUBLIC_HDRS}
-  	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
+	DESTINATION ${INCLUDE_DIR}/manifold
 	)
 

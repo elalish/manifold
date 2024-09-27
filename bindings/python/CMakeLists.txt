@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT MANIFOLD_PYBIND)
+	return()
+endif()
+
 project(python)
+
+if(Python_VERSION VERSION_LESS 3.12)
+	find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+else()
+	find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+endif()
+if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
+	set(MANIFOLD_PYBIND_STUBGEN ON)
+else()
+	# stubgen does not support version less than 3.11
+	set(MANIFOLD_PYBIND_STUBGEN OFF)
+	message("Python version too old, stub will not be generated")
+endif()
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" -m nanobind --version
