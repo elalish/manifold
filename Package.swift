@@ -14,13 +14,17 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/audulus/glm", branch: "spm"),
         .package(url: "https://github.com/audulus/Clipper2", branch: "spm"),
+        .package(url: "https://github.com/audulus/oneTBB", branch: "spm"),
     ],
     targets: [
         .target(
             name: "manifold",
-            dependencies: ["glm", "Clipper2"],
+            dependencies: ["glm", "Clipper2", "oneTBB"],
             path: "src",
-            publicHeadersPath: "include"
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .define("MANIFOLD_PAR", to: "'T'"),
+            ]
         )
     ],
     cxxLanguageStandard: .cxx20
