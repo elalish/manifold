@@ -37,7 +37,6 @@ option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF) # fuzztest is a rather large dependency
 option(MANIFOLD_PAR "Parallel backend, either \"TBB\" or \"NONE\"" "NONE")
-option(MANIFOLD_POLYGON "Build Polygon support" ON)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)

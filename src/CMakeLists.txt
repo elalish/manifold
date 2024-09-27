@@ -24,6 +24,7 @@ set(MANIFOLD_SRCS
 	face_op.cpp
 	impl.cpp
 	manifold.cpp
+	polygon.cpp
 	properties.cpp
 	quickhull.cpp
 	sdf.cpp
@@ -65,11 +66,6 @@ endif()
 if(MANIFOLD_EXPORT)
 	list(APPEND MANIFOLD_SRCS meshIO.cpp meshIOc.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/meshIO.h)
-endif()
-
-if(MANIFOLD_POLYGON)
-	list(APPEND MANIFOLD_SRCS polygon.cpp)
-	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/polygon.h)
 endif()
 
 # Dependency libraries
