@@ -102,16 +102,24 @@ struct MeshGLP {
 
   bool Merge();
 
-  vec3 GetVertPos(size_t i) const {
+  glm::vec<3, Precision> GetVertPos(size_t i) const {
     size_t offset = i * numProp;
-    return vec3(vertProperties[offset], vertProperties[offset + 1],
-                vertProperties[offset + 2]);
+    return glm::vec<3, Precision>(vertProperties[offset],
+                                  vertProperties[offset + 1],
+                                  vertProperties[offset + 2]);
   }
 
   glm::vec<3, I> GetTriVerts(size_t i) const {
     size_t offset = 3 * i;
     return glm::vec<3, I>(triVerts[offset], triVerts[offset + 1],
                           triVerts[offset + 2]);
+  }
+
+  glm::vec<4, Precision> GetTangent(size_t i) const {
+    size_t offset = 4 * i;
+    return glm::vec<4, Precision>(
+        halfedgeTangent[offset], halfedgeTangent[offset + 1],
+        halfedgeTangent[offset + 2], halfedgeTangent[offset + 3]);
   }
 };
 
@@ -168,7 +176,6 @@ class Manifold {
   Manifold& operator=(Manifold&&) noexcept;
 
   Manifold(const MeshGL&);
-  Manifold(const Mesh&);
   Manifold(const MeshGL64&);
 
   static Manifold Smooth(const MeshGL&,
@@ -204,7 +211,6 @@ class Manifold {
    *  Details of the manifold
    */
   ///@{
-  Mesh GetMesh() const;
   MeshGL GetMeshGL(ivec3 normalIdx = ivec3(0)) const;
   MeshGL64 GetMeshGL64(ivec3 normalIdx = ivec3(0)) const;
   bool IsEmpty() const;

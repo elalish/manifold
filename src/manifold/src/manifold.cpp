@@ -294,50 +294,6 @@ Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
 
 /**
- * Convert a Mesh into a Manifold. Will return an empty Manifold
- * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
- *
- * @param mesh The input Mesh.
- */
-Manifold::Manifold(const Mesh& mesh) {
-  Impl::MeshRelationD relation;
-  pNode_ =
-      std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
-}
-
-/**
- * This returns a Mesh of simple vectors of vertices and triangles suitable for
- * saving or other operations outside of the context of this library.
- */
-Mesh Manifold::GetMesh() const {
-  ZoneScoped;
-  const Impl& impl = *GetCsgLeafNode().GetImpl();
-
-  Mesh result;
-  result.precision = Precision();
-  result.vertPos.insert(result.vertPos.end(), impl.vertPos_.begin(),
-                        impl.vertPos_.end());
-  result.vertNormal.insert(result.vertNormal.end(), impl.vertNormal_.begin(),
-                           impl.vertNormal_.end());
-  result.halfedgeTangent.insert(result.halfedgeTangent.end(),
-                                impl.halfedgeTangent_.begin(),
-                                impl.halfedgeTangent_.end());
-
-  result.triVerts.resize(NumTri());
-  auto& triVerts = result.triVerts;
-  const auto& halfedges = impl.halfedge_;
-  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [&triVerts, &halfedges](const int tri) {
-               for (int i : {0, 1, 2}) {
-                 triVerts[tri][i] = halfedges[3 * tri + i].startVert;
-               }
-             });
-
-  return result;
-}
-
-/**
  * The most complete output of this library, returning a MeshGL that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
