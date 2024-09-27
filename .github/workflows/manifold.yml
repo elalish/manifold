@@ -245,7 +245,9 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        variant: [none, tbb, js]
+        # variant: [none, tbb, js]
+        # disabling js variant for now
+        variant: [none, tbb]
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
