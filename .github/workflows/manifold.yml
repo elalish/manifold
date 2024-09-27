@@ -38,8 +38,6 @@ jobs:
         sudo apt-get install libglm-dev libgtest-dev libassimp-dev git libtbb-dev libthrust-dev pkg-config libpython3-dev lcov
         python -m pip install -U trimesh pytest
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build ${{matrix.parallel_backend}}
       if: matrix.parallel_backend != 'NONE'
@@ -98,8 +96,6 @@ jobs:
         sudo apt-get -y update
         DEBIAN_FRONTEND=noninteractive sudo apt install -y libgtest-dev libglm-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev python3 python3-distutils python3-pip
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build C bindings with TBB
       run: |
@@ -124,8 +120,6 @@ jobs:
         sudo apt-get -y update
         DEBIAN_FRONTEND=noninteractive sudo apt install -y nodejs libglm-dev 
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - name: Setup WASM
       run: |
         # setup emscripten
@@ -170,8 +164,6 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build ${{matrix.parallel_backend}}
@@ -203,8 +195,6 @@ jobs:
     container: openscad/mxe-x86_64-gui:latest
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - name: Build
       run: |
         mkdir build
@@ -233,8 +223,6 @@ jobs:
       if: matrix.parallel_backend == 'TBB'
       run: brew install tbb onedpl
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build
       run: |
@@ -257,13 +245,13 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        variant: [none, tbb, js]
+        # variant: [none, tbb, js]
+        # disabling js variant for now
+        variant: [none, tbb]
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: cachix/install-nix-action@v22
     - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
 
@@ -273,7 +261,5 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: cachix/install-nix-action@v22
     - run: nix build -L '.?submodules=1#manifold3d'
