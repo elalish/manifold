@@ -51,7 +51,7 @@ TEST(Manifold, GetMeshGL) {
 }
 
 TEST(Manifold, Empty) {
-  Mesh emptyMesh;
+  MeshGL emptyMesh;
   Manifold empty(emptyMesh);
 
   EXPECT_TRUE(empty.IsEmpty());
@@ -176,18 +176,6 @@ TEST(Manifold, Cylinder) {
   int n = 10000;
   Manifold cylinder = Manifold::Cylinder(2, 2, 2, n);
   EXPECT_EQ(cylinder.NumTri(), 4 * n - 4);
-}
-
-TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(vec3(1), true).GetMesh();
-  const int nVert = cube.vertPos.size();
-  for (int i = 0; i < nVert; ++i) {
-    vec3 v = glm::normalize(cube.vertPos[i]);
-    vec3& n = cube.vertNormal[i];
-    EXPECT_FLOAT_EQ(v.x, n.x);
-    EXPECT_FLOAT_EQ(v.y, n.y);
-    EXPECT_FLOAT_EQ(v.z, n.z);
-  }
 }
 
 TEST(Manifold, Extrude) {

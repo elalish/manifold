@@ -22,14 +22,14 @@
 
 using namespace manifold;
 
-std::vector<int> EdgePairs(const Mesh in) {
-  const int numHalfedge = 3 * in.triVerts.size();
+std::vector<int> EdgePairs(const MeshGL in) {
+  const int numHalfedge = 3 * in.NumTri();
   std::vector<int> edgePair(numHalfedge);
 
   std::map<std::pair<int, int>, int> halfedgeLink;
   for (int i = 0; i < numHalfedge; ++i) {
-    std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
-                                             in.triVerts[i / 3][(i + 1) % 3]);
+    std::pair<int, int> key = std::make_pair(
+        in.triVerts[i], in.triVerts[(i + 1) % 3 == 0 ? i - 2 : i + 1]);
     if (key.first > key.second) std::swap(key.first, key.second);
     const auto result = halfedgeLink.emplace(std::make_pair(key, i));
     if (!result.second) {
@@ -49,7 +49,6 @@ TEST(Samples, Knot13) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
 #endif
-  CheckNormals(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -63,7 +62,6 @@ TEST(Samples, Knot42) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMeshGL(), {});
 #endif
-  CheckNormals(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -81,22 +79,28 @@ TEST(Samples, Scallop) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    Mesh in = scallop.GetMesh();
+    MeshGL in = scallop.GetMeshGL();
     std::vector<int> edgePair = EdgePairs(in);
 
     ExportOptions options;
     const int numVert = scallop.NumVert();
     const int numHalfedge = 3 * scallop.NumTri();
+    const int numProp = in.numProp;
     for (size_t i = 0; i < scallop.NumVert(); ++i) {
       options.mat.vertColor.push_back({0, 0, 1, 1});
     }
     for (int i = 0; i < numHalfedge; ++i) {
-      const int vert = in.triVerts[i / 3][i % 3];
-      in.vertPos.push_back(in.vertPos[vert] + vec3(in.halfedgeTangent[i]) *
-                                                  in.halfedgeTangent[i].w);
+      const int vert = in.triVerts[i];
+      for (int j : {0, 1, 2}) {
+        in.vertProperties.push_back(in.vertProperties[numProp * vert + j] +
+                                    in.halfedgeTangent[4 * i + j] *
+                                        in.halfedgeTangent[4 * i + 3]);
+      }
       options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
-      in.triVerts.push_back({vert, numVert + i, numVert + j});
+      in.triVerts.push_back(vert);
+      in.triVerts.push_back(numVert + i);
+      in.triVerts.push_back(numVert + j);
     }
     options.faceted = true;
     options.mat.roughness = 0.5;
@@ -117,7 +121,6 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  CheckNormals(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 39.9, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
@@ -138,7 +141,6 @@ TEST(Samples, Scallop) {
 
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
-  CheckNormals(puzzle);
   EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   CheckGL(puzzle);
 
@@ -152,7 +154,6 @@ TEST(Samples, TetPuzzle) {
 
 TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
-  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -167,7 +168,6 @@ TEST(Samples, FrameReduced) {
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
@@ -182,7 +182,6 @@ TEST(Samples, Frame) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  CheckNormals(bracelet);
   EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
@@ -216,7 +215,6 @@ TEST(Samples, Bracelet) {
 TEST(Samples, GyroidModule) {
   const double size = 20;
   Manifold gyroid = GyroidModule(size);
-  CheckNormals(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 4);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
@@ -241,7 +239,6 @@ TEST(Samples, GyroidModule) {
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  CheckNormals(sponge);
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
@@ -260,7 +257,6 @@ TEST(Samples, Sponge1) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  CheckNormals(sponge);
   EXPECT_LE(sponge.NumDegenerateTris(), 8);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
