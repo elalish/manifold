@@ -219,8 +219,34 @@ if(MANIFOLD_CROSS_SECTION)
 	if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
 		pkg_check_modules(Clipper2 Clipper2)
 	endif()
-	if (NOT Clipper2_FOUND)
-		set(BUNDLED_CLIPPER2 ON CACHE BOOL "Indicate Clipper2 is being bundled\n")
+	if(Clipper2_FOUND)
+		add_library(Clipper2 SHARED IMPORTED)
+		set_property(TARGET Clipper2 PROPERTY
+			IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
+		if(WIN32)
+			set_property(TARGET Clipper2 PROPERTY
+				IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
+		endif()
+		target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
+	else()
+		if (NOT MANIFOLD_DOWNLOADS)
+			message(FATAL_ERROR "cross_section enabled, but Clipper2 was not found and dependency downloading is disabled.  Please install Clipper2 and reconfigure.\n")
+		endif()
+		message(STATUS "clipper2 not found, downloading from source")
+		set(CLIPPER2_UTILS OFF)
+		set(CLIPPER2_EXAMPLES OFF)
+		set(CLIPPER2_TESTS OFF)
+		set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
+		FetchContent_Declare(Clipper2
+			GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
+			GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
+			GIT_PROGRESS TRUE
+			SOURCE_SUBDIR CPP
+			)
+		FetchContent_MakeAvailable(Clipper2)
+		if(NOT EMSCRIPTEN)
+			install(TARGETS Clipper2)
+		endif()
 	endif()
 endif()
 
