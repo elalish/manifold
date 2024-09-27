@@ -28,9 +28,6 @@ target_include_directories(samples
 )
 
 target_link_libraries(samples PUBLIC manifold)
-if(MANIFOLD_CROSS_SECTION)
-  target_link_libraries(samples PUBLIC cross_section)
-endif()
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(samples PUBLIC cxx_std_17)

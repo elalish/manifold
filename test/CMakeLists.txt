@@ -59,7 +59,7 @@ if(NOT TARGET GTest::gtest_main)
 endif()
 
 add_executable(manifold_test ${SOURCE_FILES})
-target_link_libraries(manifold_test polygon GTest::gtest_main manifold samples)
+target_link_libraries(manifold_test GTest::gtest_main manifold samples)
 
 if(MANIFOLD_FUZZ)
 	FetchContent_Declare(fuzztest
@@ -81,12 +81,10 @@ if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
 endif()
 
 if(MANIFOLD_CROSS_SECTION)
-	target_link_libraries(manifold_test cross_section)
 	target_compile_options(manifold_test PUBLIC -DMANIFOLD_CROSS_SECTION)
 endif()
 
 if(MANIFOLD_EXPORT)
-	target_link_libraries(manifold_test meshIO)
 	target_compile_options(manifold_test PUBLIC -DMANIFOLD_EXPORT)
 endif()
 

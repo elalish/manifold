@@ -94,9 +94,12 @@ endif()
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
-target_link_libraries(manifold PRIVATE ${MANIFOLD_LIBS})
+target_link_libraries(manifold PUBLIC ${MANIFOLD_LIBS})
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
-target_include_directories(manifold PRIVATE ${MANIFOLD_INCLUDE_DIRS})
+target_include_directories(manifold
+	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+	PRIVATE ${MANIFOLD_INCLUDE_DIRS}
+	)
 if(MANIFOLD_EXCEPTIONS)
 	target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
 endif()
