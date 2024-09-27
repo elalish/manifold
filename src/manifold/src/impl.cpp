@@ -469,7 +469,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
                for (const int i : {0, 1, 2}) {
                  const int j = (i + 1) % 3;
                  const int e = 3 * tri + i;
-                 halfedge_[e] = {verts[i], verts[j], -1, tri};
+                 halfedge_[e] = {verts[i], verts[j], -1};
                  // Sort the forward halfedges in front of the backward ones
                  // by setting the highest-order bit.
                  edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |

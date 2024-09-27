@@ -301,9 +301,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       int newFace = newHalfedge / 3;
       int oldFace = current / 3;
       int outsideVert = halfedge_[current].startVert;
-      halfedge_.push_back({endVert, newVert, -1, newFace});
-      halfedge_.push_back({newVert, outsideVert, -1, newFace});
-      halfedge_.push_back({outsideVert, endVert, -1, newFace});
+      halfedge_.push_back({endVert, newVert, -1});
+      halfedge_.push_back({newVert, outsideVert, -1});
+      halfedge_.push_back({outsideVert, endVert, -1});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
@@ -317,9 +317,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       ++newFace;
       oldFace = opposite / 3;
       outsideVert = halfedge_[opposite].startVert;
-      halfedge_.push_back({newVert, endVert, -1, newFace});
-      halfedge_.push_back({endVert, outsideVert, -1, newFace});
-      halfedge_.push_back({outsideVert, newVert, -1, newFace});
+      halfedge_.push_back({newVert, endVert, -1});
+      halfedge_.push_back({endVert, outsideVert, -1});
+      halfedge_.push_back({outsideVert, newVert, -1});
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
@@ -421,7 +421,7 @@ void Manifold::Impl::CollapseTri(const ivec3& triEdge) {
   halfedge_[pair1].pairedHalfedge = pair2;
   halfedge_[pair2].pairedHalfedge = pair1;
   for (int i : {0, 1, 2}) {
-    halfedge_[triEdge[i]] = {-1, -1, -1, -1};
+    halfedge_[triEdge[i]] = {-1, -1, -1};
   }
 }
 
@@ -447,8 +447,8 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
     PairUp(halfedge_[tri0edge[2]].pairedHalfedge,
            halfedge_[tri1edge[1]].pairedHalfedge);
     for (int i : {0, 1, 2}) {
-      halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
-      halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
+      halfedge_[tri0edge[i]] = {-1, -1, -1};
+      halfedge_[tri1edge[i]] = {-1, -1, -1};
     }
   }
 }
