@@ -151,6 +151,7 @@ class MeshBuilder {
   // Mesh data
   std::vector<Face> faces;
   Vec<Halfedge> halfedges;
+  Vec<int> halfedgeToFace;
   Vec<int> halfedgeNext;
 
   // When the mesh is modified and faces and half edges are removed from it, we
@@ -202,6 +203,7 @@ class HalfEdgeMesh {
   // Index of one of the half edges of the faces
   std::vector<size_t> halfEdgeIndexFaces;
   Vec<Halfedge> halfedges;
+  Vec<int> halfedgeToFace;
   Vec<int> halfedgeNext;
 
   HalfEdgeMesh(const MeshBuilder& builderObject,

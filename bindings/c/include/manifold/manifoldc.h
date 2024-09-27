@@ -176,9 +176,9 @@ ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
 
 int manifold_is_empty(ManifoldManifold *m);
 ManifoldError manifold_status(ManifoldManifold *m);
-int manifold_num_vert(ManifoldManifold *m);
-int manifold_num_edge(ManifoldManifold *m);
-int manifold_num_tri(ManifoldManifold *m);
+size_t manifold_num_vert(ManifoldManifold *m);
+size_t manifold_num_edge(ManifoldManifold *m);
+size_t manifold_num_tri(ManifoldManifold *m);
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
 double manifold_precision(ManifoldManifold *m);
 int manifold_genus(ManifoldManifold *m);

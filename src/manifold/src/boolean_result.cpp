@@ -65,14 +65,15 @@ struct DuplicateVerts {
 
 template <bool atomic>
 struct CountVerts {
+  VecView<Halfedge> halfedges;
   VecView<int> count;
   VecView<const int> inclusion;
 
-  void operator()(const Halfedge &edge) {
+  void operator()(size_t i) {
     if (atomic)
-      AtomicAdd(count[edge.face], std::abs(inclusion[edge.startVert]));
+      AtomicAdd(count[i / 3], std::abs(inclusion[halfedges[i].startVert]));
     else
-      count[edge.face] += std::abs(inclusion[edge.startVert]);
+      count[i / 3] += std::abs(inclusion[halfedges[i].startVert]);
   }
 };
 
@@ -92,13 +93,13 @@ struct CountNewVerts {
     if (atomic) {
       AtomicAdd(countQ[faceQ], inclusion);
       const Halfedge half = halfedges[edgeP];
-      AtomicAdd(countP[half.face], inclusion);
-      AtomicAdd(countP[halfedges[half.pairedHalfedge].face], inclusion);
+      AtomicAdd(countP[edgeP / 3], inclusion);
+      AtomicAdd(countP[half.pairedHalfedge / 3], inclusion);
     } else {
       countQ[faceQ] += inclusion;
       const Halfedge half = halfedges[edgeP];
-      countP[half.face] += inclusion;
-      countP[halfedges[half.pairedHalfedge].face] += inclusion;
+      countP[edgeP / 3] += inclusion;
+      countP[half.pairedHalfedge / 3] += inclusion;
     }
   }
 };
@@ -116,15 +117,15 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
   if (inP.halfedge_.size() >= 1e5) {
-    for_each(ExecutionPolicy::Par, inP.halfedge_.begin(), inP.halfedge_.end(),
-             CountVerts<true>({sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Par, inQ.halfedge_.begin(), inQ.halfedge_.end(),
-             CountVerts<true>({sidesPerFaceQ, i30}));
+    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inP.halfedge_.size()),
+             CountVerts<true>({inP.halfedge_, sidesPerFaceP, i03}));
+    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inQ.halfedge_.size()),
+             CountVerts<true>({inQ.halfedge_, sidesPerFaceQ, i30}));
   } else {
-    for_each(ExecutionPolicy::Seq, inP.halfedge_.begin(), inP.halfedge_.end(),
-             CountVerts<false>({sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Seq, inQ.halfedge_.begin(), inQ.halfedge_.end(),
-             CountVerts<false>({sidesPerFaceQ, i30}));
+    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inP.halfedge_.size()),
+             CountVerts<false>({inP.halfedge_, sidesPerFaceP, i03}));
+    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inQ.halfedge_.size()),
+             CountVerts<false>({inQ.halfedge_, sidesPerFaceQ, i30}));
   }
 
   if (i12.size() >= 1e5) {
@@ -219,11 +220,10 @@ void AddNewEdgeVerts(
     const int inclusion = i12[i];
 
     Halfedge halfedge = halfedgeP[edgeP];
-    std::pair<int, int> keyRight = {halfedgeP[halfedge.pairedHalfedge].face,
-                                    faceQ};
+    std::pair<int, int> keyRight = {halfedge.pairedHalfedge / 3, faceQ};
     if (!forward) std::swap(keyRight.first, keyRight.second);
 
-    std::pair<int, int> keyLeft = {halfedge.face, faceQ};
+    std::pair<int, int> keyLeft = {edgeP / 3, faceQ};
     if (!forward) std::swap(keyLeft.first, keyLeft.second);
 
     bool direction = inclusion < 0;
@@ -286,7 +286,7 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
   for (size_t i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
+    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1});
   return edges;
 }
 
@@ -343,9 +343,9 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     std::vector<Halfedge> edges = PairUp(edgePosP);
 
     // add halfedges to result
-    const int faceLeftP = halfedge.face;
+    const int faceLeftP = edgeP / 3;
     const int faceLeft = faceP2R[faceLeftP];
-    const int faceRightP = halfedgeP[halfedge.pairedHalfedge].face;
+    const int faceRightP = halfedge.pairedHalfedge / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -358,13 +358,11 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
-      e.face = faceLeft;
       e.pairedHalfedge = backwardEdge;
       halfedgeR[forwardEdge] = e;
       halfedgeRef[forwardEdge] = forwardRef;
 
       std::swap(e.startVert, e.endVert);
-      e.face = faceRight;
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
@@ -411,13 +409,11 @@ void AppendNewEdges(
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
-      e.face = faceLeft;
       e.pairedHalfedge = backwardEdge;
       halfedgeR[forwardEdge] = e;
       halfedgeRef[forwardEdge] = forwardRef;
 
       std::swap(e.startVert, e.endVert);
-      e.face = faceRight;
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
@@ -444,15 +440,13 @@ struct DuplicateHalfedges {
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
-      int tmp = halfedge.startVert;
-      halfedge.startVert = halfedge.endVert;
-      halfedge.endVert = tmp;
+      std::swap(halfedge.startVert, halfedge.endVert);
     }
     halfedge.startVert = vP2R[halfedge.startVert];
     halfedge.endVert = vP2R[halfedge.endVert];
-    const int faceLeftP = halfedge.face;
-    halfedge.face = faceP2R[faceLeftP];
-    const int faceRightP = halfedgesP[halfedge.pairedHalfedge].face;
+    const int faceLeftP = idx / 3;
+    const int newFace = faceP2R[faceLeftP];
+    const int faceRightP = halfedge.pairedHalfedge / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -461,13 +455,13 @@ struct DuplicateHalfedges {
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
 
     for (int i = 0; i < std::abs(inclusion); ++i) {
-      int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
+      int forwardEdge = AtomicAdd(facePtr[newFace], 1);
       int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardEdge;
 
       halfedgesR[forwardEdge] = halfedge;
       halfedgesR[backwardEdge] = {halfedge.endVert, halfedge.startVert,
-                                  forwardEdge, faceRight};
+                                  forwardEdge};
       halfedgeRef[forwardEdge] = forwardRef;
       halfedgeRef[backwardEdge] = backwardRef;
 
@@ -675,11 +669,22 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
   if (inP_.IsEmpty()) {
+    if (inP_.status_ != Manifold::Error::NoError ||
+        inQ_.status_ != Manifold::Error::NoError) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::InvalidConstruction;
+      return impl;
+    }
     if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
   } else if (inQ_.IsEmpty()) {
+    if (inQ_.status_ != Manifold::Error::NoError) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::InvalidConstruction;
+      return impl;
+    }
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }

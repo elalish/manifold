@@ -39,5 +39,7 @@ def run(n=1):
     result -= hole.rotate([0, 90, 0])
 
     return (
-        result.trim_by_plane([1, 1, 1], 0).set_properties(4, posColors).scale([100] * 3)
+        result.trim_by_plane([1, 1, 1], 0)
+        .set_properties(4, posColors)
+        .scale([100, 100, 100])
     )

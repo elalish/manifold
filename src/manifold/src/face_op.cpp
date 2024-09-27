@@ -291,11 +291,14 @@ Polygons Manifold::Impl::Project() const {
   const mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
   Vec<Halfedge> cusps(NumEdge());
   cusps.resize(
-      copy_if(halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
-              [&](Halfedge edge) {
-                return faceNormal_[edge.face].z >= 0 &&
-                       faceNormal_[halfedge_[edge.pairedHalfedge].face].z < 0;
-              }) -
+      copy_if(
+          halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
+          [&](Halfedge edge) {
+            return faceNormal_[halfedge_[edge.pairedHalfedge].pairedHalfedge /
+                               3]
+                           .z >= 0 &&
+                   faceNormal_[edge.pairedHalfedge / 3].z < 0;
+          }) -
       cusps.begin());
 
   PolygonsIdx polysIndexed =

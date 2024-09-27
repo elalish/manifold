@@ -88,6 +88,13 @@ if(MANIFOLD_PYBIND)
   else()
     find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
   endif()
+  if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
+    set(MANIFOLD_PYBIND_STUBGEN ON)
+  else()
+    # stubgen does not support version less than 3.11
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("Python version too old, stub will not be generated")
+  endif()
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
@@ -125,11 +132,11 @@ endif()
 # installation rpath
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} isSystemDir)
 if("${isSystemDir}" STREQUAL "-1")
-    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+    set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 endif("${isSystemDir}" STREQUAL "-1")
 
 
@@ -176,7 +183,7 @@ if(MANIFOLD_CROSS_SECTION)
 endif()
 configure_file(manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
-  DESTINATION lib/pkgconfig)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 endif()
 

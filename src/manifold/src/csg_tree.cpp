@@ -48,7 +48,6 @@ struct UpdateHalfedge {
     edge.startVert += nextVert;
     edge.endVert += nextVert;
     edge.pairedHalfedge += nextEdge;
-    edge.face += nextFace;
     return edge;
   }
 };
@@ -184,6 +183,11 @@ Manifold::Impl CsgLeafNode::Compose(
   std::vector<int> propVertIndices;
   int numPropOut = 0;
   for (auto &node : nodes) {
+    if (node->pImpl_->status_ != Manifold::Error::NoError) {
+      Manifold::Impl impl;
+      impl.status_ = Manifold::Error::InvalidConstruction;
+      return impl;
+    }
     double nodeOldScale = node->pImpl_->bBox_.Scale();
     double nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
@@ -479,8 +483,6 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
           continue;
         }
         group.run([&, a, b]() {
-          const Manifold::Impl *aImpl;
-          const Manifold::Impl *bImpl;
           Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
           queue.emplace(
               std::make_shared<Manifold::Impl>(boolean.Result(operation)));
@@ -508,11 +510,11 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     results.pop_back();
     // boolean operation
     Boolean3 boolean(*a, *b, operation);
+    auto result = std::make_shared<Manifold::Impl>(boolean.Result(operation));
     if (results.size() == 0) {
-      return std::make_shared<Manifold::Impl>(boolean.Result(operation));
+      return result;
     }
-    results.push_back(
-        std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
+    results.push_back(result);
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
   return std::make_shared<Manifold::Impl>(*results.front());

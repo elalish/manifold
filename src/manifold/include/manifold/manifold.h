@@ -15,6 +15,7 @@
 #pragma once
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -37,38 +38,28 @@ class CsgLeafNode;
  *  @{
  */
 
-template <typename Precision>
+template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
   /// Number of property vertices
-  uint32_t NumVert() const {
-    ASSERT(vertProperties.size() / numProp <
-               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
-           std::out_of_range("mesh too large for MeshGL"));
-    return vertProperties.size() / numProp;
-  };
+  I NumVert() const { return vertProperties.size() / numProp; };
   /// Number of triangles
-  uint32_t NumTri() const {
-    ASSERT(triVerts.size() / 3 <
-               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
-           std::out_of_range("mesh too large for MeshGL"));
-    return triVerts.size() / 3;
-  };
+  I NumTri() const { return triVerts.size() / 3; };
   /// Number of properties per vertex, always >= 3.
-  uint32_t numProp = 3;
+  I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
   std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
-  std::vector<uint32_t> triVerts;
+  std::vector<I> triVerts;
   /// Optional: A list of only the vertex indicies that need to be merged to
   /// reconstruct the manifold.
-  std::vector<uint32_t> mergeFromVert;
+  std::vector<I> mergeFromVert;
   /// Optional: The same length as mergeFromVert, and the corresponding value
   /// contains the vertex to merge with. It will have an identical position, but
   /// the other properties may differ.
-  std::vector<uint32_t> mergeToVert;
+  std::vector<I> mergeToVert;
   /// Optional: Indicates runs of triangles that correspond to a particular
   /// input mesh instance. The runs encompass all of triVerts and are sorted
   /// by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
@@ -76,7 +67,7 @@ struct MeshGLP {
   /// runIndex will always be 1 longer than runOriginalID, but same length is
   /// also allowed as input: triVerts.size() will be automatically appended in
   /// this case.
-  std::vector<uint32_t> runIndex;
+  std::vector<I> runIndex;
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
   /// is ideal for reapplying materials to the output mesh. Multiple runs may
   /// have the same ID, e.g. representing different copies of the same input
@@ -95,7 +86,7 @@ struct MeshGLP {
   /// supplying faceIDs, ensure that triangles with the same ID are in fact
   /// coplanar and have consistent properties (within some tolerance) or the
   /// output will be surprising.
-  std::vector<uint32_t> faceID;
+  std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
@@ -117,9 +108,10 @@ struct MeshGLP {
                 vertProperties[offset + 2]);
   }
 
-  ivec3 GetTriVerts(size_t i) const {
+  glm::vec<3, I> GetTriVerts(size_t i) const {
     size_t offset = 3 * i;
-    return ivec3(triVerts[offset], triVerts[offset + 1], triVerts[offset + 2]);
+    return glm::vec<3, I>(triVerts[offset], triVerts[offset + 1],
+                          triVerts[offset + 2]);
   }
 };
 
@@ -130,7 +122,7 @@ struct MeshGLP {
  * store this missing information, allowing the manifold to be reconstructed.
  */
 using MeshGL = MeshGLP<float>;
-using MeshGL64 = MeshGLP<double>;
+using MeshGL64 = MeshGLP<double, size_t>;
 /** @} */
 
 /** @defgroup Core
@@ -231,11 +223,11 @@ class Manifold {
     InvalidConstruction,
   };
   Error Status() const;
-  int NumVert() const;
-  int NumEdge() const;
-  int NumTri() const;
-  int NumProp() const;
-  int NumPropVert() const;
+  size_t NumVert() const;
+  size_t NumEdge() const;
+  size_t NumTri() const;
+  size_t NumProp() const;
+  size_t NumPropVert() const;
   Box BoundingBox() const;
   double Precision() const;
   int Genus() const;
@@ -315,8 +307,8 @@ class Manifold {
    */
   ///@{
   bool MatchesTriNormals() const;
-  int NumDegenerateTris() const;
-  int NumOverlaps(const Manifold& second) const;
+  size_t NumDegenerateTris() const;
+  size_t NumOverlaps(const Manifold& second) const;
   ///@}
 
   struct Impl;

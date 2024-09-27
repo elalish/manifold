@@ -123,7 +123,6 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
 struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
-  int face;
   bool IsForward() const { return startVert < endVert; }
   bool operator<(const Halfedge& other) const {
     return startVert == other.startVert ? endVert < other.endVert
@@ -206,8 +205,7 @@ struct ReindexEdge {
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
   return stream << "startVert = " << edge.startVert
                 << ", endVert = " << edge.endVert
-                << ", pairedHalfedge = " << edge.pairedHalfedge
-                << ", face = " << edge.face;
+                << ", pairedHalfedge = " << edge.pairedHalfedge;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {

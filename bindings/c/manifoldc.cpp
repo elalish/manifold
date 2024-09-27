@@ -510,9 +510,9 @@ ManifoldError manifold_status(ManifoldManifold *m) {
   return to_c(error);
 }
 
-int manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
-int manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
-int manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
+size_t manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
+size_t manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
+size_t manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
 int manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
 
 ManifoldProperties manifold_get_properties(ManifoldManifold *m) {

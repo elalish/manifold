@@ -120,7 +120,7 @@ struct CountingIterator {
   using value_type = T;
   using iterator_category = std::random_access_iterator_tag;
 
-  CountingIterator(T counter) : counter(counter) {}
+  constexpr CountingIterator(T counter) : counter(counter) {}
 
   value_type operator*() const { return counter; }
   value_type operator[](T i) const { return counter + i; }
@@ -190,8 +190,7 @@ struct CountingIterator {
   }
 };
 
-template <typename T>
-CountingIterator<T> countAt(T i) {
+constexpr CountingIterator<size_t> countAt(size_t i) {
   return CountingIterator(i);
 }
 

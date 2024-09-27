@@ -17,7 +17,8 @@ project(python)
 execute_process(
   COMMAND "${Python_EXECUTABLE}" -m nanobind --version
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_VERSION)
-if(NB_VERSION VERSION_GREATER_EQUAL 1.8.0)
+# we are fine with 2.0.0
+if(NB_VERSION VERSION_GREATER_EQUAL 2.0.0)
   message("Found nanobind, version ${NB_VERSION}")
   execute_process(
     COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
@@ -28,16 +29,35 @@ else()
   include(FetchContent)
   FetchContent_Declare(nanobind
     GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-    GIT_TAG 8d7f1ee0621c17fa370b704b2100ffa0243d5bf  # v2.0.0
+    GIT_TAG 9641bb7151f04120013b812789b3ebdfa7e7324f # v2.1.0
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(nanobind)
 endif()
+
+if(NB_VERSION VERSION_LESS 2.1.0)
+  message("Nanobind version too old, stub will not be generated")
+  set(MANIFOLD_PYBIND_STUBGEN OFF)
+endif()
+
 nanobind_add_module(
   manifold3d
   NB_STATIC STABLE_ABI LTO
   autogen_docstrings.inl
   manifold3d.cpp)
+
+if(MANIFOLD_PYBIND_STUBGEN)
+  nanobind_add_stub(
+    manifold3d_stub
+    MODULE manifold3d
+    OUTPUT manifold3d.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:manifold3d>
+    DEPENDS manifold3d
+    MARKER_FILE py.typed
+    PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
+    )
+endif()
+
 target_link_libraries(manifold3d PRIVATE manifold polygon cross_section)
 target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
 target_compile_features(manifold3d PUBLIC cxx_std_17)
@@ -62,15 +82,22 @@ add_custom_command(
 target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(SKBUILD)
-install(
-  TARGETS manifold3d
-  LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}
-  COMPONENT bindings
-)
+  set(MANIFOLD_PYBIND_LIBDIR ${SKBUILD_PLATLIB_DIR})
 else()
+  set(MANIFOLD_PYBIND_LIBDIR ${Python_SITEARCH})
+endif()
+
 install(
   TARGETS manifold3d
-  LIBRARY DESTINATION ${Python_SITEARCH}
+  LIBRARY DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
   COMPONENT bindings
+  EXCLUDE_FROM_ALL
 )
+if(MANIFOLD_PYBIND_STUBGEN)
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
+    DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
+    COMPONENT bindings
+    EXCLUDE_FROM_ALL
+  )
 endif()

@@ -88,7 +88,7 @@ struct SwappableEdge {
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
-    int tri = halfedge[edge].face;
+    int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
     mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
     vec2 v[3];
@@ -99,7 +99,7 @@ struct SwappableEdge {
 
     // Switch to neighbor's projection.
     edge = halfedge[edge].pairedHalfedge;
-    tri = halfedge[edge].face;
+    tri = edge / 3;
     triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
@@ -299,11 +299,11 @@ void Manifold::Impl::DedupeEdge(const int edge) {
 
       int newHalfedge = halfedge_.size();
       int newFace = newHalfedge / 3;
-      int oldFace = halfedge_[current].face;
+      int oldFace = current / 3;
       int outsideVert = halfedge_[current].startVert;
-      halfedge_.push_back({endVert, newVert, -1, newFace});
-      halfedge_.push_back({newVert, outsideVert, -1, newFace});
-      halfedge_.push_back({outsideVert, endVert, -1, newFace});
+      halfedge_.push_back({endVert, newVert, -1});
+      halfedge_.push_back({newVert, outsideVert, -1});
+      halfedge_.push_back({outsideVert, endVert, -1});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
@@ -315,11 +315,11 @@ void Manifold::Impl::DedupeEdge(const int edge) {
 
       newHalfedge += 3;
       ++newFace;
-      oldFace = halfedge_[opposite].face;
+      oldFace = opposite / 3;
       outsideVert = halfedge_[opposite].startVert;
-      halfedge_.push_back({newVert, endVert, -1, newFace});
-      halfedge_.push_back({endVert, outsideVert, -1, newFace});
-      halfedge_.push_back({outsideVert, newVert, -1, newFace});
+      halfedge_.push_back({newVert, endVert, -1});
+      halfedge_.push_back({endVert, outsideVert, -1});
+      halfedge_.push_back({outsideVert, newVert, -1});
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
@@ -421,7 +421,7 @@ void Manifold::Impl::CollapseTri(const ivec3& triEdge) {
   halfedge_[pair1].pairedHalfedge = pair2;
   halfedge_[pair2].pairedHalfedge = pair1;
   for (int i : {0, 1, 2}) {
-    halfedge_[triEdge[i]] = {-1, -1, -1, -1};
+    halfedge_[triEdge[i]] = {-1, -1, -1};
   }
 }
 
@@ -447,8 +447,8 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
     PairUp(halfedge_[tri0edge[2]].pairedHalfedge,
            halfedge_[tri1edge[1]].pairedHalfedge);
     for (int i : {0, 1, 2}) {
-      halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
-      halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
+      halfedge_[tri0edge[i]] = {-1, -1, -1};
+      halfedge_[tri1edge[i]] = {-1, -1, -1};
     }
   }
 }
@@ -587,7 +587,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     return;
 
   // Switch to neighbor's projection.
-  projection = GetAxisAlignedProjection(faceNormal_[halfedge_[pair].face]);
+  projection = GetAxisAlignedProjection(faceNormal_[pair / 3]);
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];
   v[3] = projection * vertPos_[halfedge_[tri1edge[2]].startVert];
@@ -604,8 +604,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     PairUp(tri1edge[0], halfedge_[tri0edge[2]].pairedHalfedge);
     PairUp(tri0edge[2], tri1edge[2]);
     // Both triangles are now subsets of the neighboring triangle.
-    const int tri0 = halfedge_[tri0edge[0]].face;
-    const int tri1 = halfedge_[tri1edge[0]].face;
+    const int tri0 = tri0edge[0] / 3;
+    const int tri1 = tri1edge[0] / 3;
     faceNormal_[tri0] = faceNormal_[tri1];
     triRef[tri0] = triRef[tri1];
     const double l01 = glm::length(v[1] - v[0]);
