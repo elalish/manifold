@@ -25,6 +25,7 @@ endif()
 
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
+option(MANIFOLD_POLYGON "Build Polygon support" ON)
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
@@ -142,10 +143,6 @@ endif("${isSystemDir}" STREQUAL "-1")
 
 add_subdirectory(src)
 add_subdirectory(bindings)
-
-if(MANIFOLD_EXPORT)
-  add_subdirectory(meshIO)
-endif()
 
 if(MANIFOLD_TEST)
   add_subdirectory(samples)
