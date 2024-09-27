@@ -31,6 +31,7 @@ set(MANIFOLD_SRCS
 	sort.cpp
 	subdivision.cpp
 	)
+
 set(MANIFOLD_PRIVATE_HDRS
 	boolean3.h
 	collider.h
@@ -45,14 +46,27 @@ set(MANIFOLD_PRIVATE_HDRS
 	utils.h
 	vec.h
 	)
+
+set(MANIFOLD_C_BINDING_SRCS
+	manifoldc.cpp
+	conv.cpp
+	box.cpp
+	cross.cpp
+	rect.cpp
+	)
+
+list(APPEND MANIFOLD_SRCS ${MANIFOLD_C_BINDING_SRCS})
+
 if(MANIFOLD_CROSS_SECTION)
 	list(APPEND MANIFOLD_SRCS cross_section.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/cross_section.h)
 endif()
+
 if(MANIFOLD_EXPORT)
-	list(APPEND MANIFOLD_SRCS meshIO.cpp)
+	list(APPEND MANIFOLD_SRCS meshIO.cpp meshIOc.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/meshIO.h)
 endif()
+
 if(MANIFOLD_POLYGON)
 	list(APPEND MANIFOLD_SRCS polygon.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/polygon.h)
@@ -94,8 +108,13 @@ endif()
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
+if(MSVC)
+	set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
 target_link_libraries(manifold PUBLIC ${MANIFOLD_LIBS})
-target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
+if(MANIFOLD_FLAGS)
+	target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
+endif()
 target_include_directories(manifold
 	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
 	PRIVATE ${MANIFOLD_INCLUDE_DIRS}
@@ -107,7 +126,8 @@ if(MANIFOLD_DEBUG)
 	target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)
 endif()
 if(MANIFOLD_EXPORT)
-	target_link_libraries(meshIO PRIVATE assimp::assimp)
+	target_link_libraries(manifold PRIVATE assimp::assimp)
+	target_compile_options(manifold PUBLIC -DMANIFOLD_EXPORT)
 endif()
 target_compile_features(manifold PUBLIC cxx_std_17)
 if(MANIFOLD_PAR STREQUAL "TBB")

@@ -31,25 +31,26 @@ option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_DOWNLOADS "Allow Manifold build to download missing dependencies" ON) 
 option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
-option(MANIFOLD_FLAGS "Manifold compiler flags" "")
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF) # fuzztest is a rather large dependency
 option(MANIFOLD_PAR "Parallel backend, either \"TBB\" or \"NONE\"" "NONE")
 option(MANIFOLD_POLYGON "Build Polygon support" ON)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
-cmake_dependent_option(MANIFOLD_CBIND "Build C (FFI) bindings" ON "MANIFOLD_CROSS_SECTION" OFF)
 cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "MANIFOLD_CROSS_SECTION;EMSCRIPTEN" OFF)
 cmake_dependent_option(MANIFOLD_PYBIND "Build python bindings" OFF "MANIFOLD_CROSS_SECTION" OFF)
 
 # Set some option values in the CMake cache
-set(MANIFOLD_FLAGS "${MANIFOLD_FLAGS}" CACHE STRING "Manifold compiler flags")
+if(NOT MANIFOLD_FLAGS)
+	set(MANIFOLD_FLAGS "")
+endif()
+set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 set(MANIFOLD_PAR "${MANIFOLD_PAR}" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set_property(CACHE MANIFOLD_PAR PROPERTY STRINGS "TBB;NONE")
 
 
 # Development options
-option(TRACY_ENABLE "Use tracy profiling" OFF) 
+option(TRACY_ENABLE "Use tracy profiling" OFF)
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 mark_as_advanced(TRACY_ENABLE)
@@ -102,7 +103,7 @@ endif()
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
   # for nixos
-  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES 
+  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
       ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
@@ -301,7 +302,6 @@ message(STATUS "MANIFOLD_TEST:               ${MANIFOLD_TEST}")
 message(STATUS "MANIFOLD_FUZZ:               ${MANIFOLD_FUZZ}")
 message(STATUS "MANIFOLD_DEBUG:              ${MANIFOLD_DEBUG}")
 message(STATUS "MANIFOLD_PYBIND:             ${MANIFOLD_PYBIND}")
-message(STATUS "MANIFOLD_CBIND:              ${MANIFOLD_CBIND}")
 message(STATUS "MANIFOLD_JSBIND:             ${MANIFOLD_JSBIND}")
 message(STATUS "MANIFOLD_EXCEPTIONS:         ${MANIFOLD_EXCEPTIONS}")
 message(STATUS " ")

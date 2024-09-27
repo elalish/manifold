@@ -1,0 +1,33 @@
+set(MANIFOLD_PUBLIC_HDR
+	common.h
+	iters.h
+	manifold.h
+	optional_assert.h
+	parallel.h
+	tri_dist.h
+	vec_view.h
+	)
+
+set(MANIFOLD_C_BINDING_HDRS
+	conv.h
+	manifoldc.h
+	types.h
+	)
+list(APPEND MANIFOLD_PUBLIC_HDRS ${MANIFOLD_C_BINDING_HDRS})
+
+if (MANIFOLD_CROSS_SECTION)
+	list(APPEND MANIFOLD_PUBLIC_HDRS cross_section.h)
+endif()
+
+if (MANIFOLD_EXPORT)
+	list(APPEND MANIFOLD_PUBLIC_HDRS meshIO.h)
+endif()
+
+if (MANIFOLD_POLYGON)
+	list(APPEND MANIFOLD_PUBLIC_HDRS polygon.h)
+endif()
+
+install(FILES ${MANIFOLD_PUBLIC_HDRS}
+	DESTINATION ${INCLUDE_DIR}/manifold
+	)
+
