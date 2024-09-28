@@ -254,6 +254,7 @@ if(MANIFOLD_EXPORT)
 endif()
 
 add_subdirectory(src)
+add_subdirectory(include)
 add_subdirectory(bindings)
 add_subdirectory(samples)
 add_subdirectory(test)

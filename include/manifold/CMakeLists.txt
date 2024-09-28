@@ -1,4 +1,4 @@
-set(MANIFOLD_PUBLIC_HDR
+set(MANIFOLD_PUBLIC_HDRS
 	common.h
 	iters.h
 	manifold.h
@@ -25,6 +25,6 @@ if (MANIFOLD_EXPORT)
 endif()
 
 install(FILES ${MANIFOLD_PUBLIC_HDRS}
-	DESTINATION ${INCLUDE_DIR}/manifold
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
 	)
 

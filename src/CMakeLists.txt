@@ -110,8 +110,9 @@ target_link_libraries(manifold PUBLIC ${MANIFOLD_LIBS})
 if(MANIFOLD_FLAGS)
 	target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
 endif()
-target_include_directories(manifold
-	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+target_include_directories(manifold PUBLIC
+  	$<INSTALL_INTERFACE:include>
+  	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
 	PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 	)
 if(MANIFOLD_EXCEPTIONS)
