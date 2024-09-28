@@ -18,7 +18,9 @@
 
 #include "manifold/common.h"
 #include "manifold/conv.h"
-#include "manifold/cross_section.h"
+#ifdef MANIFOLD_CROSS_SECTION
+#  include "manifold/cross_section.h"
+#endif
 #include "manifold/manifold.h"
 #include "manifold/types.h"
 
@@ -586,10 +588,12 @@ int manifold_get_circular_segments(double radius) {
 void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
 
 // memory size
+#ifdef MANIFOLD_CROSS_SECTION
 size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_cross_section_vec_size() {
   return sizeof(std::vector<CrossSection>);
 }
+#endif
 size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
@@ -600,12 +604,14 @@ size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
 
 // pointer free + destruction
+#ifdef MANIFOLD_CROSS_SECTION
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
   delete from_c(c);
 }
 void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv) {
   delete from_c(csv);
 }
+#endif
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
   delete from_c(p);
 }
@@ -619,12 +625,14 @@ void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
 
 // destruction
+#ifdef MANIFOLD_CROSS_SECTION
 void manifold_destruct_cross_section(ManifoldCrossSection *cs) {
   from_c(cs)->~CrossSection();
 }
 void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv) {
   from_c(csv)->~CrossSectionVec();
 }
+#endif
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p) {
   from_c(p)->~SimplePolygon();
 }

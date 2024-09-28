@@ -17,7 +17,9 @@
 #include <vector>
 
 #include "manifold/common.h"
+#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
+#endif
 #include "manifold/manifold.h"
 #include "manifold/types.h"
 
@@ -29,6 +31,7 @@ ManifoldManifoldVec *to_c(ManifoldVec *ms) {
   return reinterpret_cast<ManifoldManifoldVec *>(ms);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 ManifoldCrossSection *to_c(manifold::CrossSection *cs) {
   return reinterpret_cast<ManifoldCrossSection *>(cs);
 }
@@ -36,6 +39,7 @@ ManifoldCrossSection *to_c(manifold::CrossSection *cs) {
 ManifoldCrossSectionVec *to_c(CrossSectionVec *csv) {
   return reinterpret_cast<ManifoldCrossSectionVec *>(csv);
 }
+#endif
 
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *m) {
   return reinterpret_cast<ManifoldSimplePolygon *>(m);
@@ -132,6 +136,7 @@ ManifoldVec *from_c(ManifoldManifoldVec *ms) {
   return reinterpret_cast<ManifoldVec *>(ms);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 const manifold::CrossSection *from_c(ManifoldCrossSection *cs) {
   return reinterpret_cast<manifold::CrossSection *>(cs);
 }
@@ -139,6 +144,7 @@ const manifold::CrossSection *from_c(ManifoldCrossSection *cs) {
 CrossSectionVec *from_c(ManifoldCrossSectionVec *csv) {
   return reinterpret_cast<CrossSectionVec *>(csv);
 }
+#endif
 
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m) {
   return reinterpret_cast<manifold::SimplePolygon const *>(m);
@@ -167,6 +173,7 @@ OpType from_c(ManifoldOpType optype) {
   return op;
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 CrossSection::FillRule from_c(ManifoldFillRule fillrule) {
   auto fr = CrossSection::FillRule::EvenOdd;
   switch (fillrule) {
@@ -199,6 +206,7 @@ CrossSection::JoinType from_c(ManifoldJoinType join_type) {
   };
   return jt;
 }
+#endif
 
 const manifold::Box *from_c(ManifoldBox *m) {
   return reinterpret_cast<manifold::Box const *>(m);

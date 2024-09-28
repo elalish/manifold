@@ -52,14 +52,13 @@ set(MANIFOLD_C_BINDING_SRCS
 	manifoldc.cpp
 	conv.cpp
 	box.cpp
-	cross.cpp
 	rect.cpp
 	)
 
 list(APPEND MANIFOLD_SRCS ${MANIFOLD_C_BINDING_SRCS})
 
 if(MANIFOLD_CROSS_SECTION)
-	list(APPEND MANIFOLD_SRCS cross_section.cpp)
+	list(APPEND MANIFOLD_SRCS cross_section.cpp cross.cpp)
 	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/cross_section.h)
 endif()
 
@@ -117,6 +116,9 @@ target_include_directories(manifold
 	)
 if(MANIFOLD_EXCEPTIONS)
 	target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
+endif()
+if(MANIFOLD_CROSS_SECTION)
+	target_compile_options(manifold PRIVATE -DMANIFOLD_CROSS_SECTION)
 endif()
 if(MANIFOLD_DEBUG)
 	target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)
