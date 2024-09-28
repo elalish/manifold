@@ -300,7 +300,7 @@ ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);
 ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,
                                                      ManifoldCrossSection *cs);
-#endif // MANIFOLD_CROSS_SECTION
+#endif  // MANIFOLD_CROSS_SECTION
 
 // Rectangle
 

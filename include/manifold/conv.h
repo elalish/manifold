@@ -18,7 +18,7 @@
 
 #include "manifold/common.h"
 #ifdef MANIFOLD_CROSS_SECTION
-#  include "manifold/cross_section.h"
+#include "manifold/cross_section.h"
 #endif
 #include "manifold/manifold.h"
 #include "manifold/types.h"
