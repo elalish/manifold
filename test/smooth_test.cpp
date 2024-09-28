@@ -133,16 +133,16 @@ TEST(Smooth, ToLength) {
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
+  // Tests vertex precision of interpolation
   double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
-    // Refine(odd) puts a center point in the triangle, which is the worst case.
+    // Refine(3*x) makes a center point, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     MeshGL64 out = smoothed.GetMeshGL64();
     const int numVert = out.NumVert();
-    const int numProp = out.numProp;
     double maxR2 = 0;
     double minR2 = 2;
     for (int v = 0; v < numVert; ++v) {
@@ -154,6 +154,37 @@ TEST(Smooth, Sphere) {
     EXPECT_NEAR(std::sqrt(minR2), 1, precision[i]);
     EXPECT_NEAR(std::sqrt(maxR2), 1, precision[i]);
   }
+}
+
+TEST(Smooth, Precision) {
+  // Tests face precision of refinement
+  const double precision = 0.001;
+  const double radius = 10;
+  const double height = 10;
+  Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
+  Manifold smoothed = cylinder.SmoothOut().RefineToPrecision(precision);
+  // Makes an edge bisector, which is the worst case.
+  MeshGL64 out = smoothed.Refine(2).GetMeshGL64();
+  const int numVert = out.NumVert();
+  double maxR2 = 0;
+  double minR2 = 2 * radius * radius;
+  for (int v = 0; v < numVert; ++v) {
+    const vec3 a = out.GetVertPos(v);
+    const vec2 a1(a);
+    // Ignore end caps.
+    const double r2 = (std::abs(a.z) < 0.001 || std::abs(a.z - height) < 0.001)
+                          ? radius * radius
+                          : glm::dot(a1, a1);
+    maxR2 = std::max(maxR2, r2);
+    minR2 = std::min(minR2, r2);
+  }
+  EXPECT_NEAR(std::sqrt(minR2), radius - precision, 1e-4);
+  EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
+  EXPECT_EQ(smoothed.NumTri(), 7984);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("refineCylinder.glb", smoothed.GetMeshGL(), {});
+#endif
 }
 
 TEST(Smooth, Normals) {

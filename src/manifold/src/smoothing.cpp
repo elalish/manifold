@@ -981,10 +981,11 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   DistributeTangents(fixedHalfedge);
 }
 
-void Manifold::Impl::Refine(std::function<int(vec3)> edgeDivisions) {
+void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
+                            bool keepInterior) {
   if (IsEmpty()) return;
   Manifold::Impl old = *this;
-  Vec<Barycentric> vertBary = Subdivide(edgeDivisions);
+  Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {

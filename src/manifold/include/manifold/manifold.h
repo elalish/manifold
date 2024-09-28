@@ -270,6 +270,7 @@ class Manifold {
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
+  Manifold RefineToPrecision(double) const;
   ///@}
 
   /** @name Boolean

@@ -476,7 +476,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
  * (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
-    std::function<int(vec3)> edgeDivisions) {
+    std::function<int(vec3, vec4, vec4)> edgeDivisions, bool keepInterior) {
   Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
   const int numVert = NumVert();
   const int numEdge = edges.size();
@@ -499,13 +499,63 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   for_each_n(policy, countAt(0), numEdge,
              [&edgeAdded, &edges, edgeDivisions, this](const int i) {
                const TmpEdge edge = edges[i];
-               if (IsMarkedInsideQuad(edge.halfedgeIdx)) {
+               const int hIdx = edge.halfedgeIdx;
+               if (IsMarkedInsideQuad(hIdx)) {
                  edgeAdded[i] = 0;
                  return;
                }
                const vec3 vec = vertPos_[edge.first] - vertPos_[edge.second];
-               edgeAdded[i] = edgeDivisions(vec);
+               const vec4 tangent0 =
+                   halfedgeTangent_.empty() ? vec4(0) : halfedgeTangent_[hIdx];
+               const vec4 tangent1 =
+                   halfedgeTangent_.empty()
+                       ? vec4(0)
+                       : halfedgeTangent_[halfedge_[hIdx].pairedHalfedge];
+               edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
              });
+
+  if (keepInterior) {
+    // Triangles where the greatest number of divisions exceeds the sum of the
+    // other two sides will be triangulated as a strip, since if the sub-edges
+    // were all equal length it would be degenerate. This leads to poor results
+    // with RefineToPrecision, so we avoid this case by adding some extra
+    // divisions to the short sides so that the triangulation has some thickness
+    // and creates more interior facets.
+    Vec<int> tmp(numEdge);
+    for_each_n(
+        policy, countAt(0), numEdge,
+        [&tmp, &edgeAdded, &edges, &half2Edge, this](const int i) {
+          tmp[i] = edgeAdded[i];
+          const TmpEdge edge = edges[i];
+          int hIdx = edge.halfedgeIdx;
+          if (IsMarkedInsideQuad(hIdx)) return;
+
+          const int thisAdded = tmp[i];
+          auto Added = [&edgeAdded, &half2Edge, thisAdded, this](int hIdx) {
+            int longest = 0;
+            int total = 0;
+            for (int j : {0, 1, 2}) {
+              const int added = edgeAdded[half2Edge[hIdx]];
+              longest = glm::max(longest, added);
+              total += added;
+              hIdx = NextHalfedge(hIdx);
+              if (IsMarkedInsideQuad(hIdx)) {
+                // No extra on quads
+                longest = 0;
+                total = 1;
+                break;
+              }
+            }
+            const int minExtra = longest * 0.2 + 1;
+            const int extra = 2 * longest + minExtra - total;
+            return extra > 0 ? (extra * (longest - thisAdded)) / longest : 0;
+          };
+
+          tmp[i] +=
+              glm::max(Added(hIdx), Added(halfedge_[hIdx].pairedHalfedge));
+        });
+    edgeAdded.swap(tmp);
+  }
 
   Vec<int> edgeOffset(numEdge);
   exclusive_scan(edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),

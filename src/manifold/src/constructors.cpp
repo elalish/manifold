@@ -172,7 +172,8 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
-  pImpl_->Subdivide([n](vec3 edge) { return n - 1; });
+  pImpl_->Subdivide(
+      [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
                v = glm::cos(glm::half_pi<double>() * (1.0 - v));
