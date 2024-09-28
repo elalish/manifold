@@ -29,8 +29,8 @@ template <typename K, typename V>
 // not really concurrent when tbb is disabled
 using concurrent_map = std::map<K, V>;
 #endif
-#include "boolean3.h"
-#include "manifold/parallel.h"
+#include "./boolean3.h"
+#include "./parallel.h"
 
 using namespace manifold;
 

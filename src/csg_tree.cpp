@@ -21,10 +21,10 @@
 #include <algorithm>
 #include <variant>
 
-#include "boolean3.h"
-#include "csg_tree.h"
-#include "impl.h"
-#include "manifold/parallel.h"
+#include "./boolean3.h"
+#include "./csg_tree.h"
+#include "./impl.h"
+#include "./parallel.h"
 #include "mesh_fixes.h"
 
 constexpr int kParallelThreshold = 4096;
