@@ -5,7 +5,6 @@ set(MANIFOLD_PUBLIC_HDRS
 	optional_assert.h
 	parallel.h
 	polygon.h
-	tri_dist.h
 	vec_view.h
 	)
 

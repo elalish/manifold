@@ -14,9 +14,9 @@
 
 #include <limits>
 
-#include "impl.h"
+#include "./impl.h"
+#include "./tri_dist.h"
 #include "manifold/parallel.h"
-#include "manifold/tri_dist.h"
 
 namespace {
 using namespace manifold;

@@ -44,6 +44,7 @@ set(MANIFOLD_PRIVATE_HDRS
 	shared.h
 	sparse.h
 	svd.h
+	tri_dist.h
 	utils.h
 	vec.h
 	)

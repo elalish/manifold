@@ -19,7 +19,7 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "manifold/tri_dist.h"
+#include "../src/tri_dist.h"
 #include "samples.h"
 #include "test.h"
 

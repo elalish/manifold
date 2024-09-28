@@ -14,8 +14,8 @@
 
 #include <algorithm>
 
+#include "../src/tri_dist.h"
 #include "manifold/manifold.h"
-#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
 
