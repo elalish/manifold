@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if (NOT MANIFOLD_CROSS_SECTION)
+	return()
+endif()
+
 if(NOT EMSCRIPTEN AND MANIFOLD_PYBIND)
     add_subdirectory(python)
 endif()
