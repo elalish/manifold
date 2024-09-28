@@ -16,12 +16,12 @@
 #include <map>
 
 #include "./collider.h"
-#include "manifold/manifold.h"
-#include "manifold/optional_assert.h"
-#include "manifold/polygon.h"
 #include "./sparse.h"
 #include "./utils.h"
 #include "./vec.h"
+#include "manifold/manifold.h"
+#include "manifold/optional_assert.h"
+#include "manifold/polygon.h"
 #include "quickhull.h"
 #include "shared.h"
 

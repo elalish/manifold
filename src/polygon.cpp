@@ -19,8 +19,8 @@
 #include <set>
 
 #include "./collider.h"
-#include "manifold/optional_assert.h"
 #include "./utils.h"
+#include "manifold/optional_assert.h"
 
 namespace {
 using namespace manifold;
