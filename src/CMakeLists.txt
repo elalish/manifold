@@ -65,13 +65,17 @@ set(MANIFOLD_C_BINDING_PRIVATE_HDRS
 list(APPEND MANIFOLD_PRIVATE_HDRS ${MANIFOLD_C_BINDING_PRIVATE_HDRS})
 
 if(MANIFOLD_CROSS_SECTION)
-	list(APPEND MANIFOLD_SRCS cross_section.cpp cross.cpp)
-	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/cross_section.h)
+	list(APPEND MANIFOLD_SRCS
+	  	cross_section/cross_section.cpp
+	  	cross_section/cross.cpp
+		)
 endif()
 
 if(MANIFOLD_EXPORT)
-	list(APPEND MANIFOLD_SRCS meshIO.cpp meshIOc.cpp)
-	list(APPEND MANIFOLD_PRIVATE_HDRS ../include/manifold/meshIO.h)
+	list(APPEND MANIFOLD_SRCS
+		meshIO/meshIO.cpp
+		meshIO/meshIOc.cpp
+		)
 endif()
 
 # Dependency libraries
