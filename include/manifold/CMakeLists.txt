@@ -1,6 +1,5 @@
 set(MANIFOLD_PUBLIC_HDRS
 	common.h
-	iters.h
 	manifold.h
 	optional_assert.h
 	polygon.h
