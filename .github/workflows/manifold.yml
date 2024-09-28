@@ -84,7 +84,7 @@ jobs:
         cd build
         sudo cmake --install .
         cd ..
-        ./sh/test-cmake.sh
+        ./scripts/test-cmake.sh
 
   build_cbind:
     timeout-minutes: 30
@@ -183,7 +183,7 @@ jobs:
         cd build
         cmake --install .
         cd ..
-        ./sh/test-cmake.sh
+        ./scripts/test-cmake.sh
 
   build_mxe:
     timeout-minutes: 30
@@ -239,7 +239,7 @@ jobs:
         cd build
         sudo cmake --install .
         cd ..
-        ./sh/test-cmake.sh
+        ./scripts/test-cmake.sh
 
   build_nix:
     timeout-minutes: 30
