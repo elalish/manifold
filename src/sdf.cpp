@@ -14,8 +14,8 @@
 
 #include <glm/gtc/integer.hpp>
 
-#include "./impl.h"
 #include "./hashtable.h"
+#include "./impl.h"
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/manifold.h"

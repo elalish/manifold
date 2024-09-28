@@ -1,7 +1,7 @@
 #include <algorithm>
-#include <iostream>
-#include <iomanip>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <string>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
