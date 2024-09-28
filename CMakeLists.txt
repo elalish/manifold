@@ -147,6 +147,7 @@ endif("${isSystemDir}" STREQUAL "-1")
 
 
 # Dependencies
+include(FetchContent)
 
 # GLM is required in all configurations.
 find_package(glm QUIET)
@@ -155,7 +156,6 @@ if(NOT glm_FOUND)
 		message(FATAL_ERROR "glm not found, and dependency downloading disabled.  Please install glm and reconfigure.\n")
 	endif()
 	message(STATUS "glm not found, downloading from source")
-	include(FetchContent)
 	set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
 	FetchContent_Declare(glm
 		GIT_REPOSITORY https://github.com/g-truc/glm.git
@@ -187,7 +187,6 @@ if(MANIFOLD_PAR STREQUAL "TBB")
 		# TODO - this isn't recommended by the TBB upstream - should we be
 		# doing it?
 		message(STATUS "TBB not found, downloading from source")
-		include(FetchContent)
 		set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
 		set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
 		FetchContent_Declare(TBB
