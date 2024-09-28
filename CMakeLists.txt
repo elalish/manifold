@@ -32,9 +32,9 @@ set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANI
 # work this way)
 if (DEFINED MANIFOLD_PAR)
   if ("${MANIFOLD_PAR}" STREQUAL "" OR "${MANIFOLD_PAR}" STREQUAL "NONE")
-    set(MANIFOLD_PAR OFF CACHE BOOL "Normalized MANIFOLD_PAR setting")
+    set(MANIFOLD_PAR OFF)
   else()
-    set(MANIFOLD_PAR ON CACHE BOOL "Normalized MANIFOLD_PAR setting")
+    set(MANIFOLD_PAR ON)
   endif ()
 endif ()
 
