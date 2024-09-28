@@ -15,6 +15,9 @@
 if (NOT MANIFOLD_TEST)
 	return()
 endif()
+if (NOT MANIFOLD_DOWNLOADS)
+	message("Downloading is disabled, but testing requires googletest - skipping.\n")
+endif()
 
 enable_testing()
 

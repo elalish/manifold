@@ -314,6 +314,7 @@ if(EMSCRIPTEN)
 	return()
 endif()
 
+
 # CMake exports
 configure_file(manifoldConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake @ONLY)
 include(CMakePackageConfigHelpers)
@@ -322,17 +323,21 @@ write_basic_package_version_file(
 	VERSION ${MANIFOLD_VERSION}
 	COMPATIBILITY SameMajorVersion
 	)
+
+# Location of inputs for CMake find_package - see:
+# https://cmake.org/cmake/help/latest/command/find_package.html
 set(EXPORT_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake)
+
 install(EXPORT manifoldTargets
 	NAMESPACE manifold::
   	DESTINATION ${EXPORT_INSTALL_DIR}/manifold
 	)
-# TODO - do we need different destinations for this for different platforms?
 install(FILES
 	${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
 	${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
 	DESTINATION ${EXPORT_INSTALL_DIR}/manifold
 	)
+
 
 # PkgConfig file
 if(MANIFOLD_CROSS_SECTION)
