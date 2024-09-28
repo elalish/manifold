@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 
@@ -6,8 +8,8 @@
 #include <execution>
 #endif
 
+#include "../src/utils.h"
 #include "manifold/polygon.h"
-#include "manifold/utils.h"
 
 using namespace manifold;
 
