@@ -45,7 +45,7 @@ cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "EMSCRIPTEN" OFF)
 
 # Set some option values in the CMake cache
 if(NOT MANIFOLD_FLAGS)
-	set(MANIFOLD_FLAGS "")
+  set(MANIFOLD_FLAGS "")
 endif()
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 set(MANIFOLD_PAR "${MANIFOLD_PAR}" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
@@ -85,7 +85,7 @@ if(TRACY_ENABLE)
     set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTRACY_MEMORY_USAGE)
   endif()
   if(NOT MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
   endif()
 else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
@@ -107,7 +107,7 @@ endif()
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
   # for nixos
   set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
-      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+    ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
 if (MSVC)
@@ -142,7 +142,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} isSystemDir)
 if("${isSystemDir}" STREQUAL "-1")
-    set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+  set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 endif("${isSystemDir}" STREQUAL "-1")
 
 
@@ -152,105 +152,105 @@ include(FetchContent)
 # GLM is required in all configurations.
 find_package(glm QUIET)
 if(NOT glm_FOUND)
-	if (NOT MANIFOLD_DOWNLOADS)
-		message(FATAL_ERROR "glm not found, and dependency downloading disabled.  Please install glm and reconfigure.\n")
-	endif()
-	message(STATUS "glm not found, downloading from source")
-	set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
-	FetchContent_Declare(glm
-		GIT_REPOSITORY https://github.com/g-truc/glm.git
-		GIT_TAG 1.0.1
-		GIT_PROGRESS TRUE
-		)
-	FetchContent_MakeAvailable(glm)
-	if(NOT EMSCRIPTEN)
-		install(TARGETS glm)
-	endif()
+  if (NOT MANIFOLD_DOWNLOADS)
+    message(FATAL_ERROR "glm not found, and dependency downloading disabled.  Please install glm and reconfigure.\n")
+  endif()
+  message(STATUS "glm not found, downloading from source")
+  set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
+  FetchContent_Declare(glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG 1.0.1
+    GIT_PROGRESS TRUE
+    )
+  FetchContent_MakeAvailable(glm)
+  if(NOT EMSCRIPTEN)
+    install(TARGETS glm)
+  endif()
 endif()
 
 # If we're building parallel, we need the requisite libraries
 if(MANIFOLD_PAR STREQUAL "TBB")
-	find_package(Threads REQUIRED)
-	find_package(TBB QUIET)
-	if(APPLE)
-		find_package(oneDPL QUIET)
-	endif()
-	find_package(PkgConfig QUIET)
-	if(NOT TBB_FOUND AND PKG_CONFIG_FOUND)
-		pkg_check_modules(TBB tbb)
-	endif()
-	if(NOT TBB_FOUND)
-		if (NOT MANIFOLD_DOWNLOADS)
-			message(FATAL_ERROR "Parallel mode enabled, but TBB was not found and dependency downloading is disabled.  Please install TBB and reconfigure.\n")
-		endif()
+  find_package(Threads REQUIRED)
+  find_package(TBB QUIET)
+  if(APPLE)
+    find_package(oneDPL QUIET)
+  endif()
+  find_package(PkgConfig QUIET)
+  if(NOT TBB_FOUND AND PKG_CONFIG_FOUND)
+    pkg_check_modules(TBB tbb)
+  endif()
+  if(NOT TBB_FOUND)
+    if (NOT MANIFOLD_DOWNLOADS)
+      message(FATAL_ERROR "Parallel mode enabled, but TBB was not found and dependency downloading is disabled.  Please install TBB and reconfigure.\n")
+    endif()
 
-		# TODO - this isn't recommended by the TBB upstream - should we be
-		# doing it?
-		message(STATUS "TBB not found, downloading from source")
-		set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
-		set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
-		FetchContent_Declare(TBB
-			GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-			GIT_TAG        v2021.11.0
-			GIT_PROGRESS   TRUE
-			)
-		FetchContent_MakeAvailable(TBB)
-		set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-		# note: we do want to install tbb to the user machine when built from
-		# source
-		if(NOT EMSCRIPTEN)
-			install(TARGETS tbb)
-		endif()
-	endif()
-	message("Parallel Backend: ${MANIFOLD_PAR}")
+    # TODO - this isn't recommended by the TBB upstream - should we be
+    # doing it?
+    message(STATUS "TBB not found, downloading from source")
+    set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+    set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+    FetchContent_Declare(TBB
+      GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+      GIT_TAG        v2021.11.0
+      GIT_PROGRESS   TRUE
+      )
+    FetchContent_MakeAvailable(TBB)
+    set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    # note: we do want to install tbb to the user machine when built from
+    # source
+    if(NOT EMSCRIPTEN)
+      install(TARGETS tbb)
+    endif()
+  endif()
+  message("Parallel Backend: ${MANIFOLD_PAR}")
 elseif(NOT MANIFOLD_PAR OR MANIFOLD_PAR STREQUAL "NONE")
-	message("Parallel Backend: NONE")
-	set(MANIFOLD_PAR "NONE")
+  message("Parallel Backend: NONE")
+  set(MANIFOLD_PAR "NONE")
 else()
-	message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
-		"Should be \"TBB\" or \"NONE\"")
+  message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
+    "Should be \"TBB\" or \"NONE\"")
 endif()
 
 # If we're building cross_section, we need Clipper2
 if(MANIFOLD_CROSS_SECTION)
-	find_package(Clipper2 QUIET)
-	if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
-		pkg_check_modules(Clipper2 Clipper2)
-	endif()
-	if(Clipper2_FOUND)
-		add_library(Clipper2 SHARED IMPORTED)
-		set_property(TARGET Clipper2 PROPERTY
-			IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
-		if(WIN32)
-			set_property(TARGET Clipper2 PROPERTY
-				IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
-		endif()
-		target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
-	else()
-		if (NOT MANIFOLD_DOWNLOADS)
-			message(FATAL_ERROR "cross_section enabled, but Clipper2 was not found and dependency downloading is disabled.  Please install Clipper2 and reconfigure.\n")
-		endif()
-		message(STATUS "clipper2 not found, downloading from source")
-		set(CLIPPER2_UTILS OFF)
-		set(CLIPPER2_EXAMPLES OFF)
-		set(CLIPPER2_TESTS OFF)
-		set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
-		FetchContent_Declare(Clipper2
-			GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-			GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
-			GIT_PROGRESS TRUE
-			SOURCE_SUBDIR CPP
-			)
-		FetchContent_MakeAvailable(Clipper2)
-		if(NOT EMSCRIPTEN)
-			install(TARGETS Clipper2)
-		endif()
-	endif()
+  find_package(Clipper2 QUIET)
+  if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
+    pkg_check_modules(Clipper2 Clipper2)
+  endif()
+  if(Clipper2_FOUND)
+    add_library(Clipper2 SHARED IMPORTED)
+    set_property(TARGET Clipper2 PROPERTY
+      IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
+    if(WIN32)
+      set_property(TARGET Clipper2 PROPERTY
+	IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
+    endif()
+    target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
+  else()
+    if (NOT MANIFOLD_DOWNLOADS)
+      message(FATAL_ERROR "cross_section enabled, but Clipper2 was not found and dependency downloading is disabled.  Please install Clipper2 and reconfigure.\n")
+    endif()
+    message(STATUS "clipper2 not found, downloading from source")
+    set(CLIPPER2_UTILS OFF)
+    set(CLIPPER2_EXAMPLES OFF)
+    set(CLIPPER2_TESTS OFF)
+    set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
+    FetchContent_Declare(Clipper2
+      GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
+      GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
+      GIT_PROGRESS TRUE
+      SOURCE_SUBDIR CPP
+      )
+    FetchContent_MakeAvailable(Clipper2)
+    if(NOT EMSCRIPTEN)
+      install(TARGETS Clipper2)
+    endif()
+  endif()
 endif()
 
 # If we're supporting mesh I/O, we need assimp
 if(MANIFOLD_EXPORT)
-	find_package(assimp REQUIRED)
+  find_package(assimp REQUIRED)
 endif()
 
 add_subdirectory(src)
@@ -267,21 +267,21 @@ message(STATUS "Manifold Build Configuration Summary")
 message(STATUS "====================================")
 message(STATUS " ")
 if (MXECROSS)
-	message(STATUS "Environment: MXE")
+  message(STATUS "Environment: MXE")
 elseif (APPLE)
-	message(STATUS "Environment: macOS")
+  message(STATUS "Environment: macOS")
 elseif (WIN32)
-	if (MINGW)
-		message(STATUS "Environment: msys2")
-	else()
-		message(STATUS "Environment: Windows")
-	endif()
+  if (MINGW)
+    message(STATUS "Environment: msys2")
+  else()
+    message(STATUS "Environment: Windows")
+  endif()
 elseif (LINUX)
-	message(STATUS "Environment: Linux")
+  message(STATUS "Environment: Linux")
 elseif(UNIX)
-	message(STATUS "Environment: Unknown Unix")
+  message(STATUS "Environment: Unknown Unix")
 else()
-	message(STATUS "Environment: Unknown")
+  message(STATUS "Environment: Unknown")
 endif()
 message(STATUS " ")
 message(STATUS "CMAKE_VERSION:               ${CMAKE_VERSION}")
@@ -293,8 +293,8 @@ message(STATUS "CMAKE_PREFIX_PATH:           ${CMAKE_PREFIX_PATH}")
 message(STATUS "CMAKE_CXX_COMPILER_ID:       ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION:  ${CMAKE_CXX_COMPILER_VERSION}")
 if (APPLE)
-	message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
-	message(STATUS "CMAKE_OSX_ARCHITECTURES:     ${CMAKE_OSX_ARCHITECTURES}")
+  message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  message(STATUS "CMAKE_OSX_ARCHITECTURES:     ${CMAKE_OSX_ARCHITECTURES}")
 endif()
 message(STATUS "BUILD_SHARED_LIBS:           ${BUILD_SHARED_LIBS}")
 message(STATUS " ")
@@ -311,7 +311,7 @@ message(STATUS " ")
 
 # If it's an EMSCRIPTEN build, we're done
 if(EMSCRIPTEN)
-	return()
+  return()
 endif()
 
 
@@ -319,31 +319,38 @@ endif()
 configure_file(manifoldConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake @ONLY)
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-	${CMAKE_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
-	VERSION ${MANIFOLD_VERSION}
-	COMPATIBILITY SameMajorVersion
-	)
+  ${CMAKE_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
+  VERSION ${MANIFOLD_VERSION}
+  COMPATIBILITY SameMajorVersion
+  )
 
 # Location of inputs for CMake find_package - see:
 # https://cmake.org/cmake/help/latest/command/find_package.html
 set(EXPORT_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake)
 
 install(EXPORT manifoldTargets
-	NAMESPACE manifold::
-  	DESTINATION ${EXPORT_INSTALL_DIR}/manifold
-	)
+  NAMESPACE manifold::
+  DESTINATION ${EXPORT_INSTALL_DIR}/manifold
+  )
 install(FILES
-	${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
-	${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
-	DESTINATION ${EXPORT_INSTALL_DIR}/manifold
-	)
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
+  DESTINATION ${EXPORT_INSTALL_DIR}/manifold
+  )
 
 
 # PkgConfig file
 if(MANIFOLD_CROSS_SECTION)
-	set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
+  set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
 endif()
 configure_file(manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
-	DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8
