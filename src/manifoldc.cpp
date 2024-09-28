@@ -16,8 +16,8 @@
 
 #include <vector>
 
+#include "./conv.h"
 #include "manifold/common.h"
-#include "manifold/conv.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif

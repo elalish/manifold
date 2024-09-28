@@ -9,7 +9,6 @@ set(MANIFOLD_PUBLIC_HDRS
 	)
 
 set(MANIFOLD_C_BINDING_HDRS
-	conv.h
 	manifoldc.h
 	types.h
 	)
