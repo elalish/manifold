@@ -22,7 +22,7 @@
             src = clipper2-src;
           });
           manifold =
-            { parallel-backend ? "off"
+            { parallel-backend ? "none"
             , doCheck ? true
             , build-tools ? [ ]
             , ...
@@ -60,9 +60,9 @@
               '';
             };
           parallelBackends = [
-            { parallel-backend = "off"; }
+            { parallel-backend = "none"; }
             {
-              parallel-backend = "on";
+              parallel-backend = "tbb";
               build-tools = with pkgs; [ tbb pkg-config ];
             }
           ];

@@ -28,6 +28,15 @@ set(MANIFOLD_VERSION_MINOR 5)
 set(MANIFOLD_VERSION_PATCH 1)
 set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}")
 
+# Correct MANIFOLD_PAR values to on/off (previous NONE/TBB values should still
+# work this way)
+if (DEFINED MANIFOLD_PAR)
+  if ("${MANIFOLD_PAR}" STREQUAL "" OR "${MANIFOLD_PAR}" STREQUAL "NONE")
+    set(MANIFOLD_PAR OFF CACHE BOOL "Normalized MANIFOLD_PAR setting")
+  else()
+    set(MANIFOLD_PAR ON CACHE BOOL "Normalized MANIFOLD_PAR setting")
+  endif ()
+endif ()
 
 # Primary user facing options
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
