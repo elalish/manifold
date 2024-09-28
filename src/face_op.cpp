@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
+#if defined(MANIFOLD_PAR) && __has_include(<tbb/concurrent_map.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
@@ -131,7 +131,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
     return TriangulateIdx(polys, precision_);
   };
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#if defined(MANIFOLD_PAR) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
   // map from face to triangle
   tbb::concurrent_unordered_map<int, std::vector<ivec3>> results;

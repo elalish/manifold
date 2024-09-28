@@ -16,7 +16,7 @@
 // Iterators must be RandomAccessIterator.
 
 #pragma once
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
 #include <tbb/combinable.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_invoke.h>
@@ -63,7 +63,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first);
 
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
 namespace details {
 using manifold::kSeqThreshold;
 // implementation from
@@ -294,7 +294,7 @@ template <typename Iterator,
           typename Comp = decltype(std::less<T>())>
 void mergeSort(ExecutionPolicy policy, Iterator first, Iterator last,
                Comp comp) {
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     // apparently this prioritizes threads inside here?
     tbb::this_task_arena::isolate([&] {
@@ -348,7 +348,7 @@ struct SortFunctor<
     static_assert(std::is_trivially_destructible_v<T>,
                   "Our simple implementation does not support types that are "
                   "not trivially destructable.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
     if (policy == ExecutionPolicy::Par) {
       radix_sort(&*first, static_cast<size_t>(std::distance(first, last)));
       return;
@@ -369,7 +369,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
                       [&f](const tbb::blocked_range<Iter> &range) {
@@ -405,7 +405,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
                     typename std::iterator_traits<InputIter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
     return tbb::parallel_reduce(
@@ -481,7 +481,7 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_scan(
         tbb::blocked_range<size_t>(0, std::distance(first, last)),
@@ -543,7 +543,7 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     details::ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f,
                                                             first, d_first);
@@ -596,7 +596,7 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(
         tbb::blocked_range<size_t>(
@@ -640,7 +640,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<size_t>(
                           0_uz, static_cast<size_t>(std::distance(first, last)),
@@ -697,7 +697,7 @@ void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<OutputIter>(first, last),
                       [&](const tbb::blocked_range<OutputIter> &range) {
@@ -720,7 +720,7 @@ void fill(OutputIter first, OutputIter last, T value) {
 template <typename InputIter, typename P>
 size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
                 P pred) {
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     return reduce(policy, TransformIterator(first, pred),
                   TransformIterator(last, pred), 0_uz, std::plus<size_t>());
@@ -744,7 +744,7 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
                     typename std::iterator_traits<InputIter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
     return tbb::parallel_reduce(
@@ -791,7 +791,7 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     auto pred2 = [&](size_t i) { return pred(first[i]); };
     details::CopyIfScanBody body(pred2, first, d_first);
@@ -838,7 +838,7 @@ Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
     auto back =
@@ -885,7 +885,7 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
     auto back =
@@ -932,7 +932,7 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par && first != last) {
     Iter newSrcStart = first;
     // cap the maximum buffer size, proved to be beneficial for unique with huge
@@ -985,7 +985,7 @@ Iter unique(Iter first, Iter last) {
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   details::SortFunctor<Iterator, T>()(policy, first, last);
 #else
   std::stable_sort(first, last);
@@ -1016,7 +1016,7 @@ template <typename Iterator,
           typename Comp = decltype(std::less<T>())>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
                  Comp comp) {
-#if MANIFOLD_PAR == 'T'
+#if defined(MANIFOLD_PAR)
   details::mergeSort(policy, first, last, comp);
 #else
   std::stable_sort(first, last, comp);

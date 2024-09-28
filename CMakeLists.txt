@@ -36,7 +36,7 @@ option(MANIFOLD_DOWNLOADS "Allow Manifold build to download missing dependencies
 option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF) # fuzztest is a rather large dependency
-option(MANIFOLD_PAR "Parallel backend, either \"TBB\" or \"NONE\"" "NONE")
+option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
@@ -48,8 +48,6 @@ if(NOT MANIFOLD_FLAGS)
   set(MANIFOLD_FLAGS "")
 endif()
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
-set(MANIFOLD_PAR "${MANIFOLD_PAR}" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
-set_property(CACHE MANIFOLD_PAR PROPERTY STRINGS "TBB;NONE")
 
 
 # Development options
@@ -169,7 +167,7 @@ if(NOT glm_FOUND)
 endif()
 
 # If we're building parallel, we need the requisite libraries
-if(MANIFOLD_PAR STREQUAL "TBB")
+if(MANIFOLD_PAR)
   find_package(Threads REQUIRED)
   find_package(TBB QUIET)
   find_package(PkgConfig QUIET)
@@ -199,13 +197,6 @@ if(MANIFOLD_PAR STREQUAL "TBB")
       install(TARGETS tbb)
     endif()
   endif()
-  message("Parallel Backend: ${MANIFOLD_PAR}")
-elseif(NOT MANIFOLD_PAR OR MANIFOLD_PAR STREQUAL "NONE")
-  message("Parallel Backend: NONE")
-  set(MANIFOLD_PAR "NONE")
-else()
-  message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
-    "Should be \"TBB\" or \"NONE\"")
 endif()
 
 # If we're building cross_section, we need Clipper2

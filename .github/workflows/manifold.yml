@@ -12,16 +12,16 @@ on:
 
 jobs:
   build:
-    name: CrossSection:${{matrix.cross_section}} ${{matrix.parallel_backend == 'TBB' && 'TBB' || ''}} GCC ${{matrix.gcc}}
+    name: CrossSection:${{matrix.cross_section}} ${{matrix.parallel_backend == 'ON'}} GCC ${{matrix.gcc}}
     timeout-minutes: 45
     strategy:
       matrix:
         cross_section: [ON]
-        parallel_backend: [NONE, TBB]
+        parallel_backend: [OFF, ON]
         gcc: [13, 14]
         include:
           - cross_section: OFF
-            parallel_backend: TBB
+            parallel_backend: ON
             gcc: 14
     runs-on: ubuntu-24.04
     env:
@@ -40,18 +40,18 @@ jobs:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build ${{matrix.parallel_backend}}
-      if: matrix.parallel_backend != 'NONE'
+      if: matrix.parallel_backend != 'OFF'
       run: |
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_FLAGS=-UNDEBUG -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test ${{matrix.parallel_backend}}
-      if: matrix.parallel_backend != 'NONE'
+      if: matrix.parallel_backend != 'OFF'
       run: |
         cd build/test
         ./manifold_test
     - name: Test Python bindings ${{matrix.parallel_backend}}
-      if: matrix.parallel_backend != 'NONE' && matrix.cross_section == 'ON'
+      if: matrix.parallel_backend != 'OFF' && matrix.cross_section == 'ON'
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         python3 bindings/python/examples/run_all.py -e
@@ -60,7 +60,7 @@ jobs:
       # only do code coverage for default sequential backend, it seems that TBB
       # backend will cause failure
       # perhaps issue related to invalid memory access?
-      if: matrix.parallel_backend == 'NONE'
+      if: matrix.parallel_backend == 'OFF'
       run: |
         mkdir build
         cd build
@@ -74,7 +74,7 @@ jobs:
         lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' --output-file ./code_coverage.info
         cd ../
     - uses: codecov/codecov-action@v4
-      if: matrix.parallel_backend == 'NONE'
+      if: matrix.parallel_backend == 'OFF'
       with:
         files: build/code_coverage.info
         fail_ci_if_error: false
@@ -101,7 +101,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=TBB .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=ON .. && make
     - name: Test
       run: |
         cd build/test
@@ -158,7 +158,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        parallel_backend: [NONE, TBB]
+        parallel_backend: [OFF, ON]
       max-parallel: 1
     runs-on: windows-2019
     if: github.event.pull_request.draft == false
@@ -189,7 +189,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        parallel_backend: [NONE, TBB]
+        parallel_backend: [OFF, ON]
       max-parallel: 1
     runs-on: ubuntu-latest
     container: openscad/mxe-x86_64-gui:latest
@@ -211,7 +211,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        parallel_backend: [NONE, TBB]
+        parallel_backend: [OFF, ON]
     runs-on: macos-latest
     if: github.event.pull_request.draft == false
     steps:
@@ -220,7 +220,7 @@ jobs:
         brew install pkg-config googletest assimp
         pip install trimesh pytest
     - name: Install TBB
-      if: matrix.parallel_backend == 'TBB'
+      if: matrix.parallel_backend == 'ON'
       run: brew install tbb onedpl
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2

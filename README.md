@@ -34,7 +34,7 @@ This is a modern C++ library that Github's CI verifies builds and runs on a vari
 
 System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
 - [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
-- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=TBB` is enabled)
+- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=ON` is enabled)
 - [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
 Other dependencies:
@@ -70,7 +70,7 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding when using emscripten.
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding.
-- `MANIFOLD_PAR=[<NONE>, TBB]`: Provides multi-thread parallelization, requires `libtbb-dev` if `TBB` backend is selected.
+- `MANIFOLD_PAR=[<OFF>, ON]`: Provides multi-thread parallelization, requires `libtbb-dev` enabled.
 - `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings).
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
