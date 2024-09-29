@@ -354,6 +354,7 @@ int manifold_box_is_finite(ManifoldBox *b);
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
 void manifold_set_circular_segments(int number);
+void manifold_reset_to_circular_defaults();
 
 // Manifold Mesh Extraction
 
