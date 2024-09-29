@@ -583,6 +583,8 @@ int manifold_get_circular_segments(double radius) {
   return Quality::GetCircularSegments(radius);
 }
 
+void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
+
 // memory size
 size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_cross_section_vec_size() {
