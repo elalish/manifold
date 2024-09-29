@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT MANIFOLD_PYBIND)
+  return()
+endif()
+
 project(python)
+
+if(Python_VERSION VERSION_LESS 3.12)
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+else()
+  find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+endif()
+if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
+  set(MANIFOLD_PYBIND_STUBGEN ON)
+else()
+  # stubgen does not support version less than 3.11
+  set(MANIFOLD_PYBIND_STUBGEN OFF)
+  message("Python version too old, stub will not be generated")
+endif()
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" -m nanobind --version
@@ -31,7 +48,7 @@ else()
     GIT_REPOSITORY https://github.com/wjakob/nanobind.git
     GIT_TAG 9641bb7151f04120013b812789b3ebdfa7e7324f # v2.1.0
     GIT_PROGRESS TRUE
-  )
+    )
   FetchContent_MakeAvailable(nanobind)
 endif()
 
@@ -58,7 +75,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     )
 endif()
 
-target_link_libraries(manifold3d PRIVATE manifold polygon cross_section)
+target_link_libraries(manifold3d PRIVATE manifold)
 target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
 target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
@@ -66,19 +83,19 @@ set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 message(Python_EXECUTABLE = ${Python_EXECUTABLE})
 # ideally we should generate a dependency file from python...
 set(DOCSTRING_DEPS
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/manifold.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/constructors.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/sort.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cross_section/src/cross_section.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/polygon/src/polygon.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/manifold/common.h
+  ${CMAKE_SOURCE_DIR}/src/manifold.cpp
+  ${CMAKE_SOURCE_DIR}/src/constructors.cpp
+  ${CMAKE_SOURCE_DIR}/src/sort.cpp
+  ${CMAKE_SOURCE_DIR}/src/cross_section/cross_section.cpp
+  ${CMAKE_SOURCE_DIR}/src/polygon.cpp
+  ${CMAKE_SOURCE_DIR}/include/manifold/common.h
   )
 add_custom_command(
   OUTPUT autogen_docstrings.inl
   DEPENDS ${DOCSTRING_DEPS}
   COMMAND ${Python_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
+  )
 target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(SKBUILD)
@@ -92,12 +109,19 @@ install(
   LIBRARY DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
   COMPONENT bindings
   EXCLUDE_FROM_ALL
-)
+  )
 if(MANIFOLD_PYBIND_STUBGEN)
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
     DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
     COMPONENT bindings
     EXCLUDE_FROM_ALL
-  )
+    )
 endif()
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8

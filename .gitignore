@@ -118,6 +118,18 @@ __pycache__
 *.sublime-project
 *.sublime-workspace
 .cache
+CMakeUserPresets.json
+CMakeSettings.json
 
 # PyCharm
 .idea
+
+# Temporary files
+*~
+\#*\#
+.\#*
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
+
