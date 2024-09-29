@@ -86,7 +86,7 @@ set(DOCSTRING_DEPS
   ${CMAKE_SOURCE_DIR}/src/manifold.cpp
   ${CMAKE_SOURCE_DIR}/src/constructors.cpp
   ${CMAKE_SOURCE_DIR}/src/sort.cpp
-  ${CMAKE_SOURCE_DIR}/src/cross_section.cpp
+  ${CMAKE_SOURCE_DIR}/src/cross_section/cross_section.cpp
   ${CMAKE_SOURCE_DIR}/src/polygon.cpp
   ${CMAKE_SOURCE_DIR}/include/manifold/common.h
   )
