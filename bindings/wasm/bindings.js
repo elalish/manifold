@@ -190,7 +190,7 @@ Module.setup = function() {
 
   Module.CrossSection.prototype.toPolygons = function() {
     const vec = this._ToPolygons();
-    const result = vec2polygons(vec);
+    const result = vec2polygons(vec, v => [v.x, v.y]);
     vec.delete();
     return result;
   };
