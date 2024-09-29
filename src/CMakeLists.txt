@@ -39,7 +39,6 @@ set(MANIFOLD_PRIVATE_HDRS
 	csg_tree.h
 	hashtable.h
 	impl.h
-	iters.h
 	mesh_fixes.h
 	parallel.h
 	quickhull.h
