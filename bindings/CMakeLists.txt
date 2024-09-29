@@ -13,13 +13,20 @@
 # limitations under the License.
 
 if (NOT MANIFOLD_CROSS_SECTION)
-	return()
+  return()
 endif()
 
 if(NOT EMSCRIPTEN AND MANIFOLD_PYBIND)
-    add_subdirectory(python)
+  add_subdirectory(python)
 endif()
 
 if(EMSCRIPTEN AND MANIFOLD_JSBIND)
-    add_subdirectory(wasm)
+  add_subdirectory(wasm)
 endif()
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8

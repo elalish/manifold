@@ -13,22 +13,22 @@
 # limitations under the License.
 
 if(NOT MANIFOLD_PYBIND)
-	return()
+  return()
 endif()
 
 project(python)
 
 if(Python_VERSION VERSION_LESS 3.12)
-	find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 else()
-	find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+  find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
 endif()
 if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
-	set(MANIFOLD_PYBIND_STUBGEN ON)
+  set(MANIFOLD_PYBIND_STUBGEN ON)
 else()
-	# stubgen does not support version less than 3.11
-	set(MANIFOLD_PYBIND_STUBGEN OFF)
-	message("Python version too old, stub will not be generated")
+  # stubgen does not support version less than 3.11
+  set(MANIFOLD_PYBIND_STUBGEN OFF)
+  message("Python version too old, stub will not be generated")
 endif()
 
 execute_process(
@@ -48,7 +48,7 @@ else()
     GIT_REPOSITORY https://github.com/wjakob/nanobind.git
     GIT_TAG 9641bb7151f04120013b812789b3ebdfa7e7324f # v2.1.0
     GIT_PROGRESS TRUE
-  )
+    )
   FetchContent_MakeAvailable(nanobind)
 endif()
 
@@ -95,7 +95,7 @@ add_custom_command(
   DEPENDS ${DOCSTRING_DEPS}
   COMMAND ${Python_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
+  )
 target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(SKBUILD)
@@ -109,12 +109,19 @@ install(
   LIBRARY DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
   COMPONENT bindings
   EXCLUDE_FROM_ALL
-)
+  )
 if(MANIFOLD_PYBIND_STUBGEN)
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
     DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
     COMPONENT bindings
     EXCLUDE_FROM_ALL
-  )
+    )
 endif()
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8

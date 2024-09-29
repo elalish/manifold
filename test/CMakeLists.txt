@@ -13,26 +13,26 @@
 # limitations under the License.
 
 if (NOT MANIFOLD_TEST)
-	return()
+  return()
 endif()
 if (NOT MANIFOLD_DOWNLOADS)
-	message("Downloading is disabled, but testing requires googletest - skipping.\n")
+  message("Downloading is disabled, but testing requires googletest - skipping.\n")
 endif()
 
 enable_testing()
 
 set(SOURCE_FILES
-	boolean_complex_test.cpp
-	boolean_test.cpp
-	hull_test.cpp
-	manifold_test.cpp
-	polygon_test.cpp
-	properties_test.cpp
-	samples_test.cpp
-	sdf_test.cpp
-	smooth_test.cpp
-	test_main.cpp
-	)
+  boolean_complex_test.cpp
+  boolean_test.cpp
+  hull_test.cpp
+  manifold_test.cpp
+  polygon_test.cpp
+  properties_test.cpp
+  samples_test.cpp
+  sdf_test.cpp
+  smooth_test.cpp
+  test_main.cpp
+  )
 
 if(MANIFOLD_CROSS_SECTION)
   list(APPEND SOURCE_FILES cross_section_test.cpp)
@@ -54,37 +54,37 @@ FetchContent_Declare(googletest
   GIT_SHALLOW    TRUE
   GIT_PROGRESS   TRUE
   FIND_PACKAGE_ARGS NAMES GTest gtest
-)
+  )
 FetchContent_MakeAvailable(googletest)
 
 if(NOT TARGET GTest::gtest_main)
-    add_library(GTest::gtest_main ALIAS gtest_main)
+  add_library(GTest::gtest_main ALIAS gtest_main)
 endif()
 
 add_executable(manifold_test ${SOURCE_FILES})
 target_link_libraries(manifold_test GTest::gtest_main manifold samples)
 
 if(MANIFOLD_FUZZ)
-	FetchContent_Declare(fuzztest
-		GIT_REPOSITORY https://github.com/google/fuzztest.git
-		# note that if commit hash is used, it cannot be a shallow clone
-		GIT_TAG        2606e04a43e5a7730e437a849604a61f1cb0ff28
-		GIT_PROGRESS   TRUE
-		)
-	FetchContent_MakeAvailable(fuzztest)
-	fuzztest_setup_fuzzing_flags()
-	add_executable(polygon_fuzz polygon_fuzz.cpp)
-	target_link_libraries(polygon_fuzz PUBLIC manifold)
-	link_fuzztest(polygon_fuzz)
-	gtest_discover_tests(polygon_fuzz)
+  FetchContent_Declare(fuzztest
+    GIT_REPOSITORY https://github.com/google/fuzztest.git
+    # note that if commit hash is used, it cannot be a shallow clone
+    GIT_TAG        2606e04a43e5a7730e437a849604a61f1cb0ff28
+    GIT_PROGRESS   TRUE
+    )
+  FetchContent_MakeAvailable(fuzztest)
+  fuzztest_setup_fuzzing_flags()
+  add_executable(polygon_fuzz polygon_fuzz.cpp)
+  target_link_libraries(polygon_fuzz PUBLIC manifold)
+  link_fuzztest(polygon_fuzz)
+  gtest_discover_tests(polygon_fuzz)
 endif()
 
 if(MANIFOLD_CROSS_SECTION)
-	target_compile_options(manifold_test PUBLIC -DMANIFOLD_CROSS_SECTION)
+  target_compile_options(manifold_test PUBLIC -DMANIFOLD_CROSS_SECTION)
 endif()
 
 if(MANIFOLD_EXPORT)
-	target_compile_options(manifold_test PUBLIC -DMANIFOLD_EXPORT)
+  target_compile_options(manifold_test PUBLIC -DMANIFOLD_EXPORT)
 endif()
 
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
@@ -94,14 +94,21 @@ add_test(test_all manifold_test)
 target_precompile_headers(manifold_test INTERFACE test.h)
 
 if(EMSCRIPTEN)
-	set_target_properties(manifold_test PROPERTIES LINK_FLAGS
-		"-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons")
+  set_target_properties(manifold_test PROPERTIES LINK_FLAGS
+    "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons")
 endif()
 
 if(MSVC)
-	set_target_properties(manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-		${CMAKE_BINARY_DIR}/bin )
-	set_target_properties(manifold_test PROPERTIES LIBRARY_OUTPUT_DIRECTORY
-		${CMAKE_BINARY_DIR}/bin )
+  set_target_properties(manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+    ${CMAKE_BINARY_DIR}/bin )
+  set_target_properties(manifold_test PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+    ${CMAKE_BINARY_DIR}/bin )
 endif()
 
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8

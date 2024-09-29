@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(NOT MANIFOLD_TEST)
-	return()
+  return()
 endif()
 
 add_executable(perfTest perf_test.cpp)
@@ -48,18 +48,25 @@ if(MANIFOLD_EXPORT)
 endif()
 
 if(BUILD_TEST_CGAL)
-    add_executable(perfTestCGAL perf_test_cgal.cpp)
-    find_package(CGAL REQUIRED COMPONENTS Core)
-    find_package(Boost REQUIRED COMPONENTS thread)
-    target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)
-    target_link_libraries(perfTestCGAL manifold CGAL::CGAL CGAL::CGAL_Core Boost::thread)
-    target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
-    target_compile_features(perfTestCGAL PUBLIC cxx_std_17)
+  add_executable(perfTestCGAL perf_test_cgal.cpp)
+  find_package(CGAL REQUIRED COMPONENTS Core)
+  find_package(Boost REQUIRED COMPONENTS thread)
+  target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)
+  target_link_libraries(perfTestCGAL manifold CGAL::CGAL CGAL::CGAL_Core Boost::thread)
+  target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
+  target_compile_features(perfTestCGAL PUBLIC cxx_std_17)
 
-    add_executable(testHullPerformance test_hull_performance.cpp)
-    target_compile_definitions(testHullPerformance PRIVATE CGAL_USE_GMPXX)
-    target_link_libraries(testHullPerformance manifold samples CGAL::CGAL CGAL::CGAL_Core Boost::thread)
-    target_compile_options(testHullPerformance PRIVATE ${MANIFOLD_FLAGS})
-    target_compile_features(testHullPerformance PUBLIC cxx_std_17)
+  add_executable(testHullPerformance test_hull_performance.cpp)
+  target_compile_definitions(testHullPerformance PRIVATE CGAL_USE_GMPXX)
+  target_link_libraries(testHullPerformance manifold samples CGAL::CGAL CGAL::CGAL_Core Boost::thread)
+  target_compile_options(testHullPerformance PRIVATE ${MANIFOLD_FLAGS})
+  target_compile_features(testHullPerformance PUBLIC cxx_std_17)
 endif()
 
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8

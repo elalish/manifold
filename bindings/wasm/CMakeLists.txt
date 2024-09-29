@@ -29,26 +29,33 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 
 # ensure that interface files are copied over when modified
 add_custom_target(js_deps ALL
-        DEPENDS manifoldjs
-               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
+  DEPENDS manifoldjs
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
 
 # copy WASM build back here for publishing to npm
 add_custom_command(
-        TARGET js_deps POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-               ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
-               ${CMAKE_CURRENT_SOURCE_DIR})
+  TARGET js_deps POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+  ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
+  ${CMAKE_CURRENT_SOURCE_DIR})
 
 # copy WASM build and TS declarations for Vite to package into ManifoldCAD.org
 add_custom_command(
-        TARGET js_deps POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*
-               ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)
+  TARGET js_deps POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifold*
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)
 
 # copy TS declarations to public so they can be accessed by our editor
 add_custom_command(
-        TARGET js_deps POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
-               ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/)
+  TARGET js_deps POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/)
+
+# Local Variables:
+# tab-width: 8
+# mode: cmake
+# indent-tabs-mode: t
+# End:
+# ex: shiftwidth=2 tabstop=8
