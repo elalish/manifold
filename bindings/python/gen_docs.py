@@ -92,7 +92,7 @@ collect(f"{base}/src/manifold.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/constructors.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/sort.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/sdf.cpp", lambda s: method_re.search(s))
-collect(f"{base}/src/cross_section.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/cross_section/cross_section.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/polygon.cpp", select_functions)
 collect(f"{base}/include/manifold/common.h", select_functions)
 
