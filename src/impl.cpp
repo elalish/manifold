@@ -19,8 +19,8 @@
 #include <map>
 
 #include "./hashtable.h"
-#include "./parallel.h"
 #include "./svd.h"
+#include "manifold/parallel.h"
 #include "mesh_fixes.h"
 
 namespace {

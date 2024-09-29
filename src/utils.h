@@ -23,8 +23,8 @@
 #include <iostream>
 #endif
 
-#include "./parallel.h"
 #include "./vec.h"
+#include "manifold/parallel.h"
 
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>

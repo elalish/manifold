@@ -10,7 +10,7 @@
 #include <random>
 #include <vector>
 
-#include "../src/parallel.h"
+#include "manifold/parallel.h"
 
 static constexpr size_t g_Iterations = 5;
 static constexpr size_t g_IterationsDiscard = 1;

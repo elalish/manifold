@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./csg_tree.h"
-#include "./impl.h"
-#include "./parallel.h"
+#include "csg_tree.h"
+#include "impl.h"
+#include "manifold/parallel.h"
 #include "manifold/polygon.h"
 
 namespace manifold {

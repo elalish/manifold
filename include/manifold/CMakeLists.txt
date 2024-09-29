@@ -3,6 +3,7 @@ set(MANIFOLD_PUBLIC_HDRS
 	iters.h
 	manifold.h
 	optional_assert.h
+	parallel.h
 	polygon.h
 	vec_view.h
 	)
