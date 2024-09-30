@@ -29,7 +29,9 @@ endif()
 target_link_libraries(manifoldc PRIVATE manifold)
 
 target_include_directories(manifoldc PUBLIC
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/bindings/c/include>
+  )
 target_compile_options(manifoldc PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(manifoldc PRIVATE cxx_std_17)
 
