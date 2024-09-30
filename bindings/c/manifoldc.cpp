@@ -599,6 +599,40 @@ size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
 
+// allocation
+ManifoldManifold *manifold_alloc_manifold() {
+  return to_c(static_cast<Manifold *>(malloc(manifold_manifold_size())));
+}
+ManifoldManifoldVec *manifold_alloc_manifold_vec() {
+  return to_c(static_cast<std::vector<Manifold> *>(
+      malloc(manifold_manifold_vec_size())));
+}
+ManifoldCrossSection *manifold_alloc_cross_section() {
+  return to_c(
+      static_cast<CrossSection *>(malloc(manifold_cross_section_size())));
+}
+ManifoldCrossSectionVec *manifold_alloc_cross_section_vec() {
+  return to_c(static_cast<std::vector<CrossSection> *>(
+      malloc(manifold_cross_section_vec_size())));
+}
+ManifoldSimplePolygon *manifold_alloc_simple_polygon() {
+  return to_c(
+      static_cast<SimplePolygon *>(malloc(manifold_simple_polygon_size())));
+}
+ManifoldPolygons *manifold_alloc_polygons() {
+  return to_c(static_cast<std::vector<SimplePolygon> *>(
+      malloc(manifold_polygons_size())));
+}
+ManifoldMeshGL *manifold_alloc_meshgl() {
+  return to_c(static_cast<MeshGL *>(malloc(manifold_meshgl_size())));
+}
+ManifoldBox *manifold_alloc_box() {
+  return to_c(static_cast<Box *>(malloc(manifold_box_size())));
+}
+ManifoldRect *manifold_alloc_rect() {
+  return to_c(static_cast<Rect *>(malloc(manifold_rect_size())));
+}
+
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
   delete from_c(c);

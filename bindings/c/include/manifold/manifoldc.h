@@ -392,6 +392,18 @@ size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_curvature_size();
 
+// allocation
+
+ManifoldManifold *manifold_alloc_manifold();
+ManifoldManifoldVec *manifold_alloc_manifold_vec();
+ManifoldCrossSection *manifold_alloc_cross_section();
+ManifoldCrossSectionVec *manifold_alloc_cross_section_vec();
+ManifoldSimplePolygon *manifold_alloc_simple_polygon();
+ManifoldPolygons *manifold_alloc_polygons();
+ManifoldMeshGL *manifold_alloc_meshgl();
+ManifoldBox *manifold_alloc_box();
+ManifoldRect *manifold_alloc_rect();
+
 // destruction
 
 void manifold_destruct_manifold(ManifoldManifold *m);
