@@ -23,7 +23,7 @@ using namespace manifold;
   Build & execute with the following command:
 
   ( mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=TBB .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=ON .. && \
     make -j && \
     time ./extras/largeSceneTest 50 )
 */
