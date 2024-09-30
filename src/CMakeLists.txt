@@ -49,30 +49,15 @@ set(MANIFOLD_PRIVATE_HDRS
   vec.h
   )
 
-set(MANIFOLD_C_BINDING_SRCS
-  manifoldc.cpp
-  conv.cpp
-  box.cpp
-  rect.cpp
-  )
-list(APPEND MANIFOLD_SRCS ${MANIFOLD_C_BINDING_SRCS})
-
-set(MANIFOLD_C_BINDING_PRIVATE_HDRS
-  conv.h
-  )
-list(APPEND MANIFOLD_PRIVATE_HDRS ${MANIFOLD_C_BINDING_PRIVATE_HDRS})
-
 if(MANIFOLD_CROSS_SECTION)
   list(APPEND MANIFOLD_SRCS
     cross_section/cross_section.cpp
-    cross_section/cross.cpp
     )
 endif()
 
 if(MANIFOLD_EXPORT)
   list(APPEND MANIFOLD_SRCS
     meshIO/meshIO.cpp
-    meshIO/meshIOc.cpp
     )
 endif()
 
@@ -118,9 +103,6 @@ target_include_directories(manifold PUBLIC
   )
 if(MANIFOLD_EXCEPTIONS)
   target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
-endif()
-if(MANIFOLD_CROSS_SECTION)
-  target_compile_options(manifold PRIVATE -DMANIFOLD_CROSS_SECTION)
 endif()
 if(MANIFOLD_DEBUG)
   target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)

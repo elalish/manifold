@@ -71,7 +71,7 @@ jobs:
         cd ../
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' --output-file ./code_coverage.info
+        lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
         cd ../
     - uses: codecov/codecov-action@v4
       if: matrix.parallel_backend == 'OFF'
@@ -101,7 +101,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=ON .. && make
     - name: Test
       run: |
         cd build/test
@@ -205,7 +205,7 @@ jobs:
         export MXETARGETDIR=$MXEDIR/usr/$MXE_TARGETS
         export PATH=/mxe/usr/bin:$PATH
         export CMAKE=$MXE_TARGETS-cmake
-        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
 
   build_mac:
     timeout-minutes: 30

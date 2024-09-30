@@ -16,6 +16,10 @@ if (NOT MANIFOLD_CROSS_SECTION)
   return()
 endif()
 
+if(NOT EMSCRIPTEN AND MANIFOLD_CBIND)
+  add_subdirectory(c)
+endif()
+
 if(NOT EMSCRIPTEN AND MANIFOLD_PYBIND)
   add_subdirectory(python)
 endif()

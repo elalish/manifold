@@ -35,6 +35,7 @@ build-backend = "scikit_build_core.build"
 cmake.minimum-version = "3.18"
 sdist.exclude = [
     ".github",
+    "bindings/c",
     "bindings/wasm",
     "docs",
     "extras",
@@ -43,7 +44,7 @@ sdist.exclude = [
     "oneTBB", # we may have this when we build with cibuildwheel
 ]
 wheel.packages = ["manifold3d"]
-cmake.args = ["-DMANIFOLD_PYBIND=ON", "-DMANIFOLD_PAR=ON", "-DMANIFOLD_TEST=OFF", "-DBUILD_SHARED_LIBS=OFF"]
+cmake.args = ["-DMANIFOLD_PYBIND=ON", "-DMANIFOLD_CBIND=OFF", "-DMANIFOLD_PAR=ON", "-DMANIFOLD_TEST=OFF", "-DBUILD_SHARED_LIBS=OFF"]
 install.components = ["bindings"]
 
 [tool.cibuildwheel]

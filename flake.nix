@@ -46,6 +46,7 @@
               ];
               cmakeFlags = [
                 "-DMANIFOLD_PYBIND=ON"
+                "-DMANIFOLD_CBIND=ON"
                 "-DMANIFOLD_EXPORT=ON"
                 "-DBUILD_SHARED_LIBS=ON"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"

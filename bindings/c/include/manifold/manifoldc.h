@@ -200,7 +200,6 @@ ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int min_sharp_angle);
 
 // CrossSection Shapes/Constructors
-#ifdef MANIFOLD_CROSS_SECTION
 ManifoldCrossSection *manifold_cross_section_empty(void *mem);
 ManifoldCrossSection *manifold_cross_section_copy(void *mem,
                                                   ManifoldCrossSection *cs);
@@ -300,7 +299,6 @@ ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);
 ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,
                                                      ManifoldCrossSection *cs);
-#endif  // MANIFOLD_CROSS_SECTION
 
 // Rectangle
 
