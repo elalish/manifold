@@ -22,12 +22,6 @@ set(MANIFOLD_PUBLIC_HDRS
   vec_view.h
   )
 
-set(MANIFOLD_C_BINDING_HDRS
-  manifoldc.h
-  types.h
-  )
-list(APPEND MANIFOLD_PUBLIC_HDRS ${MANIFOLD_C_BINDING_HDRS})
-
 if (MANIFOLD_CROSS_SECTION)
   list(APPEND MANIFOLD_PUBLIC_HDRS cross_section.h)
 endif()

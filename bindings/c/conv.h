@@ -17,24 +17,18 @@
 #include <vector>
 
 #include "manifold/common.h"
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
 #include "manifold/manifold.h"
 #include "manifold/types.h"
 
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
-#ifdef MANIFOLD_CROSS_SECTION
 using CrossSectionVec = std::vector<CrossSection>;
-#endif
 
 ManifoldManifold *to_c(manifold::Manifold *m);
 ManifoldManifoldVec *to_c(ManifoldVec *ms);
-#ifdef MANIFOLD_CROSS_SECTION
 ManifoldCrossSection *to_c(manifold::CrossSection *cs);
 ManifoldCrossSectionVec *to_c(CrossSectionVec *csv);
-#endif
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *p);
 ManifoldPolygons *to_c(manifold::Polygons *ps);
 ManifoldMeshGL *to_c(manifold::MeshGL *m);
@@ -48,18 +42,14 @@ ManifoldProperties to_c(manifold::Properties p);
 
 const manifold::Manifold *from_c(ManifoldManifold *m);
 ManifoldVec *from_c(ManifoldManifoldVec *ms);
-#ifdef MANIFOLD_CROSS_SECTION
 const manifold::CrossSection *from_c(ManifoldCrossSection *cs);
 CrossSectionVec *from_c(ManifoldCrossSectionVec *csv);
-#endif
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m);
 const manifold::Polygons *from_c(ManifoldPolygons *m);
 const manifold::MeshGL *from_c(ManifoldMeshGL *m);
 OpType from_c(ManifoldOpType op);
-#ifdef MANIFOLD_CROSS_SECTION
 CrossSection::FillRule from_c(ManifoldFillRule fillrule);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
-#endif
 const manifold::Box *from_c(ManifoldBox *m);
 const manifold::Rect *from_c(ManifoldRect *r);
 vec2 from_c(ManifoldVec2 v);

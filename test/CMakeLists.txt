@@ -79,6 +79,10 @@ if(MANIFOLD_FUZZ)
   gtest_discover_tests(polygon_fuzz)
 endif()
 
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
+  target_link_libraries(manifold_test manifoldc)
+endif()
+
 if(MANIFOLD_CROSS_SECTION)
   target_compile_options(manifold_test PUBLIC -DMANIFOLD_CROSS_SECTION)
 endif()
