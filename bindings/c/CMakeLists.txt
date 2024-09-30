@@ -23,7 +23,6 @@ endif()
 
 if(MANIFOLD_EXPORT)
   target_sources(manifoldc PRIVATE meshIOc.cpp)
-  target_link_libraries(manifoldc PRIVATE meshIO)
   target_compile_options(manifoldc PUBLIC -DMANIFOLD_EXPORT)
 endif()
 
