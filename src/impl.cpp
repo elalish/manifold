@@ -497,11 +497,13 @@ bool Manifold::Impl::Internal(int halfedge) const {
   const int baseNum = halfedge - 3 * edgeFace;
   const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
-  const ivec3 triProp0 = meshRelation_.triProperties[edgeFace];
-  const ivec3 triProp1 = meshRelation_.triProperties[pairFace];
-  if (triProp0[baseNum] != triProp1[Next3(jointNum)] ||
-      triProp0[Next3(baseNum)] != triProp1[jointNum])
-    return false;
+  if (!meshRelation_.triProperties.empty()) {
+    const ivec3 triProp0 = meshRelation_.triProperties[edgeFace];
+    const ivec3 triProp1 = meshRelation_.triProperties[pairFace];
+    if (triProp0[baseNum] != triProp1[Next3(jointNum)] ||
+        triProp0[Next3(baseNum)] != triProp1[jointNum])
+      return false;
+  }
 
   const int edgeNum = Prev3(baseNum);
   const int pairNum = Prev3(jointNum);
