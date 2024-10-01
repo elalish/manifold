@@ -18,6 +18,10 @@
 #include <map>
 #include <set>
 
+#ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#endif
+
 #include "./collider.h"
 #include "./utils.h"
 #include "manifold/optional_assert.h"
