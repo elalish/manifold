@@ -214,7 +214,7 @@ void Manifold::Impl::SimplifyTopology() {
                  if (halfedge_[edge].pairedHalfedge < 0) return;
                  // Flag redundant edges - those where the startVert is
                  // surrounded by only two original triangles.
-                 int numExternal = 0;
+                 int numExternal = internalEdges[edge] ? 2 : 0;
                  ForVert(edge, [&numExternal, &internalEdges](int current) {
                    numExternal += internalEdges[current] ? 0 : 1;
                  });
@@ -473,26 +473,21 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
   if (!shortEdge) {
     current = start;
-    TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
+    int numExternal = Internal(edge) ? 2 : 1;
+    numExternal += Internal(tri1edge[1]) ? 0 : 1;
     vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
-    int numExternal = 0;
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      vec3 pNext = vertPos_[halfedge_[current].endVert];
-      const int tri = current / 3;
-      const TriRef ref = triRef[tri];
-      const mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+
       // Don't collapse if the edge is not redundant (this may have changed due
-      // to the collapse of neighbors).
+      //  to the collapse of neighbors).
       numExternal += Internal(current) ? 0 : 1;
       if (numExternal > 2) return;
-      // Don't collapse if the edges separating the faces are not colinear
-      // (can happen when the two faces are coplanar).
-      if (CCW(projection * pOld, projection * pLast, projection * pNew,
-              precision_) != 0)
-        return;
 
       // Don't collapse edge if it would cause a triangle to invert.
+      const vec3 pNext = vertPos_[halfedge_[current].endVert];
+      const mat3x2 projection =
+          GetAxisAlignedProjection(faceNormal_[current / 3]);
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               precision_) < 0)
         return;
