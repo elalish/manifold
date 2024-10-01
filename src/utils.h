@@ -25,6 +25,7 @@
 #endif
 
 #include "./vec.h"
+#include "manifold/common.h"
 #include "manifold/parallel.h"
 
 #if __has_include(<tracy/Tracy.hpp>)

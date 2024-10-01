@@ -713,7 +713,7 @@ class EarClip {
 
     auto CheckEdge = [&](VertItr edge) {
       const double x = edge->InterpY2X(start->pos, onTop, precision_);
-      if (isfinite(x) && start->InsideEdge(edge, precision_, true) &&
+      if (std::isfinite(x) && start->InsideEdge(edge, precision_, true) &&
           (connector == polygon_.end() ||
            CCW({x, start->pos.y}, connector->pos, connector->right->pos,
                precision_) == 1 ||

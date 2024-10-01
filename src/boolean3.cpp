@@ -35,7 +35,7 @@ vec2 Interpolate(vec3 pL, vec3 pR, double x) {
   const bool useL = fabs(dxL) < fabs(dxR);
   const vec3 dLR = pR - pL;
   const double lambda = (useL ? dxL : dxR) / dLR.x;
-  if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
+  if (!std::isfinite(lambda) || !std::isfinite(dLR.y) || !std::isfinite(dLR.z))
     return vec2(pL.y, pL.z);
   vec2 yz;
   yz[0] = fma(lambda, dLR.y, useL ? pL.y : pR.y);
@@ -51,7 +51,7 @@ vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
   const bool useL = fabs(dyL) < fabs(dyR);
   const double dx = pR.x - pL.x;
   double lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!isfinite(lambda)) lambda = 0.0;
+  if (!std::isfinite(lambda)) lambda = 0.0;
   vec4 xyzz;
   xyzz.x = fma(lambda, dx, useL ? pL.x : pR.x);
   const double pDy = pR.y - pL.y;
@@ -206,7 +206,7 @@ struct Kernel11 {
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
-      if (isfinite(yz01[0])) {
+      if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
@@ -224,7 +224,7 @@ struct Kernel11 {
       const int s10 = syz10.first;
       const vec2 yz10 = syz10.second;
       // If the value is NaN, then these do not overlap.
-      if (isfinite(yz10[0])) {
+      if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
           shadows = s10 != 0;
@@ -319,7 +319,7 @@ struct Kernel02 {
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
-      if (isfinite(yz01[0])) {
+      if (std::isfinite(yz01[0])) {
         s02 += s01 * (forward == edge.IsForward() ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;

@@ -14,8 +14,11 @@
 
 #include <algorithm>
 #include <array>
-#include <iostream>
 #include <map>
+
+#ifdef MANIFOLD_DEBUG
+#include <iostream>
+#endif
 
 #if defined(MANIFOLD_PAR) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1

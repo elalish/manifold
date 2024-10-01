@@ -178,7 +178,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
              pImpl_->NumVert(), [radius](vec3& v) {
                v = glm::cos(glm::half_pi<double>() * (1.0 - v));
                v = radius * glm::normalize(v);
-               if (isnan(v.x)) v = vec3(0.0);
+               if (std::isnan(v.x)) v = vec3(0.0);
              });
   pImpl_->Finish();
   // Ignore preceding octahedron.

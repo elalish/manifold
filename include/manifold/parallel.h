@@ -26,7 +26,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "manifold/common.h"
 #include "manifold/iters.h"
 namespace manifold {
 

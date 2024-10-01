@@ -67,7 +67,7 @@ struct AssignNormals {
 
     if (calculateTriNormal) {
       triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
-      if (isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
+      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     }
 
     // corner angles

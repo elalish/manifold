@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include <math.h>
-
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/common.h"

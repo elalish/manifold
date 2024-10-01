@@ -1,4 +1,4 @@
-#include "impl.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
@@ -14,7 +14,7 @@ struct TransformNormals {
 
   vec3 operator()(vec3 normal) const {
     normal = glm::normalize(transform * normal);
-    if (isnan(normal.x)) normal = vec3(0.0);
+    if (std::isnan(normal.x)) normal = vec3(0.0);
     return normal;
   }
 };
