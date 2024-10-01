@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/tri_dist.h"
+#include "../src/utils.h"
 #include "manifold/manifold.h"
 #include "samples.h"
 #include "test.h"

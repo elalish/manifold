@@ -14,6 +14,7 @@
 
 #include "manifold/cross_section.h"
 
+#include "../utils.h"
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.h"
 #include "clipper2/clipper.offset.h"
