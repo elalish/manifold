@@ -475,7 +475,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
-    int numInternal = 0;
+    int numExternal = 0;
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
       vec3 pNext = vertPos_[halfedge_[current].endVert];
@@ -484,8 +484,8 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       const mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      numInternal += Internal(current) ? 1 : 0;
-      if (numInternal > 2) return;
+      numExternal += Internal(current) ? 0 : 1;
+      if (numExternal > 2) return;
       // Don't collapse if the edges separating the faces are not colinear
       // (can happen when the two faces are coplanar).
       if (CCW(projection * pOld, projection * pLast, projection * pNew,

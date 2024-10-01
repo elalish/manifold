@@ -21,17 +21,18 @@ endif()
 
 enable_testing()
 
+# order these to run simpler/faster tests first
 set(SOURCE_FILES
-  boolean_complex_test.cpp
+  test_main.cpp  
+  polygon_test.cpp  
+  properties_test.cpp
+  manifold_test.cpp
   boolean_test.cpp
   hull_test.cpp
-  manifold_test.cpp
-  polygon_test.cpp
-  properties_test.cpp
-  samples_test.cpp
   sdf_test.cpp
   smooth_test.cpp
-  test_main.cpp
+  samples_test.cpp
+  boolean_complex_test.cpp
   )
 
 if(MANIFOLD_CROSS_SECTION)
