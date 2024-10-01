@@ -142,6 +142,8 @@ ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
 ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
                                             double length);
+ManifoldManifold *manifold_refine_to_precision(void *mem, ManifoldManifold *m,
+                                               double precision);
 
 // Manifold Shapes / Constructors
 
@@ -198,7 +200,6 @@ ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int min_sharp_angle);
 
 // CrossSection Shapes/Constructors
-
 ManifoldCrossSection *manifold_cross_section_empty(void *mem);
 ManifoldCrossSection *manifold_cross_section_copy(void *mem,
                                                   ManifoldCrossSection *cs);
@@ -352,6 +353,7 @@ int manifold_box_is_finite(ManifoldBox *b);
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
 void manifold_set_circular_segments(int number);
+void manifold_reset_to_circular_defaults();
 
 // Manifold Mesh Extraction
 
@@ -389,6 +391,18 @@ size_t manifold_meshgl_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_curvature_size();
+
+// allocation
+
+ManifoldManifold *manifold_alloc_manifold();
+ManifoldManifoldVec *manifold_alloc_manifold_vec();
+ManifoldCrossSection *manifold_alloc_cross_section();
+ManifoldCrossSectionVec *manifold_alloc_cross_section_vec();
+ManifoldSimplePolygon *manifold_alloc_simple_polygon();
+ManifoldPolygons *manifold_alloc_polygons();
+ManifoldMeshGL *manifold_alloc_meshgl();
+ManifoldBox *manifold_alloc_box();
+ManifoldRect *manifold_alloc_rect();
 
 // destruction
 

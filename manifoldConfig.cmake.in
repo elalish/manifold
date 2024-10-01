@@ -1,5 +1,32 @@
-set(MANIFOLD_PAR "@MANIFOLD_PAR@")
+# Compute the installation prefix relative to this file, so we can have the
+# subsequent find_package calls first check for bundled dependencies.
+get_filename_component(_FIND_ROOT "${CMAKE_CURRENT_LIST_FILE}" PATH)
+# CMAKE_CURRENT_LIST_FILE path is several directories below the path we want
+# for _FIND_ROOT, so we need multiple get_filename_component calls to trim it
+# back to the the root path.
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+get_filename_component(_FIND_ROOT "${_FIND_ROOT}" PATH)
+if(_FIND_ROOT STREQUAL "/")
+  set(_FIND_ROOT "")
+endif()
+
+set(glm_ROOT "${_FIND_ROOT}")
+find_package(glm REQUIRED)
 set(MANIFOLD_CROSS_SECTION "@MANIFOLD_CROSS_SECTION@")
+if(MANIFOLD_CROSS_SECTION)
+	set(Clipper2_ROOT "${_FIND_ROOT}")
+	find_package(Clipper2 REQUIRED)
+endif()
+set(MANIFOLD_PAR "@MANIFOLD_PAR@")
+if(MANIFOLD_PAR STREQUAL "ON")
+	find_package(TBB REQUIRED)
+	if(APPLE)
+		find_package(oneDPL REQUIRED)
+	endif()
+endif()
 set(MANIFOLD_EXPORT "@MANIFOLD_EXPORT@")
-include("${CMAKE_CURRENT_LIST_DIR}/manifoldDeps.cmake")
+if(MANIFOLD_EXPORT)
+	find_package(assimp REQUIRED)
+endif(MANIFOLD_EXPORT)
 include("${CMAKE_CURRENT_LIST_DIR}/manifoldTargets.cmake")
