@@ -14,9 +14,6 @@
 
 #include "manifold/meshIO.h"
 
-#include <algorithm>
-#include <iostream>
-
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
 #include "assimp/material.h"

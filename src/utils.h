@@ -21,6 +21,7 @@
 
 #ifdef MANIFOLD_DEBUG
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #endif
 

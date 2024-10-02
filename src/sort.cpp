@@ -15,7 +15,7 @@
 #include <atomic>
 #include <set>
 
-#include "impl.h"
+#include "./impl.h"
 #include "manifold/parallel.h"
 
 namespace {
