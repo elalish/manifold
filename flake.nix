@@ -53,6 +53,7 @@
               checkPhase = ''
                 cd test
                 ./manifold_test
+                cd ../
               '';
             };
           parallelBackends = [
