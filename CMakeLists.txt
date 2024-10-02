@@ -125,7 +125,7 @@ else()
     set(WARNING_FLAGS -Wall -Wno-unused -Wno-array-bounds
       -Wno-stringop-overflow -Wno-alloc-size-larger-than)
   else()
-    set(WARNING_FLAGS -Wall -Wno-unused)
+    set(WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
   endif()
   if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
