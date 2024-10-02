@@ -314,7 +314,7 @@ struct ComputeVerts {
       const GridVert& neighbor = gridVerts[EncodeIndex(neighborIndex, gridPow)];
 
       const double val =
-          isfinite(neighbor.distance)
+          std::isfinite(neighbor.distance)
               ? neighbor.distance
               : voxels[EncodeIndex(neighborIndex + kVoxelOffset, gridPow)];
       if (gridVert.SameSide(val)) continue;

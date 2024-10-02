@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "../src/utils.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif

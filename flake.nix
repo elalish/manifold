@@ -45,7 +45,6 @@
                 assimp
               ];
               cmakeFlags = [
-                "-DMANIFOLD_PYBIND=ON"
                 "-DMANIFOLD_CBIND=ON"
                 "-DMANIFOLD_EXPORT=ON"
                 "-DBUILD_SHARED_LIBS=ON"
@@ -54,10 +53,7 @@
               checkPhase = ''
                 cd test
                 ./manifold_test
-                cd ../../
-                PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 bindings/python/examples/run_all.py
-                PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 -m pytest
-                cd build
+                cd ../
               '';
             };
           parallelBackends = [

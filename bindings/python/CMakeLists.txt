@@ -70,7 +70,6 @@ if(MANIFOLD_PYBIND_STUBGEN)
     OUTPUT manifold3d.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:manifold3d>
     DEPENDS manifold3d
-    MARKER_FILE py.typed
     PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
     )
 endif()
@@ -108,14 +107,12 @@ install(
   TARGETS manifold3d
   LIBRARY DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
   COMPONENT bindings
-  EXCLUDE_FROM_ALL
   )
 if(MANIFOLD_PYBIND_STUBGEN)
   install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
     DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
     COMPONENT bindings
-    EXCLUDE_FROM_ALL
     )
 endif()
 

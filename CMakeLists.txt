@@ -125,7 +125,7 @@ else()
     set(WARNING_FLAGS -Wall -Wno-unused -Wno-array-bounds
       -Wno-stringop-overflow -Wno-alloc-size-larger-than)
   else()
-    set(WARNING_FLAGS -Wall -Wno-unused)
+    set(WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
   endif()
   if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -252,7 +252,6 @@ if(MANIFOLD_EXPORT)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(include)
 add_subdirectory(bindings)
 add_subdirectory(samples)
 add_subdirectory(test)
@@ -337,6 +336,28 @@ install(FILES
   DESTINATION ${EXPORT_INSTALL_DIR}/manifold
   )
 
+# install public headers
+set(MANIFOLD_PUBLIC_HDRS
+  include/manifold/common.h
+  include/manifold/iters.h
+  include/manifold/manifold.h
+  include/manifold/optional_assert.h
+  include/manifold/parallel.h
+  include/manifold/polygon.h
+  include/manifold/vec_view.h
+  )
+
+if (MANIFOLD_CROSS_SECTION)
+  list(APPEND MANIFOLD_PUBLIC_HDRS include/manifold/cross_section.h)
+endif()
+
+if (MANIFOLD_EXPORT)
+  list(APPEND MANIFOLD_PUBLIC_HDRS include/manifold/meshIO.h)
+endif()
+
+install(FILES ${MANIFOLD_PUBLIC_HDRS}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
+  )
 
 # PkgConfig file
 if(MANIFOLD_CROSS_SECTION)

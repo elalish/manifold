@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include "manifold/optional_assert.h"
 
 namespace manifold {

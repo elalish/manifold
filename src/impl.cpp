@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "impl.h"
+#include "./impl.h"
 
 #include <algorithm>
 #include <atomic>
 #include <map>
 
 #include "./hashtable.h"
+#include "./mesh_fixes.h"
 #include "./svd.h"
 #include "manifold/parallel.h"
-#include "mesh_fixes.h"
 
 namespace {
 using namespace manifold;
@@ -67,7 +67,7 @@ struct AssignNormals {
 
     if (calculateTriNormal) {
       triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
-      if (isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
+      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     }
 
     // corner angles
