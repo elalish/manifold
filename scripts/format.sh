@@ -17,3 +17,10 @@ $CLANG_FORMAT -i bindings/wasm/examples/public/*.{js,ts}
 $CLANG_FORMAT -i src/*/src/*.{h,cpp}
 $CLANG_FORMAT -i src/*/include/manifold/*.h
 black bindings/python/examples/*.py
+
+for f in $(find -name CMakeLists.txt); do
+  # skip build directories
+  if [[ $f != *build* ]]; then
+    cmake-format -i $f
+  fi
+done

@@ -26,30 +26,35 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(MANIFOLD_VERSION_MAJOR 2)
 set(MANIFOLD_VERSION_MINOR 5)
 set(MANIFOLD_VERSION_PATCH 1)
-set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}")
+set(MANIFOLD_VERSION
+    "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}"
+)
 
 # Correct MANIFOLD_PAR values to on/off (previous NONE/TBB values should still
 # work this way)
-if (DEFINED MANIFOLD_PAR)
-  if ("${MANIFOLD_PAR}" STREQUAL "" OR "${MANIFOLD_PAR}" STREQUAL "NONE" OR "${MANIFOLD_PAR}" STREQUAL "OFF")
+if(DEFINED MANIFOLD_PAR)
+  if("${MANIFOLD_PAR}" STREQUAL ""
+     OR "${MANIFOLD_PAR}" STREQUAL "NONE"
+     OR "${MANIFOLD_PAR}" STREQUAL "OFF")
     set(MANIFOLD_PAR OFF)
   else()
     set(MANIFOLD_PAR ON)
-  endif ()
-endif ()
+  endif()
+endif()
 
 # Primary user facing options
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
-option(MANIFOLD_DOWNLOADS "Allow Manifold build to download missing dependencies" ON) 
+option(MANIFOLD_DOWNLOADS
+       "Allow Manifold build to download missing dependencies" ON)
 option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
-option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF) # fuzztest is a rather large dependency
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
-cmake_dependent_option(MANIFOLD_CBIND "Build C (FFI) bindings" ON "MANIFOLD_CROSS_SECTION" OFF)
+cmake_dependent_option(MANIFOLD_CBIND "Build C (FFI) bindings" ON
+                       "MANIFOLD_CROSS_SECTION" OFF)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
 cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "EMSCRIPTEN" OFF)
 
@@ -57,8 +62,9 @@ cmake_dependent_option(MANIFOLD_JSBIND "Build js binding" ON "EMSCRIPTEN" OFF)
 if(NOT MANIFOLD_FLAGS)
   set(MANIFOLD_FLAGS "")
 endif()
-set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
-
+set(MANIFOLD_FLAGS
+    ""
+    CACHE STRING "Manifold compiler flags")
 
 # Development options
 option(TRACY_ENABLE "Use tracy profiling" OFF)
@@ -67,6 +73,10 @@ option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 mark_as_advanced(TRACY_ENABLE)
 mark_as_advanced(TRACY_MEMORY_USAGE)
 mark_as_advanced(BUILD_TEST_CGAL)
+
+# fuzztest is a rather large dependency
+option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
+mark_as_advanced(MANIFOLD_FUZZ)
 
 # Define some paths for CMake
 include(GNUInstallDirs)
@@ -77,23 +87,23 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Various Compiler Flags
 if(MANIFOLD_FUZZ)
   if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(FATAL_ERROR "fuzztest only supports clang" )
+    message(FATAL_ERROR "fuzztest only supports clang")
   endif()
   # we should enable debug checks
   set(MANIFOLD_DEBUG ON)
   # enable fuzztest fuzzing mode
   set(FUZZTEST_FUZZING_MODE ON)
   # address sanitizer required
-  set(CMAKE_CXX_FLAGS "$CMAKE_CXX_FLAGS -fsanitize=address")
+  list(APPEND CMAKE_CXX_FLAGS -fsanitize=address)
 endif()
 
 if(TRACY_ENABLE)
   option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
   if(TRACY_MEMORY_USAGE)
-    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTRACY_MEMORY_USAGE)
+    list(APPEND MANIFOLD_FLAGS -DTRACY_MEMORY_USAGE)
   endif()
   if(NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+    list(APPEND CMAKE_CXX_FLAGS -fno-omit-frame-pointer)
   endif()
 else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
@@ -102,11 +112,13 @@ endif()
 if(EMSCRIPTEN)
   message("Building for Emscripten")
   if(MANIFOLD_EXCEPTIONS)
-    set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1 -fexceptions -sDISABLE_EXCEPTION_CATCHING=0")
+    list(APPEND MANIFOLD_FLAGS -fexceptions)
+    list(APPEND CMAKE_EXE_LINKER_FLAGS -sALLOW_MEMORY_GROWTH=1 -fexceptions
+         -sDISABLE_EXCEPTION_CATCHING=0)
   else()
-    set(MANIFOLD_FLAGS -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1")
+    list(APPEND MANIFOLD_FLAGS -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL
+         -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
+    list(APPEND CMAKE_EXE_LINKER_FLAGS -sALLOW_MEMORY_GROWTH=1)
   endif()
   set(MANIFOLD_PYBIND OFF)
   set(BUILD_SHARED_LIBS OFF)
@@ -115,31 +127,38 @@ endif()
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
   # for nixos
   set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
-    ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
-if (MSVC)
-  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} /DNOMINMAX /bigobj)
+if(MSVC)
+  list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
 else()
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(WARNING_FLAGS -Wall -Wno-unused -Wno-array-bounds
-      -Wno-stringop-overflow -Wno-alloc-size-larger-than)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(
+      APPEND
+      WARNING_FLAGS
+      -Wall
+      -Wno-unused
+      -Wno-array-bounds
+      -Wno-stringop-overflow
+      -Wno-alloc-size-larger-than)
   else()
-    set(WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
+    list(APPEND WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
   endif()
-  if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-      set(WARNING_FLAGS ${WARNING_FLAGS} -Wno-format)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      list(APPEND WARNING_FLAGS -Wno-format)
     endif()
   else()
-    set(WARNING_FLAGS ${WARNING_FLAGS} -Werror)
+    list(APPEND WARNING_FLAGS -Werror)
   endif()
-  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${WARNING_FLAGS})
+  list(APPEND MANIFOLD_FLAGS ${WARNING_FLAGS})
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
-  set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
-  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${COVERAGE_FLAGS})
+  list(APPEND COVERAGE_FLAGS -coverage -fno-inline-small-functions
+       -fkeep-inline-functions -fkeep-static-functions)
+  list(APPEND MANIFOLD_FLAGS ${COVERAGE_FLAGS})
   add_link_options("-coverage")
 endif()
 
@@ -148,28 +167,41 @@ set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} isSystemDir)
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
+     ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} isSystemDir)
 if("${isSystemDir}" STREQUAL "-1")
   set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 endif("${isSystemDir}" STREQUAL "-1")
 
-
 # Dependencies
 include(FetchContent)
+
+function(logMissingDep PKG)
+  if(NOT MANIFOLD_DOWNLOADS)
+    if(ARGC EQUAL 3)
+      set(MSG "${ARGV2} enabled, but ${PKG} was not found ")
+      string(APPEND MSG "and dependency downloading is disabled. ")
+    else()
+      set(MSG "${PKG} not found, and dependency downloading disabled. ")
+    endif()
+    string(APPEND MSG "Please install ${PKG} and reconfigure.\n")
+    message(FATAL_ERROR ${MSG})
+  endif()
+endfunction()
 
 # GLM is required in all configurations.
 find_package(glm QUIET)
 if(NOT glm_FOUND)
-  if (NOT MANIFOLD_DOWNLOADS)
-    message(FATAL_ERROR "glm not found, and dependency downloading disabled.  Please install glm and reconfigure.\n")
-  endif()
+  logmissingdep("glm")
   message(STATUS "glm not found, downloading from source")
-  set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
-  FetchContent_Declare(glm
+  set(GLM_BUILD_INSTALL
+      "ON"
+      CACHE STRING "")
+  FetchContent_Declare(
+    glm
     GIT_REPOSITORY https://github.com/g-truc/glm.git
     GIT_TAG 1.0.1
-    GIT_PROGRESS TRUE
-    )
+    GIT_PROGRESS TRUE)
   FetchContent_MakeAvailable(glm)
   if(NOT EMSCRIPTEN)
     install(TARGETS glm)
@@ -185,20 +217,21 @@ if(MANIFOLD_PAR)
     pkg_check_modules(TBB tbb)
   endif()
   if(NOT TBB_FOUND)
-    if (NOT MANIFOLD_DOWNLOADS)
-      message(FATAL_ERROR "Parallel mode enabled, but TBB was not found and dependency downloading is disabled.  Please install TBB and reconfigure.\n")
-    endif()
-
+    logmissingdep("TBB", "Parallel mode")
     # TODO - this isn't recommended by the TBB upstream - should we be
     # doing it?
     message(STATUS "TBB not found, downloading from source")
-    set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
-    set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
-    FetchContent_Declare(TBB
+    set(TBB_TEST
+        OFF
+        CACHE INTERNAL "" FORCE)
+    set(TBB_STRICT
+        OFF
+        CACHE INTERNAL "" FORCE)
+    FetchContent_Declare(
+      TBB
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-      GIT_TAG        v2021.11.0
-      GIT_PROGRESS   TRUE
-      )
+      GIT_TAG v2021.11.0
+      GIT_PROGRESS TRUE)
     FetchContent_MakeAvailable(TBB)
     set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     # note: we do want to install tbb to the user machine when built from
@@ -217,28 +250,28 @@ if(MANIFOLD_CROSS_SECTION)
   endif()
   if(Clipper2_FOUND)
     add_library(Clipper2 SHARED IMPORTED)
-    set_property(TARGET Clipper2 PROPERTY
-      IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
+    set_property(TARGET Clipper2 PROPERTY IMPORTED_LOCATION
+                                          ${Clipper2_LINK_LIBRARIES})
     if(WIN32)
-      set_property(TARGET Clipper2 PROPERTY
-	IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
+      set_property(TARGET Clipper2 PROPERTY IMPORTED_IMPLIB
+                                            ${Clipper2_LINK_LIBRARIES})
     endif()
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
   else()
-    if (NOT MANIFOLD_DOWNLOADS)
-      message(FATAL_ERROR "cross_section enabled, but Clipper2 was not found and dependency downloading is disabled.  Please install Clipper2 and reconfigure.\n")
-    endif()
+    logmissingdep("Clipper2", "cross_section")
     message(STATUS "clipper2 not found, downloading from source")
     set(CLIPPER2_UTILS OFF)
     set(CLIPPER2_EXAMPLES OFF)
     set(CLIPPER2_TESTS OFF)
-    set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
-    FetchContent_Declare(Clipper2
+    set(CLIPPER2_USINGZ
+        "OFF"
+        CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
+    FetchContent_Declare(
+      Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
       GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
       GIT_PROGRESS TRUE
-      SOURCE_SUBDIR CPP
-      )
+      SOURCE_SUBDIR CPP)
     FetchContent_MakeAvailable(Clipper2)
     if(NOT EMSCRIPTEN)
       install(TARGETS Clipper2)
@@ -263,17 +296,17 @@ message(STATUS "====================================")
 message(STATUS "Manifold Build Configuration Summary")
 message(STATUS "====================================")
 message(STATUS " ")
-if (MXECROSS)
+if(MXECROSS)
   message(STATUS "Environment: MXE")
-elseif (APPLE)
+elseif(APPLE)
   message(STATUS "Environment: macOS")
-elseif (WIN32)
-  if (MINGW)
+elseif(WIN32)
+  if(MINGW)
     message(STATUS "Environment: msys2")
   else()
     message(STATUS "Environment: Windows")
   endif()
-elseif (LINUX)
+elseif(LINUX)
   message(STATUS "Environment: Linux")
 elseif(UNIX)
   message(STATUS "Environment: Unknown Unix")
@@ -289,7 +322,7 @@ message(STATUS "CMAKE_BUILD_TYPE:            ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_PREFIX_PATH:           ${CMAKE_PREFIX_PATH}")
 message(STATUS "CMAKE_CXX_COMPILER_ID:       ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION:  ${CMAKE_CXX_COMPILER_VERSION}")
-if (APPLE)
+if(APPLE)
   message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
   message(STATUS "CMAKE_OSX_ARCHITECTURES:     ${CMAKE_OSX_ARCHITECTURES}")
 endif()
@@ -312,52 +345,47 @@ if(EMSCRIPTEN)
   return()
 endif()
 
-
 # CMake exports
-configure_file(manifoldConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake @ONLY)
+configure_file(manifoldConfig.cmake.in
+               ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake @ONLY)
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   ${CMAKE_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
   VERSION ${MANIFOLD_VERSION}
-  COMPATIBILITY SameMajorVersion
-  )
+  COMPATIBILITY SameMajorVersion)
 
 # Location of inputs for CMake find_package - see:
 # https://cmake.org/cmake/help/latest/command/find_package.html
 set(EXPORT_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake)
 
-install(EXPORT manifoldTargets
+install(
+  EXPORT manifoldTargets
   NAMESPACE manifold::
-  DESTINATION ${EXPORT_INSTALL_DIR}/manifold
-  )
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
-  DESTINATION ${EXPORT_INSTALL_DIR}/manifold
-  )
+  DESTINATION ${EXPORT_INSTALL_DIR}/manifold)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
+        DESTINATION ${EXPORT_INSTALL_DIR}/manifold)
 
 # install public headers
 set(MANIFOLD_PUBLIC_HDRS
-  include/manifold/common.h
-  include/manifold/iters.h
-  include/manifold/manifold.h
-  include/manifold/optional_assert.h
-  include/manifold/parallel.h
-  include/manifold/polygon.h
-  include/manifold/vec_view.h
-  )
+    include/manifold/common.h
+    include/manifold/iters.h
+    include/manifold/manifold.h
+    include/manifold/optional_assert.h
+    include/manifold/parallel.h
+    include/manifold/polygon.h
+    include/manifold/vec_view.h)
 
-if (MANIFOLD_CROSS_SECTION)
+if(MANIFOLD_CROSS_SECTION)
   list(APPEND MANIFOLD_PUBLIC_HDRS include/manifold/cross_section.h)
 endif()
 
-if (MANIFOLD_EXPORT)
+if(MANIFOLD_EXPORT)
   list(APPEND MANIFOLD_PUBLIC_HDRS include/manifold/meshIO.h)
 endif()
 
 install(FILES ${MANIFOLD_PUBLIC_HDRS}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
-  )
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
 
 # PkgConfig file
 if(MANIFOLD_CROSS_SECTION)
@@ -365,12 +393,4 @@ if(MANIFOLD_CROSS_SECTION)
 endif()
 configure_file(manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
-
-
-# Local Variables:
-# tab-width: 8
-# mode: cmake
-# indent-tabs-mode: t
-# End:
-# ex: shiftwidth=2 tabstop=8
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
