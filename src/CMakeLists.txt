@@ -106,12 +106,14 @@ target_include_directories(
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 )
 
-set(OPTIONS
+set(
+  OPTIONS
   MANIFOLD_EXCEPTIONS
   MANIFOLD_DEBUG
   MANIFOLD_CROSS_SECTION
   MANIFOLD_EXPORT
-  MANIFOLD_PAR)
+  MANIFOLD_PAR
+)
 foreach(OPT IN LISTS OPTIONS)
   if(${${OPT}})
     target_compile_options(manifold PUBLIC -D${OPT})
