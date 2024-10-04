@@ -15,7 +15,8 @@
 # For private headers
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
-set(MANIFOLD_SRCS
+set(
+  MANIFOLD_SRCS
   boolean3.cpp
   boolean_result.cpp
   constructors.cpp
@@ -31,9 +32,10 @@ set(MANIFOLD_SRCS
   smoothing.cpp
   sort.cpp
   subdivision.cpp
-  )
+)
 
-set(MANIFOLD_PRIVATE_HDRS
+set(
+  MANIFOLD_PRIVATE_HDRS
   boolean3.h
   collider.h
   csg_tree.h
@@ -47,18 +49,14 @@ set(MANIFOLD_PRIVATE_HDRS
   tri_dist.h
   utils.h
   vec.h
-  )
+)
 
 if(MANIFOLD_CROSS_SECTION)
-  list(APPEND MANIFOLD_SRCS
-    cross_section/cross_section.cpp
-    )
+  list(APPEND MANIFOLD_SRCS cross_section/cross_section.cpp)
 endif()
 
 if(MANIFOLD_EXPORT)
-  list(APPEND MANIFOLD_SRCS
-    meshIO/meshIO.cpp
-    )
+  list(APPEND MANIFOLD_SRCS meshIO/meshIO.cpp)
 endif()
 
 # Dependency libraries
@@ -77,11 +75,12 @@ if(MANIFOLD_PAR)
     list(APPEND MANIFOLD_LIBS ${TBB_LINK_LIBRARIES})
   endif()
 endif()
+if(MANIFOLD_EXPORT)
+  list(APPEND MANIFOLD_LIBS assimp::assimp)
+endif()
 
-#Include directories
-set(MANIFOLD_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/include
-  )
+# Include directories
+set(MANIFOLD_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/include)
 if(TBB_INCLUDE_DIRS)
   list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
 endif()
@@ -90,54 +89,57 @@ add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
 if(MSVC)
-  set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  set_target_properties(
+    ${PROJECT_NAME}
+    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON
+  )
 endif()
 target_link_libraries(manifold PUBLIC ${MANIFOLD_LIBS})
 if(MANIFOLD_FLAGS)
   target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
 endif()
-target_include_directories(manifold PUBLIC
-  $<INSTALL_INTERFACE:include>
-  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+target_include_directories(
+  manifold
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
-  )
-if(MANIFOLD_EXCEPTIONS)
-  target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
-endif()
-if(MANIFOLD_DEBUG)
-  target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)
-endif()
-if(MANIFOLD_EXPORT)
-  target_link_libraries(manifold PRIVATE assimp::assimp)
-  target_compile_options(manifold PUBLIC -DMANIFOLD_EXPORT)
-endif()
+)
+
+set(
+  OPTIONS
+  MANIFOLD_EXCEPTIONS
+  MANIFOLD_DEBUG
+  MANIFOLD_CROSS_SECTION
+  MANIFOLD_EXPORT
+  MANIFOLD_PAR
+)
+foreach(OPT IN LISTS OPTIONS)
+  if(${${OPT}})
+    target_compile_options(manifold PUBLIC -D${OPT})
+  endif()
+endforeach()
 target_compile_features(manifold PUBLIC cxx_std_17)
-if(MANIFOLD_PAR)
-  target_compile_options(manifold INTERFACE -DMANIFOLD_PAR)
-endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
 
 # Tracy Support
-if (MANIFOLD_DOWNLOADS)
-  include(FetchContent)
-  if (TRACY_ENABLE)
-    include(FetchContent)
-    FetchContent_Declare(tracy
-      GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-      GIT_TAG v0.10
-      GIT_SHALLOW TRUE
-      GIT_PROGRESS TRUE
-      )
-    FetchContent_MakeAvailable(tracy)
-    target_link_libraries(manifold INTERFACE TracyClient)
+if(TRACY_ENABLE)
+  if(NOT MANIFOLD_DOWNLOADS)
+    message(
+      WARNING
+      "Downloading is disabled, but tracy requires download - skipping.\n"
+    )
+    return()
   endif()
+  include(FetchContent)
+  FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.10
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(tracy)
+  target_link_libraries(manifold INTERFACE TracyClient)
 endif()
-
-
-# Local Variables:
-# tab-width: 8
-# mode: cmake
-# indent-tabs-mode: t
-# End:
-# ex: shiftwidth=2 tabstop=8
