@@ -75,8 +75,11 @@ if(MANIFOLD_PAR)
     list(APPEND MANIFOLD_LIBS ${TBB_LINK_LIBRARIES})
   endif()
 endif()
+if(MANIFOLD_EXPORT)
+  list(APPEND MANIFOLD_LIBS assimp::assimp)
+endif()
 
-#Include directories
+# Include directories
 set(MANIFOLD_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/include)
 if(TBB_INCLUDE_DIRS)
   list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
@@ -102,36 +105,39 @@ target_include_directories(
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 )
-if(MANIFOLD_EXCEPTIONS)
-  target_compile_options(manifold PRIVATE -DMANIFOLD_EXCEPTIONS=1)
-endif()
-if(MANIFOLD_DEBUG)
-  target_compile_options(manifold PRIVATE -DMANIFOLD_DEBUG)
-endif()
-if(MANIFOLD_EXPORT)
-  target_link_libraries(manifold PRIVATE assimp::assimp)
-  target_compile_options(manifold PUBLIC -DMANIFOLD_EXPORT)
-endif()
+
+set(OPTIONS
+  MANIFOLD_EXCEPTIONS
+  MANIFOLD_DEBUG
+  MANIFOLD_CROSS_SECTION
+  MANIFOLD_EXPORT
+  MANIFOLD_PAR)
+foreach(OPT IN LISTS OPTIONS)
+  if(${${OPT}})
+    target_compile_options(manifold PUBLIC -D${OPT})
+  endif()
+endforeach()
 target_compile_features(manifold PUBLIC cxx_std_17)
-if(MANIFOLD_PAR)
-  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR)
-endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
 
 # Tracy Support
-if(MANIFOLD_DOWNLOADS)
-  include(FetchContent)
-  if(TRACY_ENABLE)
-    include(FetchContent)
-    FetchContent_Declare(
-      tracy
-      GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-      GIT_TAG v0.10
-      GIT_SHALLOW TRUE
-      GIT_PROGRESS TRUE
+if(TRACY_ENABLE)
+  if(NOT MANIFOLD_DOWNLOADS)
+    message(
+      WARNING
+      "Downloading is disabled, but tracy requires download - skipping.\n"
     )
-    FetchContent_MakeAvailable(tracy)
-    target_link_libraries(manifold INTERFACE TracyClient)
+    return()
   endif()
+  include(FetchContent)
+  FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.10
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(tracy)
+  target_link_libraries(manifold INTERFACE TracyClient)
 endif()

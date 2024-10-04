@@ -94,14 +94,6 @@ if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   target_link_libraries(manifold_test manifoldc)
 endif()
 
-if(MANIFOLD_CROSS_SECTION)
-  target_compile_options(manifold_test PUBLIC -DMANIFOLD_CROSS_SECTION)
-endif()
-
-if(MANIFOLD_EXPORT)
-  target_compile_options(manifold_test PUBLIC -DMANIFOLD_EXPORT)
-endif()
-
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(manifold_test PUBLIC cxx_std_17)
 
