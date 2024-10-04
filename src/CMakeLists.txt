@@ -112,13 +112,18 @@ set(
   MANIFOLD_DEBUG
   MANIFOLD_CROSS_SECTION
   MANIFOLD_EXPORT
-  MANIFOLD_PAR
 )
 foreach(OPT IN LISTS OPTIONS)
   if(${${OPT}})
     target_compile_options(manifold PUBLIC -D${OPT})
   endif()
 endforeach()
+if(MANIFOLD_PAR)
+  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR='P')
+else()
+  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR='S')
+endif()
+
 target_compile_features(manifold PUBLIC cxx_std_17)
 
 install(TARGETS manifold EXPORT manifoldTargets)
