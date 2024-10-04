@@ -17,8 +17,14 @@ if(NOT MANIFOLD_TEST)
 endif()
 
 add_library(
-  samples src/menger_sponge.cpp src/rounded_frame.cpp src/scallop.cpp
-          src/tet_puzzle.cpp src/gyroid_module.cpp src/condensed_matter.cpp)
+  samples
+  src/menger_sponge.cpp
+  src/rounded_frame.cpp
+  src/scallop.cpp
+  src/tet_puzzle.cpp
+  src/gyroid_module.cpp
+  src/condensed_matter.cpp
+)
 if(MANIFOLD_CROSS_SECTION)
   target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
 endif()
