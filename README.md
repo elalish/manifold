@@ -161,7 +161,7 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 ### Formatting
 
 There is a formatting script `format.sh` that automatically formats everything.
-It requires clang-format, black formatter for python and [cmake-format](https://github.com/cheshirekow/cmake_format) for formatting cmake files.
+It requires clang-format, black formatter for python and [gersemi](https://github.com/BlankSpruce/gersemi) for formatting cmake files.
 
 Note that our script can run with clang-format older than 18, but the GitHub
 action check may fail due to slight differences between different versions of

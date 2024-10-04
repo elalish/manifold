@@ -22,13 +22,13 @@ black bindings/python/examples/*.py
 for f in $(find -name CMakeLists.txt); do
   # skip build directories
   if [[ $f != *build* ]]; then
-    cmake-format -i $f
+    gersemi -i $f
   fi
 done
 
 for f in $(find -name '*.cmake.in'); do
   # skip build directories
   if [[ $f != *build* ]]; then
-    cmake-format -i $f
+    gersemi -i $f
   fi
 done
