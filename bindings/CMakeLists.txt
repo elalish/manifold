@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (NOT MANIFOLD_CROSS_SECTION)
+if(NOT MANIFOLD_CROSS_SECTION)
   return()
 endif()
 
@@ -27,10 +27,3 @@ endif()
 if(EMSCRIPTEN AND MANIFOLD_JSBIND)
   add_subdirectory(wasm)
 endif()
-
-# Local Variables:
-# tab-width: 8
-# mode: cmake
-# indent-tabs-mode: t
-# End:
-# ex: shiftwidth=2 tabstop=8

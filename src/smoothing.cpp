@@ -15,7 +15,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-#include "impl.h"
+#include "./impl.h"
 #include "manifold/parallel.h"
 
 namespace {

@@ -161,10 +161,12 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 ### Formatting
 
 There is a formatting script `format.sh` that automatically formats everything.
-It requires clang-format 11 and black formatter for python.
+It requires clang-format, black formatter for python and [gersemi](https://github.com/BlankSpruce/gersemi) for formatting cmake files.
 
-If you have clang-format installed but without clang-11, you can specify the
-clang-format executable by setting the `CLANG_FORMAT` environment variable.
+Note that our script can run with clang-format older than 18, but the GitHub
+action check may fail due to slight differences between different versions of
+clang-format. In that case, either update your clang-format version or apply the
+patch from the GitHub action log.
 
 ### Profiling
 

@@ -21,29 +21,10 @@
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <limits>
-#include <memory>
 #include <stdexcept>
-#include <unordered_map>
 #include <vector>
 
-#ifdef MANIFOLD_DEBUG
-#include <iomanip>
-#include <iostream>
-#include <sstream>
-#endif
-
 namespace manifold {
-
-/**
- * Stand-in for C++23's operator""uz (P0330R8)[https://wg21.link/P0330R8].
- */
-[[nodiscard]] constexpr std::size_t operator""_uz(
-    unsigned long long n) noexcept {
-  return n;
-}
-
-constexpr double kTolerance = 1e-12;
-
 /** @defgroup Math data structure definitions
  *  @brief Abstract away from glm.
  *  In the future the underlying data type can change.
@@ -65,11 +46,6 @@ using ivec3 = glm::vec<3, int>;
 using ivec4 = glm::vec<4, int>;
 using quat = glm::dquat;
 ///@}
-
-/** @defgroup Connections
- *  @brief Move data in and out of the Manifold class.
- *  @{
- */
 
 /**
  * Sine function where multiples of 90 degrees come out exact.
@@ -100,42 +76,6 @@ inline double sind(double x) {
  * @param x Angle in degrees.
  */
 inline double cosd(double x) { return sind(x + 90.0); }
-
-/**
- * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
- * object. Turns along the shortest path from given up-vector to (0, 0, 1).
- *
- * @param up The vector to be turned to point upwards. Length does not matter.
- */
-inline mat4x3 RotateUp(vec3 up) {
-  up = glm::normalize(up);
-  vec3 axis = glm::cross(up, {0, 0, 1});
-  double angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<double>() - angle;
-  return mat4x3(glm::rotate(mat4(1), angle, axis));
-}
-
-/**
- * Determines if the three points are wound counter-clockwise, clockwise, or
- * colinear within the specified tolerance.
- *
- * @param p0 First point
- * @param p1 Second point
- * @param p2 Third point
- * @param tol Tolerance value for colinearity
- * @return int, like Signum, this returns 1 for CCW, -1 for CW, and 0 if within
- * tol of colinear.
- */
-inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
-  vec2 v1 = p1 - p0;
-  vec2 v2 = p2 - p0;
-  double area = fma(v1.x, v2.y, -v1.y * v2.x);
-  double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area * 4 <= base2 * tol * tol)
-    return 0;
-  else
-    return area > 0 ? 1 : -1;
-}
 
 /**
  * Single polygon contour, wound CCW. First and last point are implicitly
@@ -586,19 +526,10 @@ class Quality {
 };
 /** @} */
 
-/** @defgroup Debug
- *  @brief Debugging features
- *
- * The features require compiler flags to be enabled. Assertions are enabled
- * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
- * Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set. Import and
- * Export of 3D models is only supported with the MANIFOLD_EXPORT flag, which
- * also requires linking in the Assimp dependency.
- *  @{
- */
-
 /** @defgroup Exceptions
  *  @brief Custom Exceptions
+ *
+ *  Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set.
  * @{
  */
 struct userErr : public virtual std::runtime_error {
@@ -636,77 +567,6 @@ struct ExecutionParams {
   bool cleanupTriangles = true;
 };
 
-#ifdef MANIFOLD_DEBUG
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec3<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
-                << ", w = " << v.w;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat3& mat) {
-  mat3 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat4x3& mat) {
-  mat3x4 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-/**
- * Print the contents of this vector to standard output. Only exists if compiled
- * with MANIFOLD_DEBUG flag.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (size_t i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-template <typename T>
-void Diff(const std::vector<T>& a, const std::vector<T>& b) {
-  std::cout << "Diff = " << std::endl;
-  if (a.size() != b.size()) {
-    std::cout << "a and b must have the same length, aborting Diff"
-              << std::endl;
-    return;
-  }
-  for (size_t i = 0; i < a.size(); ++i) {
-    if (a[i] != b[i])
-      std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
-  }
-  std::cout << std::endl;
-}
-/** @} */
-#endif
 }  // namespace manifold
 
 #undef HOST_DEVICE

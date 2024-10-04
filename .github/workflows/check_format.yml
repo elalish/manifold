@@ -22,3 +22,12 @@ jobs:
       with:
         options: "--check --verbose"
         src: "./bindings/python/examples"
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12' 
+        cache: 'pip'
+    - name: "gersemi cmake check"
+      run: |
+        pip3 install gersemi
+        ./scripts/gersemi-check.sh
+

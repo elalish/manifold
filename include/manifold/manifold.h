@@ -15,7 +15,6 @@
 #pragma once
 #include <functional>
 #include <memory>
-#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"

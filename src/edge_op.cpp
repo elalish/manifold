@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "impl.h"
+#include "./impl.h"
 #include "manifold/parallel.h"
 
 namespace {
@@ -115,7 +115,6 @@ void Manifold::Impl::CleanupTopology() {
     ZoneScopedN("DedupeEdge");
 
     const size_t nbEdges = halfedge_.size();
-    auto policy = autoPolicy(nbEdges, 1e5);
     size_t numFlagged = 0;
 
     Vec<SortEntry> entries;

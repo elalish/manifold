@@ -133,8 +133,8 @@ struct CheckHalfedges {
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
 
-    if (!isfinite(vertPos[halfedge.startVert][0])) return false;
-    if (!isfinite(vertPos[halfedge.endVert][0])) return false;
+    if (!std::isfinite(vertPos[halfedge.startVert][0])) return false;
+    if (!std::isfinite(vertPos[halfedge.endVert][0])) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
@@ -312,15 +312,15 @@ void Manifold::Impl::CalculateBBox() {
   bBox_.min =
       reduce(vertPos_.begin(), vertPos_.end(),
              vec3(std::numeric_limits<double>::infinity()), [](auto a, auto b) {
-               if (isnan(a.x)) return b;
-               if (isnan(b.x)) return a;
+               if (std::isnan(a.x)) return b;
+               if (std::isnan(b.x)) return a;
                return glm::min(a, b);
              });
   bBox_.max = reduce(vertPos_.begin(), vertPos_.end(),
                      vec3(-std::numeric_limits<double>::infinity()),
                      [](auto a, auto b) {
-                       if (isnan(a.x)) return b;
-                       if (isnan(b.x)) return a;
+                       if (std::isnan(a.x)) return b;
+                       if (std::isnan(b.x)) return a;
                        return glm::max(a, b);
                      });
 }

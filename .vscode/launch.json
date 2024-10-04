@@ -13,7 +13,10 @@
       "args": [
         "--gtest_break_on_failure",
         "--gtest_catch_exceptions=0",
+<<<<<<< HEAD
         "--gtest_filter=Boolean.Cubes"
+=======
+>>>>>>> 658d3e037a0a198b605fd99e496e84b1dd674a32
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

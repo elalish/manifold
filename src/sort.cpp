@@ -15,7 +15,7 @@
 #include <atomic>
 #include <set>
 
-#include "impl.h"
+#include "./impl.h"
 #include "manifold/parallel.h"
 
 namespace {
@@ -26,7 +26,7 @@ constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 uint32_t MortonCode(vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
-  if (isnan(position.x)) return kNoCode;
+  if (std::isnan(position.x)) return kNoCode;
 
   return Collider::MortonCode(position, bBox);
 }

@@ -14,7 +14,6 @@
 
 #include "manifold/meshIO.h"
 
-#include <algorithm>
 #include <iostream>
 
 #include "assimp/Exporter.hpp"

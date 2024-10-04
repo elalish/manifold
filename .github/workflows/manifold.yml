@@ -27,7 +27,6 @@ jobs:
     env:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
-    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/setup-python@v5
       with:
@@ -89,7 +88,6 @@ jobs:
   build_cbind:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
     steps:
     - name: Install dependencies
       run: |
@@ -110,7 +108,6 @@ jobs:
   build_wasm:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         exception: [ON, OFF]
@@ -161,7 +158,6 @@ jobs:
         parallel_backend: [OFF, ON]
       max-parallel: 1
     runs-on: windows-2019
-    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
@@ -213,7 +209,6 @@ jobs:
       matrix:
         parallel_backend: [OFF, ON]
     runs-on: macos-latest
-    if: github.event.pull_request.draft == false
     steps:
     - name: Install common dependencies
       run: |
@@ -249,7 +244,6 @@ jobs:
         # disabling js variant for now
         variant: [none, tbb]
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v22
@@ -258,7 +252,6 @@ jobs:
   build_nix_python:
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v22

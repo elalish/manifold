@@ -14,8 +14,11 @@
 
 #include <algorithm>
 #include <array>
-#include <iostream>
 #include <map>
+
+#include "./boolean3.h"
+#include "./utils.h"
+#include "manifold/parallel.h"
 
 #if defined(MANIFOLD_PAR) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -29,8 +32,6 @@ template <typename K, typename V>
 // not really concurrent when tbb is disabled
 using concurrent_map = std::map<K, V>;
 #endif
-#include "boolean3.h"
-#include "manifold/parallel.h"
 
 using namespace manifold;
 

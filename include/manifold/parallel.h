@@ -26,7 +26,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "manifold/common.h"
 #include "manifold/iters.h"
 namespace manifold {
 
@@ -598,13 +597,13 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
       "You can only parallelize RandomAccessIterator.");
 #if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
-    tbb::parallel_for(
-        tbb::blocked_range<size_t>(
-            0_uz, static_cast<size_t>(std::distance(first, last))),
-        [&](const tbb::blocked_range<size_t> &range) {
-          std::transform(first + range.begin(), first + range.end(),
-                         d_first + range.begin(), f);
-        });
+    tbb::parallel_for(tbb::blocked_range<size_t>(
+                          0, static_cast<size_t>(std::distance(first, last))),
+                      [&](const tbb::blocked_range<size_t> &range) {
+                        std::transform(first + range.begin(),
+                                       first + range.end(),
+                                       d_first + range.begin(), f);
+                      });
     return;
   }
 #endif
@@ -643,7 +642,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 #if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0_uz, static_cast<size_t>(std::distance(first, last)),
+                          0, static_cast<size_t>(std::distance(first, last)),
                           details::kSeqThreshold),
                       [&](const tbb::blocked_range<size_t> &range) {
                         std::copy(first + range.begin(), first + range.end(),
@@ -723,7 +722,7 @@ size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
 #if defined(MANIFOLD_PAR)
   if (policy == ExecutionPolicy::Par) {
     return reduce(policy, TransformIterator(first, pred),
-                  TransformIterator(last, pred), 0_uz, std::plus<size_t>());
+                  TransformIterator(last, pred), 0, std::plus<size_t>());
   }
 #endif
   return std::count_if(first, last, pred);
@@ -1048,7 +1047,7 @@ template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
              InputIterator2 mapFirst, OutputIterator outputFirst) {
-  for_each(policy, countAt(0_uz),
+  for_each(policy, countAt(0),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first, mapFirst, outputFirst](size_t i) {
              outputFirst[mapFirst[i]] = first[i];
@@ -1080,7 +1079,7 @@ template <typename InputIterator, typename RandomAccessIterator,
 void gather(ExecutionPolicy policy, InputIterator mapFirst,
             InputIterator mapLast, RandomAccessIterator inputFirst,
             OutputIterator outputFirst) {
-  for_each(policy, countAt(0_uz),
+  for_each(policy, countAt(0),
            countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
            [mapFirst, inputFirst, outputFirst](size_t i) {
              outputFirst[i] = inputFirst[mapFirst[i]];
@@ -1104,7 +1103,7 @@ void gather(InputIterator mapFirst, InputIterator mapLast,
 // Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
-  for_each(policy, countAt(0_uz),
+  for_each(policy, countAt(0),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
 }
