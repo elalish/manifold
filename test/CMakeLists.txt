@@ -15,13 +15,35 @@
 if(NOT MANIFOLD_TEST)
   return()
 endif()
-if(NOT MANIFOLD_DOWNLOADS)
-  message(
-    "Downloading is disabled, but testing requires googletest - skipping.\n"
-  )
-endif()
 
 enable_testing()
+
+find_package(gtest QUIET)
+if(NOT gtest_FOUND)
+  if(NOT MANIFOLD_DOWNLOADS)
+    message(
+      WARNING
+      "Downloading is disabled, but testing requires googletest - skipping.\n"
+    )
+    return()
+  endif()
+
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  # Prevent installation of GTest with your project
+  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+  set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
+
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.14.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    FIND_PACKAGE_ARGS NAMES GTest gtest
+  )
+  FetchContent_MakeAvailable(googletest)
+endif()
 
 set(
   SOURCE_FILES
@@ -44,22 +66,6 @@ endif()
 if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
 endif()
-
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-# Prevent installation of GTest with your project
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
-
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG v1.14.0
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  FIND_PACKAGE_ARGS NAMES GTest gtest
-)
-FetchContent_MakeAvailable(googletest)
 
 if(NOT TARGET GTest::gtest_main)
   add_library(GTest::gtest_main ALIAS gtest_main)
@@ -103,11 +109,19 @@ add_test(test_all manifold_test)
 target_precompile_headers(manifold_test INTERFACE test.h)
 
 if(EMSCRIPTEN)
+  list(
+    APPEND
+    EMSCRIPTEN_LINK_FLAGS
+    -sASSERTIONS=1
+    -sDEMANGLE_SUPPORT=1
+    --bind
+    --preload-file
+    ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons
+  )
+  list(JOIN EMSCRIPTEN_LINK_FLAGS " " EMSCRIPTEN_LINK_FLAGS)
   set_target_properties(
     manifold_test
-    PROPERTIES
-      LINK_FLAGS
-        "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons"
+    PROPERTIES LINK_FLAGS ${EMSCRIPTEN_LINK_FLAGS}
   )
 endif()
 
