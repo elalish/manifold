@@ -114,7 +114,7 @@ if(MANIFOLD_EXPORT)
 endif()
 target_compile_features(manifold PUBLIC cxx_std_17)
 if(MANIFOLD_PAR)
-  target_compile_options(manifold INTERFACE -DMANIFOLD_PAR)
+  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR)
 endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
