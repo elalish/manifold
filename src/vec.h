@@ -154,6 +154,25 @@ class Vec : public VecView<T> {
     this->ptr_[this->size_++] = val;
   }
 
+  inline void extend(size_t n, bool seq = false) {
+    if (this->size_ + n >= capacity_) {
+      size_t targetCap = capacity_ == 0 ? 128 : capacity_ * 2;
+      T *newBuffer = reinterpret_cast<T *>(malloc(targetCap * sizeof(T)));
+      ASSERT(newBuffer != nullptr, std::bad_alloc());
+      TracyAllocS(newBuffer, targetCap * sizeof(T), 3);
+      if (this->size_ > 0)
+        manifold::copy(seq ? ExecutionPolicy::Seq : autoPolicy(this->size_),
+                       this->ptr_, this->ptr_ + this->size_, newBuffer);
+      if (this->ptr_ != nullptr) {
+        TracyFreeS(this->ptr_, 3);
+        free(this->ptr_);
+      }
+      this->ptr_ = newBuffer;
+      capacity_ = targetCap;
+    }
+    this->size_ += n;
+  }
+
   void reserve(size_t n, bool seq = false) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
@@ -184,7 +203,10 @@ class Vec : public VecView<T> {
 
   void pop_back() { resize(this->size_ - 1); }
 
-  void clear() { resize(0); }
+  void clear(bool shrink = true) {
+    this->size_ = 0;
+    if (shrink) shrink_to_fit();
+  }
 
   void shrink_to_fit() {
     T *newBuffer = nullptr;

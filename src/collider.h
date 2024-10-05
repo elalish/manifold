@@ -165,7 +165,7 @@ struct FindCollision {
   VecView<const std::pair<int, int>> internalChildren_;
   Recorder recorder;
 
-  int RecordCollision(int node, const int queryIdx, SparseIndices& ind) {
+  inline int RecordCollision(int node, const int queryIdx, SparseIndices& ind) {
     bool overlaps = nodeBBox_[node].DoesOverlap(queries[queryIdx]);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
@@ -323,7 +323,8 @@ class Collider {
 
   template <const bool selfCollision = false, const bool inverted = false,
             typename T>
-  SparseIndices Collisions(const VecView<const T>& queriesIn) const {
+  void Collisions(const VecView<const T>& queriesIn,
+                  SparseIndices& queryTri) const {
     ZoneScoped;
     using collider_internal::FindCollision;
 #ifdef MANIFOLD_PAR
@@ -338,15 +339,22 @@ class Collider {
       std::vector<SparseIndices> tmp;
       store.combine_each(
           [&](SparseIndices& ind) { tmp.emplace_back(std::move(ind)); });
-      return SparseIndices(tmp);
+      queryTri.FromIndices(tmp);
+      return;
     }
 #endif
-    SparseIndices queryTri;
     for_each_n(ExecutionPolicy::Seq, countAt(0), queriesIn.size(),
                FindCollision<T, selfCollision,
                              collider_internal::SeqCollisionRecorder<inverted>>{
                    queriesIn, nodeBBox_, internalChildren_, {queryTri}});
-    return queryTri;
+  }
+
+  template <const bool selfCollision = false, const bool inverted = false,
+            typename T>
+  SparseIndices Collisions(const VecView<const T>& queriesIn) const {
+    SparseIndices result;
+    Collisions<selfCollision, inverted, T>(queriesIn, result);
+    return result;
   }
 
   static uint32_t MortonCode(vec3 position, Box bBox) {

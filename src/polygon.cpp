@@ -489,7 +489,8 @@ class EarClip {
     // values < -precision so they will never affect validity. The first
     // totalCost is designed to give priority to sharper angles. Any cost < (-1
     // - precision) has satisfied the Delaunay condition.
-    double EarCost(double precision, const IdxCollider &collider) const {
+    double EarCost(double precision, const IdxCollider &collider,
+                   SparseIndices &toTest) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
       const double scale = 4 / glm::dot(openSide, openSide);
@@ -506,7 +507,7 @@ class EarClip {
       earBox.push_back({vec3(center.x - radius, center.y - radius, 0),
                         vec3(center.x + radius, center.y + radius, 0)});
       earBox.back().Union(vec3(pos, 0));
-      const SparseIndices toTest = collider.collider.Collisions(earBox.cview());
+      collider.collider.Collisions(earBox.cview(), toTest);
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
@@ -522,7 +523,7 @@ class EarClip {
           totalCost = std::max(totalCost, cost);
         }
       }
-
+      toTest.Clear();
       return totalCost;
     }
 
@@ -799,7 +800,8 @@ class EarClip {
 
   // Recalculate the cost of the Vert v ear, updating it in the queue by
   // removing and reinserting it.
-  void ProcessEar(VertItr v, const IdxCollider &collider) {
+  void ProcessEar(VertItr v, const IdxCollider &collider,
+                  SparseIndices &buffer) {
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
@@ -808,7 +810,7 @@ class EarClip {
       v->cost = kBest;
       v->ear = earsQueue_.insert(v);
     } else if (v->IsConvex(2 * precision_)) {
-      v->cost = v->EarCost(precision_, collider);
+      v->cost = v->EarCost(precision_, collider, buffer);
       v->ear = earsQueue_.insert(v);
     } else {
       v->cost = 1;  // not used, but marks reflex verts for debug
@@ -866,8 +868,9 @@ class EarClip {
     int numTri = -2;
     earsQueue_.clear();
 
+    SparseIndices buffer;
     auto QueueVert = [&](VertItr v) {
-      ProcessEar(v, vertCollider);
+      ProcessEar(v, vertCollider, buffer);
       ++numTri;
       v->PrintVert();
     };
@@ -890,8 +893,8 @@ class EarClip {
       ClipEar(v);
       --numTri;
 
-      ProcessEar(v->left, vertCollider);
-      ProcessEar(v->right, vertCollider);
+      ProcessEar(v->left, vertCollider, buffer);
+      ProcessEar(v->right, vertCollider, buffer);
       // This is a backup vert that is used if the queue is empty (geometrically
       // invalid polygon), to ensure manifoldness.
       v = v->right;

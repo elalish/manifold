@@ -59,7 +59,10 @@ class SparseIndices {
 
   SparseIndices() = default;
   SparseIndices(size_t size) { data_ = Vec<char>(size * sizeof(int64_t)); }
-  SparseIndices(const std::vector<SparseIndices>& indices) {
+
+  void Clear() { data_.clear(false); }
+
+  void FromIndices(const std::vector<SparseIndices>& indices) {
     std::vector<size_t> sizes;
     size_t total_size = 0;
     for (const auto& ind : indices) {
@@ -144,7 +147,7 @@ class SparseIndices {
   }
 
   inline void Add(int p, int q, bool seq = false) {
-    for (unsigned int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1, seq);
+    data_.extend(sizeof(int64_t), seq);
     Set(size() - 1, p, q);
   }
 
