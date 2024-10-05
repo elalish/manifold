@@ -15,6 +15,9 @@
 #pragma once
 
 #include <cstddef>
+#include <limits>
+#include <type_traits>
+#include <vector>
 
 #include "manifold/optional_assert.h"
 
@@ -31,7 +34,12 @@ class VecView {
   using Iter = T *;
   using IterC = const T *;
 
+  VecView() : ptr_(nullptr), size_(0) {}
+
   VecView(T *ptr, size_t size) : ptr_(ptr), size_(size) {}
+
+  VecView(const std::vector<std::remove_cv_t<T>> &v)
+      : ptr_(v.data()), size_(v.size()) {}
 
   VecView(const VecView &other) {
     ptr_ = other.ptr_;
@@ -94,6 +102,37 @@ class VecView {
 
   bool empty() const { return size_ == 0; }
 
+  VecView<T> view(size_t offset = 0,
+                  size_t length = std::numeric_limits<size_t>::max()) {
+    if (length == std::numeric_limits<size_t>::max())
+      length = this->size_ - offset;
+    ASSERT(length >= 0, std::out_of_range("Vec::view out of range"));
+    ASSERT(offset + length <= this->size_ && offset >= 0,
+           std::out_of_range("Vec::view out of range"));
+    return VecView<T>(this->ptr_ + offset, length);
+  }
+
+  VecView<const T> cview(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
+    if (length == std::numeric_limits<size_t>::max())
+      length = this->size_ - offset;
+    ASSERT(length >= 0, std::out_of_range("Vec::cview out of range"));
+    ASSERT(offset + length <= this->size_ && offset >= 0,
+           std::out_of_range("Vec::cview out of range"));
+    return VecView<const T>(this->ptr_ + offset, length);
+  }
+
+  VecView<const T> view(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
+    return cview(offset, length);
+  }
+
+  T *data() { return this->ptr_; }
+
+  const T *data() const { return this->ptr_; }
+
 #ifdef MANIFOLD_DEBUG
   void Dump() const {
     std::cout << "Vec = " << std::endl;
@@ -107,8 +146,6 @@ class VecView {
  protected:
   T *ptr_ = nullptr;
   size_t size_ = 0;
-
-  VecView() = default;
 };
 
 }  // namespace manifold
