@@ -21,6 +21,7 @@
 #include "./collider.h"
 #include "./utils.h"
 #include "manifold/optional_assert.h"
+#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -503,15 +504,16 @@ class EarClip {
         return totalCost;
       }
 
-      Vec<Box> earBox;
-      earBox.push_back({vec3(center.x - radius, center.y - radius, 0),
-                        vec3(center.x + radius, center.y + radius, 0)});
-      earBox.back().Union(vec3(pos, 0));
-      collider.collider.Collisions(earBox.cview(), collider.ind);
+      Box earBox = Box{vec3(center.x - radius, center.y - radius, 0),
+                       vec3(center.x + radius, center.y + radius, 0)};
+      earBox.Union(vec3(pos, 0));
+      collider.collider.Collisions(VecView<const Box>(&earBox, 1),
+                                   collider.ind);
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-      for (size_t i = 0; i < collider.ind.size(); ++i) {
+
+      auto f = [&](size_t i) {
         const VertItr test = collider.itr[collider.ind.Get(i, true)];
         if (!Clipped(test) && test->mesh_idx != mesh_idx &&
             test->mesh_idx != lid &&
@@ -520,9 +522,13 @@ class EarClip {
           if (cost < -precision) {
             cost = DelaunayCost(test->pos - center, scale, precision);
           }
-          totalCost = std::max(totalCost, cost);
+          return cost;
         }
-      }
+        return std::numeric_limits<double>::min();
+      };
+      totalCost = transform_reduce(
+          countAt(0), countAt(collider.ind.size()), totalCost,
+          [](double a, double b) { return std::max(a, b); }, f);
       collider.ind.Clear();
       return totalCost;
     }
