@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if defined(MANIFOLD_PAR) && __has_include(<tbb/concurrent_priority_queue.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_priority_queue.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_priority_queue.h>
@@ -465,7 +465,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     Boolean3 boolean(*results[0], *results[1], operation);
     return std::make_shared<Manifold::Impl>(boolean.Result(operation));
   }
-#if defined(MANIFOLD_PAR) && __has_include(<tbb/tbb.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   if (!ManifoldParams().deterministic) {
     tbb::task_group group;
     tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(
