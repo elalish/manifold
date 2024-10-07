@@ -524,7 +524,7 @@ class EarClip {
           }
           return cost;
         }
-        return std::numeric_limits<double>::min();
+        return std::numeric_limits<double>::lowest();
       };
       totalCost = transform_reduce(
           countAt(0), countAt(collider.ind.size()), totalCost,
