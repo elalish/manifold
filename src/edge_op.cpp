@@ -693,4 +693,36 @@ void Manifold::Impl::SplitPinchedVerts() {
     });
   }
 }
+
+// Return true if Manifold is Genus 0 and contains no concave edges
+bool Manifold::Impl::IsConvex(float tolerance) const {
+  // Convex Shape Must have Genus of 0
+  int chi = NumVert() - NumEdge() + NumTri();
+  int genus = 1 - chi / 2;
+  if (genus != 0) return false;
+
+  // Iterate across all edges; return false if any edges are concave
+  const Impl* pImpl = this;
+  const size_t nbEdges = halfedge_.size();
+  auto policy = autoPolicy(nbEdges, 1e5);
+  bool anyConcave = false;
+  for_each_n(
+      policy, countAt(0), nbEdges, [&anyConcave, &pImpl, &tolerance](int idx) {
+        Halfedge edge = pImpl->halfedge_[idx];
+        if (!edge.IsForward()) return;
+
+        const vec3 normal0 = pImpl->faceNormal_[edge.face];
+        const vec3 normal1 =
+            pImpl->faceNormal_[pImpl->halfedge_[edge.pairedHalfedge].face];
+        if (glm::all(glm::equal(normal0, normal1))) return;
+
+        const vec3 edgeVec =
+            pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
+        const bool convex =
+            glm::dot(edgeVec, glm::cross(normal0, normal1)) > tolerance;
+        if (!convex) anyConcave = true;
+      });
+
+  return !anyConcave;
+}
 }  // namespace manifold
