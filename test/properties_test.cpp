@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "../src/tri_dist.h"
+#include "../src/utils.h"
 #include "manifold/manifold.h"
-#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
 

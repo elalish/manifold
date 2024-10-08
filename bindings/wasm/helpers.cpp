@@ -223,7 +223,10 @@ std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
 }
 
 void CollectVertices(std::vector<vec3>& verts, const Manifold& manifold) {
-  Mesh mesh = manifold.GetMesh();
-  verts.insert(verts.end(), mesh.vertPos.begin(), mesh.vertPos.end());
+  const MeshGL64 mesh = manifold.GetMeshGL64();
+  const auto numVert = mesh.NumVert();
+  for (size_t v = 0; v < numVert; ++v) {
+    verts.push_back(mesh.GetVertPos(v));
+  }
 }
 }  // namespace man_js

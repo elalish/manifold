@@ -88,15 +88,13 @@ def select_functions(s):
     return None
 
 
-collect(f"{base}/src/manifold/src/manifold.cpp", lambda s: method_re.search(s))
-collect(f"{base}/src/manifold/src/constructors.cpp", lambda s: method_re.search(s))
-collect(f"{base}/src/manifold/src/sort.cpp", lambda s: method_re.search(s))
-collect(f"{base}/src/manifold/src/sdf.cpp", lambda s: method_re.search(s))
-collect(
-    f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
-)
-collect(f"{base}/src/polygon/src/polygon.cpp", select_functions)
-collect(f"{base}/src/utilities/include/manifold/common.h", select_functions)
+collect(f"{base}/src/manifold.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/constructors.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/sort.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/sdf.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/cross_section/cross_section.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/polygon.cpp", select_functions)
+collect(f"{base}/include/manifold/common.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 

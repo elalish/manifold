@@ -190,7 +190,7 @@ Module.setup = function() {
 
   Module.CrossSection.prototype.toPolygons = function() {
     const vec = this._ToPolygons();
-    const result = vec2polygons(vec);
+    const result = vec2polygons(vec, v => [v.x, v.y]);
     vec.delete();
     return result;
   };
@@ -226,6 +226,14 @@ Module.setup = function() {
   Module.Manifold.prototype.calculateNormals = function(
       normalIdx, minSharpAngle = 60) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
+  };
+
+  Module.Manifold.prototype.asOriginal = function(propertyTolerance = []) {
+    const tol = new Module.Vector_f64();
+    toVec(tol, propertyTolerance);
+    const result = this._AsOriginal(tol);
+    tol.delete();
+    return result
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
@@ -284,11 +292,17 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.slice = function(height = 0.) {
-    return Module.CrossSection(this._Slice(height));
+    const polygonsVec = this._Slice(height);
+    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    disposePolygons(polygonsVec);
+    return result;
   };
 
   Module.Manifold.prototype.project = function() {
-    return Module.CrossSection(this._Project()).simplify(this.precision());
+    const polygonsVec = this._Project();
+    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    disposePolygons(polygonsVec);
+    return result.simplify(this.precision);
   };
 
   Module.Manifold.prototype.split = function(manifold) {

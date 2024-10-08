@@ -34,7 +34,7 @@ This is a modern C++ library that Github's CI verifies builds and runs on a vari
 
 System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
 - [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
-- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=TBB` is enabled)
+- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=ON` is enabled)
 - [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
 Other dependencies:
@@ -70,7 +70,7 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding when using emscripten.
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding.
-- `MANIFOLD_PAR=[<NONE>, TBB]`: Provides multi-thread parallelization, requires `libtbb-dev` if `TBB` backend is selected.
+- `MANIFOLD_PAR=[<OFF>, ON]`: Provides multi-thread parallelization, requires `libtbb-dev` enabled.
 - `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings).
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
@@ -161,10 +161,12 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 ### Formatting
 
 There is a formatting script `format.sh` that automatically formats everything.
-It requires clang-format 11 and black formatter for python.
+It requires clang-format, black formatter for python and [gersemi](https://github.com/BlankSpruce/gersemi) for formatting cmake files.
 
-If you have clang-format installed but without clang-11, you can specify the
-clang-format executable by setting the `CLANG_FORMAT` environment variable.
+Note that our script can run with clang-format older than 18, but the GitHub
+action check may fail due to slight differences between different versions of
+clang-format. In that case, either update your clang-format version or apply the
+patch from the GitHub action log.
 
 ### Profiling
 

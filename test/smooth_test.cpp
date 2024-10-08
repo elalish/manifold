@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "../src/utils.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -58,6 +59,7 @@ TEST(Smooth, RefineQuads) {
   CheckGL(out);
 
   const MeshGL baseline = WithPositionColors(cylinder);
+  EXPECT_EQ(out.NumVert(), baseline.NumVert());
   float maxDiff = 0;
   for (size_t i = 0; i < out.vertProperties.size(); ++i) {
     maxDiff = std::max(
@@ -132,23 +134,58 @@ TEST(Smooth, ToLength) {
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
+  // Tests vertex precision of interpolation
   double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
-    // Refine(odd) puts a center point in the triangle, which is the worst case.
+    // Refine(3*x) makes a center point, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
-    Mesh out = smoothed.GetMesh();
-    auto bounds = std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
-                                      [](const vec3& a, const vec3& b) {
-                                        return glm::dot(a, a) < glm::dot(b, b);
-                                      });
-    double min = glm::length(*bounds.first);
-    double max = glm::length(*bounds.second);
-    EXPECT_NEAR(min, 1, precision[i]);
-    EXPECT_NEAR(max, 1, precision[i]);
+    MeshGL64 out = smoothed.GetMeshGL64();
+    const int numVert = out.NumVert();
+    double maxR2 = 0;
+    double minR2 = 2;
+    for (int v = 0; v < numVert; ++v) {
+      const vec3 a = out.GetVertPos(v);
+      const double r2 = dot(a, a);
+      maxR2 = std::max(maxR2, r2);
+      minR2 = std::min(minR2, r2);
+    }
+    EXPECT_NEAR(std::sqrt(minR2), 1, precision[i]);
+    EXPECT_NEAR(std::sqrt(maxR2), 1, precision[i]);
   }
+}
+
+TEST(Smooth, Precision) {
+  // Tests face precision of refinement
+  const double precision = 0.001;
+  const double radius = 10;
+  const double height = 10;
+  Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
+  Manifold smoothed = cylinder.SmoothOut().RefineToPrecision(precision);
+  // Makes an edge bisector, which is the worst case.
+  MeshGL64 out = smoothed.Refine(2).GetMeshGL64();
+  const int numVert = out.NumVert();
+  double maxR2 = 0;
+  double minR2 = 2 * radius * radius;
+  for (int v = 0; v < numVert; ++v) {
+    const vec3 a = out.GetVertPos(v);
+    const vec2 a1(a);
+    // Ignore end caps.
+    const double r2 = (std::abs(a.z) < 0.001 || std::abs(a.z - height) < 0.001)
+                          ? radius * radius
+                          : glm::dot(a1, a1);
+    maxR2 = std::max(maxR2, r2);
+    minR2 = std::min(minR2, r2);
+  }
+  EXPECT_NEAR(std::sqrt(minR2), radius - precision, 1e-4);
+  EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
+  EXPECT_EQ(smoothed.NumTri(), 7984);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("refineCylinder.glb", smoothed.GetMeshGL(), {});
+#endif
 }
 
 TEST(Smooth, Normals) {
@@ -170,12 +207,12 @@ TEST(Smooth, Normals) {
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
-  Mesh smooth = Manifold::Smooth(oct).GetMesh();
+  MeshGL smooth = Manifold::Smooth(oct).GetMeshGL();
   // Sharpen the edge from vert 4 to 5
-  smooth.halfedgeTangent[6].w = 0;
-  smooth.halfedgeTangent[22].w = 0;
-  smooth.halfedgeTangent[16].w = 0;
-  smooth.halfedgeTangent[18].w = 0;
+  smooth.halfedgeTangent[4 * 6 + 3] = 0;
+  smooth.halfedgeTangent[4 * 22 + 3] = 0;
+  smooth.halfedgeTangent[4 * 16 + 3] = 0;
+  smooth.halfedgeTangent[4 * 18 + 3] = 0;
   Manifold interp(smooth);
   interp = interp.Refine(100);
 
@@ -238,7 +275,7 @@ TEST(Smooth, Csaszar) {
     options.mat.vertColor.resize(csaszar.NumVert());
     const vec4 blue(0, 0, 1, 1);
     const vec4 yellow(1, 1, 0, 1);
-    for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
+    for (size_t tri = 0; tri < csaszar.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
         const vec3& uvw = {0.5, 0.5, 0.0};
         const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
@@ -268,21 +305,23 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Torus) {
-  Mesh torusMesh =
+  MeshGL64 torusMesh =
       Manifold::Revolve(
           CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
-          .GetMesh();
-  const int numTri = torusMesh.triVerts.size();
+          .GetMeshGL64();
+  const int numTri = torusMesh.NumTri();
+  const int numProp = torusMesh.numProp;
 
   // Create correct toroidal halfedge tangents - SmoothOut() is too generic to
   // do this perfectly.
-  torusMesh.halfedgeTangent.resize(3 * numTri);
+  torusMesh.halfedgeTangent.resize(4 * 3 * numTri);
   for (int tri = 0; tri < numTri; ++tri) {
+    const auto triVerts = torusMesh.GetTriVerts(tri);
     for (const int i : {0, 1, 2}) {
-      vec4& tangent = torusMesh.halfedgeTangent[3 * tri + i];
-      const vec3 v = torusMesh.vertPos[torusMesh.triVerts[tri][i]];
-      const vec3 edge =
-          torusMesh.vertPos[torusMesh.triVerts[tri][(i + 1) % 3]] - v;
+      vec4 tangent;
+      const vec3 v = torusMesh.GetVertPos(triVerts[i]);
+      const vec3 v1 = torusMesh.GetVertPos(triVerts[(i + 1) % 3]);
+      const vec3 edge = v1 - v;
       if (edge.z == 0) {
         vec3 tan(v.y, -v.x, 0);
         tan *= glm::sign(glm::dot(tan, edge));
@@ -299,6 +338,9 @@ TEST(Smooth, Torus) {
       } else {
         tangent = {0, 0, 0, -1};
       }
+      const int e = 3 * tri + i;
+      for (const int j : {0, 1, 2, 3})
+        torusMesh.halfedgeTangent[4 * e + j] = tangent[j];
     }
   }
 

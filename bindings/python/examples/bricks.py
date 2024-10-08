@@ -84,7 +84,7 @@ def floor(length, width):
             )
         )
     if length == 1 and width > 1:
-        results.append(row(width - 1).rotate(0, 0, 90))
+        results.append(row(width - 1).rotate((0, 0, 90)))
     if width == 1 and length > 1:
         results.append(
             row(length - 1).translate(

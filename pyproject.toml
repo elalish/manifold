@@ -39,13 +39,12 @@ sdist.exclude = [
     "bindings/wasm",
     "docs",
     "extras",
-    "meshIO",
     "samples",
     "test",
     "oneTBB", # we may have this when we build with cibuildwheel
 ]
 wheel.packages = ["manifold3d"]
-cmake.args = ["-DMANIFOLD_PYBIND=ON", "-DMANIFOLD_CBIND=OFF", "-DMANIFOLD_PAR=TBB", "-DMANIFOLD_TEST=OFF", "-DBUILD_SHARED_LIBS=OFF"]
+cmake.args = ["-DMANIFOLD_PYBIND=ON", "-DMANIFOLD_CBIND=OFF", "-DMANIFOLD_PAR=ON", "-DMANIFOLD_TEST=OFF", "-DBUILD_SHARED_LIBS=OFF"]
 install.components = ["bindings"]
 
 [tool.cibuildwheel]

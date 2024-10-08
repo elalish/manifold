@@ -19,7 +19,7 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "manifold/tri_dist.h"
+#include "../src/tri_dist.h"
 #include "samples.h"
 #include "test.h"
 
@@ -51,7 +51,7 @@ TEST(Manifold, GetMeshGL) {
 }
 
 TEST(Manifold, Empty) {
-  Mesh emptyMesh;
+  MeshGL emptyMesh;
   Manifold empty(emptyMesh);
 
   EXPECT_TRUE(empty.IsEmpty());
@@ -59,9 +59,8 @@ TEST(Manifold, Empty) {
 }
 
 TEST(Manifold, ValidInput) {
-  std::vector<float> propTol = {0.1, 0.2};
   MeshGL tetGL = TetGL();
-  Manifold tet(tetGL, propTol);
+  Manifold tet(tetGL);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
 }
@@ -177,18 +176,6 @@ TEST(Manifold, Cylinder) {
   int n = 10000;
   Manifold cylinder = Manifold::Cylinder(2, 2, 2, n);
   EXPECT_EQ(cylinder.NumTri(), 4 * n - 4);
-}
-
-TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(vec3(1), true).GetMesh();
-  const int nVert = cube.vertPos.size();
-  for (int i = 0; i < nVert; ++i) {
-    vec3 v = glm::normalize(cube.vertPos[i]);
-    vec3& n = cube.vertNormal[i];
-    EXPECT_FLOAT_EQ(v.x, n.x);
-    EXPECT_FLOAT_EQ(v.y, n.y);
-    EXPECT_FLOAT_EQ(v.z, n.z);
-  }
 }
 
 TEST(Manifold, Extrude) {
@@ -488,8 +475,7 @@ TEST(Manifold, MeshRelationTransform) {
 }
 
 TEST(Manifold, MeshRelationRefine) {
-  const MeshGL in = Csaszar();
-  MeshGL inGL = WithIndexColors(in);
+  MeshGL inGL = WithIndexColors(Csaszar());
   Manifold csaszar(inGL);
 
   RelatedGL(csaszar, {inGL});
@@ -502,6 +488,22 @@ TEST(Manifold, MeshRelationRefine) {
   opt.mat.roughness = 1;
   opt.mat.colorChannels = ivec4(3, 4, 5, -1);
   if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
+#endif
+}
+
+TEST(Manifold, MeshRelationRefinePrecision) {
+  MeshGL inGL = WithPositionColors(Csaszar());
+  Manifold csaszar = Manifold::Smooth(inGL);
+
+  csaszar = csaszar.RefineToPrecision(0.05);
+  ExpectMeshes(csaszar, {{2684, 5368, 3}});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  if (options.exportModels)
+    ExportMesh("csaszarSmooth.glb", csaszar.GetMeshGL(), opt);
 #endif
 }
 
@@ -521,6 +523,7 @@ TEST(Manifold, MeshGLRoundTrip) {
 
 void CheckCube(const MeshGL& cubeSTL) {
   Manifold cube(cubeSTL);
+  cube = cube.AsOriginal();
   EXPECT_EQ(cube.NumTri(), 12);
   EXPECT_EQ(cube.NumVert(), 8);
   EXPECT_EQ(cube.NumPropVert(), 24);
@@ -540,6 +543,7 @@ TEST(Manifold, Merge) {
   EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
 
   EXPECT_TRUE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
   CheckCube(cubeSTL);
 
   EXPECT_FALSE(cubeSTL.Merge());

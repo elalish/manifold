@@ -16,7 +16,7 @@
 
 import math
 import numpy as np
-from manifold3d import Mesh, Manifold
+from manifold3d import Manifold
 
 
 def gyroid(x, y, z):

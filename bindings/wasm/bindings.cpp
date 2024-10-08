@@ -143,6 +143,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
+      .function("refineToPrecision", &Manifold::RefineToPrecision)
       .function("smoothByNormals", &Manifold::SmoothByNormals)
       .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
@@ -169,7 +170,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)
-      .function("asOriginal", &Manifold::AsOriginal);
+      .function("_AsOriginal", &Manifold::AsOriginal);
 
   // Manifold Static Methods
   function("_Cube", &Manifold::Cube);

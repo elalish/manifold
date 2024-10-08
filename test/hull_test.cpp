@@ -14,37 +14,40 @@
 
 #include <algorithm>
 
+#include "../src/tri_dist.h"
 #include "manifold/manifold.h"
-#include "manifold/tri_dist.h"
 #include "samples.h"
 #include "test.h"
 
 using namespace manifold;
 
 // Check if the mesh remains convex after adding new faces
-bool isMeshConvex(manifold::Manifold hullManifold, double epsilon = 0.0000001) {
+bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
   // Get the mesh from the manifold
-  manifold::Mesh mesh = hullManifold.GetMesh();
+  MeshGL64 mesh = hullManifold.GetMeshGL64();
 
-  const auto &vertPos = mesh.vertPos;
+  const auto numTri = mesh.NumTri();
+  const auto numVert = mesh.NumVert();
+  const auto numProp = mesh.numProp;
 
   // Iterate over each triangle
-  for (const auto &tri : mesh.triVerts) {
+  for (size_t t = 0; t < numTri; ++t) {
     // Get the vertices of the triangle
-    vec3 v0 = vertPos[tri[0]];
-    vec3 v1 = vertPos[tri[1]];
-    vec3 v2 = vertPos[tri[2]];
+    auto tri = mesh.GetTriVerts(t);
+    vec3 v0 = mesh.GetVertPos(tri[0]);
+    vec3 v1 = mesh.GetVertPos(tri[1]);
+    vec3 v2 = mesh.GetVertPos(tri[2]);
 
     // Compute the normal of the triangle
     vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
     // Check all other vertices
-    for (int i = 0; i < (int)vertPos.size(); ++i) {
+    for (size_t i = 0; i < numVert; ++i) {
       if (i == tri[0] || i == tri[1] || i == tri[2])
         continue;  // Skip vertices of the current triangle
 
       // Get the vertex
-      vec3 v = vertPos[i];
+      vec3 v = mesh.GetVertPos(i);
 
       // Compute the signed distance from the plane
       double distance = glm::dot(normal, v - v0);
@@ -81,15 +84,6 @@ TEST(Hull, Tictac) {
   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
 
-#ifdef MANIFOLD_EXPORT
-TEST(Hull, Fail) {
-  Manifold body = ReadMesh("hull-body.glb");
-  Manifold mask = ReadMesh("hull-mask.glb");
-  Manifold ret = body - mask;
-  MeshGL mesh = ret.GetMeshGL();
-}
-#endif
-
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
@@ -109,10 +103,10 @@ TEST(Hull, Cube) {
 
 TEST(Hull, Empty) {
   const std::vector<vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(tooFew).AsOriginal().IsEmpty());
 
   const std::vector<vec3> coplanar{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(coplanar).AsOriginal().IsEmpty());
 }
 
 TEST(Hull, MengerSponge) {

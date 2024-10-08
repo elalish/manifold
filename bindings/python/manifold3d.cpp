@@ -233,9 +233,8 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL &, const std::vector<float> &>(),
-           nb::arg("mesh"), nb::arg("property_tolerance") = nb::list(),
-           manifold__manifold__mesh_gl__property_tolerance)
+      .def(nb::init<const MeshGL &>(), nb::arg("mesh"),
+           manifold__manifold__mesh_gl)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
@@ -328,7 +327,10 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
-      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = ivec3(0),
+      .def("refine_to_precision", &Manifold::RefineToPrecision,
+           nb::arg("precision"), manifold__refine_to_precision__precision)
+      .def("to_mesh", &Manifold::GetMeshGL,
+           nb::arg("normal_idx") = std::make_tuple(0, 0, 0),
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
@@ -348,7 +350,9 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
+      .def("as_original", &Manifold::AsOriginal,
+           nb::arg("property_tolerance") = nb::list(),
+           manifold__as_original__property_tolerance)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),
@@ -409,7 +413,8 @@ NB_MODULE(manifold3d, m) {
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube, nb::arg("size") = vec3{1, 1, 1},
+      .def_static("cube", &Manifold::Cube,
+                  nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",

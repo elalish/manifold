@@ -12,23 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(samples)
-
-add_library(samples src/menger_sponge.cpp
-    src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp
-    src/gyroid_module.cpp src/condensed_matter.cpp)
-if(MANIFOLD_CROSS_SECTION)
-    target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
+if(NOT MANIFOLD_TEST)
+  return()
 endif()
 
-target_include_directories(samples
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
+add_library(
+  samples
+  src/menger_sponge.cpp
+  src/rounded_frame.cpp
+  src/scallop.cpp
+  src/tet_puzzle.cpp
+  src/gyroid_module.cpp
+  src/condensed_matter.cpp
 )
+if(MANIFOLD_CROSS_SECTION)
+  target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
+endif()
+
+target_include_directories(samples PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(samples PUBLIC manifold)
-if(MANIFOLD_CROSS_SECTION)
-  target_link_libraries(${PROJECT_NAME} PUBLIC cross_section)
-endif()
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(samples PUBLIC cxx_std_17)

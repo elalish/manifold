@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "../src/utils.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -61,8 +62,8 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
-  const Manifold sphere(sphereGL);
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0);
+  const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
       cube.Scale(vec3(100)) -
@@ -218,10 +219,19 @@ TEST(Boolean, SelfSubtract) {
 }
 
 TEST(Boolean, Perturb) {
-  Mesh tmp;
-  tmp.vertPos = {
-      {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}};
-  tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
+  MeshGL tmp;
+  tmp.vertProperties = {
+      0.0, 0.0, 0.0,  //
+      0.0, 1.0, 0.0,  //
+      1.0, 0.0, 0.0,  //
+      0.0, 0.0, 1.0   //
+  };
+  tmp.triVerts = {
+      2, 0, 1,  //
+      0, 3, 1,  //
+      2, 3, 0,  //
+      3, 2, 1   //
+  };
   Manifold corner(tmp);
   Manifold empty = corner - corner;
   EXPECT_TRUE(empty.IsEmpty());

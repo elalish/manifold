@@ -696,6 +696,20 @@ export class Manifold {
   refineToLength(length: number): Manifold;
 
   /**
+   * Increase the density of the mesh by splitting each edge into pieces such
+   * that any point on the resulting triangles is roughly within precision of
+   * the smoothly curved surface defined by the tangent vectors. This means
+   * tightly curving regions will be divided more finely than smoother regions.
+   * If halfedgeTangents are not present, the result will simply be a copy of
+   * the original. Quads will ignore their interior triangle bisector.
+   *
+   * @param precision The desired maximum distance between the faceted mesh
+   * produced and the exact smoothly curving surface. All vertices are exactly
+   * on the surface, within rounding error.
+   */
+  refineToPrecision(precision: number): Manifold;
+
+  /**
    * Create a new copy of this manifold with updated vertex properties by
    * supplying a function that takes the existing position and properties as
    * input. You may specify any number of output properties, allowing creation

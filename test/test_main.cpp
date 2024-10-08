@@ -230,32 +230,7 @@ MeshGL WithPositionColors(const Manifold& in) {
         }
       });
 
-  MeshGL outGL = out.GetMeshGL();
-  outGL.runIndex.clear();
-  outGL.runOriginalID.clear();
-  outGL.runTransform.clear();
-  outGL.faceID.clear();
-  outGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  return outGL;
-}
-
-MeshGL WithNormals(const Manifold& in) {
-  const Mesh mesh = in.GetMesh();
-  MeshGL out;
-  out.runOriginalID = {Manifold::ReserveIDs(1)};
-  out.numProp = 6;
-  out.vertProperties.resize(out.numProp * mesh.vertPos.size());
-  for (size_t i = 0; i < mesh.vertPos.size(); ++i) {
-    for (int j : {0, 1, 2}) {
-      out.vertProperties[6 * i + j] = mesh.vertPos[i][j];
-      out.vertProperties[6 * i + 3 + j] = mesh.vertNormal[i][j];
-    }
-  }
-  out.triVerts.resize(3 * mesh.triVerts.size());
-  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
-    for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = mesh.triVerts[i][j];
-  }
-  return out;
+  return out.GetMeshGL();
 }
 
 MeshGL CubeUV() {
@@ -448,22 +423,10 @@ void ExpectMeshes(const Manifold& manifold,
     EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
     EXPECT_EQ(meshGL.mergeFromVert.size(),
               meshGL.NumVert() - manifolds[i].NumVert());
-    const Mesh mesh = manifolds[i].GetMesh();
-    for (const vec3& normal : mesh.vertNormal) {
-      ASSERT_NEAR(glm::length(normal), 1, 0.0001);
-    }
-  }
-}
-
-void CheckNormals(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.MatchesTriNormals());
-  for (const vec3& normal : manifold.GetMesh().vertNormal) {
-    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
   }
 }
 
 void CheckStrictly(const Manifold& manifold) {
-  CheckNormals(manifold);
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 
