@@ -520,9 +520,8 @@ bool Manifold::Impl::Internal(int halfedge) const {
   const double area = glm::length(normal);
   const double areaPair = glm::length(glm::cross(pairVec, jointVec));
   // Don't link degenerate triangles
-  // if (area < length * precision_ || areaPair < lengthPair *
-  // precision_)
-  //   return;
+  if (area < length * precision_ || areaPair < lengthPair * precision_)
+    return false;
 
   const double volume = std::abs(glm::dot(normal, pairVec));
   // Only operate on coplanar triangles
