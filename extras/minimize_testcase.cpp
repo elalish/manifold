@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-#if defined(MANIFOLD_PAR) && __has_include(<pstl/glue_execution_defs.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #endif
 
@@ -73,7 +73,7 @@ bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
     };
     const vec2 *polysk = polys[k].data();
     if (!std::all_of(
-#if defined(MANIFOLD_PAR) && __has_include(<pstl/glue_execution_defs.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<pstl/glue_execution_defs.h>)
             std::execution::par,
 #endif
             countAt(0_uz), countAt(polys[k].size()), [=](size_t l) {
@@ -150,7 +150,7 @@ std::vector<int> getChildren(const Polygons &polys, size_t i) {
       return k == (polys[i].size() - 1) ? 0 : (k + 1);
     };
     int count = std::count_if(
-#if defined(MANIFOLD_PAR) && __has_include(<pstl/glue_execution_defs.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<pstl/glue_execution_defs.h>)
         std::execution::par,
 #endif
         countAt((size_t)0), countAt(polys[i].size()),
