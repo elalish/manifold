@@ -487,6 +487,11 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       const vec3 pNext = vertPos_[halfedge_[current].endVert];
       const mat3x2 projection =
           GetAxisAlignedProjection(faceNormal_[current / 3]);
+      // Don't collapse if the edges separating the faces are not colinear
+      // (can happen when the two faces are coplanar).
+      if (CCW(projection * pOld, projection * pLast, projection * pNew,
+              precision_) != 0)
+        return;
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               precision_) < 0)
         return;
