@@ -156,7 +156,8 @@ class Vec : public VecView<T> {
 
   inline void extend(size_t n, bool seq = false) {
     if (this->size_ + n >= capacity_)
-      reserve(capacity_ == 0 ? 128 : capacity_ * 2, seq);
+      reserve(capacity_ == 0 ? 128 : std::max(capacity_ * 2, this->size_ + n),
+              seq);
     this->size_ += n;
   }
 

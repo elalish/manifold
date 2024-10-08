@@ -513,22 +513,22 @@ class EarClip {
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
 
-      auto f = [&](size_t i) {
-        const VertItr test = collider.itr[collider.ind.Get(i, true)];
-        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
-            test->mesh_idx != lid &&
-            test->mesh_idx != rid) {  // Skip duplicated verts
-          double cost = Cost(test, openSide, precision);
-          if (cost < -precision) {
-            cost = DelaunayCost(test->pos - center, scale, precision);
-          }
-          return cost;
-        }
-        return std::numeric_limits<double>::lowest();
-      };
       totalCost = transform_reduce(
           countAt(0), countAt(collider.ind.size()), totalCost,
-          [](double a, double b) { return std::max(a, b); }, f);
+          [](double a, double b) { return std::max(a, b); },
+          [&](size_t i) {
+            const VertItr test = collider.itr[collider.ind.Get(i, true)];
+            if (!Clipped(test) && test->mesh_idx != mesh_idx &&
+                test->mesh_idx != lid &&
+                test->mesh_idx != rid) {  // Skip duplicated verts
+              double cost = Cost(test, openSide, precision);
+              if (cost < -precision) {
+                cost = DelaunayCost(test->pos - center, scale, precision);
+              }
+              return cost;
+            }
+            return std::numeric_limits<double>::lowest();
+          });
       collider.ind.Clear();
       return totalCost;
     }
