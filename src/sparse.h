@@ -60,6 +60,22 @@ class SparseIndices {
   SparseIndices() = default;
   SparseIndices(size_t size) { data_ = Vec<char>(size * sizeof(int64_t)); }
 
+  void Clear() { data_.clear(false); }
+
+  void FromIndices(const std::vector<SparseIndices>& indices) {
+    std::vector<size_t> sizes;
+    size_t total_size = 0;
+    for (const auto& ind : indices) {
+      sizes.push_back(total_size);
+      total_size += ind.data_.size();
+    }
+    data_ = Vec<char>(total_size);
+    for_each_n(ExecutionPolicy::Par, countAt(0), indices.size(), [&](size_t i) {
+      std::copy(indices[i].data_.begin(), indices[i].data_.end(),
+                data_.begin() + sizes[i]);
+    });
+  }
+
   size_t size() const { return data_.size() / sizeof(int64_t); }
 
   Vec<int> Copy(bool use_q) const {
@@ -130,8 +146,8 @@ class SparseIndices {
         data_.size() / sizeof(int32_t));
   }
 
-  inline void Add(int p, int q) {
-    for (unsigned int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
+  inline void Add(int p, int q, bool seq = false) {
+    data_.extend(sizeof(int64_t), seq);
     Set(size() - 1, p, q);
   }
 

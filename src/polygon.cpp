@@ -21,6 +21,7 @@
 #include "./collider.h"
 #include "./utils.h"
 #include "manifold/optional_assert.h"
+#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -308,6 +309,7 @@ class EarClip {
   struct IdxCollider {
     Collider collider;
     std::vector<VertItr> itr;
+    SparseIndices ind;
   };
 
   // A circularly-linked list representing the polygon(s) that still need to be
@@ -489,7 +491,7 @@ class EarClip {
     // values < -precision so they will never affect validity. The first
     // totalCost is designed to give priority to sharper angles. Any cost < (-1
     // - precision) has satisfied the Delaunay condition.
-    double EarCost(double precision, const IdxCollider &collider) const {
+    double EarCost(double precision, IdxCollider &collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
       const double scale = 4 / glm::dot(openSide, openSide);
@@ -502,27 +504,32 @@ class EarClip {
         return totalCost;
       }
 
-      Vec<Box> earBox;
-      earBox.push_back({vec3(center.x - radius, center.y - radius, 0),
-                        vec3(center.x + radius, center.y + radius, 0)});
-      earBox.back().Union(vec3(pos, 0));
-      const SparseIndices toTest = collider.collider.Collisions(earBox.cview());
+      Box earBox = Box{vec3(center.x - radius, center.y - radius, 0),
+                       vec3(center.x + radius, center.y + radius, 0)};
+      earBox.Union(vec3(pos, 0));
+      collider.collider.Collisions(VecView<const Box>(&earBox, 1),
+                                   collider.ind);
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-      for (size_t i = 0; i < toTest.size(); ++i) {
-        const VertItr test = collider.itr[toTest.Get(i, true)];
-        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
-            test->mesh_idx != lid &&
-            test->mesh_idx != rid) {  // Skip duplicated verts
-          double cost = Cost(test, openSide, precision);
-          if (cost < -precision) {
-            cost = DelaunayCost(test->pos - center, scale, precision);
-          }
-          totalCost = std::max(totalCost, cost);
-        }
-      }
 
+      totalCost = transform_reduce(
+          countAt(0), countAt(collider.ind.size()), totalCost,
+          [](double a, double b) { return std::max(a, b); },
+          [&](size_t i) {
+            const VertItr test = collider.itr[collider.ind.Get(i, true)];
+            if (!Clipped(test) && test->mesh_idx != mesh_idx &&
+                test->mesh_idx != lid &&
+                test->mesh_idx != rid) {  // Skip duplicated verts
+              double cost = Cost(test, openSide, precision);
+              if (cost < -precision) {
+                cost = DelaunayCost(test->pos - center, scale, precision);
+              }
+              return cost;
+            }
+            return std::numeric_limits<double>::lowest();
+          });
+      collider.ind.Clear();
       return totalCost;
     }
 
@@ -799,7 +806,7 @@ class EarClip {
 
   // Recalculate the cost of the Vert v ear, updating it in the queue by
   // removing and reinserting it.
-  void ProcessEar(VertItr v, const IdxCollider &collider) {
+  void ProcessEar(VertItr v, IdxCollider &collider) {
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
@@ -855,7 +862,7 @@ class EarClip {
   void TriangulatePoly(VertItr start) {
     ZoneScoped;
 
-    const IdxCollider vertCollider = VertCollider(start);
+    IdxCollider vertCollider = VertCollider(start);
 
     if (vertCollider.itr.empty()) {
       PRINT("Empty poly");

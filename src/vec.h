@@ -19,7 +19,6 @@
 #define TracyAllocS(ptr, size, n) (void)0
 #define TracyFreeS(ptr, n) (void)0
 #endif
-#include <limits>
 #include <vector>
 
 #include "manifold/parallel.h"
@@ -112,12 +111,11 @@ class Vec : public VecView<T> {
     }
     this->size_ = other.size_;
     capacity_ = other.size_;
-    auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
-      copy(policy, other.begin(), other.end(), this->ptr_);
+      manifold::copy(other.begin(), other.end(), this->ptr_);
     }
     return *this;
   }
@@ -145,25 +143,32 @@ class Vec : public VecView<T> {
     std::swap(capacity_, other.capacity_);
   }
 
-  inline void push_back(const T &val) {
+  inline void push_back(const T &val, bool seq = false) {
     if (this->size_ >= capacity_) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
-      reserve(capacity_ == 0 ? 128 : capacity_ * 2);
+      reserve(capacity_ == 0 ? 128 : capacity_ * 2, seq);
       this->ptr_[this->size_++] = val_copy;
       return;
     }
     this->ptr_[this->size_++] = val;
   }
 
-  void reserve(size_t n) {
+  inline void extend(size_t n, bool seq = false) {
+    if (this->size_ + n >= capacity_)
+      reserve(capacity_ == 0 ? 128 : std::max(capacity_ * 2, this->size_ + n),
+              seq);
+    this->size_ += n;
+  }
+
+  void reserve(size_t n, bool seq = false) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
-        copy(autoPolicy(this->size_), this->ptr_, this->ptr_ + this->size_,
-             newBuffer);
+        manifold::copy(seq ? ExecutionPolicy::Seq : autoPolicy(this->size_),
+                       this->ptr_, this->ptr_ + this->size_, newBuffer);
       if (this->ptr_ != nullptr) {
         TracyFreeS(this->ptr_, 3);
         free(this->ptr_);
@@ -186,7 +191,10 @@ class Vec : public VecView<T> {
 
   void pop_back() { resize(this->size_ - 1); }
 
-  void clear() { resize(0); }
+  void clear(bool shrink = true) {
+    this->size_ = 0;
+    if (shrink) shrink_to_fit();
+  }
 
   void shrink_to_fit() {
     T *newBuffer = nullptr;
@@ -194,8 +202,7 @@ class Vec : public VecView<T> {
       newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
-      copy(autoPolicy(this->size_), this->ptr_, this->ptr_ + this->size_,
-           newBuffer);
+      manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }
     if (this->ptr_ != nullptr) {
       TracyFreeS(this->ptr_, 3);
@@ -204,36 +211,6 @@ class Vec : public VecView<T> {
     this->ptr_ = newBuffer;
     capacity_ = this->size_;
   }
-
-  VecView<T> view(size_t offset = 0,
-                  size_t length = std::numeric_limits<size_t>::max()) {
-    if (length == std::numeric_limits<size_t>::max())
-      length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::view out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
-           std::out_of_range("Vec::view out of range"));
-    return VecView<T>(this->ptr_ + offset, length);
-  }
-
-  VecView<const T> cview(
-      size_t offset = 0,
-      size_t length = std::numeric_limits<size_t>::max()) const {
-    if (length == std::numeric_limits<size_t>::max())
-      length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::cview out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
-           std::out_of_range("Vec::cview out of range"));
-    return VecView<const T>(this->ptr_ + offset, length);
-  }
-
-  VecView<const T> view(
-      size_t offset = 0,
-      size_t length = std::numeric_limits<size_t>::max()) const {
-    return cview(offset, length);
-  }
-
-  T *data() { return this->ptr_; }
-  const T *data() const { return this->ptr_; }
 
   size_t capacity() const { return capacity_; }
 

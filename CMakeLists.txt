@@ -109,7 +109,7 @@ if(MANIFOLD_FUZZ)
   # enable fuzztest fuzzing mode
   set(FUZZTEST_FUZZING_MODE ON)
   # address sanitizer required
-  list(APPEND CMAKE_CXX_FLAGS -fsanitize=address)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif()
 
 if(TRACY_ENABLE)
@@ -118,7 +118,7 @@ if(TRACY_ENABLE)
     list(APPEND MANIFOLD_FLAGS -DTRACY_MEMORY_USAGE)
   endif()
   if(NOT MSVC)
-    list(APPEND CMAKE_CXX_FLAGS -fno-omit-frame-pointer)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
   endif()
 else()
   option(CMAKE_BUILD_TYPE "Build type" Release)

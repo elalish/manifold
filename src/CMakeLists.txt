@@ -146,5 +146,5 @@ if(TRACY_ENABLE)
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(tracy)
-  target_link_libraries(manifold INTERFACE TracyClient)
+  target_link_libraries(manifold PUBLIC TracyClient)
 endif()
