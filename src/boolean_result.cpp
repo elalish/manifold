@@ -20,7 +20,7 @@
 #include "./utils.h"
 #include "manifold/parallel.h"
 
-#if defined(MANIFOLD_PAR) && __has_include(<tbb/concurrent_map.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
 #include <tbb/parallel_for.h>
@@ -243,7 +243,7 @@ void AddNewEdgeVerts(
       direction = !direction;
     }
   };
-#if defined(MANIFOLD_PAR) && __has_include(<tbb/tbb.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
   if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
