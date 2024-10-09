@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['calculatebbox_0',['CalculateBBox',['../structmanifold_1_1_manifold_1_1_impl.html#a4bad2940552ae5f952d4b1f710627a25',1,'manifold::Manifold::Impl']]],
+  ['calculatecurvature_1',['CalculateCurvature',['../classmanifold_1_1_manifold.html#a19abb297f7b7b43f5c84562bcc7df705',1,'manifold::Manifold']]],
+  ['calculatenormals_2',['calculatenormals',['../classmanifold_1_1_manifold.html#ab6c0e49ed98c9c03bc1324d4ff8452ce',1,'manifold::Manifold::CalculateNormals()'],['../structmanifold_1_1_manifold_1_1_impl.html#adef45f00696640f682ede12311bdace7',1,'manifold::Manifold::Impl::CalculateNormals()']]],
+  ['ccw_3',['CCW',['../group___private.html#ga92f3267a3f49fa8b9199570c3adcbfb7',1,'manifold']]],
+  ['center_4',['center',['../structmanifold_1_1_box.html#ac600d9d9003333be36f390c84dead39e',1,'manifold::Box::Center()'],['../structmanifold_1_1_rect.html#ac73874c64476da0c5d9f3f11c096826d',1,'manifold::Rect::Center()']]],
+  ['circle_5',['Circle',['../classmanifold_1_1_cross_section.html#af9c4ae1a5b602abdd9d9d41cfda32ecf',1,'manifold::CrossSection']]],
+  ['cleanuptopology_6',['CleanupTopology',['../structmanifold_1_1_manifold_1_1_impl.html#a91e235740ebc7024be3e7cf6ae46ddad',1,'manifold::Manifold::Impl']]],
+  ['compactprops_7',['CompactProps',['../structmanifold_1_1_manifold_1_1_impl.html#af327697359fb97021fbdcdd0d53b471a',1,'manifold::Manifold::Impl']]],
+  ['compose_8',['compose',['../classmanifold_1_1_cross_section.html#a6eb6f97b4b0c4ac7bfeb79dc1234e8f3',1,'manifold::CrossSection::Compose()'],['../classmanifold_1_1_manifold.html#a96a1b20e25443713304db55196573e3d',1,'manifold::Manifold::Compose()'],['../classmanifold_1_1_csg_leaf_node.html#ac78f0bab130bd5e2cddeb9fed4c149ed',1,'manifold::CsgLeafNode::Compose()']]],
+  ['contains_9',['contains',['../structmanifold_1_1_rect.html#ab1e5f154a88928d5a6b89ff0e4b2c0b6',1,'manifold::Rect::Contains(const vec2 &amp;p) const'],['../structmanifold_1_1_rect.html#aca39547495139ea25f2edd87569e10b6',1,'manifold::Rect::Contains(const Rect &amp;rect) const'],['../structmanifold_1_1_box.html#afddd3d24795d0c760ae8a458ead93b0d',1,'manifold::Box::Contains(const Box &amp;box) const'],['../structmanifold_1_1_box.html#aa51dc69603c0f65eca337672c9455b5c',1,'manifold::Box::Contains(const vec3 &amp;p) const']]],
+  ['cosd_10',['cosd',['../namespacemanifold.html#ac61fa065167cefe7117d0064744c7a52',1,'manifold']]],
+  ['createhalfedges_11',['CreateHalfedges',['../structmanifold_1_1_manifold_1_1_impl.html#ab66628e1ea9f38ed586b16e0c1aa4133',1,'manifold::Manifold::Impl']]],
+  ['createtangents_12',['createtangents',['../structmanifold_1_1_manifold_1_1_impl.html#acc962337837219c991a414bf4033ef61',1,'manifold::Manifold::Impl::CreateTangents(int normalIdx)'],['../structmanifold_1_1_manifold_1_1_impl.html#ace17948374ae1178c45e661c1b95cc8b',1,'manifold::Manifold::Impl::CreateTangents(std::vector&lt; Smoothness &gt;)']]],
+  ['crosssection_13',['crosssection',['../classmanifold_1_1_cross_section.html#acbed403d82ee8d55f3be2c9a5f963ec0',1,'manifold::CrossSection::CrossSection()'],['../classmanifold_1_1_cross_section.html#ada3a36554c48080ae963a9628de79436',1,'manifold::CrossSection::CrossSection(const CrossSection &amp;other)'],['../classmanifold_1_1_cross_section.html#aca5659d6e02ee4583791b54285d682a2',1,'manifold::CrossSection::CrossSection(const SimplePolygon &amp;contour, FillRule fillrule=FillRule::Positive)'],['../classmanifold_1_1_cross_section.html#a885334a617ae0eea9402f74a20f4408e',1,'manifold::CrossSection::CrossSection(const Polygons &amp;contours, FillRule fillrule=FillRule::Positive)'],['../classmanifold_1_1_cross_section.html#ad2f60f6e1e3d45e773a595a1be246cf2',1,'manifold::CrossSection::CrossSection(const Rect &amp;rect)']]],
+  ['cube_14',['Cube',['../classmanifold_1_1_manifold.html#ad5486e9d0cff020565c3c20c1f496ab9',1,'manifold::Manifold']]],
+  ['cylinder_15',['Cylinder',['../classmanifold_1_1_manifold.html#a879b867522c562c7166af539894a2815',1,'manifold::Manifold']]]
+];

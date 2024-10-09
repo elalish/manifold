@@ -1,0 +1,28 @@
+var searchData=
+[
+  ['tangentfromnormal_0',['TangentFromNormal',['../structmanifold_1_1_manifold_1_1_impl.html#a5188293029f53ae9159a9a36fb66533a',1,'manifold::Manifold::Impl']]],
+  ['tetpuzzle_1',['TetPuzzle',['../group___samples.html#gaa69f000001c833bf1534f35c19a7e8b0',1,'manifold']]],
+  ['tetrahedron_2',['Tetrahedron',['../classmanifold_1_1_manifold.html#afbd42733f05fb87dec1b3dae9ff9f582',1,'manifold::Manifold']]],
+  ['the_20author_3',['the author',['..//github/workspace/README.md#autotoc_md34',1,'About the author'],['..//github/workspace/bindings/wasm/README.md#autotoc_md14',1,'About the author']]],
+  ['timer_4',['Timer',['../structmanifold_1_1_timer.html',1,'manifold']]],
+  ['tmpedge_5',['TmpEdge',['../structmanifold_1_1_tmp_edge.html',1,'manifold']]],
+  ['to_20contribute_6',['How to Contribute',['../md__c_o_n_t_r_i_b_u_t_i_n_g.html',1,'']]],
+  ['topologyerr_7',['topologyErr',['../structmanifold_1_1topology_err.html',1,'manifold']]],
+  ['topolygons_8',['ToPolygons',['../classmanifold_1_1_cross_section.html#a209a83b1c39a84e094da9e854a7b8bc2',1,'manifold::CrossSection']]],
+  ['torusknot_9',['TorusKnot',['../group___samples.html#ga0ccde255ceda709d8e4a54ec95f3ca3e',1,'manifold']]],
+  ['transform_10',['transform',['../structmanifold_1_1_box.html#ac57a6312e33544515f782970a3b66eb6',1,'manifold::Box::Transform()'],['../structmanifold_1_1_rect.html#a16290599b6b48837a6695ae030d288af',1,'manifold::Rect::Transform()'],['../classmanifold_1_1_cross_section.html#a534ac4a433b68882dba4919ade75946c',1,'manifold::CrossSection::Transform()'],['../classmanifold_1_1_manifold.html#af4459c0e7355b2805b2694da075c8346',1,'manifold::Manifold::Transform()']]],
+  ['transform_5freduce_11',['transform_reduce',['../structbenchmarks_1_1transform__reduce.html',1,'benchmarks']]],
+  ['transformbox_12',['TransformBox',['../structmanifold_1_1collider__internal_1_1_transform_box.html',1,'manifold::collider_internal']]],
+  ['transformiterator_13',['TransformIterator',['../structmanifold_1_1_transform_iterator.html',1,'manifold']]],
+  ['translate_14',['translate',['../classmanifold_1_1_cross_section.html#a38bcb89b28140acbceca56f0bbda67b9',1,'manifold::CrossSection::Translate()'],['../classmanifold_1_1_manifold.html#a78fbea69555ea755f8731255060f7c9d',1,'manifold::Manifold::Translate()']]],
+  ['tri_15',['tri',['../structmanifold_1_1_tri_ref.html#a15e0e24263c3a2cc742b9cfcbabedf88',1,'manifold::TriRef']]],
+  ['triangulate_16',['Triangulate',['../group___connections.html#ga096515808119cda3b6aff7ab31bf6355',1,'manifold']]],
+  ['triangulateidx_17',['TriangulateIdx',['../group___private.html#ga526f0d57b4e5c29114576fdf13a304c0',1,'manifold']]],
+  ['trimbyplane_18',['TrimByPlane',['../classmanifold_1_1_manifold.html#aa8d62161da6e94da7651418c33c3e294',1,'manifold::Manifold']]],
+  ['triref_19',['TriRef',['../structmanifold_1_1_tri_ref.html',1,'manifold']]],
+  ['triverts_20',['triVerts',['../structmanifold_1_1_mesh_g_l_p.html#ab0aa7d9b8f8adbb059ff0c6b70d38e6e',1,'manifold::MeshGLP']]],
+  ['type_5fcaster_3c_20glm_3a_3amat_3c_20c_2c_20r_2c_20t_2c_20q_20_3e_20_3e_21',['type_caster&lt; glm::mat&lt; C, R, T, Q &gt; &gt;',['../structnb_1_1detail_1_1type__caster_3_01glm_1_1mat_3_01_c_00_01_r_00_01_t_00_01_q_01_4_01_4.html',1,'nb::detail']]],
+  ['type_5fcaster_3c_20glm_3a_3avec_3c_20n_2c_20t_2c_20q_20_3e_20_3e_22',['type_caster&lt; glm::vec&lt; N, T, Q &gt; &gt;',['../structnb_1_1detail_1_1type__caster_3_01glm_1_1vec_3_01_n_00_01_t_00_01_q_01_4_01_4.html',1,'nb::detail']]],
+  ['type_5fcaster_3c_20manifold_3a_3avecview_3c_20glm_3a_3avec_3c_20n_2c_20t_2c_20q_20_3e_20_3e_20_3e_23',['type_caster&lt; manifold::VecView&lt; glm::vec&lt; N, T, Q &gt; &gt; &gt;',['../structnb_1_1detail_1_1type__caster_3_01manifold_1_1_vec_view_3_01glm_1_1vec_3_01_n_00_01_t_00_01_q_01_4_01_4_01_4.html',1,'nb::detail']]],
+  ['type_5fcaster_3c_20std_3a_3avector_3c_20glm_3a_3avec_3c_20n_2c_20t_2c_20q_20_3e_20_3e_20_3e_24',['type_caster&lt; std::vector&lt; glm::vec&lt; N, T, Q &gt; &gt; &gt;',['../structnb_1_1detail_1_1type__caster_3_01std_1_1vector_3_01glm_1_1vec_3_01_n_00_01_t_00_01_q_01_4_01_4_01_4.html',1,'nb::detail']]]
+];

@@ -1,0 +1,24 @@
+var searchData=
+[
+  ['seqcollisionrecorder_0',['SeqCollisionRecorder',['../structmanifold_1_1collider__internal_1_1_seq_collision_recorder.html',1,'manifold::collider_internal']]],
+  ['sharedptrguard_1',['SharedPtrGuard',['../classmanifold_1_1_concurrent_shared_ptr_1_1_shared_ptr_guard.html',1,'manifold::ConcurrentSharedPtr']]],
+  ['smoothness_2',['Smoothness',['../namespacemanifold.html#structmanifold_1_1_smoothness',1,'manifold']]],
+  ['sort_5fasc_3',['sort_Asc',['../structbenchmarks_1_1sort___asc.html',1,'benchmarks']]],
+  ['sort_5fasc_5fsize_4',['sort_Asc_size',['../structbenchmarks_1_1sort___asc__size.html',1,'benchmarks']]],
+  ['sort_5fasc_5fsize_5fmerge_5',['sort_Asc_size_merge',['../structbenchmarks_1_1sort___asc__size__merge.html',1,'benchmarks']]],
+  ['sort_5fdes_6',['sort_Des',['../structbenchmarks_1_1sort___des.html',1,'benchmarks']]],
+  ['sort_5fdes_5fsize_7',['sort_Des_size',['../structbenchmarks_1_1sort___des__size.html',1,'benchmarks']]],
+  ['sort_5fdes_5fsize_5fmerge_8',['sort_Des_size_merge',['../structbenchmarks_1_1sort___des__size__merge.html',1,'benchmarks']]],
+  ['sort_5feq_9',['sort_Eq',['../structbenchmarks_1_1sort___eq.html',1,'benchmarks']]],
+  ['sort_5feq_5fsize_10',['sort_Eq_size',['../structbenchmarks_1_1sort___eq__size.html',1,'benchmarks']]],
+  ['sort_5feq_5fsize_5fmerge_11',['sort_Eq_size_merge',['../structbenchmarks_1_1sort___eq__size__merge.html',1,'benchmarks']]],
+  ['sort_5frnd_12',['sort_Rnd',['../structbenchmarks_1_1sort___rnd.html',1,'benchmarks']]],
+  ['sort_5frnd_5fsize_13',['sort_Rnd_size',['../structbenchmarks_1_1sort___rnd__size.html',1,'benchmarks']]],
+  ['sort_5frnd_5fsize_5fmerge_14',['sort_Rnd_size_merge',['../structbenchmarks_1_1sort___rnd__size__merge.html',1,'benchmarks']]],
+  ['sort_5froughly_5fasc_15',['sort_roughly_Asc',['../structbenchmarks_1_1sort__roughly___asc.html',1,'benchmarks']]],
+  ['sort_5froughly_5fasc_5fsize_16',['sort_roughly_Asc_size',['../structbenchmarks_1_1sort__roughly___asc__size.html',1,'benchmarks']]],
+  ['sort_5froughly_5fasc_5fsize_5fmerge_17',['sort_roughly_Asc_size_merge',['../structbenchmarks_1_1sort__roughly___asc__size__merge.html',1,'benchmarks']]],
+  ['sparseindices_18',['SparseIndices',['../classmanifold_1_1_sparse_indices.html',1,'manifold']]],
+  ['stridedrange_19',['StridedRange',['../structmanifold_1_1_strided_range.html',1,'manifold']]],
+  ['svdset_20',['SVDSet',['../group___connections.html#structmanifold_1_1_s_v_d_set',1,'manifold']]]
+];
