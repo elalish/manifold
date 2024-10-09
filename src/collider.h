@@ -23,7 +23,7 @@
 #include <intrin.h>
 #endif
 
-#ifdef MANIFOLD_PAR
+#if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
 #endif
 
@@ -217,7 +217,7 @@ struct SeqCollisionRecorder {
   SparseIndices& local() { return queryTri_; }
 };
 
-#ifdef MANIFOLD_PAR
+#if (MANIFOLD_PAR == 1)
 template <const bool inverted>
 struct ParCollisionRecorder {
   tbb::combinable<SparseIndices>& store;
@@ -327,7 +327,7 @@ class Collider {
                   SparseIndices& queryTri) const {
     ZoneScoped;
     using collider_internal::FindCollision;
-#ifdef MANIFOLD_PAR
+#if (MANIFOLD_PAR == 1)
     if (queriesIn.size() > collider_internal::kSequentialThreshold) {
       tbb::combinable<SparseIndices> store;
       for_each_n(
