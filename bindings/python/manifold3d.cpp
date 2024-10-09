@@ -19,12 +19,16 @@
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
+#ifdef MANIFOLD_EXPORT
+#include "manifold/meshIO.h"
+#endif
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
 #include "nanobind/stl/function.h"
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/pair.h"
+#include "nanobind/stl/string.h"
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
 
@@ -568,7 +572,22 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
-      .def("merge", &MeshGL::Merge, mesh_gl__merge);
+      .def("merge", &MeshGL::Merge, mesh_gl__merge)
+#ifdef MANIFOLD_EXPORT
+      .def(
+          "export_mesh",
+          [](const MeshGL &self, const std::string &filename) {
+            ExportMesh(filename, self, {});
+          },
+          nb::arg("filename"))
+      .def_static(
+          "import_mesh",
+          [](const std::string &filename, bool force_cleanup) -> MeshGL {
+            return ImportMesh(filename, force_cleanup);
+          },
+          nb::arg("filename"), nb::arg("force_cleanup") = false)
+#endif
+      ;
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
