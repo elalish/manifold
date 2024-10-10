@@ -78,13 +78,10 @@ struct MeshGLP {
   /// This matrix is stored in column-major order and the length of the overall
   /// vector is 12 * runOriginalID.size().
   std::vector<Precision> runTransform;
-  /// Optional: Length NumTri, contains an ID of the source face this triangle
-  /// comes from. When auto-generated, this ID will be a triangle index into the
-  /// original mesh. All neighboring coplanar triangles from that input mesh
-  /// will refer to a single triangle of that group as the faceID. When
-  /// supplying faceIDs, ensure that triangles with the same ID are in fact
-  /// coplanar and have consistent properties (within some tolerance) or the
-  /// output will be surprising.
+  /// Optional: Length NumTri, contains the source face ID this
+  /// triangle comes from. When auto-generated, this ID will be a triangle index
+  /// into the original mesh. This index/ID is purely for external use (e.g.
+  /// recreating polygonal faces) and will not affect Manifold's algorithms.
   std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
@@ -246,7 +243,7 @@ class Manifold {
    */
   ///@{
   int OriginalID() const;
-  Manifold AsOriginal(const std::vector<double>& propertyTolerance = {}) const;
+  Manifold AsOriginal() const;
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 

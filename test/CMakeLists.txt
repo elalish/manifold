@@ -45,17 +45,18 @@ if(NOT gtest_FOUND)
   FetchContent_MakeAvailable(googletest)
 endif()
 
+# order these to run simpler/faster tests first
 set(
   SOURCE_FILES
-  boolean_complex_test.cpp
-  boolean_test.cpp
-  hull_test.cpp
-  manifold_test.cpp
   polygon_test.cpp
   properties_test.cpp
-  samples_test.cpp
+  manifold_test.cpp
+  boolean_test.cpp
+  hull_test.cpp
   sdf_test.cpp
   smooth_test.cpp
+  samples_test.cpp
+  boolean_complex_test.cpp
   test_main.cpp
 )
 

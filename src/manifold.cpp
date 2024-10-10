@@ -418,21 +418,10 @@ int Manifold::OriginalID() const {
 }
 
 /**
- * This function condenses all coplanar faces in the relation, and
- * collapses those edges. In the process the relation to ancestor meshes is lost
- * and this new Manifold is marked an original. Properties are preserved, so if
- * they do not match across an edge, that edge will be kept.
- *
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * single-precision properties in the [-1, 1] range.
+ * This removes all relations (originalID, faceID, transform) to ancestor meshes
+ * and this new Manifold is marked an original.
  */
-Manifold Manifold::AsOriginal(
-    const std::vector<double>& propertyTolerance) const {
+Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
   if (oldImpl->status_ != Error::NoError) {
     auto newImpl = std::make_shared<Impl>();
@@ -441,8 +430,6 @@ Manifold Manifold::AsOriginal(
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces(propertyTolerance);
-  newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
@@ -686,7 +673,8 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  */
 Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->SetNormals(normalIdx, minSharpAngle);
+  const Vec<bool> internalEdges = pImpl->InternalEdges();
+  pImpl->SetNormals(normalIdx, minSharpAngle, internalEdges);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -704,7 +692,8 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
 Manifold Manifold::SmoothByNormals(int normalIdx) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
-    pImpl->CreateTangents(normalIdx);
+    const Vec<bool> internalEdges = pImpl->InternalEdges();
+    pImpl->CreateTangents(normalIdx, internalEdges);
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -730,17 +719,19 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
+    const Vec<bool> internalEdges = pImpl->InternalEdges();
     if (minSmoothness == 0) {
       const int numProp = pImpl->meshRelation_.numProp;
       Vec<double> properties = pImpl->meshRelation_.properties;
       Vec<ivec3> triProperties = pImpl->meshRelation_.triProperties;
-      pImpl->SetNormals(0, minSharpAngle);
-      pImpl->CreateTangents(0);
+      pImpl->SetNormals(0, minSharpAngle, internalEdges);
+      pImpl->CreateTangents(0, internalEdges);
       pImpl->meshRelation_.numProp = numProp;
       pImpl->meshRelation_.properties.swap(properties);
       pImpl->meshRelation_.triProperties.swap(triProperties);
     } else {
-      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
+      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness),
+                            internalEdges);
     }
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));

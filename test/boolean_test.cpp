@@ -345,6 +345,10 @@ TEST(Boolean, Split) {
   EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
                       splits.second.GetProperties().volume,
                   cube.GetProperties().volume);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("split.glb", splits.second.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, SplitByPlane) {
