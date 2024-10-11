@@ -218,24 +218,6 @@ function(logmissingdep PKG)
   endif()
 endfunction()
 
-# GLM is required in all configurations.
-find_package(glm QUIET)
-if(NOT glm_FOUND)
-  logmissingdep("glm")
-  message(STATUS "glm not found, downloading from source")
-  set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
-  FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 1.0.1
-    GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(glm)
-  if(NOT EMSCRIPTEN)
-    install(TARGETS glm)
-  endif()
-endif()
-
 # If we're building parallel, we need the requisite libraries
 if(MANIFOLD_PAR)
   find_package(Threads REQUIRED)

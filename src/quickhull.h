@@ -95,7 +95,7 @@ class Plane {
   double sqrNLength;
 
   bool isPointOnPositiveSide(const vec3& Q) const {
-    double d = glm::dot(N, Q) + D;
+    double d = la::dot(N, Q) + D;
     if (d >= 0) return true;
     return false;
   }
@@ -104,7 +104,7 @@ class Plane {
 
   // Construct a plane using normal N and any point P on the plane
   Plane(const vec3& N, const vec3& P)
-      : N(N), D(glm::dot(-N, P)), sqrNLength(glm::dot(N, N)) {}
+      : N(N), D(la::dot(-N, P)), sqrNLength(la::dot(N, N)) {}
 };
 
 struct Ray {
@@ -113,7 +113,7 @@ struct Ray {
   const double VInvLengthSquared;
 
   Ray(const vec3& S, const vec3& V)
-      : S(S), V(V), VInvLengthSquared(1 / (glm::dot(V, V))) {}
+      : S(S), V(V), VInvLengthSquared(1 / (la::dot(V, V))) {}
 };
 
 class MeshBuilder {

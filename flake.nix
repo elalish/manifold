@@ -40,7 +40,6 @@
                 pkg-config
               ]) ++ build-tools;
               buildInputs = with pkgs; [
-                glm
                 clipper2
                 assimp
               ];
@@ -86,7 +85,6 @@
                 mkdir build
                 cd build
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release \
-                -DFETCHCONTENT_SOURCE_DIR_GLM=${pkgs.glm.src} \
                 -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
                 -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
               '';
@@ -114,7 +112,6 @@
               ];
               buildInputs = with pkgs; [
                 tbb
-                glm
                 clipper2
               ];
               nativeBuildInputs = with pkgs; [

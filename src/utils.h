@@ -223,7 +223,7 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
   vec2 v1 = p1 - p0;
   vec2 v2 = p2 - p0;
   double area = fma(v1.x, v2.y, -v1.y * v2.x);
-  double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  double base2 = la::max(la::dot(v1, v1), la::dot(v2, v2));
   if (area * area * 4 <= base2 * tol * tol)
     return 0;
   else
@@ -237,11 +237,11 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
  * @param up The vector to be turned to point upwards. Length does not matter.
  */
 inline mat4x3 RotateUp(vec3 up) {
-  up = glm::normalize(up);
-  vec3 axis = glm::cross(up, {0, 0, 1});
-  double angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<double>() - angle;
-  return mat4x3(glm::rotate(mat4(1), angle, axis));
+  up = la::normalize(up);
+  vec3 axis = la::cross(up, {0, 0, 1});
+  double angle = la::asin(la::length(axis));
+  if (la::dot(up, {0, 0, 1}) < 0) angle = kPi - angle;
+  return mat4x3(la::rotate(mat4(1), angle, axis));
 }
 
 /** @} */
@@ -254,36 +254,7 @@ inline mat4x3 RotateUp(vec3 up) {
  *  @{
  */
 #ifdef MANIFOLD_DEBUG
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec3<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
-                << ", w = " << v.w;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat3& mat) {
-  mat3 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat4x3& mat) {
-  mat3x4 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
+using namespace linalg::ostream_overloads;
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min << ", "

@@ -7,6 +7,6 @@ Name: manifold@PCFILE_LIB_SUFFIX@
 Description: Geometry library for topological robustness
 Version: @MANIFOLD_VERSION@
 URL: https://github.com/elalish/manifold
-Requires-private: glm tbb @TEMPLATE_OPTIONAL_CLIPPER@
+Requires-private: tbb @TEMPLATE_OPTIONAL_CLIPPER@
 Libs: -L${libdir} -lmanifold@PCFILE_LIB_SUFFIX@
 Cflags: -I${includedir}

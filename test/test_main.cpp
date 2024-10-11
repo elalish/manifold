@@ -131,7 +131,7 @@ MeshGL Csaszar() {
 struct GyroidSDF {
   double operator()(vec3 p) const {
     const vec3 min = p;
-    const vec3 max = vec3(glm::two_pi<double>()) - p;
+    const vec3 max = vec3(kTwoPi) - p;
     const double min3 = std::min(min.x, std::min(min.y, min.z));
     const double max3 = std::min(max.x, std::min(max.y, max.z));
     const double bound = std::min(min3, max3);
@@ -142,7 +142,7 @@ struct GyroidSDF {
 };
 
 Manifold Gyroid() {
-  const double period = glm::two_pi<double>();
+  const double period = kTwoPi;
   return Manifold::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
 }
 
@@ -181,8 +181,8 @@ MeshGL CubeSTL() {
       }
     }
 
-    const vec3 normal = glm::normalize(
-        glm::cross(triPos[1] - triPos[0], triPos[2] - triPos[0]));
+    const vec3 normal =
+        la::normalize(la::cross(triPos[1] - triPos[0], triPos[2] - triPos[0]));
     for (const int i : {0, 1, 2}) {
       for (const int j : {0, 1, 2}) {
         cube.vertProperties.push_back(triPos[i][j]);
@@ -292,7 +292,7 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
   ASSERT_EQ(mesh1.vertProperties.size() / mesh1.numProp,
             mesh2.vertProperties.size() / mesh2.numProp);
   for (size_t i = 0; i < mesh1.vertProperties.size() / mesh1.numProp; ++i)
-    ASSERT_LE(glm::length(mesh1.GetVertPos(i) - mesh2.GetVertPos(i)), 0.0001);
+    ASSERT_LE(la::length(mesh1.GetVertPos(i) - mesh2.GetVertPos(i)), 0.0001);
 
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
 
@@ -359,10 +359,10 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         inTriPos[j] = transform * pos;
       }
       vec3 outNormal =
-          glm::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
+          la::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
       vec3 inNormal =
-          glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
-      const double area = glm::length(inNormal);
+          la::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
+      const double area = la::length(inNormal);
       if (area == 0) continue;
       inNormal /= area;
 
@@ -370,16 +370,15 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         const int vert = output.triVerts[3 * tri + j];
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
-        const double volume =
-            glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+        const double volume = la::dot(edges[0], la::cross(edges[1], edges[2]));
         ASSERT_LE(volume, area * output.precision);
 
         if (checkNormals) {
           vec3 normal;
           for (int k : {0, 1, 2})
             normal[k] = output.vertProperties[vert * output.numProp + 3 + k];
-          ASSERT_NEAR(glm::length(normal), 1, 0.0001);
-          ASSERT_GT(glm::dot(normal, outNormal), 0);
+          ASSERT_NEAR(la::length(normal), 1, 0.0001);
+          ASSERT_GT(la::dot(normal, outNormal), 0);
         } else {
           for (size_t p = 3; p < inMesh.numProp; ++p) {
             const double propOut =
@@ -393,7 +392,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
               edgesP[k] = edges[k] + inNormal * inProp[k] - inNormal * propOut;
             }
             const double volumeP =
-                glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
+                la::dot(edgesP[0], la::cross(edgesP[1], edgesP[2]));
 
             ASSERT_LE(volumeP, area * output.precision);
           }

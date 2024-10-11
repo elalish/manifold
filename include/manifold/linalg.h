@@ -618,6 +618,12 @@ struct op_or {
 };
 
 // Function objects for applying standard library math functions
+struct std_isfinite {
+  template <class A>
+  auto operator()(A a) const -> decltype(std::isfinite(a)) {
+    return std::isfinite(a);
+  }
+};
 struct std_abs {
   template <class A>
   auto operator()(A a) const -> decltype(std::abs(a)) {
@@ -646,6 +652,12 @@ struct std_log {
   template <class A>
   auto operator()(A a) const -> decltype(std::log(a)) {
     return std::log(a);
+  }
+};
+struct std_log2 {
+  template <class A>
+  auto operator()(A a) const -> decltype(std::log2(a)) {
+    return std::log2(a);
   }
 };
 struct std_log10 {
@@ -774,9 +786,9 @@ struct vec<T, 2> {
   constexpr vec(const T &x_, const T &y_) : x(x_), y(y_) {}
   constexpr explicit vec(const T &s) : vec(s, s) {}
   constexpr explicit vec(const T *p) : vec(p[0], p[1]) {}
-  template <class U>
-  constexpr explicit vec(const vec<U, 2> &v)
-      : vec(static_cast<T>(v.x), static_cast<T>(v.y)) {}
+  template <class U, int N>
+  constexpr explicit vec(const vec<U, N> &v)
+      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y)) {}
   constexpr const T &operator[](int i) const { return i == 0 ? x : y; }
   LINALG_CONSTEXPR14 T &operator[](int i) { return i == 0 ? x : y; }
 
@@ -795,9 +807,10 @@ struct vec<T, 3> {
   constexpr vec(const vec<T, 2> &xy, const T &z_) : vec(xy.x, xy.y, z_) {}
   constexpr explicit vec(const T &s) : vec(s, s, s) {}
   constexpr explicit vec(const T *p) : vec(p[0], p[1], p[2]) {}
-  template <class U>
-  constexpr explicit vec(const vec<U, 3> &v)
-      : vec(static_cast<T>(v.x), static_cast<T>(v.y), static_cast<T>(v.z)) {}
+  template <class U, int N>
+  constexpr explicit vec(const vec<U, N> &v)
+      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y),
+            N < 3 ? 0 : static_cast<T>(v.z)) {}
   constexpr const T &operator[](int i) const {
     return i == 0 ? x : i == 1 ? y : z;
   }
@@ -828,10 +841,10 @@ struct vec<T, 4> {
       : vec(xyz.x, xyz.y, xyz.z, w_) {}
   constexpr explicit vec(const T &s) : vec(s, s, s, s) {}
   constexpr explicit vec(const T *p) : vec(p[0], p[1], p[2], p[3]) {}
-  template <class U>
-  constexpr explicit vec(const vec<U, 4> &v)
-      : vec(static_cast<T>(v.x), static_cast<T>(v.y), static_cast<T>(v.z),
-            static_cast<T>(v.w)) {}
+  template <class U, int N>
+  constexpr explicit vec(const vec<U, N> &v)
+      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y),
+            N < 3 ? 0 : static_cast<T>(v.z), N < 4 ? 0 : static_cast<T>(v.w)) {}
   constexpr const T &operator[](int i) const {
     return i == 0 ? x : i == 1 ? y : i == 2 ? z : w;
   }
@@ -1283,6 +1296,10 @@ constexpr mat<T, I1 - I0, J1 - J0> submat(const mat<T, M, N> &a) {
 
 // Component-wise standard library math functions
 template <class A>
+apply_t<detail::std_isfinite, A> isfinite(const A &a) {
+  return apply(detail::std_isfinite{}, a);
+}
+template <class A>
 apply_t<detail::std_abs, A> abs(const A &a) {
   return apply(detail::std_abs{}, a);
 }
@@ -1301,6 +1318,10 @@ apply_t<detail::std_exp, A> exp(const A &a) {
 template <class A>
 apply_t<detail::std_log, A> log(const A &a) {
   return apply(detail::std_log{}, a);
+}
+template <class A>
+apply_t<detail::std_log2, A> log2(const A &a) {
+  return apply(detail::std_log2{}, a);
 }
 template <class A>
 apply_t<detail::std_log10, A> log10(const A &a) {

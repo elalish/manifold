@@ -124,16 +124,16 @@ std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
 
 std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
                                          double zDegrees) const {
-  mat3 rX(1.0, 0.0, 0.0,                        //
-          0.0, cosd(xDegrees), sind(xDegrees),  //
-          0.0, -sind(xDegrees), cosd(xDegrees));
-  mat3 rY(cosd(yDegrees), 0.0, -sind(yDegrees),  //
-          0.0, 1.0, 0.0,                         //
-          sind(yDegrees), 0.0, cosd(yDegrees));
-  mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0,   //
-          -sind(zDegrees), cosd(zDegrees), 0.0,  //
-          0.0, 0.0, 1.0);
-  mat4x3 transform(rZ * rY * rX);
+  mat3 rX({1.0, 0.0, 0.0},                        //
+          {0.0, cosd(xDegrees), sind(xDegrees)},  //
+          {0.0, -sind(xDegrees), cosd(xDegrees)});
+  mat3 rY({cosd(yDegrees), 0.0, -sind(yDegrees)},  //
+          {0.0, 1.0, 0.0},                         //
+          {sind(yDegrees), 0.0, cosd(yDegrees)});
+  mat3 rZ({cosd(zDegrees), sind(zDegrees), 0.0},   //
+          {-sind(zDegrees), cosd(zDegrees), 0.0},  //
+          {0.0, 0.0, 1.0});
+  mat4x3 transform(la::mul(rZ, rY, rX));
   return Transform(transform);
 }
 
@@ -161,7 +161,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
 }
 
 std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat4x3 &m) const {
-  return std::make_shared<CsgLeafNode>(pImpl_, m * mat4(transform_));
+  return std::make_shared<CsgLeafNode>(pImpl_, la::mul(m, mat4(transform_)));
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
@@ -282,7 +282,7 @@ Manifold::Impl CsgLeafNode::Compose(
           auto vertPosBegin = TransformIterator(
               node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
           mat3 normalTransform =
-              glm::inverse(glm::transpose(mat3(node->transform_)));
+              la::inverse(la::transpose(mat3(node->transform_)));
           auto faceNormalBegin =
               TransformIterator(node->pImpl_->faceNormal_.begin(),
                                 TransformNormals({normalTransform}));
@@ -291,7 +291,7 @@ Manifold::Impl CsgLeafNode::Compose(
           copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
-          const bool invert = glm::determinant(mat3(node->transform_)) < 0;
+          const bool invert = la::determinant(mat3(node->transform_)) < 0;
           for_each_n(policy, countAt(0), node->pImpl_->halfedgeTangent_.size(),
                      TransformTangents{combined.halfedgeTangent_,
                                        edgeIndices[i], mat3(node->transform_),
@@ -392,7 +392,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
 std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat4x3 &m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
-  node->transform_ = m * mat4(transform_);
+  node->transform_ = la::mul(m, mat4(transform_));
   node->op_ = op_;
   return node;
 }

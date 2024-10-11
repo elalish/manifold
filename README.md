@@ -33,7 +33,6 @@ If you prefer Python to JS/TS, make your own copy of the example notebook above.
 This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python ([manifold3d](https://pypi.org/project/manifold3d/)), and C to make this library more portable and easy to use.
 
 System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
-- [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
 - [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=ON` is enabled)
 - [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
@@ -80,7 +79,6 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.
 
 Offline building:
-- `FETCHCONTENT_SOURCE_DIR_GLM`: path to glm source.
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.

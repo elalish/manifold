@@ -23,8 +23,8 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
   vec2 r = p1 - p0;
   vec2 s = q1 - q0;
   // allow some error in the intersection point
-  double epsilon_r = 2.0 * precision / glm::length(r);
-  double epsilon_s = 2.0 * precision / glm::length(s);
+  double epsilon_r = 2.0 * precision / la::length(r);
+  double epsilon_s = 2.0 * precision / la::length(s);
   double rxs = cross(r, s);
   // in case they are nearly collinear, ignore them...
   // this is to avoid treating degenerate triangles as intersecting
@@ -45,7 +45,7 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
     // perturbation along r/s is not enough.
     //
     // in that case, apply perturbation perpendicular to r
-    vec2 r_orth = glm::normalize(vec2(-r.y, r.x)) * precision;
+    vec2 r_orth = la::normalize(vec2(-r.y, r.x)) * precision;
     double u1 = cross(q0 - p0 + r_orth, r) / rxs;
     double u2 = cross(q0 - p0 - r_orth, r) / rxs;
     double t1 = cross(q0 - p0 + r_orth, s) / rxs;
@@ -369,8 +369,8 @@ int main(int argc, char **argv) {
     double bound = 0;
     for (const SimplePolygon &poly : polys) {
       for (const vec2 &pt : poly) {
-        bound = glm::max(bound, glm::abs(pt.x));
-        bound = glm::max(bound, glm::abs(pt.y));
+        bound = la::max(bound, la::abs(pt.x));
+        bound = la::max(bound, la::abs(pt.y));
       }
     }
     precision = bound * kTolerance;

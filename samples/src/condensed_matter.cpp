@@ -18,7 +18,6 @@
 
 namespace {
 using namespace manifold;
-using namespace glm;
 using manifold::vec3;
 
 constexpr double AtomicRadiusN2 = 0.65;

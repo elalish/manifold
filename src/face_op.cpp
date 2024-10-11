@@ -94,8 +94,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
           tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
-      DEBUG_ASSERT(glm::all(glm::greaterThanEqual(tri0, ivec3(0))) &&
-                       glm::all(glm::greaterThanEqual(tri1, ivec3(0))),
+      DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
+                       la::all(la::gequal(tri1, ivec3(0))),
                    topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
@@ -108,8 +108,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       } else if (firstValid) {
         vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
         vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
-        if (glm::dot(firstCross, firstCross) <
-            glm::dot(secondCross, secondCross)) {
+        if (la::dot(firstCross, firstCross) <
+            la::dot(secondCross, secondCross)) {
           tri0[2] = tri1[0];
           tri1[2] = tri0[0];
         }
@@ -275,7 +275,7 @@ Polygons Manifold::Impl::Slice(double height) const {
       const vec3 below = vertPos_[up.startVert];
       const vec3 above = vertPos_[up.endVert];
       const double a = (height - below.z) / (above.z - below.z);
-      poly.push_back(vec2(glm::mix(below, above, a)));
+      poly.push_back(vec2(la::lerp(below, above, a)));
 
       const int pair = up.pairedHalfedge;
       tri = pair / 3;

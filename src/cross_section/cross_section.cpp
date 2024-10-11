@@ -96,7 +96,7 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
 }
 
 C2::PathsD transform(const C2::PathsD ps, const mat3x2 m) {
-  const bool invert = glm::determinant(mat2(m)) < 0;
+  const bool invert = la::determinant(mat2(m)) < 0;
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
   for (auto path : ps) {
@@ -309,7 +309,7 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
  * @param center Set to true to shift the center to the origin.
  */
 CrossSection CrossSection::Square(const vec2 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || glm::length(size) == 0.0) {
+  if (size.x < 0.0 || size.y < 0.0 || la::length(size) == 0.0) {
     return CrossSection();
   }
 
@@ -526,11 +526,11 @@ CrossSection CrossSection::Scale(const vec2 scale) const {
  * @param ax the axis to be mirrored over
  */
 CrossSection CrossSection::Mirror(const vec2 ax) const {
-  if (glm::length(ax) == 0.) {
+  if (la::length(ax) == 0.) {
     return CrossSection();
   }
-  auto n = glm::normalize(glm::abs(ax));
-  auto m = mat3x2(mat2(1.0) - 2.0 * glm::outerProduct(n, n));
+  auto n = la::normalize(la::abs(ax));
+  auto m = mat3x2(mat2(1.0) - 2.0 * la::outerProduct(n, n));
   return Transform(m);
 }
 

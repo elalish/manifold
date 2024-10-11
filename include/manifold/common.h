@@ -13,13 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#define GLM_ENABLE_EXPERIMENTAL  // needed for glm/gtx/compatibility.hpp
-#define GLM_FORCE_EXPLICIT_CTOR
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtc/constants.hpp>
-#include <glm/gtx/compatibility.hpp>
-#include <glm/gtx/rotate_vector.hpp>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -28,27 +21,34 @@
 
 namespace manifold {
 /** @defgroup Math data structure definitions
- *  @brief Abstract away from glm.
+ *  @brief Abstract away from linalg.
  *  In the future the underlying data type can change.
  *  @{
  */
 namespace la = linalg;
-using vec2 = glm::dvec2;
-using vec3 = glm::dvec3;
-using vec4 = glm::dvec4;
-using mat2 = glm::dmat2;
-using mat2x3 = glm::dmat2x3;
-using mat2x4 = glm::dmat2x4;
-using mat3x2 = glm::dmat3x2;
-using mat3 = glm::dmat3;
-using mat3x4 = glm::dmat3x4;
-using mat4x3 = glm::dmat4x3;
-using mat4 = glm::dmat4;
+using vec2 = la::vec<double, 2>;
+using vec3 = la::vec<double, 3>;
+using vec4 = la::vec<double, 4>;
+using mat2 = la::mat<double, 2, 2>;
+using mat2x3 = la::mat<double, 3, 2>;
+using mat2x4 = la::mat<double, 4, 2>;
+using mat3x2 = la::mat<double, 2, 3>;
+using mat3 = la::mat<double, 3, 3>;
+using mat3x4 = la::mat<double, 4, 3>;
+using mat4x3 = la::mat<double, 3, 4>;
+using mat4 = la::mat<double, 4, 4>;
 using ivec2 = la::vec<int, 2>;
-using ivec3 = glm::vec<3, int>;
-using ivec4 = glm::vec<4, int>;
-using quat = glm::dquat;
+using ivec3 = la::vec<int, 3>;
+using ivec4 = la::vec<int, 4>;
+using quat = la::vec<double, 4>;
 ///@}
+
+constexpr double kPi = 3.14159265358979323846264338327950288;
+constexpr double kTwoPi = 6.28318530717958647692528676655900576;
+constexpr double kHalfPi = 1.57079632679489661923132169163975144;
+
+inline double radians(double a) { return a * kPi / 180; }
+inline double degrees(double a) { return a * 180 / kPi; }
 
 /**
  * Sine function where multiples of 90 degrees come out exact.
@@ -56,19 +56,19 @@ using quat = glm::dquat;
  * @param x Angle in degrees.
  */
 inline double sind(double x) {
-  if (!std::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return sin(x);
   if (x < 0.0) return -sind(-x);
   int quo;
   x = remquo(fabs(x), 90.0, &quo);
   switch (quo % 4) {
     case 0:
-      return sin(glm::radians(x));
+      return sin(radians(x));
     case 1:
-      return cos(glm::radians(x));
+      return cos(radians(x));
     case 2:
-      return -sin(glm::radians(x));
+      return -sin(radians(x));
     case 3:
-      return -cos(glm::radians(x));
+      return -cos(radians(x));
   }
   return 0.0;
 }
@@ -128,8 +128,8 @@ struct Box {
    * Creates a box that contains the two given points.
    */
   Box(const vec3 p1, const vec3 p2) {
-    min = glm::min(p1, p2);
-    max = glm::max(p1, p2);
+    min = la::min(p1, p2);
+    max = la::max(p1, p2);
   }
 
   /**
@@ -147,32 +147,31 @@ struct Box {
    * point.
    */
   double Scale() const {
-    vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
-    return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
+    vec3 absMax = la::max(la::abs(min), la::abs(max));
+    return la::max(absMax.x, la::max(absMax.y, absMax.z));
   }
 
   /**
    * Does this box contain (includes equal) the given point?
    */
   bool Contains(const vec3& p) const {
-    return glm::all(glm::greaterThanEqual(p, min)) &&
-           glm::all(glm::greaterThanEqual(max, p));
+    return la::all(la::gequal(p, min)) && la::all(la::gequal(max, p));
   }
 
   /**
    * Does this box contain (includes equal) the given box?
    */
   bool Contains(const Box& box) const {
-    return glm::all(glm::greaterThanEqual(box.min, min)) &&
-           glm::all(glm::greaterThanEqual(max, box.max));
+    return la::all(la::gequal(box.min, min)) &&
+           la::all(la::gequal(max, box.max));
   }
 
   /**
    * Expand this box to include the given point.
    */
   void Union(const vec3 p) {
-    min = glm::min(min, p);
-    max = glm::max(max, p);
+    min = la::min(min, p);
+    max = la::max(max, p);
   }
 
   /**
@@ -180,8 +179,8 @@ struct Box {
    */
   Box Union(const Box& box) const {
     Box out;
-    out.min = glm::min(min, box.min);
-    out.max = glm::max(max, box.max);
+    out.min = la::min(min, box.min);
+    out.max = la::max(max, box.max);
     return out;
   }
 
@@ -196,8 +195,8 @@ struct Box {
     Box out;
     vec3 minT = transform * vec4(min, 1.0);
     vec3 maxT = transform * vec4(max, 1.0);
-    out.min = glm::min(minT, maxT);
-    out.max = glm::max(minT, maxT);
+    out.min = la::min(minT, maxT);
+    out.max = la::max(minT, maxT);
     return out;
   }
 
@@ -259,7 +258,7 @@ struct Box {
    * Does this box have finite bounds?
    */
   bool IsFinite() const {
-    return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
+    return la::all(la::isfinite(min)) && la::all(la::isfinite(max));
   }
 };
 
@@ -279,8 +278,8 @@ struct Rect {
    * Create a rectangle that contains the two given points.
    */
   Rect(const vec2 a, const vec2 b) {
-    min = glm::min(a, b);
-    max = glm::max(a, b);
+    min = la::min(a, b);
+    max = la::max(a, b);
   }
 
   /** @name Information
@@ -306,8 +305,8 @@ struct Rect {
    * point.
    */
   double Scale() const {
-    vec2 absMax = glm::max(glm::abs(min), glm::abs(max));
-    return glm::max(absMax.x, absMax.y);
+    vec2 absMax = la::max(la::abs(min), la::abs(max));
+    return la::max(absMax.x, absMax.y);
   }
 
   /**
@@ -319,16 +318,15 @@ struct Rect {
    * Does this rectangle contain (includes on border) the given point?
    */
   bool Contains(const vec2& p) const {
-    return glm::all(glm::greaterThanEqual(p, min)) &&
-           glm::all(glm::greaterThanEqual(max, p));
+    return la::all(la::gequal(p, min)) && la::all(la::gequal(max, p));
   }
 
   /**
    * Does this rectangle contain (includes equal) the given rectangle?
    */
   bool Contains(const Rect& rect) const {
-    return glm::all(glm::greaterThanEqual(rect.min, min)) &&
-           glm::all(glm::greaterThanEqual(max, rect.max));
+    return la::all(la::gequal(rect.min, min)) &&
+           la::all(la::gequal(max, rect.max));
   }
 
   /**
@@ -348,7 +346,7 @@ struct Rect {
    * Does this recangle have finite bounds?
    */
   bool IsFinite() const {
-    return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
+    return la::all(la::isfinite(min)) && la::all(la::isfinite(max));
   }
 
   ///@}
@@ -361,8 +359,8 @@ struct Rect {
    * Expand this rectangle (in place) to include the given point.
    */
   void Union(const vec2 p) {
-    min = glm::min(min, p);
-    max = glm::max(max, p);
+    min = la::min(min, p);
+    max = la::max(max, p);
   }
 
   /**
@@ -370,8 +368,8 @@ struct Rect {
    */
   Rect Union(const Rect& rect) const {
     Rect out;
-    out.min = glm::min(min, rect.min);
-    out.max = glm::max(max, rect.max);
+    out.min = la::min(min, rect.min);
+    out.max = la::max(max, rect.max);
     return out;
   }
 
@@ -510,7 +508,7 @@ class Quality {
   static int GetCircularSegments(double radius) {
     if (circularSegments_ > 0) return circularSegments_;
     int nSegA = 360.0 / circularAngle_;
-    int nSegL = 2.0 * radius * glm::pi<double>() / circularEdgeLength_;
+    int nSegL = 2.0 * radius * kPi / circularEdgeLength_;
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
     return std::max(nSeg, 3);

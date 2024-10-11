@@ -113,10 +113,10 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || glm::length(size) == 0.) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
-  mat4x3 m(glm::translate(center ? (-size / 2.0) : vec3(0)) * glm::scale(size));
+  mat4x3 m(la::translate(center ? (-size / 2.0) : vec3(0.0)) * la::scale(size));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -176,8 +176,8 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
       [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
-               v = glm::cos(glm::half_pi<double>() * (1.0 - v));
-               v = radius * glm::normalize(v);
+               v = la::cos(kHalfPi * (1.0 - v));
+               v = radius * la::normalize(v);
                if (std::isnan(v.x)) v = vec3(0.0);
              });
   pImpl_->Finish();
@@ -236,9 +236,9 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   for (int i = 1; i < nDivisions + 1; ++i) {
     double alpha = i / double(nDivisions);
     double phi = alpha * twistDegrees;
-    vec2 scale = glm::mix(vec2(1.0), scaleTop, alpha);
+    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
     mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
-    mat2 transform = mat2(scale.x, 0.0, 0.0, scale.y) * rotation;
+    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
     size_t j = 0;
     size_t idx = 0;
     for (const auto& poly : crossSection) {

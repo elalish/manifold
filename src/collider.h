@@ -360,7 +360,7 @@ class Collider {
   static uint32_t MortonCode(vec3 position, Box bBox) {
     using collider_internal::SpreadBits3;
     vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
-    xyz = glm::min(vec3(1023.0), glm::max(vec3(0.0), 1024.0 * xyz));
+    xyz = la::min(vec3(1023.0), la::max(vec3(0.0), 1024.0 * xyz));
     uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
     uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
     uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
