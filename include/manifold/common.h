@@ -24,12 +24,15 @@
 #include <stdexcept>
 #include <vector>
 
+#include "linalg.h"
+
 namespace manifold {
 /** @defgroup Math data structure definitions
  *  @brief Abstract away from glm.
  *  In the future the underlying data type can change.
  *  @{
  */
+namespace la = linalg;
 using vec2 = glm::dvec2;
 using vec3 = glm::dvec3;
 using vec4 = glm::dvec4;
@@ -41,7 +44,7 @@ using mat3 = glm::dmat3;
 using mat3x4 = glm::dmat3x4;
 using mat4x3 = glm::dmat4x3;
 using mat4 = glm::dmat4;
-using ivec2 = glm::vec<2, int>;
+using ivec2 = la::vec<int, 2>;
 using ivec3 = glm::vec<3, int>;
 using ivec4 = glm::vec<4, int>;
 using quat = glm::dquat;
