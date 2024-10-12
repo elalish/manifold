@@ -499,7 +499,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
     if (gridVerts.Full()) {  // Resize HashTable
       const vec3 lastVert = vertPos[index[0] - 1];
       const Uint64 lastIndex =
-          EncodeIndex(ivec4((lastVert - origin) / spacing, 1), gridPow);
+          EncodeIndex(ivec4(ivec3((lastVert - origin) / spacing), 1), gridPow);
       const double ratio = static_cast<double>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large

@@ -117,8 +117,8 @@ std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
 }
 
 std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
-  mat4x3 transform(1.0);
-  for (int i : {0, 1, 2}) transform[i] *= v;
+  mat4x3 transform;
+  for (int i : {0, 1, 2}) transform[i][i] = v[i];
   return Transform(transform);
 }
 

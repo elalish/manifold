@@ -1206,35 +1206,26 @@ constexpr apply_t<detail::op_rsh, A, B> operator>>(const A &a, const B &b) {
   return apply(detail::op_rsh{}, a, b);
 }
 
-// Binary `operator *` was originally defined component-wise for all patterns,
-// in a fashion consistent with the other operators. However, this was one of
-// the most frequent sources of confusion among new users of this library, with
-// the binary `operator *` being used accidentally by users who INTENDED the
-// semantics of the algebraic matrix product, but RECEIVED the semantics of the
-// Hadamard product. While there is precedent within the HLSL, Fortran, R, APL,
-// J, and Mathematica programming languages for `operator *` having the
-// semantics of the Hadamard product between matrices, it is counterintuitive to
-// users of GLSL, Eigen, and many other languages and libraries that chose
-// matrix product semantics for `operator *`.
-//
-// For these reasons, binary `operator *` is now DEPRECATED between pairs of
-// matrices. Users may call `cmul(...)` for component-wise multiplication, or
-// `mul(...)` for matrix multiplication. Binary `operator *` continues to be
-// available for vector * vector, vector * scalar, matrix * scalar, etc.
+// Binary `operator *` represents the algebraic matrix product - use cmul(a, b)
+// for the Hadamard (component-wise) product.
 template <class A, class B>
-constexpr no_mm_apply_t<detail::op_mul, A, B> operator*(const A &a,
-                                                        const B &b) {
+constexpr auto operator*(const A &a, const B &b) {
+  return mul(a, b);
+}
+// Handle scalar multiplication.
+template <class A>
+constexpr auto operator*(const double scalar, const A &a) {
+  return cmul(scalar, a);
+}
+template <class A>
+constexpr auto operator*(const A &a, const double scalar) {
+  return cmul(a, scalar);
+}
+// Allow component-wise multiplication of vectors.
+template <class T, int M>
+constexpr auto operator*(const vec<T, M> &a, const vec<T, M> &b) {
   return cmul(a, b);
 }
-#ifndef LINALG_FORWARD_COMPATIBLE
-template <class A, class B>
-[[deprecated(
-    "`operator *` between pairs of matrices is deprecated. See the source text "
-    "for details.")]] constexpr mm_apply_t<detail::op_mul, A, B>
-operator*(const A &a, const B &b) {
-  return cmul(a, b);
-}
-#endif
 
 // Binary assignment operators a $= b is always defined as though it were
 // explicitly written a = a $ b
@@ -1459,7 +1450,7 @@ constexpr vec<T, 3> cross(const vec<T, 3> &a, const vec<T, 3> &b) {
 }
 template <class T, int M>
 constexpr T dot(const vec<T, M> &a, const vec<T, M> &b) {
-  return sum(a * b);
+  return sum(cmul(a, b));
 }
 template <class T, int M>
 constexpr T length2(const vec<T, M> &a) {
