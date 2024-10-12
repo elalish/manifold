@@ -251,17 +251,13 @@ TEST(BooleanComplex, Close) {
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
-  mat4 m = la::translate(mat4(1.0), vec3(1.0));
-
   // Define solids which volumes are easy to compute w/ bit arithmetics:
   // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
   // m3 = m1 + m2
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
-  auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      mat4x3(la::translate(mat4(1.0), vec3(1.0, 0, 0))));
-  auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      mat4x3(la::translate(mat4(1.0), vec3(3.0, 0, 0))));
+  auto m2 = Manifold::Cube({2, 1, 1}).Translate({1, 0, 0});
+  auto m4 = Manifold::Cube({4, 1, 1}).Translate({3, 0, 0});
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 

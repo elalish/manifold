@@ -211,7 +211,7 @@ struct Kernel11 {
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
           pRL[k] = vertPosP[p0[i]];
-          qRL[k] = vec3(pRL[k].x, yz01);
+          qRL[k] = vec3(pRL[k].x, yz01.x, yz01.y);
           ++k;
         }
       }
@@ -229,7 +229,7 @@ struct Kernel11 {
         if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
           shadows = s10 != 0;
           qRL[k] = vertPosQ[q0[i]];
-          pRL[k] = vec3(qRL[k].x, yz10);
+          pRL[k] = vec3(qRL[k].x, yz10.x, yz10.y);
           ++k;
         }
       }

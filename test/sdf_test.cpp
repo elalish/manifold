@@ -29,7 +29,7 @@ struct CubeVoid {
 
 struct Layers {
   double operator()(vec3 p) const {
-    int a = la::mod(std::round(2 * p.z), 4.0);
+    int a = std::fmod(std::round(2 * p.z), 4.0);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }
 };
@@ -141,7 +141,7 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const double size = 20;
-  Manifold layers = Manifold::LevelSet(Layers(), {vec3(0), vec3(size)}, 1);
+  Manifold layers = Manifold::LevelSet(Layers(), {vec3(0.0), vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMeshGL(), {});
 #endif
@@ -170,21 +170,21 @@ TEST(SDF, SineSurface) {
 
 TEST(SDF, Blobs) {
   const double blend = 1;
-  std::vector<la::vec4> balls = {{0, 0, 0, 2},     //
-                                 {1, 2, 3, 2},     //
-                                 {-2, 2, -2, 1},   //
-                                 {-2, -3, -2, 2},  //
-                                 {-3, -1, -3, 1},  //
-                                 {2, -3, -2, 2},   //
-                                 {-2, 3, 2, 2},    //
-                                 {-2, -3, 2, 2},   //
-                                 {1, -1, 1, -2},   //
-                                 {-4, -3, -2, 1}};
+  std::vector<vec4> balls = {{0, 0, 0, 2},     //
+                             {1, 2, 3, 2},     //
+                             {-2, 2, -2, 1},   //
+                             {-2, -3, -2, 2},  //
+                             {-3, -1, -3, 1},  //
+                             {2, -3, -2, 2},   //
+                             {-2, 3, 2, 2},    //
+                             {-2, -3, 2, 2},   //
+                             {1, -1, 1, -2},   //
+                             {-4, -3, -2, 1}};
   Manifold blobs = Manifold::LevelSet(
       [&balls, blend](vec3 p) {
         double d = 0;
         for (const auto& ball : balls) {
-          d += la::sign(ball.w) *
+          d += (ball.w > 0 ? 1 : -1) *
                la::smoothstep(-blend, blend,
                               std::abs(ball.w) - la::length(vec3(ball) - p));
         }

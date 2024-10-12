@@ -324,7 +324,7 @@ TEST(Smooth, Torus) {
       const vec3 edge = v1 - v;
       if (edge.z == 0) {
         vec3 tan(v.y, -v.x, 0);
-        tan *= la::sign(la::dot(tan, edge));
+        tan *= la::dot(tan, edge) < 0 ? -1.0 : 1.0;
         tangent = CircularTangent(tan, edge);
       } else if (std::abs(la::determinant(mat2(vec2(v), vec2(edge)))) <
                  kTolerance) {
@@ -333,7 +333,7 @@ TEST(Smooth, Torus) {
         const double r = la::length(xy);
         xy = xy / r * v.z * (r > 2 ? -1.0 : 1.0);
         vec3 tan(xy.x, xy.y, std::cos(theta));
-        tan *= la::sign(la::dot(tan, edge));
+        tan *= la::dot(tan, edge) < 0 ? -1.0 : 1.0;
         tangent = CircularTangent(tan, edge);
       } else {
         tangent = {0, 0, 0, -1};

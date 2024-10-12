@@ -116,7 +116,8 @@ Manifold Manifold::Cube(vec3 size, bool center) {
   if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
-  mat4x3 m(la::translate(center ? (-size / 2.0) : vec3(0.0)) * la::scale(size));
+  mat4x3 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
+           center ? (-size / 2.0) : vec3(0.0));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -237,7 +238,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     double alpha = i / double(nDivisions);
     double phi = alpha * twistDegrees;
     vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
-    mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
+    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
     mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
     size_t j = 0;
     size_t idx = 0;

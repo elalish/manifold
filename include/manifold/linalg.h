@@ -1595,6 +1595,10 @@ vec<T, 3> qaxis(const vec<T, 4> &q) {
   return normalize(q.xyz());
 }
 template <class T>
+vec<T, 4> axisangleq(const vec<T, 3> &axis, const T angle) {
+  return vec<T, 4>(std::sin(angle / 2) * normalize(axis), std::cos(angle / 2));
+}
+template <class T>
 vec<T, 4> qnlerp(const vec<T, 4> &a, const vec<T, 4> &b, T t) {
   return nlerp(a, dot(a, b) < 0 ? -b : b, t);
 }

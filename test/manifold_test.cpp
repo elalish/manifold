@@ -421,16 +421,16 @@ TEST(Manifold, Transform) {
   Manifold cube2 = cube;
   cube = cube.Rotate(30, 40, 50).Scale({6, 5, 4}).Translate({1, 2, 3});
 
-  mat3 rX(1.0, 0.0, 0.0,            //
-          0.0, cosd(30), sind(30),  //
-          0.0, -sind(30), cosd(30));
-  mat3 rY(cosd(40), 0.0, -sind(40),  //
-          0.0, 1.0, 0.0,             //
-          sind(40), 0.0, cosd(40));
-  mat3 rZ(cosd(50), sind(50), 0.0,   //
-          -sind(50), cosd(50), 0.0,  //
-          0.0, 0.0, 1.0);
-  mat3 s = mat3(1.0);
+  mat3 rX({1.0, 0.0, 0.0},            //
+          {0.0, cosd(30), sind(30)},  //
+          {0.0, -sind(30), cosd(30)});
+  mat3 rY({cosd(40), 0.0, -sind(40)},  //
+          {0.0, 1.0, 0.0},             //
+          {sind(40), 0.0, cosd(40)});
+  mat3 rZ({cosd(50), sind(50), 0.0},   //
+          {-sind(50), cosd(50), 0.0},  //
+          {0.0, 0.0, 1.0});
+  mat3 s;
   s[0][0] = 6;
   s[1][1] = 5;
   s[2][2] = 4;
@@ -611,7 +611,7 @@ TEST(Manifold, MirrorUnion) {
 
   auto vol_a = a.GetProperties().volume;
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
-  EXPECT_TRUE(a.Mirror(vec3(0)).IsEmpty());
+  EXPECT_TRUE(a.Mirror(vec3(0.0)).IsEmpty());
 }
 
 TEST(Manifold, MirrorUnion2) {

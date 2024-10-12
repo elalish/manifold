@@ -143,7 +143,7 @@ struct GyroidSDF {
 
 Manifold Gyroid() {
   const double period = kTwoPi;
-  return Manifold::LevelSet(GyroidSDF(), {vec3(0), vec3(period)}, 0.5);
+  return Manifold::LevelSet(GyroidSDF(), {vec3(0.0), vec3(period)}, 0.5);
 }
 
 MeshGL TetGL() {
@@ -323,10 +323,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   MeshGL output = out.GetMeshGL(normalIdx);
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
-    const mat4x3 transform = output.runTransform.empty()
-                                 ? mat4x3(1.0)
-                                 : mat4x3(m[0], m[1], m[2], m[3], m[4], m[5],
-                                          m[6], m[7], m[8], m[9], m[10], m[11]);
+    const mat4x3 transform =
+        output.runTransform.empty()
+            ? mat4x3(1.0)
+            : mat4x3({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
+                     {m[9], m[10], m[11]});
     size_t i = 0;
     for (; i < originals.size(); ++i) {
       ASSERT_EQ(originals[i].runOriginalID.size(), 1);
