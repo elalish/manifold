@@ -244,6 +244,10 @@ inline mat4x3 RotateUp(vec3 up) {
   return mat4x3(la::rotate(mat4(1), angle, axis));
 }
 
+inline mat4 Mat4(mat4x3 a) {
+  return mat4({a[0], 0}, {a[1], 0}, {a[2], 0}, {a[3], 1});
+}
+
 /** @} */
 
 /** @defgroup Debug

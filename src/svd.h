@@ -292,8 +292,8 @@ struct SVDSet {
  * @param A The matrix to decompose.
  */
 inline SVDSet SVD(mat3 A) {
-  mat3 V = JacobiEigenAnalysis(la::mul(la::transpose(A), A));
-  auto B = la::mul(A, V);
+  mat3 V = JacobiEigenAnalysis(la::transpose(A) * A);
+  auto B = A * V;
   SortSingularValues(B, V);
   QR qr = QRDecomposition(B);
   return SVDSet{qr.Q, qr.R, V};

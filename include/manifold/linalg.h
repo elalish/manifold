@@ -788,7 +788,11 @@ struct vec<T, 2> {
   constexpr explicit vec(const T *p) : vec(p[0], p[1]) {}
   template <class U, int N>
   constexpr explicit vec(const vec<U, N> &v)
-      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y)) {}
+      : vec(static_cast<T>(v.x), static_cast<T>(v.y)) {
+    static_assert(
+        N >= 2,
+        "You must give extra arguments if your input vector is shorter.");
+  }
   constexpr const T &operator[](int i) const { return i == 0 ? x : y; }
   LINALG_CONSTEXPR14 T &operator[](int i) { return i == 0 ? x : y; }
 
@@ -809,8 +813,11 @@ struct vec<T, 3> {
   constexpr explicit vec(const T *p) : vec(p[0], p[1], p[2]) {}
   template <class U, int N>
   constexpr explicit vec(const vec<U, N> &v)
-      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y),
-            N < 3 ? 0 : static_cast<T>(v.z)) {}
+      : vec(static_cast<T>(v.x), static_cast<T>(v.y), static_cast<T>(v.z)) {
+    static_assert(
+        N >= 3,
+        "You must give extra arguments if your input vector is shorter.");
+  }
   constexpr const T &operator[](int i) const {
     return i == 0 ? x : i == 1 ? y : z;
   }
@@ -843,8 +850,12 @@ struct vec<T, 4> {
   constexpr explicit vec(const T *p) : vec(p[0], p[1], p[2], p[3]) {}
   template <class U, int N>
   constexpr explicit vec(const vec<U, N> &v)
-      : vec(static_cast<T>(v.x), N < 2 ? 0 : static_cast<T>(v.y),
-            N < 3 ? 0 : static_cast<T>(v.z), N < 4 ? 0 : static_cast<T>(v.w)) {}
+      : vec(static_cast<T>(v.x), static_cast<T>(v.y), static_cast<T>(v.z),
+            static_cast<T>(v.w)) {
+    static_assert(
+        N >= 4,
+        "You must give extra arguments if your input vector is shorter.");
+  }
   constexpr const T &operator[](int i) const {
     return i == 0 ? x : i == 1 ? y : i == 2 ? z : w;
   }
@@ -899,8 +910,10 @@ struct mat<T, M, 2> {
   constexpr mat(const V &x_, const V &y_) : x(x_), y(y_) {}
   constexpr explicit mat(const T &s) : x(s), y(s) {}
   constexpr explicit mat(const T *p) : x(p + M * 0), y(p + M * 1) {}
-  template <class U>
-  constexpr explicit mat(const mat<U, M, 2> &m) : mat(V(m.x), V(m.y)) {}
+  template <class U, int N, int P>
+  constexpr explicit mat(const mat<U, N, P> &m) : mat(V(m.x), V(m.y)) {
+    static_assert(P >= 2, "Input matrix dimensions must be at least as big.");
+  }
   constexpr vec<T, 2> row(int i) const { return {x[i], y[i]}; }
   constexpr const V &operator[](int j) const { return j == 0 ? x : y; }
   LINALG_CONSTEXPR14 V &operator[](int j) { return j == 0 ? x : y; }
@@ -921,8 +934,10 @@ struct mat<T, M, 3> {
   constexpr explicit mat(const T &s) : x(s), y(s), z(s) {}
   constexpr explicit mat(const T *p)
       : x(p + M * 0), y(p + M * 1), z(p + M * 2) {}
-  template <class U>
-  constexpr explicit mat(const mat<U, M, 3> &m) : mat(V(m.x), V(m.y), V(m.z)) {}
+  template <class U, int N, int P>
+  constexpr explicit mat(const mat<U, N, P> &m) : mat(V(m.x), V(m.y), V(m.z)) {
+    static_assert(P >= 3, "Input matrix dimensions must be at least as big.");
+  }
   constexpr vec<T, 3> row(int i) const { return {x[i], y[i], z[i]}; }
   constexpr const V &operator[](int j) const {
     return j == 0 ? x : j == 1 ? y : z;
@@ -945,12 +960,17 @@ struct mat<T, M, 4> {
   constexpr mat() : x(), y(), z(), w() {}
   constexpr mat(const V &x_, const V &y_, const V &z_, const V &w_)
       : x(x_), y(y_), z(z_), w(w_) {}
+  constexpr mat(const mat<T, M, 3> &m_, const V &w_)
+      : x(m_.x), y(m_.y), z(m_.z), w(w_) {}
   constexpr explicit mat(const T &s) : x(s), y(s), z(s), w(s) {}
   constexpr explicit mat(const T *p)
       : x(p + M * 0), y(p + M * 1), z(p + M * 2), w(p + M * 3) {}
-  template <class U>
-  constexpr explicit mat(const mat<U, M, 4> &m)
-      : mat(V(m.x), V(m.y), V(m.z), V(m.w)) {}
+  template <class U, int N, int P>
+  constexpr explicit mat(const mat<U, N, P> &m)
+      : mat(V(m.x), V(m.y), V(m.z), V(m.w)) {
+    static_assert(P >= 4, "Input matrix dimensions must be at least as big.");
+  }
+
   constexpr vec<T, 4> row(int i) const { return {x[i], y[i], z[i], w[i]}; }
   constexpr const V &operator[](int j) const {
     return j == 0 ? x : j == 1 ? y : j == 2 ? z : w;

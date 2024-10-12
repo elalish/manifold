@@ -533,7 +533,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
 
   result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
-    m.second.transform = transform_ * mat4(m.second.transform);
+    m.second.transform = transform_ * Mat4(m.second.transform);
   }
 
   result.vertPos_.resize(NumVert());

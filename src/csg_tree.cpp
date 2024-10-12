@@ -133,7 +133,7 @@ std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
   mat3 rZ({cosd(zDegrees), sind(zDegrees), 0.0},   //
           {-sind(zDegrees), cosd(zDegrees), 0.0},  //
           {0.0, 0.0, 1.0});
-  mat4x3 transform(la::mul(rZ, rY, rX));
+  mat4x3 transform(rZ * rY * rX, vec3());
   return Transform(transform);
 }
 
@@ -161,7 +161,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
 }
 
 std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat4x3 &m) const {
-  return std::make_shared<CsgLeafNode>(pImpl_, la::mul(m, mat4(transform_)));
+  return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_));
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
@@ -392,7 +392,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
 std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat4x3 &m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
-  node->transform_ = la::mul(m, mat4(transform_));
+  node->transform_ = m * Mat4(transform_);
   node->op_ = op_;
   return node;
 }
