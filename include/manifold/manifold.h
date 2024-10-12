@@ -140,8 +140,7 @@ using MeshGL64 = MeshGLP<double, size_t>;
 /**
  * This library's internal representation of an oriented, 2-manifold, triangle
  * mesh - a simple boundary-representation of a solid object. Use this class to
- * store and operate on solids, and use MeshGL for input and output, or
- * potentially Mesh if only basic geometry is required.
+ * store and operate on solids, and use MeshGL for input and output.
  *
  * In addition to storing geometric data, a Manifold can also store an arbitrary
  * number of vertex properties. These could be anything, e.g. normals, UV
