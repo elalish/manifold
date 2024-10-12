@@ -113,7 +113,7 @@ struct InterpTri {
       cosTheta = -cosTheta;
     }
 
-    if (cosTheta > 1.0 - la::epsilon<double>()) {
+    if (cosTheta > 1.0 - std::numeric_limits<double>::epsilon()) {
       return la::lerp(x, z, a);  // for numerical stability
     } else {
       double angle = std::acos(cosTheta);
@@ -181,7 +181,7 @@ struct InterpTri {
         impl->vertPos_[impl->halfedge_[halfedges[1]].startVert],
         impl->vertPos_[impl->halfedge_[halfedges[2]].startVert],
         halfedges[3] < 0
-            ? vec3(0)
+            ? vec3(0.0)
             : impl->vertPos_[impl->halfedge_[halfedges[3]].startVert]};
 
     for (const int i : {0, 1, 2, 3}) {
@@ -191,7 +191,7 @@ struct InterpTri {
       }
     }
 
-    vec4 posH(0);
+    vec4 posH(0.0);
 
     if (halfedges[3] < 0) {  // tri
       const mat4x3 tangentR = {impl->halfedgeTangent_[halfedges[0]],
@@ -568,7 +568,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                   (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
                    !meshRelation_.triRef[here.face].SameFace(
                        meshRelation_.triRef[next.face]))) {
-                normals.push_back(vec3(0));
+                normals.push_back(vec3(0.0));
               }
               group.push_back(normals.size() - 1);
               if (std::isfinite(next.edgeVec.x)) {
@@ -680,7 +680,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           halfedge = NextHalfedge(halfedge_[halfedge].pairedHalfedge);
         }
 
-        vec3 normal(0);
+        vec3 normal(0.0);
         Vec<double> currentAngle;
         Vec<double> desiredAngle;
 
@@ -812,7 +812,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                                      vertPos_[halfedge_[halfedge].startVert];
                 const vec3 dir = la::cross(here.normal, next.normal);
                 tangent[halfedge] = CircularTangent(
-                    la::sign(la::dot(dir, edgeVec)) * dir, edgeVec);
+                    (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
               } else {
                 tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }

@@ -89,7 +89,7 @@ class Partition {
     return partition;
   }
 
-  Vec<ivec3> Reindex(ivec4 triVerts, ivec4 edgeOffsets, la::bvec4 edgeFwd,
+  Vec<ivec3> Reindex(ivec4 triVerts, ivec4 edgeOffsets, bvec4 edgeFwd,
                      int interiorOffset) const {
     Vec<int> newVerts;
     newVerts.reserve(vertBary.size());
@@ -97,7 +97,7 @@ class Partition {
     ivec4 outTri = {0, 1, 2, 3};
     if (triVerts[3] < 0 && idx[1] != Next3(idx[0])) {
       triIdx = {idx[2], idx[0], idx[1], idx[3]};
-      edgeFwd = la::not_(edgeFwd);
+      edgeFwd = !edgeFwd;
       std::swap(outTri[0], outTri[1]);
     }
     for (const int i : {0, 1, 2, 3}) {
@@ -259,7 +259,7 @@ class Partition {
   // are zero, in which case a terminal triangulation is performed.
   static void PartitionQuad(Vec<ivec3>& triVert, Vec<vec4>& vertBary,
                             ivec4 cornerVerts, ivec4 edgeOffsets,
-                            ivec4 edgeAdded, la::bvec4 edgeFwd) {
+                            ivec4 edgeAdded, bvec4 edgeFwd) {
     auto GetEdgeVert = [&](int edge, int idx) {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
@@ -326,7 +326,7 @@ class Partition {
     ivec4 newEdgeOffsets = {edgeOffsets[1], -1,
                             GetEdgeVert(3, edgeAdded[3] + 1), edgeOffsets[0]};
     ivec4 newEdgeAdded = {0, -1, 0, edgeAdded[0]};
-    la::bvec4 newEdgeFwd = {edgeFwd[1], true, edgeFwd[3], edgeFwd[0]};
+    bvec4 newEdgeFwd = {edgeFwd[1], true, edgeFwd[3], edgeFwd[0]};
 
     for (int i = 1; i < partitions; ++i) {
       const int cornerOffset1 = (edgeAdded[1] * i) / partitions;
@@ -461,7 +461,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
     for (const int i : {0, 1, 2}) {
       const BaryIndices indices = GetIndices(3 * tri + i);
       if (indices.start4 < 0) continue;  // skip quad interiors
-      vec4 uvw(0);
+      vec4 uvw(0.0);
       uvw[indices.start4] = 1;
       vertBary[halfedge_[3 * tri + i].startVert] = {indices.tri, uvw};
     }
@@ -505,11 +505,12 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  return;
                }
                const vec3 vec = vertPos_[edge.first] - vertPos_[edge.second];
-               const vec4 tangent0 =
-                   halfedgeTangent_.empty() ? vec4(0) : halfedgeTangent_[hIdx];
+               const vec4 tangent0 = halfedgeTangent_.empty()
+                                         ? vec4(0.0)
+                                         : halfedgeTangent_[hIdx];
                const vec4 tangent1 =
                    halfedgeTangent_.empty()
-                       ? vec4(0)
+                       ? vec4(0.0)
                        : halfedgeTangent_[halfedge_[hIdx].pairedHalfedge];
                edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
              });
@@ -575,7 +576,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                const double frac = 1.0 / (n + 1);
 
                for (int i = 0; i < n; ++i) {
-                 vec4 uvw(0);
+                 vec4 uvw(0.0);
                  uvw[indices.end4] = (i + 1) * frac;
                  uvw[indices.start4] = 1 - uvw[indices.end4];
                  vertBary[offset + i].uvw = uvw;
@@ -624,7 +625,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         if (halfedges[0] < 0) return;
         ivec4 tri3;
         ivec4 edgeOffsets;
-        la::bvec4 edgeFwd(false);
+        bvec4 edgeFwd(false);
         for (const int i : {0, 1, 2, 3}) {
           if (halfedges[i] < 0) {
             tri3[i] = -1;
@@ -764,7 +765,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  auto& rel = meshRelation_;
                  ivec4 tri3;
                  ivec4 edgeOffsets;
-                 la::bvec4 edgeFwd(true);
+                 bvec4 edgeFwd(true);
                  for (const int i : {0, 1, 2, 3}) {
                    if (halfedges[i] < 0) {
                      tri3[i] = -1;

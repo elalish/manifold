@@ -29,6 +29,7 @@ namespace la = linalg;
 using vec2 = la::vec<double, 2>;
 using vec3 = la::vec<double, 3>;
 using vec4 = la::vec<double, 4>;
+using bvec4 = la::vec<bool, 4>;
 using mat2 = la::mat<double, 2, 2>;
 using mat3x2 = la::mat<double, 3, 2>;
 using mat4x2 = la::mat<double, 4, 2>;
@@ -49,6 +50,9 @@ constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
 inline double radians(double a) { return a * kPi / 180; }
 inline double degrees(double a) { return a * 180 / kPi; }
+
+inline mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
+inline mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
 
 /**
  * Sine function where multiples of 90 degrees come out exact.
