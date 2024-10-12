@@ -292,11 +292,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == mat2x3(1.0)) {
+  if (transform_ == Identity2x3()) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = mat2x3(1.0);
+  transform_ = Identity2x3();
   return paths_;
 }
 
@@ -483,9 +483,9 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  * @param v The vector to add to every vertex.
  */
 CrossSection CrossSection::Translate(const vec2 v) const {
-  mat2x3 m(1.0, 0.0,  //
-           0.0, 1.0,  //
-           v.x, v.y);
+  mat2x3 m({1.0, 0.0},  //
+           {0.0, 1.0},  //
+           {v.x, v.y});
   return Transform(m);
 }
 
@@ -498,9 +498,9 @@ CrossSection CrossSection::Translate(const vec2 v) const {
 CrossSection CrossSection::Rotate(double degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  mat2x3 m(c, s,   //
-           -s, c,  //
-           0.0, 0.0);
+  mat2x3 m({c, s},   //
+           {-s, c},  //
+           {0.0, 0.0});
   return Transform(m);
 }
 
@@ -511,9 +511,9 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * @param v The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat2x3 m(scale.x, 0.0,  //
-           0.0, scale.y,  //
-           0.0, 0.0);
+  mat2x3 m({scale.x, 0.0},  //
+           {0.0, scale.y},  //
+           {0.0, 0.0});
   return Transform(m);
 }
 
@@ -530,7 +530,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
     return CrossSection();
   }
   auto n = la::normalize(la::abs(ax));
-  auto m = mat2x3(mat2(1.0) - 2.0 * la::outerProduct(n, n));
+  auto m = mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n));
   return Transform(m);
 }
 

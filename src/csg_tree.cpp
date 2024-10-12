@@ -147,10 +147,10 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
     : pImpl_(pImpl_), transform_(transform_) {}
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
-  if (transform_ == mat3x4(1.0)) return pImpl_;
+  if (transform_ == Identity3x4()) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
-  transform_ = mat3x4(1.0);
+  transform_ = Identity3x4();
   return pImpl_;
 }
 
@@ -270,7 +270,7 @@ Manifold::Impl CsgLeafNode::Compose(
           }
         }
 
-        if (node->transform_ == mat3x4(1.0)) {
+        if (node->transform_ == Identity3x4()) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),

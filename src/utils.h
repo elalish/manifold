@@ -249,6 +249,9 @@ inline mat4 Mat4(mat3x4 a) {
   return mat4({a[0], 0}, {a[1], 0}, {a[2], 0}, {a[3], 1});
 }
 
+inline mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
+inline mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
+
 /** @} */
 
 /** @defgroup Debug

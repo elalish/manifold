@@ -165,7 +165,7 @@ class CrossSection {
 
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
-  mutable mat2x3 transform_ = mat2x3(1.0);
+  mutable mat2x3 transform_ = Identity2x3();
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

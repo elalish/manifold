@@ -517,7 +517,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
 
 Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   ZoneScoped;
-  if (transform_ == mat3x4(1.0)) return *this;
+  if (transform_ == Identity3x4()) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
   if (status_ != Manifold::Error::NoError) {

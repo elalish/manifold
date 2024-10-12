@@ -59,7 +59,7 @@ class CsgLeafNode final : public CsgNode {
 
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
-  mutable mat3x4 transform_ = mat3x4(1.0);
+  mutable mat3x4 transform_ = Identity3x4();
 };
 
 class CsgOpNode final : public CsgNode {
@@ -88,7 +88,7 @@ class CsgOpNode final : public CsgNode {
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
   CsgNodeType op_;
-  mat3x4 transform_ = mat3x4(1.0);
+  mat3x4 transform_ = Identity3x4();
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
 
