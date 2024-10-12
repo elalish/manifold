@@ -95,7 +95,7 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   return p;
 }
 
-C2::PathsD transform(const C2::PathsD ps, const mat3x2 m) {
+C2::PathsD transform(const C2::PathsD ps, const mat2x3 m) {
   const bool invert = la::determinant(mat2(m)) < 0;
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
@@ -292,11 +292,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == mat3x2(1.0)) {
+  if (transform_ == mat2x3(1.0)) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = mat3x2(1.0);
+  transform_ = mat2x3(1.0);
   return paths_;
 }
 
@@ -483,7 +483,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  * @param v The vector to add to every vertex.
  */
 CrossSection CrossSection::Translate(const vec2 v) const {
-  mat3x2 m(1.0, 0.0,  //
+  mat2x3 m(1.0, 0.0,  //
            0.0, 1.0,  //
            v.x, v.y);
   return Transform(m);
@@ -498,7 +498,7 @@ CrossSection CrossSection::Translate(const vec2 v) const {
 CrossSection CrossSection::Rotate(double degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  mat3x2 m(c, s,   //
+  mat2x3 m(c, s,   //
            -s, c,  //
            0.0, 0.0);
   return Transform(m);
@@ -511,7 +511,7 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * @param v The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat3x2 m(scale.x, 0.0,  //
+  mat2x3 m(scale.x, 0.0,  //
            0.0, scale.y,  //
            0.0, 0.0);
   return Transform(m);
@@ -530,7 +530,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
     return CrossSection();
   }
   auto n = la::normalize(la::abs(ax));
-  auto m = mat3x2(mat2(1.0) - 2.0 * la::outerProduct(n, n));
+  auto m = mat2x3(mat2(1.0) - 2.0 * la::outerProduct(n, n));
   return Transform(m);
 }
 
@@ -541,7 +541,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-CrossSection CrossSection::Transform(const mat3x2& m) const {
+CrossSection CrossSection::Transform(const mat2x3& m) const {
   auto transformed = CrossSection();
   transformed.transform_ = m * mat3(transform_);
   transformed.paths_ = paths_;

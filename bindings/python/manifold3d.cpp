@@ -49,11 +49,11 @@ struct la_name<ivec3> {
   static constexpr char const multi_name[] = "IntNx3";
 };
 template <>
-struct la_name<mat4x3> {
+struct la_name<mat3x4> {
   static constexpr char const name[] = "Double3x4";
 };
 template <>
-struct la_name<mat3x2> {
+struct la_name<mat2x3> {
   static constexpr char const name[] = "Double2x3";
 };
 

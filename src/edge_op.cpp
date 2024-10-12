@@ -90,7 +90,7 @@ struct SwappableEdge {
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
-    mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+    mat2x3 projection = GetAxisAlignedProjection(triNormal[tri]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
@@ -491,7 +491,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
-      const mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+      const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
@@ -577,7 +577,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
   const ivec3 perm0 = TriOf(edge % 3);
   const ivec3 perm1 = TriOf(pair % 3);
 
-  mat3x2 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
+  mat2x3 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
   vec2 v[4];
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];

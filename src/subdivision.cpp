@@ -674,7 +674,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  }
                  newVertPos[vert] = triPos * vec3(bary.uvw);
                } else {
-                 mat4x3 quadPos;
+                 mat3x4 quadPos;
                  for (const int i : {0, 1, 2, 3}) {
                    quadPos[i] = vertPos_[halfedge_[halfedges[i]].startVert];
                  }

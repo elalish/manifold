@@ -323,10 +323,10 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   MeshGL output = out.GetMeshGL(normalIdx);
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
-    const mat4x3 transform =
+    const mat3x4 transform =
         output.runTransform.empty()
-            ? mat4x3(1.0)
-            : mat4x3({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
+            ? mat3x4(1.0)
+            : mat3x4({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
                      {m[9], m[10], m[11]});
     size_t i = 0;
     for (; i < originals.size(); ++i) {

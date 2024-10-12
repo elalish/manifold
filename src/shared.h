@@ -40,7 +40,7 @@ inline int NextHalfedge(int current) {
   return current;
 }
 
-inline mat3 NormalTransform(const mat4x3& transform) {
+inline mat3 NormalTransform(const mat3x4& transform) {
   return la::inverse(la::transpose(mat3(transform)));
 }
 
@@ -48,20 +48,20 @@ inline mat3 NormalTransform(const mat4x3& transform) {
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
  */
-inline mat3x2 GetAxisAlignedProjection(vec3 normal) {
+inline mat2x3 GetAxisAlignedProjection(vec3 normal) {
   vec3 absNormal = la::abs(normal);
   double xyzMax;
-  mat2x3 projection;
+  mat3x2 projection;
   if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
-    projection = mat2x3({1.0, 0.0, 0.0},  //
+    projection = mat3x2({1.0, 0.0, 0.0},  //
                         {0.0, 1.0, 0.0});
     xyzMax = normal.z;
   } else if (absNormal.y > absNormal.x) {
-    projection = mat2x3({0.0, 0.0, 1.0},  //
+    projection = mat3x2({0.0, 0.0, 1.0},  //
                         {1.0, 0.0, 0.0});
     xyzMax = normal.y;
   } else {
-    projection = mat2x3({0.0, 1.0, 0.0},  //
+    projection = mat3x2({0.0, 1.0, 0.0},  //
                         {0.0, 0.0, 1.0});
     xyzMax = normal.x;
   }

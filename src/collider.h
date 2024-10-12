@@ -253,7 +253,7 @@ struct BuildInternalBoxes {
 };
 
 struct TransformBox {
-  const mat4x3 transform;
+  const mat3x4 transform;
   void operator()(Box& box) { box = box.Transform(transform); }
 };
 
@@ -288,7 +288,7 @@ class Collider {
     UpdateBoxes(leafBB);
   }
 
-  bool Transform(mat4x3 transform) {
+  bool Transform(mat3x4 transform) {
     ZoneScoped;
     bool axisAligned = true;
     for (int row : {0, 1, 2}) {

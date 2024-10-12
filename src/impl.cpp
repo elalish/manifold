@@ -40,7 +40,7 @@ void AtomicAddVec3(vec3& target, const vec3& add) {
 }
 
 struct Transform4x3 {
-  const mat4x3 transform;
+  const mat3x4 transform;
 
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
@@ -255,7 +255,7 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
+Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   std::vector<vec3> vertPos;
   std::vector<ivec3> triVerts;
   switch (shape) {
@@ -515,9 +515,9 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Finish();
 }
 
-Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
+Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   ZoneScoped;
-  if (transform_ == mat4x3(1.0)) return *this;
+  if (transform_ == mat3x4(1.0)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
   if (status_ != Manifold::Error::NoError) {

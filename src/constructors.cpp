@@ -116,7 +116,7 @@ Manifold Manifold::Cube(vec3 size, bool center) {
   if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
-  mat4x3 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
+  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
            center ? (-size / 2.0) : vec3(0.0));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }

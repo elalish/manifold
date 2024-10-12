@@ -30,12 +30,12 @@ using vec2 = la::vec<double, 2>;
 using vec3 = la::vec<double, 3>;
 using vec4 = la::vec<double, 4>;
 using mat2 = la::mat<double, 2, 2>;
-using mat2x3 = la::mat<double, 3, 2>;
-using mat2x4 = la::mat<double, 4, 2>;
-using mat3x2 = la::mat<double, 2, 3>;
+using mat3x2 = la::mat<double, 3, 2>;
+using mat4x2 = la::mat<double, 4, 2>;
+using mat2x3 = la::mat<double, 2, 3>;
 using mat3 = la::mat<double, 3, 3>;
-using mat3x4 = la::mat<double, 4, 3>;
-using mat4x3 = la::mat<double, 3, 4>;
+using mat4x3 = la::mat<double, 4, 3>;
+using mat3x4 = la::mat<double, 3, 4>;
 using mat4 = la::mat<double, 4, 4>;
 using ivec2 = la::vec<int, 2>;
 using ivec3 = la::vec<int, 3>;
@@ -191,7 +191,7 @@ struct Box {
    * multiples of 90 degrees), or else the resulting bounding box will no longer
    * bound properly.
    */
-  Box Transform(const mat4x3& transform) const {
+  Box Transform(const mat3x4& transform) const {
     Box out;
     vec3 minT = transform * vec4(min, 1.0);
     vec3 maxT = transform * vec4(max, 1.0);
@@ -418,7 +418,7 @@ struct Rect {
    * multiples of 90 degrees), or else the resulting rectangle will no longer
    * bound properly.
    */
-  Rect Transform(const mat3x2& m) const {
+  Rect Transform(const mat2x3& m) const {
     Rect rect;
     rect.min = m * vec3(min, 1);
     rect.max = m * vec3(max, 1);

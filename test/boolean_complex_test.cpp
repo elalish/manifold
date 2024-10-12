@@ -142,7 +142,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m1;
   for (auto& array : arrays1) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -153,7 +153,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m2;
   for (auto& array : arrays2) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];

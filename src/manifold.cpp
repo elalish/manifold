@@ -532,7 +532,7 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-Manifold Manifold::Transform(const mat4x3& m) const {
+Manifold Manifold::Transform(const mat3x4& m) const {
   return Manifold(pNode_->Transform(m));
 }
 
@@ -549,7 +549,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
     return Manifold();
   }
   auto n = la::normalize(normal);
-  auto m = mat4x3(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
+  auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
   return Manifold(pNode_->Transform(m));
 }
 

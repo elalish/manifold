@@ -98,7 +98,7 @@ TEST(CrossSection, Transform) {
              {0.0, 3.0, 0.0},  //
              {0.0, 0.0, 1.0});
 
-  auto b = sq.Transform(mat3x2(trans * scale * rot));
+  auto b = sq.Transform(mat2x3(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
   auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL();

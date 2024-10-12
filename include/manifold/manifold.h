@@ -257,7 +257,7 @@ class Manifold {
   Manifold Scale(vec3) const;
   Manifold Rotate(double xDegrees, double yDegrees = 0.0,
                   double zDegrees = 0.0) const;
-  Manifold Transform(const mat4x3&) const;
+  Manifold Transform(const mat3x4&) const;
   Manifold Mirror(vec3) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;

@@ -75,7 +75,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                         halfedge_[firstEdge + 1].startVert,
                         halfedge_[firstEdge + 2].startVert,
                         halfedge_[firstEdge + 3].startVert};
-      const mat3x2 projection = GetAxisAlignedProjection(normal);
+      const mat2x3 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
                    projection * this->vertPos_[tri[1]],
@@ -126,7 +126,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   };
   auto generalTriangulation = [&](int face) {
     const vec3 normal = faceNormal_[face];
-    const mat3x2 projection = GetAxisAlignedProjection(normal);
+    const mat2x3 projection = GetAxisAlignedProjection(normal);
     const PolygonsIdx polys =
         Face2Polygons(halfedge_.cbegin() + faceEdge[face],
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
@@ -199,7 +199,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
  */
 PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           VecView<Halfedge>::IterC end,
-                                          mat3x2 projection) const {
+                                          mat2x3 projection) const {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
     vert_edge.emplace(
@@ -289,7 +289,7 @@ Polygons Manifold::Impl::Slice(double height) const {
 }
 
 Polygons Manifold::Impl::Project() const {
-  const mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
+  const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
   Vec<Halfedge> cusps(NumEdge());
   cusps.resize(
       copy_if(

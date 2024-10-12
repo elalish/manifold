@@ -155,7 +155,7 @@ struct CheckCCW {
   bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
-    const mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    const mat2x3 projection = GetAxisAlignedProjection(triNormal[face]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];

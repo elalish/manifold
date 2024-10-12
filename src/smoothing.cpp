@@ -82,20 +82,20 @@ struct InterpTri {
     return Homogeneous(vec4(point, 0) + tangent);
   }
 
-  static mat2x4 CubicBezier2Linear(vec4 p0, vec4 p1, vec4 p2, vec4 p3,
+  static mat4x2 CubicBezier2Linear(vec4 p0, vec4 p1, vec4 p2, vec4 p3,
                                    double x) {
-    mat2x4 out;
+    mat4x2 out;
     vec4 p12 = la::lerp(p1, p2, x);
     out[0] = la::lerp(la::lerp(p0, p1, x), p12, x);
     out[1] = la::lerp(p12, la::lerp(p2, p3, x), x);
     return out;
   }
 
-  static vec3 BezierPoint(mat2x4 points, double x) {
+  static vec3 BezierPoint(mat4x2 points, double x) {
     return HNormalize(la::lerp(points[0], points[1], x));
   }
 
-  static vec3 BezierTangent(mat2x4 points) {
+  static vec3 BezierTangent(mat4x2 points) {
     return SafeNormalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
@@ -122,18 +122,18 @@ struct InterpTri {
     }
   }
 
-  static mat2x4 Bezier2Bezier(const mat2x3& corners, const mat2x4& tangentsX,
-                              const mat2x4& tangentsY, double x,
+  static mat4x2 Bezier2Bezier(const mat3x2& corners, const mat4x2& tangentsX,
+                              const mat4x2& tangentsY, double x,
                               const vec3& anchor) {
-    const mat2x4 bez = CubicBezier2Linear(
+    const mat4x2 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
         Bezier(corners[1], tangentsX[1]), Homogeneous(corners[1]), x);
     const vec3 end = BezierPoint(bez, x);
     const vec3 tangent = BezierTangent(bez);
 
-    const mat2x3 nTangentsX(SafeNormalize(vec3(tangentsX[0])),
+    const mat3x2 nTangentsX(SafeNormalize(vec3(tangentsX[0])),
                             -SafeNormalize(vec3(tangentsX[1])));
-    const mat2x3 biTangents = {
+    const mat3x2 biTangents = {
         OrthogonalTo(vec3(tangentsY[0]), (anchor - corners[0]), nTangentsX[0]),
         OrthogonalTo(vec3(tangentsY[1]), (anchor - corners[1]), nTangentsX[1])};
 
@@ -154,17 +154,17 @@ struct InterpTri {
     return {Homogeneous(end), vec4(delta, deltaW)};
   }
 
-  static vec3 Bezier2D(const mat4x3& corners, const mat4& tangentsX,
+  static vec3 Bezier2D(const mat3x4& corners, const mat4& tangentsX,
                        const mat4& tangentsY, double x, double y,
                        const vec3& centroid) {
-    mat2x4 bez0 =
+    mat4x2 bez0 =
         Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
                       {tangentsY[0], tangentsY[1]}, x, centroid);
-    mat2x4 bez1 =
+    mat4x2 bez1 =
         Bezier2Bezier({corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
                       {tangentsY[2], tangentsY[3]}, 1 - x, centroid);
 
-    const mat2x4 bez =
+    const mat4x2 bez =
         CubicBezier2Linear(bez0[0], Bezier(vec3(bez0[0]), bez0[1]),
                            Bezier(vec3(bez1[0]), bez1[1]), bez1[0], y);
     return BezierPoint(bez, y);
@@ -176,7 +176,7 @@ struct InterpTri {
     const vec4 uvw = vertBary[vert].uvw;
 
     const ivec4 halfedges = impl->GetHalfedges(tri);
-    const mat4x3 corners = {
+    const mat3x4 corners = {
         impl->vertPos_[impl->halfedge_[halfedges[0]].startVert],
         impl->vertPos_[impl->halfedge_[halfedges[1]].startVert],
         impl->vertPos_[impl->halfedge_[halfedges[2]].startVert],
@@ -194,10 +194,10 @@ struct InterpTri {
     vec4 posH(0);
 
     if (halfedges[3] < 0) {  // tri
-      const mat3x4 tangentR = {impl->halfedgeTangent_[halfedges[0]],
+      const mat4x3 tangentR = {impl->halfedgeTangent_[halfedges[0]],
                                impl->halfedgeTangent_[halfedges[1]],
                                impl->halfedgeTangent_[halfedges[2]]};
-      const mat3x4 tangentL = {
+      const mat4x3 tangentL = {
           impl->halfedgeTangent_[impl->halfedge_[halfedges[2]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[0]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[1]].pairedHalfedge]};
@@ -208,11 +208,11 @@ struct InterpTri {
         const int k = Prev3(i);
         const double x = uvw[k] / (1 - uvw[i]);
 
-        const mat2x4 bez =
+        const mat4x2 bez =
             Bezier2Bezier({corners[j], corners[k]}, {tangentR[j], tangentL[k]},
                           {tangentL[j], tangentR[k]}, x, centroid);
 
-        const mat2x4 bez1 = CubicBezier2Linear(
+        const mat4x2 bez1 = CubicBezier2Linear(
             bez[0], Bezier(vec3(bez[0]), bez[1]),
             Bezier(corners[i], la::lerp(tangentR[i], tangentL[i], x)),
             Homogeneous(corners[i]), uvw[i]);
