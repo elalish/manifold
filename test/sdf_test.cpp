@@ -185,8 +185,8 @@ TEST(SDF, Blobs) {
         double d = 0;
         for (const auto& ball : balls) {
           d += (ball.w > 0 ? 1 : -1) *
-               la::smoothstep(-blend, blend,
-                              std::abs(ball.w) - la::length(vec3(ball) - p));
+               smoothstep(-blend, blend,
+                          std::abs(ball.w) - la::length(vec3(ball) - p));
         }
         return d;
       },

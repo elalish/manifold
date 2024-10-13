@@ -434,7 +434,7 @@ TEST(Manifold, Transform) {
   s[0][0] = 6;
   s[1][1] = 5;
   s[2][2] = 4;
-  mat3x4 transform = mat3x4(s * rZ * rY * rX);
+  mat3x4 transform = mat3x4(s * rZ * rY * rX, vec3(0.0));
   transform[3] = vec3(1, 2, 3);
   cube2 = cube2.Transform(transform);
 

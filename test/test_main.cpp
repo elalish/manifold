@@ -345,7 +345,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
       ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
                           inMesh.triVerts[3 * inTri + 1],
                           inMesh.triVerts[3 * inTri + 2]};
-      inTriangle *= inMesh.numProp;
+      inTriangle *= static_cast<int>(inMesh.numProp);
 
       mat3 inTriPos;
       mat3 outTriPos;

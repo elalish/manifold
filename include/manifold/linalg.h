@@ -1234,20 +1234,6 @@ template <class A, class B>
 constexpr auto operator*(const A &a, const B &b) {
   return mul(a, b);
 }
-// Handle scalar multiplication.
-template <class A>
-constexpr auto operator*(const double scalar, const A &a) {
-  return cmul(scalar, a);
-}
-template <class A>
-constexpr auto operator*(const A &a, const double scalar) {
-  return cmul(a, scalar);
-}
-// Allow component-wise multiplication of vectors.
-template <class T, int M>
-constexpr auto operator*(const vec<T, M> &a, const vec<T, M> &b) {
-  return cmul(a, b);
-}
 
 // Binary assignment operators a $= b is always defined as though it were
 // explicitly written a = a $ b
@@ -1621,6 +1607,26 @@ vec<T, 4> qslerp(const vec<T, 4> &a, const vec<T, 4> &b, T t) {
 }
 
 // Support for matrix algebra
+template <class T, int M>
+constexpr vec<T, M> mul(const vec<T, M> &a, const T &b) {
+  return cmul(a, b);
+}
+template <class T, int M>
+constexpr vec<T, M> mul(const T &b, const vec<T, M> &a) {
+  return cmul(b, a);
+}
+template <class T, int M, int N>
+constexpr mat<T, M, N> mul(const mat<T, M, N> &a, const T &b) {
+  return cmul(a, b);
+}
+template <class T, int M, int N>
+constexpr mat<T, M, N> mul(const T &b, const mat<T, M, N> &a) {
+  return cmul(b, a);
+}
+template <class T, int M>
+constexpr vec<T, M> mul(const vec<T, M> &a, const vec<T, M> &b) {
+  return cmul(a, b);
+}
 template <class T, int M>
 constexpr vec<T, M> mul(const mat<T, M, 1> &a, const vec<T, 1> &b) {
   return a.x * b.x;

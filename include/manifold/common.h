@@ -51,6 +51,11 @@ constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 inline double radians(double a) { return a * kPi / 180; }
 inline double degrees(double a) { return a * 180 / kPi; }
 
+inline double smoothstep(double edge0, double edge1, double a) {
+  const double x = la::clamp((a - edge0) / (edge1 - edge0), 0, 1);
+  return x * x * (3 - 2 * x);
+}
+
 inline mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
 inline mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
 

@@ -227,8 +227,7 @@ TEST(Smooth, Manual) {
         3, [](double* newProp, vec3 pos, const double* oldProp) {
           const vec3 red(1, 0, 0);
           const vec3 purple(1, 0, 1);
-          vec3 color =
-              la::lerp(purple, red, la::smoothstep(0.0, 2.0, oldProp[0]));
+          vec3 color = la::lerp(purple, red, smoothstep(0.0, 2.0, oldProp[0]));
           for (const int i : {0, 1, 2}) newProp[i] = color[i];
         });
     const MeshGL out = interp.GetMeshGL();
@@ -280,7 +279,7 @@ TEST(Smooth, Csaszar) {
         const vec3& uvw = {0.5, 0.5, 0.0};
         const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
         options.mat.vertColor[out.triVerts[3 * tri + i]] =
-            la::lerp(yellow, blue, la::smoothstep(0.0, 0.2, alpha));
+            la::lerp(yellow, blue, smoothstep(0.0, 0.2, alpha));
       }
     }
     ExportMesh("smoothCsaszar.glb", out, options);
