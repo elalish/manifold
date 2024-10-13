@@ -241,13 +241,14 @@ inline mat3x4 RotateUp(vec3 up) {
   const vec3 axis = la::cross(up, {0, 0, 1});
   double angle = la::asin(la::length(axis));
   if (la::dot(up, {0, 0, 1}) < 0) angle = kPi - angle;
-  const quat q = la::axisangleq(axis, angle);
+  const quat q = la::rotation_quat(la::normalize(axis), angle);
   return mat3x4(la::qmat(q), vec3());
 }
 
 inline mat4 Mat4(mat3x4 a) {
   return mat4({a[0], 0}, {a[1], 0}, {a[2], 0}, {a[3], 1});
 }
+inline mat3 Mat3(mat2x3 a) { return mat3({a[0], 0}, {a[1], 0}, {a[2], 1}); }
 
 /** @} */
 

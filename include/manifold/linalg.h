@@ -1508,6 +1508,21 @@ vec<T, 2> rot(T a, const vec<T, 2> &v) {
   const T s = std::sin(a), c = std::cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c};
 }
+template <class T>
+vec<T, 3> rotx(T a, const vec<T, 3> &v) {
+  const T s = std::sin(a), c = std::cos(a);
+  return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
+}
+template <class T>
+vec<T, 3> roty(T a, const vec<T, 3> &v) {
+  const T s = std::sin(a), c = std::cos(a);
+  return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
+}
+template <class T>
+vec<T, 3> rotz(T a, const vec<T, 3> &v) {
+  const T s = std::sin(a), c = std::cos(a);
+  return {v.x * c - v.y * s, v.x * s + v.y * c, v.z};
+}
 template <class T, int M>
 vec<T, M> nlerp(const vec<T, M> &a, const vec<T, M> &b, T t) {
   return normalize(lerp(a, b, t));
@@ -1595,10 +1610,6 @@ T qangle(const vec<T, 4> &q) {
 template <class T>
 vec<T, 3> qaxis(const vec<T, 4> &q) {
   return normalize(q.xyz());
-}
-template <class T>
-vec<T, 4> axisangleq(const vec<T, 3> &axis, const T angle) {
-  return vec<T, 4>(std::sin(angle / 2) * normalize(axis), std::cos(angle / 2));
 }
 template <class T>
 vec<T, 4> qnlerp(const vec<T, 4> &a, const vec<T, 4> &b, T t) {
@@ -1803,6 +1814,23 @@ enum z_range {
 template <class T>
 vec<T, 4> rotation_quat(const vec<T, 3> &axis, T angle) {
   return {axis * std::sin(angle / 2), std::cos(angle / 2)};
+}
+template <class T>
+vec<T, 4> rotation_quat(const vec<T, 3> &orig, const vec<T, 3> &dest) {
+  T cosTheta = dot(orig, dest);
+  if (cosTheta >= 1 - std::numeric_limits<T>::epsilon()) {
+    return {0, 0, 0, 1};
+  }
+  if (cosTheta < -1 + std::numeric_limits<T>::epsilon()) {
+    vec<T, 3> axis = cross(vec<T, 3>(0, 0, 1), orig);
+    if (length2(axis) < std::numeric_limits<T>::epsilon())
+      axis = cross(vec<T, 3>(1, 0, 0), orig);
+    return rotation_quat(normalize(axis),
+                         3.14159265358979323846264338327950288);
+  }
+  vec<T, 3> axis = cross(orig, dest);
+  T s = std::sqrt((1 + cosTheta) * 2);
+  return {axis * (1 / s), s * 0.5};
 }
 template <class T>
 vec<T, 4> rotation_quat(const mat<T, 3, 3> &m);

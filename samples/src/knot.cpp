@@ -61,11 +61,11 @@ Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
     v = vec3(cos(phi), 0.0, sin(phi));
     v *= threadRadius;
     double r = majorRadius + minorRadius * cos(theta);
-    v = la::rotateX(v, -double(atan2(p * minorRadius, q * r)));
+    v = la::rotx(-double(atan2(p * minorRadius, q * r)), v);
     v.x += minorRadius;
-    v = la::rotateY(v, theta);
+    v = la::roty(theta, v);
     v.x += majorRadius;
-    v = la::rotateZ(v, psi);
+    v = la::rotz(psi, v);
   });
 
   if (kLoops > 1) {

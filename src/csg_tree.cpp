@@ -358,7 +358,6 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   };
 
   auto self = std::dynamic_pointer_cast<CsgOpNode>(shared_from_this());
-  assert(self);
   if (IsOp(op) && !isReused(self)) {
     auto impl = impl_.GetGuard();
     copyChildren(impl->children_, transform_);

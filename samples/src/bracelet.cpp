@@ -40,10 +40,10 @@ Manifold Base(double width, double radius, double decorRadius,
   vec2 p1(innerRadius, -cut);
   vec2 p2(innerRadius, cut);
   for (int i = 0; i < nCut; ++i) {
-    stretch[0].push_back(la::rotate(p0, dPhiRad * i));
-    stretch[0].push_back(la::rotate(p1, dPhiRad * i));
-    stretch[0].push_back(la::rotate(p2, dPhiRad * i));
-    stretch[0].push_back(la::rotate(p0, dPhiRad * i));
+    stretch[0].push_back(la::rot(dPhiRad * i, p0));
+    stretch[0].push_back(la::rot(dPhiRad * i, p1));
+    stretch[0].push_back(la::rot(dPhiRad * i, p2));
+    stretch[0].push_back(la::rot(dPhiRad * i, p0));
   }
 
   base = Manifold::Extrude(stretch, width) ^ base;

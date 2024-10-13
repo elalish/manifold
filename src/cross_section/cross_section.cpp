@@ -530,7 +530,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
     return CrossSection();
   }
   auto n = la::normalize(la::abs(ax));
-  auto m = mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n));
+  auto m = mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0));
   return Transform(m);
 }
 
@@ -543,7 +543,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  */
 CrossSection CrossSection::Transform(const mat2x3& m) const {
   auto transformed = CrossSection();
-  transformed.transform_ = m * mat3(transform_);
+  transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
   return transformed;
 }

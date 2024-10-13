@@ -137,15 +137,15 @@ struct InterpTri {
         OrthogonalTo(vec3(tangentsY[0]), (anchor - corners[0]), nTangentsX[0]),
         OrthogonalTo(vec3(tangentsY[1]), (anchor - corners[1]), nTangentsX[1])};
 
-    const quat q0 = la::quat_cast(mat3(
+    const quat q0 = la::rotation_quat(mat3(
         nTangentsX[0], biTangents[0], la::cross(nTangentsX[0], biTangents[0])));
-    const quat q1 = la::quat_cast(mat3(
+    const quat q1 = la::rotation_quat(mat3(
         nTangentsX[1], biTangents[1], la::cross(nTangentsX[1], biTangents[1])));
     const vec3 edge = corners[1] - corners[0];
     const bool longWay =
         la::dot(nTangentsX[0], edge) + la::dot(nTangentsX[1], edge) < 0;
     const quat qTmp = Slerp(q0, q1, x, longWay);
-    const quat q = la::rotation(qTmp * vec3(1, 0, 0), tangent) * qTmp;
+    const quat q = la::qmul(la::rotation_quat(la::qxdir(qTmp), tangent), qTmp);
 
     const vec3 delta = la::lerp(RotateFromTo(vec3(tangentsY[0]), q0, q),
                                 RotateFromTo(vec3(tangentsY[1]), q1, q), x);
@@ -744,8 +744,9 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           }
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
           vec3 tangent(halfedgeTangent_[current]);
-          halfedgeTangent_[current] = vec4(la::rotate(tangent, angle, normal),
-                                           halfedgeTangent_[current].w);
+          const quat q = la::rotation_quat(la::normalize(normal), angle);
+          halfedgeTangent_[current] =
+              vec4(la::qrot(q, tangent), halfedgeTangent_[current].w);
           ++i;
         } while (!fixedHalfedges[current]);
       });
