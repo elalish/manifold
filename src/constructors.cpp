@@ -248,14 +248,16 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
         size_t thisVert = vert + offset;
         size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
         if (i == nDivisions && isCone) {
-          triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
-                              thisVert - nCrossSection});
+          triVerts.push_back(ivec3(nCrossSection * i + j,
+                                   lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
         } else {
           vec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
-              {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
+              ivec3(thisVert, lastVert, thisVert - nCrossSection));
+          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
         }
       }
       ++j;
@@ -384,18 +386,18 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
         if (isFullRevolution || slice > 0) {
           const int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
           if (currPolyVertex.x > 0.0) {
-            triVerts.push_back(
-                {startPosIndex + slice, startPosIndex + lastSlice,
-                 // "Reuse" vertex of first slice if it lies on the revolve axis
-                 (prevPolyVertex.x == 0.0 ? prevStartPosIndex
-                                          : prevStartPosIndex + lastSlice)});
+            triVerts.push_back(ivec3(
+                startPosIndex + slice, startPosIndex + lastSlice,
+                // "Reuse" vertex of first slice if it lies on the revolve axis
+                (prevPolyVertex.x == 0.0 ? prevStartPosIndex
+                                         : prevStartPosIndex + lastSlice)));
           }
 
           if (prevPolyVertex.x > 0.0) {
             triVerts.push_back(
-                {prevStartPosIndex + lastSlice, prevStartPosIndex + slice,
-                 (currPolyVertex.x == 0.0 ? startPosIndex
-                                          : startPosIndex + slice)});
+                ivec3(prevStartPosIndex + lastSlice, prevStartPosIndex + slice,
+                      (currPolyVertex.x == 0.0 ? startPosIndex
+                                               : startPosIndex + slice)));
           }
         }
       }

@@ -161,8 +161,6 @@ else()
       -Wno-array-bounds
       -Wno-stringop-overflow
       -Wno-alloc-size-larger-than
-      -Wno-narrowing
-      -Wno-c++11-narrowing-const-reference
     )
   else()
     list(
@@ -172,7 +170,6 @@ else()
       -Wno-unknown-warning-option
       -Wno-unused
       -Wno-shorten-64-to-32
-      -Wno-c++11-narrowing-const-reference
     )
   endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

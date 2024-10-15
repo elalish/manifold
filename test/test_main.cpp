@@ -342,9 +342,9 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
       }
       const int inTri = output.faceID.empty() ? tri : output.faceID[tri];
       ASSERT_LT(inTri, inMesh.triVerts.size() / 3);
-      ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
-                          inMesh.triVerts[3 * inTri + 1],
-                          inMesh.triVerts[3 * inTri + 2]};
+      ivec3 inTriangle(inMesh.triVerts[3 * inTri],
+                       inMesh.triVerts[3 * inTri + 1],
+                       inMesh.triVerts[3 * inTri + 2]);
       inTriangle *= static_cast<int>(inMesh.numProp);
 
       mat3 inTriPos;

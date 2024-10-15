@@ -136,8 +136,9 @@ Manifold CondensedMatter(int fn) {
   for (int x = -3; x <= 3; x++)
     for (int y = -1; y <= 2; y++)
       parts.push_back(
-          GraphiteCell(fn, {x + (y % 2 == 0 ? 0.0 : 0.5), y,
-                            LayerSeperationC * 0.5 + LatticeCellSizeSi * 1.5})
+          GraphiteCell(fn,
+                       {x + (y % 2 == 0 ? 0.0 : 0.5), static_cast<double>(y),
+                        LayerSeperationC * 0.5 + LatticeCellSizeSi * 1.5})
               .Translate({0, -siOffset, 0})
               .Rotate(0, 0, 45));
 
