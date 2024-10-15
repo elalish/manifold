@@ -158,9 +158,6 @@ else()
       -Wall
       -Wno-unknown-warning-option
       -Wno-unused
-      -Wno-array-bounds
-      -Wno-stringop-overflow
-      -Wno-alloc-size-larger-than
     )
   else()
     list(
