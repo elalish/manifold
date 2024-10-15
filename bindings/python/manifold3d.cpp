@@ -31,6 +31,13 @@
 namespace nb = nanobind;
 using namespace manifold;
 
+#if NB_VERSION_MAJOR < 2 || (NB_VERSION_MAJOR == 2 && NB_VERSION_MINOR < 2)
+#define ndarray_export ndarray_wrap
+#define numpy_value int(ndarray_framework::numpy)
+#else
+#define numpy_value numpy::value
+#endif
+
 template <class T>
 struct glm_name {};
 template <>
@@ -114,8 +121,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
       }
     }
     numpy_type arr{buffer, {R, C}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy::value, policy, cleanup);
   }
 };
 
@@ -160,8 +166,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
       }
     }
     numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
@@ -193,8 +198,7 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
     static_assert(sizeof(vec[0]) == (N * sizeof(T)),
                   "VecView -> numpy requires packed structs");
     numpy_type arr{&vec[0], {num_vec, N}, nb::handle()};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
@@ -256,7 +260,9 @@ NB_MODULE(manifold3d, m) {
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
-          [](const Manifold &self, double s) { self.Scale({s, s, s}); },
+          [](const Manifold &self, double s) {
+            self.Scale({s, s, s});
+          },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -651,7 +657,9 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection &self, double s) { self.Scale({s, s}); },
+          [](const CrossSection &self, double s) {
+            self.Scale({s, s});
+          },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
