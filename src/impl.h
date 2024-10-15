@@ -147,6 +147,7 @@ struct Manifold::Impl {
           ref.meshID = meshID;
           ref.originalID = originalID;
           ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+          ref.faceID = tri;
         }
 
         if (meshGL.runTransform.empty()) {
@@ -209,6 +210,8 @@ struct Manifold::Impl {
       InitializeOriginal();
     }
 
+    CreateFaces();
+
     SimplifyTopology();
     Finish();
 
@@ -240,7 +243,7 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces(const std::vector<double>& propertyTolerance = {});
+  void CreateFaces();
   void RemoveUnreferencedVerts();
   void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triVerts);
