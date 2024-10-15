@@ -161,6 +161,7 @@ else()
       -Wno-stringop-overflow
       -Wno-alloc-size-larger-than
       -Wno-narrowing
+      -Wno-c++11-narrowing-const-reference
     )
   else()
     list(APPEND WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
