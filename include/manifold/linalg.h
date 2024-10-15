@@ -620,139 +620,139 @@ struct op_or {
 // Function objects for applying standard library math functions
 struct std_isfinite {
   template <class A>
-  auto operator()(A a) const -> decltype(std::isfinite(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::isfinite(a)) {
     return std::isfinite(a);
   }
 };
 struct std_abs {
   template <class A>
-  auto operator()(A a) const -> decltype(std::abs(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::abs(a)) {
     return std::abs(a);
   }
 };
 struct std_floor {
   template <class A>
-  auto operator()(A a) const -> decltype(std::floor(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::floor(a)) {
     return std::floor(a);
   }
 };
 struct std_ceil {
   template <class A>
-  auto operator()(A a) const -> decltype(std::ceil(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::ceil(a)) {
     return std::ceil(a);
   }
 };
 struct std_exp {
   template <class A>
-  auto operator()(A a) const -> decltype(std::exp(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::exp(a)) {
     return std::exp(a);
   }
 };
 struct std_log {
   template <class A>
-  auto operator()(A a) const -> decltype(std::log(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::log(a)) {
     return std::log(a);
   }
 };
 struct std_log2 {
   template <class A>
-  auto operator()(A a) const -> decltype(std::log2(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::log2(a)) {
     return std::log2(a);
   }
 };
 struct std_log10 {
   template <class A>
-  auto operator()(A a) const -> decltype(std::log10(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::log10(a)) {
     return std::log10(a);
   }
 };
 struct std_sqrt {
   template <class A>
-  auto operator()(A a) const -> decltype(std::sqrt(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::sqrt(a)) {
     return std::sqrt(a);
   }
 };
 struct std_sin {
   template <class A>
-  auto operator()(A a) const -> decltype(std::sin(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
     return std::sin(a);
   }
 };
 struct std_cos {
   template <class A>
-  auto operator()(A a) const -> decltype(std::cos(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
     return std::cos(a);
   }
 };
 struct std_tan {
   template <class A>
-  auto operator()(A a) const -> decltype(std::tan(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
     return std::tan(a);
   }
 };
 struct std_asin {
   template <class A>
-  auto operator()(A a) const -> decltype(std::asin(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
     return std::asin(a);
   }
 };
 struct std_acos {
   template <class A>
-  auto operator()(A a) const -> decltype(std::acos(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
     return std::acos(a);
   }
 };
 struct std_atan {
   template <class A>
-  auto operator()(A a) const -> decltype(std::atan(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
     return std::atan(a);
   }
 };
 struct std_sinh {
   template <class A>
-  auto operator()(A a) const -> decltype(std::sinh(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::sinh(a)) {
     return std::sinh(a);
   }
 };
 struct std_cosh {
   template <class A>
-  auto operator()(A a) const -> decltype(std::cosh(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::cosh(a)) {
     return std::cosh(a);
   }
 };
 struct std_tanh {
   template <class A>
-  auto operator()(A a) const -> decltype(std::tanh(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::tanh(a)) {
     return std::tanh(a);
   }
 };
 struct std_round {
   template <class A>
-  auto operator()(A a) const -> decltype(std::round(a)) {
+  constexpr auto operator()(A a) const -> decltype(std::round(a)) {
     return std::round(a);
   }
 };
 struct std_fmod {
   template <class A, class B>
-  auto operator()(A a, B b) const -> decltype(std::fmod(a, b)) {
+  constexpr auto operator()(A a, B b) const -> decltype(std::fmod(a, b)) {
     return std::fmod(a, b);
   }
 };
 struct std_pow {
   template <class A, class B>
-  auto operator()(A a, B b) const -> decltype(std::pow(a, b)) {
+  constexpr auto operator()(A a, B b) const -> decltype(std::pow(a, b)) {
     return std::pow(a, b);
   }
 };
 struct std_atan2 {
   template <class A, class B>
-  auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
+  constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
     return std::atan2(a, b);
   }
 };
 struct std_copysign {
   template <class A, class B>
-  auto operator()(A a, B b) const -> decltype(std::copysign(a, b)) {
+  constexpr auto operator()(A a, B b) const -> decltype(std::copysign(a, b)) {
     return std::copysign(a, b);
   }
 };
@@ -1295,96 +1295,96 @@ constexpr mat<T, I1 - I0, J1 - J0> submat(const mat<T, M, N> &a) {
 
 // Component-wise standard library math functions
 template <class A>
-apply_t<detail::std_isfinite, A> isfinite(const A &a) {
+constexpr apply_t<detail::std_isfinite, A> isfinite(const A &a) {
   return apply(detail::std_isfinite{}, a);
 }
 template <class A>
-apply_t<detail::std_abs, A> abs(const A &a) {
+constexpr apply_t<detail::std_abs, A> abs(const A &a) {
   return apply(detail::std_abs{}, a);
 }
 template <class A>
-apply_t<detail::std_floor, A> floor(const A &a) {
+constexpr apply_t<detail::std_floor, A> floor(const A &a) {
   return apply(detail::std_floor{}, a);
 }
 template <class A>
-apply_t<detail::std_ceil, A> ceil(const A &a) {
+constexpr apply_t<detail::std_ceil, A> ceil(const A &a) {
   return apply(detail::std_ceil{}, a);
 }
 template <class A>
-apply_t<detail::std_exp, A> exp(const A &a) {
+constexpr apply_t<detail::std_exp, A> exp(const A &a) {
   return apply(detail::std_exp{}, a);
 }
 template <class A>
-apply_t<detail::std_log, A> log(const A &a) {
+constexpr apply_t<detail::std_log, A> log(const A &a) {
   return apply(detail::std_log{}, a);
 }
 template <class A>
-apply_t<detail::std_log2, A> log2(const A &a) {
+constexpr apply_t<detail::std_log2, A> log2(const A &a) {
   return apply(detail::std_log2{}, a);
 }
 template <class A>
-apply_t<detail::std_log10, A> log10(const A &a) {
+constexpr apply_t<detail::std_log10, A> log10(const A &a) {
   return apply(detail::std_log10{}, a);
 }
 template <class A>
-apply_t<detail::std_sqrt, A> sqrt(const A &a) {
+constexpr apply_t<detail::std_sqrt, A> sqrt(const A &a) {
   return apply(detail::std_sqrt{}, a);
 }
 template <class A>
-apply_t<detail::std_sin, A> sin(const A &a) {
+constexpr apply_t<detail::std_sin, A> sin(const A &a) {
   return apply(detail::std_sin{}, a);
 }
 template <class A>
-apply_t<detail::std_cos, A> cos(const A &a) {
+constexpr apply_t<detail::std_cos, A> cos(const A &a) {
   return apply(detail::std_cos{}, a);
 }
 template <class A>
-apply_t<detail::std_tan, A> tan(const A &a) {
+constexpr apply_t<detail::std_tan, A> tan(const A &a) {
   return apply(detail::std_tan{}, a);
 }
 template <class A>
-apply_t<detail::std_asin, A> asin(const A &a) {
+constexpr apply_t<detail::std_asin, A> asin(const A &a) {
   return apply(detail::std_asin{}, a);
 }
 template <class A>
-apply_t<detail::std_acos, A> acos(const A &a) {
+constexpr apply_t<detail::std_acos, A> acos(const A &a) {
   return apply(detail::std_acos{}, a);
 }
 template <class A>
-apply_t<detail::std_atan, A> atan(const A &a) {
+constexpr apply_t<detail::std_atan, A> atan(const A &a) {
   return apply(detail::std_atan{}, a);
 }
 template <class A>
-apply_t<detail::std_sinh, A> sinh(const A &a) {
+constexpr apply_t<detail::std_sinh, A> sinh(const A &a) {
   return apply(detail::std_sinh{}, a);
 }
 template <class A>
-apply_t<detail::std_cosh, A> cosh(const A &a) {
+constexpr apply_t<detail::std_cosh, A> cosh(const A &a) {
   return apply(detail::std_cosh{}, a);
 }
 template <class A>
-apply_t<detail::std_tanh, A> tanh(const A &a) {
+constexpr apply_t<detail::std_tanh, A> tanh(const A &a) {
   return apply(detail::std_tanh{}, a);
 }
 template <class A>
-apply_t<detail::std_round, A> round(const A &a) {
+constexpr apply_t<detail::std_round, A> round(const A &a) {
   return apply(detail::std_round{}, a);
 }
 
 template <class A, class B>
-apply_t<detail::std_fmod, A, B> fmod(const A &a, const B &b) {
+constexpr apply_t<detail::std_fmod, A, B> fmod(const A &a, const B &b) {
   return apply(detail::std_fmod{}, a, b);
 }
 template <class A, class B>
-apply_t<detail::std_pow, A, B> pow(const A &a, const B &b) {
+constexpr apply_t<detail::std_pow, A, B> pow(const A &a, const B &b) {
   return apply(detail::std_pow{}, a, b);
 }
 template <class A, class B>
-apply_t<detail::std_atan2, A, B> atan2(const A &a, const B &b) {
+constexpr apply_t<detail::std_atan2, A, B> atan2(const A &a, const B &b) {
   return apply(detail::std_atan2{}, a, b);
 }
 template <class A, class B>
-apply_t<detail::std_copysign, A, B> copysign(const A &a, const B &b) {
+constexpr apply_t<detail::std_copysign, A, B> copysign(const A &a, const B &b) {
   return apply(detail::std_copysign{}, a, b);
 }
 
@@ -1818,11 +1818,12 @@ enum z_range {
   zero_to_one
 };  // Should projection matrices map z into the range of [-1,1] or [0,1]?
 template <class T>
-vec<T, 4> rotation_quat(const vec<T, 3> &axis, T angle) {
+vec<T, 4> constexpr rotation_quat(const vec<T, 3> &axis, T angle) {
   return {axis * std::sin(angle / 2), std::cos(angle / 2)};
 }
 template <class T>
-vec<T, 4> rotation_quat(const vec<T, 3> &orig, const vec<T, 3> &dest) {
+vec<T, 4> constexpr rotation_quat(const vec<T, 3> &orig,
+                                  const vec<T, 3> &dest) {
   T cosTheta = dot(orig, dest);
   if (cosTheta >= 1 - std::numeric_limits<T>::epsilon()) {
     return {0, 0, 0, 1};

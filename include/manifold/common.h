@@ -48,16 +48,16 @@ constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
 constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
-inline double radians(double a) { return a * kPi / 180; }
-inline double degrees(double a) { return a * 180 / kPi; }
+constexpr double radians(double a) { return a * kPi / 180; }
+constexpr double degrees(double a) { return a * 180 / kPi; }
 
-inline double smoothstep(double edge0, double edge1, double a) {
+constexpr double smoothstep(double edge0, double edge1, double a) {
   const double x = la::clamp((a - edge0) / (edge1 - edge0), 0, 1);
   return x * x * (3 - 2 * x);
 }
 
-inline mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
-inline mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
+constexpr mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
+constexpr mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
 
 /**
  * Sine function where multiples of 90 degrees come out exact.
@@ -131,12 +131,12 @@ struct Box {
   /**
    * Default constructor is an infinite box that contains all space.
    */
-  Box() {}
+  constexpr Box() {}
 
   /**
    * Creates a box that contains the two given points.
    */
-  Box(const vec3 p1, const vec3 p2) {
+  constexpr Box(const vec3 p1, const vec3 p2) {
     min = la::min(p1, p2);
     max = la::max(p1, p2);
   }
@@ -144,18 +144,18 @@ struct Box {
   /**
    * Returns the dimensions of the Box.
    */
-  vec3 Size() const { return max - min; }
+  constexpr vec3 Size() const { return max - min; }
 
   /**
    * Returns the center point of the Box.
    */
-  vec3 Center() const { return 0.5 * (max + min); }
+  constexpr vec3 Center() const { return 0.5 * (max + min); }
 
   /**
    * Returns the absolute-largest coordinate value of any contained
    * point.
    */
-  double Scale() const {
+  constexpr double Scale() const {
     vec3 absMax = la::max(la::abs(min), la::abs(max));
     return la::max(absMax.x, la::max(absMax.y, absMax.z));
   }
@@ -163,14 +163,14 @@ struct Box {
   /**
    * Does this box contain (includes equal) the given point?
    */
-  bool Contains(const vec3& p) const {
+  constexpr bool Contains(const vec3& p) const {
     return la::all(la::gequal(p, min)) && la::all(la::gequal(max, p));
   }
 
   /**
    * Does this box contain (includes equal) the given box?
    */
-  bool Contains(const Box& box) const {
+  constexpr bool Contains(const Box& box) const {
     return la::all(la::gequal(box.min, min)) &&
            la::all(la::gequal(max, box.max));
   }
@@ -186,7 +186,7 @@ struct Box {
   /**
    * Expand this box to include the given box.
    */
-  Box Union(const Box& box) const {
+  constexpr Box Union(const Box& box) const {
     Box out;
     out.min = la::min(min, box.min);
     out.max = la::max(max, box.max);
@@ -200,7 +200,7 @@ struct Box {
    * multiples of 90 degrees), or else the resulting bounding box will no longer
    * bound properly.
    */
-  Box Transform(const mat3x4& transform) const {
+  constexpr Box Transform(const mat3x4& transform) const {
     Box out;
     vec3 minT = transform * vec4(min, 1.0);
     vec3 maxT = transform * vec4(max, 1.0);
@@ -212,7 +212,7 @@ struct Box {
   /**
    * Shift this box by the given vector.
    */
-  Box operator+(vec3 shift) const {
+  constexpr Box operator+(vec3 shift) const {
     Box out;
     out.min = min + shift;
     out.max = max + shift;
@@ -231,7 +231,7 @@ struct Box {
   /**
    * Scale this box by the given vector.
    */
-  Box operator*(vec3 scale) const {
+  constexpr Box operator*(vec3 scale) const {
     Box out;
     out.min = min * scale;
     out.max = max * scale;
@@ -250,7 +250,7 @@ struct Box {
   /**
    * Does this box overlap the one given (including equality)?
    */
-  inline bool DoesOverlap(const Box& box) const {
+  constexpr bool DoesOverlap(const Box& box) const {
     return min.x <= box.max.x && min.y <= box.max.y && min.z <= box.max.z &&
            max.x >= box.min.x && max.y >= box.min.y && max.z >= box.min.z;
   }
@@ -259,14 +259,14 @@ struct Box {
    * Does the given point project within the XY extent of this box
    * (including equality)?
    */
-  inline bool DoesOverlap(vec3 p) const {  // projected in z
+  constexpr bool DoesOverlap(vec3 p) const {  // projected in z
     return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
   }
 
   /**
    * Does this box have finite bounds?
    */
-  bool IsFinite() const {
+  constexpr bool IsFinite() const {
     return la::all(la::isfinite(min)) && la::all(la::isfinite(max));
   }
 };
@@ -281,12 +281,12 @@ struct Rect {
   /**
    * Default constructor is an empty rectangle..
    */
-  Rect() {}
+  constexpr Rect() {}
 
   /**
    * Create a rectangle that contains the two given points.
    */
-  Rect(const vec2 a, const vec2 b) {
+  constexpr Rect(const vec2 a, const vec2 b) {
     min = la::min(a, b);
     max = la::max(a, b);
   }
@@ -299,12 +299,12 @@ struct Rect {
   /**
    * Return the dimensions of the rectangle.
    */
-  vec2 Size() const { return max - min; }
+  constexpr vec2 Size() const { return max - min; }
 
   /**
    * Return the area of the rectangle.
    */
-  double Area() const {
+  constexpr double Area() const {
     auto sz = Size();
     return sz.x * sz.y;
   }
@@ -313,7 +313,7 @@ struct Rect {
    * Returns the absolute-largest coordinate value of any contained
    * point.
    */
-  double Scale() const {
+  constexpr double Scale() const {
     vec2 absMax = la::max(la::abs(min), la::abs(max));
     return la::max(absMax.x, absMax.y);
   }
@@ -321,19 +321,19 @@ struct Rect {
   /**
    * Returns the center point of the rectangle.
    */
-  vec2 Center() const { return 0.5 * (max + min); }
+  constexpr vec2 Center() const { return 0.5 * (max + min); }
 
   /**
    * Does this rectangle contain (includes on border) the given point?
    */
-  bool Contains(const vec2& p) const {
+  constexpr bool Contains(const vec2& p) const {
     return la::all(la::gequal(p, min)) && la::all(la::gequal(max, p));
   }
 
   /**
    * Does this rectangle contain (includes equal) the given rectangle?
    */
-  bool Contains(const Rect& rect) const {
+  constexpr bool Contains(const Rect& rect) const {
     return la::all(la::gequal(rect.min, min)) &&
            la::all(la::gequal(max, rect.max));
   }
@@ -341,7 +341,7 @@ struct Rect {
   /**
    * Does this rectangle overlap the one given (including equality)?
    */
-  bool DoesOverlap(const Rect& rect) const {
+  constexpr bool DoesOverlap(const Rect& rect) const {
     return min.x <= rect.max.x && min.y <= rect.max.y && max.x >= rect.min.x &&
            max.y >= rect.min.y;
   }
@@ -349,12 +349,12 @@ struct Rect {
   /**
    * Is the rectangle empty (containing no space)?
    */
-  bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
 
   /**
    * Does this recangle have finite bounds?
    */
-  bool IsFinite() const {
+  constexpr bool IsFinite() const {
     return la::all(la::isfinite(min)) && la::all(la::isfinite(max));
   }
 
@@ -375,7 +375,7 @@ struct Rect {
   /**
    * Expand this rectangle to include the given Rect.
    */
-  Rect Union(const Rect& rect) const {
+  constexpr Rect Union(const Rect& rect) const {
     Rect out;
     out.min = la::min(min, rect.min);
     out.max = la::max(max, rect.max);
@@ -385,7 +385,7 @@ struct Rect {
   /**
    * Shift this rectangle by the given vector.
    */
-  Rect operator+(const vec2 shift) const {
+  constexpr Rect operator+(const vec2 shift) const {
     Rect out;
     out.min = min + shift;
     out.max = max + shift;
@@ -404,7 +404,7 @@ struct Rect {
   /**
    * Scale this rectangle by the given vector.
    */
-  Rect operator*(const vec2 scale) const {
+  constexpr Rect operator*(const vec2 scale) const {
     Rect out;
     out.min = min * scale;
     out.max = max * scale;
@@ -427,7 +427,7 @@ struct Rect {
    * multiples of 90 degrees), or else the resulting rectangle will no longer
    * bound properly.
    */
-  Rect Transform(const mat2x3& m) const {
+  constexpr Rect Transform(const mat2x3& m) const {
     Rect rect;
     rect.min = m * vec3(min, 1);
     rect.max = m * vec3(max, 1);
@@ -578,5 +578,3 @@ struct ExecutionParams {
 };
 
 }  // namespace manifold
-
-#undef HOST_DEVICE
