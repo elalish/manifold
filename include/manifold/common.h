@@ -17,7 +17,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "linalg.h"
+#include "manifold/linalg.h"
 
 namespace manifold {
 /** @defgroup Math data structure definitions
