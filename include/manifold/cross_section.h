@@ -94,7 +94,7 @@ class CrossSection {
   CrossSection Rotate(double degrees) const;
   CrossSection Scale(const vec2 s) const;
   CrossSection Mirror(const vec2 ax) const;
-  CrossSection Transform(const mat3x2& m) const;
+  CrossSection Transform(const mat2x3& m) const;
   CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
   CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
@@ -165,7 +165,7 @@ class CrossSection {
 
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
-  mutable mat3x2 transform_ = mat3x2(1.0);
+  mutable mat2x3 transform_ = Identity2x3();
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

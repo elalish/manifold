@@ -25,8 +25,8 @@ namespace manifold {
  *  @{
  */
 inline vec3 SafeNormalize(vec3 v) {
-  v = glm::normalize(v);
-  return std::isfinite(v.x) ? v : vec3(0);
+  v = la::normalize(v);
+  return std::isfinite(v.x) ? v : vec3(0.0);
 }
 
 inline double MaxPrecision(double minPrecision, const Box& bBox) {
@@ -40,52 +40,52 @@ inline int NextHalfedge(int current) {
   return current;
 }
 
-inline mat3 NormalTransform(const mat4x3& transform) {
-  return glm::inverse(glm::transpose(mat3(transform)));
+inline mat3 NormalTransform(const mat3x4& transform) {
+  return la::inverse(la::transpose(mat3(transform)));
 }
 
 /**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
  */
-inline mat3x2 GetAxisAlignedProjection(vec3 normal) {
-  vec3 absNormal = glm::abs(normal);
+inline mat2x3 GetAxisAlignedProjection(vec3 normal) {
+  vec3 absNormal = la::abs(normal);
   double xyzMax;
-  mat2x3 projection;
+  mat3x2 projection;
   if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
-    projection = mat2x3(1.0, 0.0, 0.0,  //
-                        0.0, 1.0, 0.0);
+    projection = mat3x2({1.0, 0.0, 0.0},  //
+                        {0.0, 1.0, 0.0});
     xyzMax = normal.z;
   } else if (absNormal.y > absNormal.x) {
-    projection = mat2x3(0.0, 0.0, 1.0,  //
-                        1.0, 0.0, 0.0);
+    projection = mat3x2({0.0, 0.0, 1.0},  //
+                        {1.0, 0.0, 0.0});
     xyzMax = normal.y;
   } else {
-    projection = mat2x3(0.0, 1.0, 0.0,  //
-                        0.0, 0.0, 1.0);
+    projection = mat3x2({0.0, 1.0, 0.0},  //
+                        {0.0, 0.0, 1.0});
     xyzMax = normal.x;
   }
   if (xyzMax < 0) projection[0] *= -1.0;
-  return glm::transpose(projection);
+  return la::transpose(projection);
 }
 
 inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
                            double precision) {
   const mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
                    triPos[1] - triPos[0]);
-  const vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
-                glm::dot(edges[2], edges[2]));
+  const vec3 d2(la::dot(edges[0], edges[0]), la::dot(edges[1], edges[1]),
+                la::dot(edges[2], edges[2]));
   const int longSide = d2[0] > d2[1] && d2[0] > d2[2] ? 0
                        : d2[1] > d2[2]                ? 1
                                                       : 2;
-  const vec3 crossP = glm::cross(edges[0], edges[1]);
-  const double area2 = glm::dot(crossP, crossP);
+  const vec3 crossP = la::cross(edges[0], edges[1]);
+  const double area2 = la::dot(crossP, crossP);
   const double tol2 = precision * precision;
 
-  vec3 uvw(0);
+  vec3 uvw(0.0);
   for (const int i : {0, 1, 2}) {
     const vec3 dv = v - triPos[i];
-    if (glm::dot(dv, dv) < tol2) {
+    if (la::dot(dv, dv) < tol2) {
       // Return exactly equal if within tolerance of vert.
       uvw[i] = 1;
       return uvw;
@@ -97,17 +97,17 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
   } else if (area2 > d2[longSide] * tol2) {  // triangle
     for (const int i : {0, 1, 2}) {
       const int j = Next3(i);
-      const vec3 crossPv = glm::cross(edges[i], v - triPos[j]);
-      const double area2v = glm::dot(crossPv, crossPv);
+      const vec3 crossPv = la::cross(edges[i], v - triPos[j]);
+      const double area2v = la::dot(crossPv, crossPv);
       // Return exactly equal if within tolerance of edge.
-      uvw[i] = area2v < d2[i] * tol2 ? 0 : glm::dot(crossPv, crossP);
+      uvw[i] = area2v < d2[i] * tol2 ? 0 : la::dot(crossPv, crossP);
     }
     uvw /= (uvw[0] + uvw[1] + uvw[2]);
     return uvw;
   } else {  // line
     const int nextV = Next3(longSide);
     const double alpha =
-        glm::dot(v - triPos[nextV], edges[longSide]) / d2[longSide];
+        la::dot(v - triPos[nextV], edges[longSide]) / d2[longSide];
     uvw[longSide] = 0;
     uvw[nextV] = 1 - alpha;
     const int lastV = Next3(nextV);

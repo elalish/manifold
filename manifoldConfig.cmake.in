@@ -11,8 +11,6 @@ if(_FIND_ROOT STREQUAL "/")
   set(_FIND_ROOT "")
 endif()
 
-set(glm_ROOT "${_FIND_ROOT}")
-find_package(glm REQUIRED)
 set(MANIFOLD_CROSS_SECTION "@MANIFOLD_CROSS_SECTION@")
 if(MANIFOLD_CROSS_SECTION)
   set(Clipper2_ROOT "${_FIND_ROOT}")

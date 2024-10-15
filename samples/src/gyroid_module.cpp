@@ -20,13 +20,13 @@ using namespace manifold;
 
 struct Gyroid {
   double operator()(vec3 p) const {
-    p -= glm::pi<double>() / 4;
+    p -= kPi / 4;
     return cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
   }
 };
 
 Manifold RhombicDodecahedron(double size) {
-  Manifold box = Manifold::Cube(size * glm::sqrt(2.0) * vec3(1, 1, 2), true);
+  Manifold box = Manifold::Cube(size * la::sqrt(2.0) * vec3(1, 1, 2), true);
   Manifold result = box.Rotate(90, 45) ^ box.Rotate(90, 45, 90);
   return result ^ box.Rotate(0, 0, 45);
 }
@@ -44,7 +44,7 @@ namespace manifold {
  */
 Manifold GyroidModule(double size, int n) {
   auto gyroid = [&](double level) {
-    const double period = glm::two_pi<double>();
+    const double period = kTwoPi;
     return Manifold::LevelSet(Gyroid(), {vec3(-period), vec3(period)},
                               period / n, level)
         .Scale(vec3(size / period));
@@ -52,6 +52,6 @@ Manifold GyroidModule(double size, int n) {
 
   Manifold result = (RhombicDodecahedron(size) ^ gyroid(-0.4)) - gyroid(0.4);
 
-  return result.Rotate(-45, 0, 90).Translate({0, 0, size / glm::sqrt(2.0)});
+  return result.Rotate(-45, 0, 90).Translate({0, 0, size / la::sqrt(2.0)});
 }
 }  // namespace manifold

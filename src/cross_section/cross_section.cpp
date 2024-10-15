@@ -95,8 +95,8 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   return p;
 }
 
-C2::PathsD transform(const C2::PathsD ps, const mat3x2 m) {
-  const bool invert = glm::determinant(mat2(m)) < 0;
+C2::PathsD transform(const C2::PathsD ps, const mat2x3 m) {
+  const bool invert = la::determinant(mat2(m)) < 0;
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
   for (auto path : ps) {
@@ -292,11 +292,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == mat3x2(1.0)) {
+  if (transform_ == Identity2x3()) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = mat3x2(1.0);
+  transform_ = Identity2x3();
   return paths_;
 }
 
@@ -309,7 +309,7 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
  * @param center Set to true to shift the center to the origin.
  */
 CrossSection CrossSection::Square(const vec2 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || glm::length(size) == 0.0) {
+  if (size.x < 0.0 || size.y < 0.0 || la::length(size) == 0.0) {
     return CrossSection();
   }
 
@@ -483,9 +483,9 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  * @param v The vector to add to every vertex.
  */
 CrossSection CrossSection::Translate(const vec2 v) const {
-  mat3x2 m(1.0, 0.0,  //
-           0.0, 1.0,  //
-           v.x, v.y);
+  mat2x3 m({1.0, 0.0},  //
+           {0.0, 1.0},  //
+           {v.x, v.y});
   return Transform(m);
 }
 
@@ -498,9 +498,9 @@ CrossSection CrossSection::Translate(const vec2 v) const {
 CrossSection CrossSection::Rotate(double degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  mat3x2 m(c, s,   //
-           -s, c,  //
-           0.0, 0.0);
+  mat2x3 m({c, s},   //
+           {-s, c},  //
+           {0.0, 0.0});
   return Transform(m);
 }
 
@@ -511,9 +511,9 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * @param v The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat3x2 m(scale.x, 0.0,  //
-           0.0, scale.y,  //
-           0.0, 0.0);
+  mat2x3 m({scale.x, 0.0},  //
+           {0.0, scale.y},  //
+           {0.0, 0.0});
   return Transform(m);
 }
 
@@ -526,11 +526,11 @@ CrossSection CrossSection::Scale(const vec2 scale) const {
  * @param ax the axis to be mirrored over
  */
 CrossSection CrossSection::Mirror(const vec2 ax) const {
-  if (glm::length(ax) == 0.) {
+  if (la::length(ax) == 0.) {
     return CrossSection();
   }
-  auto n = glm::normalize(glm::abs(ax));
-  auto m = mat3x2(mat2(1.0) - 2.0 * glm::outerProduct(n, n));
+  auto n = la::normalize(la::abs(ax));
+  auto m = mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0));
   return Transform(m);
 }
 
@@ -541,9 +541,9 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-CrossSection CrossSection::Transform(const mat3x2& m) const {
+CrossSection CrossSection::Transform(const mat2x3& m) const {
   auto transformed = CrossSection();
-  transformed.transform_ = m * mat3(transform_);
+  transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
   return transformed;
 }

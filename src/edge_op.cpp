@@ -29,7 +29,7 @@ ivec3 TriOf(int edge) {
 bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
   const vec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
   double l[3];
-  for (int i : {0, 1, 2}) l[i] = glm::dot(e[i], e[i]);
+  for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
 }
 
@@ -54,7 +54,7 @@ struct ShortEdge {
     // Flag short edges
     const vec3 delta =
         vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    return glm::dot(delta, delta) < precision * precision;
+    return la::dot(delta, delta) < precision * precision;
   }
 };
 
@@ -90,7 +90,7 @@ struct SwappableEdge {
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
-    mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+    mat2x3 projection = GetAxisAlignedProjection(triNormal[tri]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
@@ -470,7 +470,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[toRemove.startVert];
   const vec3 delta = pNew - pOld;
-  const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
+  const bool shortEdge = la::dot(delta, delta) < precision_ * precision_;
 
   // Orbit endVert
   int current = halfedge_[tri0edge[1]].pairedHalfedge;
@@ -491,7 +491,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
-      const mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+      const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
@@ -577,7 +577,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
   const ivec3 perm0 = TriOf(edge % 3);
   const ivec3 perm1 = TriOf(pair % 3);
 
-  mat3x2 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
+  mat2x3 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
   vec2 v[4];
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];
@@ -607,8 +607,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const int tri1 = tri1edge[0] / 3;
     faceNormal_[tri0] = faceNormal_[tri1];
     triRef[tri0] = triRef[tri1];
-    const double l01 = glm::length(v[1] - v[0]);
-    const double l02 = glm::length(v[2] - v[0]);
+    const double l01 = la::length(v[1] - v[0]);
+    const double l02 = la::length(v[2] - v[0]);
     const double a = std::max(0.0, std::min(1.0, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
@@ -649,7 +649,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     // Two facing, long-edge degenerates can swap.
     SwapEdge();
     const vec2 e23 = v[3] - v[2];
-    if (glm::dot(e23, e23) < precision_ * precision_) {
+    if (la::dot(e23, e23) < precision_ * precision_) {
       tag++;
       CollapseEdge(tri0edge[2], edges);
       edges.resize(0);

@@ -32,7 +32,7 @@ constexpr int kParallelThreshold = 4096;
 namespace {
 using namespace manifold;
 struct Transform4x3 {
-  mat4x3 transform;
+  mat3x4 transform;
 
   vec3 operator()(vec3 position) const {
     return transform * vec4(position, 1.0);
@@ -111,29 +111,29 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
 }
 
 std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
-  mat4x3 transform(1.0);
+  mat3x4 transform = Identity3x4();
   transform[3] += t;
   return Transform(transform);
 }
 
 std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
-  mat4x3 transform(1.0);
-  for (int i : {0, 1, 2}) transform[i] *= v;
+  mat3x4 transform;
+  for (int i : {0, 1, 2}) transform[i][i] = v[i];
   return Transform(transform);
 }
 
 std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
                                          double zDegrees) const {
-  mat3 rX(1.0, 0.0, 0.0,                        //
-          0.0, cosd(xDegrees), sind(xDegrees),  //
-          0.0, -sind(xDegrees), cosd(xDegrees));
-  mat3 rY(cosd(yDegrees), 0.0, -sind(yDegrees),  //
-          0.0, 1.0, 0.0,                         //
-          sind(yDegrees), 0.0, cosd(yDegrees));
-  mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0,   //
-          -sind(zDegrees), cosd(zDegrees), 0.0,  //
-          0.0, 0.0, 1.0);
-  mat4x3 transform(rZ * rY * rX);
+  mat3 rX({1.0, 0.0, 0.0},                        //
+          {0.0, cosd(xDegrees), sind(xDegrees)},  //
+          {0.0, -sind(xDegrees), cosd(xDegrees)});
+  mat3 rY({cosd(yDegrees), 0.0, -sind(yDegrees)},  //
+          {0.0, 1.0, 0.0},                         //
+          {sind(yDegrees), 0.0, cosd(yDegrees)});
+  mat3 rZ({cosd(zDegrees), sind(zDegrees), 0.0},   //
+          {-sind(zDegrees), cosd(zDegrees), 0.0},  //
+          {0.0, 0.0, 1.0});
+  mat3x4 transform(rZ * rY * rX, vec3());
   return Transform(transform);
 }
 
@@ -143,25 +143,25 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_)
     : pImpl_(pImpl_) {}
 
 CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
-                         mat4x3 transform_)
+                         mat3x4 transform_)
     : pImpl_(pImpl_), transform_(transform_) {}
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
-  if (transform_ == mat4x3(1.0)) return pImpl_;
+  if (transform_ == Identity3x4()) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
-  transform_ = mat4x3(1.0);
+  transform_ = Identity3x4();
   return pImpl_;
 }
 
-mat4x3 CsgLeafNode::GetTransform() const { return transform_; }
+mat3x4 CsgLeafNode::GetTransform() const { return transform_; }
 
 std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
   return std::make_shared<CsgLeafNode>(*this);
 }
 
-std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat4x3 &m) const {
-  return std::make_shared<CsgLeafNode>(pImpl_, m * mat4(transform_));
+std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4 &m) const {
+  return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_));
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
@@ -270,7 +270,7 @@ Manifold::Impl CsgLeafNode::Compose(
           }
         }
 
-        if (node->transform_ == mat4x3(1.0)) {
+        if (node->transform_ == Identity3x4()) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),
@@ -282,7 +282,7 @@ Manifold::Impl CsgLeafNode::Compose(
           auto vertPosBegin = TransformIterator(
               node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
           mat3 normalTransform =
-              glm::inverse(glm::transpose(mat3(node->transform_)));
+              la::inverse(la::transpose(mat3(node->transform_)));
           auto faceNormalBegin =
               TransformIterator(node->pImpl_->faceNormal_.begin(),
                                 TransformNormals({normalTransform}));
@@ -291,7 +291,7 @@ Manifold::Impl CsgLeafNode::Compose(
           copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
-          const bool invert = glm::determinant(mat3(node->transform_)) < 0;
+          const bool invert = la::determinant(mat3(node->transform_)) < 0;
           for_each_n(policy, countAt(0), node->pImpl_->halfedgeTangent_.size(),
                      TransformTangents{combined.halfedgeTangent_,
                                        edgeIndices[i], mat3(node->transform_),
@@ -351,14 +351,13 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
 
   auto isReused = [](const auto &node) { return node->impl_.UseCount() > 1; };
 
-  auto copyChildren = [&](const auto &list, const mat4x3 &transform) {
+  auto copyChildren = [&](const auto &list, const mat3x4 &transform) {
     for (const auto &child : list) {
       children.push_back(child->Transform(transform));
     }
   };
 
   auto self = std::dynamic_pointer_cast<CsgOpNode>(shared_from_this());
-  assert(self);
   if (IsOp(op) && !isReused(self)) {
     auto impl = impl_.GetGuard();
     copyChildren(impl->children_, transform_);
@@ -389,10 +388,10 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   return std::make_shared<CsgOpNode>(children, op);
 }
 
-std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat4x3 &m) const {
+std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat3x4 &m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
-  node->transform_ = m * mat4(transform_);
+  node->transform_ = m * Mat4(transform_);
   node->op_ = op_;
   return node;
 }
@@ -641,6 +640,6 @@ bool CsgOpNode::IsOp(OpType op) {
   }
 }
 
-mat4x3 CsgOpNode::GetTransform() const { return transform_; }
+mat3x4 CsgOpNode::GetTransform() const { return transform_; }
 
 }  // namespace manifold

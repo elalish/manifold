@@ -32,36 +32,36 @@ namespace nb = nanobind;
 using namespace manifold;
 
 template <class T>
-struct glm_name {};
+struct la_name {};
 template <>
-struct glm_name<vec3> {
+struct la_name<vec3> {
   static constexpr char const name[] = "Doublex3";
   static constexpr char const multi_name[] = "DoubleNx3";
 };
 template <>
-struct glm_name<vec2> {
+struct la_name<vec2> {
   static constexpr char const name[] = "Doublex2";
   static constexpr char const multi_name[] = "DoubleNx2";
 };
 template <>
-struct glm_name<ivec3> {
+struct la_name<ivec3> {
   static constexpr char const name[] = "Intx3";
   static constexpr char const multi_name[] = "IntNx3";
 };
 template <>
-struct glm_name<mat4x3> {
+struct la_name<mat3x4> {
   static constexpr char const name[] = "Double3x4";
 };
 template <>
-struct glm_name<mat3x2> {
+struct la_name<mat2x3> {
   static constexpr char const name[] = "Double2x3";
 };
 
-// handle glm::vecN
-template <class T, int N, glm::qualifier Q>
-struct nb::detail::type_caster<glm::vec<N, T, Q>> {
-  using glm_type = glm::vec<N, T, Q>;
-  NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
+// handle la::vecN
+template <class T, int N>
+struct nb::detail::type_caster<la::vec<T, N>> {
+  using la_type = la::vec<T, N>;
+  NB_TYPE_CASTER(la_type, const_name(la_name<la_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     int size = PyObject_Size(src.ptr());  // negative on failure
@@ -73,7 +73,7 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
     }
     return true;
   }
-  static handle from_cpp(glm_type vec, rv_policy policy,
+  static handle from_cpp(la_type vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     nb::list out;
     for (int i = 0; i < N; i++) out.append(vec[i]);
@@ -81,12 +81,12 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   }
 };
 
-// handle glm::matMxN
-template <class T, int C, int R, glm::qualifier Q>
-struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
-  using glm_type = glm::mat<C, R, T, Q>;
+// handle la::matMxN
+template <class T, int C, int R>
+struct nb::detail::type_caster<la::mat<T, R, C>> {
+  using la_type = la::mat<T, R, C>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<R, C>>;
-  NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
+  NB_TYPE_CASTER(la_type, const_name(la_name<la_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     int rows = PyObject_Size(src.ptr());  // negative on failure
@@ -103,13 +103,13 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
     }
     return true;
   }
-  static handle from_cpp(glm_type mat, rv_policy policy,
+  static handle from_cpp(la_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
     nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
-        // py is (Rows, Cols), glm is (Cols, Rows)
+        // py is (Rows, Cols), la is (Cols, Rows)
         buffer[i * C + j] = mat[j][i];
       }
     }
@@ -119,13 +119,13 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   }
 };
 
-// handle std::vector<glm::vecN>
-template <class T, int N, glm::qualifier Q>
-struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
-  using glm_type = glm::vec<N, T, Q>;
+// handle std::vector<la::vecN>
+template <class T, int N>
+struct nb::detail::type_caster<std::vector<la::vec<T, N>>> {
+  using la_type = la::vec<T, N>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
-  NB_TYPE_CASTER(std::vector<glm_type>,
-                 const_name(glm_name<glm_type>::multi_name));
+  NB_TYPE_CASTER(std::vector<la_type>,
+                 const_name(la_name<la_type>::multi_name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     make_caster<numpy_type> arr_cast;
@@ -142,7 +142,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
       if (num_vec == static_cast<size_t>(-1)) return false;
       value.resize(num_vec);
       for (size_t i = 0; i < num_vec; i++) {
-        make_caster<glm_type> vec_cast;
+        make_caster<la_type> vec_cast;
         if (!vec_cast.from_python(src[i], flags, cleanup)) return false;
         value[i] = vec_cast.value;
       }
@@ -165,13 +165,13 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   }
 };
 
-// handle VecView<glm::vec*>
-template <class T, int N, glm::qualifier Q>
-struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
-  using glm_type = glm::vec<N, T, Q>;
+// handle VecView<la::vec*>
+template <class T, int N>
+struct nb::detail::type_caster<manifold::VecView<la::vec<T, N>>> {
+  using la_type = la::vec<T, N>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
-  NB_TYPE_CASTER(manifold::VecView<glm_type>,
-                 const_name(glm_name<glm_type>::multi_name));
+  NB_TYPE_CASTER(manifold::VecView<la_type>,
+                 const_name(la_name<la_type>::multi_name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     make_caster<numpy_type> arr_cast;

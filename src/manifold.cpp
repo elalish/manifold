@@ -47,13 +47,13 @@ struct UpdateProperties {
 };
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
-  normal = glm::normalize(normal);
+  normal = la::normalize(normal);
   Manifold cutter = Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
-  double size = glm::length(bBox.Center() - normal * originOffset) +
-                0.5 * glm::length(bBox.Size());
+  double size = la::length(bBox.Center() - normal * originOffset) +
+                0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
-  double yDeg = glm::degrees(-std::asin(normal.z));
-  double zDeg = glm::degrees(std::atan2(normal.y, normal.x));
+  double yDeg = degrees(-std::asin(normal.z));
+  double zDeg = degrees(std::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 
@@ -67,7 +67,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
   const bool updateNormals =
-      !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
+      !isOriginal && la::all(la::greater(normalIdx, ivec3(2)));
 
   MeshGLP<Precision, I> out;
   out.precision =
@@ -197,7 +197,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + normalIdx[i]];
           }
-          normal = glm::normalize(runNormalTransform[run] * normal);
+          normal = la::normalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
             out.vertProperties[start + normalIdx[i]] = normal[i];
           }
@@ -532,7 +532,7 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-Manifold Manifold::Transform(const mat4x3& m) const {
+Manifold Manifold::Transform(const mat3x4& m) const {
   return Manifold(pNode_->Transform(m));
 }
 
@@ -545,11 +545,11 @@ Manifold Manifold::Transform(const mat4x3& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  if (glm::length(normal) == 0.) {
+  if (la::length(normal) == 0.) {
     return Manifold();
   }
-  auto n = glm::normalize(normal);
-  auto m = mat4x3(mat3(1.0) - 2.0 * glm::outerProduct(n, n));
+  auto n = la::normalize(normal);
+  auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
   return Manifold(pNode_->Transform(m));
 }
 
@@ -780,7 +780,7 @@ Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Refine([length](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
-    return static_cast<int>(glm::length(edge) / length);
+    return static_cast<int>(la::length(edge) / length);
   });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -803,16 +803,16 @@ Manifold Manifold::RefineToPrecision(double precision) const {
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
         [precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
-          const vec3 edgeNorm = glm::normalize(edge);
+          const vec3 edgeNorm = la::normalize(edge);
           // Weight heuristic
           const vec3 tStart = vec3(tangentStart);
           const vec3 tEnd = vec3(tangentEnd);
           // Perpendicular to edge
-          const vec3 start = tStart - edgeNorm * glm::dot(edgeNorm, tStart);
-          const vec3 end = tEnd - edgeNorm * glm::dot(edgeNorm, tEnd);
+          const vec3 start = tStart - edgeNorm * la::dot(edgeNorm, tStart);
+          const vec3 end = tEnd - edgeNorm * la::dot(edgeNorm, tEnd);
           // Circular arc result plus heuristic term for non-circular curves
-          const double d = 0.5 * (glm::length(start) + glm::length(end)) +
-                           glm::length(start - end);
+          const double d = 0.5 * (la::length(start) + la::length(end)) +
+                           la::length(start - end);
           return static_cast<int>(std::sqrt(3 * d / (4 * precision)));
         },
         true);

@@ -31,7 +31,6 @@
 #include "manifold/meshIO.h"
 #include "samples.h"
 using namespace std;
-using namespace glm;
 using namespace manifold;
 
 // Epick = Exact predicates Inexact constructions. Seems fair to use to compare
@@ -70,7 +69,7 @@ class HullImpl {
       vec3 v2 = vertPos[tri[2]];
 
       // Compute the normal of the triangle
-      vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+      vec3 normal = la::normalize(la::cross(v1 - v0, v2 - v0));
 
       // Check all other vertices
       for (int i = 0; i < (int)vertPos.size(); ++i) {
@@ -81,7 +80,7 @@ class HullImpl {
         vec3 v = vertPos[i];
 
         // Compute the signed distance from the plane
-        double distance = glm::dot(normal, v - v0);
+        double distance = la::dot(normal, v - v0);
 
         // If any vertex lies on the opposite side of the normal direction
         if (distance > 0) {

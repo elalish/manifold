@@ -39,7 +39,7 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
     vec3 v2 = mesh.GetVertPos(tri[2]);
 
     // Compute the normal of the triangle
-    vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+    vec3 normal = la::normalize(la::cross(v1 - v0, v2 - v0));
 
     // Check all other vertices
     for (size_t i = 0; i < numVert; ++i) {
@@ -50,7 +50,7 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
       vec3 v = mesh.GetVertPos(i);
 
       // Compute the signed distance from the plane
-      double distance = glm::dot(normal, v - v0);
+      double distance = la::dot(normal, v - v0);
 
       // If any vertex lies on the opposite side of the normal direction
       if (distance > epsilon) {

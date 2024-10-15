@@ -143,12 +143,13 @@ TEST(CBIND, level_set) {
   double a = context[0] * context[1];
   double b = context[0] * context[2];
   double c = context[0] * context[3];
-  double s = 4.0 * glm::pi<double>() *
+  constexpr double kPi = 3.14159265358979323846264338327950288;
+  double s = 4.0 * kPi *
              std::pow(((std::pow(a * b, 1.6) + std::pow(a * c, 1.6) +
                         std::pow(b * c, 1.6)) /
                        3.0),
                       1.0 / 1.6);
-  double v = 4.0 * glm::pi<double>() / 3.0 * a * b * c;
+  double v = 4.0 * kPi / 3.0 * a * b * c;
 
   // Numerical calculations for volume and surface area
   ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
@@ -174,7 +175,7 @@ TEST(CBIND, properties) {
                 void *) = [](double *new_prop, ManifoldVec3 position,
                              const double *old_prop, void *ctx) {
     new_prop[0] =
-        glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
+        std::sqrt(std::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
         5.0;
   };
@@ -184,7 +185,7 @@ TEST(CBIND, properties) {
                        void *) = [](double *new_prop, ManifoldVec3 position,
                                     const double *old_prop, void *ctx) {
     new_prop[0] =
-        glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
+        std::sqrt(std::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
         ((double *)ctx)[0];
   };

@@ -30,7 +30,7 @@ static ExecutionParams params;
 
 constexpr double kBest = -std::numeric_limits<double>::infinity();
 
-// it seems that MSVC cannot optimize glm::determinant(mat2(a, b))
+// it seems that MSVC cannot optimize la::determinant(mat2(a, b))
 constexpr double determinant2x2(vec2 a, vec2 b) {
   return a.x * b.y - a.y * b.x;
 }
@@ -176,15 +176,15 @@ bool IsConvex(const PolygonsIdx &polys, double precision) {
     // Zero-length edges comes out NaN, which won't trip the early return, but
     // it's okay because that zero-length edge will also get tested
     // non-normalized and will trip det == 0.
-    vec2 lastEdge = glm::normalize(firstEdge);
+    vec2 lastEdge = la::normalize(firstEdge);
     for (size_t v = 0; v < poly.size(); ++v) {
       const vec2 edge =
           v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
       const double det = determinant2x2(lastEdge, edge);
       if (det <= 0 ||
-          (std::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+          (std::abs(det) < precision && la::dot(lastEdge, edge) < 0))
         return false;
-      lastEdge = glm::normalize(edge);
+      lastEdge = la::normalize(edge);
     }
   }
   return true;
@@ -326,7 +326,7 @@ class EarClip {
     // cause CW triangles that exceed precision due to rounding error.
     bool IsShort(double precision) const {
       const vec2 edge = right->pos - pos;
-      return glm::dot(edge, edge) * 4 < precision * precision;
+      return la::dot(edge, edge) * 4 < precision * precision;
     }
 
     // Like CCW, returns 1 if v is on the inside of the angle formed at this
@@ -334,7 +334,7 @@ class EarClip {
     // Ensure v is more than precision from pos, as case this will not return 0.
     int Interior(vec2 v, double precision) const {
       const vec2 diff = v - pos;
-      if (glm::dot(diff, diff) < precision * precision) {
+      if (la::dot(diff, diff) < precision * precision) {
         return 0;
       }
       return CCW(pos, left->pos, right->pos, precision) +
@@ -357,21 +357,21 @@ class EarClip {
       while (nextL != nextR && tail != nextR &&
              nextL != (toLeft ? right : left)) {
         const vec2 edgeL = nextL->pos - center->pos;
-        const double l2 = glm::dot(edgeL, edgeL);
+        const double l2 = la::dot(edgeL, edgeL);
         if (l2 <= p2) {
           nextL = toLeft ? nextL->left : nextL->right;
           continue;
         }
 
         const vec2 edgeR = nextR->pos - center->pos;
-        const double r2 = glm::dot(edgeR, edgeR);
+        const double r2 = la::dot(edgeR, edgeR);
         if (r2 <= p2) {
           nextR = nextR->right;
           continue;
         }
 
         const vec2 vecLR = nextR->pos - nextL->pos;
-        const double lr2 = glm::dot(vecLR, vecLR);
+        const double lr2 = la::dot(vecLR, vecLR);
         if (lr2 <= p2) {
           last = center;
           center = nextL;
@@ -411,7 +411,7 @@ class EarClip {
       if (convexity != 0) {
         return convexity > 0;
       }
-      if (glm::dot(left->pos - pos, right->pos - pos) <= 0) {
+      if (la::dot(left->pos - pos, right->pos - pos) <= 0) {
         return true;
       }
       return left->InsideEdge(left->right, precision, true);
@@ -429,7 +429,7 @@ class EarClip {
     // right of start - all within a precision tolerance. If onTop != 0, this
     // restricts which end is allowed to terminate within the precision band.
     double InterpY2X(vec2 start, int onTop, double precision) const {
-      if (glm::abs(pos.y - start.y) <= precision) {
+      if (la::abs(pos.y - start.y) <= precision) {
         if (right->pos.y <= start.y + precision || onTop == 1) {
           return NAN;
         } else {
@@ -478,7 +478,7 @@ class EarClip {
     // to aid in prioritization and produce cleaner triangulations. This doesn't
     // affect robustness, but may be adjusted to improve output.
     static double DelaunayCost(vec2 diff, double scale, double precision) {
-      return -precision - scale * glm::dot(diff, diff);
+      return -precision - scale * la::dot(diff, diff);
     }
 
     // This is the expensive part of the algorithm, checking this ear against
@@ -494,11 +494,11 @@ class EarClip {
     double EarCost(double precision, IdxCollider &collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
-      const double scale = 4 / glm::dot(openSide, openSide);
-      const double radius = glm::length(openSide) / 2;
-      openSide = glm::normalize(openSide);
+      const double scale = 4 / la::dot(openSide, openSide);
+      const double radius = la::length(openSide) / 2;
+      openSide = la::normalize(openSide);
 
-      double totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
+      double totalCost = la::dot(left->rightDir, rightDir) - 1 - precision;
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         // Clip folded ears first
         return totalCost;
@@ -544,7 +544,7 @@ class EarClip {
   };
 
   static vec2 SafeNormalize(vec2 v) {
-    vec2 n = glm::normalize(v);
+    vec2 n = la::normalize(v);
     return std::isfinite(n.x) ? n : vec2(0, 0);
   }
 
@@ -616,7 +616,7 @@ class EarClip {
     }
     if (ear->IsShort(precision_) ||
         (CCW(ear->left->pos, ear->pos, ear->right->pos, precision_) == 0 &&
-         glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
+         la::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
          ear->IsConvex(precision_))) {
       ClipEar(ear);
       ClipIfDegenerate(ear->left);
@@ -759,7 +759,7 @@ class EarClip {
         : edge->right->pos.y - start->pos.y > start->pos.y - edge->pos.y
             ? edge
             : edge->right;
-    if (glm::abs(connector->pos.y - start->pos.y) <= precision_) {
+    if (la::abs(connector->pos.y - start->pos.y) <= precision_) {
       return connector;
     }
     const double above = connector->pos.y > start->pos.y ? 1 : -1;

@@ -101,22 +101,22 @@ struct MeshGLP {
 
   bool Merge();
 
-  glm::vec<3, Precision> GetVertPos(size_t i) const {
+  la::vec<Precision, 3> GetVertPos(size_t i) const {
     size_t offset = i * numProp;
-    return glm::vec<3, Precision>(vertProperties[offset],
-                                  vertProperties[offset + 1],
-                                  vertProperties[offset + 2]);
+    return la::vec<Precision, 3>(vertProperties[offset],
+                                 vertProperties[offset + 1],
+                                 vertProperties[offset + 2]);
   }
 
-  glm::vec<3, I> GetTriVerts(size_t i) const {
+  la::vec<I, 3> GetTriVerts(size_t i) const {
     size_t offset = 3 * i;
-    return glm::vec<3, I>(triVerts[offset], triVerts[offset + 1],
-                          triVerts[offset + 2]);
+    return la::vec<I, 3>(triVerts[offset], triVerts[offset + 1],
+                         triVerts[offset + 2]);
   }
 
-  glm::vec<4, Precision> GetTangent(size_t i) const {
+  la::vec<Precision, 4> GetTangent(size_t i) const {
     size_t offset = 4 * i;
-    return glm::vec<4, Precision>(
+    return la::vec<Precision, 4>(
         halfedgeTangent[offset], halfedgeTangent[offset + 1],
         halfedgeTangent[offset + 2], halfedgeTangent[offset + 3]);
   }
@@ -256,7 +256,7 @@ class Manifold {
   Manifold Scale(vec3) const;
   Manifold Rotate(double xDegrees, double yDegrees = 0.0,
                   double zDegrees = 0.0) const;
-  Manifold Transform(const mat4x3&) const;
+  Manifold Transform(const mat3x4&) const;
   Manifold Mirror(vec3) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;

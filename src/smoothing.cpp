@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/quaternion.hpp>
-
 #include "./impl.h"
 #include "manifold/parallel.h"
 
@@ -25,23 +22,23 @@ using namespace manifold;
 // unless in and ref are colinear, in which case it falls back to the plane of
 // ref and altIn.
 vec3 OrthogonalTo(vec3 in, vec3 altIn, vec3 ref) {
-  vec3 out = in - glm::dot(in, ref) * ref;
-  if (glm::dot(out, out) < kTolerance * glm::dot(in, in)) {
-    out = altIn - glm::dot(altIn, ref) * ref;
+  vec3 out = in - la::dot(in, ref) * ref;
+  if (la::dot(out, out) < kTolerance * la::dot(in, in)) {
+    out = altIn - la::dot(altIn, ref) * ref;
   }
   return SafeNormalize(out);
 }
 
 double Wrap(double radians) {
-  return radians < -glm::pi<double>()  ? radians + glm::two_pi<double>()
-         : radians > glm::pi<double>() ? radians - glm::two_pi<double>()
-                                       : radians;
+  return radians < -kPi  ? radians + kTwoPi
+         : radians > kPi ? radians - kTwoPi
+                         : radians;
 }
 
 // Get the angle between two unit-vectors.
 double AngleBetween(vec3 a, vec3 b) {
-  const double dot = glm::dot(a, b);
-  return dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : glm::acos(dot));
+  const double dot = la::dot(a, b);
+  return dot >= 1 ? 0 : (dot <= -1 ? kPi : la::acos(dot));
 }
 
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
@@ -52,11 +49,11 @@ double AngleBetween(vec3 a, vec3 b) {
 vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
   const vec3 dir = SafeNormalize(tangent);
 
-  double weight = std::max(0.5, glm::dot(dir, SafeNormalize(edgeVec)));
+  double weight = std::max(0.5, la::dot(dir, SafeNormalize(edgeVec)));
   // Quadratic weighted bezier for circular interpolation
-  const vec4 bz2 = vec4(dir * 0.5 * glm::length(edgeVec), weight);
+  const vec4 bz2 = vec4(dir * 0.5 * la::length(edgeVec), weight);
   // Equivalent cubic weighted bezier
-  const vec4 bz3 = glm::mix(vec4(0, 0, 0, 1), bz2, 2 / 3.0);
+  const vec4 bz3 = la::lerp(vec4(0, 0, 0, 1), bz2, 2 / 3.0);
   // Convert from homogeneous form to geometric form
   return vec4(vec3(bz3) / bz3.w, bz3.w);
 }
@@ -85,30 +82,30 @@ struct InterpTri {
     return Homogeneous(vec4(point, 0) + tangent);
   }
 
-  static mat2x4 CubicBezier2Linear(vec4 p0, vec4 p1, vec4 p2, vec4 p3,
+  static mat4x2 CubicBezier2Linear(vec4 p0, vec4 p1, vec4 p2, vec4 p3,
                                    double x) {
-    mat2x4 out;
-    vec4 p12 = glm::mix(p1, p2, x);
-    out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
-    out[1] = glm::mix(p12, glm::mix(p2, p3, x), x);
+    mat4x2 out;
+    vec4 p12 = la::lerp(p1, p2, x);
+    out[0] = la::lerp(la::lerp(p0, p1, x), p12, x);
+    out[1] = la::lerp(p12, la::lerp(p2, p3, x), x);
     return out;
   }
 
-  static vec3 BezierPoint(mat2x4 points, double x) {
-    return HNormalize(glm::mix(points[0], points[1], x));
+  static vec3 BezierPoint(mat4x2 points, double x) {
+    return HNormalize(la::lerp(points[0], points[1], x));
   }
 
-  static vec3 BezierTangent(mat2x4 points) {
+  static vec3 BezierTangent(mat4x2 points) {
     return SafeNormalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
   static vec3 RotateFromTo(vec3 v, quat start, quat end) {
-    return end * glm::conjugate(start) * v;
+    return la::qrot(end, la::qrot(la::qconj(start), v));
   }
 
   static quat Slerp(const quat& x, const quat& y, double a, bool longWay) {
     quat z = y;
-    double cosTheta = glm::dot(x, y);
+    double cosTheta = la::dot(x, y);
 
     // Take the long way around the sphere only when requested
     if ((cosTheta < 0) != longWay) {
@@ -116,8 +113,8 @@ struct InterpTri {
       cosTheta = -cosTheta;
     }
 
-    if (cosTheta > 1.0 - glm::epsilon<double>()) {
-      return glm::lerp(x, z, a);  // for numerical stability
+    if (cosTheta > 1.0 - std::numeric_limits<double>::epsilon()) {
+      return la::lerp(x, z, a);  // for numerical stability
     } else {
       double angle = std::acos(cosTheta);
       return (std::sin((1.0 - a) * angle) * x + std::sin(a * angle) * z) /
@@ -125,51 +122,49 @@ struct InterpTri {
     }
   }
 
-  static mat2x4 Bezier2Bezier(const mat2x3& corners, const mat2x4& tangentsX,
-                              const mat2x4& tangentsY, double x,
+  static mat4x2 Bezier2Bezier(const mat3x2& corners, const mat4x2& tangentsX,
+                              const mat4x2& tangentsY, double x,
                               const vec3& anchor) {
-    const mat2x4 bez = CubicBezier2Linear(
+    const mat4x2 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
         Bezier(corners[1], tangentsX[1]), Homogeneous(corners[1]), x);
     const vec3 end = BezierPoint(bez, x);
     const vec3 tangent = BezierTangent(bez);
 
-    const mat2x3 nTangentsX(SafeNormalize(vec3(tangentsX[0])),
+    const mat3x2 nTangentsX(SafeNormalize(vec3(tangentsX[0])),
                             -SafeNormalize(vec3(tangentsX[1])));
-    const mat2x3 biTangents = {
+    const mat3x2 biTangents = {
         OrthogonalTo(vec3(tangentsY[0]), (anchor - corners[0]), nTangentsX[0]),
         OrthogonalTo(vec3(tangentsY[1]), (anchor - corners[1]), nTangentsX[1])};
 
-    const quat q0 =
-        glm::quat_cast(mat3(nTangentsX[0], biTangents[0],
-                            glm::cross(nTangentsX[0], biTangents[0])));
-    const quat q1 =
-        glm::quat_cast(mat3(nTangentsX[1], biTangents[1],
-                            glm::cross(nTangentsX[1], biTangents[1])));
+    const quat q0 = la::rotation_quat(mat3(
+        nTangentsX[0], biTangents[0], la::cross(nTangentsX[0], biTangents[0])));
+    const quat q1 = la::rotation_quat(mat3(
+        nTangentsX[1], biTangents[1], la::cross(nTangentsX[1], biTangents[1])));
     const vec3 edge = corners[1] - corners[0];
     const bool longWay =
-        glm::dot(nTangentsX[0], edge) + glm::dot(nTangentsX[1], edge) < 0;
+        la::dot(nTangentsX[0], edge) + la::dot(nTangentsX[1], edge) < 0;
     const quat qTmp = Slerp(q0, q1, x, longWay);
-    const quat q = glm::rotation(qTmp * vec3(1, 0, 0), tangent) * qTmp;
+    const quat q = la::qmul(la::rotation_quat(la::qxdir(qTmp), tangent), qTmp);
 
-    const vec3 delta = glm::mix(RotateFromTo(vec3(tangentsY[0]), q0, q),
+    const vec3 delta = la::lerp(RotateFromTo(vec3(tangentsY[0]), q0, q),
                                 RotateFromTo(vec3(tangentsY[1]), q1, q), x);
-    const double deltaW = glm::mix(tangentsY[0].w, tangentsY[1].w, x);
+    const double deltaW = la::lerp(tangentsY[0].w, tangentsY[1].w, x);
 
     return {Homogeneous(end), vec4(delta, deltaW)};
   }
 
-  static vec3 Bezier2D(const mat4x3& corners, const mat4& tangentsX,
+  static vec3 Bezier2D(const mat3x4& corners, const mat4& tangentsX,
                        const mat4& tangentsY, double x, double y,
                        const vec3& centroid) {
-    mat2x4 bez0 =
+    mat4x2 bez0 =
         Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
                       {tangentsY[0], tangentsY[1]}, x, centroid);
-    mat2x4 bez1 =
+    mat4x2 bez1 =
         Bezier2Bezier({corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
                       {tangentsY[2], tangentsY[3]}, 1 - x, centroid);
 
-    const mat2x4 bez =
+    const mat4x2 bez =
         CubicBezier2Linear(bez0[0], Bezier(vec3(bez0[0]), bez0[1]),
                            Bezier(vec3(bez1[0]), bez1[1]), bez1[0], y);
     return BezierPoint(bez, y);
@@ -181,12 +176,12 @@ struct InterpTri {
     const vec4 uvw = vertBary[vert].uvw;
 
     const ivec4 halfedges = impl->GetHalfedges(tri);
-    const mat4x3 corners = {
+    const mat3x4 corners = {
         impl->vertPos_[impl->halfedge_[halfedges[0]].startVert],
         impl->vertPos_[impl->halfedge_[halfedges[1]].startVert],
         impl->vertPos_[impl->halfedge_[halfedges[2]].startVert],
         halfedges[3] < 0
-            ? vec3(0)
+            ? vec3(0.0)
             : impl->vertPos_[impl->halfedge_[halfedges[3]].startVert]};
 
     for (const int i : {0, 1, 2, 3}) {
@@ -196,13 +191,13 @@ struct InterpTri {
       }
     }
 
-    vec4 posH(0);
+    vec4 posH(0.0);
 
     if (halfedges[3] < 0) {  // tri
-      const mat3x4 tangentR = {impl->halfedgeTangent_[halfedges[0]],
+      const mat4x3 tangentR = {impl->halfedgeTangent_[halfedges[0]],
                                impl->halfedgeTangent_[halfedges[1]],
                                impl->halfedgeTangent_[halfedges[2]]};
-      const mat3x4 tangentL = {
+      const mat4x3 tangentL = {
           impl->halfedgeTangent_[impl->halfedge_[halfedges[2]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[0]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[1]].pairedHalfedge]};
@@ -213,13 +208,13 @@ struct InterpTri {
         const int k = Prev3(i);
         const double x = uvw[k] / (1 - uvw[i]);
 
-        const mat2x4 bez =
+        const mat4x2 bez =
             Bezier2Bezier({corners[j], corners[k]}, {tangentR[j], tangentL[k]},
                           {tangentL[j], tangentR[k]}, x, centroid);
 
-        const mat2x4 bez1 = CubicBezier2Linear(
+        const mat4x2 bez1 = CubicBezier2Linear(
             bez[0], Bezier(vec3(bez[0]), bez[1]),
-            Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
+            Bezier(corners[i], la::lerp(tangentR[i], tangentL[i], x)),
             Homogeneous(corners[i]), uvw[i]);
         const vec3 p = BezierPoint(bez1, uvw[i]);
         posH += Homogeneous(vec4(p, uvw[j] * uvw[k]));
@@ -279,7 +274,7 @@ vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
   const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
   const vec3 edgeNormal =
       faceNormal_[halfedge / 3] + faceNormal_[edge.pairedHalfedge / 3];
-  vec3 dir = glm::cross(glm::cross(edgeNormal, edgeVec), normal);
+  vec3 dir = la::cross(la::cross(edgeNormal, edgeVec), normal);
   return CircularTangent(dir, edgeVec);
 }
 
@@ -403,12 +398,12 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
 std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     double minSharpAngle, double minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
-  const double minRadians = glm::radians(minSharpAngle);
+  const double minRadians = radians(minSharpAngle);
   for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
     const size_t pair = halfedge_[e].pairedHalfedge;
     const double dihedral =
-        std::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+        std::acos(la::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
     if (dihedral > minRadians) {
       sharpenedEdges.push_back({e, minSmoothness});
       sharpenedEdges.push_back({pair, minSmoothness});
@@ -449,7 +444,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const int tri1 = e / 3;
     const int tri2 = pair / 3;
     const double dihedral =
-        glm::degrees(std::acos(glm::dot(faceNormal_[tri1], faceNormal_[tri2])));
+        degrees(std::acos(la::dot(faceNormal_[tri1], faceNormal_[tri2])));
     if (dihedral > minSharpAngle) {
       ++vertNumSharp[halfedge_[e].startVert];
       ++vertNumSharp[halfedge_[e].endVert];
@@ -520,8 +515,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           int next = NextHalfedge(halfedge_[current].pairedHalfedge);
           const int face = next / 3;
 
-          const double dihedral = glm::degrees(
-              std::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
+          const double dihedral = degrees(
+              std::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
           if (dihedral > minSharpAngle ||
               triIsFlatFace[face] != triIsFlatFace[prevFace] ||
               (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
@@ -566,19 +561,19 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
                 int current, const FaceEdge& here, FaceEdge& next) {
-              const double dihedral = glm::degrees(std::acos(
-                  glm::dot(faceNormal_[here.face], faceNormal_[next.face])));
+              const double dihedral = degrees(std::acos(
+                  la::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
                   triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
                   (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
                    !meshRelation_.triRef[here.face].SameFace(
                        meshRelation_.triRef[next.face]))) {
-                normals.push_back(vec3(0));
+                normals.push_back(vec3(0.0));
               }
               group.push_back(normals.size() - 1);
               if (std::isfinite(next.edgeVec.x)) {
                 normals.back() +=
-                    SafeNormalize(glm::cross(next.edgeVec, here.edgeVec)) *
+                    SafeNormalize(la::cross(next.edgeVec, here.edgeVec)) *
                     AngleBetween(here.edgeVec, next.edgeVec);
               } else {
                 next.edgeVec = here.edgeVec;
@@ -685,7 +680,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           halfedge = NextHalfedge(halfedge_[halfedge].pairedHalfedge);
         }
 
-        vec3 normal(0);
+        vec3 normal(0.0);
         Vec<double> currentAngle;
         Vec<double> desiredAngle;
 
@@ -704,25 +699,25 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
               SafeNormalize(vertPos_[halfedge_[current].endVert] - center);
           const vec3 thisTangent =
               SafeNormalize(vec3(halfedgeTangent_[current]));
-          normal += glm::cross(thisTangent, lastTangent);
+          normal += la::cross(thisTangent, lastTangent);
           // cumulative sum
           desiredAngle.push_back(
               AngleBetween(thisEdgeVec, lastEdgeVec) +
               (desiredAngle.size() > 0 ? desiredAngle.back() : 0));
           if (current == halfedge) {
-            currentAngle.push_back(glm::two_pi<double>());
+            currentAngle.push_back(kTwoPi);
           } else {
             currentAngle.push_back(AngleBetween(thisTangent, firstTangent));
-            if (glm::dot(approxNormal, glm::cross(thisTangent, firstTangent)) <
+            if (la::dot(approxNormal, la::cross(thisTangent, firstTangent)) <
                 0) {
-              currentAngle.back() = glm::two_pi<double>() - currentAngle.back();
+              currentAngle.back() = kTwoPi - currentAngle.back();
             }
           }
           lastEdgeVec = thisEdgeVec;
           lastTangent = thisTangent;
         } while (!fixedHalfedges[current]);
 
-        if (currentAngle.size() == 1 || glm::dot(normal, normal) == 0) return;
+        if (currentAngle.size() == 1 || la::dot(normal, normal) == 0) return;
 
         const double scale = currentAngle.back() / desiredAngle.back();
         double offset = 0;
@@ -741,17 +736,17 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           desiredAngle[i] *= scale;
           const double lastAngle = i > 0 ? desiredAngle[i - 1] : 0;
           // shrink obtuse angles
-          if (desiredAngle[i] - lastAngle > glm::pi<double>()) {
-            desiredAngle[i] = lastAngle + glm::pi<double>();
+          if (desiredAngle[i] - lastAngle > kPi) {
+            desiredAngle[i] = lastAngle + kPi;
           } else if (i + 1 < desiredAngle.size() &&
-                     scale * desiredAngle[i + 1] - desiredAngle[i] >
-                         glm::pi<double>()) {
-            desiredAngle[i] = scale * desiredAngle[i + 1] - glm::pi<double>();
+                     scale * desiredAngle[i + 1] - desiredAngle[i] > kPi) {
+            desiredAngle[i] = scale * desiredAngle[i + 1] - kPi;
           }
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
           vec3 tangent(halfedgeTangent_[current]);
-          halfedgeTangent_[current] = vec4(glm::rotate(tangent, angle, normal),
-                                           halfedgeTangent_[current].w);
+          const quat q = la::rotation_quat(la::normalize(normal), angle);
+          halfedgeTangent_[current] =
+              vec4(la::qrot(q, tangent), halfedgeTangent_[current].w);
           ++i;
         } while (!fixedHalfedges[current]);
       });
@@ -790,7 +785,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               const vec3 normal = GetNormal(halfedge, normalIdx);
               const vec3 diff = faceNormal_[halfedge / 3] - normal;
               return FlatNormal(
-                  {glm::dot(diff, diff) < kTolerance * kTolerance, normal});
+                  {la::dot(diff, diff) < kTolerance * kTolerance, normal});
             },
             [&faceEdges, &tangent, &fixedHalfedge, this](
                 int halfedge, const FlatNormal& here, const FlatNormal& next) {
@@ -801,7 +796,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               // mark special edges
               const vec3 diff = next.normal - here.normal;
               const bool differentNormals =
-                  glm::dot(diff, diff) > kTolerance * kTolerance;
+                  la::dot(diff, diff) > kTolerance * kTolerance;
               if (differentNormals || here.isFlatFace != next.isFlatFace) {
                 fixedHalfedge[halfedge] = true;
                 if (faceEdges[0] == -1) {
@@ -816,9 +811,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               if (differentNormals) {
                 const vec3 edgeVec = vertPos_[halfedge_[halfedge].endVert] -
                                      vertPos_[halfedge_[halfedge].startVert];
-                const vec3 dir = glm::cross(here.normal, next.normal);
+                const vec3 dir = la::cross(here.normal, next.normal);
                 tangent[halfedge] = CircularTangent(
-                    glm::sign(glm::dot(dir, edgeVec)) * dir, edgeVec);
+                    (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
               } else {
                 tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
@@ -829,7 +824,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                              vertPos_[halfedge_[faceEdges[0]].startVert];
           const vec3 edge1 = vertPos_[halfedge_[faceEdges[1]].endVert] -
                              vertPos_[halfedge_[faceEdges[1]].startVert];
-          const vec3 newTangent = glm::normalize(edge0) - glm::normalize(edge1);
+          const vec3 newTangent = la::normalize(edge0) - la::normalize(edge1);
           tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
           tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
         } else if (faceEdges[0] == -1 && faceEdges[0] == -1) {
@@ -933,8 +928,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
           const int second = vert[1].first.halfedge;
           fixedHalfedge[first] = true;
           fixedHalfedge[second] = true;
-          const vec3 newTangent = glm::normalize(
-              vec3(halfedgeTangent_[first]) - vec3(halfedgeTangent_[second]));
+          const vec3 newTangent = la::normalize(vec3(halfedgeTangent_[first]) -
+                                                vec3(halfedgeTangent_[second]));
 
           const vec3 pos = vertPos_[halfedge_[first].startVert];
           halfedgeTangent_[first] = CircularTangent(

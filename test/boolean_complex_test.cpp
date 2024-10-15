@@ -142,7 +142,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m1;
   for (auto& array : arrays1) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -153,7 +153,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m2;
   for (auto& array : arrays2) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -240,9 +240,8 @@ TEST(BooleanComplex, Close) {
   }
   auto prop = result.GetProperties();
   const double tol = 0.004;
-  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * glm::pi<double>() * r * r * r,
-              tol * r * r * r);
-  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
+  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
+  EXPECT_NEAR(prop.surfaceArea, 4 * kPi * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
@@ -252,17 +251,13 @@ TEST(BooleanComplex, Close) {
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
-  mat4 m = glm::translate(mat4(1.0), vec3(1.0));
-
   // Define solids which volumes are easy to compute w/ bit arithmetics:
   // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
   // m3 = m1 + m2
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
-  auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0), vec3(1.0, 0, 0))));
-  auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0), vec3(3.0, 0, 0))));
+  auto m2 = Manifold::Cube({2, 1, 1}).Translate({1, 0, 0});
+  auto m4 = Manifold::Cube({4, 1, 1}).Translate({3, 0, 0});
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 
@@ -283,7 +278,7 @@ TEST(BooleanComplex, Spiral) {
   const int d = 2;
   std::function<Manifold(const int, const double, const double)> spiral =
       [&](const int rec, const double r, const double add) {
-        const double rot = 360.0 / (glm::pi<double>() * r * 2) * d;
+        const double rot = 360.0 / (kPi * r * 2) * d;
         const double rNext = r + add / 360 * rot;
         const Manifold cube =
             Manifold::Cube(vec3(1), true).Translate({0, r, 0});
@@ -301,9 +296,9 @@ TEST(BooleanComplex, Sweep) {
 
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](double angle) {
-    double div = angle / glm::two_pi<double>();
+    double div = angle / kTwoPi;
     double wholeDiv = floor(div);
-    return angle - wholeDiv * glm::two_pi<double>();
+    return angle - wholeDiv * kTwoPi;
   };
 
   // calculate determinant
@@ -318,7 +313,7 @@ TEST(BooleanComplex, Sweep) {
     std::vector<vec2> arcPoints;
 
     for (int i = 0; i < numberOfArcPoints; i++) {
-      double angle = i * glm::pi<double>() / numberOfArcPoints;
+      double angle = i * kPi / numberOfArcPoints;
       double y = arcCenterPoint.y - cos(angle) * filletRadius;
       double x = arcCenterPoint.x + sin(angle) * filletRadius;
       arcPoints.push_back(vec2(x, y));
@@ -349,8 +344,7 @@ TEST(BooleanComplex, Sweep) {
       totalAngle = posEndAngle - startAngle;
     }
 
-    int nSegments =
-        ceil(totalAngle / glm::two_pi<double>() * nSegmentsPerRotation + 1);
+    int nSegments = ceil(totalAngle / kTwoPi * nSegmentsPerRotation + 1);
     if (nSegments < 2) {
       nSegments = 2;
     }
@@ -389,7 +383,7 @@ TEST(BooleanComplex, Sweep) {
         Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
             .Translate(vec3(distance, 0, 0))
-            .Rotate(0, 0, angle * 180 / glm::pi<double>())
+            .Rotate(0, 0, angle * 180 / kPi)
             .Translate(vec3(p1.x, p1.y, 0));
 
     std::vector<Manifold> result;

@@ -114,7 +114,7 @@ TEST(Samples, Scallop) {
     const vec3 red(1, 0, 0);
     const vec3 blue(0, 0, 1);
     const double limit = 15;
-    vec3 color = glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
+    vec3 color = la::lerp(blue, red, smoothstep(-limit, limit, curvature));
     for (const int i : {0, 1, 2}) {
       newProp[i] = color[i];
     }

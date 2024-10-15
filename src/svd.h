@@ -82,7 +82,7 @@ struct QR {
   mat3 Q, R;
 };
 // Calculates the squared norm of the vector.
-inline double Dist2(vec3 v) { return glm::dot(v, v); }
+inline double Dist2(vec3 v) { return la::dot(v, v); }
 // For an explanation of the math see
 // http://pages.cs.wisc.edu/~sifakis/papers/SVD_TR1690.pdf Computing the
 // Singular Value Decomposition of 3 x 3 matrices with minimal branching and
@@ -148,15 +148,15 @@ inline mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
     JacobiConjugation(1, 2, 0, S, q);
     JacobiConjugation(2, 0, 1, S, q);
   }
-  return mat3(1.0 - 2.0 * (fma(q.y, q.y, q.z * q.z)),  //
-              2.0 * fma(q.x, q.y, +q.w * q.z),         //
-              2.0 * fma(q.x, q.z, -q.w * q.y),         //
-              2 * fma(q.x, q.y, -q.w * q.z),           //
-              1 - 2 * fma(q.x, q.x, q.z * q.z),        //
-              2 * fma(q.y, q.z, q.w * q.x),            //
-              2 * fma(q.x, q.z, q.w * q.y),            //
-              2 * fma(q.y, q.z, -q.w * q.x),           //
-              1 - 2 * fma(q.x, q.x, q.y * q.y));
+  return mat3({1.0 - 2.0 * (fma(q.y, q.y, q.z * q.z)),  //
+               2.0 * fma(q.x, q.y, +q.w * q.z),         //
+               2.0 * fma(q.x, q.z, -q.w * q.y)},        //
+              {2 * fma(q.x, q.y, -q.w * q.z),           //
+               1 - 2 * fma(q.x, q.x, q.z * q.z),        //
+               2 * fma(q.y, q.z, q.w * q.x)},           //
+              {2 * fma(q.x, q.z, q.w * q.y),            //
+               2 * fma(q.y, q.z, -q.w * q.x),           //
+               1 - 2 * fma(q.x, q.x, q.y * q.y)});
 }
 // Implementation of Algorithm 3
 inline void SortSingularValues(mat3& B, mat3& V) {
@@ -287,12 +287,12 @@ struct SVDSet {
 };
 
 /**
- * Returns the Singular Value Decomposition of A: A = U * S * glm::transpose(V).
+ * Returns the Singular Value Decomposition of A: A = U * S * la::transpose(V).
  *
  * @param A The matrix to decompose.
  */
 inline SVDSet SVD(mat3 A) {
-  mat3 V = JacobiEigenAnalysis(glm::transpose(A) * A);
+  mat3 V = JacobiEigenAnalysis(la::transpose(A) * A);
   auto B = A * V;
   SortSingularValues(B, V);
   QR qr = QRDecomposition(B);

@@ -140,7 +140,7 @@ CrossSection IntersectionN(const std::vector<CrossSection>& cross_sections) {
 
 CrossSection Transform(CrossSection& cross_section, const val& mat) {
   std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
-  mat3x2 matrix;
+  mat2x3 matrix;
   for (const int col : {0, 1, 2})
     for (const int row : {0, 1}) matrix[col][row] = array[col * 3 + row];
   return cross_section.Transform(matrix);
@@ -188,7 +188,7 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 
 Manifold Transform(Manifold& manifold, const val& mat) {
   std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
-  mat4x3 matrix;
+  mat3x4 matrix;
   for (const int col : {0, 1, 2, 3})
     for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);

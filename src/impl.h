@@ -28,7 +28,7 @@ namespace manifold {
 struct Manifold::Impl {
   struct Relation {
     int originalID = -1;
-    mat4x3 transform = mat4x3(1);
+    mat3x4 transform = Identity3x4();
     bool backSide = false;
   };
   struct MeshRelationD {
@@ -60,7 +60,7 @@ struct Manifold::Impl {
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
-  Impl(Shape, const mat4x3 = mat4x3(1));
+  Impl(Shape, const mat3x4 = Identity3x4());
 
   template <typename Precision, typename I>
   Impl(const MeshGLP<Precision, I>& meshGL) {
@@ -153,10 +153,11 @@ struct Manifold::Impl {
           meshRelation_.meshIDtransform[meshID] = {originalID};
         } else {
           const Precision* m = meshGL.runTransform.data() + 12 * i;
-          meshRelation_.meshIDtransform[meshID] = {
-              originalID,
-              {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9],
-               m[10], m[11]}};
+          meshRelation_.meshIDtransform[meshID] = {originalID,
+                                                   {{m[0], m[1], m[2]},
+                                                    {m[3], m[4], m[5]},
+                                                    {m[6], m[7], m[8]},
+                                                    {m[9], m[10], m[11]}}};
         }
       }
     }
@@ -250,7 +251,7 @@ struct Manifold::Impl {
   void MarkFailure(Error status);
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
-  Impl Transform(const mat4x3& transform) const;
+  Impl Transform(const mat3x4& transform) const;
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const vec3> vertsIn,
                                   bool inverted = false) const;
@@ -292,7 +293,7 @@ struct Manifold::Impl {
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
-                            mat3x2 projection) const;
+                            mat2x3 projection) const;
   Polygons Slice(double height) const;
   Polygons Project() const;
 

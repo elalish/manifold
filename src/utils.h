@@ -223,7 +223,7 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
   vec2 v1 = p1 - p0;
   vec2 v2 = p2 - p0;
   double area = fma(v1.x, v2.y, -v1.y * v2.x);
-  double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  double base2 = la::max(la::dot(v1, v1), la::dot(v2, v2));
   if (area * area * 4 <= base2 * tol * tol)
     return 0;
   else
@@ -236,13 +236,19 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
  *
  * @param up The vector to be turned to point upwards. Length does not matter.
  */
-inline mat4x3 RotateUp(vec3 up) {
-  up = glm::normalize(up);
-  vec3 axis = glm::cross(up, {0, 0, 1});
-  double angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<double>() - angle;
-  return mat4x3(glm::rotate(mat4(1), angle, axis));
+inline mat3x4 RotateUp(vec3 up) {
+  up = la::normalize(up);
+  const vec3 axis = la::cross(up, {0, 0, 1});
+  double angle = la::asin(la::length(axis));
+  if (la::dot(up, {0, 0, 1}) < 0) angle = kPi - angle;
+  const quat q = la::rotation_quat(la::normalize(axis), angle);
+  return mat3x4(la::qmat(q), vec3());
 }
+
+inline mat4 Mat4(mat3x4 a) {
+  return mat4({a[0], 0}, {a[1], 0}, {a[2], 0}, {a[3], 1});
+}
+inline mat3 Mat3(mat2x3 a) { return mat3({a[0], 0}, {a[1], 0}, {a[2], 1}); }
 
 /** @} */
 
@@ -255,34 +261,38 @@ inline mat4x3 RotateUp(vec3 up) {
  */
 #ifdef MANIFOLD_DEBUG
 
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y;
+template <class T>
+std::ostream& operator<<(std::ostream& out, const la::vec<T, 1>& v) {
+  return out << '{' << v[0] << '}';
+}
+template <class T>
+std::ostream& operator<<(std::ostream& out, const la::vec<T, 2>& v) {
+  return out << '{' << v[0] << ',' << v[1] << '}';
+}
+template <class T>
+std::ostream& operator<<(std::ostream& out, const la::vec<T, 3>& v) {
+  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << '}';
+}
+template <class T>
+std::ostream& operator<<(std::ostream& out, const la::vec<T, 4>& v) {
+  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << ',' << v[3] << '}';
 }
 
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec3<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z;
+template <class T, int M>
+std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 1>& m) {
+  return out << '{' << m[0] << '}';
 }
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
-                << ", w = " << v.w;
+template <class T, int M>
+std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 2>& m) {
+  return out << '{' << m[0] << ',' << m[1] << '}';
 }
-
-inline std::ostream& operator<<(std::ostream& stream, const mat3& mat) {
-  mat3 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
+template <class T, int M>
+std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 3>& m) {
+  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << '}';
 }
-
-inline std::ostream& operator<<(std::ostream& stream, const mat4x3& mat) {
-  mat3x4 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
+template <class T, int M>
+std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 4>& m) {
+  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << ',' << m[3] << '}';
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {

@@ -29,7 +29,7 @@ struct CubeVoid {
 
 struct Layers {
   double operator()(vec3 p) const {
-    int a = glm::mod(std::round(2 * p.z), 4.0);
+    int a = std::fmod(std::round(2 * p.z), 4.0);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }
 };
@@ -37,8 +37,8 @@ struct Layers {
 TEST(SDF, SphereShell) {
   Manifold sphere = Manifold::LevelSet(
       [](vec3 pos) {
-        const double r = glm::length(pos);
-        return glm::min(1 - r, r - 0.995f);
+        const double r = la::length(pos);
+        return la::min(1 - r, r - 0.995f);
       },
       {vec3(-1.1), vec3(1.1)}, 0.01, 0, 0.0001);
 
@@ -141,7 +141,7 @@ TEST(SDF, Surface) {
 
 TEST(SDF, Resize) {
   const double size = 20;
-  Manifold layers = Manifold::LevelSet(Layers(), {vec3(0), vec3(size)}, 1);
+  Manifold layers = Manifold::LevelSet(Layers(), {vec3(0.0), vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMeshGL(), {});
 #endif
@@ -153,10 +153,10 @@ TEST(SDF, Resize) {
 TEST(SDF, SineSurface) {
   Manifold surface = Manifold::LevelSet(
       [](vec3 p) {
-        double mid = glm::sin(p.x) + glm::sin(p.y);
+        double mid = la::sin(p.x) + la::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
-      {vec3(-1.75 * glm::pi<double>()), vec3(1.75 * glm::pi<double>())}, 1);
+      {vec3(-1.75 * kPi), vec3(1.75 * kPi)}, 1);
   Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
@@ -170,23 +170,23 @@ TEST(SDF, SineSurface) {
 
 TEST(SDF, Blobs) {
   const double blend = 1;
-  std::vector<glm::vec4> balls = {{0, 0, 0, 2},     //
-                                  {1, 2, 3, 2},     //
-                                  {-2, 2, -2, 1},   //
-                                  {-2, -3, -2, 2},  //
-                                  {-3, -1, -3, 1},  //
-                                  {2, -3, -2, 2},   //
-                                  {-2, 3, 2, 2},    //
-                                  {-2, -3, 2, 2},   //
-                                  {1, -1, 1, -2},   //
-                                  {-4, -3, -2, 1}};
+  std::vector<vec4> balls = {{0, 0, 0, 2},     //
+                             {1, 2, 3, 2},     //
+                             {-2, 2, -2, 1},   //
+                             {-2, -3, -2, 2},  //
+                             {-3, -1, -3, 1},  //
+                             {2, -3, -2, 2},   //
+                             {-2, 3, 2, 2},    //
+                             {-2, -3, 2, 2},   //
+                             {1, -1, 1, -2},   //
+                             {-4, -3, -2, 1}};
   Manifold blobs = Manifold::LevelSet(
       [&balls, blend](vec3 p) {
         double d = 0;
         for (const auto& ball : balls) {
-          d += glm::sign(ball.w) *
-               glm::smoothstep(-blend, blend,
-                               std::abs(ball.w) - glm::length(vec3(ball) - p));
+          d += (ball.w > 0 ? 1 : -1) *
+               smoothstep(-blend, blend,
+                          std::abs(ball.w) - la::length(vec3(ball) - p));
         }
         return d;
       },

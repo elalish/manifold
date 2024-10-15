@@ -320,12 +320,12 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
-      edge.edgePos = glm::dot(outR.vertPos_[edge.vert], edgeVec);
+      edge.edgePos = la::dot(outR.vertPos_[edge.vert], edgeVec);
     }
 
     int inclusion = i03[vStart];
     EdgePos edgePos = {vP2R[vStart],
-                       glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
+                       la::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
@@ -333,7 +333,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     inclusion = i03[vEnd];
-    edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
+    edgePos = {vP2R[vEnd], la::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
@@ -645,7 +645,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
           vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] = properties[oldNumProp * triProp[j] + p];
-          outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+          outR.meshRelation_.properties.push_back(la::dot(uvw, oldProps));
         } else {
           outR.meshRelation_.properties.push_back(0);
         }

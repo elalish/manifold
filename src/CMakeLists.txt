@@ -60,7 +60,6 @@ if(MANIFOLD_EXPORT)
 endif()
 
 # Dependency libraries
-set(MANIFOLD_LIBS glm::glm)
 if(MANIFOLD_CROSS_SECTION)
   if(TARGET Clipper2::Clipper2)
     list(APPEND MANIFOLD_LIBS Clipper2::Clipper2)

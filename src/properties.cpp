@@ -33,12 +33,12 @@ struct FaceAreaVolume {
       const int j = (i + 1) % 3;
       edge[i] = vertPos[halfedges[3 * face + j].startVert] -
                 vertPos[halfedges[3 * face + i].startVert];
-      perimeter += glm::length(edge[i]);
+      perimeter += la::length(edge[i]);
     }
-    vec3 crossP = glm::cross(edge[0], edge[1]);
+    vec3 crossP = la::cross(edge[0], edge[1]);
 
-    double area = glm::length(crossP);
-    double volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
+    double area = la::length(crossP);
+    double volume = la::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
     return std::make_pair(area / 2.0, volume / 6.0);
   }
@@ -60,24 +60,24 @@ struct CurvatureAngles {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
       edge[i] = vertPos[endVert] - vertPos[startVert];
-      edgeLength[i] = glm::length(edge[i]);
+      edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
-          std::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
-                             edge[i]));
+          std::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
+                            edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
       AtomicAdd(degree[startVert], 1.0);
     }
 
     vec3 phi;
-    phi[0] = std::acos(-glm::dot(edge[2], edge[0]));
-    phi[1] = std::acos(-glm::dot(edge[0], edge[1]));
-    phi[2] = glm::pi<double>() - phi[0] - phi[1];
+    phi[0] = std::acos(-la::dot(edge[2], edge[0]));
+    phi[1] = std::acos(-la::dot(edge[0], edge[1]));
+    phi[2] = kPi - phi[0] - phi[1];
     const double area3 = edgeLength[0] * edgeLength[1] *
-                         glm::length(glm::cross(edge[0], edge[1])) / 6;
+                         la::length(la::cross(edge[0], edge[1])) / 6;
 
     for (int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
@@ -155,7 +155,7 @@ struct CheckCCW {
   bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
-    const mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    const mat2x3 projection = GetAxisAlignedProjection(triNormal[face]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
@@ -168,12 +168,12 @@ struct CheckCCW {
       vec2 v1 = v[1] - v[0];
       vec2 v2 = v[2] - v[0];
       double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(glm::dot(v1, v1), glm::dot(v2, v2));
+      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
       double base = std::sqrt(base2);
       vec3 V0 = vertPos[halfedges[3 * face].startVert];
       vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
       vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = glm::cross(V1 - V0, V2 - V0);
+      vec3 norm = la::cross(V1 - V0, V2 - V0);
       printf(
           "Tri %ld does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
@@ -271,7 +271,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
   Vec<double> vertMeanCurvature(NumVert(), 0);
-  Vec<double> vertGaussianCurvature(NumVert(), glm::two_pi<double>());
+  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
   Vec<double> vertArea(NumVert(), 0);
   Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
@@ -314,14 +314,14 @@ void Manifold::Impl::CalculateBBox() {
              vec3(std::numeric_limits<double>::infinity()), [](auto a, auto b) {
                if (std::isnan(a.x)) return b;
                if (std::isnan(b.x)) return a;
-               return glm::min(a, b);
+               return la::min(a, b);
              });
   bBox_.max = reduce(vertPos_.begin(), vertPos_.end(),
                      vec3(-std::numeric_limits<double>::infinity()),
                      [](auto a, auto b) {
                        if (std::isnan(a.x)) return b;
                        if (std::isnan(b.x)) return a;
-                       return glm::max(a, b);
+                       return la::max(a, b);
                      });
 }
 
@@ -333,7 +333,7 @@ bool Manifold::Impl::IsFinite() const {
   return transform_reduce(
       vertPos_.begin(), vertPos_.end(), true,
       [](bool a, bool b) { return a && b; },
-      [](auto v) { return glm::all(glm::isfinite(v)); });
+      [](auto v) { return la::all(la::isfinite(v)); });
 }
 
 /**

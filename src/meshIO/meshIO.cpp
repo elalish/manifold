@@ -45,7 +45,7 @@ aiScene* CreateScene(const ExportOptions& options) {
   material->AddProperty(&options.mat.roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
   material->AddProperty(&options.mat.metalness, 1, AI_MATKEY_METALLIC_FACTOR);
   const vec4& color = options.mat.color;
-  aiColor4D baseColor(color.r, color.g, color.b, color.a);
+  aiColor4D baseColor(color.x, color.y, color.z, color.w);
   material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);
 
   scene->mNumMeshes = 1;
@@ -55,7 +55,7 @@ aiScene* CreateScene(const ExportOptions& options) {
 
   scene->mRootNode = new aiNode();
   scene->mRootNode->mNumMeshes = 1;
-  scene->mRootNode->mMeshes = new glm::uint[scene->mRootNode->mNumMeshes];
+  scene->mRootNode->mMeshes = new uint[scene->mRootNode->mNumMeshes];
   scene->mRootNode->mMeshes[0] = 0;
 
   scene->mMeshes[0]->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
@@ -240,8 +240,8 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
                    ? 1
                    : mesh.vertProperties[i * mesh.numProp +
                                          options.mat.colorChannels[j]];
-      c = glm::saturate(c);
-      mesh_out->mColors[0][i] = aiColor4D(c.r, c.g, c.b, c.a);
+      c = la::clamp(c, 0, 1);
+      mesh_out->mColors[0][i] = aiColor4D(c.x, c.y, c.z, c.w);
     }
   }
 
@@ -251,7 +251,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   for (size_t i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
-    face.mIndices = new glm::uint[face.mNumIndices];
+    face.mIndices = new uint[face.mNumIndices];
     for (int j : {0, 1, 2}) face.mIndices[j] = mesh.triVerts[3 * i + j];
   }
 

@@ -40,7 +40,7 @@ void AtomicAddVec3(vec3& target, const vec3& add) {
 }
 
 struct Transform4x3 {
-  const mat4x3 transform;
+  const mat3x4 transform;
 
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
@@ -62,21 +62,21 @@ struct AssignNormals {
     vec3 edge[3];
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
-      edge[i] = glm::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
+      edge[i] = la::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
     }
 
     if (calculateTriNormal) {
-      triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
+      triNormal = la::normalize(la::cross(edge[0], edge[1]));
       if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     }
 
     // corner angles
     vec3 phi;
-    double dot = -glm::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
-    dot = -glm::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<double>() : std::acos(dot));
-    phi[2] = glm::pi<double>() - phi[0] - phi[1];
+    double dot = -la::dot(edge[2], edge[0]);
+    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+    dot = -la::dot(edge[0], edge[1]);
+    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+    phi[2] = kPi - phi[0] - phi[1];
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -143,18 +143,18 @@ struct CoplanarEdge {
     const vec3 pairVec =
         vertPos[halfedge[3 * pairFace + pairNum].startVert] - base;
 
-    const double length = std::max(glm::length(jointVec), glm::length(edgeVec));
+    const double length = std::max(la::length(jointVec), la::length(edgeVec));
     const double lengthPair =
-        std::max(glm::length(jointVec), glm::length(pairVec));
-    vec3 normal = glm::cross(jointVec, edgeVec);
-    const double area = glm::length(normal);
-    const double areaPair = glm::length(glm::cross(pairVec, jointVec));
+        std::max(la::length(jointVec), la::length(pairVec));
+    vec3 normal = la::cross(jointVec, edgeVec);
+    const double area = la::length(normal);
+    const double areaPair = la::length(la::cross(pairVec, jointVec));
     triArea[edgeFace] = area;
     triArea[pairFace] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
-    const double volume = std::abs(glm::dot(normal, pairVec));
+    const double volume = std::abs(la::dot(normal, pairVec));
     // Only operate on coplanar triangles
     if (volume > std::max(area, areaPair) * precision) return;
 
@@ -175,10 +175,10 @@ struct CoplanarEdge {
         const vec3 iEdgeVec = edgeVec + normal * scale * (edgeProp - baseProp);
         const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
 
-        vec3 cross = glm::cross(iJointVec, iEdgeVec);
+        vec3 cross = la::cross(iJointVec, iEdgeVec);
         const double areaP = std::max(
-            glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const double volumeP = std::abs(glm::dot(cross, iPairVec));
+            la::length(cross), la::length(la::cross(iPairVec, iJointVec)));
+        const double volumeP = std::abs(la::dot(cross, iPairVec));
         // Only operate on consistent triangles
         if (volumeP > areaP * precision) return;
       }
@@ -201,16 +201,16 @@ struct CheckCoplanarity {
     if (referenceTri < 0 || referenceTri == tri) return;
 
     const vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
-    const vec3 normal = glm::normalize(
-        glm::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
-                   vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
+    const vec3 normal = la::normalize(
+        la::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
+                  vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
 
     for (const int i : {0, 1, 2}) {
       const vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (std::abs(glm::dot(normal, vert - origin)) > precision) {
+      if (std::abs(la::dot(normal, vert - origin)) > precision) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -255,7 +255,7 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape, const mat4x3 m) {
+Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   std::vector<vec3> vertPos;
   std::vector<ivec3> triVerts;
   switch (shape) {
@@ -515,9 +515,9 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Finish();
 }
 
-Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
+Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   ZoneScoped;
-  if (transform_ == mat4x3(1.0)) return *this;
+  if (transform_ == Identity3x4()) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
   if (status_ != Manifold::Error::NoError) {
@@ -533,7 +533,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
 
   result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
-    m.second.transform = transform_ * mat4(m.second.transform);
+    m.second.transform = transform_ * Mat4(m.second.transform);
   }
 
   result.vertPos_.resize(NumVert());
@@ -548,7 +548,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat4x3& transform_) const {
   transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
             TransformNormals({normalTransform}));
 
-  const bool invert = glm::determinant(mat3(transform_)) < 0;
+  const bool invert = la::determinant(mat3(transform_)) < 0;
 
   if (halfedgeTangent_.size() > 0) {
     for_each_n(policy, countAt(0), halfedgeTangent_.size(),
@@ -597,7 +597,7 @@ void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri(), 1e4);
-  fill(vertNormal_.begin(), vertNormal_.end(), vec3(0));
+  fill(vertNormal_.begin(), vertNormal_.end(), vec3(0.0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());

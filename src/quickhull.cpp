@@ -29,17 +29,17 @@ double defaultEps() { return 0.0000001; }
 inline double getSquaredDistanceBetweenPointAndRay(const vec3& p,
                                                    const Ray& r) {
   const vec3 s = p - r.S;
-  double t = glm::dot(s, r.V);
-  return glm::dot(s, s) - t * t * r.VInvLengthSquared;
+  double t = la::dot(s, r.V);
+  return la::dot(s, s) - t * t * r.VInvLengthSquared;
 }
 
 inline double getSquaredDistance(const vec3& p1, const vec3& p2) {
-  return glm::dot(p1 - p2, p1 - p2);
+  return la::dot(p1 - p2, p1 - p2);
 }
 // Note that the unit of distance returned is relative to plane's normal's
 // length (divide by N.getNormalized() if needed to get the "real" distance).
 inline double getSignedDistanceToPlane(const vec3& v, const Plane& p) {
-  return glm::dot(p.N, v) + p.D;
+  return la::dot(p.N, v) + p.D;
 }
 
 inline vec3 getTriangleNormal(const vec3& a, const vec3& b, const vec3& c) {
@@ -53,7 +53,7 @@ inline vec3 getTriangleNormal(const vec3& a, const vec3& b, const vec3& c) {
   double px = y * rhsz - z * rhsy;
   double py = z * rhsx - x * rhsz;
   double pz = x * rhsy - y * rhsx;
-  return glm::normalize(vec3(px, py, pz));
+  return la::normalize(vec3(px, py, pz));
 }
 
 size_t MeshBuilder::addFace() {
@@ -385,7 +385,7 @@ void QuickHull::createConvexHalfedgeMesh() {
       } else {
         const Plane& P = pvf.P;
         pvf.visibilityCheckedOnIteration = iter;
-        const double d = glm::dot(P.N, activePoint) + P.D;
+        const double d = la::dot(P.N, activePoint) + P.D;
         if (d > 0) {
           pvf.isVisibleFaceOnCurrentIteration = 1;
           pvf.horizonEdgesOnCurrentIteration = 0;

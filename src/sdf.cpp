@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <glm/gtc/integer.hpp>
-
 #include "./hashtable.h"
 #include "./impl.h"
 #include "./utils.h"
@@ -148,15 +146,15 @@ inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1, double tol,
   // Sole tuning parameter, k: (0, 1) - smaller value gets better median
   // performance, but also hits the worst case more often.
   const double k = 0.1;
-  const double check = 2 * tol / glm::length(pos0 - pos1);
+  const double check = 2 * tol / la::length(pos0 - pos1);
   double frac = 1;
   double biFrac = 1;
   while (frac > check) {
-    const double t = glm::mix(d0 / (d0 - d1), 0.5, k);
+    const double t = la::lerp(d0 / (d0 - d1), 0.5, k);
     const double r = biFrac / frac - 0.5;
-    const double x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+    const double x = la::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
-    const vec3 mid = glm::mix(pos0, pos1, x);
+    const vec3 mid = la::lerp(pos0, pos1, x);
     const double d = sdf(mid) - level;
 
     if ((d > 0) == (d0 > 0)) {
@@ -171,7 +169,7 @@ inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1, double tol,
     biFrac /= 2;
   }
 
-  return glm::mix(pos0, pos1, d0 / (d0 - d1));
+  return la::lerp(pos0, pos1, d0 / (d0 - d1));
 }
 
 /**
@@ -217,7 +215,7 @@ struct NearSurface {
 
     const ivec4 gridIndex = DecodeIndex(index, gridPow);
 
-    if (glm::any(glm::greaterThan(ivec3(gridIndex), gridSize))) return;
+    if (la::any(la::greater(ivec3(gridIndex), gridSize))) return;
 
     GridVert gridVert;
     gridVert.distance = voxels[EncodeIndex(gridIndex + kVoxelOffset, gridPow)];
@@ -239,14 +237,14 @@ struct NearSurface {
           ++opposedVerts;
         }
         // Approximate bound on vert movement.
-        if (glm::abs(val) > kD * glm::abs(gridVert.distance) &&
-            glm::abs(val) > glm::abs(vMax)) {
+        if (la::abs(val) > kD * la::abs(gridVert.distance) &&
+            la::abs(val) > la::abs(vMax)) {
           vMax = val;
           closestNeighbor = i;
         }
       } else if (!gridVert.SameSide(valOp) &&
-                 glm::abs(valOp) > kD * glm::abs(gridVert.distance) &&
-                 glm::abs(valOp) > glm::abs(vMax)) {
+                 la::abs(valOp) > kD * la::abs(gridVert.distance) &&
+                 la::abs(valOp) > la::abs(vMax)) {
         vMax = valOp;
         closestNeighbor = i + 7;
       }
@@ -264,7 +262,7 @@ struct NearSurface {
                                    Position(neighborIndex, origin, spacing),
                                    vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
-      if (glm::all(glm::lessThan(glm::abs(pos - gridPos), kS * spacing))) {
+      if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
         vertPos[idx] = pos;
         gridVert.movedVert = idx;
@@ -469,7 +467,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const ivec3 gridPow(glm::log2(gridSize + 2) + 1);
+  const ivec3 gridPow(la::log2(gridSize + 2) + 1);
   const Uint64 maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
@@ -488,7 +486,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       });
 
   size_t tableSize = std::min(
-      2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
+      2 * maxIndex, static_cast<Uint64>(10 * la::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize(gridVerts.Size() * 7);
 
@@ -501,7 +499,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
     if (gridVerts.Full()) {  // Resize HashTable
       const vec3 lastVert = vertPos[index[0] - 1];
       const Uint64 lastIndex =
-          EncodeIndex(ivec4((lastVert - origin) / spacing, 1), gridPow);
+          EncodeIndex(ivec4(ivec3((lastVert - origin) / spacing), 1), gridPow);
       const double ratio = static_cast<double>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large

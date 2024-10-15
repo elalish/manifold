@@ -73,7 +73,7 @@ ManifoldRect *manifold_rect_union(void *mem, ManifoldRect *a, ManifoldRect *b) {
 ManifoldRect *manifold_rect_transform(void *mem, ManifoldRect *r, double x1,
                                       double y1, double x2, double y2,
                                       double x3, double y3) {
-  auto mat = mat3x2(x1, y1, x2, y2, x3, y3);
+  auto mat = mat2x3({x1, y1}, {x2, y2}, {x3, y3});
   auto transformed = from_c(r)->Transform(mat);
   return to_c(new (mem) Rect(transformed));
 }

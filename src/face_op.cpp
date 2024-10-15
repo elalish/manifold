@@ -75,7 +75,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                         halfedge_[firstEdge + 1].startVert,
                         halfedge_[firstEdge + 2].startVert,
                         halfedge_[firstEdge + 3].startVert};
-      const mat3x2 projection = GetAxisAlignedProjection(normal);
+      const mat2x3 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
                    projection * this->vertPos_[tri[1]],
@@ -94,8 +94,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
           tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
-      DEBUG_ASSERT(glm::all(glm::greaterThanEqual(tri0, ivec3(0))) &&
-                       glm::all(glm::greaterThanEqual(tri1, ivec3(0))),
+      DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
+                       la::all(la::gequal(tri1, ivec3(0))),
                    topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
@@ -108,8 +108,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       } else if (firstValid) {
         vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
         vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
-        if (glm::dot(firstCross, firstCross) <
-            glm::dot(secondCross, secondCross)) {
+        if (la::dot(firstCross, firstCross) <
+            la::dot(secondCross, secondCross)) {
           tri0[2] = tri1[0];
           tri1[2] = tri0[0];
         }
@@ -126,7 +126,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   };
   auto generalTriangulation = [&](int face) {
     const vec3 normal = faceNormal_[face];
-    const mat3x2 projection = GetAxisAlignedProjection(normal);
+    const mat2x3 projection = GetAxisAlignedProjection(normal);
     const PolygonsIdx polys =
         Face2Polygons(halfedge_.cbegin() + faceEdge[face],
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
@@ -199,7 +199,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
  */
 PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           VecView<Halfedge>::IterC end,
-                                          mat3x2 projection) const {
+                                          mat2x3 projection) const {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
     vert_edge.emplace(
@@ -275,7 +275,7 @@ Polygons Manifold::Impl::Slice(double height) const {
       const vec3 below = vertPos_[up.startVert];
       const vec3 above = vertPos_[up.endVert];
       const double a = (height - below.z) / (above.z - below.z);
-      poly.push_back(vec2(glm::mix(below, above, a)));
+      poly.push_back(vec2(la::lerp(below, above, a)));
 
       const int pair = up.pairedHalfedge;
       tri = pair / 3;
@@ -289,7 +289,7 @@ Polygons Manifold::Impl::Slice(double height) const {
 }
 
 Polygons Manifold::Impl::Project() const {
-  const mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
+  const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
   Vec<Halfedge> cusps(NumEdge());
   cusps.resize(
       copy_if(

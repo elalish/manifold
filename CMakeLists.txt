@@ -152,17 +152,16 @@ if(MSVC)
   list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
 else()
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND WARNING_FLAGS -Wall -Wno-unknown-warning-option -Wno-unused)
+  else()
     list(
       APPEND
       WARNING_FLAGS
       -Wall
+      -Wno-unknown-warning-option
       -Wno-unused
-      -Wno-array-bounds
-      -Wno-stringop-overflow
-      -Wno-alloc-size-larger-than
+      -Wno-shorten-64-to-32
     )
-  else()
-    list(APPEND WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
   endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -217,24 +216,6 @@ function(logmissingdep PKG)
     message(FATAL_ERROR ${MSG})
   endif()
 endfunction()
-
-# GLM is required in all configurations.
-find_package(glm QUIET)
-if(NOT glm_FOUND)
-  logmissingdep("glm")
-  message(STATUS "glm not found, downloading from source")
-  set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
-  FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 1.0.1
-    GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(glm)
-  if(NOT EMSCRIPTEN)
-    install(TARGETS glm)
-  endif()
-endif()
 
 # If we're building parallel, we need the requisite libraries
 if(MANIFOLD_PAR)
@@ -411,6 +392,7 @@ set(
   MANIFOLD_PUBLIC_HDRS
   include/manifold/common.h
   include/manifold/iters.h
+  include/manifold/linalg.h
   include/manifold/manifold.h
   include/manifold/optional_assert.h
   include/manifold/parallel.h

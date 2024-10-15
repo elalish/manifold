@@ -27,7 +27,7 @@ using namespace manifold;
 Polygons Turn180(Polygons polys) {
   for (SimplePolygon &poly : polys) {
     for (vec2 &vert : poly) {
-      vert *= -1;
+      vert *= -1.0;
     }
   }
   return polys;

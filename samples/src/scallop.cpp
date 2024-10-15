@@ -32,19 +32,19 @@ Manifold Scallop() {
   scallop.numProp = 3;
   scallop.vertProperties = {-offset, 0, height, -offset, 0, -height};
 
-  const double delta = glm::pi<double>() / wiggles;
+  const double delta = kPi / wiggles;
   for (int i = 0; i < 2 * wiggles; ++i) {
     double theta = (i - wiggles) * delta;
-    double amp = 0.5 * height * glm::max(glm::cos(0.8 * theta), 0.0);
+    double amp = 0.5 * height * la::max(la::cos(0.8 * theta), 0.0);
 
     scallop.vertProperties.insert(
         scallop.vertProperties.end(),
-        {radius * glm::cos(theta), radius * glm::sin(theta),
+        {radius * la::cos(theta), radius * la::sin(theta),
          amp * (i % 2 == 0 ? 1 : -1)});
     int j = i + 1;
     if (j == 2 * wiggles) j = 0;
 
-    double smoothness = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
+    double smoothness = 1 - sharpness * la::cos((theta + delta / 2) / 2);
     size_t halfedge = scallop.triVerts.size() + 1;
     sharpenedEdges.push_back({halfedge, smoothness});
     scallop.triVerts.insert(
