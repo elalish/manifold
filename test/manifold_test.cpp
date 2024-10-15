@@ -557,7 +557,6 @@ TEST(Manifold, Merge) {
 }
 
 TEST(Manifold, PinchedVert) {
-  // TODO
   MeshGL shape;
   shape.numProp = 3;
   shape.vertProperties = {0,        0,  0,   //
