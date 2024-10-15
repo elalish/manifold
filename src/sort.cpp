@@ -265,13 +265,6 @@ void Manifold::Impl::Finish() {
                logicErr,
                "faceNormal size = " + std::to_string(faceNormal_.size()) +
                    ", NumTri = " + std::to_string(NumTri()));
-  // TODO: figure out why this has a flaky failure and then enable reading
-  // vertNormals from a Mesh.
-  // DEBUG_ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0,
-  // logicErr,
-  //        "vertNormal size = " + std::to_string(vertNormal_.size()) +
-  //            ", NumVert = " + std::to_string(NumVert()));
-
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 

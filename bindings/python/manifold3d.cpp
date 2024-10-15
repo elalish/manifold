@@ -228,8 +228,7 @@ NB_MODULE(manifold3d, m) {
         nb::arg("radius"), get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
-        nb::arg("precision") = -1,  // TODO document
-        triangulate__polygons__precision);
+        nb::arg("precision") = -1, triangulate__polygons__precision);
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
@@ -401,7 +400,7 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
           nb::arg("edge_smoothness") = nb::list(),
-          // todo params slightly diff
+          // TODO: params slightly diff
           manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),

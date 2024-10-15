@@ -303,13 +303,9 @@ TEST(Samples, Sponge4) {
 TEST(Samples, CondensedMatter16) {
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
-  // FIXME: normals should be correct
-  // CheckNormals(cm);
 }
 
 TEST(Samples, CondensedMatter64) {
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
-  // FIXME: normals should be correct
-  // CheckNormals(cm);
 }

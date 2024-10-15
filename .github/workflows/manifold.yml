@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install libglm-dev libgtest-dev libassimp-dev git libtbb-dev libthrust-dev pkg-config libpython3-dev lcov
+        sudo apt-get install libglm-dev libgtest-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev lcov
         python -m pip install -U trimesh pytest
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2

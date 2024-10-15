@@ -1458,7 +1458,7 @@ constexpr vec<T, 3> cross(const vec<T, 3> &a, const vec<T, 3> &b) {
 }
 template <class T, int M>
 constexpr T dot(const vec<T, M> &a, const vec<T, M> &b) {
-  return sum(cmul(a, b));
+  return sum(a * b);
 }
 template <class T, int M>
 constexpr T length2(const vec<T, M> &a) {
