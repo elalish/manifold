@@ -33,7 +33,7 @@ using namespace manifold;
 
 #if NB_VERSION_MAJOR < 2 || (NB_VERSION_MAJOR == 2 && NB_VERSION_MINOR < 2)
 #define ndarray_export ndarray_wrap
-#define numpy_value int(ndarray_framework::numpy)
+#define numpy_value ndarray_framework::numpy
 #else
 #define numpy_value numpy::value
 #endif
