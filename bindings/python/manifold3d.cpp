@@ -121,7 +121,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
       }
     }
     numpy_type arr{buffer, {R, C}, std::move(mem_mgr)};
-    return ndarray_export(arr.handle(), numpy::value, policy, cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
