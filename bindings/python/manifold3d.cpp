@@ -228,8 +228,7 @@ NB_MODULE(manifold3d, m) {
         nb::arg("radius"), get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
-        nb::arg("precision") = -1,
-        triangulate__polygons__precision);
+        nb::arg("precision") = -1, triangulate__polygons__precision);
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
