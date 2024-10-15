@@ -160,6 +160,7 @@ else()
       -Wno-array-bounds
       -Wno-stringop-overflow
       -Wno-alloc-size-larger-than
+      -Wno-narrowing
     )
   else()
     list(APPEND WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)

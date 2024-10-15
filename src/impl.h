@@ -28,7 +28,7 @@ namespace manifold {
 struct Manifold::Impl {
   struct Relation {
     int originalID = -1;
-    mat3x4 transform = mat3x4(1);
+    mat3x4 transform = Identity3x4();
     bool backSide = false;
   };
   struct MeshRelationD {

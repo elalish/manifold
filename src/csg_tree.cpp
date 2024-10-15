@@ -111,7 +111,7 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
 }
 
 std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
-  mat3x4 transform(1.0);
+  mat3x4 transform = Identity3x4();
   transform[3] += t;
   return Transform(transform);
 }
