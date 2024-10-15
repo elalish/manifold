@@ -396,6 +396,7 @@ set(
   MANIFOLD_PUBLIC_HDRS
   include/manifold/common.h
   include/manifold/iters.h
+  include/manifold/linalg.h
   include/manifold/manifold.h
   include/manifold/optional_assert.h
   include/manifold/parallel.h
