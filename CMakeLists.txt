@@ -156,6 +156,7 @@ else()
       APPEND
       WARNING_FLAGS
       -Wall
+      -Wno-unknown-warning-option
       -Wno-unused
       -Wno-array-bounds
       -Wno-stringop-overflow
@@ -168,6 +169,7 @@ else()
       APPEND
       WARNING_FLAGS
       -Wall
+      -Wno-unknown-warning-option
       -Wno-unused
       -Wno-shorten-64-to-32
       -Wno-c++11-narrowing-const-reference
