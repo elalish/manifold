@@ -152,13 +152,7 @@ if(MSVC)
   list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
 else()
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(
-      APPEND
-      WARNING_FLAGS
-      -Wall
-      -Wno-unknown-warning-option
-      -Wno-unused
-    )
+    list(APPEND WARNING_FLAGS -Wall -Wno-unknown-warning-option -Wno-unused)
   else()
     list(
       APPEND
