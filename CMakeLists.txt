@@ -164,7 +164,14 @@ else()
       -Wno-c++11-narrowing-const-reference
     )
   else()
-    list(APPEND WARNING_FLAGS -Wall -Wno-unused -Wno-shorten-64-to-32)
+    list(
+      APPEND
+      WARNING_FLAGS
+      -Wall
+      -Wno-unused
+      -Wno-shorten-64-to-32
+      -Wno-c++11-narrowing-const-reference
+    )
   endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
