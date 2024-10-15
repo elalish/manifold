@@ -60,7 +60,7 @@ struct Manifold::Impl {
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
-  Impl(Shape, const mat3x4 = mat3x4(1));
+  Impl(Shape, const mat3x4 = Identity3x4());
 
   template <typename Precision, typename I>
   Impl(const MeshGLP<Precision, I>& meshGL) {
