@@ -56,7 +56,7 @@
 
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
-#if _MSC_VER <= 1900
+#if defined(_MSC_VER) && (_MSC_VER <= 1900)
 #define LINALG_CONSTEXPR14
 #else
 #define LINALG_CONSTEXPR14 constexpr
