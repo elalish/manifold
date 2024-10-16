@@ -125,6 +125,7 @@ MeshGL Csaszar() {
                       0, 5, 3,  //
                       0, 3, 2,  //
                       2, 4, 5};
+  csaszar.runOriginalID = {Manifold::ReserveIDs(1)};
   return csaszar;
 }
 
@@ -198,39 +199,16 @@ MeshGL CubeSTL() {
   return cube;
 }
 
-MeshGL WithIndexColors(const MeshGL& in) {
-  MeshGL out(in);
-  out.runIndex.clear();
-  out.runTransform.clear();
-  out.faceID.clear();
-  out.runOriginalID = {Manifold::ReserveIDs(1)};
-  const int numVert = out.NumVert();
-  out.numProp = 6;
-  out.vertProperties.resize(6 * numVert);
-  for (int i = 0; i < numVert; ++i) {
-    for (int j : {0, 1, 2})
-      out.vertProperties[6 * i + j] = in.vertProperties[3 * i + j];
-    // vertex colors
-    double a;
-    out.vertProperties[6 * i + 3] = powf(modf(i * sqrt(2.0), &a), 2.2);
-    out.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
-    out.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
-  }
-  return out;
-}
-
-MeshGL WithPositionColors(const Manifold& in) {
+Manifold WithPositionColors(const Manifold& in) {
   const Box bbox = in.BoundingBox();
   const vec3 size = bbox.Size();
 
-  Manifold out = in.SetProperties(
+  return in.SetProperties(
       3, [bbox, size](double* prop, vec3 pos, const double* oldProp) {
         for (int i : {0, 1, 2}) {
           prop[i] = (pos[i] - bbox.min[i]) / size[i];
         }
       });
-
-  return out.GetMeshGL();
 }
 
 MeshGL CubeUV() {

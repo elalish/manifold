@@ -433,6 +433,7 @@ Manifold Manifold::AsOriginal() const {
   newImpl->CreateFaces();
   newImpl->SimplifyTopology();
   newImpl->Finish();
+  newImpl->InitializeOriginal();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
