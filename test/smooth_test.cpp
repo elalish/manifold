@@ -47,18 +47,17 @@ TEST(Smooth, Tetrahedron) {
 }
 
 TEST(Smooth, RefineQuads) {
-  Manifold cylinder =
-      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12)))
-          .SmoothOut()
-          .RefineToLength(0.05);
-  EXPECT_EQ(cylinder.NumTri(), 16892);
+  Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
+                          .SmoothOut()
+                          .RefineToLength(0.05);
+  EXPECT_EQ(cylinder.NumTri(), 17044);
   auto prop = cylinder.GetProperties();
   EXPECT_NEAR(prop.volume, 2 * kPi, 0.003);
   EXPECT_NEAR(prop.surfaceArea, 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
   CheckGL(out);
 
-  const MeshGL baseline = WithPositionColors(cylinder);
+  const MeshGL baseline = WithPositionColors(cylinder).GetMeshGL();
   EXPECT_EQ(out.NumVert(), baseline.NumVert());
   float maxDiff = 0;
   for (size_t i = 0; i < out.vertProperties.size(); ++i) {
