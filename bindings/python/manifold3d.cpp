@@ -31,6 +31,13 @@
 namespace nb = nanobind;
 using namespace manifold;
 
+#if NB_VERSION_MAJOR < 2 || (NB_VERSION_MAJOR == 2 && NB_VERSION_MINOR < 2)
+#define ndarray_export ndarray_wrap
+#define numpy_value ndarray_framework::numpy
+#else
+#define numpy_value numpy::value
+#endif
+
 template <class T>
 struct la_name {};
 template <>
@@ -114,8 +121,7 @@ struct nb::detail::type_caster<la::mat<T, R, C>> {
       }
     }
     numpy_type arr{buffer, {R, C}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
@@ -160,8 +166,7 @@ struct nb::detail::type_caster<std::vector<la::vec<T, N>>> {
       }
     }
     numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
@@ -193,8 +198,7 @@ struct nb::detail::type_caster<manifold::VecView<la::vec<T, N>>> {
     static_assert(sizeof(vec[0]) == (N * sizeof(T)),
                   "VecView -> numpy requires packed structs");
     numpy_type arr{&vec[0], {num_vec, N}, nb::handle()};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    return ndarray_export(arr.handle(), numpy_value, policy, cleanup);
   }
 };
 
