@@ -282,13 +282,6 @@ Manifold::Manifold(const MeshGL& meshGL)
  * runs.
  *
  * @param meshGL The input MeshGL.
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * properties in the [-1, 1] range.
  */
 Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
@@ -419,7 +412,9 @@ int Manifold::OriginalID() const {
 
 /**
  * This removes all relations (originalID, faceID, transform) to ancestor meshes
- * and this new Manifold is marked an original.
+ * and this new Manifold is marked an original. It also collapses colinear edges
+ * - these don't get collapsed at boundaries where originalID changes, so the
+ * reset may allow flat faces to be further simplified.
  */
 Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();

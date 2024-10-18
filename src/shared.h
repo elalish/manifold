@@ -143,8 +143,8 @@ struct TriRef {
   /// The OriginalID of the mesh this triangle came from. This ID is ideal for
   /// reapplying properties like UV coordinates to the output mesh.
   int originalID;
-  /// The triangle index of the original triangle this was part of:
-  /// Mesh.triVerts[tri].
+  /// Probably the triangle index of the original triangle this was part of:
+  /// Mesh.triVerts[tri], but it's an input, so just pass it along unchanged.
   int tri;
   /// Triangles with the same face ID are coplanar.
   int faceID;
