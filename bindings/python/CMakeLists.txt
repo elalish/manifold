@@ -96,6 +96,8 @@ set(
   ${CMAKE_SOURCE_DIR}/src/cross_section/cross_section.cpp
   ${CMAKE_SOURCE_DIR}/src/polygon.cpp
   ${CMAKE_SOURCE_DIR}/include/manifold/common.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/docstring_override.txt
 )
 add_custom_command(
   OUTPUT autogen_docstrings.inl
