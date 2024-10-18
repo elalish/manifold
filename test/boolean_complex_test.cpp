@@ -1144,39 +1144,16 @@ TEST(BooleanComplex, SimpleOffset) {
     pts[15] = pnts[2].x;
     pts[16] = pnts[2].y;
     pts[17] = pnts[2].z;
-    int faces[24];
-    // 1 2 5
-    faces[0] = 0;
-    faces[1] = 1;
-    faces[2] = 4;
-    // 3 4 6
-    faces[3] = 2;
-    faces[4] = 3;
-    faces[5] = 5;
-    // 2 1 4
-    faces[6] = 1;
-    faces[7] = 0;
-    faces[8] = 3;
-    // 4 3 2
-    faces[9] = 3;
-    faces[10] = 2;
-    faces[11] = 1;
-    // 4 1 5
-    faces[12] = 3;
-    faces[13] = 0;
-    faces[14] = 4;
-    // 5 6 4
-    faces[15] = 4;
-    faces[16] = 5;
-    faces[17] = 3;
-    // 6 5 2
-    faces[18] = 5;
-    faces[19] = 4;
-    faces[20] = 1;
-    // 2 3 6
-    faces[21] = 1;
-    faces[22] = 2;
-    faces[23] = 5;
+    int faces[24] = {
+        faces[0] = 0,  faces[1] = 1,  faces[2] = 4,   // 1 2 5
+        faces[3] = 2,  faces[4] = 3,  faces[5] = 5,   // 3 4 6
+        faces[6] = 1,  faces[7] = 0,  faces[8] = 3,   // 2 1 4
+        faces[9] = 3,  faces[10] = 2, faces[11] = 1,  // 4 3 2
+        faces[12] = 3, faces[13] = 0, faces[14] = 4,  // 4 1 5
+        faces[15] = 4, faces[16] = 5, faces[17] = 3,  // 5 6 4
+        faces[18] = 5, faces[19] = 4, faces[20] = 1,  // 6 5 2
+        faces[21] = 1, faces[22] = 2, faces[23] = 5   // 2 3 6
+    };
     manifold::MeshGL64 tri_m;
     for (int j = 0; j < 18; j++)
       tri_m.vertProperties.insert(tri_m.vertProperties.end(), pts[j]);
