@@ -105,17 +105,16 @@ struct nb::detail::type_caster<la::mat<T, R, C>> {
   }
   static handle from_cpp(la_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
-    T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
+    std::array<T, R * C> buffer;
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), la is (Cols, Rows)
         buffer[i * C + j] = mat[j][i];
       }
     }
-    numpy_type arr{buffer, {R, C}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
-                        cleanup);
+    numpy_type arr{buffer, {R, C}, nb::handle()};
+    // we must copy the underlying data
+    return make_caster<numpy_type>::from_cpp(arr, rv_policy::copy, cleanup);
   }
 };
 
@@ -160,12 +159,12 @@ struct nb::detail::type_caster<std::vector<la::vec<T, N>>> {
       }
     }
     numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    // we can just do a move because we already did the copying
+    return make_caster<numpy_type>::from_cpp(arr, rv_policy::move, cleanup);
   }
 };
 
-// handle VecView<la::vec*>
+// handle VecView<la::vecN>
 template <class T, int N>
 struct nb::detail::type_caster<manifold::VecView<la::vec<T, N>>> {
   using la_type = la::vec<T, N>;
@@ -173,28 +172,17 @@ struct nb::detail::type_caster<manifold::VecView<la::vec<T, N>>> {
   NB_TYPE_CASTER(manifold::VecView<la_type>,
                  const_name(la_name<la_type>::multi_name));
 
-  bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    make_caster<numpy_type> arr_cast;
-    if (!arr_cast.from_python(src, flags, cleanup)) return false;
-    // TODO try 2d iterators if numpy cast fails
-    size_t num_vec = arr_cast.value.shape(0);
-    if (num_vec != value.size()) return false;
-    for (size_t i = 0; i < num_vec; i++) {
-      for (int j = 0; j < N; j++) {
-        value[i][j] = arr_cast.value(i, j);
-      }
-    }
-    return true;
-  }
   static handle from_cpp(Value vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
-    // do we have ownership issue here?
     size_t num_vec = vec.size();
-    static_assert(sizeof(vec[0]) == (N * sizeof(T)),
+    // assume packed struct
+    static_assert(alignof(la::vec<T, N>) <= (N * sizeof(T)),
                   "VecView -> numpy requires packed structs");
-    numpy_type arr{&vec[0], {num_vec, N}, nb::handle()};
-    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
-                        cleanup);
+    static_assert(sizeof(la::vec<T, N>) == (N * sizeof(T)),
+                  "VecView -> numpy requires packed structs");
+    numpy_type arr{vec.data(), {num_vec, N}, nb::handle()};
+    // we must copy the underlying data
+    return make_caster<numpy_type>::from_cpp(arr, rv_policy::copy, cleanup);
   }
 };
 
@@ -274,8 +262,22 @@ NB_MODULE(manifold3d, m) {
             return self.Warp([&warp_func](vec3 &v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), manifold__warp__warp_func)
-      .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
-           manifold__warp_batch__warp_func)
+      .def(
+          "warp_batch",
+          [](const Manifold &self,
+             std::function<nb::object(VecView<vec3>)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.WarpBatch([&warp_func](VecView<vec3> v) {
+              auto tmp = warp_func(v);
+              nb::ndarray<double, nb::shape<-1, 3>, nanobind::c_contig> tmpnd;
+              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2)
+                throw std::runtime_error(
+                    "Invalid vector shape, expected (:, 3)");
+              std::copy(tmpnd.data(), tmpnd.data() + v.size() * 3,
+                        &v.data()->x);
+            });
+          },
+          nb::arg("warp_func"), manifold__warp_batch__warp_func)
       .def(
           "set_properties",
           [](const Manifold &self, int newNumProp,
@@ -400,7 +402,6 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
           nb::arg("edge_smoothness") = nb::list(),
-          // TODO: params slightly diff
           manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
@@ -669,6 +670,23 @@ NB_MODULE(manifold3d, m) {
           nb::arg("warp_func"), cross_section__warp__warp_func)
       .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
            cross_section__warp_batch__warp_func)
+
+      .def(
+          "warp_batch",
+          [](const CrossSection &self,
+             std::function<nb::object(VecView<vec2>)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.WarpBatch([&warp_func](VecView<vec2> v) {
+              auto tmp = warp_func(v);
+              nb::ndarray<double, nb::shape<-1, 2>, nanobind::c_contig> tmpnd;
+              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2)
+                throw std::runtime_error(
+                    "Invalid vector shape, expected (:, 2)");
+              std::copy(tmpnd.data(), tmpnd.data() + v.size() * 2,
+                        &v.data()->x);
+            });
+          },
+          nb::arg("warp_func"), cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
            cross_section__simplify__epsilon)
       .def(
