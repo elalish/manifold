@@ -367,7 +367,7 @@ void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
                            meshRelation_.properties, propertyToleranceD,
-                           meshRelation_.numProp, precision_}));
+                           meshRelation_.numProp, uncertainty_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -388,7 +388,7 @@ void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, precision_}));
+                 {comp2tri, halfedge_, vertPos_, &components, uncertainty_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -510,7 +510,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
-  SetPrecision();
+  SetUncertainty();
   InitializeOriginal();
   Finish();
 }
@@ -526,7 +526,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
-  result.precision_ = precision_;
+  result.uncertainty_ = uncertainty_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
@@ -567,9 +567,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
 
   result.CalculateBBox();
   // Scale the precision by the norm of the 3x3 portion of the transform.
-  result.precision_ *= SpectralNorm(mat3(transform_));
+  result.uncertainty_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited precision loss and translational precision loss.
-  result.SetPrecision(result.precision_);
+  result.SetUncertainty(result.uncertainty_);
   return result;
 }
 
@@ -577,8 +577,8 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  * Sets the precision based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetPrecision(double minPrecision) {
-  precision_ = MaxPrecision(minPrecision, bBox_);
+void Manifold::Impl::SetUncertainty(double minUncertainty) {
+  uncertainty_ = MaxUncertainty(minUncertainty, bBox_);
 }
 
 /**
@@ -606,11 +606,11 @@ void Manifold::Impl::CalculateNormals() {
   if (calculateTriNormal)
     for_each_n(policy, countAt(0), NumTri(),
                AssignNormals<true>({faceNormal_, vertNormal_, vertPos_,
-                                    halfedge_, precision_}));
+                                    halfedge_, uncertainty_}));
   else
     for_each_n(policy, countAt(0), NumTri(),
                AssignNormals<false>({faceNormal_, vertNormal_, vertPos_,
-                                     halfedge_, precision_}));
+                                     halfedge_, uncertainty_}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            [](vec3& v) { v = SafeNormalize(v); });
 }

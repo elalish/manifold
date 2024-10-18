@@ -70,9 +70,6 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
       !isOriginal && la::all(la::greater(normalIdx, ivec3(2)));
 
   MeshGLP<Precision, I> out;
-  out.precision =
-      std::max(impl.precision_,
-               std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
   out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
 
@@ -387,8 +384,17 @@ Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
  * considered degenerate and removed. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-double Manifold::Precision() const {
-  return GetCsgLeafNode().GetImpl()->precision_;
+double Manifold::GetUncertainty() const {
+  auto impl = GetCsgLeafNode().GetImpl();
+  return std::max(impl->uncertainty_, std::numeric_limits<double>::epsilon() * impl->bBox_.Scale());
+}
+
+
+Manifold Manifold::SetUncertainty(double uncertainty) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  impl->SetUncertainty(uncertainty);
+  impl->SimplifyTopology();
+  return Manifold(impl);
 }
 
 /**

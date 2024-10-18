@@ -29,9 +29,9 @@ inline vec3 SafeNormalize(vec3 v) {
   return std::isfinite(v.x) ? v : vec3(0.0);
 }
 
-inline double MaxPrecision(double minPrecision, const Box& bBox) {
-  double precision = std::max(minPrecision, kTolerance * bBox.Scale());
-  return std::isfinite(precision) ? precision : -1;
+inline double MaxUncertainty(double minUncertainty, const Box& bBox) {
+  double uncertainty = std::max(minUncertainty, kTolerance * bBox.Scale());
+  return std::isfinite(uncertainty) ? uncertainty : -1;
 }
 
 inline int NextHalfedge(int current) {

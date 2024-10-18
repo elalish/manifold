@@ -233,7 +233,6 @@ class Manifold {
   size_t NumProp() const;
   size_t NumPropVert() const;
   Box BoundingBox() const;
-  double Precision() const;
   int Genus() const;
   Properties GetProperties() const;
   double MinGap(const Manifold& other, double searchLength) const;
@@ -313,6 +312,8 @@ class Manifold {
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
   size_t NumOverlaps(const Manifold& second) const;
+  double GetUncertainty() const;
+  Manifold SetUncertainty(double uncertainty) const;
   ///@}
 
   struct Impl;

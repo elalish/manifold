@@ -191,7 +191,7 @@ Manifold::Impl CsgLeafNode::Compose(
     double nodeOldScale = node->pImpl_->bBox_.Scale();
     double nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
-    double nodePrecision = node->pImpl_->precision_;
+    double nodePrecision = node->pImpl_->uncertainty_;
     nodePrecision *= std::max(1.0, nodeNewScale / nodeOldScale);
     nodePrecision = std::max(nodePrecision, kTolerance * nodeNewScale);
     if (!std::isfinite(nodePrecision)) nodePrecision = -1;
@@ -212,7 +212,7 @@ Manifold::Impl CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
-  combined.precision_ = precision;
+  combined.uncertainty_ = precision;
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);

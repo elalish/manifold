@@ -45,7 +45,7 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
-  double precision_ = -1;
+  double uncertainty_ = -1;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
@@ -199,7 +199,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetPrecision(meshGL.precision);
+    SetUncertainty();
 
     SplitPinchedVerts();
 
@@ -272,7 +272,7 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetPrecision(double minPrecision = -1);
+  void SetUncertainty(double minUncertainty = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
