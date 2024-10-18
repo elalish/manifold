@@ -282,13 +282,6 @@ Manifold::Manifold(const MeshGL& meshGL)
  * runs.
  *
  * @param meshGL The input MeshGL.
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * properties in the [-1, 1] range.
  */
 Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
@@ -418,21 +411,12 @@ int Manifold::OriginalID() const {
 }
 
 /**
- * This function condenses all coplanar faces in the relation, and
- * collapses those edges. In the process the relation to ancestor meshes is lost
- * and this new Manifold is marked an original. Properties are preserved, so if
- * they do not match across an edge, that edge will be kept.
- *
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * single-precision properties in the [-1, 1] range.
+ * This removes all relations (originalID, faceID, transform) to ancestor meshes
+ * and this new Manifold is marked an original. It also collapses colinear edges
+ * - these don't get collapsed at boundaries where originalID changes, so the
+ * reset may allow flat faces to be further simplified.
  */
-Manifold Manifold::AsOriginal(
-    const std::vector<double>& propertyTolerance) const {
+Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
   if (oldImpl->status_ != Error::NoError) {
     auto newImpl = std::make_shared<Impl>();
@@ -441,9 +425,10 @@ Manifold Manifold::AsOriginal(
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces(propertyTolerance);
+  newImpl->CreateFaces();
   newImpl->SimplifyTopology();
   newImpl->Finish();
+  newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 

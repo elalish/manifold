@@ -22,9 +22,8 @@ using namespace manifold;
  * The very simplest Boolean operation test.
  */
 TEST(Boolean, Tetra) {
-  Manifold tetra = Manifold::Tetrahedron();
-  MeshGL tetraGL = WithPositionColors(tetra);
-  tetra = Manifold(tetraGL);
+  Manifold tetra = WithPositionColors(Manifold::Tetrahedron());
+  MeshGL tetraGL = tetra.GetMeshGL();
   EXPECT_TRUE(!tetra.IsEmpty());
 
   Manifold tetra2 = tetra.Translate(vec3(0.5));
@@ -242,37 +241,12 @@ TEST(Boolean, Perturb) {
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cylinder = Manifold::Cylinder(1.0, 1.0);
-  MeshGL cylinderGL = WithPositionColors(cylinder);
-  cylinder = Manifold(cylinderGL);
+  Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
+  MeshGL cylinderGL = cylinder.GetMeshGL();
 
   Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 48}});
-  EXPECT_EQ(out.NumDegenerateTris(), 0);
-  EXPECT_EQ(out.Genus(), 1);
-
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
-  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
-#endif
-
-  RelatedGL(out, {cylinderGL});
-}
-
-/**
- * Colinear edges are not collapsed like above due to non-coplanar properties.
- */
-TEST(Boolean, CoplanarProp) {
-  Manifold cylinder = Manifold::Cylinder(1.0, 1.0);
-  MeshGL cylinderGL = WithIndexColors(cylinder.GetMeshGL());
-  cylinder = Manifold(cylinderGL);
-
-  Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
-  Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{52, 104, 3, 88}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
