@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Manifold - <code></code>&lt;model-viewer&gt;</code> Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    model-viewer {
+      display: block;
+      width: 100vw;
+      height: 100vw;
+      max-width: 600px;
+      max-height: 600px;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/modelViewer.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill.js">
+  <link rel="modulepreload" crossorigin href="/assets/gltf-io.js">
+  <link rel="modulepreload" crossorigin href="/assets/manifold.js">
+</head>
+
+<body>
+  <p>This example demonstrates reading and writing glTF models using <a
+      href="https://gltf-transform.donmccurdy.com/index.html">gltf-transform</a> and using this to feed Manifold's
+    output into <a href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>. It also shows how to pass mesh properties
+    like UV coordinates through Manifold and how to re-associate textures and materials after operations, made simple
+    using our `gltf-io.ts` library. The resulting glTF includes the EXT_mesh_manifold extension, using our
+    `manifold-gltf.ts` extension to gltf-transform, which ensures lossless data transfer.</p>
+  <p>Please open dev tools to inspect our source code - everything is source mapped back to our TS files and commented
+    thoroughly. A more basic three.js example is <a href="three.html">here</a>. </p>
+  <select>
+    <option value="difference" selected>Difference</option>
+    <option value="intersection">Intersection</option>
+    <option value="union">Union</option>
+  </select>
+  <button id="download">Download manifold GLB</button>
+  <model-viewer camera-controls shadow-intensity="1" tone-mapping="neutral"
+    alt="Output of mesh Boolean operation"></model-viewer>
+</body>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
+
+</html>
