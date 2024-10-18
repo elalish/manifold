@@ -168,7 +168,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)
-      .function("_AsOriginal", &Manifold::AsOriginal);
+      .function("asOriginal", &Manifold::AsOriginal);
 
   // Manifold Static Methods
   function("_Cube", &Manifold::Cube);

@@ -342,7 +342,7 @@ void Manifold::Impl::CreateFaces() {
               meshRelation_
                   .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
           bool propEqual = true;
-          for (int p = 0; p < numProp; ++p) {
+          for (size_t p = 0; p < numProp; ++p) {
             if (meshRelation_.properties[numProp * prop0 + p] !=
                 meshRelation_.properties[numProp * prop1 + p]) {
               propEqual = false;
