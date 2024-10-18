@@ -1087,85 +1087,35 @@ TEST(BooleanComplex, SimpleOffset) {
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
     for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
-    vec3 ev1 = vec3(seeds.vertProperties[3 * eind[0] + 0],
-                    seeds.vertProperties[3 * eind[0] + 1],
-                    seeds.vertProperties[3 * eind[0] + 2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3 * eind[1] + 0],
-                    seeds.vertProperties[3 * eind[1] + 1],
-                    seeds.vertProperties[3 * eind[1] + 2]);
-    vec3 ev3 = vec3(seeds.vertProperties[3 * eind[2] + 0],
-                    seeds.vertProperties[3 * eind[2] + 1],
-                    seeds.vertProperties[3 * eind[2] + 2]);
-    vec3 a = ev1 - ev3;
-    vec3 b = ev2 - ev3;
+    std::vector<vec3> ev;
+    for (int j = 0; j < 3; j++) {
+      ev.push_back(vec3(seeds.vertProperties[3 * eind[j] + 0],
+                        seeds.vertProperties[3 * eind[j] + 1],
+                        seeds.vertProperties[3 * eind[j] + 2]));
+    }
+    vec3 a = ev[0] - ev[2];
+    vec3 b = ev[1] - ev[2];
     vec3 n = la::normalize(la::cross(a, b));
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
-    pnts[0] = ev1 + n;
-    pnts[1] = ev2 + n;
-    pnts[2] = ev3 + n;
-    pnts[3] = ev1 - n;
-    pnts[4] = ev2 - n;
-    pnts[5] = ev3 - n;
+    for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
+    for (int j = 3; j < 6; j++) pnts[j] = ev[j] - n;
     // Construct the points and faces of the new manifold
-    double pts[3 * 6];
-    /* 1 */
-    pts[0] = pnts[4].x;
-    pts[1] = pnts[4].y;
-    pts[2] = pnts[4].z;
-    /* 2 */
-    pts[3] = pnts[3].x;
-    pts[4] = pnts[3].y;
-    pts[5] = pnts[3].z;
-    /* 3 */
-    pts[6] = pnts[0].x;
-    pts[7] = pnts[0].y;
-    pts[8] = pnts[0].z;
-    /* 4 */
-    pts[9] = pnts[1].x;
-    pts[10] = pnts[1].y;
-    pts[11] = pnts[1].z;
-    /* 5 */
-    pts[12] = pnts[5].x;
-    pts[13] = pnts[5].y;
-    pts[14] = pnts[5].z;
-    /* 6 */
-    pts[15] = pnts[2].x;
-    pts[16] = pnts[2].y;
-    pts[17] = pnts[2].z;
-    int faces[24];
-    // 1 2 5
-    faces[0] = 0;
-    faces[1] = 1;
-    faces[2] = 4;
-    // 3 4 6
-    faces[3] = 2;
-    faces[4] = 3;
-    faces[5] = 5;
-    // 2 1 4
-    faces[6] = 1;
-    faces[7] = 0;
-    faces[8] = 3;
-    // 4 3 2
-    faces[9] = 3;
-    faces[10] = 2;
-    faces[11] = 1;
-    // 4 1 5
-    faces[12] = 3;
-    faces[13] = 0;
-    faces[14] = 4;
-    // 5 6 4
-    faces[15] = 4;
-    faces[16] = 5;
-    faces[17] = 3;
-    // 6 5 2
-    faces[18] = 5;
-    faces[19] = 4;
-    faces[20] = 1;
-    // 2 3 6
-    faces[21] = 1;
-    faces[22] = 2;
-    faces[23] = 5;
+    double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
+                         pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
+                         pnts[1].y, pnts[1].z, pnts[5].x, pnts[5].y, pnts[5].z,
+                         pnts[2].x, pnts[2].y, pnts[2].z};
+    int faces[24] = {
+        faces[0] = 0,  faces[1] = 1,  faces[2] = 4,   // 1 2 5
+        faces[3] = 2,  faces[4] = 3,  faces[5] = 5,   // 3 4 6
+        faces[6] = 1,  faces[7] = 0,  faces[8] = 3,   // 2 1 4
+        faces[9] = 3,  faces[10] = 2, faces[11] = 1,  // 4 3 2
+        faces[12] = 3, faces[13] = 0, faces[14] = 4,  // 4 1 5
+        faces[15] = 4, faces[16] = 5, faces[17] = 3,  // 5 6 4
+        faces[18] = 5, faces[19] = 4, faces[20] = 1,  // 6 5 2
+        faces[21] = 1, faces[22] = 2, faces[23] = 5   // 2 3 6
+    };
+
     manifold::MeshGL64 tri_m;
     for (int j = 0; j < 18; j++)
       tri_m.vertProperties.insert(tri_m.vertProperties.end(), pts[j]);
