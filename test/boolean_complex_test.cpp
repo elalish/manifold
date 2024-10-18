@@ -1031,6 +1031,14 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
+// Note - For the moment, the Status() checks are included in the loops to
+// (more or less) mimic the BRL-CAD behavior of checking the mesh for
+// unexpected output after each iteration.  Doing so is not ideal - it
+// *massively* slows the overall evaluation - but it also seems to be
+// triggering behavior that avoids a triangulation failure.
+//
+// Eventually, once other issues are resolved, the in-loop checks should be
+// removed in favor of the top level checks.
 TEST(BooleanComplex, SimpleOffset) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
@@ -1058,8 +1066,11 @@ TEST(BooleanComplex, SimpleOffset) {
     manifold::Manifold right(vsph);
     if (!right.NumTri()) continue;
     c = left.Boolean(right, manifold::OpType::Add);
+    // See above discussion
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  // See above discussion
+  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Edge Cylinders
   for (size_t i = 0; i < edges.size(); i++) {
     vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
@@ -1081,8 +1092,11 @@ TEST(BooleanComplex, SimpleOffset) {
     if (!right.NumTri()) continue;
     manifold::Manifold left = c;
     c = left.Boolean(right, manifold::OpType::Add);
+    // See above discussion
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  // See above discussion
+  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Triangle Volumes
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
@@ -1125,8 +1139,11 @@ TEST(BooleanComplex, SimpleOffset) {
     manifold::Manifold right(tri_m);
     if (!right.NumTri()) continue;
     c = left.Boolean(right, manifold::OpType::Add);
+    // See above discussion
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  // See above discussion
+  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
 #endif
