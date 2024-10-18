@@ -1062,8 +1062,10 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
               seeds.vertProperties[3 * i + 2]);
     Manifold vsph = sph.Translate(vpos);
-    if (!vsph.NumTri()) continue;
-    c += vsph;
+    manifold::Manifold left = c;
+    manifold::Manifold right(vsph);
+    if (!right.NumTri()) continue;
+    c = left.Boolean(right, manifold::OpType::Add);
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
@@ -1088,7 +1090,8 @@ TEST(BooleanComplex, SimpleOffset) {
         origin_cyl.Transform(manifold::RotateUp(evec));
     manifold::Manifold right = rotated_cyl.Translate(ev1);
     if (!right.NumTri()) continue;
-    c += right;
+    manifold::Manifold left = c;
+    c = left.Boolean(right, manifold::OpType::Add);
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
@@ -1132,9 +1135,10 @@ TEST(BooleanComplex, SimpleOffset) {
       tri_m.vertProperties.insert(tri_m.vertProperties.end(), pts[j]);
     for (int j = 0; j < 24; j++)
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
+    manifold::Manifold left = c;
     manifold::Manifold right(tri_m);
     if (!right.NumTri()) continue;
-    c += right;
+    c = left.Boolean(right, manifold::OpType::Add);
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
