@@ -46,6 +46,7 @@ struct Manifold::Impl {
 
   Box bBox_;
   double uncertainty_ = -1;
+  double tolerance_ = -1;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;

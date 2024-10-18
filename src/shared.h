@@ -70,7 +70,7 @@ inline mat2x3 GetAxisAlignedProjection(vec3 normal) {
 }
 
 inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
-                           double precision) {
+                           double tolerance) {
   const mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
                    triPos[1] - triPos[0]);
   const vec3 d2(la::dot(edges[0], edges[0]), la::dot(edges[1], edges[1]),
@@ -80,7 +80,7 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
                                                       : 2;
   const vec3 crossP = la::cross(edges[0], edges[1]);
   const double area2 = la::dot(crossP, crossP);
-  const double tol2 = precision * precision;
+  const double tol2 = tolerance * tolerance;
 
   vec3 uvw(0.0);
   for (const int i : {0, 1, 2}) {

@@ -91,11 +91,12 @@ struct MeshGLP {
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<Precision> halfedgeTangent;
-  /// The absolute precision of the vertex positions, based on accrued rounding
-  /// errors. When creating a Manifold, the precision used will be the maximum
+  /// Tolerance for mesh simplification.
+  /// When creating a Manifold, the precision used will be the maximum
   /// of this and a baseline precision from the size of the bounding box. Any
-  /// edge shorter than precision may be collapsed.
-  Precision precision = 0;
+  /// edge shorter than tolerance may be collapsed.
+  /// Tolerance may be enlarged when floating point error accumulates.
+  Precision tolerance = 0;
 
   MeshGLP() = default;
 
@@ -236,6 +237,7 @@ class Manifold {
   int Genus() const;
   Properties GetProperties() const;
   double MinGap(const Manifold& other, double searchLength) const;
+  double GetTolerance() const;
   ///@}
 
   /** @name Mesh ID
@@ -268,6 +270,7 @@ class Manifold {
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
   Manifold RefineToPrecision(double) const;
+  Manifold SetTolerance(double) const;
   ///@}
 
   /** @name Boolean

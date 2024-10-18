@@ -51,7 +51,6 @@ struct AssignNormals {
   VecView<vec3> vertNormal;
   VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
-  const double precision;
 
   void operator()(const int face) {
     vec3& triNormal = faceNormal[face];
@@ -102,7 +101,7 @@ struct CoplanarEdge {
   VecView<const double> prop;
   VecView<const double> propTol;
   const int numProp;
-  const double precision;
+  const double tolerance;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -152,17 +151,17 @@ struct CoplanarEdge {
     triArea[edgeFace] = area;
     triArea[pairFace] = areaPair;
     // Don't link degenerate triangles
-    if (area < length * precision || areaPair < lengthPair * precision) return;
+    if (area < length * tolerance || areaPair < lengthPair * tolerance) return;
 
     const double volume = std::abs(la::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * precision) return;
+    if (volume > std::max(area, areaPair) * tolerance) return;
 
     // Check property linearity
     if (area > 0) {
       normal /= area;
       for (int i = 0; i < numProp; ++i) {
-        const double scale = precision / propTol[i];
+        const double scale = tolerance / propTol[i];
 
         const double baseProp = prop[numProp * triProp[edgeFace][baseNum] + i];
         const double jointProp =
@@ -180,7 +179,7 @@ struct CoplanarEdge {
             la::length(cross), la::length(la::cross(iPairVec, iJointVec)));
         const double volumeP = std::abs(la::dot(cross, iPairVec));
         // Only operate on consistent triangles
-        if (volumeP > areaP * precision) return;
+        if (volumeP > areaP * tolerance) return;
       }
     }
 
@@ -193,7 +192,7 @@ struct CheckCoplanarity {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const double precision;
+  const double tolerance;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
@@ -210,7 +209,7 @@ struct CheckCoplanarity {
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (std::abs(la::dot(normal, vert - origin)) > precision) {
+      if (std::abs(la::dot(normal, vert - origin)) > tolerance) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -367,7 +366,7 @@ void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
                            meshRelation_.properties, propertyToleranceD,
-                           meshRelation_.numProp, uncertainty_}));
+                           meshRelation_.numProp, tolerance_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -388,7 +387,7 @@ void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, uncertainty_}));
+                 {comp2tri, halfedge_, vertPos_, &components, tolerance_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -527,6 +526,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.uncertainty_ = uncertainty_;
+  result.tolerance_ = tolerance_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
@@ -579,6 +579,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  */
 void Manifold::Impl::SetUncertainty(double minUncertainty) {
   uncertainty_ = MaxUncertainty(minUncertainty, bBox_);
+  tolerance_ = std::max(tolerance_, uncertainty_);
 }
 
 /**
@@ -604,13 +605,13 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
   }
   if (calculateTriNormal)
-    for_each_n(policy, countAt(0), NumTri(),
-               AssignNormals<true>({faceNormal_, vertNormal_, vertPos_,
-                                    halfedge_, uncertainty_}));
+    for_each_n(
+        policy, countAt(0), NumTri(),
+        AssignNormals<true>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
   else
-    for_each_n(policy, countAt(0), NumTri(),
-               AssignNormals<false>({faceNormal_, vertNormal_, vertPos_,
-                                     halfedge_, uncertainty_}));
+    for_each_n(
+        policy, countAt(0), NumTri(),
+        AssignNormals<false>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            [](vec3& v) { v = SafeNormalize(v); });
 }

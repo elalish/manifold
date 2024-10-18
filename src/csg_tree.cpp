@@ -172,7 +172,8 @@ CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 Manifold::Impl CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
   ZoneScoped;
-  double precision = -1;
+  double uncertainty = -1;
+  double tolerance = -1;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
@@ -191,11 +192,12 @@ Manifold::Impl CsgLeafNode::Compose(
     double nodeOldScale = node->pImpl_->bBox_.Scale();
     double nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
-    double nodePrecision = node->pImpl_->uncertainty_;
-    nodePrecision *= std::max(1.0, nodeNewScale / nodeOldScale);
-    nodePrecision = std::max(nodePrecision, kTolerance * nodeNewScale);
-    if (!std::isfinite(nodePrecision)) nodePrecision = -1;
-    precision = std::max(precision, nodePrecision);
+    double nodeUncertainty = node->pImpl_->uncertainty_;
+    nodeUncertainty *= std::max(1.0, nodeNewScale / nodeOldScale);
+    nodeUncertainty = std::max(nodeUncertainty, kTolerance * nodeNewScale);
+    if (!std::isfinite(nodeUncertainty)) nodeUncertainty = -1;
+    uncertainty = std::max(uncertainty, nodeUncertainty);
+    tolerance = std::max(tolerance, node->pImpl_->tolerance_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -212,7 +214,8 @@ Manifold::Impl CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
-  combined.uncertainty_ = precision;
+  combined.uncertainty_ = uncertainty;
+  combined.tolerance_ = tolerance;
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);
