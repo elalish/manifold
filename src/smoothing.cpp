@@ -986,13 +986,12 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
                InterpTri({vertPos_, vertBary, &old}));
-    // Make original since the subdivided faces have been warped into
-    // being non-coplanar, and hence not being related to the original faces.
-    InitializeOriginal();
   }
 
   halfedgeTangent_.resize(0);
   Finish();
+  CreateFaces();
+  meshRelation_.originalID = -1;
 }
 
 }  // namespace manifold

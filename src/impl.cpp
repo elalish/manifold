@@ -499,8 +499,9 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
   SetPrecision();
-  InitializeOriginal();
   Finish();
+  CreateFaces();
+  meshRelation_.originalID = -1;
 }
 
 Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
