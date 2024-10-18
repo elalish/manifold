@@ -70,9 +70,6 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
       !isOriginal && la::all(la::greater(normalIdx, ivec3(2)));
 
   MeshGLP<Precision, I> out;
-  out.precision =
-      std::max(impl.precision_,
-               std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
   out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
 
@@ -381,14 +378,45 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the precision of this Manifold's vertices, which tracks the
+ * Returns the uncertainty of this Manifold's vertices, which tracks the
  * approximate rounding error over all the transforms and operations that have
- * led to this state. Any triangles that are colinear within this precision are
- * considered degenerate and removed. This is the value of &epsilon; defining
+ * led to this state. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-double Manifold::Precision() const {
-  return GetCsgLeafNode().GetImpl()->precision_;
+double Manifold::GetUncertainty() const {
+  return GetCsgLeafNode().GetImpl()->uncertainty_;
+}
+
+Manifold Manifold::SetUncertainty(double uncertainty) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  impl->SetUncertainty(uncertainty);
+  impl->SimplifyTopology();
+  return Manifold(impl);
+}
+
+/**
+ * Returns the tolerance of this Manifold's vertices.
+ * Edges shorter than this tolerance value will be collapsed.
+ */
+double Manifold::GetTolerance() const {
+  return GetCsgLeafNode().GetImpl()->tolerance_;
+}
+
+/**
+ * Return a copy of the manifold with the set tolerance value.
+ * This performs mesh simplification when the tolerance value is increased.
+ */
+Manifold Manifold::SetTolerance(double tolerance) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (tolerance > impl->tolerance_) {
+    impl->tolerance_ = tolerance;
+    impl->SimplifyTopology();
+  } else {
+    // for reducing tolerance, we need to make sure it is still at least
+    // equal to uncertainty.
+    impl->tolerance_ = std::max(impl->uncertainty_, tolerance);
+  }
+  return Manifold(impl);
 }
 
 /**
