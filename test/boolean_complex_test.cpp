@@ -1058,7 +1058,7 @@ TEST(BooleanComplex, SimpleOffset) {
     manifold::Manifold right(vsph);
     if (!right.NumTri()) continue;
     c = left.Boolean(right, manifold::OpType::Add);
-    EXPECT_TRUE(c.NumTri() > 0);
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // Edge Cylinders
   for (size_t i = 0; i < edges.size(); i++) {
@@ -1081,7 +1081,7 @@ TEST(BooleanComplex, SimpleOffset) {
     if (!right.NumTri()) continue;
     manifold::Manifold left = c;
     c = left.Boolean(right, manifold::OpType::Add);
-    EXPECT_TRUE(c.NumTri() > 0);
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // Triangle Volumes
   for (size_t i = 0; i < seeds.NumTri(); i++) {
@@ -1175,7 +1175,7 @@ TEST(BooleanComplex, SimpleOffset) {
     manifold::Manifold right(tri_m);
     if (!right.NumTri()) continue;
     c = left.Boolean(right, manifold::OpType::Add);
-    EXPECT_TRUE(c.NumTri() > 0);
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
 }
 
