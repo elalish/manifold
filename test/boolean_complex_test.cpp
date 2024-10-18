@@ -15,7 +15,7 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/utils.h" // For RotateUp
+#include "../src/utils.h"  // For RotateUp
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -1041,7 +1041,7 @@ TEST(BooleanComplex, SimpleOffset) {
   std::set<std::pair<int, int>> edges;
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
-    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i*3+j];
+    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
     int e11, e12, e21, e22, e31, e32;
     e11 = (eind[0] < eind[1]) ? eind[0] : eind[1];
     e12 = (eind[1] < eind[0]) ? eind[0] : eind[1];
@@ -1057,7 +1057,7 @@ TEST(BooleanComplex, SimpleOffset) {
   // Vertex Spheres
   Manifold sph = Manifold::Sphere(1, 8);
   for (size_t i = 0; i < seeds.NumVert(); i++) {
-    vec3 vpos(seeds.vertProperties[3*i+0], seeds.vertProperties[3*i+1],
+    vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
               seeds.vertProperties[3 * i + 2]);
     Manifold vsph = sph.Translate(vpos);
     manifold::Manifold left = c;
@@ -1069,23 +1069,23 @@ TEST(BooleanComplex, SimpleOffset) {
   // Edge Cylinders
   std::set<std::pair<int, int>>::iterator e_it;
   for (e_it = edges.begin(); e_it != edges.end(); ++e_it) {
-    vec3 ev1 = vec3(seeds.vertProperties[3*e_it->first+0],
-		    seeds.vertProperties[3*e_it->first+1],
-		    seeds.vertProperties[3*e_it->first+2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3*e_it->second+0],
-		    seeds.vertProperties[3*e_it->second+1],
-		    seeds.vertProperties[3*e_it->second+2]);
+    vec3 ev1 = vec3(seeds.vertProperties[3 * e_it->first + 0],
+                    seeds.vertProperties[3 * e_it->first + 1],
+                    seeds.vertProperties[3 * e_it->first + 2]);
+    vec3 ev2 = vec3(seeds.vertProperties[3 * e_it->second + 0],
+                    seeds.vertProperties[3 * e_it->second + 1],
+                    seeds.vertProperties[3 * e_it->second + 2]);
     vec3 edge = ev2 - ev1;
     double len = la::length(edge);
     if (len < std::numeric_limits<float>::min()) continue;
     // TODO - workaround, shouldn't be necessary
     if (len < 0.03) continue;
     manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
-    vec3 evec(-1*edge.x, -1*edge.y, edge.z);
-    manifold::Manifold rotated_cyl = origin_cyl.Transform(manifold::RotateUp(evec));
+    vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
+    manifold::Manifold rotated_cyl =
+        origin_cyl.Transform(manifold::RotateUp(evec));
     manifold::Manifold right = rotated_cyl.Translate(ev1);
-    if (!right.NumTri())
-       continue;
+    if (!right.NumTri()) continue;
     manifold::Manifold left = c;
     c = left.Boolean(right, manifold::OpType::Add);
     EXPECT_TRUE(c.NumTri() > 0);
@@ -1093,17 +1093,16 @@ TEST(BooleanComplex, SimpleOffset) {
   // Triangle Volumes
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
-    for (int j = 0; j < 3; j++)
-      eind[j] = seeds.triVerts[i*3+j];
-    vec3 ev1 = vec3(seeds.vertProperties[3*eind[0]+0],
-		    seeds.vertProperties[3*eind[0]+1],
-		    seeds.vertProperties[3*eind[0]+2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3*eind[1]+0],
-		    seeds.vertProperties[3*eind[1]+1],
-		    seeds.vertProperties[3*eind[1]+2]);
-    vec3 ev3 = vec3(seeds.vertProperties[3*eind[2]+0],
-		    seeds.vertProperties[3*eind[2]+1],
-		    seeds.vertProperties[3*eind[2]+2]);
+    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
+    vec3 ev1 = vec3(seeds.vertProperties[3 * eind[0] + 0],
+                    seeds.vertProperties[3 * eind[0] + 1],
+                    seeds.vertProperties[3 * eind[0] + 2]);
+    vec3 ev2 = vec3(seeds.vertProperties[3 * eind[1] + 0],
+                    seeds.vertProperties[3 * eind[1] + 1],
+                    seeds.vertProperties[3 * eind[1] + 2]);
+    vec3 ev3 = vec3(seeds.vertProperties[3 * eind[2] + 0],
+                    seeds.vertProperties[3 * eind[2] + 1],
+                    seeds.vertProperties[3 * eind[2] + 2]);
     vec3 a = ev1 - ev3;
     vec3 b = ev2 - ev3;
     vec3 n = la::normalize(la::cross(a, b));
@@ -1116,7 +1115,7 @@ TEST(BooleanComplex, SimpleOffset) {
     pnts[4] = ev2 - n;
     pnts[5] = ev3 - n;
     // Construct the points and faces of the new manifold
-    double pts[3*6];
+    double pts[3 * 6];
     /* 1 */
     pts[0] = pnts[4].x;
     pts[1] = pnts[4].y;
@@ -1143,19 +1142,19 @@ TEST(BooleanComplex, SimpleOffset) {
     pts[17] = pnts[2].z;
     int faces[24];
     // 1 2 5
-    faces[ 0] = 0;
-    faces[ 1] = 1;
-    faces[ 2] = 4;
+    faces[0] = 0;
+    faces[1] = 1;
+    faces[2] = 4;
     // 3 4 6
-    faces[ 3] = 2;
-    faces[ 4] = 3;
-    faces[ 5] = 5;
+    faces[3] = 2;
+    faces[4] = 3;
+    faces[5] = 5;
     // 2 1 4
-    faces[ 6] = 1;
-    faces[ 7] = 0;
-    faces[ 8] = 3;
+    faces[6] = 1;
+    faces[7] = 0;
+    faces[8] = 3;
     // 4 3 2
-    faces[ 9] = 3;
+    faces[9] = 3;
     faces[10] = 2;
     faces[11] = 1;
     // 4 1 5
