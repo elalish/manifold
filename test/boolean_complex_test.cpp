@@ -1037,21 +1037,15 @@ TEST(BooleanComplex, SimpleOffset) {
   MeshGL seeds = ImportMesh(dir + "/models/" + "Generic_Twin_91.1.t0.glb");
   EXPECT_TRUE(seeds.NumTri() > 10);
   EXPECT_TRUE(seeds.NumVert() > 10);
-  // Find unique edges
-  std::set<std::pair<int, int>> edges;
+  // Unique edges
+  std::vector<std::pair<int, int>> edges;
   for (size_t i = 0; i < seeds.NumTri(); i++) {
-    int eind[3];
-    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
-    int e11, e12, e21, e22, e31, e32;
-    e11 = (eind[0] < eind[1]) ? eind[0] : eind[1];
-    e12 = (eind[1] < eind[0]) ? eind[0] : eind[1];
-    e21 = (eind[1] < eind[2]) ? eind[1] : eind[2];
-    e22 = (eind[2] < eind[1]) ? eind[1] : eind[2];
-    e31 = (eind[2] < eind[0]) ? eind[2] : eind[0];
-    e32 = (eind[0] < eind[2]) ? eind[2] : eind[0];
-    edges.insert(std::make_pair(e11, e12));
-    edges.insert(std::make_pair(e21, e22));
-    edges.insert(std::make_pair(e31, e32));
+    const int k[3] = {1, 2, 0};
+    for (const int j : {0, 1, 2}) {
+      int v1 = seeds.triVerts[i * 3 + j];
+      int v2 = seeds.triVerts[i * 3 + k[j]];
+      if (v2 > v1) edges.push_back(std::make_pair(v1, v2));
+    }
   }
   manifold::Manifold c;
   // Vertex Spheres
@@ -1067,14 +1061,13 @@ TEST(BooleanComplex, SimpleOffset) {
     EXPECT_TRUE(c.NumTri() > 0);
   }
   // Edge Cylinders
-  std::set<std::pair<int, int>>::iterator e_it;
-  for (e_it = edges.begin(); e_it != edges.end(); ++e_it) {
-    vec3 ev1 = vec3(seeds.vertProperties[3 * e_it->first + 0],
-                    seeds.vertProperties[3 * e_it->first + 1],
-                    seeds.vertProperties[3 * e_it->first + 2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3 * e_it->second + 0],
-                    seeds.vertProperties[3 * e_it->second + 1],
-                    seeds.vertProperties[3 * e_it->second + 2]);
+  for (size_t i = 0; i < edges.size(); i++) {
+    vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
+                    seeds.vertProperties[3 * edges[i].first + 1],
+                    seeds.vertProperties[3 * edges[i].first + 2]);
+    vec3 ev2 = vec3(seeds.vertProperties[3 * edges[i].second + 0],
+                    seeds.vertProperties[3 * edges[i].second + 1],
+                    seeds.vertProperties[3 * edges[i].second + 2]);
     vec3 edge = ev2 - ev1;
     double len = la::length(edge);
     if (len < std::numeric_limits<float>::min()) continue;
