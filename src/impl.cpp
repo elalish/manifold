@@ -300,14 +300,15 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
            });
 }
 
-void Manifold::Impl::InitializeOriginal() {
+void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, tri, tri};
+             [meshID, keepFaceID, &triRef](const int tri) {
+               triRef[tri] = {meshID, meshID, tri,
+                              keepFaceID ? triRef[tri].faceID : tri};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};

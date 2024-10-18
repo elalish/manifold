@@ -245,7 +245,7 @@ struct Manifold::Impl {
 
   void CreateFaces();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal();
+  void InitializeOriginal(bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triVerts);
   void CalculateNormals();
   void IncrementMeshIDs();
