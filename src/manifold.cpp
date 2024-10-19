@@ -525,6 +525,10 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
   return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
+Manifold Manifold::Rotate(quat quaternion) const {
+  return Manifold(pNode_->Rotate(quaternion));
+}
+
 /**
  * Transform this Manifold in space. The first three columns form a 3x3 matrix
  * transform and the last is a translation vector. This operation can be

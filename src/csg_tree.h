@@ -36,6 +36,7 @@ class CsgNode : public std::enable_shared_from_this<CsgNode> {
   std::shared_ptr<CsgNode> Scale(const vec3 &s) const;
   std::shared_ptr<CsgNode> Rotate(double xDegrees = 0, double yDegrees = 0,
                                   double zDegrees = 0) const;
+  std::shared_ptr<CsgNode> Rotate(quat q) const;
 };
 
 class CsgLeafNode final : public CsgNode {

@@ -15,7 +15,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/utils.h"  // For RotateUp
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -1084,9 +1083,8 @@ TEST(BooleanComplex, SimpleOffset) {
     if (len < 0.03) continue;
     manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
     vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
-    manifold::Manifold rotated_cyl =
-        origin_cyl.Transform(manifold::RotateUp(evec));
-    manifold::Manifold right = rotated_cyl.Translate(ev1);
+    quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
+    manifold::Manifold right = origin_cyl.Rotate(q).Translate(ev1);
     if (!right.NumTri()) continue;
     c += right;
     // See above discussion
