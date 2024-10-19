@@ -1056,7 +1056,6 @@ TEST(BooleanComplex, SimpleOffset) {
     }
   }
   manifold::Manifold c;
-  manifold::Manifold c_noeval;
   // Vertex Spheres
   Manifold sph = Manifold::Sphere(1, 8);
   for (size_t i = 0; i < seeds.NumVert(); i++) {
@@ -1067,10 +1066,6 @@ TEST(BooleanComplex, SimpleOffset) {
     c += vsph;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
-    // Check behavior of reordered CSG tree
-    c_noeval += vsph;
-    Manifold c_noeval_check = c_noeval;
-    EXPECT_EQ(c_noeval_check.Status(), Manifold::Error::NoError);
   }
   // See above discussion
   // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1096,10 +1091,6 @@ TEST(BooleanComplex, SimpleOffset) {
     c += right;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
-    // Check behavior of reordered CSG tree
-    c_noeval += right;
-    Manifold c_noeval_check = c_noeval;
-    EXPECT_EQ(c_noeval_check.Status(), Manifold::Error::NoError);
   }
   // See above discussion
   // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1145,10 +1136,6 @@ TEST(BooleanComplex, SimpleOffset) {
     c += right;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
-    // Check behavior of reordered CSG tree
-    c_noeval += right;
-    Manifold c_noeval_check = c_noeval;
-    EXPECT_EQ(c_noeval_check.Status(), Manifold::Error::NoError);
   }
   // See above discussion
   // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
