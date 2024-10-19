@@ -1084,7 +1084,7 @@ TEST(BooleanComplex, SimpleOffset) {
     manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
     vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
     quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
-    manifold::Manifold right = origin_cyl.Rotate(q).Translate(ev1);
+    manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
     if (!right.NumTri()) continue;
     c += right;
     // See above discussion

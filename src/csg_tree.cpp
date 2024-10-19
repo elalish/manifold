@@ -137,11 +137,6 @@ std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
   return Transform(transform);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Rotate(quat q) const {
-  mat3x4 transform(la::qmat(q), vec3());
-  return Transform(transform);
-}
-
 CsgLeafNode::CsgLeafNode() : pImpl_(std::make_shared<Manifold::Impl>()) {}
 
 CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_)

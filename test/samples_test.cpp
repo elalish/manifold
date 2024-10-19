@@ -147,7 +147,7 @@ TEST(Samples, TetPuzzle) {
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   quat q = rotation_quat(normalize(vec3(1, -1, -1)), vec3(0, 0, 1));
-  puzzle = puzzle.Rotate(q);
+  puzzle = puzzle.Transform({la::qmat(q), vec3()});
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMeshGL(), {});
 #endif
