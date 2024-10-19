@@ -1119,31 +1119,10 @@ TEST(BooleanComplex, SimpleOffset) {
     pnts[4] = ev2 - n;
     pnts[5] = ev3 - n;
     // Construct the points and faces of the new manifold
-    double pts[3 * 6];
-    /* 1 */
-    pts[0] = pnts[4].x;
-    pts[1] = pnts[4].y;
-    pts[2] = pnts[4].z;
-    /* 2 */
-    pts[3] = pnts[3].x;
-    pts[4] = pnts[3].y;
-    pts[5] = pnts[3].z;
-    /* 3 */
-    pts[6] = pnts[0].x;
-    pts[7] = pnts[0].y;
-    pts[8] = pnts[0].z;
-    /* 4 */
-    pts[9] = pnts[1].x;
-    pts[10] = pnts[1].y;
-    pts[11] = pnts[1].z;
-    /* 5 */
-    pts[12] = pnts[5].x;
-    pts[13] = pnts[5].y;
-    pts[14] = pnts[5].z;
-    /* 6 */
-    pts[15] = pnts[2].x;
-    pts[16] = pnts[2].y;
-    pts[17] = pnts[2].z;
+    double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
+                         pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
+                         pnts[1].y, pnts[1].z, pnts[5].x, pnts[5].y, pnts[5].z,
+                         pnts[2].x, pnts[2].y, pnts[2].z};
     int faces[24] = {
         faces[0] = 0,  faces[1] = 1,  faces[2] = 4,   // 1 2 5
         faces[3] = 2,  faces[4] = 3,  faces[5] = 5,   // 3 4 6
