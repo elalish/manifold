@@ -1110,7 +1110,7 @@ TEST(BooleanComplex, SimpleOffset) {
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
     for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
-    for (int j = 3; j < 6; j++) pnts[j] = ev[j-3] - n;
+    for (int j = 3; j < 6; j++) pnts[j] = ev[j - 3] - n;
     // Construct the points and faces of the new manifold
     double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
                          pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
