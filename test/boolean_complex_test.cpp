@@ -1098,26 +1098,19 @@ TEST(BooleanComplex, SimpleOffset) {
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
     for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
-    vec3 ev1 = vec3(seeds.vertProperties[3 * eind[0] + 0],
-                    seeds.vertProperties[3 * eind[0] + 1],
-                    seeds.vertProperties[3 * eind[0] + 2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3 * eind[1] + 0],
-                    seeds.vertProperties[3 * eind[1] + 1],
-                    seeds.vertProperties[3 * eind[1] + 2]);
-    vec3 ev3 = vec3(seeds.vertProperties[3 * eind[2] + 0],
-                    seeds.vertProperties[3 * eind[2] + 1],
-                    seeds.vertProperties[3 * eind[2] + 2]);
-    vec3 a = ev1 - ev3;
-    vec3 b = ev2 - ev3;
+    std::vector<vec3> ev;
+    for (int j = 0; j < 3; j++) {
+      ev.push_back(vec3(seeds.vertProperties[3 * eind[j] + 0],
+                        seeds.vertProperties[3 * eind[j] + 1],
+                        seeds.vertProperties[3 * eind[j] + 2]));
+    }
+    vec3 a = ev[0] - ev[2];
+    vec3 b = ev[1] - ev[2];
     vec3 n = la::normalize(la::cross(a, b));
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
-    pnts[0] = ev1 + n;
-    pnts[1] = ev2 + n;
-    pnts[2] = ev3 + n;
-    pnts[3] = ev1 - n;
-    pnts[4] = ev2 - n;
-    pnts[5] = ev3 - n;
+    for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
+    for (int j = 3; j < 6; j++) pnts[j] = ev[j-3] - n;
     // Construct the points and faces of the new manifold
     double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
                          pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
