@@ -1061,7 +1061,6 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
               seeds.vertProperties[3 * i + 2]);
     Manifold vsph = sph.Translate(vpos);
-    if (!vsph.NumTri()) continue;
     c += vsph;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1079,13 +1078,10 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 edge = ev2 - ev1;
     double len = la::length(edge);
     if (len < std::numeric_limits<float>::min()) continue;
-    // TODO - workaround, shouldn't be necessary
-    if (len < 0.03) continue;
     manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
     vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
     quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
     manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
-    if (!right.NumTri()) continue;
     c += right;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1130,7 +1126,6 @@ TEST(BooleanComplex, SimpleOffset) {
     for (int j = 0; j < 24; j++)
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
     manifold::Manifold right(tri_m);
-    if (!right.NumTri()) continue;
     c += right;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
