@@ -28,9 +28,8 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = Manifold::Sphere(1.0, 12);
-  MeshGL sphereGL = WithPositionColors(sphere);
-  sphere = Manifold(sphereGL);
+  Manifold sphere = WithPositionColors(Manifold::Sphere(1.0, 12));
+  MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold sphere2 = sphere.Translate(vec3(0.5));
   Manifold result = sphere - sphere2;
@@ -52,8 +51,8 @@ TEST(BooleanComplex, Sphere) {
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  MeshGL gyroidMeshGL = WithPositionColors(Gyroid());
-  Manifold gyroid(gyroidMeshGL);
+  Manifold gyroid = WithPositionColors(Gyroid()).AsOriginal();
+  MeshGL gyroidMeshGL = gyroid.GetMeshGL();
 
   Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 

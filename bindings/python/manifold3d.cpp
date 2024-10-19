@@ -351,9 +351,7 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("as_original", &Manifold::AsOriginal,
-           nb::arg("property_tolerance") = nb::list(),
-           manifold__as_original__property_tolerance)
+      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),
