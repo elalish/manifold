@@ -18,8 +18,8 @@ endif()
 
 enable_testing()
 
-find_package(gtest QUIET)
-if(NOT gtest_FOUND)
+find_package(GTest QUIET)
+if(NOT GTest_FOUND)
   if(NOT MANIFOLD_DOWNLOADS)
     message(
       WARNING
