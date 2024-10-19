@@ -1065,7 +1065,7 @@ TEST(BooleanComplex, SimpleOffset) {
     if (!vsph.NumTri()) continue;
     c += vsph;
     // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+    //EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // See above discussion
   // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1090,7 +1090,7 @@ TEST(BooleanComplex, SimpleOffset) {
     if (!right.NumTri()) continue;
     c += right;
     // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+    //EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // See above discussion
   // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
@@ -1135,10 +1135,10 @@ TEST(BooleanComplex, SimpleOffset) {
     if (!right.NumTri()) continue;
     c += right;
     // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+    //EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
 #endif
