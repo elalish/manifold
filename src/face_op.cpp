@@ -79,7 +79,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       auto triCCW = [&projection, this](const ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
                    projection * this->vertPos_[tri[1]],
-                   projection * this->vertPos_[tri[2]], tolerance_) >= 0;
+                   projection * this->vertPos_[tri[2]], epsilon_) >= 0;
       };
 
       ivec3 tri0(halfedge_[firstEdge].startVert, halfedge_[firstEdge].endVert,
@@ -130,7 +130,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const PolygonsIdx polys =
         Face2Polygons(halfedge_.cbegin() + faceEdge[face],
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
-    return TriangulateIdx(polys, tolerance_);
+    return TriangulateIdx(polys, epsilon_);
   };
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;

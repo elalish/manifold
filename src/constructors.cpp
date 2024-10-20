@@ -407,8 +407,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
-    std::vector<ivec3> frontTriangles =
-        Triangulate(polygons, pImpl_->tolerance_);
+    std::vector<ivec3> frontTriangles = Triangulate(polygons, pImpl_->epsilon_);
     for (auto& t : frontTriangles) {
       triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
     }

@@ -229,7 +229,7 @@ bool Manifold::Impl::Is2Manifold() const {
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(countAt(0_uz), countAt(NumTri()),
-                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * tolerance_}));
+                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * epsilon_}));
 }
 
 /**
@@ -239,7 +239,7 @@ int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(
       countAt(0_uz), countAt(NumTri()),
-      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * tolerance_ / 2}));
+      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * epsilon_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {
@@ -252,7 +252,7 @@ Properties Manifold::Impl::GetProperties() const {
   double volumeCompensation = 0;
   for (size_t i = 0; i < NumTri(); ++i) {
     auto [area1, volume1] =
-        FaceAreaVolume({halfedge_, vertPos_, tolerance_})(i);
+        FaceAreaVolume({halfedge_, vertPos_, epsilon_})(i);
     const double t1 = area + area1;
     const double t2 = volume + volume1;
     areaCompensation += (area - t1) + area1;
