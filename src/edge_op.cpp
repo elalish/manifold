@@ -502,14 +502,14 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
           // Don't collapse if the edges separating the faces are not colinear
           // (can happen when the two faces are coplanar).
           if (CCW(projection * pOld, projection * pLast, projection * pNew,
-                  tolerance_) != 0)
+                  epsilon_) != 0)
             return;
         }
       }
 
       // Don't collapse edge if it would cause a triangle to invert.
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
-              tolerance_) < 0)
+              epsilon_) < 0)
         return;
 
       pLast = pNext;

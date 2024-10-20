@@ -98,7 +98,7 @@ struct CoplanarEdge {
   VecView<const TriRef> triRef;
   VecView<const ivec3> triProp;
   const int numProp;
-  const double tolerance;
+  const double epsilon;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -138,11 +138,11 @@ struct CoplanarEdge {
     triArea[edgeFace] = area;
     triArea[pairFace] = areaPair;
     // Don't link degenerate triangles
-    if (area < length * tolerance || areaPair < lengthPair * tolerance) return;
+    if (area < length * epsilon || areaPair < lengthPair * epsilon) return;
 
     const double volume = std::abs(la::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * tolerance) return;
+    if (volume > std::max(area, areaPair) * epsilon) return;
 
     face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
@@ -153,7 +153,7 @@ struct CheckCoplanarity {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const double tolerance;
+  const double epsilon;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
@@ -170,7 +170,7 @@ struct CheckCoplanarity {
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (std::abs(la::dot(normal, vert - origin)) > tolerance) {
+      if (std::abs(la::dot(normal, vert - origin)) > epsilon) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -375,7 +375,7 @@ void Manifold::Impl::CreateFaces() {
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, tolerance_}));
+                 {comp2tri, halfedge_, vertPos_, &components, epsilon_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
