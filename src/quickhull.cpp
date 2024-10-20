@@ -847,7 +847,7 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   QuickHull qh(vertPos);
   std::tie(halfedge_, vertPos_) = qh.buildMesh();
   CalculateBBox();
-  SetUncertainty(bBox_.Scale() * kTolerance);
+  SetEpsilon(bBox_.Scale() * kTolerance);
   CalculateNormals();
   InitializeOriginal();
   Finish();

@@ -143,21 +143,21 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }
-  auto uncertainty = MaxUncertainty(0, bBox);
+  auto epsilon = MaxEpsilon(0, bBox);
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
   for_each_n(policy, countAt(0), numOpenVert,
-             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, uncertainty](const int i) {
+             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, epsilon](const int i) {
                int vert = openVerts[i];
 
                const vec3 center(mesh.vertProperties[mesh.numProp * vert],
                                  mesh.vertProperties[mesh.numProp * vert + 1],
                                  mesh.vertProperties[mesh.numProp * vert + 2]);
 
-               vertBox[i].min = center - uncertainty / 2.0;
-               vertBox[i].max = center + uncertainty / 2.0;
+               vertBox[i].min = center - epsilon / 2.0;
+               vertBox[i].max = center + epsilon / 2.0;
 
                vertMorton[i] = MortonCode(center, bBox);
              });
@@ -211,7 +211,7 @@ void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
 
   CalculateBBox();
-  SetUncertainty(uncertainty_);
+  SetEpsilon(epsilon_);
   if (!bBox_.IsFinite()) {
     // Decimated out of existence - early out.
     MarkFailure(Error::NoError);

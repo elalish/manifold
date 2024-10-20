@@ -37,17 +37,17 @@ TEST(Properties, GetProperties) {
 
 TEST(Properties, Precision) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.GetUncertainty(), kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kTolerance);
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.GetUncertainty(), 10 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * kTolerance);
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.GetUncertainty(), 100 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kTolerance);
 }
 
 TEST(Properties, Precision2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetUncertainty(), 2 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kTolerance);
 }
 
 TEST(Properties, Precision3) {
@@ -56,7 +56,7 @@ TEST(Properties, Precision3) {
 
   MeshGL mesh = cylinder.GetMeshGL();
   mesh.faceID.clear();
-  Manifold cylinder2 = Manifold(mesh).SetUncertainty(0.001);
+  Manifold cylinder2 = Manifold(mesh).SetEpsilon(0.001);
 
   const auto prop2 = cylinder2.GetProperties();
   EXPECT_NEAR(prop.volume, prop2.volume, 0.001);

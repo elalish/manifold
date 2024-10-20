@@ -509,7 +509,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
-  SetUncertainty();
+  SetEpsilon();
   InitializeOriginal();
   Finish();
 }
@@ -525,7 +525,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
-  result.uncertainty_ = uncertainty_;
+  result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
@@ -567,9 +567,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
 
   result.CalculateBBox();
   // Scale the precision by the norm of the 3x3 portion of the transform.
-  result.uncertainty_ *= SpectralNorm(mat3(transform_));
+  result.epsilon_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited precision loss and translational precision loss.
-  result.SetUncertainty(result.uncertainty_);
+  result.SetEpsilon(result.epsilon_);
   return result;
 }
 
@@ -577,9 +577,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  * Sets the precision based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetUncertainty(double minUncertainty) {
-  uncertainty_ = MaxUncertainty(minUncertainty, bBox_);
-  tolerance_ = std::max(tolerance_, uncertainty_);
+void Manifold::Impl::SetEpsilon(double minEpsilon) {
+  epsilon_ = MaxEpsilon(minEpsilon, bBox_);
+  tolerance_ = std::max(tolerance_, epsilon_);
 }
 
 /**

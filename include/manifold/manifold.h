@@ -315,8 +315,8 @@ class Manifold {
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
   size_t NumOverlaps(const Manifold& second) const;
-  double GetUncertainty() const;
-  Manifold SetUncertainty(double uncertainty) const;
+  double GetEpsilon() const;
+  Manifold SetEpsilon(double epsilon) const;
   ///@}
 
   struct Impl;

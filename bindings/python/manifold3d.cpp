@@ -338,7 +338,7 @@ NB_MODULE(manifold3d, m) {
       .def("num_tri", &Manifold::NumTri, manifold__num_tri)
       .def("num_prop", &Manifold::NumProp, manifold__num_prop)
       .def("num_prop_vert", &Manifold::NumPropVert, manifold__num_prop_vert)
-      .def("precision", &Manifold::GetUncertainty, manifold__get_uncertainty)
+      .def("precision", &Manifold::GetEpsilon, manifold__get_uncertainty)
       .def("genus", &Manifold::Genus, manifold__genus)
       .def(
           "volume",
@@ -373,7 +373,7 @@ NB_MODULE(manifold3d, m) {
       .def(
           "project",
           [](const Manifold &self) {
-            return CrossSection(self.Project()).Simplify(self.GetUncertainty());
+            return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
       .def("status", &Manifold::Status, manifold__status)

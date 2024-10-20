@@ -322,8 +322,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   const ivec3 normalIdx = updateNormals ? ivec3(3, 4, 5) : ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
 
-  float uncertainty =
-      std::max(static_cast<float>(out.GetUncertainty()),
+  float epsilon =
+      std::max(static_cast<float>(out.GetEpsilon()),
                std::numeric_limits<float>::epsilon() *
                    static_cast<float>(out.BoundingBox().Scale()));
 
@@ -378,7 +378,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const double volume = la::dot(edges[0], la::cross(edges[1], edges[2]));
-        ASSERT_LE(volume, area * uncertainty);
+        ASSERT_LE(volume, area * epsilon);
 
         if (checkNormals) {
           vec3 normal;
@@ -401,7 +401,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             const double volumeP =
                 la::dot(edgesP[0], la::cross(edgesP[1], edgesP[2]));
 
-            ASSERT_LE(volumeP, area * uncertainty);
+            ASSERT_LE(volumeP, area * epsilon);
           }
         }
       }

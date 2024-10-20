@@ -738,7 +738,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   if (numVertR == 0) return outR;
 
-  outR.uncertainty_ = std::max(inP_.uncertainty_, inQ_.uncertainty_);
+  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
 
   outR.vertPos_.resize(numVertR);

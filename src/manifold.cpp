@@ -378,18 +378,18 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the uncertainty of this Manifold's vertices, which tracks the
+ * Returns the epsilon value of this Manifold's vertices, which tracks the
  * approximate rounding error over all the transforms and operations that have
  * led to this state. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-double Manifold::GetUncertainty() const {
-  return GetCsgLeafNode().GetImpl()->uncertainty_;
+double Manifold::GetEpsilon() const {
+  return GetCsgLeafNode().GetImpl()->epsilon_;
 }
 
-Manifold Manifold::SetUncertainty(double uncertainty) const {
+Manifold Manifold::SetEpsilon(double epsilon) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  impl->SetUncertainty(uncertainty);
+  impl->SetEpsilon(epsilon);
   impl->SimplifyTopology();
   return Manifold(impl);
 }
@@ -413,8 +413,8 @@ Manifold Manifold::SetTolerance(double tolerance) const {
     impl->SimplifyTopology();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
-    // equal to uncertainty.
-    impl->tolerance_ = std::max(impl->uncertainty_, tolerance);
+    // equal to epsilon.
+    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
   }
   return Manifold(impl);
 }

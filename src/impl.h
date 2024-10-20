@@ -45,7 +45,7 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
-  double uncertainty_ = -1;
+  double epsilon_ = -1;
   double tolerance_ = -1;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
@@ -200,7 +200,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetUncertainty();
+    SetEpsilon();
 
     SplitPinchedVerts();
 
@@ -273,7 +273,7 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetUncertainty(double minUncertainty = -1);
+  void SetEpsilon(double minEpsilon = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
