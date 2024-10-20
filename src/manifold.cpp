@@ -389,8 +389,9 @@ double Manifold::GetEpsilon() const {
 
 Manifold Manifold::SetEpsilon(double epsilon) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldTolerance = impl->tolerance_;
   impl->SetEpsilon(epsilon);
-  impl->SimplifyTopology();
+  if (impl->tolerance_ > oldTolerance) impl->SimplifyTopology();
   return Manifold(impl);
 }
 
