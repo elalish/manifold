@@ -144,35 +144,6 @@ struct CoplanarEdge {
     // Only operate on coplanar triangles
     if (volume > std::max(area, areaPair) * tolerance) return;
 
-<<<<<<< HEAD
-    // Check property linearity
-    if (area > 0) {
-      normal /= area;
-      for (int i = 0; i < numProp; ++i) {
-        const double scale = tolerance / propTol[i];
-
-        const double baseProp = prop[numProp * triProp[edgeFace][baseNum] + i];
-        const double jointProp =
-            prop[numProp * triProp[pairFace][jointNum] + i];
-        const double edgeProp = prop[numProp * triProp[edgeFace][edgeNum] + i];
-        const double pairProp = prop[numProp * triProp[pairFace][pairNum] + i];
-
-        const vec3 iJointVec =
-            jointVec + normal * scale * (jointProp - baseProp);
-        const vec3 iEdgeVec = edgeVec + normal * scale * (edgeProp - baseProp);
-        const vec3 iPairVec = pairVec + normal * scale * (pairProp - baseProp);
-
-        vec3 cross = la::cross(iJointVec, iEdgeVec);
-        const double areaP = std::max(
-            la::length(cross), la::length(la::cross(iPairVec, iJointVec)));
-        const double volumeP = std::abs(la::dot(cross, iPairVec));
-        // Only operate on consistent triangles
-        if (volumeP > areaP * tolerance) return;
-      }
-    }
-
-=======
->>>>>>> upstream/master
     face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
 };
@@ -526,12 +497,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
-<<<<<<< HEAD
-  SetEpsilon();
-  InitializeOriginal();
-=======
   SetPrecision();
->>>>>>> upstream/master
   Finish();
   CreateFaces();
   meshRelation_.originalID = -1;
