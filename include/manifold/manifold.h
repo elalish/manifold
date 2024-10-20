@@ -359,6 +359,8 @@ inline std::ostream& operator<<(std::ostream& stream,
       return stream << "Face ID Wrong Length";
     case Manifold::Error::InvalidConstruction:
       return stream << "Invalid Construction";
+    default:
+      return stream << "Unkown Error";
   };
 }
 #endif
