@@ -300,10 +300,9 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   const ivec3 normalIdx = updateNormals ? ivec3(3, 4, 5) : ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
 
-  float epsilon =
-      std::max(static_cast<float>(out.GetEpsilon()),
-               std::numeric_limits<float>::epsilon() *
-                   static_cast<float>(out.BoundingBox().Scale()));
+  float epsilon = std::max(static_cast<float>(out.GetEpsilon()),
+                           std::numeric_limits<float>::epsilon() *
+                               static_cast<float>(out.BoundingBox().Scale()));
 
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;

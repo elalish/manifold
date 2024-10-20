@@ -251,8 +251,7 @@ Properties Manifold::Impl::GetProperties() const {
   double areaCompensation = 0;
   double volumeCompensation = 0;
   for (size_t i = 0; i < NumTri(); ++i) {
-    auto [area1, volume1] =
-        FaceAreaVolume({halfedge_, vertPos_, epsilon_})(i);
+    auto [area1, volume1] = FaceAreaVolume({halfedge_, vertPos_, epsilon_})(i);
     const double t1 = area + area1;
     const double t2 = volume + volume1;
     areaCompensation += (area - t1) + area1;

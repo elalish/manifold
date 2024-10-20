@@ -148,19 +148,20 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
-  for_each_n(policy, countAt(0), numOpenVert,
-             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, epsilon](const int i) {
-               int vert = openVerts[i];
+  for_each_n(
+      policy, countAt(0), numOpenVert,
+      [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, epsilon](const int i) {
+        int vert = openVerts[i];
 
-               const vec3 center(mesh.vertProperties[mesh.numProp * vert],
-                                 mesh.vertProperties[mesh.numProp * vert + 1],
-                                 mesh.vertProperties[mesh.numProp * vert + 2]);
+        const vec3 center(mesh.vertProperties[mesh.numProp * vert],
+                          mesh.vertProperties[mesh.numProp * vert + 1],
+                          mesh.vertProperties[mesh.numProp * vert + 2]);
 
-               vertBox[i].min = center - epsilon / 2.0;
-               vertBox[i].max = center + epsilon / 2.0;
+        vertBox[i].min = center - epsilon / 2.0;
+        vertBox[i].max = center + epsilon / 2.0;
 
-               vertMorton[i] = MortonCode(center, bBox);
-             });
+        vertMorton[i] = MortonCode(center, bBox);
+      });
 
   Vec<int> vertNew2Old(numOpenVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
