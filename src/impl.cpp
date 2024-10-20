@@ -92,14 +92,11 @@ struct UpdateMeshID {
 
 struct CoplanarEdge {
   VecView<std::pair<int, int>> face2face;
-  VecView<std::pair<int, int>> vert2vert;
   VecView<double> triArea;
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   VecView<const TriRef> triRef;
   VecView<const ivec3> triProp;
-  VecView<const double> prop;
-  VecView<const double> propTol;
   const int numProp;
   const double tolerance;
 
@@ -117,19 +114,9 @@ struct CoplanarEdge {
     const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
     if (numProp > 0) {
-      const int prop0 = triProp[edgeFace][baseNum];
-      const int prop1 = triProp[pairFace][jointNum == 2 ? 0 : jointNum + 1];
-      bool propEqual = true;
-      for (int p = 0; p < numProp; ++p) {
-        if (std::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
-            propTol[p]) {
-          propEqual = false;
-          break;
-        }
-      }
-      if (propEqual) {
-        vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
-      }
+      if (triProp[edgeFace][baseNum] != triProp[pairFace][Next3(jointNum)] ||
+          triProp[edgeFace][Next3(baseNum)] != triProp[pairFace][jointNum])
+        return;
     }
 
     if (!edge.IsForward()) return;
@@ -157,6 +144,7 @@ struct CoplanarEdge {
     // Only operate on coplanar triangles
     if (volume > std::max(area, areaPair) * tolerance) return;
 
+<<<<<<< HEAD
     // Check property linearity
     if (area > 0) {
       normal /= area;
@@ -183,6 +171,8 @@ struct CoplanarEdge {
       }
     }
 
+=======
+>>>>>>> upstream/master
     face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
 };
@@ -338,39 +328,66 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
            });
 }
 
-void Manifold::Impl::InitializeOriginal() {
+void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, tri};
+             [meshID, keepFaceID, &triRef](const int tri) {
+               triRef[tri] = {meshID, meshID, tri,
+                              keepFaceID ? triRef[tri].faceID : tri};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
+void Manifold::Impl::CreateFaces() {
   ZoneScoped;
-  constexpr double kDefaultPropTolerance = 1e-5;
-  Vec<double> propertyToleranceD =
-      propertyTolerance.empty()
-          ? Vec<double>(meshRelation_.numProp, kDefaultPropTolerance)
-          : propertyTolerance;
-
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   Vec<double> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-             CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
-                           meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.properties, propertyToleranceD,
-                           meshRelation_.numProp, tolerance_}));
 
-  if (meshRelation_.triProperties.size() > 0) {
+  const size_t numProp = NumProp();
+  if (numProp > 0) {
+    for_each_n(
+        autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
+        [&vert2vert, numProp, this](const int edgeIdx) {
+          const Halfedge edge = halfedge_[edgeIdx];
+          const Halfedge pair = halfedge_[edge.pairedHalfedge];
+          const int edgeFace = edgeIdx / 3;
+          const int pairFace = edge.pairedHalfedge / 3;
+
+          if (meshRelation_.triRef[edgeFace].meshID !=
+              meshRelation_.triRef[pairFace].meshID)
+            return;
+
+          const int baseNum = edgeIdx - 3 * edgeFace;
+          const int jointNum = edge.pairedHalfedge - 3 * pairFace;
+
+          const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
+          const int prop1 =
+              meshRelation_
+                  .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
+          bool propEqual = true;
+          for (size_t p = 0; p < numProp; ++p) {
+            if (meshRelation_.properties[numProp * prop0 + p] !=
+                meshRelation_.properties[numProp * prop1 + p]) {
+              propEqual = false;
+              break;
+            }
+          }
+          if (propEqual) {
+            vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
+          }
+        });
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
   }
+
+  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
+             CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
+                           meshRelation_.triRef, meshRelation_.triProperties,
+                           meshRelation_.numProp, precision_}));
 
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
@@ -393,7 +410,7 @@ void Manifold::Impl::CreateFaces(const std::vector<double>& propertyTolerance) {
   for (size_t tri = 0; tri < NumTri(); ++tri) {
     const int referenceTri = comp2tri[components[tri]];
     if (referenceTri >= 0) {
-      triRef[tri].tri = referenceTri;
+      triRef[tri].faceID = referenceTri;
     }
   }
 }
@@ -509,9 +526,15 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
+<<<<<<< HEAD
   SetEpsilon();
   InitializeOriginal();
+=======
+  SetPrecision();
+>>>>>>> upstream/master
   Finish();
+  CreateFaces();
+  meshRelation_.originalID = -1;
 }
 
 Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {

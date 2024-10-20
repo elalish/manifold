@@ -851,6 +851,7 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   CalculateNormals();
   InitializeOriginal();
   Finish();
+  CreateFaces();
 }
 
 }  // namespace manifold

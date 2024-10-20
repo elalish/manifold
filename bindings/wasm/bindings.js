@@ -228,14 +228,6 @@ Module.setup = function() {
     return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
-  Module.Manifold.prototype.asOriginal = function(propertyTolerance = []) {
-    const tol = new Module.Vector_f64();
-    toVec(tol, propertyTolerance);
-    const result = this._AsOriginal(tol);
-    tol.delete();
-    return result
-  };
-
   Module.Manifold.prototype.setProperties = function(numProp, func) {
     const oldNumProp = this.numProp();
     const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
