@@ -358,7 +358,7 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.numProp, precision_}));
+                           meshRelation_.numProp, epsilon_}));
 
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
@@ -497,7 +497,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
-  SetPrecision();
+  SetEpsilon();
   Finish();
   CreateFaces();
   meshRelation_.originalID = -1;
