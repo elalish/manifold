@@ -513,6 +513,10 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.status_ = status_;
     return result;
   }
+  if (!all(isfinite(transform_))) {
+    result.MarkFailure(Error::NonFiniteVertex);
+    return result;
+  }
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.precision_ = precision_;

@@ -126,15 +126,11 @@ struct UpdateProperties {
 
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
 
   bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
-
-    if (!std::isfinite(vertPos[halfedge.startVert][0])) return false;
-    if (!std::isfinite(vertPos[halfedge.endVert][0])) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
@@ -199,7 +195,7 @@ namespace manifold {
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   return all_of(countAt(0_uz), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_, vertPos_}));
+                CheckHalfedges({halfedge_}));
 }
 
 /**
