@@ -1053,11 +1053,7 @@ TEST(BooleanComplex, SimpleOffset) {
               seeds.vertProperties[3 * i + 2]);
     Manifold vsph = sph.Translate(vpos);
     c += vsph;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Edge Cylinders
   for (size_t i = 0; i < edges.size(); i++) {
     vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
@@ -1074,11 +1070,7 @@ TEST(BooleanComplex, SimpleOffset) {
     quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
     manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
     c += right;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Triangle Volumes
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
@@ -1092,6 +1084,7 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 a = ev[0] - ev[2];
     vec3 b = ev[1] - ev[2];
     vec3 n = la::normalize(la::cross(a, b));
+    if (!all(isfinite(n))) continue;
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
     for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
@@ -1122,7 +1115,7 @@ TEST(BooleanComplex, SimpleOffset) {
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
 #endif

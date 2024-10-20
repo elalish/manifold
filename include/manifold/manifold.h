@@ -323,4 +323,44 @@ class Manifold {
   CsgLeafNode& GetCsgLeafNode() const;
 };
 /** @} */
+
+/** @defgroup Debug
+ *  @brief Debugging features
+ *
+ * The features require compiler flags to be enabled. Assertions are enabled
+ * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
+ *  @{
+ */
+#ifdef MANIFOLD_DEBUG
+inline std::ostream& operator<<(std::ostream& stream,
+                                const Manifold::Error& error) {
+  switch (error) {
+    case Manifold::Error::NoError:
+      return stream << "No Error";
+    case Manifold::Error::NonFiniteVertex:
+      return stream << "Non Finite Vertex";
+    case Manifold::Error::NotManifold:
+      return stream << "Not Manifold";
+    case Manifold::Error::VertexOutOfBounds:
+      return stream << "Vertex Out Of Bounds";
+    case Manifold::Error::PropertiesWrongLength:
+      return stream << "Properties Wrong Length";
+    case Manifold::Error::MissingPositionProperties:
+      return stream << "Missing Position Properties";
+    case Manifold::Error::MergeVectorsDifferentLengths:
+      return stream << "Merge Vectors Different Lengths";
+    case Manifold::Error::MergeIndexOutOfBounds:
+      return stream << "Merge Index Out Of Bounds";
+    case Manifold::Error::TransformWrongLength:
+      return stream << "Transform Wrong Length";
+    case Manifold::Error::RunIndexWrongLength:
+      return stream << "Run Index Wrong Length";
+    case Manifold::Error::FaceIDWrongLength:
+      return stream << "Face ID Wrong Length";
+    case Manifold::Error::InvalidConstruction:
+      return stream << "Invalid Construction";
+  };
+}
+#endif
+/** @} */
 }  // namespace manifold

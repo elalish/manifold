@@ -185,7 +185,7 @@ Manifold::Impl CsgLeafNode::Compose(
   for (auto &node : nodes) {
     if (node->pImpl_->status_ != Manifold::Error::NoError) {
       Manifold::Impl impl;
-      impl.status_ = Manifold::Error::InvalidConstruction;
+      impl.status_ = node->pImpl_->status_;
       return impl;
     }
     double nodeOldScale = node->pImpl_->bBox_.Scale();
