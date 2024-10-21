@@ -351,7 +351,8 @@ NB_MODULE(manifold3d, m) {
           "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
       .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
-      .def("set_tolerance", &Manifold::SetTolerance, manifold__set_tolerance__tolerance)
+      .def("set_tolerance", &Manifold::SetTolerance,
+           manifold__set_tolerance__tolerance)
       .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
