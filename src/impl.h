@@ -277,6 +277,7 @@ struct Manifold::Impl {
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
   void SetEpsilon(double minEpsilon = -1);
+  void SetTolerance(double minTolerance);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;

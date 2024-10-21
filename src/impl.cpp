@@ -99,6 +99,7 @@ struct CoplanarEdge {
   VecView<const ivec3> triProp;
   const int numProp;
   const double epsilon;
+  const double tolerance;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -142,7 +143,7 @@ struct CoplanarEdge {
 
     const double volume = std::abs(la::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * epsilon) return;
+    if (volume > std::max(area, areaPair) * tolerance) return;
 
     face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
@@ -153,7 +154,7 @@ struct CheckCoplanarity {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const double epsilon;
+  const double tolerance;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
@@ -170,7 +171,7 @@ struct CheckCoplanarity {
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (std::abs(la::dot(normal, vert - origin)) > epsilon) {
+      if (std::abs(la::dot(normal, vert - origin)) > tolerance) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -358,7 +359,7 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.numProp, epsilon_}));
+                           meshRelation_.numProp, epsilon_, tolerance_}));
 
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
@@ -375,7 +376,7 @@ void Manifold::Impl::CreateFaces() {
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, epsilon_}));
+                 {comp2tri, halfedge_, vertPos_, &components, tolerance_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -568,7 +569,19 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  */
 void Manifold::Impl::SetEpsilon(double minEpsilon) {
   epsilon_ = MaxEpsilon(minEpsilon, bBox_);
-  tolerance_ = std::max(tolerance_, epsilon_);
+  SetTolerance(std::max(tolerance_, epsilon_));
+}
+
+void Manifold::Impl::SetTolerance(double newTolerance) {
+  if (newTolerance > tolerance_) {
+    // increased tolerance -> simplify opportunity
+    tolerance_ = newTolerance;
+    SimplifyTopology();
+  } else {
+    // for reducing tolerance, we need to make sure it is still at least
+    // equal to epsilon.
+    tolerance_ = std::max(epsilon_, newTolerance);
+  }
 }
 
 /**

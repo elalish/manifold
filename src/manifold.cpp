@@ -382,9 +382,7 @@ double Manifold::GetEpsilon() const {
 
 Manifold Manifold::SetEpsilon(double epsilon) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  auto oldTolerance = impl->tolerance_;
   impl->SetEpsilon(epsilon);
-  if (impl->tolerance_ > oldTolerance) impl->SimplifyTopology();
   return Manifold(impl);
 }
 
@@ -402,14 +400,7 @@ double Manifold::GetTolerance() const {
  */
 Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  if (tolerance > impl->tolerance_) {
-    impl->tolerance_ = tolerance;
-    impl->SimplifyTopology();
-  } else {
-    // for reducing tolerance, we need to make sure it is still at least
-    // equal to epsilon.
-    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
-  }
+  impl->SetTolerance(tolerance);
   return Manifold(impl);
 }
 
