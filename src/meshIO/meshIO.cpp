@@ -55,7 +55,7 @@ aiScene* CreateScene(const ExportOptions& options) {
 
   scene->mRootNode = new aiNode();
   scene->mRootNode->mNumMeshes = 1;
-  scene->mRootNode->mMeshes = new uint[scene->mRootNode->mNumMeshes];
+  scene->mRootNode->mMeshes = new uint32_t[scene->mRootNode->mNumMeshes];
   scene->mRootNode->mMeshes[0] = 0;
 
   scene->mMeshes[0]->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
@@ -251,7 +251,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   for (size_t i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
-    face.mIndices = new uint[face.mNumIndices];
+    face.mIndices = new uint32_t[face.mNumIndices];
     for (int j : {0, 1, 2}) face.mIndices[j] = mesh.triVerts[3 * i + j];
   }
 

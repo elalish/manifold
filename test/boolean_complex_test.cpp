@@ -15,7 +15,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/utils.h"  // For RotateUp
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -1053,13 +1052,8 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
               seeds.vertProperties[3 * i + 2]);
     Manifold vsph = sph.Translate(vpos);
-    if (!vsph.NumTri()) continue;
     c += vsph;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Edge Cylinders
   for (size_t i = 0; i < edges.size(); i++) {
     vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
@@ -1071,20 +1065,12 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 edge = ev2 - ev1;
     double len = la::length(edge);
     if (len < std::numeric_limits<float>::min()) continue;
-    // TODO - workaround, shouldn't be necessary
-    if (len < 0.03) continue;
     manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
     vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
-    manifold::Manifold rotated_cyl =
-        origin_cyl.Transform(manifold::RotateUp(evec));
-    manifold::Manifold right = rotated_cyl.Translate(ev1);
-    if (!right.NumTri()) continue;
+    quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
+    manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
     c += right;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   // Triangle Volumes
   for (size_t i = 0; i < seeds.NumTri(); i++) {
     int eind[3];
@@ -1098,6 +1084,7 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 a = ev[0] - ev[2];
     vec3 b = ev[1] - ev[2];
     vec3 n = la::normalize(la::cross(a, b));
+    if (!all(isfinite(n))) continue;
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
     for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
@@ -1123,13 +1110,12 @@ TEST(BooleanComplex, SimpleOffset) {
     for (int j = 0; j < 24; j++)
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
     manifold::Manifold right(tri_m);
-    if (!right.NumTri()) continue;
     c += right;
     // See above discussion
     EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
   // See above discussion
-  // EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
 #endif

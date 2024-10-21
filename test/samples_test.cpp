@@ -17,7 +17,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/utils.h"
 #include "manifold/polygon.h"
 #include "test.h"
 
@@ -147,7 +146,8 @@ TEST(Samples, TetPuzzle) {
 
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
-  puzzle = puzzle.Transform(RotateUp({1, -1, -1}));
+  quat q = rotation_quat(normalize(vec3(1, -1, -1)), vec3(0, 0, 1));
+  puzzle = puzzle.Transform({la::qmat(q), vec3()});
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMeshGL(), {});
 #endif

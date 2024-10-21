@@ -14,7 +14,6 @@
 
 #include <algorithm>
 
-#include "../src/utils.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -324,8 +323,7 @@ TEST(Smooth, Torus) {
         vec3 tan(v.y, -v.x, 0);
         tan *= la::dot(tan, edge) < 0 ? -1.0 : 1.0;
         tangent = CircularTangent(tan, edge);
-      } else if (std::abs(la::determinant(mat2(vec2(v), vec2(edge)))) <
-                 kTolerance) {
+      } else if (std::abs(la::determinant(mat2(vec2(v), vec2(edge)))) < 1e-5) {
         const double theta = std::asin(v.z);
         vec2 xy(v);
         const double r = la::length(xy);
