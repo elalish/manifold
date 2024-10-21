@@ -111,6 +111,7 @@ struct Manifold::Impl {
     const auto numProp = meshGL.numProp - 3;
     meshRelation_.numProp = numProp;
     meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
     vertPos_.resize(meshGL.NumVert());
