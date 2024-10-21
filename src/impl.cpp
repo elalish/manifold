@@ -569,19 +569,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  */
 void Manifold::Impl::SetEpsilon(double minEpsilon) {
   epsilon_ = MaxEpsilon(minEpsilon, bBox_);
-  SetTolerance(std::max(tolerance_, epsilon_));
-}
-
-void Manifold::Impl::SetTolerance(double newTolerance) {
-  if (newTolerance > tolerance_) {
-    // increased tolerance -> simplify opportunity
-    tolerance_ = newTolerance;
-    SimplifyTopology();
-  } else {
-    // for reducing tolerance, we need to make sure it is still at least
-    // equal to epsilon.
-    tolerance_ = std::max(epsilon_, newTolerance);
-  }
+  tolerance_ = std::max(tolerance_, epsilon_);
 }
 
 /**
