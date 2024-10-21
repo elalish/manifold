@@ -216,7 +216,7 @@ NB_MODULE(manifold3d, m) {
         nb::arg("radius"), get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
-        nb::arg("precision") = -1, triangulate__polygons__precision);
+        nb::arg("epsilon") = -1, triangulate__polygons__epsilon);
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
@@ -338,19 +338,21 @@ NB_MODULE(manifold3d, m) {
       .def("num_tri", &Manifold::NumTri, manifold__num_tri)
       .def("num_prop", &Manifold::NumProp, manifold__num_prop)
       .def("num_prop_vert", &Manifold::NumPropVert, manifold__num_prop_vert)
-      .def("precision", &Manifold::Precision, manifold__precision)
       .def("genus", &Manifold::Genus, manifold__genus)
       .def(
           "volume",
           [](const Manifold &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
-          "given face if they are within the Precision().")
+          "given face if they are within the Epsilon().")
       .def(
           "surface_area",
           [](const Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
-          "a given face if they are within the Precision().")
+          "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
+      .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
+      .def("set_tolerance", &Manifold::SetTolerance,
+           manifold__set_tolerance__tolerance)
       .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
@@ -371,7 +373,7 @@ NB_MODULE(manifold3d, m) {
       .def(
           "project",
           [](const Manifold &self) {
-            return CrossSection(self.Project()).Simplify(self.Precision());
+            return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
       .def("status", &Manifold::Status, manifold__status)

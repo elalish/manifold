@@ -51,7 +51,6 @@ struct AssignNormals {
   VecView<vec3> vertNormal;
   VecView<const vec3> vertPos;
   VecView<const Halfedge> halfedges;
-  const double precision;
 
   void operator()(const int face) {
     vec3& triNormal = faceNormal[face];
@@ -99,7 +98,8 @@ struct CoplanarEdge {
   VecView<const TriRef> triRef;
   VecView<const ivec3> triProp;
   const int numProp;
-  const double precision;
+  const double epsilon;
+  const double tolerance;
 
   // FIXME: race condition
   void operator()(const int edgeIdx) {
@@ -139,11 +139,11 @@ struct CoplanarEdge {
     triArea[edgeFace] = area;
     triArea[pairFace] = areaPair;
     // Don't link degenerate triangles
-    if (area < length * precision || areaPair < lengthPair * precision) return;
+    if (area < length * epsilon || areaPair < lengthPair * epsilon) return;
 
     const double volume = std::abs(la::dot(normal, pairVec));
     // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * precision) return;
+    if (volume > std::max(area, areaPair) * tolerance) return;
 
     face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
   }
@@ -154,7 +154,7 @@ struct CheckCoplanarity {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   std::vector<int>* components;
-  const double precision;
+  const double tolerance;
 
   void operator()(int tri) {
     const int component = (*components)[tri];
@@ -171,7 +171,7 @@ struct CheckCoplanarity {
       // If any component vertex is not coplanar with the component's reference
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
-      if (std::abs(la::dot(normal, vert - origin)) > precision) {
+      if (std::abs(la::dot(normal, vert - origin)) > tolerance) {
         reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
             ->store(-1, std::memory_order_relaxed);
         break;
@@ -359,7 +359,7 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.numProp, precision_}));
+                           meshRelation_.numProp, epsilon_, tolerance_}));
 
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
@@ -376,7 +376,7 @@ void Manifold::Impl::CreateFaces() {
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, precision_}));
+                 {comp2tri, halfedge_, vertPos_, &components, tolerance_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -498,7 +498,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   Update();
   faceNormal_.resize(0);  // force recalculation of triNormal
   CalculateNormals();
-  SetPrecision();
+  SetEpsilon();
   Finish();
   CreateFaces();
   meshRelation_.originalID = -1;
@@ -519,7 +519,8 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
-  result.precision_ = precision_;
+  result.epsilon_ = epsilon_;
+  result.tolerance_ = tolerance_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
@@ -560,9 +561,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
 
   result.CalculateBBox();
   // Scale the precision by the norm of the 3x3 portion of the transform.
-  result.precision_ *= SpectralNorm(mat3(transform_));
+  result.epsilon_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited precision loss and translational precision loss.
-  result.SetPrecision(result.precision_);
+  result.SetEpsilon(result.epsilon_);
   return result;
 }
 
@@ -570,8 +571,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  * Sets the precision based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetPrecision(double minPrecision) {
-  precision_ = MaxPrecision(minPrecision, bBox_);
+void Manifold::Impl::SetEpsilon(double minEpsilon) {
+  epsilon_ = MaxEpsilon(minEpsilon, bBox_);
+  tolerance_ = std::max(tolerance_, epsilon_);
 }
 
 /**
@@ -597,13 +599,13 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
   }
   if (calculateTriNormal)
-    for_each_n(policy, countAt(0), NumTri(),
-               AssignNormals<true>({faceNormal_, vertNormal_, vertPos_,
-                                    halfedge_, precision_}));
+    for_each_n(
+        policy, countAt(0), NumTri(),
+        AssignNormals<true>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
   else
-    for_each_n(policy, countAt(0), NumTri(),
-               AssignNormals<false>({faceNormal_, vertNormal_, vertPos_,
-                                     halfedge_, precision_}));
+    for_each_n(
+        policy, countAt(0), NumTri(),
+        AssignNormals<false>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            [](vec3& v) { v = SafeNormalize(v); });
 }

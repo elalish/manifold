@@ -70,10 +70,9 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
       !isOriginal && la::all(la::greater(normalIdx, ivec3(2)));
 
   MeshGLP<Precision, I> out;
-  out.precision =
-      std::max(impl.precision_,
-               std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
   out.numProp = 3 + numProp;
+  out.tolerance = std::max(std::numeric_limits<Precision>::epsilon(),
+                           static_cast<Precision>(impl.tolerance_));
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
@@ -374,14 +373,46 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the precision of this Manifold's vertices, which tracks the
+ * Returns the epsilon value of this Manifold's vertices, which tracks the
  * approximate rounding error over all the transforms and operations that have
- * led to this state. Any triangles that are colinear within this precision are
- * considered degenerate and removed. This is the value of &epsilon; defining
+ * led to this state. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-double Manifold::Precision() const {
-  return GetCsgLeafNode().GetImpl()->precision_;
+double Manifold::GetEpsilon() const {
+  return GetCsgLeafNode().GetImpl()->epsilon_;
+}
+
+Manifold Manifold::SetEpsilon(double epsilon) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto oldTolerance = impl->tolerance_;
+  impl->SetEpsilon(epsilon);
+  if (impl->tolerance_ > oldTolerance) impl->SimplifyTopology();
+  return Manifold(impl);
+}
+
+/**
+ * Returns the tolerance of this Manifold's vertices.
+ * Edges shorter than this tolerance value will be collapsed.
+ */
+double Manifold::GetTolerance() const {
+  return GetCsgLeafNode().GetImpl()->tolerance_;
+}
+
+/**
+ * Return a copy of the manifold with the set tolerance value.
+ * This performs mesh simplification when the tolerance value is increased.
+ */
+Manifold Manifold::SetTolerance(double tolerance) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (tolerance > impl->tolerance_) {
+    impl->tolerance_ = tolerance;
+    impl->SimplifyTopology();
+  } else {
+    // for reducing tolerance, we need to make sure it is still at least
+    // equal to epsilon.
+    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
+  }
+  return Manifold(impl);
 }
 
 /**

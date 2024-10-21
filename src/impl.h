@@ -45,7 +45,8 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
-  double precision_ = -1;
+  double epsilon_ = -1;
+  double tolerance_ = -1;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
@@ -110,6 +111,7 @@ struct Manifold::Impl {
     const auto numProp = meshGL.numProp - 3;
     meshRelation_.numProp = numProp;
     meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
     vertPos_.resize(meshGL.NumVert());
@@ -200,7 +202,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetPrecision(meshGL.precision);
+    SetEpsilon();
 
     SplitPinchedVerts();
 
@@ -275,7 +277,7 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetPrecision(double minPrecision = -1);
+  void SetEpsilon(double minEpsilon = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;

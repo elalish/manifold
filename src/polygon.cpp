@@ -945,39 +945,39 @@ namespace manifold {
  * @param polys The set of polygons, wound CCW and representing multiple
  * polygons and/or holes. These have 2D-projected positions as well as
  * references back to the original vertices.
- * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
  * @return std::vector<ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
   std::vector<ivec3> triangles;
-  double updatedPrecision = precision;
+  double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_EXCEPTIONS
   try {
 #endif
-    if (IsConvex(polys, precision)) {  // fast path
+    if (IsConvex(polys, epsilon)) {  // fast path
       triangles = TriangulateConvex(polys);
     } else {
-      EarClip triangulator(polys, precision);
+      EarClip triangulator(polys, epsilon);
       triangles = triangulator.Triangulate();
-      updatedPrecision = triangulator.GetPrecision();
+      updatedEpsilon = triangulator.GetPrecision();
     }
 #ifdef MANIFOLD_EXCEPTIONS
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * updatedPrecision);
+        CheckGeometry(triangles, polys, 2 * updatedEpsilon);
       }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles, updatedPrecision);
+      PrintFailure(e, polys, triangles, updatedEpsilon);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles, updatedPrecision);
+    PrintFailure(e, polys, triangles, updatedEpsilon);
     throw;
 #else
   } catch (const std::exception &e) {
@@ -994,12 +994,12 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
  * @return std::vector<ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, double precision) {
+std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
   for (const auto &poly : polygons) {
@@ -1009,7 +1009,7 @@ std::vector<ivec3> Triangulate(const Polygons &polygons, double precision) {
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
-  return TriangulateIdx(polygonsIndexed, precision);
+  return TriangulateIdx(polygonsIndexed, epsilon);
 }
 
 ExecutionParams &PolygonParams() { return params; }

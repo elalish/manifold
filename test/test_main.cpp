@@ -299,6 +299,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   ASSERT_FALSE(out.IsEmpty());
   const ivec3 normalIdx = updateNormals ? ivec3(3, 4, 5) : ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
+
+  float epsilon = std::max(static_cast<float>(out.GetEpsilon()),
+                           std::numeric_limits<float>::epsilon() *
+                               static_cast<float>(out.BoundingBox().Scale()));
+
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
     const mat3x4 transform =
@@ -350,7 +355,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const double volume = la::dot(edges[0], la::cross(edges[1], edges[2]));
-        ASSERT_LE(volume, area * output.precision);
+        ASSERT_LE(volume, area * epsilon);
 
         if (checkNormals) {
           vec3 normal;
@@ -373,7 +378,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             const double volumeP =
                 la::dot(edgesP[0], la::cross(edgesP[1], edgesP[2]));
 
-            ASSERT_LE(volumeP, area * output.precision);
+            ASSERT_LE(volumeP, area * epsilon);
           }
         }
       }
