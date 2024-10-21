@@ -332,36 +332,40 @@ class Manifold {
  *  @{
  */
 #ifdef MANIFOLD_DEBUG
-inline std::ostream& operator<<(std::ostream& stream,
-                                const Manifold::Error& error) {
+inline std::string ToString(const Manifold::Error& error) {
   switch (error) {
     case Manifold::Error::NoError:
-      return stream << "No Error";
+      return "No Error";
     case Manifold::Error::NonFiniteVertex:
-      return stream << "Non Finite Vertex";
+      return "Non Finite Vertex";
     case Manifold::Error::NotManifold:
-      return stream << "Not Manifold";
+      return "Not Manifold";
     case Manifold::Error::VertexOutOfBounds:
-      return stream << "Vertex Out Of Bounds";
+      return "Vertex Out Of Bounds";
     case Manifold::Error::PropertiesWrongLength:
-      return stream << "Properties Wrong Length";
+      return "Properties Wrong Length";
     case Manifold::Error::MissingPositionProperties:
-      return stream << "Missing Position Properties";
+      return "Missing Position Properties";
     case Manifold::Error::MergeVectorsDifferentLengths:
-      return stream << "Merge Vectors Different Lengths";
+      return "Merge Vectors Different Lengths";
     case Manifold::Error::MergeIndexOutOfBounds:
-      return stream << "Merge Index Out Of Bounds";
+      return "Merge Index Out Of Bounds";
     case Manifold::Error::TransformWrongLength:
-      return stream << "Transform Wrong Length";
+      return "Transform Wrong Length";
     case Manifold::Error::RunIndexWrongLength:
-      return stream << "Run Index Wrong Length";
+      return "Run Index Wrong Length";
     case Manifold::Error::FaceIDWrongLength:
-      return stream << "Face ID Wrong Length";
+      return "Face ID Wrong Length";
     case Manifold::Error::InvalidConstruction:
-      return stream << "Invalid Construction";
+      return "Invalid Construction";
     default:
-      return stream << "Unkown Error";
+      return "Unkown Error";
   };
+}
+
+inline std::ostream& operator<<(std::ostream& stream,
+                                const Manifold::Error& error) {
+  return stream << ToString(error);
 }
 #endif
 /** @} */

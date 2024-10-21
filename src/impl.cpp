@@ -513,7 +513,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.status_ = status_;
     return result;
   }
-  if (!all(isfinite(transform_))) {
+  if (!all(la::isfinite(transform_))) {
     result.MarkFailure(Error::NonFiniteVertex);
     return result;
   }
