@@ -221,7 +221,7 @@ TEST(Samples, GyroidModule) {
   CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
-  const double precision = gyroid.Precision();
+  const double precision = gyroid.GetEpsilon();
   EXPECT_NEAR(bounds.min.z, 0, precision);
   EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), precision);
 
@@ -267,7 +267,7 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
   CrossSection projection(cutSponge.first.Project());
-  projection = projection.Simplify(cutSponge.first.Precision());
+  projection = projection.Simplify(cutSponge.first.GetEpsilon());
   Rect rect = projection.Bounds();
   Box box = cutSponge.first.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);

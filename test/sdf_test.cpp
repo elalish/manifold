@@ -70,7 +70,7 @@ TEST(SDF, Bounds) {
   Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
-  const double precision = cubeVoid.Precision();
+  const double precision = cubeVoid.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("cubeVoid.glb", cubeVoid.GetMeshGL(), {});
@@ -94,7 +94,7 @@ TEST(SDF, Bounds2) {
   Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
-  const double precision = cubeVoid.Precision();
+  const double precision = cubeVoid.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("cubeVoid2.glb", cubeVoid.GetMeshGL(), {});
@@ -121,7 +121,7 @@ TEST(SDF, Surface) {
   Manifold cube = Manifold::Cube(vec3(size), true);
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
-  const double precision = cube.Precision();
+  const double precision = cube.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMeshGL(), {});
 #endif

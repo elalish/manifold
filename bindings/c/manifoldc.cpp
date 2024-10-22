@@ -525,7 +525,7 @@ ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m) {
 }
 
 double manifold_precision(ManifoldManifold *m) {
-  return from_c(m)->Precision();
+  return from_c(m)->GetEpsilon();
 }
 
 uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }

@@ -161,7 +161,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numProp", &Manifold::NumProp)
       .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
-      .function("precision", &Manifold::Precision)
+      .function("tolerance", &Manifold::GetTolerance)
       .function("genus", &Manifold::Genus)
       .function("getProperties", &Manifold::GetProperties)
       .function("minGap", &Manifold::MinGap)

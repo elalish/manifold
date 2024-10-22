@@ -143,25 +143,25 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }
-  mesh.precision = MaxPrecision(mesh.precision, bBox);
-  if (mesh.precision < 0) return false;
+  auto epsilon = MaxEpsilon(0, bBox);
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
-  for_each_n(policy, countAt(0), numOpenVert,
-             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh](const int i) {
-               int vert = openVerts[i];
+  for_each_n(
+      policy, countAt(0), numOpenVert,
+      [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, epsilon](const int i) {
+        int vert = openVerts[i];
 
-               const vec3 center(mesh.vertProperties[mesh.numProp * vert],
-                                 mesh.vertProperties[mesh.numProp * vert + 1],
-                                 mesh.vertProperties[mesh.numProp * vert + 2]);
+        const vec3 center(mesh.vertProperties[mesh.numProp * vert],
+                          mesh.vertProperties[mesh.numProp * vert + 1],
+                          mesh.vertProperties[mesh.numProp * vert + 2]);
 
-               vertBox[i].min = center - mesh.precision / 2.0;
-               vertBox[i].max = center + mesh.precision / 2.0;
+        vertBox[i].min = center - epsilon / 2.0;
+        vertBox[i].max = center + epsilon / 2.0;
 
-               vertMorton[i] = MortonCode(center, bBox);
-             });
+        vertMorton[i] = MortonCode(center, bBox);
+      });
 
   Vec<int> vertNew2Old(numOpenVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
@@ -212,7 +212,7 @@ void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
 
   CalculateBBox();
-  SetPrecision(precision_);
+  SetEpsilon(epsilon_);
   if (!bBox_.IsFinite()) {
     // Decimated out of existence - early out.
     MarkFailure(Error::NoError);

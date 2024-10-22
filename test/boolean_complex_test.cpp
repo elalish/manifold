@@ -235,7 +235,7 @@ TEST(BooleanComplex, Close) {
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
     // std::cout << i << std::endl;
-    result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
+    result ^= a.Translate({a.GetEpsilon() / 10 * i, 0.0, 0.0});
   }
   auto prop = result.GetProperties();
   const double tol = 0.004;
