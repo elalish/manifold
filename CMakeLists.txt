@@ -89,10 +89,8 @@ set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 # Development options
 option(TRACY_ENABLE "Use tracy profiling" OFF)
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
-option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 mark_as_advanced(TRACY_ENABLE)
 mark_as_advanced(TRACY_MEMORY_USAGE)
-mark_as_advanced(BUILD_TEST_CGAL)
 
 # fuzztest is a rather large dependency
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
