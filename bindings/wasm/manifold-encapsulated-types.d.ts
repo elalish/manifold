@@ -707,7 +707,7 @@ export class Manifold {
    * produced and the exact smoothly curving surface. All vertices are exactly
    * on the surface, within rounding error.
    */
-  refineToPrecision(precision: number): Manifold;
+  refineToTolerance(precision: number): Manifold;
 
   /**
    * Create a new copy of this manifold with updated vertex properties by

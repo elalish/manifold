@@ -328,8 +328,8 @@ NB_MODULE(manifold3d, m) {
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
-      .def("refine_to_precision", &Manifold::RefineToPrecision,
-           nb::arg("precision"), manifold__refine_to_precision__precision)
+      .def("refine_to_tolerance", &Manifold::RefineToTolerance,
+           nb::arg("precision"), manifold__refine_to_tolerance__precision)
       .def("to_mesh", &Manifold::GetMeshGL,
            nb::arg("normal_idx") = std::make_tuple(0, 0, 0),
            manifold__get_mesh_gl__normal_idx)

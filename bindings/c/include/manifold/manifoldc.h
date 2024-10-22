@@ -142,7 +142,7 @@ ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
 ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
                                             double length);
-ManifoldManifold *manifold_refine_to_precision(void *mem, ManifoldManifold *m,
+ManifoldManifold *manifold_refine_to_tolerance(void *mem, ManifoldManifold *m,
                                                double precision);
 
 // Manifold Shapes / Constructors

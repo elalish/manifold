@@ -161,7 +161,7 @@ TEST(Smooth, Precision) {
   const double radius = 10;
   const double height = 10;
   Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
-  Manifold smoothed = cylinder.SmoothOut().RefineToPrecision(precision);
+  Manifold smoothed = cylinder.SmoothOut().RefineToTolerance(precision);
   // Makes an edge bisector, which is the worst case.
   MeshGL64 out = smoothed.Refine(2).GetMeshGL64();
   const int numVert = out.NumVert();

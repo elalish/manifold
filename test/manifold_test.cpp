@@ -506,7 +506,7 @@ TEST(Manifold, MeshRelationRefinePrecision) {
   const int id = inGL.runOriginalID[0];
   Manifold csaszar = Manifold::Smooth(inGL);
 
-  csaszar = csaszar.RefineToPrecision(0.05);
+  csaszar = csaszar.RefineToTolerance(0.05);
   ExpectMeshes(csaszar, {{2684, 5368, 3}});
   std::vector<uint32_t> runOriginalID = csaszar.GetMeshGL().runOriginalID;
   EXPECT_EQ(runOriginalID.size(), 1);

@@ -266,7 +266,7 @@ class Manifold {
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
-  Manifold RefineToPrecision(double) const;
+  Manifold RefineToTolerance(double) const;
   Manifold SetTolerance(double) const;
   ///@}
 
@@ -363,7 +363,7 @@ inline std::string ToString(const Manifold::Error& error) {
     case Manifold::Error::InvalidConstruction:
       return "Invalid Construction";
     default:
-      return "Unkown Error";
+      return "Unknown Error";
   };
 }
 

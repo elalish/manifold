@@ -301,9 +301,9 @@ ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold *manifold_refine_to_precision(void *mem, ManifoldManifold *m,
+ManifoldManifold *manifold_refine_to_tolerance(void *mem, ManifoldManifold *m,
                                                double precision) {
-  auto refined = from_c(m)->RefineToPrecision(precision);
+  auto refined = from_c(m)->RefineToTolerance(precision);
   return to_c(new (mem) Manifold(refined));
 }
 

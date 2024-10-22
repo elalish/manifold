@@ -813,7 +813,7 @@ Manifold Manifold::RefineToLength(double length) const {
  * produced and the exact smoothly curving surface. All vertices are exactly on
  * the surface, within rounding error.
  */
-Manifold Manifold::RefineToPrecision(double precision) const {
+Manifold Manifold::RefineToTolerance(double precision) const {
   precision = std::abs(precision);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!pImpl->halfedgeTangent_.empty()) {
