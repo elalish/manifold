@@ -489,8 +489,8 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
  * Updates the mergeFromVert and mergeToVert vectors in order to create a
  * manifold solid. If the MeshGL is already manifold, no change will occur and
  * the function will return false. Otherwise, this will merge verts along open
- * edges within precision (the maximum of the MeshGL precision and the baseline
- * bounding-box precision), keeping any from the existing merge vectors.
+ * edges within tolerance (the maximum of the MeshGL tolerance and the baseline
+ * bounding-box tolerance), keeping any from the existing merge vectors.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
@@ -507,8 +507,8 @@ bool MeshGL::Merge() {
  * Updates the mergeFromVert and mergeToVert vectors in order to create a
  * manifold solid. If the MeshGL is already manifold, no change will occur and
  * the function will return false. Otherwise, this will merge verts along open
- * edges within precision (the maximum of the MeshGL precision and the baseline
- * bounding-box precision), keeping any from the existing merge vectors.
+ * edges within tolerance (the maximum of the MeshGL tolerance and the baseline
+ * bounding-box tolerance), keeping any from the existing merge vectors.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold

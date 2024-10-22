@@ -640,7 +640,7 @@ Module.setup = function() {
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 
   Module.Manifold.levelSet = function(
-      sdf, bounds, edgeLength, level = 0, precision = -1) {
+      sdf, bounds, edgeLength, level = 0, tolerance = -1) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
@@ -653,7 +653,7 @@ Module.setup = function() {
       return sdf(vert);
     }, 'di');
     const out =
-        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, precision);
+        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
     removeFunction(wasmFuncPtr);
     return out;
   };
@@ -697,10 +697,10 @@ Module.setup = function() {
 
   // Top-level functions
 
-  Module.triangulate = function(polygons, precision = -1) {
+  Module.triangulate = function(polygons, epsilon = -1) {
     const polygonsVec = polygons2vec(polygons);
     const result = fromVec(
-        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
+        Module._Triangulate(polygonsVec, epsilon), (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   };

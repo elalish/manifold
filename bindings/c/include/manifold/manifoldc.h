@@ -64,10 +64,10 @@ ManifoldManifold *manifold_level_set(void *mem,
                                      double (*sdf)(double, double, double,
                                                    void *),
                                      ManifoldBox *bounds, double edge_length,
-                                     double level, double precision, void *ctx);
+                                     double level, double tolerance, void *ctx);
 ManifoldManifold *manifold_level_set_seq(
     void *mem, double (*sdf)(double, double, double, void *),
-    ManifoldBox *bounds, double edge_length, double level, double precision,
+    ManifoldBox *bounds, double edge_length, double level, double tolerance,
     void *ctx);
 
 // Manifold Vectors
@@ -143,7 +143,7 @@ ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
 ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
                                             double length);
 ManifoldManifold *manifold_refine_to_tolerance(void *mem, ManifoldManifold *m,
-                                               double precision);
+                                               double tolerance);
 
 // Manifold Shapes / Constructors
 
@@ -180,7 +180,7 @@ size_t manifold_num_vert(ManifoldManifold *m);
 size_t manifold_num_edge(ManifoldManifold *m);
 size_t manifold_num_tri(ManifoldManifold *m);
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
-double manifold_precision(ManifoldManifold *m);
+double manifold_epsilon(ManifoldManifold *m);
 int manifold_genus(ManifoldManifold *m);
 ManifoldProperties manifold_get_properties(ManifoldManifold *m);
 int manifold_get_circular_segments(double radius);

@@ -47,14 +47,14 @@ struct DuplicateEdge {
 struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
-  const double precision;
+  const double tolerance;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag short edges
     const vec3 delta =
         vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    return la::dot(delta, delta) < precision * precision;
+    return la::dot(delta, delta) < tolerance * tolerance;
   }
 };
 
@@ -83,7 +83,7 @@ struct SwappableEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
-  const double precision;
+  const double tolerance;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -94,7 +94,7 @@ struct SwappableEdge {
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
-    if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
+    if (CCW(v[0], v[1], v[2], tolerance) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
@@ -104,7 +104,7 @@ struct SwappableEdge {
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triEdge[i]].startVert];
-    return CCW(v[0], v[1], v[2], precision) > 0 ||
+    return CCW(v[0], v[1], v[2], tolerance) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   }
 };
@@ -169,7 +169,7 @@ void Manifold::Impl::CleanupTopology() {
 }
 
 /**
- * Collapses degenerate triangles by removing edges shorter than precision_ and
+ * Collapses degenerate triangles by removing edges shorter than tolerance_ and
  * any edge that is preceeded by an edge that joins the same two face relations.
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.

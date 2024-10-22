@@ -331,7 +331,7 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  * combined into a new Manifold via operations, the status reverts to NoError,
  * simply processing the problem mesh as empty. Likewise, empty meshes may still
  * show NoError, for instance if they are small enough relative to their
- * precision to be collapsed to nothing.
+ * tolerance to be collapsed to nothing.
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
@@ -803,22 +803,22 @@ Manifold Manifold::RefineToLength(double length) const {
 
 /**
  * Increase the density of the mesh by splitting each edge into pieces such that
- * any point on the resulting triangles is roughly within precision of the
+ * any point on the resulting triangles is roughly within tolerance of the
  * smoothly curved surface defined by the tangent vectors. This means tightly
  * curving regions will be divided more finely than smoother regions. If
  * halfedgeTangents are not present, the result will simply be a copy of the
  * original. Quads will ignore their interior triangle bisector.
  *
- * @param precision The desired maximum distance between the faceted mesh
+ * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
  * the surface, within rounding error.
  */
-Manifold Manifold::RefineToTolerance(double precision) const {
-  precision = std::abs(precision);
+Manifold Manifold::RefineToTolerance(double tolerance) const {
+  tolerance = std::abs(tolerance);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
-        [precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
+        [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
           const vec3 edgeNorm = la::normalize(edge);
           // Weight heuristic
           const vec3 tStart = vec3(tangentStart);
@@ -829,7 +829,7 @@ Manifold Manifold::RefineToTolerance(double precision) const {
           // Circular arc result plus heuristic term for non-circular curves
           const double d = 0.5 * (la::length(start) + la::length(end)) +
                            la::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * precision)));
+          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
         },
         true);
   }

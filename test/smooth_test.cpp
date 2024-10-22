@@ -156,12 +156,12 @@ TEST(Smooth, Sphere) {
 }
 
 TEST(Smooth, Precision) {
-  // Tests face precision of refinement
-  const double precision = 0.001;
+  // Tests face tolerance of refinement
+  const double tolerance = 0.001;
   const double radius = 10;
   const double height = 10;
   Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
-  Manifold smoothed = cylinder.SmoothOut().RefineToTolerance(precision);
+  Manifold smoothed = cylinder.SmoothOut().RefineToTolerance(tolerance);
   // Makes an edge bisector, which is the worst case.
   MeshGL64 out = smoothed.Refine(2).GetMeshGL64();
   const int numVert = out.NumVert();
@@ -177,7 +177,7 @@ TEST(Smooth, Precision) {
     maxR2 = std::max(maxR2, r2);
     minR2 = std::min(minR2, r2);
   }
-  EXPECT_NEAR(std::sqrt(minR2), radius - precision, 1e-4);
+  EXPECT_NEAR(std::sqrt(minR2), radius - tolerance, 1e-4);
   EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
   EXPECT_EQ(smoothed.NumTri(), 7984);
 #ifdef MANIFOLD_EXPORT

@@ -323,7 +323,7 @@ Manifold::Impl CsgLeafNode::Compose(
     }
   }
 
-  // required to remove parts that are smaller than the precision
+  // required to remove parts that are smaller than the tolerance
   combined.SimplifyTopology();
   combined.Finish();
   combined.IncrementMeshIDs();

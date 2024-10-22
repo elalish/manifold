@@ -19,10 +19,10 @@ import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedF
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @param epsilon The value of epsilon, bounding the uncertainty of the input
  * @return The triangles, referencing the original polygon points in order.
  */
-export function triangulate(polygons: Polygons, precision?: number): Vec3[];
+export function triangulate(polygons: Polygons, epsilon?: number): Vec3[];
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -569,14 +569,14 @@ export class Manifold {
    * performance.
    * @param level You can inset your Mesh by using a positive value, or outset
    * it with a negative value.
-   * @param precision Ensure each vertex is within this distance of the true
+   * @param tolerance Ensure each vertex is within this distance of the true
    * surface. Defaults to -1, which will return the interpolated
    * crossing-point based on the two nearest grid points. Small positive values
    * will require more sdf evaluations per output vertex.
    */
   static levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-      level?: number, precision?: number): Manifold;
+      level?: number, tolerance?: number): Manifold;
 
   // Transformations
 
@@ -697,17 +697,17 @@ export class Manifold {
 
   /**
    * Increase the density of the mesh by splitting each edge into pieces such
-   * that any point on the resulting triangles is roughly within precision of
+   * that any point on the resulting triangles is roughly within tolerance of
    * the smoothly curved surface defined by the tangent vectors. This means
    * tightly curving regions will be divided more finely than smoother regions.
    * If halfedgeTangents are not present, the result will simply be a copy of
    * the original. Quads will ignore their interior triangle bisector.
    *
-   * @param precision The desired maximum distance between the faceted mesh
+   * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
    * on the surface, within rounding error.
    */
-  refineToTolerance(precision: number): Manifold;
+  refineToTolerance(tolerance: number): Manifold;
 
   /**
    * Create a new copy of this manifold with updated vertex properties by
@@ -929,14 +929,14 @@ export class Manifold {
   boundingBox(): Box;
 
   /**
-   * Returns the precision of this Manifold's vertices, which tracks the
+   * Returns the tolerance of this Manifold's vertices, which tracks the
    * approximate rounding error over all the transforms and operations that have
-   * led to this state. Any triangles that are colinear within this precision
+   * led to this state. Any triangles that are colinear within this tolerance
    * are considered degenerate and removed. This is the value of &epsilon;
    * defining
    * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
    */
-  precision(): number;
+  tolerance(): number;
 
   /**
    * The genus is a topological property of the manifold, representing the
@@ -1137,8 +1137,8 @@ export class Mesh {
    * Updates the mergeFromVert and mergeToVert vectors in order to create a
    * manifold solid. If the MeshGL is already manifold, no change will occur and
    * the function will return false. Otherwise, this will merge verts along open
-   * edges within precision (the maximum of the MeshGL precision and the
-   * baseline bounding-box precision), keeping any from the existing merge
+   * edges within tolerance (the maximum of the MeshGL tolerance and the
+   * baseline bounding-box tolerance), keeping any from the existing merge
    * vectors.
    *
    * There is no guarantee the result will be manifold - this is a best-effort

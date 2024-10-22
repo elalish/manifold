@@ -329,7 +329,7 @@ NB_MODULE(manifold3d, m) {
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
       .def("refine_to_tolerance", &Manifold::RefineToTolerance,
-           nb::arg("precision"), manifold__refine_to_tolerance__precision)
+           nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance)
       .def("to_mesh", &Manifold::GetMeshGL,
            nb::arg("normal_idx") = std::make_tuple(0, 0, 0),
            manifold__get_mesh_gl__normal_idx)
@@ -437,7 +437,7 @@ NB_MODULE(manifold3d, m) {
           "level_set",
           [](const std::function<double(double, double, double)> &f,
              std::vector<double> bounds, double edgeLength, double level = 0.0,
-             double precision = -1) {
+             double tolerance = -1) {
             // Same format as Manifold.bounding_box
             Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
                          vec3(bounds[3], bounds[4], bounds[5])};
@@ -446,11 +446,11 @@ NB_MODULE(manifold3d, m) {
               return f(v.x, v.y, v.z);
             };
             return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
-                                      precision, false);
+                                      tolerance, false);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
-          nb::arg("level") = 0.0, nb::arg("precision") = -1,
-          manifold__level_set__sdf__bounds__edge_length__level__precision__can_parallel)
+          nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
+          manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
@@ -484,7 +484,7 @@ NB_MODULE(manifold3d, m) {
                  nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>> &faceID,
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>> &halfedgeTangent,
-             float precision) {
+             float tolerance) {
             new (self) MeshGL();
             MeshGL &out = *self;
             out.numProp = vertProp.shape(1);
@@ -529,7 +529,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
           nb::arg("face_id") = nb::none(),
-          nb::arg("halfedge_tangent") = nb::none(), nb::arg("precision") = 0)
+          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
       .def_prop_ro(
           "vert_properties",
           [](const MeshGL &self) {

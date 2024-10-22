@@ -24,7 +24,7 @@ using namespace manifold;
 struct FaceAreaVolume {
   VecView<const Halfedge> halfedges;
   VecView<const vec3> vertPos;
-  const double precision;
+  const double epsilon;
 
   std::pair<double, double> operator()(int face) {
     double perimeter = 0;
@@ -229,7 +229,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 }
 
 /**
- * Returns the number of triangles that are colinear within precision_.
+ * Returns the number of triangles that are colinear within epsilon_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
@@ -300,8 +300,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
 /**
  * Calculates the bounding box of the entire manifold, which is stored
- * internally to short-cut Boolean operations and to serve as the precision
- * range for Morton code calculation. Ignores NaNs.
+ * internally to short-cut Boolean operations. Ignores NaNs.
  */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min =
