@@ -71,8 +71,12 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
-  out.tolerance = std::max(std::numeric_limits<Precision>::epsilon(),
-                           static_cast<Precision>(impl.tolerance_));
+  out.tolerance = impl.tolerance_;
+  if (std::is_same<Precision, float>::value)
+    out.tolerance =
+        std::max(out.tolerance,
+                 static_cast<Precision>(std::numeric_limits<float>::epsilon() *
+                                        impl.bBox_.Scale()));
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();

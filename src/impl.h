@@ -202,7 +202,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetEpsilon();
+    SetEpsilon(-1, std::is_same<Precision, float>::value);
 
     SplitPinchedVerts();
 
@@ -277,7 +277,7 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetEpsilon(double minEpsilon = -1);
+  void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;

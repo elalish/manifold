@@ -69,6 +69,7 @@ namespace manifold {
 }
 
 constexpr double kTolerance = 1e-12;
+constexpr double kFloatTolerance = 1e-6;
 
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);
