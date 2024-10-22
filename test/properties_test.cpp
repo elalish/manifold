@@ -35,7 +35,7 @@ TEST(Properties, GetProperties) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
 }
 
-TEST(Properties, Precision) {
+TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
   cube = cube.Scale({0.1, 1, 10});
@@ -44,23 +44,37 @@ TEST(Properties, Precision) {
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kPrecision);
 }
 
-TEST(Properties, Precision2) {
+TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
 }
 
-TEST(Properties, Precision3) {
+TEST(Properties, Tolerance) {
   Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
   const auto prop = cylinder.GetProperties();
 
+  Manifold cylinder2 = cylinder.SetTolerance(0.01);
   MeshGL mesh = cylinder.GetMeshGL();
-  mesh.faceID.clear();
-  Manifold cylinder2 = Manifold(mesh).SetEpsilon(0.001);
+  mesh.tolerance = 0.01;
+  Manifold cylinder3(mesh);
+
+  EXPECT_EQ(cylinder.NumTri(), 3996);
+  EXPECT_EQ(cylinder2.NumTri(), 1122);
+  EXPECT_EQ(cylinder3.NumTri(), 1122);
 
   const auto prop2 = cylinder2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.001);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.001);
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.01);
+
+  const auto prop3 = cylinder3.GetProperties();
+  EXPECT_FLOAT_EQ(prop2.volume, prop3.volume);
+  EXPECT_FLOAT_EQ(prop2.surfaceArea, prop3.surfaceArea);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("tolerance.glb", cylinder2.GetMeshGL(), {});
+#endif
 }
 
 /**

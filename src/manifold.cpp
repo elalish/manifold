@@ -386,17 +386,10 @@ double Manifold::GetEpsilon() const {
   return GetCsgLeafNode().GetImpl()->epsilon_;
 }
 
-Manifold Manifold::SetEpsilon(double epsilon) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  auto oldTolerance = impl->tolerance_;
-  impl->SetEpsilon(epsilon);
-  if (impl->tolerance_ > oldTolerance) impl->SimplifyTopology();
-  return Manifold(impl);
-}
-
 /**
- * Returns the tolerance of this Manifold's vertices.
- * Edges shorter than this tolerance value will be collapsed.
+ * Returns the tolerance value of this Manifold. Triangles that are coplanar
+ * within tolerance tend to be merged and edges shorter than tolerance tend to
+ * be collapsed.
  */
 double Manifold::GetTolerance() const {
   return GetCsgLeafNode().GetImpl()->tolerance_;
@@ -411,6 +404,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->SimplifyTopology();
+    impl->Finish();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
