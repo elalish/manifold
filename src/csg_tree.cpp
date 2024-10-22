@@ -194,7 +194,7 @@ Manifold::Impl CsgLeafNode::Compose(
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
     double nodeEpsilon = node->pImpl_->epsilon_;
     nodeEpsilon *= std::max(1.0, nodeNewScale / nodeOldScale);
-    nodeEpsilon = std::max(nodeEpsilon, kTolerance * nodeNewScale);
+    nodeEpsilon = std::max(nodeEpsilon, kPrecision * nodeNewScale);
     if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
     epsilon = std::max(epsilon, nodeEpsilon);
     tolerance = std::max(tolerance, node->pImpl_->tolerance_);
@@ -323,7 +323,7 @@ Manifold::Impl CsgLeafNode::Compose(
     }
   }
 
-  // required to remove parts that are smaller than the precision
+  // required to remove parts that are smaller than the tolerance
   combined.SimplifyTopology();
   combined.Finish();
   combined.IncrementMeshIDs();

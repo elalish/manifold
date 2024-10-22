@@ -70,7 +70,7 @@ TEST(SDF, Bounds) {
   Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
-  const double precision = cubeVoid.GetEpsilon();
+  const double epsilon = cubeVoid.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("cubeVoid.glb", cubeVoid.GetMeshGL(), {});
@@ -79,12 +79,12 @@ TEST(SDF, Bounds) {
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
   const double outerBound = size / 2 + edgeLength / 2;
-  EXPECT_NEAR(bounds.min.x, -outerBound, precision);
-  EXPECT_NEAR(bounds.min.y, -outerBound, precision);
-  EXPECT_NEAR(bounds.min.z, -outerBound, precision);
-  EXPECT_NEAR(bounds.max.x, outerBound, precision);
-  EXPECT_NEAR(bounds.max.y, outerBound, precision);
-  EXPECT_NEAR(bounds.max.z, outerBound, precision);
+  EXPECT_NEAR(bounds.min.x, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.min.y, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.min.z, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.x, outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.y, outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.z, outerBound, epsilon);
 }
 
 TEST(SDF, Bounds2) {
@@ -94,7 +94,7 @@ TEST(SDF, Bounds2) {
   Manifold cubeVoid = Manifold::LevelSet(
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
-  const double precision = cubeVoid.GetEpsilon();
+  const double epsilon = cubeVoid.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("cubeVoid2.glb", cubeVoid.GetMeshGL(), {});
@@ -103,12 +103,12 @@ TEST(SDF, Bounds2) {
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
   const double outerBound = size / 2 + edgeLength / 2;
-  EXPECT_NEAR(bounds.min.x, -outerBound, precision);
-  EXPECT_NEAR(bounds.min.y, -outerBound, precision);
-  EXPECT_NEAR(bounds.min.z, -outerBound, precision);
-  EXPECT_NEAR(bounds.max.x, outerBound, precision);
-  EXPECT_NEAR(bounds.max.y, outerBound, precision);
-  EXPECT_NEAR(bounds.max.z, outerBound, precision);
+  EXPECT_NEAR(bounds.min.x, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.min.y, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.min.z, -outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.x, outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.y, outerBound, epsilon);
+  EXPECT_NEAR(bounds.max.z, outerBound, epsilon);
 }
 
 TEST(SDF, Surface) {
@@ -121,7 +121,7 @@ TEST(SDF, Surface) {
   Manifold cube = Manifold::Cube(vec3(size), true);
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
-  const double precision = cube.GetEpsilon();
+  const double epsilon = cube.GetEpsilon();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMeshGL(), {});
 #endif
@@ -131,12 +131,12 @@ TEST(SDF, Surface) {
   auto prop = cube.GetProperties();
   EXPECT_NEAR(prop.volume, 8, 0.001);
   EXPECT_NEAR(prop.surfaceArea, 24, 0.001);
-  EXPECT_NEAR(bounds.min.x, -1, precision);
-  EXPECT_NEAR(bounds.min.y, -1, precision);
-  EXPECT_NEAR(bounds.min.z, -1, precision);
-  EXPECT_NEAR(bounds.max.x, 1, precision);
-  EXPECT_NEAR(bounds.max.y, 1, precision);
-  EXPECT_NEAR(bounds.max.z, 1, precision);
+  EXPECT_NEAR(bounds.min.x, -1, epsilon);
+  EXPECT_NEAR(bounds.min.y, -1, epsilon);
+  EXPECT_NEAR(bounds.min.z, -1, epsilon);
+  EXPECT_NEAR(bounds.max.x, 1, epsilon);
+  EXPECT_NEAR(bounds.max.y, 1, epsilon);
+  EXPECT_NEAR(bounds.max.z, 1, epsilon);
 }
 
 TEST(SDF, Resize) {

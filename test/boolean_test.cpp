@@ -408,7 +408,7 @@ TEST(Boolean, Precision) {
   Manifold cube2 = cube;
   Manifold cube3 = cube;
   double distance = 100;
-  double scale = distance * kTolerance;
+  double scale = distance * kPrecision;
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
@@ -423,11 +423,11 @@ TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
   Manifold cube2 = cube;
-  double distance = scale * (1 - kTolerance / 2);
+  double distance = scale * (1 - kPrecision / 2);
 
   cube2 = cube2.Translate(vec3(-distance));
   EXPECT_TRUE((cube ^ cube2).IsEmpty());
 
-  cube2 = cube2.Translate(vec3(scale * kTolerance));
+  cube2 = cube2.Translate(vec3(scale * kPrecision));
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }

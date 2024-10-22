@@ -68,7 +68,7 @@ namespace manifold {
   return n;
 }
 
-constexpr double kTolerance = 1e-12;
+constexpr double kPrecision = 1e-12;
 
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);

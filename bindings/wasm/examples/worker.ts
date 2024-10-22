@@ -74,7 +74,7 @@ const manifoldMemberFunctions = [
   'smoothOut',
   'refine',
   'refineToLength',
-  'refineToPrecision',
+  'refineToTolerance',
   'setProperties',
   'asOriginal',
   'trimByPlane',
