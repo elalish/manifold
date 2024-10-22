@@ -89,8 +89,8 @@ struct MeshGLP {
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<Precision> halfedgeTangent;
   /// Tolerance for mesh simplification.
-  /// When creating a Manifold, the precision used will be the maximum
-  /// of this and a baseline precision from the size of the bounding box. Any
+  /// When creating a Manifold, the tolerance used will be the maximum
+  /// of this and a baseline tolerance from the size of the bounding box. Any
   /// edge shorter than tolerance may be collapsed.
   /// Tolerance may be enlarged when floating point error accumulates.
   Precision tolerance = 0;
@@ -192,7 +192,7 @@ class Manifold {
                           double revolveDegrees = 360.0f);
   static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
                            double edgeLength, double level = 0,
-                           double precision = -1, bool canParallel = true);
+                           double tolerance = -1, bool canParallel = true);
   ///@}
 
   /** @name Topological
@@ -266,7 +266,7 @@ class Manifold {
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
-  Manifold RefineToPrecision(double) const;
+  Manifold RefineToTolerance(double) const;
   Manifold SetTolerance(double) const;
   ///@}
 
@@ -363,7 +363,7 @@ inline std::string ToString(const Manifold::Error& error) {
     case Manifold::Error::InvalidConstruction:
       return "Invalid Construction";
     default:
-      return "Unkown Error";
+      return "Unknown Error";
   };
 }
 

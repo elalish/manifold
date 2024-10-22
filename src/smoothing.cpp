@@ -23,7 +23,7 @@ using namespace manifold;
 // ref and altIn.
 vec3 OrthogonalTo(vec3 in, vec3 altIn, vec3 ref) {
   vec3 out = in - la::dot(in, ref) * ref;
-  if (la::dot(out, out) < kTolerance * la::dot(in, in)) {
+  if (la::dot(out, out) < kPrecision * la::dot(in, in)) {
     out = altIn - la::dot(altIn, ref) * ref;
   }
   return SafeNormalize(out);
@@ -785,7 +785,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               const vec3 normal = GetNormal(halfedge, normalIdx);
               const vec3 diff = faceNormal_[halfedge / 3] - normal;
               return FlatNormal(
-                  {la::dot(diff, diff) < kTolerance * kTolerance, normal});
+                  {la::dot(diff, diff) < kPrecision * kPrecision, normal});
             },
             [&faceEdges, &tangent, &fixedHalfedge, this](
                 int halfedge, const FlatNormal& here, const FlatNormal& next) {
@@ -796,7 +796,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               // mark special edges
               const vec3 diff = next.normal - here.normal;
               const bool differentNormals =
-                  la::dot(diff, diff) > kTolerance * kTolerance;
+                  la::dot(diff, diff) > kPrecision * kPrecision;
               if (differentNormals || here.isFlatFace != next.isFlatFace) {
                 fixedHalfedge[halfedge] = true;
                 if (faceEdges[0] == -1) {

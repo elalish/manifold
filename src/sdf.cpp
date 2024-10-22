@@ -444,7 +444,7 @@ namespace manifold {
  * performance.
  * @param level You can inset your Mesh by using a positive value, or outset
  * it with a negative value.
- * @param precision Ensure each vertex is within this distance of the true
+ * @param tolerance Ensure each vertex is within this distance of the true
  * surface. Defaults to -1, which will return the interpolated
  * crossing-point based on the two nearest grid points. Small positive values
  * will require more sdf evaluations per output vertex.
@@ -454,10 +454,10 @@ namespace manifold {
  * active.
  */
 Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
-                            double edgeLength, double level, double precision,
+                            double edgeLength, double level, double tolerance,
                             bool canParallel) {
-  if (precision <= 0) {
-    precision = std::numeric_limits<double>::infinity();
+  if (tolerance <= 0) {
+    tolerance = std::numeric_limits<double>::infinity();
   }
 
   auto pImpl_ = std::make_shared<Impl>();
@@ -494,7 +494,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
                NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                            gridSize, gridPow, spacing, level, precision}));
+                            gridSize, gridPow, spacing, level, tolerance}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const vec3 lastVert = vertPos[index[0] - 1];
@@ -512,7 +512,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       for_each_n(
           pol, countAt(0), gridVerts.Size(),
           ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                        gridSize, gridPow, spacing, level, precision}));
+                        gridSize, gridPow, spacing, level, tolerance}));
       vertPos.resize(index[0]);
       break;
     }

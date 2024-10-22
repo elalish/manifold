@@ -560,15 +560,15 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   if (!result.collider_.Transform(transform_)) result.Update();
 
   result.CalculateBBox();
-  // Scale the precision by the norm of the 3x3 portion of the transform.
+  // Scale epsilon by the norm of the 3x3 portion of the transform.
   result.epsilon_ *= SpectralNorm(mat3(transform_));
-  // Maximum of inherited precision loss and translational precision loss.
+  // Maximum of inherited epsilon loss and translational epsilon loss.
   result.SetEpsilon(result.epsilon_);
   return result;
 }
 
 /**
- * Sets the precision based on the bounding box, and limits its minimum value
+ * Sets epsilon based on the bounding box, and limits its minimum value
  * by the optional input.
  */
 void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {

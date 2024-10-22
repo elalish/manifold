@@ -221,9 +221,9 @@ TEST(Samples, GyroidModule) {
   CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
-  const double precision = gyroid.GetEpsilon();
-  EXPECT_NEAR(bounds.min.z, 0, precision);
-  EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), precision);
+  const double epsilon = gyroid.GetEpsilon();
+  EXPECT_NEAR(bounds.min.z, 0, epsilon);
+  EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), epsilon);
 
   CrossSection slice(gyroid.Slice(5));
   EXPECT_EQ(slice.NumContour(), 4);

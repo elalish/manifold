@@ -30,7 +30,7 @@ inline vec3 SafeNormalize(vec3 v) {
 }
 
 inline double MaxEpsilon(double minEpsilon, const Box& bBox) {
-  double epsilon = std::max(minEpsilon, kTolerance * bBox.Scale());
+  double epsilon = std::max(minEpsilon, kPrecision * bBox.Scale());
   return std::isfinite(epsilon) ? epsilon : -1;
 }
 
