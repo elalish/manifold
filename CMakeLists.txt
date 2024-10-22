@@ -56,6 +56,11 @@ option(
 option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
+option(
+  MANIFOLD_OPTIMIZED
+  "Force Optimized build, even with debugging enabled"
+  OFF
+)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 include(CMakeDependentOption)
@@ -171,6 +176,13 @@ else()
     list(APPEND WARNING_FLAGS -Werror)
   endif()
   list(APPEND MANIFOLD_FLAGS ${WARNING_FLAGS})
+  if(
+    MANIFOLD_OPTIMIZED
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "Release"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo"
+  )
+    list(APPEND MANIFOLD_FLAGS -O3)
+  endif()
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
