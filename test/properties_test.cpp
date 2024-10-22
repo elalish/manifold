@@ -37,17 +37,17 @@ TEST(Properties, GetProperties) {
 
 TEST(Properties, Precision) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * kPrecision);
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kPrecision);
 }
 
 TEST(Properties, Precision2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
 }
 
 TEST(Properties, Precision3) {

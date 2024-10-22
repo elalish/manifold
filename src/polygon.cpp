@@ -650,7 +650,7 @@ class EarClip {
       Link(last, first);
     }
 
-    if (precision_ < 0) precision_ = bBox_.Scale() * kTolerance;
+    if (precision_ < 0) precision_ = bBox_.Scale() * kPrecision;
 
     // Slightly more than enough, since each hole can cause two extra triangles.
     triangles_.reserve(polygon_.size() + 2 * starts.size());
