@@ -144,10 +144,11 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.max[i] = minMax.second;
   }
 
-  const double tolerance = std::max(
-      static_cast<double>(mesh.tolerance),
-      (std::is_same<Precision, float>::value ? kFloatTolerance : kTolerance) *
-          bBox.Scale());
+  const double tolerance = std::max(static_cast<double>(mesh.tolerance),
+                                    (std::is_same<Precision, float>::value
+                                         ? std::numeric_limits<float>::epsilon()
+                                         : kTolerance) *
+                                        bBox.Scale());
 
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
