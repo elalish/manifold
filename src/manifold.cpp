@@ -403,6 +403,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
+    impl->CreateFaces();
     impl->SimplifyTopology();
     impl->Finish();
   } else {

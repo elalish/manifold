@@ -60,12 +60,12 @@ TEST(Properties, Tolerance) {
   Manifold cylinder3(mesh);
 
   EXPECT_EQ(cylinder.NumTri(), 3996);
-  EXPECT_EQ(cylinder2.NumTri(), 1122);
-  EXPECT_EQ(cylinder3.NumTri(), 1122);
+  EXPECT_EQ(cylinder2.NumTri(), 3996);
+  EXPECT_EQ(cylinder3.NumTri(), 3996);
 
   const auto prop2 = cylinder2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.01);
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.0001);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.0001);
 
   const auto prop3 = cylinder3.GetProperties();
   EXPECT_FLOAT_EQ(prop2.volume, prop3.volume);
