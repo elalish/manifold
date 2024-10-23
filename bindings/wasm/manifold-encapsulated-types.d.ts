@@ -842,6 +842,22 @@ export class Manifold {
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
 
   /**
+   * Compute the minkowski sum of this manifold with another.
+   * This corresponds to the morphological dilation of the manifold.
+   *
+   * @param other The other manifold to minkowski sum to this one.
+   */
+  minkowskiSum(other: Manifold): Manifold;
+
+  /**
+   * Subtract the sweep of the other manifold across this manifold's surface.
+   * This corresponds to the morphological erosion of the manifold.
+   *
+   * @param other The other manifold to minkowski subtract from this one.
+   */
+  minkowskiDifference(other: Manifold): Manifold;
+
+  /**
    * Returns the cross section of this object parallel to the X-Y plane at the
    * specified height. Using a height equal to the bottom
    * of the bounding box will return the bottom faces, while using a height
