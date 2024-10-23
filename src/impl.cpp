@@ -571,9 +571,13 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  * Sets epsilon based on the bounding box, and limits its minimum value
  * by the optional input.
  */
-void Manifold::Impl::SetEpsilon(double minEpsilon) {
+void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
   epsilon_ = MaxEpsilon(minEpsilon, bBox_);
-  tolerance_ = std::max(tolerance_, epsilon_);
+  double minTol = epsilon_;
+  if (useSingle)
+    minTol =
+        std::max(minTol, std::numeric_limits<float>::epsilon() * bBox_.Scale());
+  tolerance_ = std::max(tolerance_, minTol);
 }
 
 /**

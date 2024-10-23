@@ -143,25 +143,31 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }
-  auto epsilon = MaxEpsilon(0, bBox);
+
+  const double tolerance = std::max(static_cast<double>(mesh.tolerance),
+                                    (std::is_same<Precision, float>::value
+                                         ? std::numeric_limits<float>::epsilon()
+                                         : kPrecision) *
+                                        bBox.Scale());
+
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
-  for_each_n(
-      policy, countAt(0), numOpenVert,
-      [&vertMorton, &vertBox, &openVerts, &bBox, &mesh, epsilon](const int i) {
-        int vert = openVerts[i];
+  for_each_n(policy, countAt(0), numOpenVert,
+             [&vertMorton, &vertBox, &openVerts, &bBox, &mesh,
+              tolerance](const int i) {
+               int vert = openVerts[i];
 
-        const vec3 center(mesh.vertProperties[mesh.numProp * vert],
-                          mesh.vertProperties[mesh.numProp * vert + 1],
-                          mesh.vertProperties[mesh.numProp * vert + 2]);
+               const vec3 center(mesh.vertProperties[mesh.numProp * vert],
+                                 mesh.vertProperties[mesh.numProp * vert + 1],
+                                 mesh.vertProperties[mesh.numProp * vert + 2]);
 
-        vertBox[i].min = center - epsilon / 2.0;
-        vertBox[i].max = center + epsilon / 2.0;
+               vertBox[i].min = center - tolerance / 2.0;
+               vertBox[i].max = center + tolerance / 2.0;
 
-        vertMorton[i] = MortonCode(center, bBox);
-      });
+               vertMorton[i] = MortonCode(center, bBox);
+             });
 
   Vec<int> vertNew2Old(numOpenVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());

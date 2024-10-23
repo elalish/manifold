@@ -71,8 +71,12 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
-  out.tolerance = std::max(std::numeric_limits<Precision>::epsilon(),
-                           static_cast<Precision>(impl.tolerance_));
+  out.tolerance = impl.tolerance_;
+  if (std::is_same<Precision, float>::value)
+    out.tolerance =
+        std::max(out.tolerance,
+                 static_cast<Precision>(std::numeric_limits<float>::epsilon() *
+                                        impl.bBox_.Scale()));
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
@@ -382,17 +386,10 @@ double Manifold::GetEpsilon() const {
   return GetCsgLeafNode().GetImpl()->epsilon_;
 }
 
-Manifold Manifold::SetEpsilon(double epsilon) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  auto oldTolerance = impl->tolerance_;
-  impl->SetEpsilon(epsilon);
-  if (impl->tolerance_ > oldTolerance) impl->SimplifyTopology();
-  return Manifold(impl);
-}
-
 /**
- * Returns the tolerance of this Manifold's vertices.
- * Edges shorter than this tolerance value will be collapsed.
+ * Returns the tolerance value of this Manifold. Triangles that are coplanar
+ * within tolerance tend to be merged and edges shorter than tolerance tend to
+ * be collapsed.
  */
 double Manifold::GetTolerance() const {
   return GetCsgLeafNode().GetImpl()->tolerance_;
@@ -406,7 +403,9 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
+    impl->CreateFaces();
     impl->SimplifyTopology();
+    impl->Finish();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
