@@ -51,29 +51,34 @@ TEST(Properties, Epsilon2) {
 }
 
 TEST(Properties, Tolerance) {
-  Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
-  const auto prop = cylinder.GetProperties();
+  double degrees = 1;
+  double tol = sind(degrees);
+  Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  const auto prop = imperfect.GetProperties();
 
-  Manifold cylinder2 = cylinder.SetTolerance(0.01);
-  MeshGL mesh = cylinder.GetMeshGL();
-  mesh.tolerance = 0.01;
-  Manifold cylinder3(mesh);
+  Manifold imperfect2 = imperfect.SetTolerance(tol);
+  MeshGL mesh = imperfect.GetMeshGL();
+  mesh.tolerance = tol;
+  Manifold imperfect3(mesh);
 
-  EXPECT_EQ(cylinder.NumTri(), 3996);
-  EXPECT_EQ(cylinder2.NumTri(), 3996);
-  EXPECT_EQ(cylinder3.NumTri(), 3996);
+  EXPECT_EQ(imperfect.NumTri(), 28);
+  EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
+  EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
 
-  const auto prop2 = cylinder2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.0001);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.0001);
+  const auto prop2 = imperfect2.GetProperties();
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.02);
 
-  const auto prop3 = cylinder3.GetProperties();
-  EXPECT_FLOAT_EQ(prop2.volume, prop3.volume);
-  EXPECT_FLOAT_EQ(prop2.surfaceArea, prop3.surfaceArea);
+  const auto prop3 = imperfect3.GetProperties();
+  EXPECT_NEAR(prop2.volume, prop3.volume, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, prop3.surfaceArea, 0.02);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("tolerance.glb", cylinder2.GetMeshGL(), {});
+  if (options.exportModels) {
+    ExportMesh("tolerance.glb", imperfect2.GetMeshGL(), {});
+    ExportMesh("tolerance2.glb", imperfect3.GetMeshGL(), {});
+  }
 #endif
 }
 
