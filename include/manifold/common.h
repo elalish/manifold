@@ -22,8 +22,8 @@
 namespace manifold {
 /** @addtogroup Math
  * @ingroup Core
- *  @brief Abstract away from linalg.
- *  In the future the underlying data type can change.
+ *  @brief Simple operations on scalars, quaternions, and vectors and matrices
+ * up to dimension 4.
  *  @{
  */
 namespace la = linalg;
@@ -92,6 +92,7 @@ inline double cosd(double x) { return sind(x + 90.0); }
 
 /** @addtogroup Structs
  * @ingroup Core
+ * @brief Miscellaneous data structures for interfacing with this library.
  *  @{
  */
 

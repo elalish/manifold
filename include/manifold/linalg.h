@@ -477,8 +477,8 @@ struct select {
 };
 struct lerp {
   template <class A, class B, class C>
-  constexpr auto operator()(A a, B b,
-                            C c) const -> decltype(a * (1 - c) + b * c) {
+  constexpr auto operator()(A a, B b, C c) const
+      -> decltype(a * (1 - c) + b * c) {
     return a * (1 - c) + b * c;
   }
 };
@@ -757,6 +757,10 @@ struct std_copysign {
   }
 };
 }  // namespace detail
+
+/** @addtogroup Math
+ *  @{
+ */
 
 // Small, fixed-length vector type, consisting of exactly M elements of type T,
 // and presumed to be a column-vector unless otherwise noted
@@ -1097,33 +1101,33 @@ constexpr typename detail::any_compare<A, B>::type compare(const A &a,
   return detail::any_compare<A, B>()(a, b);
 }
 template <class A, class B>
-constexpr auto operator==(const A &a,
-                          const B &b) -> decltype(compare(a, b) == 0) {
+constexpr auto operator==(const A &a, const B &b)
+    -> decltype(compare(a, b) == 0) {
   return compare(a, b) == 0;
 }
 template <class A, class B>
-constexpr auto operator!=(const A &a,
-                          const B &b) -> decltype(compare(a, b) != 0) {
+constexpr auto operator!=(const A &a, const B &b)
+    -> decltype(compare(a, b) != 0) {
   return compare(a, b) != 0;
 }
 template <class A, class B>
-constexpr auto operator<(const A &a,
-                         const B &b) -> decltype(compare(a, b) < 0) {
+constexpr auto operator<(const A &a, const B &b)
+    -> decltype(compare(a, b) < 0) {
   return compare(a, b) < 0;
 }
 template <class A, class B>
-constexpr auto operator>(const A &a,
-                         const B &b) -> decltype(compare(a, b) > 0) {
+constexpr auto operator>(const A &a, const B &b)
+    -> decltype(compare(a, b) > 0) {
   return compare(a, b) > 0;
 }
 template <class A, class B>
-constexpr auto operator<=(const A &a,
-                          const B &b) -> decltype(compare(a, b) <= 0) {
+constexpr auto operator<=(const A &a, const B &b)
+    -> decltype(compare(a, b) <= 0) {
   return compare(a, b) <= 0;
 }
 template <class A, class B>
-constexpr auto operator>=(const A &a,
-                          const B &b) -> decltype(compare(a, b) >= 0) {
+constexpr auto operator>=(const A &a, const B &b)
+    -> decltype(compare(a, b) >= 0) {
   return compare(a, b) >= 0;
 }
 
@@ -1918,6 +1922,7 @@ struct converter<std::array<T, 4>, vec<T, 4>> {
     return {a[0], a[1], a[2], a[3]};
   }
 };
+/** @} */
 }  // namespace linalg
 
 namespace std {
@@ -2091,5 +2096,4 @@ linalg::mat<T, 4, 4> linalg::frustum_matrix(T x0, T x1, T y0, T y1, T n, T f,
            s * (f + o) / (f - n), s},
           {0, 0, -(n + o) * f / (f - n), 0}};
 }
-
 #endif

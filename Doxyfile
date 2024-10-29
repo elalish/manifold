@@ -965,8 +965,25 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = src \
-                         include
+INPUT                  = include/manifold/manifold.h \
+                         include/manifold/cross_section.h \
+                         include/manifold/polygon.h \
+                         include/manifold/common.h \
+                         include/manifold/meshIO.h \
+                         include/manifold/linalg.h \
+                         include/manifold/parallel.h \
+                         include/manifold/vec_view.h \
+                         include/manifold/iters.h \
+                         include/manifold/optional_assert.h \
+                         src/manifold.cpp \
+                         src/constructors.cpp \
+                         src/polygon.cpp \
+                         src/cross_section/cross_section.cpp \
+                         src/meshIO/meshIO.cpp \
+                         src/sdf.cpp \
+                         README.md \
+                         samples/include/samples.h \
+                         samples/src
 
 # This tag can be used to specify the character encoding of the source files
 # that Doxygen parses. Internally Doxygen uses the UTF-8 encoding. Doxygen uses
@@ -1058,7 +1075,7 @@ FILE_PATTERNS          = *.c \
 # be searched for input files as well.
 # The default value is: NO.
 
-RECURSIVE              = YES
+RECURSIVE              = NO
 
 # The EXCLUDE tag can be used to specify files and/or directories that should be
 # excluded from the INPUT source files. This way you can easily exclude a

@@ -38,6 +38,14 @@ class CsgLeafNode;
  *  @{
  */
 
+/**
+ * Output suitable for pushing into graphics libraries directly. This may not be
+ * manifold since the verts are duplicated along property boundaries that do not
+ * match. The additional merge vectors store this missing information, allowing
+ * the manifold to be reconstructed. MeshGL is an alias for the standard
+ * single-precision version. Use MeshGL64 to output the full double precision
+ * that Manifold uses internally.
+ */
 template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
   /// Number of property vertices
@@ -121,12 +129,6 @@ struct MeshGLP {
   }
 };
 
-/**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly. This may not be manifold since the verts are duplicated
- * along property boundaries that do not match. The additional merge vectors
- * store this missing information, allowing the manifold to be reconstructed.
- */
 using MeshGL = MeshGLP<float>;
 using MeshGL64 = MeshGLP<double, size_t>;
 

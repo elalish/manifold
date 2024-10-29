@@ -19,6 +19,7 @@ namespace manifold {
 
 /** @addtogroup Triangulation
  *  @ingroup Core
+ * @brief Polygon triangulation
  *  @{
  */
 
