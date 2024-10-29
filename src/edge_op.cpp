@@ -206,7 +206,7 @@ void Manifold::Impl::SimplifyTopology() {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
-    ShortEdge se{halfedge_, vertPos_, tolerance_};
+    ShortEdge se{halfedge_, vertPos_, epsilon_};
     for_each_n(policy, countAt(0_uz), nbEdges,
                [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {

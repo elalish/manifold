@@ -35,7 +35,7 @@ TEST(Properties, GetProperties) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
 }
 
-TEST(Properties, Precision) {
+TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
   cube = cube.Scale({0.1, 1, 10});
@@ -44,23 +44,42 @@ TEST(Properties, Precision) {
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kPrecision);
 }
 
-TEST(Properties, Precision2) {
+TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
   EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
 }
 
-TEST(Properties, Precision3) {
-  Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
-  const auto prop = cylinder.GetProperties();
+TEST(Properties, Tolerance) {
+  double degrees = 1;
+  double tol = sind(degrees);
+  Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  const auto prop = imperfect.GetProperties();
 
-  MeshGL mesh = cylinder.GetMeshGL();
-  mesh.faceID.clear();
-  Manifold cylinder2 = Manifold(mesh).SetEpsilon(0.001);
+  Manifold imperfect2 = imperfect.SetTolerance(tol);
+  MeshGL mesh = imperfect.GetMeshGL();
+  mesh.tolerance = tol;
+  Manifold imperfect3(mesh);
 
-  const auto prop2 = cylinder2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.001);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.001);
+  EXPECT_EQ(imperfect.NumTri(), 28);
+  EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
+  EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
+
+  const auto prop2 = imperfect2.GetProperties();
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.02);
+
+  const auto prop3 = imperfect3.GetProperties();
+  EXPECT_NEAR(prop2.volume, prop3.volume, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, prop3.surfaceArea, 0.02);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tolerance.glb", imperfect2.GetMeshGL(), {});
+    ExportMesh("tolerance2.glb", imperfect3.GetMeshGL(), {});
+  }
+#endif
 }
 
 /**

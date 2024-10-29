@@ -313,7 +313,6 @@ class Manifold {
   size_t NumDegenerateTris() const;
   size_t NumOverlaps(const Manifold& second) const;
   double GetEpsilon() const;
-  Manifold SetEpsilon(double epsilon) const;
   ///@}
 
   struct Impl;

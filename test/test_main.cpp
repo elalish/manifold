@@ -300,10 +300,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   const ivec3 normalIdx = updateNormals ? ivec3(3, 4, 5) : ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
 
-  float epsilon = std::max(static_cast<float>(out.GetEpsilon()),
-                           std::numeric_limits<float>::epsilon() *
-                               static_cast<float>(out.BoundingBox().Scale()));
-
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
     const mat3x4 transform =
@@ -318,6 +314,9 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
+    const float tolerance =
+        3 * std::max(static_cast<float>(out.GetTolerance()), inMesh.tolerance);
+
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {
       if (!output.faceID.empty()) {
@@ -355,7 +354,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const double volume = la::dot(edges[0], la::cross(edges[1], edges[2]));
-        ASSERT_LE(volume, area * epsilon);
+        ASSERT_LE(volume, area * tolerance);
 
         if (checkNormals) {
           vec3 normal;
@@ -378,7 +377,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             const double volumeP =
                 la::dot(edgesP[0], la::cross(edgesP[1], edgesP[2]));
 
-            ASSERT_LE(volumeP, area * epsilon);
+            ASSERT_LE(volumeP, area * tolerance);
           }
         }
       }
