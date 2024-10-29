@@ -508,7 +508,7 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * Scale this CrossSection in space. This operation can be chained. Transforms
  * are combined and applied lazily.
  *
- * @param v The vector to multiply every vertex by per component.
+ * @param scale The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
   mat2x3 m({scale.x, 0.0},  //
@@ -640,7 +640,7 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * @param delta Positive deltas will cause the expansion of outlining contours
  * to expand, and retraction of inner (hole) contours. Negative deltas will
  * have the opposite effect.
- * @param jt The join type specifying the treatment of contour joins
+ * @param jointype The join type specifying the treatment of contour joins
  * (corners).
  * @param miter_limit The maximum distance in multiples of delta that vertices
  * can be offset from their original positions with before squaring is
@@ -718,8 +718,8 @@ CrossSection CrossSection::Hull(SimplePolygon pts) {
  * Compute the convex hull of a set of points/polygons. If the given points are
  * fewer than 3, an empty CrossSection will be returned.
  *
- * @param pts A vector of vectors of 2-dimensional points over which to compute
- * a convex hull.
+ * @param polys A vector of vectors of 2-dimensional points over which to
+ * compute a convex hull.
  */
 CrossSection CrossSection::Hull(const Polygons polys) {
   SimplePolygon pts;

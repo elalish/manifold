@@ -68,7 +68,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  * No higher-order derivatives are considered, as the interpolation is
  * independent per triangle, only sharing constraints on their boundaries.
  *
- * @param meshGL input MeshGL.
+ * @param meshGL64 input MeshGL64.
  * @param sharpenedEdges If desired, you can supply a vector of sharpened
  * halfedges, which should in general be a small subset of all halfedges. Order
  * of entries doesn't matter, as each one specifies the desired smoothness

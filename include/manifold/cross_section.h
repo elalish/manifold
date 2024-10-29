@@ -155,7 +155,7 @@ class CrossSection {
   ///@{
   CrossSection Hull() const;
   static CrossSection Hull(const std::vector<CrossSection>& crossSections);
-  static CrossSection Hull(const SimplePolygon poly);
+  static CrossSection Hull(const SimplePolygon pts);
   static CrossSection Hull(const Polygons polys);
   ///@}
   ///

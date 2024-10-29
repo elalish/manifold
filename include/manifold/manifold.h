@@ -256,7 +256,8 @@ class Manifold {
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
   Manifold SetProperties(
-      int, std::function<void(double*, vec3, const double*)>) const;
+      int numProp,
+      std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
   Manifold SmoothByNormals(int normalIdx) const;
