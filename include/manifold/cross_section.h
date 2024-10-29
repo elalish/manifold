@@ -23,7 +23,9 @@
 
 namespace manifold {
 
-/** @addtogroup Core
+/** @addtogroup Optional
+ * @brief Optional features that can be enabled through build flags and may
+ * require extra dependencies.
  *  @{
  */
 

@@ -55,11 +55,6 @@
 
 namespace manifold {
 
-/** @defgroup Private
- *  @brief Internal classes of the library; not currently part of the public API
- *  @{
- */
-
 /**
  * Stand-in for C++23's operator""uz (P0330R8)[https://wg21.link/P0330R8].
  */
@@ -235,15 +230,6 @@ inline mat4 Mat4(mat3x4 a) {
 }
 inline mat3 Mat3(mat2x3 a) { return mat3({a[0], 0}, {a[1], 0}, {a[2], 1}); }
 
-/** @} */
-
-/** @defgroup Debug
- *  @brief Debugging features
- *
- * The features require compiler flags to be enabled. Assertions are enabled
- * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
- *  @{
- */
 #ifdef MANIFOLD_DEBUG
 
 template <class T>
@@ -335,5 +321,4 @@ struct Timer {
   }
 };
 #endif
-/** @} */
 }  // namespace manifold

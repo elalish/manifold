@@ -33,7 +33,8 @@ ExecutionParams& ManifoldParams();
 class CsgNode;
 class CsgLeafNode;
 
-/** @ingroup Connections
+/** @addtogroup Core
+ *  @brief The central classes of the library
  *  @{
  */
 
@@ -128,12 +129,6 @@ struct MeshGLP {
  */
 using MeshGL = MeshGLP<float>;
 using MeshGL64 = MeshGLP<double, size_t>;
-/** @} */
-
-/** @defgroup Core
- *  @brief The central classes of the library
- *  @{
- */
 
 /**
  * This library's internal representation of an oriented, 2-manifold, triangle
@@ -327,7 +322,8 @@ class Manifold {
 };
 /** @} */
 
-/** @defgroup Debug
+/** @addtogroup Debug
+ *  @ingroup Optional
  *  @brief Debugging features
  *
  * The features require compiler flags to be enabled. Assertions are enabled

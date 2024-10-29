@@ -421,10 +421,6 @@ struct BuildTris {
 
 namespace manifold {
 
-/** @addtogroup Core
- *  @{
- */
-
 /**
  * Constructs a level-set manifold from the input Signed-Distance Function
  * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
@@ -531,5 +527,4 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
-/** @} */
 }  // namespace manifold

@@ -275,9 +275,6 @@ inline QR QRDecomposition(mat3& B) {
 }  // namespace
 
 namespace manifold {
-/** @addtogroup Connections
- *  @{
- */
 
 /**
  * The three matrices of a Singular Value Decomposition.
@@ -308,5 +305,4 @@ inline double SpectralNorm(mat3 A) {
   SVDSet usv = SVD(A);
   return usv.S[0][0];
 }
-/** @} */
 }  // namespace manifold

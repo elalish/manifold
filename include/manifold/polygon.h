@@ -17,7 +17,8 @@
 
 namespace manifold {
 
-/** @addtogroup Private
+/** @addtogroup Triangulation
+ *  @ingroup Core
  *  @{
  */
 
@@ -36,11 +37,7 @@ using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                   double epsilon = -1);
-/** @} */
 
-/** @ingroup Connections
- *  @{
- */
 std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon = -1);
 
 ExecutionParams &PolygonParams();
