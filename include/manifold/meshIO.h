@@ -19,7 +19,8 @@
 
 namespace manifold {
 
-/** @defgroup MeshIO
+/** @addtogroup MeshIO
+ *  @ingroup Optional
  *  @brief 3D model file I/O based on Assimp
  * @{
  */

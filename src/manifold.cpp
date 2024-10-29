@@ -284,7 +284,7 @@ Manifold::Manifold(const MeshGL& meshGL)
  * unique originalID for each material, and sort the materials into triangle
  * runs.
  *
- * @param meshGL The input MeshGL.
+ * @param meshGL64 The input MeshGL64.
  */
 Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}

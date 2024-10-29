@@ -21,9 +21,6 @@
 
 namespace manifold {
 
-/** @addtogroup Private
- *  @{
- */
 inline vec3 SafeNormalize(vec3 v) {
   v = la::normalize(v);
   return std::isfinite(v.x) ? v : vec3(0.0);
@@ -172,7 +169,6 @@ struct TmpEdge {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
-/** @} */
 
 Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());

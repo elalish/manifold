@@ -26,9 +26,6 @@
 
 namespace manifold {
 
-/** @addtogroup Private
- *  @{
- */
 template <typename T>
 class Vec;
 
@@ -219,5 +216,4 @@ class Vec : public VecView<T> {
 
   static_assert(std::is_trivially_destructible<T>::value);
 };
-/** @} */
 }  // namespace manifold

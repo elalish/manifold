@@ -55,9 +55,6 @@ inline Uint64 hash64bit(Uint64 x) {
 }  // namespace
 
 namespace manifold {
-/** @addtogroup Private
- *  @{
- */
 
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
@@ -168,6 +165,4 @@ class HashTable {
   std::atomic<size_t> used_ = 0;
   uint32_t step_;
 };
-
-/** @} */
 }  // namespace manifold

@@ -33,10 +33,19 @@ ExecutionParams& ManifoldParams();
 class CsgNode;
 class CsgLeafNode;
 
-/** @ingroup Connections
+/** @addtogroup Core
+ *  @brief The central classes of the library
  *  @{
  */
 
+/**
+ * Output suitable for pushing into graphics libraries directly. This may not be
+ * manifold since the verts are duplicated along property boundaries that do not
+ * match. The additional merge vectors store this missing information, allowing
+ * the manifold to be reconstructed. MeshGL is an alias for the standard
+ * single-precision version. Use MeshGL64 to output the full double precision
+ * that Manifold uses internally.
+ */
 template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
   /// Number of property vertices
@@ -120,20 +129,8 @@ struct MeshGLP {
   }
 };
 
-/**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly. This may not be manifold since the verts are duplicated
- * along property boundaries that do not match. The additional merge vectors
- * store this missing information, allowing the manifold to be reconstructed.
- */
 using MeshGL = MeshGLP<float>;
 using MeshGL64 = MeshGLP<double, size_t>;
-/** @} */
-
-/** @defgroup Core
- *  @brief The central classes of the library
- *  @{
- */
 
 /**
  * This library's internal representation of an oriented, 2-manifold, triangle
@@ -259,7 +256,8 @@ class Manifold {
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
   Manifold SetProperties(
-      int, std::function<void(double*, vec3, const double*)>) const;
+      int numProp,
+      std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
   Manifold SmoothByNormals(int normalIdx) const;
@@ -327,7 +325,8 @@ class Manifold {
 };
 /** @} */
 
-/** @defgroup Debug
+/** @addtogroup Debug
+ *  @ingroup Optional
  *  @brief Debugging features
  *
  * The features require compiler flags to be enabled. Assertions are enabled

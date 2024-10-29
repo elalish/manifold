@@ -23,7 +23,9 @@
 
 namespace manifold {
 
-/** @addtogroup Core
+/** @addtogroup Optional
+ * @brief Optional features that can be enabled through build flags and may
+ * require extra dependencies.
  *  @{
  */
 
@@ -153,7 +155,7 @@ class CrossSection {
   ///@{
   CrossSection Hull() const;
   static CrossSection Hull(const std::vector<CrossSection>& crossSections);
-  static CrossSection Hull(const SimplePolygon poly);
+  static CrossSection Hull(const SimplePolygon pts);
   static CrossSection Hull(const Polygons polys);
   ///@}
   ///

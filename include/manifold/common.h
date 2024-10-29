@@ -20,9 +20,10 @@
 #include "manifold/linalg.h"
 
 namespace manifold {
-/** @defgroup Math data structure definitions
- *  @brief Abstract away from linalg.
- *  In the future the underlying data type can change.
+/** @addtogroup Math
+ * @ingroup Core
+ *  @brief Simple operations on scalars, quaternions, and vectors and matrices
+ * up to dimension 4.
  *  @{
  */
 namespace la = linalg;
@@ -42,7 +43,6 @@ using ivec2 = la::vec<int, 2>;
 using ivec3 = la::vec<int, 3>;
 using ivec4 = la::vec<int, 4>;
 using quat = la::vec<double, 4>;
-///@}
 
 constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
@@ -88,6 +88,13 @@ inline double sind(double x) {
  * @param x Angle in degrees.
  */
 inline double cosd(double x) { return sind(x + 90.0); }
+/** @} */
+
+/** @addtogroup Structs
+ * @ingroup Core
+ * @brief Miscellaneous data structures for interfacing with this library.
+ *  @{
+ */
 
 /**
  * Single polygon contour, wound CCW. First and last point are implicitly
@@ -435,11 +442,6 @@ struct Rect {
   }
   ///@}
 };
-/** @} */
-
-/** @addtogroup Core
- *  @{
- */
 
 /**
  * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
@@ -536,7 +538,8 @@ class Quality {
 };
 /** @} */
 
-/** @defgroup Exceptions
+/** @addtogroup Exceptions
+ *  @ingroup Optional
  *  @brief Custom Exceptions
  *
  *  Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set.
@@ -553,6 +556,11 @@ struct geometryErr : public virtual std::runtime_error {
 };
 using logicErr = std::logic_error;
 /** @} */
+
+/** @addtogroup Debug
+ * @ingroup Optional
+ * @{
+ */
 
 /**
  * Global parameters that control debugging output. Only has an
@@ -576,5 +584,5 @@ struct ExecutionParams {
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
 };
-
+/** @} */
 }  // namespace manifold

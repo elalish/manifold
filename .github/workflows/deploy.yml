@@ -13,7 +13,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Doxygen Action
-      uses: mattnotmitt/doxygen-action@v1
+      uses: mattnotmitt/doxygen-action@edge
 
     - name: Move deployables
       run: |
