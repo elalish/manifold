@@ -204,8 +204,8 @@ class Manifold {
    *  Details of the manifold
    */
   ///@{
-  MeshGL GetMeshGL(ivec3 normalIdx = ivec3(0)) const;
-  MeshGL64 GetMeshGL64(ivec3 normalIdx = ivec3(0)) const;
+  MeshGL GetMeshGL(int normalIdx = -1) const;
+  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
   bool IsEmpty() const;
   enum class Error {
     NoError,

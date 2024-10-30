@@ -469,7 +469,7 @@ TEST(Manifold, MeshRelation) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
@@ -496,7 +496,7 @@ TEST(Manifold, MeshRelationRefine) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
 #endif
 }
@@ -515,7 +515,7 @@ TEST(Manifold, MeshRelationRefinePrecision) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels)
     ExportMesh("csaszarSmooth.glb", csaszar.GetMeshGL(), opt);
 #endif

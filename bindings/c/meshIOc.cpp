@@ -52,13 +52,8 @@ void manifold_material_set_metalness(ManifoldMaterial *mat, double metalness) {
   from_c(mat)->metalness = metalness;
 }
 
-void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec4 color) {
+void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec3 color) {
   from_c(mat)->color = from_c(color);
-}
-
-void manifold_material_set_vert_color(ManifoldMaterial *mat,
-                                      ManifoldVec4 *vert_color, size_t n_vert) {
-  from_c(mat)->vertColor = vector_of_vec_array(vert_color, n_vert);
 }
 
 // export options

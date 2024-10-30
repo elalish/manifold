@@ -44,8 +44,8 @@ aiScene* CreateScene(const ExportOptions& options) {
   aiMaterial* material = scene->mMaterials[0];
   material->AddProperty(&options.mat.roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
   material->AddProperty(&options.mat.metalness, 1, AI_MATKEY_METALLIC_FACTOR);
-  const vec4& color = options.mat.color;
-  aiColor4D baseColor(color.x, color.y, color.z, color.w);
+  const vec3& color = options.mat.color;
+  aiColor4D baseColor(color.x, color.y, color.z, options.mat.alpha);
   material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);
 
   scene->mNumMeshes = 1;
@@ -199,25 +199,22 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   mesh_out->mNumVertices = mesh.NumVert();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
   if (!options.faceted) {
-    bool validChannels = true;
-    for (int i : {0, 1, 2}) {
-      int c = options.mat.normalChannels[i];
-      validChannels &= c >= 3 && c < (int)mesh.numProp;
-    }
+    const bool validChannels = options.mat.normalIdx >= 0 &&
+                               options.mat.normalIdx + 6 <= (int)mesh.numProp;
     DEBUG_ASSERT(
         validChannels, userErr,
         "When faceted is false, valid normalChannels must be supplied.");
     mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
   }
 
-  bool validChannels = true;
-  bool hasColor = false;
-  for (int i : {0, 1, 2, 3}) {
-    int c = options.mat.colorChannels[i];
-    validChannels &= c < (int)mesh.numProp;
-    hasColor |= c >= 0;
-  }
+  const bool hasColor = options.mat.colorIdx >= 0;
+  const bool validChannels =
+      !hasColor || options.mat.colorIdx + 6 <= (int)mesh.numProp;
   DEBUG_ASSERT(validChannels, userErr, "Invalid colorChannels.");
+  const bool hasAlpha = options.mat.alphaIdx >= 0;
+  const bool validAlpha =
+      !hasAlpha || options.mat.alphaIdx + 4 <= (int)mesh.numProp;
+  DEBUG_ASSERT(validAlpha, userErr, "Invalid colorChannels.");
   if (hasColor) mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
 
   for (size_t i = 0; i < mesh_out->mNumVertices; ++i) {
@@ -228,18 +225,18 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
     if (!options.faceted) {
       vec3 n;
       for (int j : {0, 1, 2})
-        n[j] = mesh.vertProperties[i * mesh.numProp +
-                                   options.mat.normalChannels[j]];
+        n[j] = mesh.vertProperties[i * mesh.numProp + 3 +
+                                   options.mat.normalIdx + j];
       mesh_out->mNormals[i] =
           isYup ? aiVector3D(n.y, n.z, n.x) : aiVector3D(n.x, n.y, n.z);
     }
     if (hasColor) {
-      vec4 c;
-      for (int j : {0, 1, 2, 3})
-        c[j] = options.mat.colorChannels[j] < 0
-                   ? 1
-                   : mesh.vertProperties[i * mesh.numProp +
-                                         options.mat.colorChannels[j]];
+      vec4 c(1.0);
+      for (int j : {0, 1, 2})
+        c[j] = mesh.vertProperties[i * mesh.numProp + 3 + options.mat.colorIdx +
+                                   j];
+      if (hasAlpha)
+        c[3] = mesh.vertProperties[i * mesh.numProp + 3 + options.mat.alphaIdx];
       c = la::clamp(c, 0, 1);
       mesh_out->mColors[0][i] = aiColor4D(c.x, c.y, c.z, c.w);
     }

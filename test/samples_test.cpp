@@ -86,9 +86,6 @@ TEST(Samples, Scallop) {
     const int numVert = scallop.NumVert();
     const int numHalfedge = 3 * scallop.NumTri();
     const int numProp = in.numProp;
-    for (size_t i = 0; i < scallop.NumVert(); ++i) {
-      options.mat.vertColor.push_back({0, 0, 1, 1});
-    }
     for (int i = 0; i < numHalfedge; ++i) {
       const int vert = in.triVerts[i];
       for (int j : {0, 1, 2}) {
@@ -96,7 +93,6 @@ TEST(Samples, Scallop) {
                                     in.halfedgeTangent[4 * i + j] *
                                         in.halfedgeTangent[4 * i + 3]);
       }
-      options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
       in.triVerts.push_back(vert);
       in.triVerts.push_back(numVert + i);
@@ -133,7 +129,7 @@ TEST(Samples, Scallop) {
     // options2.faceted = false;
     options2.mat.roughness = 0.1;
     options2.mat.metalness = 0;
-    options2.mat.colorChannels = {3, 4, 5, -1};
+    options2.mat.colorIdx = 0;
     ExportMesh("scallop.glb", out, options2);
   }
 #endif
@@ -283,16 +279,19 @@ TEST(Samples, Sponge4) {
   if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMeshGL(), {});
 
-    const MeshGL out = sponge.GetMeshGL();
+    const MeshGL out = sponge
+                           .SetProperties(3,
+                                          [](double* newProp, vec3 pos,
+                                             const double* oldProp) {
+                                            for (const int i : {0, 1, 2})
+                                              newProp[i] = 0.5 * (pos[i] + 0.5);
+                                          })
+                           .GetMeshGL();
     ExportOptions options;
     options.faceted = true;
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
-    for (size_t i = 0; i < out.vertProperties.size(); i += out.numProp) {
-      vec3 pos = {out.vertProperties[i], out.vertProperties[i + 1],
-                  out.vertProperties[i + 2]};
-      options.mat.vertColor.push_back(vec4(0.5 * (pos + 0.5), 1.0));
-    }
+    options.mat.colorIdx = 0;
     ExportMesh("mengerSponge.glb", out, options);
   }
 #endif

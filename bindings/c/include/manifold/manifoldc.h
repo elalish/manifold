@@ -434,9 +434,7 @@ void manifold_delete_rect(ManifoldRect *b);
 ManifoldMaterial *manifold_material(void *mem);
 void manifold_material_set_roughness(ManifoldMaterial *mat, double roughness);
 void manifold_material_set_metalness(ManifoldMaterial *mat, double metalness);
-void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec4 color);
-void manifold_material_set_vert_color(ManifoldMaterial *mat,
-                                      ManifoldVec4 *vert_color, size_t n_vert);
+void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec3 color);
 ManifoldExportOptions *manifold_export_options(void *mem);
 void manifold_export_options_set_faceted(ManifoldExportOptions *options,
                                          int faceted);
