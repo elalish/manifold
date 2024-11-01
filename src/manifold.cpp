@@ -295,11 +295,12 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
 MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
@@ -313,11 +314,12 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
