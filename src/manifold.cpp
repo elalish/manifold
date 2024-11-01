@@ -59,15 +59,14 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
 
 template <typename Precision, typename I>
 MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
-                                    ivec3 normalIdx) {
+                                    int normalIdx) {
   ZoneScoped;
   const int numProp = impl.NumProp();
   const int numVert = impl.NumPropVert();
   const int numTri = impl.NumTri();
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
-  const bool updateNormals =
-      !isOriginal && la::all(la::greater(normalIdx, ivec3(2)));
+  const bool updateNormals = !isOriginal && normalIdx >= 0;
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
@@ -198,11 +197,11 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {
-            normal[i] = out.vertProperties[start + normalIdx[i]];
+            normal[i] = out.vertProperties[start + 3 + normalIdx + i];
           }
           normal = la::normalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
-            out.vertProperties[start + normalIdx[i]] = normal[i];
+            out.vertProperties[start + 3 + normalIdx + i] = normal[i];
           }
         }
 
@@ -296,13 +295,14 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
-MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
+MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
   return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
@@ -314,13 +314,14 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
-MeshGL64 Manifold::GetMeshGL64(ivec3 normalIdx) const {
+MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
   return GetMeshGLImpl<double, size_t>(impl, normalIdx);
 }

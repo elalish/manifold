@@ -330,8 +330,7 @@ NB_MODULE(manifold3d, m) {
            manifold__refine_to_length__length)
       .def("refine_to_tolerance", &Manifold::RefineToTolerance,
            nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance)
-      .def("to_mesh", &Manifold::GetMeshGL,
-           nb::arg("normal_idx") = std::make_tuple(0, 0, 0),
+      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
            manifold__get_mesh_gl__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)

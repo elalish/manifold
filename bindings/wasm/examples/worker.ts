@@ -618,7 +618,8 @@ function createNodeFromCache(
     } else {
       const cachedNode = cachedNodes.get(backupMaterial);
       if (cachedNode == null) {
-        const [oldBackupMaterial, oldNode] = cachedNodes.entries().next().value;
+        const [oldBackupMaterial, oldNode] =
+            cachedNodes.entries().next().value!;
         cloneNodeNewMaterial(
             doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
             getCachedMaterial(doc, oldBackupMaterial));

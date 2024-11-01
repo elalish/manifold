@@ -71,16 +71,16 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
+  MeshGL output = result.GetMeshGL(0);
+
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.faceted = false;
   opt.mat.roughness = 0;
-  opt.mat.normalChannels = {3, 4, 5};
-  if (options.exportModels)
-    ExportMesh("normals.glb", result.GetMeshGL({3, 4, 5}), opt);
+  opt.mat.normalIdx = 0;
+  if (options.exportModels) ExportMesh("normals.glb", output, opt);
 #endif
 
-  MeshGL output = result.GetMeshGL({3, 4, 5});
   output.mergeFromVert.clear();
   output.mergeToVert.clear();
   output.Merge();
@@ -253,7 +253,7 @@ TEST(Boolean, Coplanar) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 

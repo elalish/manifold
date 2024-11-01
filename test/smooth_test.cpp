@@ -71,7 +71,7 @@ TEST(Smooth, RefineQuads) {
   ExportOptions options2;
   options2.mat.metalness = 0;
   options2.mat.roughness = 0.5;
-  options2.mat.colorChannels = {3, 4, 5, -1};
+  options2.mat.colorIdx = 0;
   if (options.exportModels) ExportMesh("refineQuads.glb", out, options2);
 #endif
 }
@@ -96,7 +96,7 @@ TEST(Smooth, TruncatedCone) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
-  options2.mat.normalChannels = {3, 4, 5};
+  options2.mat.normalIdx = 0;
   options2.mat.roughness = 0;
   if (options.exportModels)
     ExportMesh("smoothTruncatedCone.glb", out, options2);
@@ -231,7 +231,7 @@ TEST(Smooth, Manual) {
     const MeshGL out = interp.GetMeshGL();
     ExportOptions options;
     options.mat.roughness = 0.1;
-    options.mat.colorChannels = {3, 4, 5, -1};
+    options.mat.colorIdx = 0;
     ExportMesh("manual.glb", out, options);
   }
 #endif
@@ -268,18 +268,6 @@ TEST(Smooth, Csaszar) {
     ExportOptions options;
     options.faceted = false;
     options.mat.roughness = 0.1;
-
-    options.mat.vertColor.resize(csaszar.NumVert());
-    const vec4 blue(0, 0, 1, 1);
-    const vec4 yellow(1, 1, 0, 1);
-    for (size_t tri = 0; tri < csaszar.NumTri(); ++tri) {
-      for (int i : {0, 1, 2}) {
-        const vec3& uvw = {0.5, 0.5, 0.0};
-        const double alpha = std::min(uvw[0], std::min(uvw[1], uvw[2]));
-        options.mat.vertColor[out.triVerts[3 * tri + i]] =
-            la::lerp(yellow, blue, smoothstep(0.0, 0.2, alpha));
-      }
-    }
     ExportMesh("smoothCsaszar.glb", out, options);
   }
 #endif
@@ -361,7 +349,7 @@ TEST(Smooth, Torus) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
-  options2.mat.normalChannels = {4, 5, 6};
+  options2.mat.normalIdx = 1;
   options2.mat.roughness = 0;
   if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
 #endif
@@ -415,7 +403,7 @@ TEST(Smooth, SineSurface) {
   if (options.exportModels) {
     ExportOptions options2;
     // options2.faceted = false;
-    // options2.mat.normalChannels = {3, 4, 5};
+    // options2.mat.normalIdx = 0;
     ExportMesh("smoothSineSurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif

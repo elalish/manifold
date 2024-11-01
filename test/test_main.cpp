@@ -297,7 +297,7 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
-  const ivec3 normalIdx = updateNormals ? ivec3(3, 4, 5) : ivec3(0);
+  const int normalIdx = updateNormals ? 0 : -1;
   MeshGL output = out.GetMeshGL(normalIdx);
 
   for (size_t run = 0; run < output.runOriginalID.size(); ++run) {

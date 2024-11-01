@@ -43,7 +43,7 @@ TEST(BooleanComplex, Sphere) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels)
     ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
 #endif
@@ -64,7 +64,7 @@ TEST(BooleanComplex, MeshRelation) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels)
     ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
 #endif

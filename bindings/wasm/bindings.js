@@ -401,9 +401,7 @@ Module.setup = function() {
 
   Module.Mesh = Mesh;
 
-  Module.Manifold.prototype.getMesh = function(normalIdx = [0, 0, 0]) {
-    if (normalIdx instanceof Array)
-      normalIdx = {0: normalIdx[0], 1: normalIdx[1], 2: normalIdx[2]};
+  Module.Manifold.prototype.getMesh = function(normalIdx = -1) {
     return new Mesh(this._GetMeshJS(normalIdx));
   };
 
