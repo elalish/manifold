@@ -24,6 +24,7 @@ typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
+typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 
@@ -103,3 +104,6 @@ typedef enum ManifoldJoinType {
   MANIFOLD_JOIN_TYPE_ROUND,
   MANIFOLD_JOIN_TYPE_MITER,
 } ManifoldJoinType;
+
+// function pointer
+typedef double (*ManifoldSdf)(double, double, double, void*);
