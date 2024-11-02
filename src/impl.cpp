@@ -101,7 +101,6 @@ struct CoplanarEdge {
   const double epsilon;
   const double tolerance;
 
-  // FIXME: race condition
   void operator()(const int edgeIdx) {
     const Halfedge edge = halfedge[edgeIdx];
     const Halfedge pair = halfedge[edge.pairedHalfedge];
@@ -136,8 +135,9 @@ struct CoplanarEdge {
     vec3 normal = la::cross(jointVec, edgeVec);
     const double area = la::length(normal);
     const double areaPair = la::length(la::cross(pairVec, jointVec));
-    triArea[edgeFace] = area;
-    triArea[pairFace] = areaPair;
+
+    // make sure we only write this once
+    if (edgeIdx % 3 == 0) triArea[edgeFace] = area;
     // Don't link degenerate triangles
     if (area < length * epsilon || areaPair < lengthPair * epsilon) return;
 
@@ -158,7 +158,9 @@ struct CheckCoplanarity {
 
   void operator()(int tri) {
     const int component = (*components)[tri];
-    const int referenceTri = comp2tri[component];
+    const int referenceTri =
+        reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
+            ->load(std::memory_order_relaxed);
     if (referenceTri < 0 || referenceTri == tri) return;
 
     const vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];

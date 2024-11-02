@@ -90,6 +90,7 @@ struct CurvatureAngles {
 struct UpdateProperties {
   VecView<ivec3> triProp;
   VecView<double> properties;
+  VecView<uint8_t> counters;
 
   VecView<const double> oldProperties;
   VecView<const Halfedge> halfedge;
@@ -100,7 +101,6 @@ struct UpdateProperties {
   const int gaussianIdx;
   const int meanIdx;
 
-  // FIXME: race condition
   void operator()(const size_t tri) {
     for (const int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
@@ -108,6 +108,10 @@ struct UpdateProperties {
         triProp[tri][i] = vert;
       }
       const int propVert = triProp[tri][i];
+
+      auto old = std::atomic_exchange(
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]), 1);
+      if (old == 1) return;
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -290,10 +294,11 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
     meshRelation_.triProperties.resize(NumTri());
   }
 
+  const Vec<uint8_t> counters(NumPropVert(), 0);
   for_each_n(
       policy, countAt(0_uz), NumTri(),
       UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
-                        oldProperties, halfedge_, vertMeanCurvature,
+                        counters, oldProperties, halfedge_, vertMeanCurvature,
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
                         meanIdx}));
 }

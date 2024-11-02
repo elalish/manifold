@@ -201,6 +201,13 @@ struct EdgePos {
   bool isStart;
 };
 
+// thread sanitizer doesn't really know how to check when there are too many
+// mutex
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+__attribute__((no_sanitize("thread")))
+#endif
+#endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
