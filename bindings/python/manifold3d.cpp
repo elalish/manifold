@@ -598,19 +598,19 @@ NB_MODULE(manifold3d, m) {
           "__init__",
           [](MeshGL64 *self,
              nb::ndarray<double, nb::shape<-1, -1>, nb::c_contig> &vertProp,
-             nb::ndarray<uint64_t, nb::shape<-1, 3>, nb::c_contig> &triVerts,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
+             nb::ndarray<size_t, nb::shape<-1, 3>, nb::c_contig> &triVerts,
+             const std::optional<nb::ndarray<size_t, nb::shape<-1>,
                                              nb::c_contig>> &mergeFromVert,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
-                                             nb::c_contig>> &mergeToVert,
              const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>> &runIndex,
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &mergeToVert,
+             const std::optional<
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &runIndex,
              const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &runOriginalID,
              std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
                                        nb::c_contig>> &runTransform,
              const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>> &faceID,
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
                                              nb::c_contig>> &halfedgeTangent,
              float tolerance) {
