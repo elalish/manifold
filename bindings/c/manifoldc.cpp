@@ -718,40 +718,27 @@ size_t manifold_rect_size() { return sizeof(Rect); }
 
 // allocation
 ManifoldManifold *manifold_alloc_manifold() {
-  return to_c(static_cast<Manifold *>(malloc(manifold_manifold_size())));
+  return to_c(new manifold::Manifold);
 }
 ManifoldManifoldVec *manifold_alloc_manifold_vec() {
-  return to_c(static_cast<std::vector<Manifold> *>(
-      malloc(manifold_manifold_vec_size())));
+  return to_c(new std::vector<manifold::Manifold>);
 }
 ManifoldCrossSection *manifold_alloc_cross_section() {
-  return to_c(
-      static_cast<CrossSection *>(malloc(manifold_cross_section_size())));
+  return to_c(new CrossSection);
 }
 ManifoldCrossSectionVec *manifold_alloc_cross_section_vec() {
-  return to_c(static_cast<std::vector<CrossSection> *>(
-      malloc(manifold_cross_section_vec_size())));
+  return to_c(new std::vector<CrossSection>);
 }
 ManifoldSimplePolygon *manifold_alloc_simple_polygon() {
-  return to_c(
-      static_cast<SimplePolygon *>(malloc(manifold_simple_polygon_size())));
+  return to_c(new SimplePolygon);
 }
 ManifoldPolygons *manifold_alloc_polygons() {
-  return to_c(static_cast<std::vector<SimplePolygon> *>(
-      malloc(manifold_polygons_size())));
+  return to_c(new std::vector<SimplePolygon>);
 }
-ManifoldMeshGL *manifold_alloc_meshgl() {
-  return to_c(static_cast<MeshGL *>(malloc(manifold_meshgl_size())));
-}
-ManifoldMeshGL64 *manifold_alloc_meshgl64() {
-  return to_c(static_cast<MeshGL64 *>(malloc(manifold_meshgl64_size())));
-}
-ManifoldBox *manifold_alloc_box() {
-  return to_c(static_cast<Box *>(malloc(manifold_box_size())));
-}
-ManifoldRect *manifold_alloc_rect() {
-  return to_c(static_cast<Rect *>(malloc(manifold_rect_size())));
-}
+ManifoldMeshGL *manifold_alloc_meshgl() { return to_c(new MeshGL); }
+ManifoldMeshGL64 *manifold_alloc_meshgl64() { return to_c(new MeshGL64); }
+ManifoldBox *manifold_alloc_box() { return to_c(new Box); }
+ManifoldRect *manifold_alloc_rect() { return to_c(new Rect); }
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
