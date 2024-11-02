@@ -59,8 +59,7 @@ ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
 
 ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
                                                size_t n_verts, size_t n_props,
-                                               size_t *tri_verts,
-                                               size_t n_tris,
+                                               size_t *tri_verts, size_t n_tris,
                                                double *halfedge_tangent);
 ManifoldMeshGL64 *manifold_get_meshgl64(void *mem, ManifoldManifold *m);
 ManifoldMeshGL64 *manifold_meshgl64_copy(void *mem, ManifoldMeshGL64 *m);
