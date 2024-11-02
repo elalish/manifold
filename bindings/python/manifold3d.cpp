@@ -511,38 +511,36 @@ NB_MODULE(manifold3d, m) {
             new (self) MeshGL();
             MeshGL &out = *self;
             out.numProp = vertProp.shape(1);
-            out.vertProperties =
-                toVector<float>(vertProp.data(), vertProp.size());
+            out.vertProperties = toVector(vertProp.data(), vertProp.size());
 
-            out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
+            out.triVerts = toVector(triVerts.data(), triVerts.size());
 
             if (mergeFromVert.has_value())
-              out.mergeFromVert = toVector<uint32_t>(mergeFromVert->data(),
-                                                     mergeFromVert->size());
+              out.mergeFromVert =
+                  toVector(mergeFromVert->data(), mergeFromVert->size());
 
             if (mergeToVert.has_value())
               out.mergeToVert =
-                  toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
+                  toVector(mergeToVert->data(), mergeToVert->size());
 
             if (runIndex.has_value())
-              out.runIndex =
-                  toVector<uint32_t>(runIndex->data(), runIndex->size());
+              out.runIndex = toVector(runIndex->data(), runIndex->size());
 
             if (runOriginalID.has_value())
-              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
-                                                     runOriginalID->size());
+              out.runOriginalID =
+                  toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
               out.runTransform =
-                  toVector<float>(runTransform->data(), runTransform->size());
+                  toVector(runTransform->data(), runTransform->size());
             }
 
             if (faceID.has_value())
-              out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
+              out.faceID = toVector(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              out.halfedgeTangent = toVector<float>(halfedgeTangent->data(),
-                                                    halfedgeTangent->size());
+              out.halfedgeTangent =
+                  toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
@@ -619,38 +617,36 @@ NB_MODULE(manifold3d, m) {
             new (self) MeshGL64();
             MeshGL64 &out = *self;
             out.numProp = vertProp.shape(1);
-            out.vertProperties =
-                toVector<double>(vertProp.data(), vertProp.size());
+            out.vertProperties = toVector(vertProp.data(), vertProp.size());
 
-            out.triVerts = toVector<uint64_t>(triVerts.data(), triVerts.size());
+            out.triVerts = toVector(triVerts.data(), triVerts.size());
 
             if (mergeFromVert.has_value())
-              out.mergeFromVert = toVector<uint64_t>(mergeFromVert->data(),
-                                                     mergeFromVert->size());
+              out.mergeFromVert =
+                  toVector(mergeFromVert->data(), mergeFromVert->size());
 
             if (mergeToVert.has_value())
               out.mergeToVert =
-                  toVector<uint64_t>(mergeToVert->data(), mergeToVert->size());
+                  toVector(mergeToVert->data(), mergeToVert->size());
 
             if (runIndex.has_value())
-              out.runIndex =
-                  toVector<uint64_t>(runIndex->data(), runIndex->size());
+              out.runIndex = toVector(runIndex->data(), runIndex->size());
 
             if (runOriginalID.has_value())
-              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
-                                                     runOriginalID->size());
+              out.runOriginalID =
+                  toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
               out.runTransform =
-                  toVector<double>(runTransform->data(), runTransform->size());
+                  toVector(runTransform->data(), runTransform->size());
             }
 
             if (faceID.has_value())
-              out.faceID = toVector<uint64_t>(faceID->data(), faceID->size());
+              out.faceID = toVector(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              out.halfedgeTangent = toVector<double>(halfedgeTangent->data(),
-                                                     halfedgeTangent->size());
+              out.halfedgeTangent =
+                  toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
