@@ -117,6 +117,8 @@ def all_manifold():
     m = Manifold.cube()
     m2 = Manifold.cube().translate([2, 0, 0])
     d = m.min_gap(m2, 2)
+    mesh2 = m.to_mesh64()
+    ok = mesh.merge()
 
 
 def run():
