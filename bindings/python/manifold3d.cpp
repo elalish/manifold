@@ -222,6 +222,8 @@ NB_MODULE(manifold3d, m) {
       .def(nb::init<>(), manifold__manifold)
       .def(nb::init<const MeshGL &>(), nb::arg("mesh"),
            manifold__manifold__mesh_gl)
+      .def(nb::init<const MeshGL64 &>(), nb::arg("mesh"),
+           manifold__manifold__mesh_gl64)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
@@ -332,6 +334,8 @@ NB_MODULE(manifold3d, m) {
            nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance)
       .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
            manifold__get_mesh_gl__normal_idx)
+      .def("to_mesh64", &Manifold::GetMeshGL64, nb::arg("normal_idx") = -1,
+           manifold__get_mesh_gl64__normal_idx)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
       .def("num_tri", &Manifold::NumTri, manifold__num_tri)
@@ -401,6 +405,26 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
           nb::arg("edge_smoothness") = nb::list(),
+          manifold__smooth__mesh_gl__sharpened_edges)
+      .def_static(
+          "smooth",
+          [](const MeshGL64 &mesh, std::vector<size_t> sharpened_edges,
+             std::vector<double> edge_smoothness) {
+            if (sharpened_edges.size() != edge_smoothness.size()) {
+              throw std::runtime_error(
+                  "sharpened_edges.size() != edge_smoothness.size()");
+            }
+            std::vector<Smoothness> vec(sharpened_edges.size());
+            for (size_t i = 0; i < vec.size(); i++) {
+              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
+            }
+            return Manifold::Smooth(mesh, vec);
+          },
+          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
+          nb::arg("edge_smoothness") = nb::list(),
+          // note: this is not a typo, the documentation is essentially the same
+          // so we just use the 32 byte variant to avoid duplicating docstring
+          // override...
           manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
@@ -487,38 +511,36 @@ NB_MODULE(manifold3d, m) {
             new (self) MeshGL();
             MeshGL &out = *self;
             out.numProp = vertProp.shape(1);
-            out.vertProperties =
-                toVector<float>(vertProp.data(), vertProp.size());
+            out.vertProperties = toVector(vertProp.data(), vertProp.size());
 
-            out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
+            out.triVerts = toVector(triVerts.data(), triVerts.size());
 
             if (mergeFromVert.has_value())
-              out.mergeFromVert = toVector<uint32_t>(mergeFromVert->data(),
-                                                     mergeFromVert->size());
+              out.mergeFromVert =
+                  toVector(mergeFromVert->data(), mergeFromVert->size());
 
             if (mergeToVert.has_value())
               out.mergeToVert =
-                  toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
+                  toVector(mergeToVert->data(), mergeToVert->size());
 
             if (runIndex.has_value())
-              out.runIndex =
-                  toVector<uint32_t>(runIndex->data(), runIndex->size());
+              out.runIndex = toVector(runIndex->data(), runIndex->size());
 
             if (runOriginalID.has_value())
-              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
-                                                     runOriginalID->size());
+              out.runOriginalID =
+                  toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
               out.runTransform =
-                  toVector<float>(runTransform->data(), runTransform->size());
+                  toVector(runTransform->data(), runTransform->size());
             }
 
             if (faceID.has_value())
-              out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
+              out.faceID = toVector(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              out.halfedgeTangent = toVector<float>(halfedgeTangent->data(),
-                                                    halfedgeTangent->size());
+              out.halfedgeTangent =
+                  toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
@@ -568,6 +590,112 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
+
+  nb::class_<MeshGL64>(m, "Mesh64")
+      .def(
+          // note that reshape requires mutable ndarray, but this will not
+          // affect the original array passed into the function
+          "__init__",
+          [](MeshGL64 *self,
+             nb::ndarray<double, nb::shape<-1, -1>, nb::c_contig> &vertProp,
+             nb::ndarray<size_t, nb::shape<-1, 3>, nb::c_contig> &triVerts,
+             const std::optional<nb::ndarray<size_t, nb::shape<-1>,
+                                             nb::c_contig>> &mergeFromVert,
+             const std::optional<
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &mergeToVert,
+             const std::optional<
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &runIndex,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+                                             nb::c_contig>> &runOriginalID,
+             std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
+                                       nb::c_contig>> &runTransform,
+             const std::optional<
+                 nb::ndarray<size_t, nb::shape<-1>, nb::c_contig>> &faceID,
+             const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
+                                             nb::c_contig>> &halfedgeTangent,
+             float tolerance) {
+            new (self) MeshGL64();
+            MeshGL64 &out = *self;
+            out.numProp = vertProp.shape(1);
+            out.vertProperties = toVector(vertProp.data(), vertProp.size());
+
+            out.triVerts = toVector(triVerts.data(), triVerts.size());
+
+            if (mergeFromVert.has_value())
+              out.mergeFromVert =
+                  toVector(mergeFromVert->data(), mergeFromVert->size());
+
+            if (mergeToVert.has_value())
+              out.mergeToVert =
+                  toVector(mergeToVert->data(), mergeToVert->size());
+
+            if (runIndex.has_value())
+              out.runIndex = toVector(runIndex->data(), runIndex->size());
+
+            if (runOriginalID.has_value())
+              out.runOriginalID =
+                  toVector(runOriginalID->data(), runOriginalID->size());
+
+            if (runTransform.has_value()) {
+              out.runTransform =
+                  toVector(runTransform->data(), runTransform->size());
+            }
+
+            if (faceID.has_value())
+              out.faceID = toVector(faceID->data(), faceID->size());
+
+            if (halfedgeTangent.has_value()) {
+              out.halfedgeTangent =
+                  toVector(halfedgeTangent->data(), halfedgeTangent->size());
+            }
+          },
+          nb::arg("vert_properties"), nb::arg("tri_verts"),
+          nb::arg("merge_from_vert") = nb::none(),
+          nb::arg("merge_to_vert") = nb::none(),
+          nb::arg("run_index") = nb::none(),
+          nb::arg("run_original_id") = nb::none(),
+          nb::arg("run_transform") = nb::none(),
+          nb::arg("face_id") = nb::none(),
+          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
+      .def_prop_ro(
+          "vert_properties",
+          [](const MeshGL64 &self) {
+            return nb::ndarray<nb::numpy, const double, nb::c_contig>(
+                self.vertProperties.data(),
+                {self.vertProperties.size() / self.numProp, self.numProp},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "tri_verts",
+          [](const MeshGL64 &self) {
+            return nb::ndarray<nb::numpy, const uint64_t, nb::c_contig>(
+                self.triVerts.data(), {self.triVerts.size() / 3, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "run_transform",
+          [](const MeshGL64 &self) {
+            return nb::ndarray<nb::numpy, const double, nb::c_contig>(
+                self.runTransform.data(), {self.runTransform.size() / 12, 4, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "halfedge_tangent",
+          [](const MeshGL64 &self) {
+            return nb::ndarray<nb::numpy, const double, nb::c_contig>(
+                self.halfedgeTangent.data(),
+                {self.halfedgeTangent.size() / 12, 3, 4}, nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_ro("merge_from_vert", &MeshGL64::mergeFromVert)
+      .def_ro("merge_to_vert", &MeshGL64::mergeToVert)
+      .def_ro("run_index", &MeshGL64::runIndex)
+      .def_ro("run_original_id", &MeshGL64::runOriginalID)
+      .def_ro("face_id", &MeshGL64::faceID)
+      .def("merge", &MeshGL64::Merge, mesh_gl__merge);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)

@@ -49,6 +49,10 @@ ManifoldMeshGL *to_c(manifold::MeshGL *m) {
   return reinterpret_cast<ManifoldMeshGL *>(m);
 }
 
+ManifoldMeshGL64 *to_c(manifold::MeshGL64 *m) {
+  return reinterpret_cast<ManifoldMeshGL64 *>(m);
+}
+
 ManifoldOpType to_c(manifold::OpType optype) {
   ManifoldOpType op = MANIFOLD_ADD;
   switch (optype) {
@@ -150,6 +154,10 @@ const manifold::Polygons *from_c(ManifoldPolygons *m) {
 
 const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
+}
+
+const manifold::MeshGL64 *from_c(ManifoldMeshGL64 *m) {
+  return reinterpret_cast<manifold::MeshGL64 const *>(m);
 }
 
 OpType from_c(ManifoldOpType optype) {
