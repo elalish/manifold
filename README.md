@@ -9,7 +9,7 @@
 
 [OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
 
-## Manifold Frontend Sandboxes
+## Frontend Sandboxes
 
 ### [ManifoldCAD.org](https://manifoldcad.org)
 
@@ -33,6 +33,8 @@ Optional Dependencies (no dependencies are required anymore, but the first two a
 - [`TBB`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library (only when `MANIFOLD_PAR=ON`)
 - [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem (only when `MANIFOLD_CROSS_SECTION=ON`)
 - ['Assimp'](https://github.com/assimp/assimp): provides I/O for various 3D formats (only when `MANIFOLD_EXPORT=ON`)
+- ['Pybind11](https://github.com/pybind/pybind11): provides Python bindings (only when `MANIFOLD_PYBIND=ON`)
+- ['Emscripten'](https://github.com/emscripten-core/emscripten): WASM compiler that provides our JS bindings (only when `MANIFOLD_JSBIND=ON`)
 - [`GTest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
 ### Overview
