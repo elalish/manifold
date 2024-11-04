@@ -28,7 +28,7 @@ namespace manifold {
 struct Manifold::Impl {
   struct Relation {
     int originalID = -1;
-    mat3x4 transform = Identity3x4();
+    mat3x4 transform = la::identity;
     bool backSide = false;
   };
   struct MeshRelationD {
@@ -61,7 +61,7 @@ struct Manifold::Impl {
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
-  Impl(Shape, const mat3x4 = Identity3x4());
+  Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
   Impl(const MeshGLP<Precision, I>& meshGL) {
