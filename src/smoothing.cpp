@@ -387,8 +387,14 @@ Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
 
 Vec<int> Manifold::Impl::VertHalfedge() const {
   Vec<int> vertHalfedge(NumVert());
+  Vec<uint8_t> counters(NumVert(), 0);
   for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
-             [&vertHalfedge, this](const int idx) {
+             [&vertHalfedge, &counters, this](const int idx) {
+               auto old = std::atomic_exchange(
+                   reinterpret_cast<std::atomic<uint8_t>*>(
+                       &counters[halfedge_[idx].startVert]),
+                   1);
+               if (old == 1) return;
                // arbitrary, last one wins.
                vertHalfedge[halfedge_[idx].startVert] = idx;
              });
