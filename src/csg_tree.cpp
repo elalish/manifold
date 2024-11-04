@@ -111,7 +111,7 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
 }
 
 std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
-  mat3x4 transform = Identity3x4();
+  mat3x4 transform = la::identity;
   transform[3] += t;
   return Transform(transform);
 }
@@ -147,10 +147,10 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
     : pImpl_(pImpl_), transform_(transform_) {}
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
-  if (transform_ == Identity3x4()) return pImpl_;
+  if (transform_ == mat3x4(la::identity)) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
-  transform_ = Identity3x4();
+  transform_ = la::identity;
   return pImpl_;
 }
 
@@ -273,7 +273,7 @@ Manifold::Impl CsgLeafNode::Compose(
           }
         }
 
-        if (node->transform_ == Identity3x4()) {
+        if (node->transform_ == mat3x4(la::identity)) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),

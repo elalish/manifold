@@ -17,9 +17,7 @@
 
 namespace manifold {
 
-/** @addtogroup Triangulation
- *  @ingroup Core
- * @brief Polygon triangulation
+/** @addtogroup Structs
  *  @{
  */
 
@@ -33,9 +31,27 @@ struct PolyVert {
   int idx;
 };
 
+/**
+ * Single polygon contour, wound CCW, with indices. First and last point are
+ * implicitly connected. Should ensure all input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
 using SimplePolygonIdx = std::vector<PolyVert>;
-using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
+/**
+ * Set of indexed polygons with holes. Order of contours is arbitrary. Can
+ * contain any depth of nested holes and any number of separate polygons. Should
+ * ensure all input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
+using PolygonsIdx = std::vector<SimplePolygonIdx>;
+/** @} */
+
+/** @addtogroup Triangulation
+ *  @ingroup Core
+ * @brief Polygon triangulation
+ *  @{
+ */
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                   double epsilon = -1);
 

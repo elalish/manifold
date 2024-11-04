@@ -304,7 +304,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     const float* m = output.runTransform.data() + 12 * run;
     const mat3x4 transform =
         output.runTransform.empty()
-            ? Identity3x4()
+            ? la::identity
             : mat3x4({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
                      {m[9], m[10], m[11]});
     size_t i = 0;

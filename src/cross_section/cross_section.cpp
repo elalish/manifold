@@ -292,11 +292,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == Identity2x3()) {
+  if (transform_ == mat2x3(la::identity)) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = Identity2x3();
+  transform_ = mat2x3(la::identity);
   return paths_;
 }
 

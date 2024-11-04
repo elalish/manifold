@@ -22,8 +22,12 @@
 namespace manifold {
 /** @addtogroup Math
  * @ingroup Core
- *  @brief Simple operations on scalars, quaternions, and vectors and matrices
- * up to dimension 4.
+ * @brief Simple math operations.
+ * */
+
+/** @addtogroup Scalar
+ * @ingroup Math
+ *  @brief Simple scalar operations.
  *  @{
  */
 namespace la = linalg;
@@ -48,16 +52,31 @@ constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
 constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
+/**
+ * Convert degrees to radians.
+ *
+ * @param x Angle in degrees.
+ */
 constexpr double radians(double a) { return a * kPi / 180; }
+
+/**
+ * Convert radians to degrees.
+ *
+ * @param x Angle in radians.
+ */
 constexpr double degrees(double a) { return a * 180 / kPi; }
 
+/**
+ * Performs smooth Hermite interpolation between 0 and 1 when edge0 < x < edge1.
+ *
+ * @param edge0 Specifies the value of the lower edge of the Hermite function.
+ * @param edge1 Specifies the value of the upper edge of the Hermite function.
+ * @param x Specifies the source value for interpolation.
+ */
 constexpr double smoothstep(double edge0, double edge1, double a) {
   const double x = la::clamp((a - edge0) / (edge1 - edge0), 0, 1);
   return x * x * (3 - 2 * x);
 }
-
-constexpr mat3x4 Identity3x4() { return mat3x4(mat3(la::identity), vec3(0.0)); }
-constexpr mat2x3 Identity2x3() { return mat2x3(mat2(la::identity), vec2(0.0)); }
 
 /**
  * Sine function where multiples of 90 degrees come out exact.
