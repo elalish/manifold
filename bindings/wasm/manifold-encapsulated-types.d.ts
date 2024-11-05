@@ -939,6 +939,12 @@ export class Manifold {
   tolerance(): number;
 
   /**
+   * Return a copy of the manifold with the set tolerance value.
+   * This performs mesh simplification when the tolerance value is increased.
+   */
+  setTolerance(tolerance: number): Manifold;
+
+  /**
    * The genus is a topological property of the manifold, representing the
    * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
    * a single mesh, so it is best to call Decompose() first.

@@ -158,6 +158,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
       .function("tolerance", &Manifold::GetTolerance)
+      .function("setTolerance", &Manifold::SetTolerance)
       .function("genus", &Manifold::Genus)
       .function("volume", &Manifold::Volume)
       .function("surfaceArea", &Manifold::SurfaceArea)
