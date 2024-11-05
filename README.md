@@ -32,9 +32,9 @@ This is a modern C++ library that Github's CI verifies builds and runs on a vari
 Optional Dependencies (no dependencies are required anymore, but the first two are encouraged):
 - [`TBB`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library (only when `MANIFOLD_PAR=ON`)
 - [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem (only when `MANIFOLD_CROSS_SECTION=ON`)
-- ['Assimp'](https://github.com/assimp/assimp): provides I/O for various 3D formats (only when `MANIFOLD_EXPORT=ON`)
-- ['Pybind11](https://github.com/pybind/pybind11): provides Python bindings (only when `MANIFOLD_PYBIND=ON`)
-- ['Emscripten'](https://github.com/emscripten-core/emscripten): WASM compiler that provides our JS bindings (only when `MANIFOLD_JSBIND=ON`)
+- [`Assimp`](https://github.com/assimp/assimp): provides I/O for various 3D formats (only when `MANIFOLD_EXPORT=ON`)
+- [`Nanobind`](https://github.com/wjakob/nanobind): provides Python bindings (only when `MANIFOLD_PYBIND=ON`)
+- [`Emscripten`](https://github.com/emscripten-core/emscripten): WASM compiler that provides our JS bindings (only when `MANIFOLD_JSBIND=ON`)
 - [`GTest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
 ### Overview
