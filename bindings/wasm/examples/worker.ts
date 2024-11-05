@@ -522,7 +522,7 @@ function addMesh(
   }
   log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
       size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
-  const volume = Math.round(manifold.getProperties().volume / 10);
+  const volume = Math.round(manifold.volume() / 10);
   log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
       (volume / 100).toLocaleString()} cm^3`);
 

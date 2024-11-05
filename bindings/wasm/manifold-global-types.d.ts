@@ -67,9 +67,5 @@ export type Smoothness = {
   halfedge: number,
   smoothness: number
 };
-export type Properties = {
-  surfaceArea: number,
-  volume: number
-};
 export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
 export type JoinType = 'Square'|'Round'|'Miter'

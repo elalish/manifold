@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -946,13 +946,14 @@ export class Manifold {
   genus(): number;
 
   /**
-   * Returns the surface area and volume of the manifold. These properties are
-   * clamped to zero for a given face if they are within the Precision(). This
-   * means degenerate manifolds can by identified by testing these properties as
-   * == 0.
+   * Returns the surface area of the manifold.
    */
-  getProperties(): Properties;
+  surfaceArea(): number;
 
+  /**
+   * Returns the volume of the manifold.
+   */
+  volume(): number;
 
   /**
    * Returns the minimum gap between two manifolds. Returns a float between

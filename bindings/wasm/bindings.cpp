@@ -78,10 +78,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("halfedge", &Smoothness::halfedge)
       .field("smoothness", &Smoothness::smoothness);
 
-  value_object<Properties>("properties")
-      .field("surfaceArea", &Properties::surfaceArea)
-      .field("volume", &Properties::volume);
-
   register_vector<ivec3>("Vector_ivec3");
   register_vector<vec3>("Vector_vec3");
   register_vector<vec2>("Vector_vec2");
@@ -163,7 +159,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_boundingBox", &Manifold::BoundingBox)
       .function("tolerance", &Manifold::GetTolerance)
       .function("genus", &Manifold::Genus)
-      .function("getProperties", &Manifold::GetProperties)
+      .function("volume", &Manifold::Volume)
+      .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)

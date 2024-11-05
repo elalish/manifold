@@ -23,7 +23,7 @@ using namespace manifold;
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
-TEST(Properties, GetProperties) {
+TEST(Properties, Measurements) {
   Manifold cube = Manifold::Cube();
   EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
   EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
