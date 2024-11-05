@@ -133,9 +133,9 @@ using MeshGL = MeshGLP<float>;
 using MeshGL64 = MeshGLP<double, size_t>;
 
 /**
- * This library's internal representation of an oriented, 2-manifold, triangle
- * mesh - a simple boundary-representation of a solid object. Use this class to
- * store and operate on solids, and use MeshGL for input and output.
+ * @brief This library's internal representation of an oriented, 2-manifold,
+ * triangle mesh - a simple boundary-representation of a solid object. Use this
+ * class to store and operate on solids, and use MeshGL for input and output.
  *
  * In addition to storing geometric data, a Manifold can also store an arbitrary
  * number of vertex properties. These could be anything, e.g. normals, UV
@@ -157,8 +157,8 @@ using MeshGL64 = MeshGLP<double, size_t>;
  */
 class Manifold {
  public:
-  /** @name Creation
-   *  Constructors
+  /** @name Basics
+   *  Copy / move / assignment
    */
   ///@{
   Manifold();
@@ -167,46 +167,49 @@ class Manifold {
   Manifold& operator=(const Manifold& other);
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
+  ///@}
 
+  /** @name Input & Output
+   *  Create and retrieve arbitrary manifolds
+   */
+  ///@{
   Manifold(const MeshGL&);
   Manifold(const MeshGL64&);
+  MeshGL GetMeshGL(int normalIdx = -1) const;
+  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
+  ///@}
 
-  static Manifold Smooth(const MeshGL&,
-                         const std::vector<Smoothness>& sharpenedEdges = {});
-  static Manifold Smooth(const MeshGL64&,
-                         const std::vector<Smoothness>& sharpenedEdges = {});
+  /** @name Constructors
+   *  Topological ops, primitives, and SDF
+   */
+  ///@{
+  std::vector<Manifold> Decompose() const;
+  static Manifold Compose(const std::vector<Manifold>&);
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
   static Manifold Cylinder(double height, double radiusLow,
                            double radiusHigh = -1.0, int circularSegments = 0,
                            bool center = false);
   static Manifold Sphere(double radius, int circularSegments = 0);
+  static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                           double edgeLength, double level = 0,
+                           double tolerance = -1, bool canParallel = true);
+  ///@}
+
+  /** @name Polygons
+   * 3D to 2D and 2D to 3D
+   */
+  ///@{
+  Polygons Slice(double height = 0) const;
+  Polygons Project() const;
   static Manifold Extrude(const Polygons& crossSection, double height,
                           int nDivisions = 0, double twistDegrees = 0.0,
                           vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
                           double revolveDegrees = 360.0f);
-  static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
-                           double edgeLength, double level = 0,
-                           double tolerance = -1, bool canParallel = true);
   ///@}
 
-  /** @name Topological
-   *  No geometric calculations.
-   */
-  ///@{
-  static Manifold Compose(const std::vector<Manifold>&);
-  std::vector<Manifold> Decompose() const;
-  ///@}
-
-  /** @name Information
-   *  Details of the manifold
-   */
-  ///@{
-  MeshGL GetMeshGL(int normalIdx = -1) const;
-  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
-  bool IsEmpty() const;
   enum class Error {
     NoError,
     NonFiniteVertex,
@@ -221,7 +224,13 @@ class Manifold {
     FaceIDWrongLength,
     InvalidConstruction,
   };
+
+  /** @name Information
+   *  Details of the manifold
+   */
+  ///@{
   Error Status() const;
+  bool IsEmpty() const;
   size_t NumVert() const;
   size_t NumEdge() const;
   size_t NumTri() const;
@@ -229,9 +238,14 @@ class Manifold {
   size_t NumPropVert() const;
   Box BoundingBox() const;
   int Genus() const;
+  double GetTolerance() const;
+  ///@}
+
+  /** @name Measurement
+   */
+  ///@{
   Properties GetProperties() const;
   double MinGap(const Manifold& other, double searchLength) const;
-  double GetTolerance() const;
   ///@}
 
   /** @name Mesh ID
@@ -244,27 +258,17 @@ class Manifold {
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 
-  /** @name Modification
+  /** @name Transformations
    */
   ///@{
   Manifold Translate(vec3) const;
   Manifold Scale(vec3) const;
   Manifold Rotate(double xDegrees, double yDegrees = 0.0,
                   double zDegrees = 0.0) const;
-  Manifold Transform(const mat3x4&) const;
   Manifold Mirror(vec3) const;
+  Manifold Transform(const mat3x4&) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
-  Manifold SetProperties(
-      int numProp,
-      std::function<void(double*, vec3, const double*)> propFunc) const;
-  Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
-  Manifold SmoothByNormals(int normalIdx) const;
-  Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
-  Manifold Refine(int) const;
-  Manifold RefineToLength(double) const;
-  Manifold RefineToTolerance(double) const;
   Manifold SetTolerance(double) const;
   ///@}
 
@@ -288,14 +292,34 @@ class Manifold {
   Manifold TrimByPlane(vec3 normal, double originOffset) const;
   ///@}
 
-  /** @name 2D from 3D
+  /** @name Properties
+   * Create and modify vertex properties.
    */
   ///@{
-  Polygons Slice(double height = 0) const;
-  Polygons Project() const;
+  Manifold SetProperties(
+      int numProp,
+      std::function<void(double*, vec3, const double*)> propFunc) const;
+  Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
+  Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
   ///@}
 
-  /** @name Convex hull
+  /** @name Smoothing
+   * Smooth meshes by calculating tangent vectors and refining to a higher
+   * triangle count.
+   */
+  ///@{
+  Manifold Refine(int) const;
+  Manifold RefineToLength(double) const;
+  Manifold RefineToTolerance(double) const;
+  Manifold SmoothByNormals(int normalIdx) const;
+  Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
+  static Manifold Smooth(const MeshGL&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
+  static Manifold Smooth(const MeshGL64&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
+  ///@}
+
+  /** @name Convex Hull
    */
   ///@{
   Manifold Hull() const;
@@ -303,7 +327,7 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
-  /** @name Testing hooks
+  /** @name Testing Hooks
    *  These are just for internal testing.
    */
   ///@{

@@ -55,14 +55,14 @@ constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 /**
  * Convert degrees to radians.
  *
- * @param x Angle in degrees.
+ * @param a Angle in degrees.
  */
 constexpr double radians(double a) { return a * kPi / 180; }
 
 /**
  * Convert radians to degrees.
  *
- * @param x Angle in radians.
+ * @param a Angle in radians.
  */
 constexpr double degrees(double a) { return a * 180 / kPi; }
 
@@ -71,7 +71,7 @@ constexpr double degrees(double a) { return a * 180 / kPi; }
  *
  * @param edge0 Specifies the value of the lower edge of the Hermite function.
  * @param edge1 Specifies the value of the upper edge of the Hermite function.
- * @param x Specifies the source value for interpolation.
+ * @param a Specifies the source value for interpolation.
  */
 constexpr double smoothstep(double edge0, double edge1, double a) {
   const double x = la::clamp((a - edge0) / (edge1 - edge0), 0, 1);
@@ -150,6 +150,9 @@ struct Properties {
   double surfaceArea, volume;
 };
 
+/**
+ * @brief Axis-aligned 3D box, primarily for bounding.
+ */
 struct Box {
   vec3 min = vec3(std::numeric_limits<double>::infinity());
   vec3 max = vec3(-std::numeric_limits<double>::infinity());
@@ -298,7 +301,7 @@ struct Box {
 };
 
 /**
- * Axis-aligned rectangular bounds.
+ * @brief Axis-aligned 2D box, primarily for bounding.
  */
 struct Rect {
   vec2 min = vec2(std::numeric_limits<double>::infinity());
@@ -471,8 +474,10 @@ constexpr int DEFAULT_SEGMENTS = 0;
 constexpr double DEFAULT_ANGLE = 10.0;
 constexpr double DEFAULT_LENGTH = 1.0;
 /**
- * These static properties control how circular shapes are quantized by
- * default on construction. If circularSegments is specified, it takes
+ * @brief These static properties control how circular shapes are quantized by
+ * default on construction.
+ *
+ * If circularSegments is specified, it takes
  * precedence. If it is zero, then instead the minimum is used of the segments
  * calculated based on edge length and angle, rounded up to the nearest
  * multiple of four. To get numbers not divisible by four, circularSegments
