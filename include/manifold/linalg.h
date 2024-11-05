@@ -466,8 +466,8 @@ struct select {
 };
 struct lerp {
   template <class A, class B, class C>
-  constexpr auto operator()(A a, B b, C c) const
-      -> decltype(a * (1 - c) + b * c) {
+  constexpr auto operator()(A a, B b,
+                            C c) const -> decltype(a * (1 - c) + b * c) {
     return a * (1 - c) + b * c;
   }
 };
@@ -1134,33 +1134,33 @@ constexpr typename detail::any_compare<A, B>::type compare(const A &a,
   return detail::any_compare<A, B>()(a, b);
 }
 template <class A, class B>
-constexpr auto operator==(const A &a, const B &b)
-    -> decltype(compare(a, b) == 0) {
+constexpr auto operator==(const A &a,
+                          const B &b) -> decltype(compare(a, b) == 0) {
   return compare(a, b) == 0;
 }
 template <class A, class B>
-constexpr auto operator!=(const A &a, const B &b)
-    -> decltype(compare(a, b) != 0) {
+constexpr auto operator!=(const A &a,
+                          const B &b) -> decltype(compare(a, b) != 0) {
   return compare(a, b) != 0;
 }
 template <class A, class B>
-constexpr auto operator<(const A &a, const B &b)
-    -> decltype(compare(a, b) < 0) {
+constexpr auto operator<(const A &a,
+                         const B &b) -> decltype(compare(a, b) < 0) {
   return compare(a, b) < 0;
 }
 template <class A, class B>
-constexpr auto operator>(const A &a, const B &b)
-    -> decltype(compare(a, b) > 0) {
+constexpr auto operator>(const A &a,
+                         const B &b) -> decltype(compare(a, b) > 0) {
   return compare(a, b) > 0;
 }
 template <class A, class B>
-constexpr auto operator<=(const A &a, const B &b)
-    -> decltype(compare(a, b) <= 0) {
+constexpr auto operator<=(const A &a,
+                          const B &b) -> decltype(compare(a, b) <= 0) {
   return compare(a, b) <= 0;
 }
 template <class A, class B>
-constexpr auto operator>=(const A &a, const B &b)
-    -> decltype(compare(a, b) >= 0) {
+constexpr auto operator>=(const A &a,
+                          const B &b) -> decltype(compare(a, b) >= 0) {
   return compare(a, b) >= 0;
 }
 /** @} */
