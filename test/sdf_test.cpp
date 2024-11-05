@@ -128,9 +128,8 @@ TEST(SDF, Surface) {
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cube.Genus(), 0);
-  auto prop = cube.GetProperties();
-  EXPECT_NEAR(prop.volume, 8, 0.001);
-  EXPECT_NEAR(prop.surfaceArea, 24, 0.001);
+  EXPECT_NEAR(cube.Volume(), 8, 0.001);
+  EXPECT_NEAR(cube.SurfaceArea(), 24, 0.001);
   EXPECT_NEAR(bounds.min.x, -1, epsilon);
   EXPECT_NEAR(bounds.min.y, -1, epsilon);
   EXPECT_NEAR(bounds.min.z, -1, epsilon);

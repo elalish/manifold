@@ -28,7 +28,7 @@ TEST(CrossSection, Square) {
   auto a = Manifold::Cube({5, 5, 5});
   auto b = Manifold::Extrude(CrossSection::Square({5, 5}).ToPolygons(), 5);
 
-  EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
+  EXPECT_FLOAT_EQ((a - b).Volume(), 0.);
 }
 
 TEST(CrossSection, MirrorUnion) {
@@ -58,7 +58,7 @@ TEST(CrossSection, RoundOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.GetProperties().volume, 4386, 1);
+  EXPECT_NEAR(result.Volume(), 4386, 1);
   EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
 

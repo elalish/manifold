@@ -144,13 +144,6 @@ struct Smoothness {
 };
 
 /**
- * Geometric properties of the manifold, created with Manifold.GetProperties().
- */
-struct Properties {
-  double surfaceArea, volume;
-};
-
-/**
  * @brief Axis-aligned 3D box, primarily for bounding.
  */
 struct Box {

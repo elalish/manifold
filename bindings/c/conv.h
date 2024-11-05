@@ -39,7 +39,6 @@ ManifoldError to_c(manifold::Manifold::Error error);
 ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
-ManifoldProperties to_c(manifold::Properties p);
 
 const manifold::Manifold *from_c(ManifoldManifold *m);
 ManifoldVec *from_c(ManifoldManifoldVec *ms);

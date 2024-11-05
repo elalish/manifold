@@ -49,10 +49,9 @@ int main(int argc, char** argv) {
   const std::vector<Manifold> parts = manifold.Decompose();
   std::cout << parts.size() << " objects:" << std::endl;
   for (const Manifold& part : parts) {
-    auto prop = part.GetProperties();
     std::cout << part.NumVert() << " vertices, " << part.NumTri()
-              << " triangles, volume = " << prop.volume
-              << ", surface area = " << prop.surfaceArea << std::endl;
+              << " triangles, volume = " << part.Volume()
+              << ", surface area = " << part.SurfaceArea() << std::endl;
   }
 
   if (argc == 3) {

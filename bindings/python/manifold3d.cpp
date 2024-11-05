@@ -343,13 +343,12 @@ NB_MODULE(manifold3d, m) {
       .def("num_prop_vert", &Manifold::NumPropVert, manifold__num_prop_vert)
       .def("genus", &Manifold::Genus, manifold__genus)
       .def(
-          "volume",
-          [](const Manifold &self) { return self.GetProperties().volume; },
+          "volume", [](const Manifold &self) { return self.Volume(); },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Epsilon().")
       .def(
           "surface_area",
-          [](const Manifold &self) { return self.GetProperties().surfaceArea; },
+          [](const Manifold &self) { return self.SurfaceArea(); },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)

@@ -21,29 +21,6 @@
 namespace {
 using namespace manifold;
 
-struct FaceAreaVolume {
-  VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
-  const double epsilon;
-
-  std::pair<double, double> operator()(int face) {
-    double perimeter = 0;
-    vec3 edge[3];
-    for (int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      edge[i] = vertPos[halfedges[3 * face + j].startVert] -
-                vertPos[halfedges[3 * face + i].startVert];
-      perimeter += la::length(edge[i]);
-    }
-    vec3 crossP = la::cross(edge[0], edge[1]);
-
-    double area = la::length(crossP);
-    double volume = la::dot(crossP, vertPos[halfedges[3 * face].startVert]);
-
-    return std::make_pair(area / 2.0, volume / 6.0);
-  }
-};
-
 struct CurvatureAngles {
   VecView<double> meanCurvature;
   VecView<double> gaussianCurvature;
@@ -242,27 +219,36 @@ int Manifold::Impl::NumDegenerateTris() const {
       CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * epsilon_ / 2}));
 }
 
-Properties Manifold::Impl::GetProperties() const {
+double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
-  if (IsEmpty()) return {0, 0};
-  // Kahan summation
-  double area = 0;
-  double volume = 0;
-  double areaCompensation = 0;
-  double volumeCompensation = 0;
-  for (size_t i = 0; i < NumTri(); ++i) {
-    auto [area1, volume1] = FaceAreaVolume({halfedge_, vertPos_, epsilon_})(i);
-    const double t1 = area + area1;
-    const double t2 = volume + volume1;
-    areaCompensation += (area - t1) + area1;
-    volumeCompensation += (volume - t2) + volume1;
-    area = t1;
-    volume = t2;
-  }
-  area += areaCompensation;
-  volume += volumeCompensation;
+  if (IsEmpty()) return 0;
 
-  return {area, volume};
+  auto Volume = [this](size_t tri) {
+    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+    vec3 crossP = la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
+                            vertPos_[halfedge_[3 * tri + 2].startVert] - v);
+    return la::dot(crossP, v) / 6.0;
+  };
+
+  auto Area = [this](size_t tri) {
+    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+    return la::length(
+               la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
+                         vertPos_[halfedge_[3 * tri + 2].startVert] - v)) /
+           2.0;
+  };
+
+  // Kahan summation
+  double value = 0;
+  double valueCompensation = 0;
+  for (size_t i = 0; i < NumTri(); ++i) {
+    const double value1 = prop == Property::SurfaceArea ? Area(i) : Volume(i);
+    const double t = value + value1;
+    valueCompensation += (value - t) + value1;
+    value = t;
+  }
+  value += valueCompensation;
+  return value;
 }
 
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {

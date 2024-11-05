@@ -244,7 +244,8 @@ class Manifold {
   /** @name Measurement
    */
   ///@{
-  Properties GetProperties() const;
+  double SurfaceArea() const;
+  double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
   ///@}
 

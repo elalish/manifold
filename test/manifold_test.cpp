@@ -182,16 +182,15 @@ TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0, 3);
   EXPECT_EQ(donut.Genus(), 1);
-  auto prop = donut.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 12.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 48.0);
+  EXPECT_FLOAT_EQ(donut.Volume(), 12.0);
+  EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0);
 }
 
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0, 0, 0, vec2(0.0));
   EXPECT_EQ(donut.Genus(), 0);
-  EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0);
+  EXPECT_FLOAT_EQ(donut.Volume(), 4.0);
 }
 
 Polygons RotatePolygons(Polygons polys, const int index) {
@@ -212,9 +211,8 @@ TEST(Manifold, Revolve) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     vug = Manifold::Revolve(rotatedPolys, 48);
     EXPECT_EQ(vug.Genus(), -1);
-    auto prop = vug.GetProperties();
-    EXPECT_NEAR(prop.volume, 14.0 * kPi, 0.2);
-    EXPECT_NEAR(prop.surfaceArea, 30.0 * kPi, 0.2);
+    EXPECT_NEAR(vug.Volume(), 14.0 * kPi, 0.2);
+    EXPECT_NEAR(vug.SurfaceArea(), 30.0 * kPi, 0.2);
   }
 }
 
@@ -222,18 +220,16 @@ TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0);
   Manifold donutHole = Manifold::Revolve(polys, 48);
   EXPECT_EQ(donutHole.Genus(), 0);
-  auto prop = donutHole.GetProperties();
-  EXPECT_NEAR(prop.volume, 48.0 * kPi, 1.0);
-  EXPECT_NEAR(prop.surfaceArea, 96.0 * kPi, 1.0);
+  EXPECT_NEAR(donutHole.Volume(), 48.0 * kPi, 1.0);
+  EXPECT_NEAR(donutHole.SurfaceArea(), 96.0 * kPi, 1.0);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Revolve3) {
   CrossSection circle = CrossSection::Circle(1, 32);
   Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
-  auto prop = sphere.GetProperties();
-  EXPECT_NEAR(prop.volume, 4.0 / 3.0 * kPi, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 4 * kPi, 0.15);
+  EXPECT_NEAR(sphere.Volume(), 4.0 / 3.0 * kPi, 0.1);
+  EXPECT_NEAR(sphere.SurfaceArea(), 4 * kPi, 0.15);
 }
 #endif
 
@@ -246,9 +242,8 @@ TEST(Manifold, PartialRevolveOnYAxis) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     EXPECT_EQ(revolute.Genus(), 1);
-    auto prop = revolute.GetProperties();
-    EXPECT_NEAR(prop.volume, 24.0 * kPi, 1.0);
-    EXPECT_NEAR(prop.surfaceArea,
+    EXPECT_NEAR(revolute.Volume(), 24.0 * kPi, 1.0);
+    EXPECT_NEAR(revolute.SurfaceArea(),
                 48.0 * kPi + 4.0 * 4.0 * 2.0 - 2.0 * 2.0 * 2.0, 1.0);
   }
 }
@@ -260,10 +255,9 @@ TEST(Manifold, PartialRevolveOffset) {
   for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
-    auto prop = revolute.GetProperties();
     EXPECT_EQ(revolute.Genus(), 1);
-    EXPECT_NEAR(prop.surfaceArea, 777.0, 1.0);
-    EXPECT_NEAR(prop.volume, 376.0, 1.0);
+    EXPECT_NEAR(revolute.SurfaceArea(), 777.0, 1.0);
+    EXPECT_NEAR(revolute.Volume(), 376.0, 1.0);
   }
 }
 
@@ -274,14 +268,12 @@ TEST(Manifold, Warp) {
       Manifold::Extrude(square.ToPolygons(), 2, 10).Warp([](vec3& v) {
         v.x += v.z * v.z;
       });
-  auto propBefore = shape.GetProperties();
 
   Manifold simplified = Manifold::Compose({shape});
-  auto propAfter = simplified.GetProperties();
 
-  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
-  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
-  EXPECT_NEAR(propBefore.volume, 2, 0.0001);
+  EXPECT_NEAR(shape.Volume(), simplified.Volume(), 0.0001);
+  EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
+  EXPECT_NEAR(shape.Volume(), 2, 0.0001);
 }
 
 TEST(Manifold, Warp2) {
@@ -298,14 +290,11 @@ TEST(Manifold, Warp2) {
         v.x = v.x * cos(angle);
       });
 
-  auto propBefore = shape.GetProperties();
-
   Manifold simplified = Manifold::Compose({shape});
-  auto propAfter = simplified.GetProperties();
 
-  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
-  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
-  EXPECT_NEAR(propBefore.volume, 321, 1);
+  EXPECT_NEAR(shape.Volume(), simplified.Volume(), 0.0001);
+  EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
+  EXPECT_NEAR(shape.Volume(), 321, 1);
 }
 #endif
 
@@ -314,14 +303,11 @@ TEST(Manifold, WarpBatch) {
   const int id = cube.OriginalID();
 
   Manifold shape1 = cube.Warp([](vec3& v) { v.x += v.z * v.z; });
-  auto prop1 = shape1.GetProperties();
-
   Manifold shape2 = cube.WarpBatch([](VecView<vec3> vecs) {
     for (vec3& v : vecs) {
       v.x += v.z * v.z;
     }
   });
-  auto prop2 = shape2.GetProperties();
 
   EXPECT_GE(id, 0);
   EXPECT_EQ(shape1.OriginalID(), -1);
@@ -332,8 +318,8 @@ TEST(Manifold, WarpBatch) {
   std::vector<uint32_t> runOriginalID2 = shape2.GetMeshGL().runOriginalID;
   EXPECT_EQ(runOriginalID2.size(), 1);
   EXPECT_EQ(runOriginalID2[0], id);
-  EXPECT_EQ(prop1.volume, prop2.volume);
-  EXPECT_EQ(prop1.surfaceArea, prop2.surfaceArea);
+  EXPECT_EQ(shape1.Volume(), shape2.Volume());
+  EXPECT_EQ(shape1.SurfaceArea(), shape2.SurfaceArea());
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -542,9 +528,8 @@ void CheckCube(const MeshGL& cubeSTL) {
   EXPECT_EQ(cube.NumVert(), 8);
   EXPECT_EQ(cube.NumPropVert(), 24);
 
-  auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
+  EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 }
 
 TEST(Manifold, Merge) {
@@ -623,8 +608,8 @@ TEST(Manifold, MirrorUnion) {
     ExportMesh("manifold_mirror_union.glb", result.GetMeshGL(), {});
 #endif
 
-  auto vol_a = a.GetProperties().volume;
-  EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
+  auto vol_a = a.Volume();
+  EXPECT_FLOAT_EQ(vol_a * 2.75, result.Volume());
   EXPECT_TRUE(a.Mirror(vec3(0.0)).IsEmpty());
 }
 
@@ -658,7 +643,7 @@ TEST(Manifold, MultiCompose) {
       Manifold::Compose({part, part.Translate({0, 10, 0}),
                          part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
                          part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
-  EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
+  EXPECT_FLOAT_EQ(finalAssembly.Volume(), 4000);
 }
 
 TEST(Manifold, MergeDegenerates) {
