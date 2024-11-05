@@ -427,8 +427,9 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
 }
 
 ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
-                                   int circular_segments) {
-  auto m = Manifold::Revolve(*from_c(cs), circular_segments);
+                                   int circular_segments,
+                                   double revolve_degrees) {
+  auto m = Manifold::Revolve(*from_c(cs), circular_segments, revolve_degrees);
   return to_c(new (mem) Manifold(m));
 }
 
