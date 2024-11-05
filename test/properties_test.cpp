@@ -23,16 +23,14 @@ using namespace manifold;
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
-TEST(Properties, GetProperties) {
+TEST(Properties, Measurements) {
   Manifold cube = Manifold::Cube();
-  auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
+  EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 
   cube = cube.Scale(vec3(-1.0));
-  prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
+  EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 }
 
 TEST(Properties, Epsilon) {
@@ -55,7 +53,6 @@ TEST(Properties, Tolerance) {
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
   Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
-  const auto prop = imperfect.GetProperties();
 
   Manifold imperfect2 = imperfect.SetTolerance(tol);
   MeshGL mesh = imperfect.GetMeshGL();
@@ -66,13 +63,10 @@ TEST(Properties, Tolerance) {
   EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
   EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
 
-  const auto prop2 = imperfect2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.02);
-
-  const auto prop3 = imperfect3.GetProperties();
-  EXPECT_NEAR(prop2.volume, prop3.volume, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, prop3.surfaceArea, 0.02);
+  EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
+  EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);
+  EXPECT_NEAR(imperfect2.Volume(), imperfect3.Volume(), 0.01);
+  EXPECT_NEAR(imperfect2.SurfaceArea(), imperfect3.SurfaceArea(), 0.02);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {

@@ -124,10 +124,6 @@ ManifoldVec3 to_c(vec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldIVec3 to_c(ivec3 v) { return {v.x, v.y, v.z}; }
 
-ManifoldProperties to_c(manifold::Properties p) {
-  return {p.surfaceArea, p.volume};
-}
-
 const manifold::Manifold *from_c(ManifoldManifold *m) {
   return reinterpret_cast<manifold::Manifold const *>(m);
 }

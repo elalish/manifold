@@ -87,8 +87,8 @@ TEST(Hull, Tictac) {
 TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
-  const double sphere_vol = sphere.GetProperties().volume;
-  EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
+  const double sphere_vol = sphere.Volume();
+  EXPECT_FLOAT_EQ(hollow.Hull().Volume(), sphere_vol);
 }
 
 TEST(Hull, Cube) {
@@ -98,7 +98,7 @@ TEST(Hull, Cube) {
       {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
   };
   auto cube = Manifold::Hull(cubePts);
-  EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1);
 }
 
 TEST(Hull, Empty) {
@@ -114,8 +114,8 @@ TEST(Hull, MengerSponge) {
   sponge = sponge.Rotate(10, 20, 30);
   Manifold spongeHull = sponge.Hull();
   EXPECT_EQ(spongeHull.NumTri(), 12);
-  EXPECT_FLOAT_EQ(spongeHull.GetProperties().surfaceArea, 6);
-  EXPECT_FLOAT_EQ(spongeHull.GetProperties().volume, 1);
+  EXPECT_FLOAT_EQ(spongeHull.SurfaceArea(), 6);
+  EXPECT_FLOAT_EQ(spongeHull.Volume(), 1);
 }
 
 TEST(Hull, Sphere) {
@@ -123,8 +123,7 @@ TEST(Hull, Sphere) {
   sphere = sphere.Translate(vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
-  EXPECT_FLOAT_EQ(sphereHull.GetProperties().volume,
-                  sphere.GetProperties().volume);
+  EXPECT_FLOAT_EQ(sphereHull.Volume(), sphere.Volume());
 }
 
 TEST(Hull, FailingTest1) {

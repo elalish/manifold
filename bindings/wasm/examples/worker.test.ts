@@ -39,10 +39,11 @@ async function runExample(name: string) {
     }
     const {mesh} = readMesh(docMesh)!;
     const manifold = new module.Manifold(mesh as Mesh);
-    const prop = manifold.getProperties();
+    const volume = manifold.volume();
+    const surfaceArea = manifold.surfaceArea();
     const genus = manifold.genus();
     manifold.delete();
-    return {...prop, genus};
+    return {volume, surfaceArea, genus};
   }
   assert.ok(false);
 }

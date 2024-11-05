@@ -426,10 +426,17 @@ int Manifold::Genus() const {
 }
 
 /**
- * Returns the surface area and volume of the manifold.
+ * Returns the surface area of the manifold.
  */
-Properties Manifold::GetProperties() const {
-  return GetCsgLeafNode().GetImpl()->GetProperties();
+double Manifold::SurfaceArea() const {
+  return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::SurfaceArea);
+}
+
+/**
+ * Returns the volume of the manifold.
+ */
+double Manifold::Volume() const {
+  return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::Volume);
 }
 
 /**
@@ -1023,9 +1030,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
   auto intersect = *this ^ other;
-  auto prop = intersect.GetProperties();
-
-  if (prop.volume != 0) return 0.0;
+  if (!intersect.IsEmpty()) return 0.0;
 
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);

@@ -272,7 +272,8 @@ struct Manifold::Impl {
   }
 
   // properties.cu
-  Properties GetProperties() const;
+  enum class Property { Volume, SurfaceArea };
+  double GetProperty(Property prop) const;
   void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
   bool IsFinite() const;

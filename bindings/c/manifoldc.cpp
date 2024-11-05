@@ -632,9 +632,10 @@ size_t manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
 size_t manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
 int manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
 
-ManifoldProperties manifold_get_properties(ManifoldManifold *m) {
-  return to_c(from_c(m)->GetProperties());
+double manifold_surface_area(ManifoldManifold *m) {
+  return from_c(m)->SurfaceArea();
 }
+double manifold_volume(ManifoldManifold *m) { return from_c(m)->Volume(); }
 
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m) {
   auto box = from_c(m)->BoundingBox();

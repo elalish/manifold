@@ -60,11 +60,8 @@ TEST(CBIND, warp_translation) {
   ManifoldManifold *diffcontext =
       manifold_difference(alloc_manifold_buffer(), trans, warped);
 
-  ManifoldProperties props = manifold_get_properties(diff);
-  ManifoldProperties propscontext = manifold_get_properties(diffcontext);
-
-  EXPECT_NEAR(props.volume, 0, 0.0001);
-  EXPECT_NEAR(propscontext.volume, 0, 0.0001);
+  EXPECT_NEAR(manifold_volume(diff), 0, 0.0001);
+  EXPECT_NEAR(manifold_volume(diffcontext), 0, 0.0001);
 
   ManifoldBox *sphere_bounds =
       manifold_bounding_box(alloc_box_buffer(), sphere);
@@ -180,17 +177,13 @@ TEST(CBIND, level_set) {
                       1.0 / 1.6);
   double v = 4.0 * kPi / 3.0 * a * b * c;
 
-  // Numerical calculations for volume and surface area
-  ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
-  ManifoldProperties sdf_context_props =
-      manifold_get_properties(sdf_man_context);
-
   // Assert that numerical properties are equal to each other and +/- 0.5% of
   // analytical
-  EXPECT_FLOAT_EQ(sdf_props.volume, sdf_context_props.volume);
-  EXPECT_FLOAT_EQ(sdf_props.surface_area, sdf_context_props.surface_area);
-  EXPECT_NEAR(v, sdf_props.volume, 0.005 * v);
-  EXPECT_NEAR(s, sdf_props.surface_area, 0.005 * s);
+  EXPECT_FLOAT_EQ(manifold_volume(sdf_man), manifold_volume(sdf_man_context));
+  EXPECT_FLOAT_EQ(manifold_surface_area(sdf_man),
+                  manifold_surface_area(sdf_man_context));
+  EXPECT_NEAR(v, manifold_volume(sdf_man), 0.005 * v);
+  EXPECT_NEAR(s, manifold_surface_area(sdf_man), 0.005 * s);
 
   manifold_destruct_meshgl(sdf_mesh);
   manifold_destruct_manifold(sdf_man);
@@ -260,17 +253,13 @@ TEST(CBIND, level_set_64) {
                       1.0 / 1.6);
   double v = 4.0 * kPi / 3.0 * a * b * c;
 
-  // Numerical calculations for volume and surface area
-  ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
-  ManifoldProperties sdf_context_props =
-      manifold_get_properties(sdf_man_context);
-
   // Assert that numerical properties are equal to each other and +/- 0.5% of
   // analytical
-  EXPECT_FLOAT_EQ(sdf_props.volume, sdf_context_props.volume);
-  EXPECT_FLOAT_EQ(sdf_props.surface_area, sdf_context_props.surface_area);
-  EXPECT_NEAR(v, sdf_props.volume, 0.005 * v);
-  EXPECT_NEAR(s, sdf_props.surface_area, 0.005 * s);
+  EXPECT_FLOAT_EQ(manifold_volume(sdf_man), manifold_volume(sdf_man_context));
+  EXPECT_FLOAT_EQ(manifold_surface_area(sdf_man),
+                  manifold_surface_area(sdf_man_context));
+  EXPECT_NEAR(v, manifold_volume(sdf_man), 0.005 * v);
+  EXPECT_NEAR(s, manifold_surface_area(sdf_man), 0.005 * s);
 
   manifold_destruct_meshgl64(sdf_mesh);
   manifold_destruct_manifold(sdf_man);
@@ -332,9 +321,8 @@ TEST(CBIND, extrude) {
 
   ManifoldManifold *diff =
       manifold_difference(alloc_manifold_buffer(), cube, extrusion);
-  ManifoldProperties props = manifold_get_properties(diff);
 
-  EXPECT_TRUE(props.volume < 0.0001);
+  EXPECT_TRUE(manifold_volume(diff) < 0.0001);
 
   manifold_destruct_manifold(cube);
   manifold_destruct_manifold(extrusion);

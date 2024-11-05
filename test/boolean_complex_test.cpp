@@ -72,9 +72,8 @@ TEST(BooleanComplex, MeshRelation) {
   EXPECT_TRUE(result.MatchesTriNormals());
   EXPECT_LE(result.NumDegenerateTris(), 12);
   EXPECT_EQ(result.Decompose().size(), 1);
-  auto prop = result.GetProperties();
-  EXPECT_NEAR(prop.volume, 226, 1);
-  EXPECT_NEAR(prop.surfaceArea, 387, 1);
+  EXPECT_NEAR(result.Volume(), 226, 1);
+  EXPECT_NEAR(result.SurfaceArea(), 387, 1);
 
   RelatedGL(result, {gyroidMeshGL});
 }
@@ -236,10 +235,9 @@ TEST(BooleanComplex, Close) {
     // std::cout << i << std::endl;
     result ^= a.Translate({a.GetEpsilon() / 10 * i, 0.0, 0.0});
   }
-  auto prop = result.GetProperties();
   const double tol = 0.004;
-  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
-  EXPECT_NEAR(prop.surfaceArea, 4 * kPi * r * r, tol * r * r);
+  EXPECT_NEAR(result.Volume(), (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
+  EXPECT_NEAR(result.SurfaceArea(), 4 * kPi * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
@@ -259,17 +257,17 @@ TEST(BooleanComplex, BooleanVolumes) {
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 
-  EXPECT_FLOAT_EQ((m1 ^ m2).GetProperties().volume, 0);
-  EXPECT_FLOAT_EQ((m1 + m2 + m4).GetProperties().volume, 7);
-  EXPECT_FLOAT_EQ((m1 + m2 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m1 + (m2 ^ m4)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ m4).GetProperties().volume, 4);
-  EXPECT_FLOAT_EQ((m7 ^ m3 ^ m1).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ (m1 + m2)).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4 - m2).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m7 - m1)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
+  EXPECT_FLOAT_EQ((m1 ^ m2).Volume(), 0);
+  EXPECT_FLOAT_EQ((m1 + m2 + m4).Volume(), 7);
+  EXPECT_FLOAT_EQ((m1 + m2 - m4).Volume(), 3);
+  EXPECT_FLOAT_EQ((m1 + (m2 ^ m4)).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 ^ m4).Volume(), 4);
+  EXPECT_FLOAT_EQ((m7 ^ m3 ^ m1).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 ^ (m1 + m2)).Volume(), 3);
+  EXPECT_FLOAT_EQ((m7 - m4).Volume(), 3);
+  EXPECT_FLOAT_EQ((m7 - m4 - m2).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 - (m7 - m1)).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 - (m1 + m2)).Volume(), 4);
 }
 
 TEST(BooleanComplex, Spiral) {
@@ -512,16 +510,14 @@ TEST(BooleanComplex, Sweep) {
 
   // all primitives should be valid
   for (Manifold primitive : result) {
-    manifold::Properties properties = primitive.GetProperties();
-    if (properties.volume < 0) {
+    if (primitive.Volume() < 0) {
       std::cerr << "INVALID PRIMITIVE" << std::endl;
     }
   }
 
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
-  auto prop = shape.GetProperties();
 
-  EXPECT_NEAR(prop.volume, 3757, 1);
+  EXPECT_NEAR(shape.Volume(), 3757, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif

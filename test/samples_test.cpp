@@ -50,9 +50,8 @@ TEST(Samples, Knot13) {
   if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
 #endif
   EXPECT_EQ(knot13.Genus(), 1);
-  auto prop = knot13.GetProperties();
-  EXPECT_NEAR(prop.volume, 20786, 1);
-  EXPECT_NEAR(prop.surfaceArea, 11177, 1);
+  EXPECT_NEAR(knot13.Volume(), 20786, 1);
+  EXPECT_NEAR(knot13.SurfaceArea(), 11177, 1);
   CheckGL(knot13);
 }
 
@@ -66,10 +65,8 @@ TEST(Samples, Knot42) {
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
   EXPECT_EQ(knots[1].Genus(), 1);
-  auto prop0 = knots[0].GetProperties();
-  auto prop1 = knots[1].GetProperties();
-  EXPECT_NEAR(prop0.volume, prop1.volume, 1);
-  EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
+  EXPECT_NEAR(knots[0].Volume(), knots[1].Volume(), 1);
+  EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
   CheckGL(knot42);
 }
 #endif
@@ -117,9 +114,8 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  auto prop = scallop.GetProperties();
-  EXPECT_NEAR(prop.volume, 39.9, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
+  EXPECT_NEAR(scallop.Volume(), 39.9, 0.1);
+  EXPECT_NEAR(scallop.SurfaceArea(), 79.3, 0.1);
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
@@ -153,9 +149,8 @@ TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
-  auto prop = frame.GetProperties();
-  EXPECT_NEAR(prop.volume, 227333, 10);
-  EXPECT_NEAR(prop.surfaceArea, 62635, 1);
+  EXPECT_NEAR(frame.Volume(), 227333, 10);
+  EXPECT_NEAR(frame.SurfaceArea(), 62635, 1);
   CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)

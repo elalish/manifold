@@ -32,18 +32,18 @@ namespace manifold {
 struct PathImpl;
 
 /**
- * Two-dimensional cross sections guaranteed to be without self-intersections,
- * or overlaps between polygons (from construction onwards). This class makes
- * use of the [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm)
- * library for polygon clipping (boolean) and offsetting operations.
+ * @brief Two-dimensional cross sections guaranteed to be without
+ * self-intersections, or overlaps between polygons (from construction onwards).
+ * This class makes use of the
+ * [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library for
+ * polygon clipping (boolean) and offsetting operations.
  */
 class CrossSection {
  public:
-  /** @name Creation
-   *  Constructors
+  /** @name Basics
+   *  Copy / move / assignment
    */
   ///@{
-
   CrossSection();
   ~CrossSection();
 
@@ -51,6 +51,7 @@ class CrossSection {
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
+  ///@}
 
   // Adapted from Clipper2 docs:
   // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm
@@ -68,38 +69,6 @@ class CrossSection {
     Positive,  ///< Only sub-regions with winding counts > 0 are filled.
     Negative   ///< Only sub-regions with winding counts < 0 are filled.
   };
-
-  CrossSection(const SimplePolygon& contour,
-               FillRule fillrule = FillRule::Positive);
-  CrossSection(const Polygons& contours,
-               FillRule fillrule = FillRule::Positive);
-  CrossSection(const Rect& rect);
-  static CrossSection Square(const vec2 dims, bool center = false);
-  static CrossSection Circle(double radius, int circularSegments = 0);
-  ///@}
-
-  /** @name Information
-   *  Details of the cross-section
-   */
-  ///@{
-  double Area() const;
-  int NumVert() const;
-  int NumContour() const;
-  bool IsEmpty() const;
-  Rect Bounds() const;
-  ///@}
-
-  /** @name Modification
-   */
-  ///@{
-  CrossSection Translate(const vec2 v) const;
-  CrossSection Rotate(double degrees) const;
-  CrossSection Scale(const vec2 s) const;
-  CrossSection Mirror(const vec2 ax) const;
-  CrossSection Transform(const mat2x3& m) const;
-  CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
-  CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
-  CrossSection Simplify(double epsilon = 1e-6) const;
 
   // Adapted from Clipper2 docs:
   // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
@@ -124,6 +93,49 @@ class CrossSection {
              (relative to the offset distance), these are 'squared' instead. */
   };
 
+  /** @name Input & Output
+   */
+  ///@{
+  CrossSection(const SimplePolygon& contour,
+               FillRule fillrule = FillRule::Positive);
+  CrossSection(const Polygons& contours,
+               FillRule fillrule = FillRule::Positive);
+  CrossSection(const Rect& rect);
+  Polygons ToPolygons() const;
+  ///@}
+
+  /** @name Constructors
+   * Topological ops and primitives
+   */
+  ///@{
+  std::vector<CrossSection> Decompose() const;
+  static CrossSection Compose(std::vector<CrossSection>&);
+  static CrossSection Square(const vec2 dims, bool center = false);
+  static CrossSection Circle(double radius, int circularSegments = 0);
+  ///@}
+
+  /** @name Information
+   *  Details of the cross-section
+   */
+  ///@{
+  bool IsEmpty() const;
+  int NumVert() const;
+  int NumContour() const;
+  Rect Bounds() const;
+  double Area() const;
+  ///@}
+
+  /** @name Transformation
+   */
+  ///@{
+  CrossSection Translate(const vec2 v) const;
+  CrossSection Rotate(double degrees) const;
+  CrossSection Scale(const vec2 s) const;
+  CrossSection Mirror(const vec2 ax) const;
+  CrossSection Transform(const mat2x3& m) const;
+  CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
+  CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
+  CrossSection Simplify(double epsilon = 1e-6) const;
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       int circularSegments = 0) const;
   ///@}
@@ -143,26 +155,13 @@ class CrossSection {
   CrossSection& operator^=(const CrossSection&);
   ///@}
 
-  /** @name Topological
-   */
-  ///@{
-  static CrossSection Compose(std::vector<CrossSection>&);
-  std::vector<CrossSection> Decompose() const;
-  ///@}
-
-  /** @name Convex Hulling
+  /** @name Convex Hull
    */
   ///@{
   CrossSection Hull() const;
   static CrossSection Hull(const std::vector<CrossSection>& crossSections);
   static CrossSection Hull(const SimplePolygon pts);
   static CrossSection Hull(const Polygons polys);
-  ///@}
-  ///
-  /** @name Conversion
-   */
-  ///@{
-  Polygons ToPolygons() const;
   ///@}
 
  private:
