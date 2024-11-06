@@ -65,11 +65,11 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding (when using the emscripten toolchain).
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding.
-- `MANIFOLD_PAR=[<OFF>, ON]`: Provides multi-thread parallelization, requires `libtbb-dev` if enabled.
+- `MANIFOLD_PAR=[<OFF>, ON]`: Provides multi-thread parallelization, requires `tbb` if enabled.
 - `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings), requires `Clipper2` if enabled.
-- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
+- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables `MeshIO` and GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions. This incurs around 20% runtime overhead.
-- `MANIFOLD_TEST=[OFF, <ON>]`: Build unittests.
+- `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests.
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
 
@@ -77,14 +77,12 @@ Offline building (with missing dependencies):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.
   Need to set `FETCHCONTENT_SOURCE_DIR_*` if the dependency `*` is missing.
 - `FETCHCONTENT_SOURCE_DIR_TBB`: path to tbb source (if `MANIFOLD_PAR` is enabled).
+- `FETCHCONTENT_SOURCE_DIR_CLIPPER2`: path to tbb source (if `MANIFOLD_CROSS_SECTION` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
 ### WASM
-
-> Note that we have only tested emscripten version 3.1.45. It is known that
-  3.1.48 has some issues compiling manifold.
 
 To build the JS WASM library, first install NodeJS and set up emscripten:
 
@@ -169,17 +167,6 @@ patch from the GitHub action log.
 There is now basic support for the [Tracy profiler](https://github.com/wolfpld/tracy) for our tests.
 To enable tracing, compile with `-DTRACY_ENABLE=on` cmake option, and run the test with Tracy server running.
 To enable memory profiling in addition to tracing, compile with `-DTRACY_MEMORY_USAGE=ON` in addition to `-DTRACY_ENABLE=ON`.
-
-### Fuzzing Support
-
-We use https://github.com/google/fuzztest for fuzzing the triangulator.
-
-To enable fuzzing, make sure that you are using clang compiler (`-DCMAKE_CXX_COMPILER=clang -DCMAKE_C_COMPILER=clang`), running Linux, and enable fuzzing support by setting `-DMANIFOLD_FUZZ=ON`.
-
-To run the fuzzer and minimize testcase, do
-```
-../minimizer.sh ./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
-```
 
 ## About the author
 
