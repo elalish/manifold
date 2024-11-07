@@ -55,12 +55,14 @@ If you prefer Python to JS/TS, make your own copy of the example notebook above.
 ### Dependencies
 
 Manifold no longer has **any** required dependencies! However, we do have several optional dependencies, of which the first two are strongly encouraged:
-- [`TBB`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library (only when `MANIFOLD_PAR=ON`)
-- [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem (only when `MANIFOLD_CROSS_SECTION=ON`)
-- [`Assimp`](https://github.com/assimp/assimp): provides I/O for various 3D formats (only when `MANIFOLD_EXPORT=ON`)
-- [`Nanobind`](https://github.com/wjakob/nanobind): provides Python bindings (only when `MANIFOLD_PYBIND=ON`)
-- [`Emscripten`](https://github.com/emscripten-core/emscripten): WASM compiler that provides our JS bindings (only when `MANIFOLD_JSBIND=ON`)
-- [`GTest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
+| Name | CMake Flag | Provides |
+| --- | --- | --- |
+| [`TBB`](https://github.com/oneapi-src/oneTBB/) |`MANIFOLD_PAR=ON` | Parallel acceleration |
+| [`Clipper2`](https://github.com/AngusJohnson/Clipper2) | `MANIFOLD_CROSS_SECTION=ON` | 2D: [`CrossSection`](https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html) |
+| [`Assimp`](https://github.com/assimp/assimp) | `MANIFOLD_EXPORT=ON` | Basic Mesh I/O |
+| [`Nanobind`](https://github.com/wjakob/nanobind) | `MANIFOLD_PYBIND=ON` | Python bindings |
+| [`Emscripten`](https://github.com/emscripten-core/emscripten) | `MANIFOLD_JSBIND=ON` | JS bindings via WASM |
+| [`GTest`](https://github.com/google/googletest/) | `MANIFOLD_TEST=ON` | Testing framework |
 
 ### Overview
 
