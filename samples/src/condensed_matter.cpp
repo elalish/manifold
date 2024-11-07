@@ -130,6 +130,12 @@ Manifold GraphiteCell(int fn, vec3 xyz = {1.0, 1.0, 1.0}) {
 }  // namespace
 
 namespace manifold {
+
+/**
+ * A demonstration of molecular bonding.
+ *
+ * @param fn Number of circular segments.
+ */
 Manifold CondensedMatter(int fn) {
   std::vector<Manifold> parts;
   double siOffset = 3.0 * LatticeCellSizeSi / 8.0;
