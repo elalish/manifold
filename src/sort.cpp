@@ -491,6 +491,20 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
                           old.halfedgeTangent_, faceNew2Old, faceOld2New}));
 }
 
+/**
+ * Updates the mergeFromVert and mergeToVert vectors in order to create a
+ * manifold solid. If the MeshGL is already manifold, no change will occur and
+ * the function will return false. Otherwise, this will merge verts along open
+ * edges within tolerance (the maximum of the MeshGL tolerance and the
+ * baseline bounding-box tolerance), keeping any from the existing merge
+ * vectors, and return true.
+ *
+ * There is no guarantee the result will be manifold - this is a best-effort
+ * helper function designed primarily to aid in the case where a manifold
+ * multi-material MeshGL was produced, but its merge vectors were lost due to
+ * a round-trip through a file format. Constructing a Manifold from the result
+ * will report an error status if it is not manifold.
+ */
 template <>
 bool MeshGL::Merge() {
   return MergeMeshGLP(*this);

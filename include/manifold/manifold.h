@@ -127,7 +127,7 @@ struct MeshGLP {
    * @param v vertex index.
    */
   la::vec<Precision, 3> GetVertPos(size_t v) const {
-    size_t offset = i * numProp;
+    size_t offset = v * numProp;
     return la::vec<Precision, 3>(vertProperties[offset],
                                  vertProperties[offset + 1],
                                  vertProperties[offset + 2]);
@@ -139,7 +139,7 @@ struct MeshGLP {
    * @param t triangle index.
    */
   la::vec<I, 3> GetTriVerts(size_t t) const {
-    size_t offset = 3 * i;
+    size_t offset = 3 * t;
     return la::vec<I, 3>(triVerts[offset], triVerts[offset + 1],
                          triVerts[offset + 2]);
   }
@@ -150,7 +150,7 @@ struct MeshGLP {
    * @param h halfedge index (3 * triangle_index + [0|1|2]).
    */
   la::vec<Precision, 4> GetTangent(size_t h) const {
-    size_t offset = 4 * i;
+    size_t offset = 4 * h;
     return la::vec<Precision, 4>(
         halfedgeTangent[offset], halfedgeTangent[offset + 1],
         halfedgeTangent[offset + 2], halfedgeTangent[offset + 3]);
