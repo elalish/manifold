@@ -5,9 +5,34 @@
 [![npm version](https://badge.fury.io/js/manifold-3d.svg)](https://badge.fury.io/js/manifold-3d)
 [![twitter](https://img.shields.io/twitter/follow/manifoldcad?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=manifoldcad)
 
+Manifold is a geometry kernel for operating on watertight meshes that represent solid objects. Our primary goal is reliability: guaranteed manifold output without caveats or edge cases. Our secondary goal is performance: efficient algorithms that make extensive use of parallelization (or pipelining when only a single thread is available).
+
 ## Users
 
-[OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
+Here is an incomplete list of our users, whose integrations may be anywhere from in-progress to released. Please feel free to send a PR to update this list with your own project - it's quite difficult for us to keep track.
+
+| | | |
+| --- | --- | --- |
+| [OpenSCAD](https://openscad.org/) | [IFCjs](https://ifcjs.github.io/info/) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
+| [Nomad Sculpt](https://apps.apple.com/us/app/id1519508653?mt=8&platform=ipad) | [Grid.Space](https://grid.space/) | [badcad](https://github.com/wrongbad/badcad) |
+| [Godot Engine](https://godotengine.org/) | [OCADml](https://github.com/OCADml/OManifold) | [Flitter](https://flitter.readthedocs.io/en/latest/) |
+| [BRL-CAD](https://brlcad.org/) | [PolygonJS](https://polygonjs.com/) | [Spherene](https://spherene.ch/) |
+| [trimesh](https://trimesh.org/) | [Gypsum](https://github.com/playkostudios/gypsum) | |
+
+### Bindings & Packages
+
+If C++ isn't your cup of tea, Manifold also has bindings to many other languages, some maintained in this repository, and others elsewhere.
+
+| Language | Packager | Name | Maintenance |
+| --- | --- | --- | --- |
+| C | N/A | N/A | internal |
+| TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
+| Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
+| Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
+| Clojure | N/A | [clj-manifold3d](https://github.com/SovereignShop/clj-manifold3d) | external |
+| C# | NuGet | [ManifoldNET](https://www.nuget.org/packages/ManifoldNET) | external |
+| Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
+| OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
 
 ## Frontend Sandboxes
 
@@ -27,9 +52,9 @@ If you prefer Python to JS/TS, make your own copy of the example notebook above.
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
-This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python ([manifold3d](https://pypi.org/project/manifold3d/)), and C to make this library more portable and easy to use.
+### Dependencies
 
-Optional Dependencies (no dependencies are required anymore, but the first two are encouraged):
+Manifold no longer has **any** required dependencies! However, we do have several optional dependencies, of which the first two are strongly encouraged:
 - [`TBB`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library (only when `MANIFOLD_PAR=ON`)
 - [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem (only when `MANIFOLD_CROSS_SECTION=ON`)
 - [`Assimp`](https://github.com/assimp/assimp): provides I/O for various 3D formats (only when `MANIFOLD_EXPORT=ON`)
@@ -130,12 +155,6 @@ python binding documentation:
 ```
 
 For more detailed documentation, please refer to the C++ API.
-
-### Java / Clojure
-
-Unofficial java bindings are currently maintained in [a fork](https://github.com/SovereignShop/manifold).
-
-There is also a Clojure [library](https://github.com/SovereignShop/clj-manifold3d).
 
 ### Windows Shenanigans
 
