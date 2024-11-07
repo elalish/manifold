@@ -297,9 +297,17 @@ TEST(Samples, Sponge4) {
 TEST(Samples, CondensedMatter16) {
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
+#endif
 }
 
 TEST(Samples, CondensedMatter64) {
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
+#endif
 }

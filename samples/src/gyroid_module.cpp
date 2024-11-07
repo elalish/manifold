@@ -41,6 +41,10 @@ namespace manifold {
  * 3D-printable, as it is oriented with minimal overhangs. This sample
  * demonstrates the use of a Signed Distance Function (SDF) to create smooth,
  * complex manifolds.
+ *
+ * @param size Creates a module scaled to this dimension between opposite faces.
+ * @param n The number of divisions for SDF evaluation across the gyroid's
+ * period.
  */
 Manifold GyroidModule(double size, int n) {
   auto gyroid = [&](double level) {
