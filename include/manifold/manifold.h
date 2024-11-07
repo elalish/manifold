@@ -97,31 +97,59 @@ struct MeshGLP {
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<Precision> halfedgeTangent;
-  /// Tolerance for mesh simplification.
-  /// When creating a Manifold, the tolerance used will be the maximum
-  /// of this and a baseline tolerance from the size of the bounding box. Any
-  /// edge shorter than tolerance may be collapsed.
+  /// Tolerance for mesh simplification. When creating a Manifold, the tolerance
+  /// used will be the maximum of this and a baseline tolerance from the size of
+  /// the bounding box. Any edge shorter than tolerance may be collapsed.
   /// Tolerance may be enlarged when floating point error accumulates.
   Precision tolerance = 0;
 
   MeshGLP() = default;
 
+  /**
+   * Updates the mergeFromVert and mergeToVert vectors in order to create a
+   * manifold solid. If the MeshGL is already manifold, no change will occur and
+   * the function will return false. Otherwise, this will merge verts along open
+   * edges within tolerance (the maximum of the MeshGL tolerance and the
+   * baseline bounding-box tolerance), keeping any from the existing merge
+   * vectors, and return true.
+   *
+   * There is no guarantee the result will be manifold - this is a best-effort
+   * helper function designed primarily to aid in the case where a manifold
+   * multi-material MeshGL was produced, but its merge vectors were lost due to
+   * a round-trip through a file format. Constructing a Manifold from the result
+   * will report an error status if it is not manifold.
+   */
   bool Merge();
 
-  la::vec<Precision, 3> GetVertPos(size_t i) const {
+  /**
+   * Returns the x, y, z position of the ith vertex.
+   *
+   * @param v vertex index.
+   */
+  la::vec<Precision, 3> GetVertPos(size_t v) const {
     size_t offset = i * numProp;
     return la::vec<Precision, 3>(vertProperties[offset],
                                  vertProperties[offset + 1],
                                  vertProperties[offset + 2]);
   }
 
-  la::vec<I, 3> GetTriVerts(size_t i) const {
+  /**
+   * Returns the three vertex indices of the ith triangle.
+   *
+   * @param t triangle index.
+   */
+  la::vec<I, 3> GetTriVerts(size_t t) const {
     size_t offset = 3 * i;
     return la::vec<I, 3>(triVerts[offset], triVerts[offset + 1],
                          triVerts[offset + 2]);
   }
 
-  la::vec<Precision, 4> GetTangent(size_t i) const {
+  /**
+   * Returns the x, y, z, w tangent of the ith halfedge.
+   *
+   * @param h halfedge index (3 * triangle_index + [0|1|2]).
+   */
+  la::vec<Precision, 4> GetTangent(size_t h) const {
     size_t offset = 4 * i;
     return la::vec<Precision, 4>(
         halfedgeTangent[offset], halfedgeTangent[offset + 1],
