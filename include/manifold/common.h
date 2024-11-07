@@ -116,22 +116,22 @@ inline double cosd(double x) { return sind(x + 90.0); }
  */
 
 /**
- * Single polygon contour, wound CCW. First and last point are implicitly
+ * @brief Single polygon contour, wound CCW. First and last point are implicitly
  * connected. Should ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using SimplePolygon = std::vector<vec2>;
 
 /**
- * Set of polygons with holes. Order of contours is arbitrary. Can contain any
- * depth of nested holes and any number of separate polygons. Should ensure all
- * input is
+ * @brief Set of polygons with holes. Order of contours is arbitrary. Can
+ * contain any depth of nested holes and any number of separate polygons. Should
+ * ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
 
 /**
- * Defines which edges to sharpen and how much for the Manifold.Smooth()
+ * @brief Defines which edges to sharpen and how much for the Manifold.Smooth()
  * constructor.
  */
 struct Smoothness {
@@ -459,7 +459,8 @@ struct Rect {
 };
 
 /**
- * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
+ * @brief Boolean operation type: Add (Union), Subtract (Difference), and
+ * Intersect.
  */
 enum class OpType { Add, Subtract, Intersect };
 
@@ -557,9 +558,8 @@ class Quality {
 
 /** @addtogroup Exceptions
  *  @ingroup Optional
- *  @brief Custom Exceptions
- *
- *  Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set.
+ *  @brief Custom Exceptions. Exceptions are only thrown if the
+ * MANIFOLD_EXCEPTIONS flag is set.
  * @{
  */
 struct userErr : public virtual std::runtime_error {
@@ -580,7 +580,7 @@ using logicErr = std::logic_error;
  */
 
 /**
- * Global parameters that control debugging output. Only has an
+ * @brief Global parameters that control debugging output. Only has an
  * effect when compiled with the MANIFOLD_DEBUG flag.
  */
 struct ExecutionParams {

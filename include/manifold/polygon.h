@@ -22,7 +22,7 @@ namespace manifold {
  */
 
 /**
- * Polygon vertex.
+ * @brief Polygon vertex.
  */
 struct PolyVert {
   /// X-Y position
@@ -32,16 +32,16 @@ struct PolyVert {
 };
 
 /**
- * Single polygon contour, wound CCW, with indices. First and last point are
- * implicitly connected. Should ensure all input is
+ * @brief Single polygon contour, wound CCW, with indices. First and last point
+ * are implicitly connected. Should ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using SimplePolygonIdx = std::vector<PolyVert>;
 
 /**
- * Set of indexed polygons with holes. Order of contours is arbitrary. Can
- * contain any depth of nested holes and any number of separate polygons. Should
- * ensure all input is
+ * @brief Set of indexed polygons with holes. Order of contours is arbitrary.
+ * Can contain any depth of nested holes and any number of separate polygons.
+ * Should ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using PolygonsIdx = std::vector<SimplePolygonIdx>;
