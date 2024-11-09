@@ -78,6 +78,7 @@ jobs:
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallelization}}
+        token: ${{secrets.CODECOV_TOKEN}}
     - name: test cmake consumer
       run: |
         cd build
