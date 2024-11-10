@@ -20,8 +20,8 @@
 #include "manifold/common.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
-#include "manifold/types.h"
 #include "manifold/polygon.h"
+#include "manifold/types.h"
 
 using namespace manifold;
 
@@ -703,7 +703,8 @@ int manifold_get_circular_segments(double radius) {
 
 void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
 
-ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps, double epsilon) {
+ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps,
+                                            double epsilon) {
   auto triangulation = manifold::Triangulate(*from_c(ps), epsilon);
   return to_c(new (mem) std::vector<ivec3>(triangulation));
 }
@@ -756,7 +757,7 @@ ManifoldMeshGL64 *manifold_alloc_meshgl64() { return to_c(new MeshGL64); }
 ManifoldBox *manifold_alloc_box() { return to_c(new Box); }
 ManifoldRect *manifold_alloc_rect() { return to_c(new Rect); }
 ManifoldTriangulation *manifold_alloc_triangulation() {
-    return to_c(new std::vector<ivec3>);
+  return to_c(new std::vector<ivec3>);
 }
 
 // pointer free + destruction
@@ -779,7 +780,7 @@ void manifold_delete_meshgl64(ManifoldMeshGL64 *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
 void manifold_delete_triangulation(ManifoldTriangulation *m) {
-    delete from_c(m);
+  delete from_c(m);
 }
 
 // destruction

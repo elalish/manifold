@@ -417,7 +417,8 @@ double *manifold_meshgl64_halfedge_tangent(void *mem, ManifoldMeshGL64 *m);
 
 // Triangulation
 
-ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps, double epsilon);
+ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps,
+                                            double epsilon);
 size_t manifold_triangulation_num_tri(ManifoldTriangulation *m);
 int *manifold_triangulation_tri_verts(void *mem, ManifoldTriangulation *m);
 
