@@ -39,6 +39,7 @@ ManifoldError to_c(manifold::Manifold::Error error);
 ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
+ManifoldTriangulation *to_c(std::vector<ivec3> *m);
 
 const manifold::Manifold *from_c(ManifoldManifold *m);
 ManifoldVec *from_c(ManifoldManifoldVec *ms);
@@ -57,6 +58,7 @@ vec2 from_c(ManifoldVec2 v);
 vec3 from_c(ManifoldVec3 v);
 ivec3 from_c(ManifoldIVec3 v);
 vec4 from_c(ManifoldVec4 v);
+const std::vector<ivec3> *from_c(ManifoldTriangulation *m);
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length);
 std::vector<ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length);
