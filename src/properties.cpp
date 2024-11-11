@@ -87,7 +87,8 @@ struct UpdateProperties {
       const int propVert = triProp[tri][i];
 
       auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]), 1);
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
       if (old == 1) return;
 
       for (int p = 0; p < oldNumProp; ++p) {
