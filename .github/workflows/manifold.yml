@@ -79,6 +79,7 @@ jobs:
         fail_ci_if_error: false
         name: ${{matrix.parallelization}}
         token: ${{secrets.CODECOV_TOKEN}}
+        verbose: true
     - name: test cmake consumer
       run: |
         cd build
