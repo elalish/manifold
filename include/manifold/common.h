@@ -596,8 +596,6 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Deterministic outputs. Will disable some parallel optimizations.
-  bool deterministic = false;
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
 };
