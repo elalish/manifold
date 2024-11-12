@@ -78,7 +78,7 @@ TEST(SDF, Bounds) {
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
-  const double outerBound = size / 2 + edgeLength / 2;
+  const double outerBound = size / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, epsilon);
   EXPECT_NEAR(bounds.min.y, -outerBound, epsilon);
   EXPECT_NEAR(bounds.min.z, -outerBound, epsilon);
@@ -102,7 +102,7 @@ TEST(SDF, Bounds2) {
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
-  const double outerBound = size / 2 + edgeLength / 2;
+  const double outerBound = size / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, epsilon);
   EXPECT_NEAR(bounds.min.y, -outerBound, epsilon);
   EXPECT_NEAR(bounds.min.z, -outerBound, epsilon);
@@ -142,7 +142,7 @@ TEST(SDF, Resize) {
   const double size = 20;
   Manifold layers = Manifold::LevelSet(Layers(), {vec3(0.0), vec3(size)}, 1);
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("layers.gltf", layers.GetMeshGL(), {});
+  if (options.exportModels) ExportMesh("layers.glb", layers.GetMeshGL(), {});
 #endif
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
