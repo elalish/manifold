@@ -587,16 +587,16 @@ size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64 *m) {
 double *manifold_meshgl64_vert_properties(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->vertProperties);
 }
-size_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->triVerts);
 }
-size_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->mergeFromVert);
 }
-size_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->mergeToVert);
 }
-size_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->runIndex);
 }
 uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m) {
@@ -605,7 +605,7 @@ uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m) {
 double *manifold_meshgl64_run_transform(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->runTransform);
 }
-size_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->faceID);
 }
 double *manifold_meshgl64_halfedge_tangent(void *mem, ManifoldMeshGL64 *m) {
