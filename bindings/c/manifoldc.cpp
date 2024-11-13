@@ -365,7 +365,7 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
 
 ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
                                     size_t n_verts, size_t n_props,
-                                    size_t *tri_verts, size_t n_tris) {
+                                    uint64_t *tri_verts, size_t n_tris) {
   auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
@@ -375,7 +375,8 @@ ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
 
 ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
                                                size_t n_verts, size_t n_props,
-                                               size_t *tri_verts, size_t n_tris,
+                                               uint64_t *tri_verts,
+                                               size_t n_tris,
                                                double *halfedge_tangent) {
   auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
@@ -397,7 +398,7 @@ ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
 }
 
 ManifoldManifold *manifold_smooth64(void *mem, ManifoldMeshGL64 *mesh,
-                                    size_t *half_edges, double *smoothness,
+                                    uint64_t *half_edges, double *smoothness,
                                     size_t n_edges) {
   auto smooth = std::vector<Smoothness>();
   for (size_t i = 0; i < n_edges; ++i) {

@@ -55,11 +55,12 @@ ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
 
 ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
                                     size_t n_verts, size_t n_props,
-                                    size_t *tri_verts, size_t n_tris);
+                                    uint64_t *tri_verts, size_t n_tris);
 
 ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
                                                size_t n_verts, size_t n_props,
-                                               size_t *tri_verts, size_t n_tris,
+                                               uint64_t *tri_verts,
+                                               size_t n_tris,
                                                double *halfedge_tangent);
 ManifoldMeshGL64 *manifold_get_meshgl64(void *mem, ManifoldManifold *m);
 ManifoldMeshGL64 *manifold_meshgl64_copy(void *mem, ManifoldMeshGL64 *m);
@@ -173,7 +174,7 @@ ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
                                   size_t *half_edges, double *smoothness,
                                   size_t n_idxs);
 ManifoldManifold *manifold_smooth64(void *mem, ManifoldMeshGL64 *mesh,
-                                    size_t *half_edges, double *smoothness,
+                                    uint64_t *half_edges, double *smoothness,
                                     size_t n_idxs);
 ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
                                    double height, int slices,
