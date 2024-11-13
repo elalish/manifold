@@ -216,7 +216,7 @@ void Manifold::Impl::CreateFaces() {
   ZoneScoped;
   const int numTri = NumTri();
   struct TriPriority {
-    double area;
+    double area2;
     int tri;
   };
   Vec<TriPriority> triPriority(numTri);
@@ -225,16 +225,17 @@ void Manifold::Impl::CreateFaces() {
                meshRelation_.triRef[tri].faceID = -1;
                const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
                triPriority[tri] = {
-                   length(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
-                                vertPos_[halfedge_[3 * tri + 1].endVert] - v)),
+                   length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
+                                 vertPos_[halfedge_[3 * tri + 1].endVert] - v)),
                    tri};
              });
 
   stable_sort(triPriority.begin(), triPriority.end(),
-              [](auto a, auto b) { return a.area > b.area; });
+              [](auto a, auto b) { return a.area2 > b.area2; });
 
   for (const auto tp : triPriority) {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
+
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
@@ -244,6 +245,8 @@ void Manifold::Impl::CreateFaces() {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
       interiorHalfedges.pop_back();
+      if (meshRelation_.triRef[h / 3].faceID >= 0) continue;
+
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (abs(dot(v - base, normal)) < tolerance_) {
         meshRelation_.triRef[h / 3].faceID = tp.tri;
