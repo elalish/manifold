@@ -192,18 +192,6 @@ int GetLabels(std::vector<int>& components,
 
   return uf.connectedComponents(components);
 }
-
-void DedupePropVerts(manifold::Vec<ivec3>& triProp,
-                     const Vec<std::pair<int, int>>& vert2vert) {
-  ZoneScoped;
-  std::vector<int> vertLabels;
-  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
-
-  std::vector<int> label2vert(numLabels);
-  for (size_t v = 0; v < vert2vert.size(); ++v) label2vert[vertLabels[v]] = v;
-  for (auto& prop : triProp)
-    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
-}
 }  // namespace
 
 namespace manifold {
@@ -319,44 +307,9 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
 void Manifold::Impl::CreateFaces() {
   ZoneScoped;
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
-  Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   Vec<double> triArea(NumTri());
 
-  const size_t numProp = NumProp();
-  if (numProp > 0) {
-    for_each_n(
-        autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-        [&vert2vert, numProp, this](const int edgeIdx) {
-          const Halfedge edge = halfedge_[edgeIdx];
-          const Halfedge pair = halfedge_[edge.pairedHalfedge];
-          const int edgeFace = edgeIdx / 3;
-          const int pairFace = edge.pairedHalfedge / 3;
-
-          if (meshRelation_.triRef[edgeFace].meshID !=
-              meshRelation_.triRef[pairFace].meshID)
-            return;
-
-          const int baseNum = edgeIdx - 3 * edgeFace;
-          const int jointNum = edge.pairedHalfedge - 3 * pairFace;
-
-          const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
-          const int prop1 =
-              meshRelation_
-                  .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
-          bool propEqual = true;
-          for (size_t p = 0; p < numProp; ++p) {
-            if (meshRelation_.properties[numProp * prop0 + p] !=
-                meshRelation_.properties[numProp * prop1 + p]) {
-              propEqual = false;
-              break;
-            }
-          }
-          if (propEqual) {
-            vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
-          }
-        });
-    DedupePropVerts(meshRelation_.triProperties, vert2vert);
-  }
+  DedupePropVerts();
 
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
@@ -387,6 +340,53 @@ void Manifold::Impl::CreateFaces() {
       triRef[tri].faceID = referenceTri;
     }
   }
+}
+
+void Manifold::Impl::DedupePropVerts() {
+  ZoneScoped;
+  const size_t numProp = NumProp();
+  if (numProp == 0) return;
+
+  Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
+  for_each_n(
+      autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
+      [&vert2vert, numProp, this](const int edgeIdx) {
+        const Halfedge edge = halfedge_[edgeIdx];
+        const Halfedge pair = halfedge_[edge.pairedHalfedge];
+        const int edgeFace = edgeIdx / 3;
+        const int pairFace = edge.pairedHalfedge / 3;
+
+        if (meshRelation_.triRef[edgeFace].meshID !=
+            meshRelation_.triRef[pairFace].meshID)
+          return;
+
+        const int baseNum = edgeIdx - 3 * edgeFace;
+        const int jointNum = edge.pairedHalfedge - 3 * pairFace;
+
+        const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
+        const int prop1 =
+            meshRelation_
+                .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
+        bool propEqual = true;
+        for (size_t p = 0; p < numProp; ++p) {
+          if (meshRelation_.properties[numProp * prop0 + p] !=
+              meshRelation_.properties[numProp * prop1 + p]) {
+            propEqual = false;
+            break;
+          }
+        }
+        if (propEqual) {
+          vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
+        }
+      });
+
+  std::vector<int> vertLabels;
+  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
+
+  std::vector<int> label2vert(numLabels);
+  for (size_t v = 0; v < vert2vert.size(); ++v) label2vert[vertLabels[v]] = v;
+  for (auto& prop : meshRelation_.triProperties)
+    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }
 
 /**

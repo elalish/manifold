@@ -246,6 +246,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces();
+  void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triVerts);
