@@ -323,7 +323,7 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<double, size_t>(impl, normalIdx);
+  return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
 }
 
 /**
