@@ -309,8 +309,6 @@ void Manifold::Impl::CreateFaces() {
   Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<double> triArea(NumTri());
 
-  DedupePropVerts();
-
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
                            meshRelation_.triRef, meshRelation_.triProperties,

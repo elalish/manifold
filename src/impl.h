@@ -212,6 +212,7 @@ struct Manifold::Impl {
       InitializeOriginal();
     }
 
+    DedupePropVerts();
     CreateFaces();
 
     SimplifyTopology();
