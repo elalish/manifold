@@ -60,8 +60,8 @@ TEST(Properties, Tolerance) {
   Manifold imperfect3(mesh);
 
   EXPECT_EQ(imperfect.NumTri(), 28);
-  EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
-  EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
+  EXPECT_EQ(imperfect2.NumTri(), 12);
+  EXPECT_EQ(imperfect3.NumTri(), 12);
 
   EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
   EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);

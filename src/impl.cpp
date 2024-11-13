@@ -90,98 +90,6 @@ struct UpdateMeshID {
   void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
 };
 
-struct CoplanarEdge {
-  VecView<std::pair<int, int>> face2face;
-  VecView<double> triArea;
-  VecView<const Halfedge> halfedge;
-  VecView<const vec3> vertPos;
-  VecView<const TriRef> triRef;
-  VecView<const ivec3> triProp;
-  const int numProp;
-  const double epsilon;
-  const double tolerance;
-
-  void operator()(const int edgeIdx) {
-    const Halfedge edge = halfedge[edgeIdx];
-    const Halfedge pair = halfedge[edge.pairedHalfedge];
-    const int edgeFace = edgeIdx / 3;
-    const int pairFace = edge.pairedHalfedge / 3;
-
-    if (triRef[edgeFace].meshID != triRef[pairFace].meshID) return;
-
-    const vec3 base = vertPos[edge.startVert];
-    const int baseNum = edgeIdx - 3 * edgeFace;
-    const int jointNum = edge.pairedHalfedge - 3 * pairFace;
-
-    if (numProp > 0) {
-      if (triProp[edgeFace][baseNum] != triProp[pairFace][Next3(jointNum)] ||
-          triProp[edgeFace][Next3(baseNum)] != triProp[pairFace][jointNum])
-        return;
-    }
-
-    if (!edge.IsForward()) return;
-
-    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
-    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
-    const vec3 jointVec = vertPos[pair.startVert] - base;
-    const vec3 edgeVec =
-        vertPos[halfedge[3 * edgeFace + edgeNum].startVert] - base;
-    const vec3 pairVec =
-        vertPos[halfedge[3 * pairFace + pairNum].startVert] - base;
-
-    const double length = std::max(la::length(jointVec), la::length(edgeVec));
-    const double lengthPair =
-        std::max(la::length(jointVec), la::length(pairVec));
-    vec3 normal = la::cross(jointVec, edgeVec);
-    const double area = la::length(normal);
-    const double areaPair = la::length(la::cross(pairVec, jointVec));
-
-    // make sure we only write this once
-    if (edgeIdx % 3 == 0) triArea[edgeFace] = area;
-    // Don't link degenerate triangles
-    if (area < length * epsilon || areaPair < lengthPair * epsilon) return;
-
-    const double volume = std::abs(la::dot(normal, pairVec));
-    // Only operate on coplanar triangles
-    if (volume > std::max(area, areaPair) * tolerance) return;
-
-    face2face[edgeIdx] = std::make_pair(edgeFace, pairFace);
-  }
-};
-
-struct CheckCoplanarity {
-  VecView<int> comp2tri;
-  VecView<const Halfedge> halfedge;
-  VecView<const vec3> vertPos;
-  std::vector<int>* components;
-  const double tolerance;
-
-  void operator()(int tri) {
-    const int component = (*components)[tri];
-    const int referenceTri =
-        reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
-            ->load(std::memory_order_relaxed);
-    if (referenceTri < 0 || referenceTri == tri) return;
-
-    const vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
-    const vec3 normal = la::normalize(
-        la::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
-                  vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
-
-    for (const int i : {0, 1, 2}) {
-      const vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
-      // If any component vertex is not coplanar with the component's reference
-      // triangle, unmark the entire component so that none of its triangles are
-      // marked coplanar.
-      if (std::abs(la::dot(normal, vert - origin)) > tolerance) {
-        reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
-            ->store(-1, std::memory_order_relaxed);
-        break;
-      }
-    }
-  }
-};
-
 int GetLabels(std::vector<int>& components,
               const Vec<std::pair<int, int>>& edges, int numNodes) {
   UnionFind<> uf(numNodes);
@@ -306,36 +214,53 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
 
 void Manifold::Impl::CreateFaces() {
   ZoneScoped;
-  Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
-  Vec<double> triArea(NumTri());
+  const int numTri = NumTri();
+  struct TriPriority {
+    double area;
+    int tri;
+  };
+  Vec<TriPriority> triPriority(numTri);
+  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+             [&triPriority, this](int tri) {
+               meshRelation_.triRef[tri].faceID = -1;
+               const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+               triPriority[tri] = {
+                   length(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
+                                vertPos_[halfedge_[3 * tri + 1].endVert] - v)),
+                   tri};
+             });
 
-  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-             CoplanarEdge({face2face, triArea, halfedge_, vertPos_,
-                           meshRelation_.triRef, meshRelation_.triProperties,
-                           meshRelation_.numProp, epsilon_, tolerance_}));
+  stable_sort(triPriority.begin(), triPriority.end(),
+              [](auto a, auto b) { return a.area > b.area; });
 
-  std::vector<int> components;
-  const int numComponent = GetLabels(components, face2face, NumTri());
-
-  Vec<int> comp2tri(numComponent, -1);
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    const int comp = components[tri];
-    const int current = comp2tri[comp];
-    if (current < 0 || triArea[tri] > triArea[current]) {
-      comp2tri[comp] = tri;
-      triArea[comp] = triArea[tri];
-    }
-  }
-
-  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), NumTri(),
-             CheckCoplanarity(
-                 {comp2tri, halfedge_, vertPos_, &components, tolerance_}));
-
-  Vec<TriRef>& triRef = meshRelation_.triRef;
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    const int referenceTri = comp2tri[components[tri]];
-    if (referenceTri >= 0) {
-      triRef[tri].faceID = referenceTri;
+  for (const auto tp : triPriority) {
+    if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
+    meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
+    const vec3 normal = faceNormal_[tp.tri];
+    std::deque<int> interiorHalfedges = {3 * tp.tri, 3 * tp.tri + 1,
+                                         3 * tp.tri + 2};
+    while (!interiorHalfedges.empty()) {
+      const int h =
+          NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
+      interiorHalfedges.pop_back();
+      const vec3 v = vertPos_[halfedge_[h].endVert];
+      if (abs(dot(v - base, normal)) < tolerance_) {
+        meshRelation_.triRef[h / 3].faceID = tp.tri;
+        if (!interiorHalfedges.empty() &&
+            h == halfedge_[interiorHalfedges.back()].pairedHalfedge) {
+          interiorHalfedges.pop_back();
+        } else {
+          interiorHalfedges.push_back(h);
+        }
+        const int hNext = NextHalfedge(h);
+        if (!interiorHalfedges.empty() &&
+            hNext == halfedge_[interiorHalfedges.front()].pairedHalfedge) {
+          interiorHalfedges.pop_front();
+        } else {
+          interiorHalfedges.push_back(hNext);
+        }
+      }
     }
   }
 }
