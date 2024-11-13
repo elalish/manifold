@@ -398,7 +398,7 @@ ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
 }
 
 ManifoldManifold *manifold_smooth64(void *mem, ManifoldMeshGL64 *mesh,
-                                    uint64_t *half_edges, double *smoothness,
+                                    size_t *half_edges, double *smoothness,
                                     size_t n_edges) {
   auto smooth = std::vector<Smoothness>();
   for (size_t i = 0; i < n_edges; ++i) {

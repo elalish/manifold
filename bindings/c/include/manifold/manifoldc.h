@@ -174,7 +174,7 @@ ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
                                   size_t *half_edges, double *smoothness,
                                   size_t n_idxs);
 ManifoldManifold *manifold_smooth64(void *mem, ManifoldMeshGL64 *mesh,
-                                    uint64_t *half_edges, double *smoothness,
+                                    size_t *half_edges, double *smoothness,
                                     size_t n_idxs);
 ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
                                    double height, int slices,
