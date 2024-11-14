@@ -60,7 +60,7 @@ class Vec : public VecView<T> {
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      DEBUG_ASSERT(this->ptr_ != nullptr, std::bad_alloc, "");
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -72,7 +72,7 @@ class Vec : public VecView<T> {
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      DEBUG_ASSERT(this->ptr_ != nullptr, std::bad_alloc, "");
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -110,7 +110,7 @@ class Vec : public VecView<T> {
     capacity_ = other.size_;
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      DEBUG_ASSERT(this->ptr_ != nullptr, std::bad_alloc, "");
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
     }
@@ -161,7 +161,7 @@ class Vec : public VecView<T> {
   void reserve(size_t n, bool seq = false) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
-      ASSERT(newBuffer != nullptr, std::bad_alloc());
+      DEBUG_ASSERT(newBuffer != nullptr, std::bad_alloc, "");
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
         manifold::copy(seq ? ExecutionPolicy::Seq : autoPolicy(this->size_),
@@ -197,7 +197,7 @@ class Vec : public VecView<T> {
     T *newBuffer = nullptr;
     if (this->size_ > 0) {
       newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
-      ASSERT(newBuffer != nullptr, std::bad_alloc());
+      DEBUG_ASSERT(newBuffer != nullptr, std::bad_alloc, "");
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }

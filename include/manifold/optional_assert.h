@@ -33,15 +33,18 @@ void Assert(bool condition, const char* file, int line, const std::string& cond,
     throw Ex(output.str());
   }
 }
+
+template <>
+inline void Assert<std::bad_alloc>(bool condition, const char* file, int line,
+                                   const std::string& cond,
+                                   const std::string& msg) {
+  if (!condition) {
+    throw std::bad_alloc();
+  }
+}
+
 #define DEBUG_ASSERT(condition, EX, msg) \
   Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
 #else
 #define DEBUG_ASSERT(condition, EX, msg)
-#endif
-
-#ifdef MANIFOLD_EXCEPTIONS
-#define ASSERT(condition, EX) \
-  if (!(condition)) throw(EX);
-#else
-#define ASSERT(condition, EX)
 #endif

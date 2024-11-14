@@ -56,12 +56,12 @@ class VecView {
   operator VecView<const T>() const { return {ptr_, size_}; }
 
   inline const T &operator[](size_t i) const {
-    ASSERT(i < size_, std::out_of_range("Vec out of range"));
+    DEBUG_ASSERT(i < size_, std::out_of_range, "Vec out of range");
     return ptr_[i];
   }
 
   inline T &operator[](size_t i) {
-    ASSERT(i < size_, std::out_of_range("Vec out of range"));
+    DEBUG_ASSERT(i < size_, std::out_of_range, "Vec out of range");
     return ptr_[i];
   }
 
@@ -75,26 +75,26 @@ class VecView {
   Iter end() { return ptr_ + size_; }
 
   const T &front() const {
-    ASSERT(size_ != 0,
-           std::out_of_range("Attempt to take the front of an empty vector"));
+    DEBUG_ASSERT(size_ != 0, std::out_of_range,
+                 "Attempt to take the front of an empty vector");
     return ptr_[0];
   }
 
   const T &back() const {
-    ASSERT(size_ != 0,
-           std::out_of_range("Attempt to take the back of an empty vector"));
+    DEBUG_ASSERT(size_ != 0, std::out_of_range,
+                 "Attempt to take the back of an empty vector");
     return ptr_[size_ - 1];
   }
 
   T &front() {
-    ASSERT(size_ != 0,
-           std::out_of_range("Attempt to take the front of an empty vector"));
+    DEBUG_ASSERT(size_ != 0, std::out_of_range,
+                 "Attempt to take the front of an empty vector");
     return ptr_[0];
   }
 
   T &back() {
-    ASSERT(size_ != 0,
-           std::out_of_range("Attempt to take the back of an empty vector"));
+    DEBUG_ASSERT(size_ != 0, std::out_of_range,
+                 "Attempt to take the back of an empty vector");
     return ptr_[size_ - 1];
   }
 
@@ -106,9 +106,9 @@ class VecView {
                   size_t length = std::numeric_limits<size_t>::max()) {
     if (length == std::numeric_limits<size_t>::max())
       length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::view out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
-           std::out_of_range("Vec::view out of range"));
+    DEBUG_ASSERT(length >= 0, std::out_of_range, "Vec::view out of range");
+    DEBUG_ASSERT(offset + length <= this->size_ && offset >= 0,
+                 std::out_of_range, "Vec::view out of range");
     return VecView<T>(this->ptr_ + offset, length);
   }
 
@@ -117,9 +117,9 @@ class VecView {
       size_t length = std::numeric_limits<size_t>::max()) const {
     if (length == std::numeric_limits<size_t>::max())
       length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::cview out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
-           std::out_of_range("Vec::cview out of range"));
+    DEBUG_ASSERT(length >= 0, std::out_of_range, "Vec::cview out of range");
+    DEBUG_ASSERT(offset + length <= this->size_ && offset >= 0,
+                 std::out_of_range, "Vec::cview out of range");
     return VecView<const T>(this->ptr_ + offset, length);
   }
 
