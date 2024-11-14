@@ -253,7 +253,7 @@ void AddNewEdgeVerts(
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
-  if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
+  if (p1q2.size() > kParallelThreshold) {
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
@@ -486,9 +486,7 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       bool forward) {
   ZoneScoped;
   for_each_n(
-      ManifoldParams().deterministic ? ExecutionPolicy::Seq
-                                     : autoPolicy(inP.halfedge_.size()),
-      countAt(0), inP.halfedge_.size(),
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
