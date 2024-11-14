@@ -564,16 +564,6 @@ class Quality {
  * @ingroup Optional
  * @{
  */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
 
 /**
  * @brief Global parameters that control debugging output. Only has an

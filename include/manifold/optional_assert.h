@@ -20,6 +20,20 @@
 #include <stdexcept>
 #include <string>
 
+/** @addtogroup Debug
+ * @{
+ */
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+using logicErr = std::logic_error;
+
 template <typename Ex>
 void Assert(bool condition, const char* file, int line, const std::string& cond,
             const std::string& msg) {
@@ -45,3 +59,4 @@ inline void Assert<std::bad_alloc>(bool condition, const char* file, int line,
 #else
 #define DEBUG_ASSERT(condition, EX, msg)
 #endif
+/** @} */
