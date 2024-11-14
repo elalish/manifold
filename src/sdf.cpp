@@ -117,6 +117,10 @@ vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
   return origin + spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
+vec3 Bound(vec3 pos, vec3 origin, vec3 spacing, ivec3 gridSize) {
+  return min(max(pos, origin), origin + spacing * (vec3(gridSize) - 1));
+}
+
 double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
                   double level, std::function<double(vec3)> sdf) {
   const ivec3 xyz(gridIndex);
@@ -256,15 +260,13 @@ struct NearSurface {
     if (closestNeighbor >= 0 && opposedVerts <= kMaxOpposed) {
       const vec3 gridPos = Position(gridIndex, origin, spacing);
       const ivec4 neighborIndex = Neighbor(gridIndex, closestNeighbor);
-      vec3 pos = FindSurface(gridPos, gridVert.distance,
-                             Position(neighborIndex, origin, spacing), vMax,
-                             tol, level, sdf);
+      const vec3 pos = FindSurface(gridPos, gridVert.distance,
+                                   Position(neighborIndex, origin, spacing),
+                                   vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
       if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
-        pos = max(pos, origin);
-        pos = min(pos, origin + spacing * (vec3(gridSize) - 1));
-        vertPos[idx] = pos;
+        vertPos[idx] = Bound(pos, origin, spacing, gridSize);
         gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
           if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
@@ -323,12 +325,10 @@ struct ComputeVerts {
       }
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vec3 pos = FindSurface(position, gridVert.distance,
-                             Position(neighborIndex, origin, spacing), val, tol,
-                             level, sdf);
-      pos = max(pos, origin);
-      pos = min(pos, origin + spacing * (vec3(gridSize) - 1));
-      vertPos[idx] = pos;
+      const vec3 pos = FindSurface(position, gridVert.distance,
+                                   Position(neighborIndex, origin, spacing),
+                                   val, tol, level, sdf);
+      vertPos[idx] = Bound(pos, origin, spacing, gridSize);
       gridVert.edgeVerts[i] = idx;
     }
   }
