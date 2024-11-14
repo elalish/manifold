@@ -14,7 +14,6 @@
 
 #pragma once
 #include <limits>
-#include <stdexcept>
 #include <vector>
 
 #include "manifold/linalg.h"
@@ -556,10 +555,8 @@ class Quality {
 };
 /** @} */
 
-/** @addtogroup Exceptions
- *  @ingroup Optional
- *  @brief Custom Exceptions. Exceptions are only thrown if the
- * MANIFOLD_EXCEPTIONS flag is set.
+/** @addtogroup Debug
+ * @ingroup Optional
  * @{
  */
 struct userErr : public virtual std::runtime_error {
@@ -572,12 +569,6 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
-/** @} */
-
-/** @addtogroup Debug
- * @ingroup Optional
- * @{
- */
 
 /**
  * @brief Global parameters that control debugging output. Only has an

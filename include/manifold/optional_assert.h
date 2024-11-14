@@ -14,13 +14,10 @@
 
 #pragma once
 
-#ifdef MANIFOLD_EXCEPTIONS
-#include <stdexcept>
-#endif
-
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 template <typename Ex>
