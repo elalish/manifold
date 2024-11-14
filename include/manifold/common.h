@@ -24,9 +24,7 @@ namespace manifold {
  * @brief Simple math operations.
  * */
 
-/** @addtogroup Scalar
- * @ingroup Math
- *  @brief Simple scalar operations.
+/** @addtogroup LinAlg
  *  @{
  */
 namespace la = linalg;
@@ -46,6 +44,13 @@ using ivec2 = la::vec<int, 2>;
 using ivec3 = la::vec<int, 3>;
 using ivec4 = la::vec<int, 4>;
 using quat = la::vec<double, 4>;
+/** @} */
+
+/** @addtogroup Scalar
+ * @ingroup Math
+ *  @brief Simple scalar operations.
+ *  @{
+ */
 
 constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
