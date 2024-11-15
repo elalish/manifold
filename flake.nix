@@ -157,7 +157,7 @@
             version = manifold-version;
             src = self;
             propagatedBuildInputs = [ numpy ];
-            buildInputs = [ onetbb clipper2 ];
+            buildInputs = [ onetbb pkgs.clipper2 ];
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
