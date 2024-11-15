@@ -192,7 +192,7 @@ bool Manifold::Impl::Is2Manifold() const {
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
-      countAt(0_uz), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+      countAt(0_uz), countAt(2 * NumEdge() - 1), [&halfedge](size_t edge) {
         const Halfedge h = halfedge[edge];
         if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
           return true;

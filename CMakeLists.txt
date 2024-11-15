@@ -53,7 +53,6 @@ option(
   "Allow Manifold build to download missing dependencies"
   ON
 )
-option(MANIFOLD_EXCEPTIONS "Build manifold with exception enabled" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(
@@ -129,7 +128,7 @@ endif()
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
-  if(MANIFOLD_EXCEPTIONS)
+  if(MANIFOLD_DEBUG)
     list(APPEND MANIFOLD_FLAGS -fexceptions)
     string(
       APPEND
@@ -359,7 +358,6 @@ message(STATUS "MANIFOLD_DEBUG:              ${MANIFOLD_DEBUG}")
 message(STATUS "MANIFOLD_CBIND:              ${MANIFOLD_CBIND}")
 message(STATUS "MANIFOLD_PYBIND:             ${MANIFOLD_PYBIND}")
 message(STATUS "MANIFOLD_JSBIND:             ${MANIFOLD_JSBIND}")
-message(STATUS "MANIFOLD_EXCEPTIONS:         ${MANIFOLD_EXCEPTIONS}")
 message(STATUS "MANIFOLD_FLAGS:              ${MANIFOLD_FLAGS}")
 message(STATUS " ")
 

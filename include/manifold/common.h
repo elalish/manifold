@@ -14,7 +14,6 @@
 
 #pragma once
 #include <limits>
-#include <stdexcept>
 #include <vector>
 
 #include "manifold/linalg.h"
@@ -559,24 +558,6 @@ class Quality {
     circularEdgeLength_ = DEFAULT_LENGTH;
   }
 };
-/** @} */
-
-/** @addtogroup Exceptions
- *  @ingroup Optional
- *  @brief Custom Exceptions. Exceptions are only thrown if the
- * MANIFOLD_EXCEPTIONS flag is set.
- * @{
- */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
 /** @} */
 
 /** @addtogroup Debug
