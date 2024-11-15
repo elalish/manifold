@@ -141,8 +141,7 @@
           '';
           installPhase = ''
             mkdir -p $out
-            cp {extras,wasm}/*.js $out/
-            cp {extras,wasm}/*.wasm $out/
+            cp bindings/wasm/manifold.* $out/
           '';
         };
       in

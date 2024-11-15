@@ -43,3 +43,8 @@ To use the manifoldCAD.org editor (`npm run dev`), you'll likely have to set
 discussion of the
 [issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
 of this repository.
+
+## Fixing Vite Static Worker Option Error
+
+Run `fixup.sh` in `bindings/wasm`.
+
