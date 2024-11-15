@@ -72,7 +72,7 @@ jobs:
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
         cd ../
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       if: matrix.parallelization == 'OFF'
       with:
         files: build/code_coverage.info
