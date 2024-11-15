@@ -194,10 +194,12 @@
             onetbb
             gtest
             assimp
+            clipper2
 
             # useful tools
             clang-tools_18
             clang_18
+            tracy
           ];
         };
       }
