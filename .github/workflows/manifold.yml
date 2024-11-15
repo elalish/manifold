@@ -240,13 +240,12 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        # variant: [none, tbb, js]
-        # disabling js variant for now
-        variant: [none, tbb]
+        variant: [none, tbb, js, js-tbb]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v22
+    - uses: DeterminateSystems/nix-installer-action@main
+    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
 
   build_nix_python:
@@ -254,5 +253,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v22
+    - uses: DeterminateSystems/nix-installer-action@main
     - run: nix build -L '.?submodules=1#manifold3d'
