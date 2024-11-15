@@ -35,27 +35,30 @@ struct geometryErr : public virtual std::runtime_error {
 using logicErr = std::logic_error;
 
 template <typename Ex>
-void Assert(bool condition, const char* file, int line, const std::string& cond,
-            const std::string& msg) {
-  if (!condition) {
-    std::ostringstream output;
-    output << "Error in file: " << file << " (" << line << "): \'" << cond
-           << "\' is false: " << msg;
-    throw Ex(output.str());
-  }
+void AssertFail(const char* file, int line, const char* cond, const char* msg) {
+  std::ostringstream output;
+  output << "Error in file: " << file << " (" << line << "): \'" << cond
+         << "\' is false: " << msg;
+  throw Ex(output.str());
+}
+
+template <typename Ex>
+void AssertFail(const char* file, int line, const std::string& cond,
+                const std::string& msg) {
+  std::ostringstream output;
+  output << "Error in file: " << file << " (" << line << "): \'" << cond
+         << "\' is false: " << msg;
+  throw Ex(output.str());
 }
 
 template <>
-inline void Assert<std::bad_alloc>(bool condition, const char* file, int line,
-                                   const std::string& cond,
-                                   const std::string& msg) {
-  if (!condition) {
-    throw std::bad_alloc();
-  }
+inline void AssertFail<std::bad_alloc>(const char* file, int line,
+                                       const char* cond, const char* msg) {
+  throw std::bad_alloc();
 }
 
 #define DEBUG_ASSERT(condition, EX, msg) \
-  Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
+  if (!(condition)) AssertFail<EX>(__FILE__, __LINE__, #condition, msg);
 #else
 #define DEBUG_ASSERT(condition, EX, msg)
 #endif
