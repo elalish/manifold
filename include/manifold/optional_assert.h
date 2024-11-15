@@ -51,15 +51,16 @@ void AssertFail(const char* file, int line, const std::string& cond,
   throw Ex(output.str());
 }
 
-template <>
-inline void AssertFail<std::bad_alloc>(const char* file, int line,
-                                       const char* cond, const char* msg) {
-  throw std::bad_alloc();
-}
-
+// DEBUG_ASSERT is slightly slower due to the function call, but gives more
+// detailed info.
 #define DEBUG_ASSERT(condition, EX, msg) \
   if (!(condition)) AssertFail<EX>(__FILE__, __LINE__, #condition, msg);
+// ASSERT has almost no overhead, so better to use for frequent calls like
+// vector bounds checking.
+#define ASSERT(condition, EX) \
+  if (!(condition)) throw(EX);
 #else
 #define DEBUG_ASSERT(condition, EX, msg)
+#define ASSERT(condition, EX)
 #endif
 /** @} */
