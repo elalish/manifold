@@ -129,15 +129,37 @@ endif()
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
+  string(
+    APPEND
+    CMAKE_EXE_LINKER_FLAGS
+    # note: the memory limit is set to 4GB because we have test cases that
+    # cannot run with 2GB of memory when run in parallel.
+    "-sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sMAXIMUM_MEMORY=4294967296 "
+  )
+  if(MANIFOLD_PAR)
+    set(CMAKE_THREAD_LIBS_INIT "-pthread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
+    string(
+      APPEND
+      CMAKE_EXE_LINKER_FLAGS
+      # notes:
+      # 1. PTHREAD_POOL_SIZE is set to 4 for OK-ish performance, in general we
+      # are not getting too much speedup for very large number of cores, and a
+      # lot of CPUs now have 4 cores...
+      # 2. mimalloc is needed for good performance
+      # 3. The default stack size apparently causes problem when parallelization
+      # is enabled.
+      "-sPTHREAD_POOL_SIZE=4 -pthread -sMALLOC=mimalloc -sSTACK_SIZE=10MB "
+    )
+  endif()
   if(MANIFOLD_EXCEPTIONS)
     list(APPEND MANIFOLD_FLAGS -fexceptions)
     string(
       APPEND
       CMAKE_EXE_LINKER_FLAGS
-      "-sALLOW_MEMORY_GROWTH=1 -fexceptions -sDISABLE_EXCEPTION_CATCHING=0 "
+      "-fexceptions -sDISABLE_EXCEPTION_CATCHING=0 "
     )
-  else()
-    string(APPEND CMAKE_EXE_LINKER_FLAGS "-sALLOW_MEMORY_GROWTH=1 ")
   endif()
   set(MANIFOLD_PYBIND OFF)
   set(BUILD_SHARED_LIBS OFF)
