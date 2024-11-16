@@ -85,6 +85,7 @@ if(TBB_INCLUDE_DIRS)
 endif()
 
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
+add_library(manifold::manifold ALIAS manifold)
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
 if(MSVC)
