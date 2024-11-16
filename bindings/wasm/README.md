@@ -1,22 +1,28 @@
+# About Manifold
+
 [![codecov](https://codecov.io/github/elalish/manifold/branch/master/graph/badge.svg?token=IIA8G5HVS7)](https://codecov.io/github/elalish/manifold)
+[![npm version](https://badge.fury.io/js/manifold-3d.svg)](https://badge.fury.io/js/manifold-3d)
 [![twitter](https://img.shields.io/twitter/follow/manifoldcad?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=manifoldcad)
 
+[**TS Documentation**](https://manifoldcad.org/jsdocs) | [**C++ Documentation**](https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html) |  [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://manifoldcad.org/model-viewer.html)
+
+[Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Manifold also supports arbitrary vertex properties and enables mapping of materials for rendering use-cases. Our primary goal is reliability: guaranteed manifold output without caveats or edge cases. Our secondary goal is performance: efficient algorithms that make extensive use of parallelization, or pipelining when only a single thread is available.
+
 ## [ManifoldCAD.org](https://manifoldcad.org)
-If you like OpenSCAD / OpenJSCAD, you might also like ManifoldCAD - our own solid modelling web app based on this package. 
 
-![A metallic Menger sponge](https://manifoldcad.org/samples/models/mengerSponge3.webp "A metallic Menger sponge")
+If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS and save a GLB or 3MF file. It contains several examples showing how to use our API to make interesting shapes. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, this library is dramatically faster and the code is more flexible.
 
-# Manifold
+![A metallic Menger sponge](https://manifoldcad.org/samples/models/mengerSponge192.png "A metallic Menger sponge")
 
-[**TS Documentation**](https://manifoldcad.org/jsdocs) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://manifoldcad.org/model-viewer.html)
+## Manifold Library
 
-[Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
-
-## What's here
-
-This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as more advanced features like smoothing and signed-distance function (SDF) level sets. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
+This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as a level set function for evaluating signed-distance functions (SDF) that improves significantly over Marching Cubes. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. We provide a [`Merge`](https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html) function to fix slightly non-manifold meshes, but in general you may need one of the automated repair tools that exist mostly for 3D printing.
 
 The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
+
+Manifold has full support for arbitrary vertex properties, and also has IDs that make it easy to keep track of materials and what surfaces belong to what input objects or faces. See our [web example](https://manifoldcad.org/model-viewer.html) for a simple demonstration of combining objects with unique textures.
+
+Also included are a novel and powerful suite of refining functions for smooth mesh interpolation. They handle smoothing both triangles and quads, as well as keeping polygonal faces flat. You can easily create sharp or small-radius edges where desired, or even drive the curvature by normal vectors.
 
 ## Note on memory management
 
