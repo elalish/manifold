@@ -57,11 +57,7 @@ set(MANIFOLD_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
 
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 
-target_link_libraries(
-  manifold
-  PUBLIC
-    $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
-)
+target_link_libraries(manifold PUBLIC $<$<BOOL:${TRACY_ENABLE}>:TracyClient>)
 
 target_link_libraries(
   manifold

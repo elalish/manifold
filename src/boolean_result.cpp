@@ -17,8 +17,8 @@
 #include <map>
 
 #include "./boolean3.h"
+#include "./parallel.h"
 #include "./utils.h"
-#include "manifold/parallel.h"
 
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1

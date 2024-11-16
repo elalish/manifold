@@ -39,10 +39,10 @@ add_executable(manifold_test ${SOURCE_FILES})
 target_link_libraries(
   manifold_test
   PRIVATE
-  GTest::gtest_main
-  manifold
-  samples
-  $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc>
+    GTest::gtest_main
+    manifold
+    samples
+    $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc>
 )
 if(MANIFOLD_PAR)
   if(MANIFOLD_BUILTIN_TBB)
