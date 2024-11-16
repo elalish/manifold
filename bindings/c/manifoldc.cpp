@@ -802,10 +802,9 @@ void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_meshgl64(ManifoldMeshGL64 *m) { from_c(m)->~MeshGL64(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
-// error: '~' in destructor name should be after nested name specifier
-// void manifold_destruct_triangulation(ManifoldTriangulation *m) {
-//     from_c(m)->~std::vector<ivec3>();
-// }
+void manifold_destruct_triangulation(ManifoldTriangulation *m) {
+  from_c(m)->~vector<ivec3>();
+}
 
 #ifdef __cplusplus
 }
