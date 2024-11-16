@@ -43,8 +43,8 @@ if(MANIFOLD_PAR)
   endif()
   if(NOT TBB_FOUND)
     logmissingdep("TBB" , "Parallel mode")
-    set(TBB_TEST OFF CACHE INTERNAL BOOL FORCE)
-    set(TBB_STRICT OFF CACHE INTERNAL BOOL FORCE)
+    set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+    set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
     FetchContent_Declare(
       TBB
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
@@ -82,10 +82,15 @@ if(MANIFOLD_CROSS_SECTION)
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
   else()
     logmissingdep("Clipper2" , "cross_section")
-    set(CLIPPER2_UTILS OFF CACHE INTERNAL BOOL "" FORCE)
-    set(CLIPPER2_EXAMPLES OFF CACHE INTERNAL BOOL "" FORCE)
-    set(CLIPPER2_TESTS OFF CACHE INTERNAL BOOL "" FORCE)
-    set(CLIPPER2_USINGZ OFF CACHE INTERNAL BOOL "" FORCE)
+    set(CLIPPER2_UTILS OFF)
+    set(CLIPPER2_EXAMPLES OFF)
+    set(CLIPPER2_TESTS OFF)
+    set(
+      CLIPPER2_USINGZ
+      "OFF"
+      CACHE STRING
+      "Preempt cache default of USINGZ (we only use 2d)"
+    )
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
@@ -121,11 +126,10 @@ if(MANIFOLD_TEST)
   find_package(GTest QUIET)
   if(NOT GTest_FOUND)
     logmissingdep("GTest" , "MANIFOLD_TEST")
-    set(gtest_force_shared_crt ON CACHE INTERNAL BOOL "" FORCE)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     # Prevent installation of GTest with your project
-    set(INSTALL_GTEST OFF CACHE INTERNAL BOOL "" FORCE)
-    set(INSTALL_GMOCK OFF CACHE INTERNAL BOOL "" FORCE)
-
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
     include(FetchContent)
     FetchContent_Declare(
       googletest

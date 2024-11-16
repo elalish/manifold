@@ -127,7 +127,14 @@ endif()
 if(MSVC)
   list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
 else()
-  list(APPEND WARNING_FLAGS -Wall -Wno-unknown-warning-option -Wno-unused -Wno-shorten-64-to-32)
+  list(
+    APPEND
+    WARNING_FLAGS
+    -Wall
+    -Wno-unknown-warning-option
+    -Wno-unused
+    -Wno-shorten-64-to-32
+  )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       list(APPEND WARNING_FLAGS -Wno-format)
@@ -244,7 +251,11 @@ install(
 if(MANIFOLD_CROSS_SECTION)
   set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
 endif()
-configure_file(cmake/manifold.pc.in ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc @ONLY)
+configure_file(
+  cmake/manifold.pc.in
+  ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
+  @ONLY
+)
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold.pc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig

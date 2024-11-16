@@ -18,7 +18,6 @@ endif()
 
 enable_testing()
 
-
 # put fast/simple tests files first to run earlier
 set(
   SOURCE_FILES

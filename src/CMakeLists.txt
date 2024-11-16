@@ -29,7 +29,6 @@ set(
   smoothing.cpp
   sort.cpp
   subdivision.cpp
-
   # optional source files
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
   $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO/meshIO.cpp>
@@ -59,20 +58,16 @@ set(
   $<$<BOOL:${TBB_INCLUDE_DIRS}>:${TBB_INCLUDE_DIRS}>
 )
 
-add_library(
-  manifold
-  ${MANIFOLD_SRCS}
-  ${MANIFOLD_PRIVATE_HDRS}
-)
+add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 
 target_link_libraries(
   manifold
   PUBLIC
-  # optional dependencies
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:$<IF:$<TARGET_EXISTS:Clipper2::Clipper2>,Clipper2::Clipper2,Clipper2>>
-  $<$<BOOL:${MANIFOLD_PAR}>:$<IF:$<TARGET_EXISTS:TBB::tbb>,TBB::tbb,${TBB_LINK_LIBRARIES}>>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
-  $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
+    # optional dependencies
+    $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:$<IF:$<TARGET_EXISTS:Clipper2::Clipper2>,Clipper2::Clipper2,Clipper2>>
+    $<$<BOOL:${MANIFOLD_PAR}>:$<IF:$<TARGET_EXISTS:TBB::tbb>,TBB::tbb,${TBB_LINK_LIBRARIES}>>
+    $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
+    $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
 )
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
@@ -108,10 +103,7 @@ add_library(manifold::manifold ALIAS manifold)
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
 if(MSVC)
-  set_target_properties(
-    manifold
-    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON
-  )
+  set_target_properties(manifold PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
