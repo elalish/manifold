@@ -87,8 +87,8 @@ if(MANIFOLD_CROSS_SECTION)
     set(CLIPPER2_TESTS OFF)
     set(
       CLIPPER2_USINGZ
-      "OFF"
-      CACHE STRING
+      OFF
+      CACHE BOOL
       "Preempt cache default of USINGZ (we only use 2d)"
     )
     FetchContent_Declare(
@@ -140,5 +140,53 @@ if(MANIFOLD_TEST)
       FIND_PACKAGE_ARGS NAMES GTest gtest
     )
     FetchContent_MakeAvailable(googletest)
+  endif()
+endif()
+
+if(MANIFOLD_PYBIND)
+  if(Python_VERSION VERSION_LESS 3.12)
+    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  else()
+    find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+  endif()
+  if(Python_VERSION VERSION_GREATER_EQUAL 3.11)
+    set(MANIFOLD_PYBIND_STUBGEN ON)
+  else()
+    # stubgen does not support version less than 3.11
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("Python version too old, stub will not be generated")
+  endif()
+
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --version
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    OUTPUT_VARIABLE NB_VERSION
+  )
+  # we are fine with 2.0.0
+  if(NB_VERSION VERSION_GREATER_EQUAL 2.0.0)
+    message("Found nanobind, version ${NB_VERSION}")
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE nanobind_ROOT
+    )
+    find_package(nanobind CONFIG REQUIRED)
+  else()
+    include(FetchContent)
+    logmissingdep("nanobind" , "MANIFOLD_PYBIND")
+    FetchContent_Declare(
+      nanobind
+      GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+      GIT_TAG
+        784efa2a0358a4dc5432c74f5685ee026e20f2b6 # v2.2.0
+      GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(nanobind)
+    set(NB_VERSION 2.2.0)
+  endif()
+
+  if(NB_VERSION VERSION_LESS 2.1.0)
+    message("Nanobind version too old, stub will not be generated")
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
   endif()
 endif()
