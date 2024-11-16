@@ -85,6 +85,7 @@ if(TBB_INCLUDE_DIRS)
 endif()
 
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
+add_library(manifold::manifold ALIAS manifold)
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
 if(MSVC)
@@ -101,17 +102,11 @@ target_include_directories(
   manifold
   PUBLIC
     $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 )
 
-set(
-  OPTIONS
-  MANIFOLD_EXCEPTIONS
-  MANIFOLD_DEBUG
-  MANIFOLD_CROSS_SECTION
-  MANIFOLD_EXPORT
-)
+set(OPTIONS MANIFOLD_DEBUG MANIFOLD_CROSS_SECTION MANIFOLD_EXPORT)
 foreach(OPT IN LISTS OPTIONS)
   if(${${OPT}})
     target_compile_options(manifold PUBLIC -D${OPT})

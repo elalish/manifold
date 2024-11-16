@@ -14,7 +14,6 @@
 
 #pragma once
 #include <limits>
-#include <stdexcept>
 #include <vector>
 
 #include "manifold/linalg.h"
@@ -25,9 +24,7 @@ namespace manifold {
  * @brief Simple math operations.
  * */
 
-/** @addtogroup Scalar
- * @ingroup Math
- *  @brief Simple scalar operations.
+/** @addtogroup LinAlg
  *  @{
  */
 namespace la = linalg;
@@ -47,6 +44,13 @@ using ivec2 = la::vec<int, 2>;
 using ivec3 = la::vec<int, 3>;
 using ivec4 = la::vec<int, 4>;
 using quat = la::vec<double, 4>;
+/** @} */
+
+/** @addtogroup Scalar
+ * @ingroup Math
+ *  @brief Simple scalar operations.
+ *  @{
+ */
 
 constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
@@ -556,24 +560,6 @@ class Quality {
 };
 /** @} */
 
-/** @addtogroup Exceptions
- *  @ingroup Optional
- *  @brief Custom Exceptions. Exceptions are only thrown if the
- * MANIFOLD_EXCEPTIONS flag is set.
- * @{
- */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
-/** @} */
-
 /** @addtogroup Debug
  * @ingroup Optional
  * @{
@@ -596,8 +582,6 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Deterministic outputs. Will disable some parallel optimizations.
-  bool deterministic = false;
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
 };

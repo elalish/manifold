@@ -117,13 +117,15 @@ vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
   return origin + spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
+vec3 Bound(vec3 pos, vec3 origin, vec3 spacing, ivec3 gridSize) {
+  return min(max(pos, origin), origin + spacing * (vec3(gridSize) - 1));
+}
+
 double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
                   double level, std::function<double(vec3)> sdf) {
-  auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
-
   const ivec3 xyz(gridIndex);
-  const int lowerBoundDist = Min(xyz);
-  const int upperBoundDist = Min(gridSize - xyz);
+  const int lowerBoundDist = minelem(xyz);
+  const int upperBoundDist = minelem(gridSize - xyz);
   const int boundDist = std::min(lowerBoundDist, upperBoundDist - gridIndex.w);
 
   if (boundDist < 0) {
@@ -264,7 +266,7 @@ struct NearSurface {
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
       if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
-        vertPos[idx] = pos;
+        vertPos[idx] = Bound(pos, origin, spacing, gridSize);
         gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
           if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
@@ -323,9 +325,10 @@ struct ComputeVerts {
       }
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] = FindSurface(position, gridVert.distance,
-                                 Position(neighborIndex, origin, spacing), val,
-                                 tol, level, sdf);
+      const vec3 pos = FindSurface(position, gridVert.distance,
+                                   Position(neighborIndex, origin, spacing),
+                                   val, tol, level, sdf);
+      vertPos[idx] = Bound(pos, origin, spacing, gridSize);
       gridVert.edgeVerts[i] = idx;
     }
   }
@@ -423,23 +426,23 @@ namespace manifold {
 
 /**
  * Constructs a level-set manifold from the input Signed-Distance Function
- * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
- * better for manifoldness). Instead of using a cubic grid, it uses a
- * body-centered cubic grid (two shifted cubic grids). This means if your
- * function's interior exceeds the given bounds, you will see a kind of
- * egg-crate shape closing off the manifold, which is due to the underlying
- * grid.
+ * (SDF). This uses a form of Marching Tetrahedra (akin to Marching
+ * Cubes, but better for manifoldness). Instead of using a cubic grid, it uses a
+ * body-centered cubic grid (two shifted cubic grids). These grid points are
+ * snapped to the surface where possible to keep short edges from forming.
  *
  * @param sdf The signed-distance functor, containing this function signature:
  * `double operator()(vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
- * negative outside.
+ * negative outside. There is no requirement that the function be a true
+ * distance, or even continuous.
  * @param bounds An axis-aligned box that defines the extent of the grid.
  * @param edgeLength Approximate maximum edge length of the triangles in the
  * final result. This affects grid spacing, and hence has a strong effect on
  * performance.
- * @param level You can inset your Mesh by using a positive value, or outset
- * it with a negative value.
+ * @param level Extract the surface at this value of your sdf; defaults to
+ * zero. You can inset your mesh by using a positive value, or outset it with a
+ * negative value.
  * @param tolerance Ensure each vertex is within this distance of the true
  * surface. Defaults to -1, which will return the interpolated
  * crossing-point based on the two nearest grid points. Small positive values

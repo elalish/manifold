@@ -60,9 +60,9 @@ size_t MeshBuilder::addFace() {
   if (disabledFaces.size()) {
     size_t index = disabledFaces.back();
     auto& f = faces[index];
-    ASSERT(f.isDisabled(), logicErr("f should be disabled"));
-    ASSERT(!f.pointsOnPositiveSide,
-           logicErr("f should not be on the positive side"));
+    DEBUG_ASSERT(f.isDisabled(), logicErr, "f should be disabled");
+    DEBUG_ASSERT(!f.pointsOnPositiveSide, logicErr,
+                 "f should not be on the positive side");
     f.mostDistantPointDist = 0;
     disabledFaces.pop_back();
     return index;
@@ -204,8 +204,8 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
   }
 
   for (auto& halfEdgeIndexFace : halfEdgeIndexFaces) {
-    ASSERT(halfEdgeMapping.count(halfEdgeIndexFace) == 1,
-           logicErr("invalid halfedge mapping"));
+    DEBUG_ASSERT(halfEdgeMapping.count(halfEdgeIndexFace) == 1, logicErr,
+                 "invalid halfedge mapping");
     halfEdgeIndexFace = halfEdgeMapping[halfEdgeIndexFace];
   }
 
@@ -324,7 +324,7 @@ void QuickHull::createConvexHalfedgeMesh() {
 
   // Compute base tetrahedron
   setupInitialTetrahedron();
-  ASSERT(mesh.faces.size() == 4, logicErr("not a tetrahedron"));
+  DEBUG_ASSERT(mesh.faces.size() == 4, logicErr, "not a tetrahedron");
 
   // Init face stack with those faces that have points assigned to them
   faceList.clear();
@@ -354,8 +354,9 @@ void QuickHull::createConvexHalfedgeMesh() {
     auto& tf = mesh.faces[topFaceIndex];
     tf.inFaceStack = 0;
 
-    ASSERT(!tf.pointsOnPositiveSide || tf.pointsOnPositiveSide->size() > 0,
-           logicErr("there should be points on the positive side"));
+    DEBUG_ASSERT(
+        !tf.pointsOnPositiveSide || tf.pointsOnPositiveSide->size() > 0,
+        logicErr, "there should be points on the positive side");
     if (!tf.pointsOnPositiveSide || tf.isDisabled()) {
       continue;
     }
@@ -376,7 +377,7 @@ void QuickHull::createConvexHalfedgeMesh() {
       const auto faceData = possiblyVisibleFaces.back();
       possiblyVisibleFaces.pop_back();
       auto& pvf = mesh.faces[faceData.faceIndex];
-      ASSERT(!pvf.isDisabled(), logicErr("pvf should not be disabled"));
+      DEBUG_ASSERT(!pvf.isDisabled(), logicErr, "pvf should not be disabled");
 
       if (pvf.visibilityCheckedOnIteration == iter) {
         if (pvf.isVisibleFaceOnCurrentIteration) {
@@ -400,8 +401,8 @@ void QuickHull::createConvexHalfedgeMesh() {
           }
           continue;
         }
-        ASSERT(faceData.faceIndex != topFaceIndex,
-               logicErr("face index invalid"));
+        DEBUG_ASSERT(faceData.faceIndex != topFaceIndex, logicErr,
+                     "face index invalid");
       }
 
       // The face is not visible. Therefore, the halfedge we came from is part
@@ -475,7 +476,7 @@ void QuickHull::createConvexHalfedgeMesh() {
       auto t = mesh.disableFace(faceIndex);
       if (t) {
         // Because we should not assign point vectors to faces unless needed...
-        ASSERT(t->size(), logicErr("t should not be empty"));
+        DEBUG_ASSERT(t->size(), logicErr, "t should not be empty");
         disabledFacePointVectors.push_back(std::move(t));
       }
     }
@@ -530,7 +531,8 @@ void QuickHull::createConvexHalfedgeMesh() {
     // Assign points that were on the positive side of the disabled faces to the
     // new faces.
     for (auto& disabledPoints : disabledFacePointVectors) {
-      ASSERT(disabledPoints, logicErr("disabledPoints should not be null"));
+      DEBUG_ASSERT(disabledPoints != nullptr, logicErr,
+                   "disabledPoints should not be null");
       for (const auto& point : *(disabledPoints)) {
         if (point == activePointIndex) {
           continue;
@@ -550,8 +552,8 @@ void QuickHull::createConvexHalfedgeMesh() {
     for (const auto newFaceIndex : newFaceIndices) {
       auto& newFace = mesh.faces[newFaceIndex];
       if (newFace.pointsOnPositiveSide) {
-        ASSERT(newFace.pointsOnPositiveSide->size() > 0,
-               logicErr("there should be points on the positive side"));
+        DEBUG_ASSERT(newFace.pointsOnPositiveSide->size() > 0, logicErr,
+                     "there should be points on the positive side");
         if (!newFace.inFaceStack) {
           faceList.push_back(newFaceIndex);
           newFace.inFaceStack = 1;
@@ -620,10 +622,11 @@ bool QuickHull::reorderHorizonEdges(VecView<size_t>& horizonEdges) {
       return false;
     }
   }
-  ASSERT(mesh.halfedges[horizonEdges[horizonEdges.size() - 1]].endVert ==
-             mesh.halfedges[mesh.halfedges[horizonEdges[0]].pairedHalfedge]
-                 .endVert,
-         logicErr("invalid halfedge"));
+  DEBUG_ASSERT(
+      mesh.halfedges[horizonEdges[horizonEdges.size() - 1]].endVert ==
+          mesh.halfedges[mesh.halfedges[horizonEdges[0]].pairedHalfedge]
+              .endVert,
+      logicErr, "invalid halfedge");
   return true;
 }
 
@@ -680,8 +683,8 @@ void QuickHull::setupInitialTetrahedron() {
                       std::min((size_t)2, vertexCount - 1),
                       std::min((size_t)3, vertexCount - 1));
   }
-  ASSERT(selectedPoints.first != selectedPoints.second,
-         logicErr("degenerate selectedPoints"));
+  DEBUG_ASSERT(selectedPoints.first != selectedPoints.second, logicErr,
+               "degenerate selectedPoints");
 
   // Find the most distant point to the line between the two chosen extreme
   // points.
@@ -730,8 +733,8 @@ void QuickHull::setupInitialTetrahedron() {
   }
 
   // These three points form the base triangle for our tetrahedron.
-  ASSERT(selectedPoints.first != maxI && selectedPoints.second != maxI,
-         logicErr("degenerate selectedPoints"));
+  DEBUG_ASSERT(selectedPoints.first != maxI && selectedPoints.second != maxI,
+               logicErr, "degenerate selectedPoints");
   std::array<size_t, 3> baseTriangle{selectedPoints.first,
                                      selectedPoints.second, maxI};
   const vec3 baseTriangleVertices[] = {originalVertexData[baseTriangle[0]],
