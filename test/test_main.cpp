@@ -25,6 +25,10 @@
 #define FrameMarkEnd(x)
 #endif
 
+#if (MANIFOLD_PAR == 1)
+#include <tbb/parallel_for.h>
+#endif
+
 using namespace manifold;
 
 Options options;
@@ -41,6 +45,23 @@ void print_usage() {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+
+  // warmup tbb for emscripten, according to
+  // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
+#if defined(__EMSCRIPTEN__) && (MANIFOLD_PAR == 1)
+  int num_threads = tbb::this_task_arena::max_concurrency();
+  std::atomic<int> barrier{num_threads};
+  tbb::parallel_for(
+      0, num_threads,
+      [&barrier](int) {
+        barrier--;
+        while (barrier > 0) {
+          // Send browser thread to event loop
+          std::this_thread::yield();
+        }
+      },
+      tbb::static_partitioner{});
+#endif
 
   const char* name = "test setup";
   FrameMarkStart(name);
