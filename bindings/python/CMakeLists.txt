@@ -82,7 +82,6 @@ target_compile_options(
   manifold3d
   PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d
 )
-target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 
 message(Python_EXECUTABLE = ${Python_EXECUTABLE})

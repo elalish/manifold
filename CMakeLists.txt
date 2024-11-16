@@ -96,7 +96,7 @@ if(MANIFOLD_FUZZ)
   # enable fuzztest fuzzing mode
   set(FUZZTEST_FUZZING_MODE ON)
   # address sanitizer required
-  add_compile_options("-fsanitize=address")
+  add_compile_options(-fsanitize=address)
 endif()
 
 if(TRACY_ENABLE)
@@ -105,25 +105,25 @@ endif()
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
-  add_link_options("-s ALLOW_MEMORY_GROWTH=1")
-  add_link_options("-s MAXIMUM_MEMORY=4294967296")
+  add_link_options(-sALLOW_MEMORY_GROWTH=1)
+  add_link_options(-sMAXIMUM_MEMORY=4294967296)
   if(MANIFOLD_PAR)
     set(CMAKE_THREAD_LIBS_INIT "-pthread")
-    add_compile_options("-pthread")
+    add_compile_options(-pthread)
     # PTHREAD_POOL_SIZE is set to 4 for OK-ish performance, in general we are
     # not getting too much speedup for very large number of cores, and a lot of
     # CPUs now have 4 cores...
-    add_link_options("-s PTHREAD_POOL_SIZE=4")
+    add_link_options(-sPTHREAD_POOL_SIZE=4)
     # mimalloc is needed for good performance
-    add_link_options("-s MALLOC=mimalloc")
+    add_link_options(-sMALLOC=mimalloc)
     # The default stack size apparently causes problem when parallelization is
     # enabled.
-    add_link_options("-s STACK_SIZE=10MB")
+    add_link_options(-sSTACK_SIZE=10MB)
   endif()
   if(MANIFOLD_DEBUG)
     list(APPEND MANIFOLD_FLAGS -fexceptions)
-    add_link_options("-fexceptions")
-    add_link_options("-s DISABLE_EXCEPTION_CATCHING=0")
+    add_link_options(-fexceptions)
+    add_link_options(-sDISABLE_EXCEPTION_CATCHING=0)
   endif()
   set(MANIFOLD_PYBIND OFF)
   set(BUILD_SHARED_LIBS OFF)
@@ -176,7 +176,7 @@ else()
       -fkeep-inline-functions
       -fkeep-static-functions
     )
-    add_link_options("-coverage")
+    add_link_options(-coverage)
   endif()
 endif()
 

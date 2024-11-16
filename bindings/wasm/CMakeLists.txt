@@ -32,7 +32,6 @@ target_link_options(
     -sEXPORT_ES6=1
 )
 
-target_compile_features(manifoldjs PUBLIC cxx_std_17)
 set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
