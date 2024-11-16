@@ -11,7 +11,6 @@ EOT
 
 cat <<EOT > testing.cpp
 #include <manifold/manifold.h>
-#include <manifold/parallel.h>
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
