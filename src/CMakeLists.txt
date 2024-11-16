@@ -60,11 +60,25 @@ target_link_libraries(
   manifold
   PUBLIC
     # optional dependencies
-    $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:Clipper2::Clipper2>
-    $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
     $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
     $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
 )
+
+if(MANIFOLD_CROSS_SECTION)
+  if(MANIFOLD_BUILTIN_CLIPPER2)
+    target_link_libraries(manifold PRIVATE Clipper2::Clipper2)
+  else()
+    target_link_libraries(manifold PUBLIC Clipper2::Clipper2)
+  endif()
+endif()
+
+if(MANIFOLD_PAR)
+  if(MANIFOLD_BUILTIN_TBB)
+    target_link_libraries(manifold PRIVATE TBB::tbb)
+  else()
+    target_link_libraries(manifold PUBLIC TBB::tbb)
+  endif()
+endif()
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
 # make sure users use appropriate c++ standard when including our headers
