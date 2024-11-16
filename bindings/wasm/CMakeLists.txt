@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(wasm)
-
 add_executable(manifoldjs bindings.cpp)
 
 set_source_files_properties(
