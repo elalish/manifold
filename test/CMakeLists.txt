@@ -32,15 +32,17 @@ set(
   samples_test.cpp
   boolean_complex_test.cpp
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
-  $<$<AND:$<BOOL:${MANIFOLD_CBIND}>,$<NOT:$<BOOL:${EMSCRIPTEN}>>>:manifoldc_test.cpp>
+  $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc_test.cpp>
 )
 
 add_executable(manifold_test ${SOURCE_FILES})
-target_link_libraries(manifold_test GTest::gtest_main manifold samples)
-
-if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
-  target_link_libraries(manifold_test manifoldc)
-endif()
+target_link_libraries(
+  manifold_test
+  GTest::gtest_main
+  manifold
+  samples
+  $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc>
+)
 
 if(EMSCRIPTEN)
   target_link_options(
