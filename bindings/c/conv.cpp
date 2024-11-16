@@ -124,6 +124,10 @@ ManifoldVec3 to_c(vec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldIVec3 to_c(ivec3 v) { return {v.x, v.y, v.z}; }
 
+ManifoldTriangulation *to_c(std::vector<ivec3> *m) {
+  return reinterpret_cast<ManifoldTriangulation *>(m);
+}
+
 const manifold::Manifold *from_c(ManifoldManifold *m) {
   return reinterpret_cast<manifold::Manifold const *>(m);
 }
@@ -219,6 +223,10 @@ vec3 from_c(ManifoldVec3 v) { return vec3(v.x, v.y, v.z); }
 ivec3 from_c(ManifoldIVec3 v) { return ivec3(v.x, v.y, v.z); }
 
 vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
+
+const std::vector<ivec3> *from_c(ManifoldTriangulation *m) {
+  return reinterpret_cast<std::vector<ivec3> const *>(m);
+}
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length) {
   auto vec = std::vector<vec3>();
