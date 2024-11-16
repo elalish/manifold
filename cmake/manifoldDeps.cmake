@@ -33,6 +33,10 @@ function(logmissingdep PKG)
   endif()
 endfunction()
 
+set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+# we build fetched dependencies as static library
+set(BUILD_SHARED_LIBS OFF)
+
 # If we're building parallel, we need the requisite libraries
 if(MANIFOLD_PAR)
   find_package(Threads REQUIRED)
@@ -53,11 +57,6 @@ if(MANIFOLD_PAR)
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(TBB)
-    # note: we do want to install tbb to the user machine when built from
-    # source
-    if(NOT EMSCRIPTEN)
-      install(TARGETS tbb)
-    endif()
   endif()
   if(NOT TARGET TBB::tbb)
     if(NOT TARGET tbb)
@@ -109,11 +108,9 @@ if(MANIFOLD_CROSS_SECTION)
       GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR CPP
+      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(Clipper2)
-    if(NOT EMSCRIPTEN)
-      install(TARGETS Clipper2)
-    endif()
   endif()
   if(NOT TARGET Clipper2::Clipper2)
     add_library(Clipper2::Clipper2 ALIAS Clipper2)
@@ -128,6 +125,7 @@ if(TRACY_ENABLE)
     GIT_TAG v0.10
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
+    EXCLUDE_FROM_ALL
   )
   FetchContent_MakeAvailable(tracy)
 endif()
@@ -174,6 +172,7 @@ if(MANIFOLD_PYBIND)
       GIT_TAG
         784efa2a0358a4dc5432c74f5685ee026e20f2b6 # v2.2.0
       GIT_PROGRESS TRUE
+      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(nanobind)
     set(NB_VERSION 2.2.0)
@@ -201,6 +200,7 @@ if(MANIFOLD_TEST)
       GIT_SHALLOW TRUE
       GIT_PROGRESS TRUE
       FIND_PACKAGE_ARGS NAMES GTest gtest
+      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(googletest)
   endif()
@@ -218,3 +218,5 @@ if(MANIFOLD_FUZZ)
   )
   FetchContent_MakeAvailable(fuzztest)
 endif()
+
+set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
