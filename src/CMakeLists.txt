@@ -52,10 +52,7 @@ set(
 )
 
 # Include directories
-set(
-  MANIFOLD_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/include
-)
+set(MANIFOLD_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include)
 
 add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
 

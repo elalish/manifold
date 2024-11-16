@@ -32,7 +32,10 @@ set(
   samples_test.cpp
   boolean_complex_test.cpp
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
-  $<$<BOOL:${MANIFOLD_CBIND} AND NOT ${EMSCRIPTEN}>:manifoldc_test.cpp>
+  $<$<BOOL:${MANIFOLD_CBIND}
+  AND
+  NOT
+  ${EMSCRIPTEN}>:manifoldc_test.cpp>
 )
 
 add_executable(manifold_test ${SOURCE_FILES})
@@ -46,11 +49,11 @@ if(EMSCRIPTEN)
   target_link_options(
     manifold_test
     PRIVATE
-    -sASSERTIONS=1
-    -sDEMANGLE_SUPPORT=1
-    --bind
-    --preload-file
-    ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons
+      -sASSERTIONS=1
+      -sDEMANGLE_SUPPORT=1
+      --bind
+      --preload-file
+      ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons
   )
 endif()
 
