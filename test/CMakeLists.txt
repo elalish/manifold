@@ -32,7 +32,7 @@ set(
   samples_test.cpp
   boolean_complex_test.cpp
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
-  "$<$<BOOL:${MANIFOLD_CBIND} AND NOT ${EMSCRIPTEN}>:manifoldc_test.cpp>"
+  $<$<AND:$<BOOL:${MANIFOLD_CBIND}>,$<NOT:$<BOOL:${EMSCRIPTEN}>>>:manifoldc_test.cpp>
 )
 
 add_executable(manifold_test ${SOURCE_FILES})
