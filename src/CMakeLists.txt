@@ -71,7 +71,8 @@ target_link_libraries(
 )
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
-
+# make sure users use appropriate c++ standard when including our headers
+target_compile_features(manifold PUBLIC cxx_std_17)
 set(
   OPTIONS
   MANIFOLD_DEBUG

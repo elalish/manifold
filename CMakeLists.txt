@@ -106,13 +106,26 @@ endif()
 if(EMSCRIPTEN)
   message("Building for Emscripten")
   add_link_options("-s ALLOW_MEMORY_GROWTH=1")
+  add_link_options("-s MAXIMUM_MEMORY=4294967296")
+  if(MANIFOLD_PAR)
+    set(CMAKE_THREAD_LIBS_INIT "-pthread")
+    add_compile_options("-pthread")
+    # PTHREAD_POOL_SIZE is set to 4 for OK-ish performance, in general we are
+    # not getting too much speedup for very large number of cores, and a lot of
+    # CPUs now have 4 cores...
+    add_link_options("-s PTHREAD_POOL_SIZE=4")
+    # mimalloc is needed for good performance
+    add_link_options("-s MALLOC=mimalloc")
+    # The default stack size apparently causes problem when parallelization is
+    # enabled.
+    add_link_options("-s STACK_SIZE=10MB")
+  endif()
   if(MANIFOLD_DEBUG)
     list(APPEND MANIFOLD_FLAGS -fexceptions)
     add_link_options("-fexceptions")
     add_link_options("-s DISABLE_EXCEPTION_CATCHING=0")
   endif()
   set(MANIFOLD_PYBIND OFF)
-  set(MANIFOLD_CBIND OFF)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
