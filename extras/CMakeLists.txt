@@ -22,13 +22,8 @@ target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 
 if(MANIFOLD_PAR AND NOT MSVC)
   add_executable(stlTest stl_test.cpp)
-  target_link_libraries(stlTest PRIVATE manifold)
+  target_link_libraries(stlTest PRIVATE manifold TBB::tbb)
   target_compile_options(stlTest PRIVATE ${MANIFOLD_FLAGS})
-  if(MANIFOLD_BUILTIN_TBB)
-    target_link_libraries(stlTest PRIVATE TBB::tbb)
-  else()
-    target_link_libraries(stlTest PUBLIC TBB::tbb)
-  endif()
 endif()
 
 add_executable(largeSceneTest large_scene_test.cpp)
@@ -37,7 +32,11 @@ target_compile_options(largeSceneTest PRIVATE ${MANIFOLD_FLAGS})
 
 if(MANIFOLD_DEBUG)
   add_executable(minimizeTestcase minimize_testcase.cpp)
-  target_link_libraries(minimizeTestcase manifold)
+  target_link_libraries(
+    minimizeTestcase
+    manifold
+    $<$<BOOL:${MANIFOLD_PAR}>TBB::tbb>
+  )
   target_compile_options(minimizeTestcase PRIVATE ${MANIFOLD_FLAGS})
 endif()
 
