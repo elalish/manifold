@@ -31,10 +31,8 @@ set(
   subdivision.cpp
 
   # optional source files
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:
-    cross_section/cross_section.cpp>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:
-    meshIO/meshIO.cpp>
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
+  $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO/meshIO.cpp>
 )
 
 set(
@@ -71,14 +69,8 @@ target_link_libraries(
   manifold
   PUBLIC
   # optional dependencies
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:
-    $<IF:$<TARGET_EXISTS:Clipper2::Clipper2>,
-      Clipper2::Clipper2,
-      Clipper2>>
-  $<$<BOOL:${MANIFOLD_PAR}>:
-    $<IF:$<TARGET_EXISTS:TBB::tbb>,
-      TBB::tbb,
-      ${TBB_LINK_LIBRARIES}>>
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:$<IF:$<TARGET_EXISTS:Clipper2::Clipper2>,Clipper2::Clipper2,Clipper2>>
+  $<$<BOOL:${MANIFOLD_PAR}>:$<IF:$<TARGET_EXISTS:TBB::tbb>,TBB::tbb,${TBB_LINK_LIBRARIES}>>
   $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
   $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
 )

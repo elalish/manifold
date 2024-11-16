@@ -22,13 +22,13 @@
             src = clipper2-src;
           });
           manifold =
-            { parallel-backend ? "none"
+            { parallel-backend ? false
             , doCheck ? true
             , build-tools ? [ ]
             , ...
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
-              pname = "manifold-${parallel-backend}";
+              pname = "manifold-${if parallelBackends then "tbb" else "none" }";
               version = "2.5.1";
               src = self;
               nativeBuildInputs = (with pkgs; [
@@ -47,7 +47,7 @@
                 "-DMANIFOLD_CBIND=ON"
                 "-DMANIFOLD_EXPORT=ON"
                 "-DBUILD_SHARED_LIBS=ON"
-                "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
+                "-DMANIFOLD_PAR=${if parallelBackends then "ON" else "OFF"}"
               ];
               checkPhase = ''
                 cd test
@@ -56,9 +56,9 @@
               '';
             };
           parallelBackends = [
-            { parallel-backend = "none"; }
+            { parallel-backend = true; }
             {
-              parallel-backend = "tbb";
+              parallel-backend = false;
               build-tools = with pkgs; [ tbb pkg-config ];
             }
           ];

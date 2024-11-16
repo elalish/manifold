@@ -230,10 +230,8 @@ set(
   parallel.h
   polygon.h
   vec_view.h
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:
-    cross_section.h>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:
-    meshIO.h>
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
+  $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO.h>
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 
