@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For private headers
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
-
 set(
   MANIFOLD_SRCS
   boolean3.cpp
@@ -32,6 +29,12 @@ set(
   smoothing.cpp
   sort.cpp
   subdivision.cpp
+
+  # optional source files
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:
+    cross_section/cross_section.cpp>
+  $<$<BOOL:${MANIFOLD_EXPORT}>:
+    meshIO/meshIO.cpp>
 )
 
 set(
@@ -51,61 +54,45 @@ set(
   vec.h
 )
 
-if(MANIFOLD_CROSS_SECTION)
-  list(APPEND MANIFOLD_SRCS cross_section/cross_section.cpp)
-endif()
-
-if(MANIFOLD_EXPORT)
-  list(APPEND MANIFOLD_SRCS meshIO/meshIO.cpp)
-endif()
-
-# Dependency libraries
-if(MANIFOLD_CROSS_SECTION)
-  if(TARGET Clipper2::Clipper2)
-    list(APPEND MANIFOLD_LIBS Clipper2::Clipper2)
-  else()
-    list(APPEND MANIFOLD_LIBS Clipper2)
-  endif()
-endif()
-if(MANIFOLD_PAR)
-  if(TARGET TBB::tbb)
-    list(APPEND MANIFOLD_LIBS TBB::tbb)
-  else()
-    list(APPEND MANIFOLD_LIBS ${TBB_LINK_LIBRARIES})
-  endif()
-endif()
-if(MANIFOLD_EXPORT)
-  list(APPEND MANIFOLD_LIBS assimp::assimp)
-endif()
-
 # Include directories
-set(MANIFOLD_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/include)
-if(TBB_INCLUDE_DIRS)
-  list(APPEND MANIFOLD_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
-endif()
-
-add_library(manifold ${MANIFOLD_SRCS} ${MANIFOLD_PRIVATE_HDRS})
-set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
-set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
-if(MSVC)
-  set_target_properties(
-    ${PROJECT_NAME}
-    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON
-  )
-endif()
-target_link_libraries(manifold PUBLIC ${MANIFOLD_LIBS})
-if(MANIFOLD_FLAGS)
-  target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
-endif()
-target_include_directories(
-  manifold
-  PUBLIC
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  PRIVATE ${MANIFOLD_INCLUDE_DIRS}
+set(
+  MANIFOLD_INCLUDE_DIRS
+  ${PROJECT_SOURCE_DIR}/include
+  $<$<BOOL:${TBB_INCLUDE_DIRS}>:${TBB_INCLUDE_DIRS}>
 )
 
-set(OPTIONS MANIFOLD_DEBUG MANIFOLD_CROSS_SECTION MANIFOLD_EXPORT)
+add_library(
+  manifold
+  ${MANIFOLD_SRCS}
+  ${MANIFOLD_PRIVATE_HDRS}
+)
+
+target_link_libraries(
+  manifold
+  PUBLIC
+  # optional dependencies
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:
+    $<IF:$<TARGET_EXISTS:Clipper2::Clipper2>,
+      Clipper2::Clipper2,
+      Clipper2>>
+  $<$<BOOL:${MANIFOLD_PAR}>:
+    $<IF:$<TARGET_EXISTS:TBB::tbb>,
+      TBB::tbb,
+      ${TBB_LINK_LIBRARIES}>>
+  $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
+  $<$<BOOL:${TRACY_ENABLE}>:TracyClient>
+)
+
+target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
+
+set(
+  OPTIONS
+  MANIFOLD_DEBUG
+  MANIFOLD_CROSS_SECTION
+  MANIFOLD_EXPORT
+  TRACY_ENABLE
+  TRACY_MEMORY_USAGE
+)
 foreach(OPT IN LISTS OPTIONS)
   if(${${OPT}})
     target_compile_options(manifold PUBLIC -D${OPT})
@@ -117,27 +104,22 @@ else()
   target_compile_options(manifold PUBLIC -DMANIFOLD_PAR=-1)
 endif()
 
-target_compile_features(manifold PUBLIC cxx_std_17)
+target_include_directories(
+  manifold
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  PRIVATE ${MANIFOLD_INCLUDE_DIRS}
+)
+
+add_library(manifold::manifold ALIAS manifold)
+set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
+set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
+if(MSVC)
+  set_target_properties(
+    manifold
+    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON
+  )
+endif()
 
 install(TARGETS manifold EXPORT manifoldTargets)
-
-# Tracy Support
-if(TRACY_ENABLE)
-  if(NOT MANIFOLD_DOWNLOADS)
-    message(
-      WARNING
-      "Downloading is disabled, but tracy requires download - skipping.\n"
-    )
-    return()
-  endif()
-  include(FetchContent)
-  FetchContent_Declare(
-    tracy
-    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG v0.10
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(tracy)
-  target_link_libraries(manifold PUBLIC TracyClient)
-endif()

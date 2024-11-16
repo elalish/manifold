@@ -46,28 +46,18 @@ add_custom_target(
   DEPENDS manifoldjs ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
 )
 
-# copy WASM build back here for publishing to npm
 add_custom_command(
   TARGET js_deps
   POST_BUILD
+  # copy WASM build back here for publishing to npm
   COMMAND
     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
     ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-# copy WASM build and TS declarations for Vite to package into ManifoldCAD.org
-add_custom_command(
-  TARGET js_deps
-  POST_BUILD
+  # copy WASM build and TS declarations for Vite to package into ManifoldCAD.org
   COMMAND
     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/manifold*
     ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/
-)
-
-# copy TS declarations to public so they can be accessed by our editor
-add_custom_command(
-  TARGET js_deps
-  POST_BUILD
+  # copy TS declarations to public so they can be accessed by our editor
   COMMAND
     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/

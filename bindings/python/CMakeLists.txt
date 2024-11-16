@@ -16,8 +16,6 @@ if(NOT MANIFOLD_PYBIND)
   return()
 endif()
 
-project(python)
-
 if(Python_VERSION VERSION_LESS 3.12)
   find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 else()
@@ -46,8 +44,8 @@ if(NB_VERSION VERSION_GREATER_EQUAL 2.0.0)
   )
   find_package(nanobind CONFIG REQUIRED)
 else()
-  message(STATUS "nanobind not found, downloading from source")
   include(FetchContent)
+  logmissingdep("nanobind" , "MANIFOLD_PYBIND")
   FetchContent_Declare(
     nanobind
     GIT_REPOSITORY https://github.com/wjakob/nanobind.git
@@ -91,12 +89,12 @@ message(Python_EXECUTABLE = ${Python_EXECUTABLE})
 # ideally we should generate a dependency file from python...
 set(
   DOCSTRING_DEPS
-  ${CMAKE_SOURCE_DIR}/src/manifold.cpp
-  ${CMAKE_SOURCE_DIR}/src/constructors.cpp
-  ${CMAKE_SOURCE_DIR}/src/sort.cpp
-  ${CMAKE_SOURCE_DIR}/src/cross_section/cross_section.cpp
-  ${CMAKE_SOURCE_DIR}/src/polygon.cpp
-  ${CMAKE_SOURCE_DIR}/include/manifold/common.h
+  ${PROJECT_SOURCE_DIR}/src/manifold.cpp
+  ${PROJECT_SOURCE_DIR}/src/constructors.cpp
+  ${PROJECT_SOURCE_DIR}/src/sort.cpp
+  ${PROJECT_SOURCE_DIR}/src/cross_section/cross_section.cpp
+  ${PROJECT_SOURCE_DIR}/src/polygon.cpp
+  ${PROJECT_SOURCE_DIR}/include/manifold/common.h
   ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
   ${CMAKE_CURRENT_SOURCE_DIR}/docstring_override.txt
 )

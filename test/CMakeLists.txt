@@ -18,32 +18,6 @@ endif()
 
 enable_testing()
 
-find_package(GTest QUIET)
-if(NOT GTest_FOUND)
-  if(NOT MANIFOLD_DOWNLOADS)
-    message(
-      WARNING
-      "Downloading is disabled, but testing requires googletest - skipping.\n"
-    )
-    return()
-  endif()
-
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-  # Prevent installation of GTest with your project
-  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-  set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
-
-  include(FetchContent)
-  FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-    FIND_PACKAGE_ARGS NAMES GTest gtest
-  )
-  FetchContent_MakeAvailable(googletest)
-endif()
 
 # put fast/simple tests files first to run earlier
 set(
@@ -96,10 +70,8 @@ if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
 endif()
 
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(manifold_test PUBLIC cxx_std_17)
 
 add_test(test_all manifold_test)
-target_precompile_headers(manifold_test INTERFACE test.h)
 
 if(EMSCRIPTEN)
   list(
