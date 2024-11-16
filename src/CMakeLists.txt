@@ -42,6 +42,7 @@ set(
   hashtable.h
   impl.h
   mesh_fixes.h
+  parallel.h
   quickhull.h
   shared.h
   sparse.h

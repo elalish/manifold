@@ -247,7 +247,6 @@ set(
   linalg.h
   manifold.h
   optional_assert.h
-  parallel.h
   polygon.h
   vec_view.h
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
