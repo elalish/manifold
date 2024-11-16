@@ -31,62 +31,39 @@ set(
   hull_test.cpp
   samples_test.cpp
   boolean_complex_test.cpp
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
+  $<$<BOOL:${MANIFOLD_CBIND} AND NOT ${EMSCRIPTEN}>:manifoldc_test.cpp>
 )
-
-if(MANIFOLD_CROSS_SECTION)
-  list(APPEND SOURCE_FILES cross_section_test.cpp)
-endif()
-
-if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
-  list(APPEND SOURCE_FILES manifoldc_test.cpp)
-endif()
-
-if(NOT TARGET GTest::gtest_main)
-  add_library(GTest::gtest_main ALIAS gtest_main)
-endif()
 
 add_executable(manifold_test ${SOURCE_FILES})
 target_link_libraries(manifold_test GTest::gtest_main manifold samples)
-
-if(MANIFOLD_FUZZ)
-  FetchContent_Declare(
-    fuzztest
-    GIT_REPOSITORY https://github.com/google/fuzztest.git
-    # note that if commit hash is used, it cannot be a shallow clone
-    GIT_TAG 2606e04a43e5a7730e437a849604a61f1cb0ff28
-    GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(fuzztest)
-  fuzztest_setup_fuzzing_flags()
-  add_executable(polygon_fuzz polygon_fuzz.cpp)
-  target_link_libraries(polygon_fuzz PUBLIC manifold)
-  link_fuzztest(polygon_fuzz)
-  gtest_discover_tests(polygon_fuzz)
-endif()
 
 if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   target_link_libraries(manifold_test manifoldc)
 endif()
 
-target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
-
-add_test(test_all manifold_test)
-
 if(EMSCRIPTEN)
-  list(
-    APPEND
-    EMSCRIPTEN_LINK_FLAGS
+  target_link_options(
+    manifold_test
+    PRIVATE
     -sASSERTIONS=1
     -sDEMANGLE_SUPPORT=1
     --bind
     --preload-file
     ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons
   )
-  list(JOIN EMSCRIPTEN_LINK_FLAGS " " EMSCRIPTEN_LINK_FLAGS)
-  set_target_properties(
-    manifold_test
-    PROPERTIES LINK_FLAGS ${EMSCRIPTEN_LINK_FLAGS}
-  )
+endif()
+
+target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
+
+add_test(test_all manifold_test)
+
+if(MANIFOLD_FUZZ)
+  fuzztest_setup_fuzzing_flags()
+  add_executable(polygon_fuzz polygon_fuzz.cpp)
+  target_link_libraries(polygon_fuzz PUBLIC manifold)
+  link_fuzztest(polygon_fuzz)
+  gtest_discover_tests(polygon_fuzz)
 endif()
 
 if(MSVC)

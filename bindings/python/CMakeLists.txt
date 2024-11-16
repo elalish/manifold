@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT MANIFOLD_PYBIND)
-  return()
-endif()
-
 nanobind_add_module(manifold3d NB_STATIC STABLE_ABI LTO autogen_docstrings.inl
                     manifold3d.cpp
 )

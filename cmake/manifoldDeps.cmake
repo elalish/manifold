@@ -59,6 +59,18 @@ if(MANIFOLD_PAR)
       install(TARGETS tbb)
     endif()
   endif()
+  if(NOT TARGET TBB::tbb)
+    if(NOT TARGET tbb)
+      add_library(TBB::tbb SHARED IMPORTED)
+      set_property(
+        TARGET TBB::tbb
+        PROPERTY IMPORTED_LOCATION ${TBB_LINK_LIBRARIES}
+      )
+      target_include_directories(TBB::tbb INTERFACE ${TBB_INCLUDE_DIRS})
+    else()
+      add_library(TBB::tbb ALIAS tbb)
+    endif()
+  endif()
 endif()
 
 # If we're building cross_section, we need Clipper2
@@ -103,6 +115,9 @@ if(MANIFOLD_CROSS_SECTION)
       install(TARGETS Clipper2)
     endif()
   endif()
+  if(NOT TARGET Clipper2::Clipper2)
+    add_library(Clipper2::Clipper2 ALIAS Clipper2)
+  endif()
 endif()
 
 if(TRACY_ENABLE)
@@ -120,27 +135,6 @@ endif()
 # If we're supporting mesh I/O, we need assimp
 if(MANIFOLD_EXPORT)
   find_package(assimp REQUIRED)
-endif()
-
-if(MANIFOLD_TEST)
-  find_package(GTest QUIET)
-  if(NOT GTest_FOUND)
-    logmissingdep("GTest" , "MANIFOLD_TEST")
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    # Prevent installation of GTest with your project
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
-    include(FetchContent)
-    FetchContent_Declare(
-      googletest
-      GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG v1.14.0
-      GIT_SHALLOW TRUE
-      GIT_PROGRESS TRUE
-      FIND_PACKAGE_ARGS NAMES GTest gtest
-    )
-    FetchContent_MakeAvailable(googletest)
-  endif()
 endif()
 
 if(MANIFOLD_PYBIND)
@@ -189,4 +183,38 @@ if(MANIFOLD_PYBIND)
     message("Nanobind version too old, stub will not be generated")
     set(MANIFOLD_PYBIND_STUBGEN OFF)
   endif()
+endif()
+
+if(MANIFOLD_TEST)
+  find_package(GTest QUIET)
+  if(NOT GTest_FOUND)
+    logmissingdep("GTest" , "MANIFOLD_TEST")
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    # Prevent installation of GTest with your project
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
+    include(FetchContent)
+    FetchContent_Declare(
+      googletest
+      GIT_REPOSITORY https://github.com/google/googletest.git
+      GIT_TAG v1.14.0
+      GIT_SHALLOW TRUE
+      GIT_PROGRESS TRUE
+      FIND_PACKAGE_ARGS NAMES GTest gtest
+    )
+    FetchContent_MakeAvailable(googletest)
+  endif()
+  if(NOT TARGET GTest::gtest_main)
+    add_library(GTest::gtest_main ALIAS gtest_main)
+  endif()
+endif()
+
+if(MANIFOLD_FUZZ)
+  FetchContent_Declare(
+    fuzztest
+    GIT_REPOSITORY https://github.com/google/fuzztest.git
+    GIT_TAG 2606e04a43e5a7730e437a849604a61f1cb0ff28
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(fuzztest)
 endif()
