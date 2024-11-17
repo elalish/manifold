@@ -33,7 +33,7 @@
 #endif
 #endif
 
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>

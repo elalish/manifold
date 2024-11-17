@@ -14,10 +14,10 @@
 
 #include "./hashtable.h"
 #include "./impl.h"
+#include "./parallel.h"
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;

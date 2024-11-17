@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 template <>
 struct std::hash<manifold::ivec4> {
