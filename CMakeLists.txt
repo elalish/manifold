@@ -270,6 +270,9 @@ install(
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
 )
 
+# note that the path ${CMAKE_CURRENT_BINARY_DIR}/include is included when we
+# build the manifold target (as ${PROJECT_SOURCE_DIR}/include), so users can
+# include manifold/version.h without installing our library.
 configure_file(
   cmake/version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
@@ -285,6 +288,9 @@ install(
 )
 
 # PkgConfig file
+if(MANIFOLD_PAR)
+  set(TEMPLATE_OPTIONAL_TBB "tbb")
+endif()
 if(MANIFOLD_CROSS_SECTION)
   set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
 endif()

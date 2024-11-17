@@ -37,7 +37,7 @@ set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 # we build fetched dependencies as static library
 set(BUILD_SHARED_LIBS OFF)
 
-# If we're building parallel, we need the requisite libraries
+# If we're building parallel, we need tbb
 if(MANIFOLD_PAR)
   find_package(Threads REQUIRED)
   if(NOT MANIFOLD_USE_BUILTIN_TBB)

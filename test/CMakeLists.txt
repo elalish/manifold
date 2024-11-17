@@ -43,14 +43,8 @@ target_link_libraries(
     manifold
     samples
     $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc>
+    $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
 )
-if(MANIFOLD_PAR)
-  if(MANIFOLD_BUILTIN_TBB)
-    target_link_libraries(manifold_test PRIVATE TBB::tbb)
-  else()
-    target_link_libraries(manifold_test PUBLIC TBB::tbb)
-  endif()
-endif()
 
 if(EMSCRIPTEN)
   target_link_options(
