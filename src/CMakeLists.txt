@@ -95,6 +95,7 @@ target_include_directories(
   PUBLIC
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 )
 

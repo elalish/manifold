@@ -12,6 +12,7 @@ EOT
 
 cat <<EOT > test.cpp
 #include <manifold/manifold.h>
+#include <manifold/version.h>
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
