@@ -19,12 +19,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#ifdef MANIFOLD_DEBUG
-#include <chrono>
-#include <iomanip>
-#include <iostream>
-#endif
-
 #include "./vec.h"
 #include "manifold/common.h"
 
@@ -230,95 +224,4 @@ inline mat4 Mat4(mat3x4 a) {
 }
 inline mat3 Mat3(mat2x3 a) { return mat3({a[0], 0}, {a[1], 0}, {a[2], 1}); }
 
-#ifdef MANIFOLD_DEBUG
-
-template <class T>
-std::ostream& operator<<(std::ostream& out, const la::vec<T, 1>& v) {
-  return out << '{' << v[0] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const la::vec<T, 2>& v) {
-  return out << '{' << v[0] << ',' << v[1] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const la::vec<T, 3>& v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const la::vec<T, 4>& v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << ',' << v[3] << '}';
-}
-
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 1>& m) {
-  return out << '{' << m[0] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 2>& m) {
-  return out << '{' << m[0] << ',' << m[1] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 3>& m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const la::mat<T, M, 4>& m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << ',' << m[3] << '}';
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-/**
- * Print the contents of this vector to standard output. Only exists if compiled
- * with MANIFOLD_DEBUG flag.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (size_t i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-template <typename T>
-void Diff(const std::vector<T>& a, const std::vector<T>& b) {
-  std::cout << "Diff = " << std::endl;
-  if (a.size() != b.size()) {
-    std::cout << "a and b must have the same length, aborting Diff"
-              << std::endl;
-    return;
-  }
-  for (size_t i = 0; i < a.size(); ++i) {
-    if (a[i] != b[i])
-      std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-struct Timer {
-  std::chrono::high_resolution_clock::time_point start, end;
-
-  void Start() { start = std::chrono::high_resolution_clock::now(); }
-
-  void Stop() { end = std::chrono::high_resolution_clock::now(); }
-
-  float Elapsed() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-        .count();
-  }
-  void Print(std::string message) {
-    std::cout << "----------- " << std::round(Elapsed()) << " ms for "
-              << message << std::endl;
-  }
-};
-#endif
 }  // namespace manifold
