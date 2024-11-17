@@ -18,7 +18,10 @@ set_source_files_properties(
   bindings.cpp
   PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js
 )
-target_link_libraries(manifoldjs manifold)
+target_link_libraries(
+  manifoldjs
+  PRIVATE manifold $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
+)
 target_compile_options(manifoldjs PRIVATE ${MANIFOLD_FLAGS})
 target_link_options(
   manifoldjs
