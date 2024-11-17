@@ -99,11 +99,6 @@ target_include_directories(
   PRIVATE ${MANIFOLD_INCLUDE_DIRS}
 )
 
-add_library(manifold::manifold ALIAS manifold)
-set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
-set_property(TARGET manifold PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
-if(MSVC)
-  set_target_properties(manifold PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-endif()
+exportlib(manifold)
 
 install(TARGETS manifold EXPORT manifoldTargets)

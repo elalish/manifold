@@ -59,6 +59,7 @@ if(EMSCRIPTEN)
 endif()
 
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
+exportbin(manifold_test)
 
 add_test(test_all manifold_test)
 
@@ -68,15 +69,4 @@ if(MANIFOLD_FUZZ)
   target_link_libraries(polygon_fuzz PUBLIC manifold)
   link_fuzztest(polygon_fuzz)
   gtest_discover_tests(polygon_fuzz)
-endif()
-
-if(MSVC)
-  set_target_properties(
-    manifold_test
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_target_properties(
-    manifold_test
-    PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
 endif()

@@ -26,21 +26,7 @@ add_library(
   cross.cpp
   rect.cpp
 )
-add_library(manifold::manifoldc ALIAS manifoldc)
-set_property(TARGET manifoldc PROPERTY VERSION "${MANIFOLD_VERSION}")
-set_property(TARGET manifoldc PROPERTY SOVERSION ${MANIFOLD_VERSION_MAJOR})
-
-if(MSVC)
-  set_target_properties(manifoldc PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-  set_target_properties(
-    manifoldc
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-  set_target_properties(
-    manifoldc
-    PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  )
-endif()
+exportlib(manifoldc)
 
 if(MANIFOLD_EXPORT)
   target_sources(manifoldc PRIVATE meshIOc.cpp)

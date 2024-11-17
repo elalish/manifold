@@ -207,6 +207,7 @@ if("${isSystemDir}" STREQUAL "-1")
 endif("${isSystemDir}" STREQUAL "-1")
 
 include(${PROJECT_SOURCE_DIR}/cmake/manifoldDeps.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/configHelper.cmake)
 
 add_subdirectory(src)
 add_subdirectory(bindings)
