@@ -421,6 +421,20 @@ install(
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
 )
 
+configure_file(
+  version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
+  @ONLY
+)
+set_source_files_properties(
+  include/manifold/version.h
+  PROPERTIES GENERATED TRUE
+)
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
+)
+
 # PkgConfig file
 if(MANIFOLD_CROSS_SECTION)
   set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
