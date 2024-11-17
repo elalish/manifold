@@ -79,8 +79,7 @@ TEST(Smooth, TruncatedCone) {
   Manifold smooth = cone.SmoothOut().RefineToLength(0.5).CalculateNormals(0);
   EXPECT_NEAR(smooth.Volume(), 1158.61, 0.01);
   EXPECT_NEAR(smooth.SurfaceArea(), 768.12, 0.01);
-  MeshGL out = smooth.GetMeshGL();
-  CheckGL(out);
+  CheckGL(smooth, false);
 
   Manifold smooth1 = cone.SmoothOut(180, 1).RefineToLength(0.5);
   Manifold smooth2 = cone.SmoothOut(180, 0).RefineToLength(0.5);
@@ -88,6 +87,7 @@ TEST(Smooth, TruncatedCone) {
   EXPECT_NEAR(smooth2.SurfaceArea(), smooth1.SurfaceArea(), 0.01);
 
 #ifdef MANIFOLD_EXPORT
+  MeshGL out = smooth.GetMeshGL();
   ExportOptions options2;
   options2.faceted = false;
   options2.mat.normalIdx = 0;
