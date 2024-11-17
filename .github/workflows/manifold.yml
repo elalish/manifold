@@ -260,7 +260,7 @@ jobs:
         sudo cmake --install .
         cd ..
         ./scripts/test-cmake.sh
-        ./scripts/test-pkgconfig.sh
+        LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
 
   build_mac_builtin_tbb_subdir:
     timeout-minutes: 30

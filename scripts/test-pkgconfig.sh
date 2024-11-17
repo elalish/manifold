@@ -4,7 +4,7 @@ cd make-consumer
 
 cat <<'EOT' > Makefile
 CXXFLAGS=$(shell pkg-config --cflags manifold)
-LDFLAGS=$(shell pkg-config --libs manifold)
+LDFLAGS=${LDFLAGS} $(shell pkg-config --libs manifold)
 
 testing : testing.cpp
 EOT
