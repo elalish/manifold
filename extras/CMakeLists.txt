@@ -35,7 +35,7 @@ if(MANIFOLD_DEBUG)
   target_link_libraries(
     minimizeTestcase
     manifold
-    $<$<BOOL:${MANIFOLD_PAR}>TBB::tbb>
+    $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
   )
   target_compile_options(minimizeTestcase PRIVATE ${MANIFOLD_FLAGS})
 endif()
