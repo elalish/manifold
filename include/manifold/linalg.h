@@ -43,6 +43,11 @@
 #include <iosfwd>       // For forward definitions of std::ostream
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
 
+#ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#include <iostream>
+#endif
+
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
 #if defined(_MSC_VER) && (_MSC_VER <= 1900)
@@ -466,8 +471,8 @@ struct select {
 };
 struct lerp {
   template <class A, class B, class C>
-  constexpr auto operator()(A a, B b,
-                            C c) const -> decltype(a * (1 - c) + b * c) {
+  constexpr auto operator()(A a, B b, C c) const
+      -> decltype(a * (1 - c) + b * c) {
     return a * (1 - c) + b * c;
   }
 };
@@ -1311,33 +1316,33 @@ constexpr typename detail::any_compare<A, B>::type compare(const A &a,
   return detail::any_compare<A, B>()(a, b);
 }
 template <class A, class B>
-constexpr auto operator==(const A &a,
-                          const B &b) -> decltype(compare(a, b) == 0) {
+constexpr auto operator==(const A &a, const B &b)
+    -> decltype(compare(a, b) == 0) {
   return compare(a, b) == 0;
 }
 template <class A, class B>
-constexpr auto operator!=(const A &a,
-                          const B &b) -> decltype(compare(a, b) != 0) {
+constexpr auto operator!=(const A &a, const B &b)
+    -> decltype(compare(a, b) != 0) {
   return compare(a, b) != 0;
 }
 template <class A, class B>
-constexpr auto operator<(const A &a,
-                         const B &b) -> decltype(compare(a, b) < 0) {
+constexpr auto operator<(const A &a, const B &b)
+    -> decltype(compare(a, b) < 0) {
   return compare(a, b) < 0;
 }
 template <class A, class B>
-constexpr auto operator>(const A &a,
-                         const B &b) -> decltype(compare(a, b) > 0) {
+constexpr auto operator>(const A &a, const B &b)
+    -> decltype(compare(a, b) > 0) {
   return compare(a, b) > 0;
 }
 template <class A, class B>
-constexpr auto operator<=(const A &a,
-                          const B &b) -> decltype(compare(a, b) <= 0) {
+constexpr auto operator<=(const A &a, const B &b)
+    -> decltype(compare(a, b) <= 0) {
   return compare(a, b) <= 0;
 }
 template <class A, class B>
-constexpr auto operator>=(const A &a,
-                          const B &b) -> decltype(compare(a, b) >= 0) {
+constexpr auto operator>=(const A &a, const B &b)
+    -> decltype(compare(a, b) >= 0) {
   return compare(a, b) >= 0;
 }
 /** @} */
@@ -2360,6 +2365,42 @@ struct converter<std::array<T, 4>, vec<T, 4>> {
   }
 };
 /** @} */
+
+#ifdef MANIFOLD_DEBUG
+template <class T>
+std::ostream &operator<<(std::ostream &out, const vec<T, 1> &v) {
+  return out << '{' << v[0] << '}';
+}
+template <class T>
+std::ostream &operator<<(std::ostream &out, const vec<T, 2> &v) {
+  return out << '{' << v[0] << ',' << v[1] << '}';
+}
+template <class T>
+std::ostream &operator<<(std::ostream &out, const vec<T, 3> &v) {
+  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << '}';
+}
+template <class T>
+std::ostream &operator<<(std::ostream &out, const vec<T, 4> &v) {
+  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << ',' << v[3] << '}';
+}
+
+template <class T, int M>
+std::ostream &operator<<(std::ostream &out, const mat<T, M, 1> &m) {
+  return out << '{' << m[0] << '}';
+}
+template <class T, int M>
+std::ostream &operator<<(std::ostream &out, const mat<T, M, 2> &m) {
+  return out << '{' << m[0] << ',' << m[1] << '}';
+}
+template <class T, int M>
+std::ostream &operator<<(std::ostream &out, const mat<T, M, 3> &m) {
+  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << '}';
+}
+template <class T, int M>
+std::ostream &operator<<(std::ostream &out, const mat<T, M, 4> &m) {
+  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << ',' << m[3] << '}';
+}
+#endif
 }  // namespace linalg
 
 namespace std {

@@ -586,4 +586,16 @@ struct ExecutionParams {
   bool cleanupTriangles = true;
 };
 /** @} */
+
+#ifdef MANIFOLD_DEBUG
+inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
+}
+#endif
 }  // namespace manifold
