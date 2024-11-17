@@ -213,7 +213,7 @@ jobs:
         pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallelization == 'ON'
-      run: brew install tbb onedpl
+      run: brew install tbb
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build
@@ -232,6 +232,50 @@ jobs:
         sudo cmake --install .
         cd ..
         ./scripts/test-cmake.sh
+        ./scripts/test-pkgconfig.sh
+
+  build_mac_builtin_tbb:
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+    - name: Install common dependencies
+      run: |
+        brew install pkg-config googletest
+        pip install trimesh pytest
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
+    - name: Test
+      run: |
+        cd build/test
+        ./manifold_test
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./scripts/test-cmake.sh
+        ./scripts/test-pkgconfig.sh
+
+  build_mac_builtin_tbb_subdir:
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+    - name: Install common dependencies
+      run: |
+        brew install pkg-config googletest
+        pip install trimesh pytest
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: test cmake consumer
+      run: |
+        cd ..
+        ./manifold/scripts/test-cmake-subdir.sh
 
   build_nix:
     timeout-minutes: 30
