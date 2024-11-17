@@ -38,16 +38,31 @@ set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS OFF)
 
 # If we're building parallel, we need the requisite libraries
-set(MANIFOLD_BUILTIN_TBB OFF)
 if(MANIFOLD_PAR)
   find_package(Threads REQUIRED)
-  find_package(TBB QUIET)
-  find_package(PkgConfig QUIET)
-  if(NOT TBB_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(TBB tbb)
+  if(NOT MANIFOLD_USE_BUILTIN_TBB)
+    find_package(TBB QUIET)
+    find_package(PkgConfig QUIET)
+    if(NOT TBB_FOUND AND PKG_CONFIG_FOUND)
+      pkg_check_modules(TBB tbb)
+    endif()
   endif()
-  if(NOT TBB_FOUND)
+  if(TBB_FOUND)
+    if(NOT TARGET TBB::tbb)
+      if(NOT TARGET tbb)
+        add_library(TBB::tbb SHARED IMPORTED)
+        set_property(
+          TARGET TBB::tbb
+          PROPERTY IMPORTED_LOCATION ${TBB_LINK_LIBRARIES}
+        )
+        target_include_directories(TBB::tbb INTERFACE ${TBB_INCLUDE_DIRS})
+      else()
+        add_library(TBB::tbb ALIAS tbb)
+      endif()
+    endif()
+  else()
     logmissingdep("TBB" , "Parallel mode")
+    set(MANIFOLD_USE_BUILTIN_TBB ON)
     set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
     set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
     FetchContent_Declare(
@@ -58,28 +73,16 @@ if(MANIFOLD_PAR)
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(TBB)
-    set(MANIFOLD_BUILTIN_TBB ON)
-  endif()
-  if(NOT TARGET TBB::tbb)
-    if(NOT TARGET tbb)
-      add_library(TBB::tbb SHARED IMPORTED)
-      set_property(
-        TARGET TBB::tbb
-        PROPERTY IMPORTED_LOCATION ${TBB_LINK_LIBRARIES}
-      )
-      target_include_directories(TBB::tbb INTERFACE ${TBB_INCLUDE_DIRS})
-    else()
-      add_library(TBB::tbb ALIAS tbb)
-    endif()
   endif()
 endif()
 
 # If we're building cross_section, we need Clipper2
-set(MANIFOLD_BUILTIN_CLIPPER2 OFF)
 if(MANIFOLD_CROSS_SECTION)
-  find_package(Clipper2 QUIET)
-  if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(Clipper2 Clipper2)
+  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2)
+    find_package(Clipper2 QUIET)
+    if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
+      pkg_check_modules(Clipper2 Clipper2)
+    endif()
   endif()
   if(Clipper2_FOUND)
     add_library(Clipper2 SHARED IMPORTED)
@@ -96,7 +99,7 @@ if(MANIFOLD_CROSS_SECTION)
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
   else()
     logmissingdep("Clipper2" , "cross_section")
-    set(MANIFOLD_BUILTIN_CLIPPER2 ON)
+    set(MANIFOLD_USE_BUILTIN_CLIPPER2 ON)
     set(CLIPPER2_UTILS OFF)
     set(CLIPPER2_EXAMPLES OFF)
     set(CLIPPER2_TESTS OFF)
@@ -153,11 +156,13 @@ if(MANIFOLD_PYBIND)
     message("Python version too old, stub will not be generated")
   endif()
 
-  execute_process(
-    COMMAND "${Python_EXECUTABLE}" -m nanobind --version
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_VARIABLE NB_VERSION
-  )
+  if(NOT MANIFOLD_USE_BUILTIN_NANOBIND)
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --version
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE NB_VERSION
+    )
+  endif()
   # we are fine with 2.0.0
   if(NB_VERSION VERSION_GREATER_EQUAL 2.0.0)
     message("Found nanobind, version ${NB_VERSION}")
@@ -168,8 +173,8 @@ if(MANIFOLD_PYBIND)
     )
     find_package(nanobind CONFIG REQUIRED)
   else()
-    include(FetchContent)
     logmissingdep("nanobind" , "MANIFOLD_PYBIND")
+    set(MANIFOLD_USE_BUILTIN_NANOBIND ON)
     FetchContent_Declare(
       nanobind
       GIT_REPOSITORY https://github.com/wjakob/nanobind.git
@@ -214,6 +219,7 @@ if(MANIFOLD_TEST)
 endif()
 
 if(MANIFOLD_FUZZ)
+  logmissingdep("fuzztest" , "MANIFOLD_FUZZ")
   FetchContent_Declare(
     fuzztest
     GIT_REPOSITORY https://github.com/google/fuzztest.git

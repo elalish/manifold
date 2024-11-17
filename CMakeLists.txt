@@ -67,6 +67,17 @@ cmake_dependent_option(
   "EMSCRIPTEN"
   OFF
 )
+# These three options can force the build to avoid using the system version of
+# the dependency
+# This will either use the provided source directory via
+# FETCHCONTENT_SOURCE_DIR_XXX, or fetch the source from GitHub.
+# Note that the dependency will be built as static dependency to avoid dynamic
+# library conflict.
+# When the system package is unavailable, the option will be automatically set
+# to true.
+option(MANIFOLD_USE_BUILTIN_TBB "Use builtin tbb" OFF)
+option(MANIFOLD_USE_BUILTIN_CLIPPER2 "Use builtin clipper2" OFF)
+option(MANIFOLD_USE_BUILTIN_NANOBIND "Use builtin nanobind" OFF)
 
 # default to Release build
 option(CMAKE_BUILD_TYPE "Build type" Release)

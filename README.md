@@ -112,12 +112,29 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
 
-Offline building (with missing dependencies):
+Dependency version override:
+- `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
+- `MANIFOLD_USE_BUILTIN_CLIPPER2=[<OFF>, ON]`: Use builtin version of clipper2.
+- `MANIFOLD_USE_BUILTIN_NANOBIND=[<OFF>, ON]`: Use builtin version of nanobind.
+
+> Note: These three options can force the build to avoid using the system
+> version of the dependency. This will either use the provided source directory
+> via `FETCHCONTENT_SOURCE_DIR_*` (see below), or fetch the source from GitHub.
+> Note that the dependency will be built as static dependency to avoid dynamic
+> library conflict. When the system package is unavailable, the option will be
+> automatically set to true.
+
+Offline building (with missing dependencies/dependency version override):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.
   Need to set `FETCHCONTENT_SOURCE_DIR_*` if the dependency `*` is missing.
 - `FETCHCONTENT_SOURCE_DIR_TBB`: path to tbb source (if `MANIFOLD_PAR` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_CLIPPER2`: path to tbb source (if `MANIFOLD_CROSS_SECTION` is enabled).
+- `FETCHCONTENT_SOURCE_DIR_NANOBIND`: path to nanobind source (if `MANIFOLD_PYBIND` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source (if `MANIFOLD_TEST` is enabled).
+
+> Note: When `FETCHCONTENT_SOURCE_DIR_*` is set, CMake will use the provided
+> source directly without downloading regardless of the value of
+> `MANIFOLD_DOWNLOADS`.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
