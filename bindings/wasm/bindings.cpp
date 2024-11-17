@@ -22,29 +22,6 @@
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 
-#if (MANIFOLD_PAR == 1)
-#include <tbb/parallel_for.h>
-
-#include <atomic>
-#endif
-
-void initTBB() {
-#if (MANIFOLD_PAR == 1)
-  int num_threads = tbb::this_task_arena::max_concurrency();
-  std::atomic<int> barrier{num_threads};
-  tbb::parallel_for(
-      0, num_threads,
-      [&barrier](int) {
-        barrier--;
-        while (barrier > 0) {
-          // Send browser thread to event loop
-          std::this_thread::yield();
-        }
-      },
-      tbb::static_partitioner{});
-#endif
-}
-
 using namespace emscripten;
 using namespace manifold;
 
@@ -218,7 +195,4 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);
-
-  // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
-  function("initTBB", &initTBB);
 }

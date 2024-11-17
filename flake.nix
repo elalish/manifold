@@ -112,7 +112,7 @@
               cd ../
             '';
           };
-        manifold-emscripten = { parallel, doCheck ? true }: pkgs.buildEmscriptenPackage {
+        manifold-emscripten = { doCheck ? true }: pkgs.buildEmscriptenPackage {
           name = "manifold-js";
           version = manifold-version;
           src = self;
@@ -126,10 +126,8 @@
             mkdir build
             cd build
             emcmake cmake -DCMAKE_BUILD_TYPE=Release \
-            -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
-            -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 \
-            ${if parallel then "-DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src}" else ""} ..
+            -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
           '';
           buildPhase = ''
             emmake make -j''${NIX_BUILD_CORES}
@@ -149,12 +147,7 @@
         packages = {
           manifold-tbb = manifold { };
           manifold-none = manifold { parallel = false; };
-          manifold-js = manifold-emscripten { parallel = false; };
-          # disable check for now
-          manifold-js-tbb = manifold-emscripten {
-            parallel = true;
-            doCheck = false;
-          };
+          manifold-js = manifold-emscripten { };
           # but how should we make it work with other python versions?
           manifold3d = with pkgs.python3Packages; buildPythonPackage {
             pname = "manifold3d";
@@ -199,6 +192,7 @@
             gtest
             assimp
             clipper2
+            pkg-config
 
             # useful tools
             clang-tools_18
