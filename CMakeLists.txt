@@ -274,11 +274,15 @@ set(
   optional_assert.h
   polygon.h
   vec_view.h
-  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
   $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO.h>
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
+list(
+  APPEND
+  MANIFOLD_PUBLIC_HDRS
+  ${CMAKE_CURRENT_BINARY_DIR}include/manifold/version.h
+)
 
 install(
   FILES ${MANIFOLD_PUBLIC_HDRS}
