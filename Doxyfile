@@ -971,10 +971,10 @@ INPUT                  = include/manifold/manifold.h \
                          include/manifold/common.h \
                          include/manifold/meshIO.h \
                          include/manifold/linalg.h \
-                         include/manifold/parallel.h \
                          include/manifold/vec_view.h \
                          include/manifold/iters.h \
                          include/manifold/optional_assert.h \
+                         src/parallel.h \
                          src/manifold.cpp \
                          src/constructors.cpp \
                          src/polygon.cpp \

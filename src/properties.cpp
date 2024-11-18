@@ -15,8 +15,8 @@
 #include <limits>
 
 #include "./impl.h"
+#include "./parallel.h"
 #include "./tri_dist.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -89,7 +89,7 @@ struct UpdateProperties {
       auto old = std::atomic_exchange(
           reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
           static_cast<uint8_t>(1));
-      if (old == 1) return;
+      if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =

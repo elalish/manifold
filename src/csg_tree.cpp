@@ -25,7 +25,7 @@
 #include "./csg_tree.h"
 #include "./impl.h"
 #include "./mesh_fixes.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 constexpr int kParallelThreshold = 4096;
 
