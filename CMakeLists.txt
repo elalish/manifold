@@ -217,6 +217,19 @@ add_subdirectory(extras)
 
 include(${PROJECT_SOURCE_DIR}/cmake/info.cmake)
 
+# note that the path ${CMAKE_CURRENT_BINARY_DIR}/include is included when we
+# build the manifold target (as ${PROJECT_SOURCE_DIR}/include), so users can
+# include manifold/version.h without installing our library.
+configure_file(
+  cmake/version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
+  @ONLY
+)
+set_source_files_properties(
+  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
+  PROPERTIES GENERATED TRUE
+)
+
 # If it's an EMSCRIPTEN build, we're done
 if(EMSCRIPTEN)
   return()
@@ -261,6 +274,7 @@ set(
   optional_assert.h
   polygon.h
   vec_view.h
+  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
   $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO.h>
 )
@@ -268,23 +282,6 @@ list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 
 install(
   FILES ${MANIFOLD_PUBLIC_HDRS}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
-)
-
-# note that the path ${CMAKE_CURRENT_BINARY_DIR}/include is included when we
-# build the manifold target (as ${PROJECT_SOURCE_DIR}/include), so users can
-# include manifold/version.h without installing our library.
-configure_file(
-  cmake/version.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
-  @ONLY
-)
-set_source_files_properties(
-  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
-  PROPERTIES GENERATED TRUE
-)
-install(
-  FILES ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
 )
 
