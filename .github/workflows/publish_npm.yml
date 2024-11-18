@@ -24,7 +24,7 @@ jobs:
         workflow: manifold.yml
         workflow_conclusion: completed
         branch: master
-        check_artifact: true
+        check_artifacts: true
         name: wasm
         path: ./bindings/wasm/
 

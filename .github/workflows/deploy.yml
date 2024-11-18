@@ -28,7 +28,6 @@ jobs:
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
-        branch: maser
         # specific to the triggering workflow
         run_id: ${{github.event.workflow_run.id}}
         # do not download from old run
