@@ -281,7 +281,7 @@ list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 list(
   APPEND
   MANIFOLD_PUBLIC_HDRS
-  ${CMAKE_CURRENT_BINARY_DIR}include/manifold/version.h
+  ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
 )
 
 install(
