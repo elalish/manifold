@@ -1,6 +1,6 @@
 name: publish_npm
 
-on: 
+on:
   release:
     types: [published]
   workflow_dispatch:
@@ -23,6 +23,8 @@ jobs:
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
+        branch: master
+        check_artifact: true
         name: wasm
         path: ./bindings/wasm/
 
