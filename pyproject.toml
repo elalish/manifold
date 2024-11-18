@@ -63,7 +63,7 @@ before-all = "git clone --depth 1 --branch v2021.10.0 https://github.com/oneapi-
 "cmake.define.FETCHCONTENT_UPDATES_DISCONNECTED" = "ON"
 
 [tool.cibuildwheel.macos]
-archs = ["universal2"]
+archs = ["x86_64", "arm64", "universal2"]
 environment = "MACOSX_DEPLOYMENT_TARGET=10.14"
 
 [tool.cibuildwheel.windows]
