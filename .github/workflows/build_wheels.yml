@@ -18,6 +18,10 @@ jobs:
       - run: |
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
+      - if: matrix.os == 'macos-13'
+        run: echo "CIBW_SKIP=\"*_arm64 *_universal2\"" >> "$GITHUB_ENV"
+      - if: matrix.os == 'macos-14'
+        run: echo "CIBW_SKIP=\"*_x86-64\"" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19
