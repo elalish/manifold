@@ -12,6 +12,11 @@ EOT
 cat <<EOT > testing.cpp
 #include <manifold/manifold.h>
 #include <manifold/version.h>
+
+#if MANIFOLD_VERSION < MANIFOLD_VERSION_NUMBER(2, 5, 1)
+# error "Unexpected: minimum version number not available"
+#endif
+
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
