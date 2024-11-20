@@ -20,6 +20,7 @@
 #include "manifold/common.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
+#include "manifold/polygon.h"
 #include "manifold/types.h"
 
 using namespace manifold;
@@ -365,7 +366,7 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
 
 ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
                                     size_t n_verts, size_t n_props,
-                                    size_t *tri_verts, size_t n_tris) {
+                                    uint64_t *tri_verts, size_t n_tris) {
   auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
@@ -375,7 +376,8 @@ ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
 
 ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
                                                size_t n_verts, size_t n_props,
-                                               size_t *tri_verts, size_t n_tris,
+                                               uint64_t *tri_verts,
+                                               size_t n_tris,
                                                double *halfedge_tangent) {
   auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
@@ -587,16 +589,16 @@ size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64 *m) {
 double *manifold_meshgl64_vert_properties(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->vertProperties);
 }
-size_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->triVerts);
 }
-size_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->mergeFromVert);
 }
-size_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->mergeToVert);
 }
-size_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->runIndex);
 }
 uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m) {
@@ -605,7 +607,7 @@ uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m) {
 double *manifold_meshgl64_run_transform(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->runTransform);
 }
-size_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m) {
+uint64_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m) {
   return copy_data(mem, from_c(m)->faceID);
 }
 double *manifold_meshgl64_halfedge_tangent(void *mem, ManifoldMeshGL64 *m) {
@@ -702,6 +704,20 @@ int manifold_get_circular_segments(double radius) {
 
 void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
 
+ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps,
+                                            double epsilon) {
+  auto triangulation = manifold::Triangulate(*from_c(ps), epsilon);
+  return to_c(new (mem) std::vector<ivec3>(triangulation));
+}
+
+size_t manifold_triangulation_num_tri(ManifoldTriangulation *m) {
+  return from_c(m)->size();
+}
+
+int *manifold_triangulation_tri_verts(void *mem, ManifoldTriangulation *m) {
+  return reinterpret_cast<int *>(copy_data<ivec3>(mem, *from_c(m)));
+}
+
 // memory size
 size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_cross_section_vec_size() {
@@ -716,6 +732,7 @@ size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_meshgl64_size() { return sizeof(MeshGL64); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
+size_t manifold_triangulation_size() { return sizeof(std::vector<ivec3>); }
 
 // allocation
 ManifoldManifold *manifold_alloc_manifold() {
@@ -740,6 +757,9 @@ ManifoldMeshGL *manifold_alloc_meshgl() { return to_c(new MeshGL); }
 ManifoldMeshGL64 *manifold_alloc_meshgl64() { return to_c(new MeshGL64); }
 ManifoldBox *manifold_alloc_box() { return to_c(new Box); }
 ManifoldRect *manifold_alloc_rect() { return to_c(new Rect); }
+ManifoldTriangulation *manifold_alloc_triangulation() {
+  return to_c(new std::vector<ivec3>);
+}
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
@@ -760,6 +780,9 @@ void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_meshgl64(ManifoldMeshGL64 *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
+void manifold_delete_triangulation(ManifoldTriangulation *m) {
+  delete from_c(m);
+}
 
 // destruction
 void manifold_destruct_cross_section(ManifoldCrossSection *cs) {
@@ -780,6 +803,9 @@ void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_meshgl64(ManifoldMeshGL64 *m) { from_c(m)->~MeshGL64(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
+void manifold_destruct_triangulation(ManifoldTriangulation *m) {
+  from_c(m)->~vector<ivec3>();
+}
 
 #ifdef __cplusplus
 }

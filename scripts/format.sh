@@ -19,16 +19,11 @@ $CLANG_FORMAT -i include/manifold/*.h
 
 black bindings/python/examples/*.py
 
-for f in $(find -name CMakeLists.txt); do
-  # skip build directories
-  if [[ $f != *build* ]]; then
-    gersemi -i $f
-  fi
-done
-
-for f in $(find -name '*.cmake.in'); do
-  # skip build directories
-  if [[ $f != *build* ]]; then
-    gersemi -i $f
-  fi
+for pattern in 'CMakeLists.txt' '*.cmake*'; do
+  for f in $(find -name ${pattern}); do
+    # skip build directories
+    if [[ $f != *build* && $f != *node_modules* ]]; then
+      gersemi -i $f
+    fi
+  done
 done

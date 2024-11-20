@@ -17,8 +17,8 @@
 #include <map>
 
 #include "./boolean3.h"
+#include "./parallel.h"
 #include "./utils.h"
-#include "manifold/parallel.h"
 
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -253,7 +253,7 @@ void AddNewEdgeVerts(
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
-  if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
+  if (p1q2.size() > kParallelThreshold) {
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
@@ -486,9 +486,7 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       bool forward) {
   ZoneScoped;
   for_each_n(
-      ManifoldParams().deterministic ? ExecutionPolicy::Seq
-                                     : autoPolicy(inP.halfedge_.size()),
-      countAt(0), inP.halfedge_.size(),
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
@@ -780,11 +778,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false);
 
+  v12R.clear();
+  v21R.clear();
+
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
+
+  i12.clear();
+  i21.clear();
 
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
@@ -801,13 +805,27 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
                      i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
 
+  edgesP.clear();
+  edgesQ.clear();
+
   AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
                  inP_.NumTri());
+
+  edgesNew.clear();
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
                    facePQ2R.cview(0, inP_.NumTri()), true);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false);
+
+  wholeHalfedgeP.clear();
+  wholeHalfedgeQ.clear();
+  facePtrR.clear();
+  facePQ2R.clear();
+  i03.clear();
+  i30.clear();
+  vP2R.clear();
+  vQ2R.clear();
 
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
@@ -821,6 +839,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, halfedgeRef);
+  halfedgeRef.clear();
+  faceEdge.clear();
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 namespace {
 using namespace manifold;
@@ -393,7 +393,7 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
                auto old = std::atomic_exchange(
                    reinterpret_cast<std::atomic<uint8_t>*>(
                        &counters[halfedge_[idx].startVert]),
-                   1);
+                   static_cast<uint8_t>(1));
                if (old == 1) return;
                // arbitrary, last one wins.
                vertHalfedge[halfedge_[idx].startVert] = idx;

@@ -15,8 +15,8 @@
 #include <limits>
 
 #include "./impl.h"
+#include "./parallel.h"
 #include "./tri_dist.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -87,8 +87,9 @@ struct UpdateProperties {
       const int propVert = triProp[tri][i];
 
       auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]), 1);
-      if (old == 1) return;
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
+      if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -191,7 +192,7 @@ bool Manifold::Impl::Is2Manifold() const {
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
-      countAt(0_uz), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+      countAt(0_uz), countAt(2 * NumEdge() - 1), [&halfedge](size_t edge) {
         const Halfedge h = halfedge[edge];
         if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
           return true;

@@ -16,7 +16,7 @@
 
 #include <limits>
 
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 using namespace manifold;
 
@@ -572,6 +572,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   std::tie(x21_, v21_) =
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
+
+  s11.clear();
+  xyzz11.clear();
+  z02.clear();
+  z20.clear();
 
   Vec<int> p0 = p0q2.Copy(false);
   p0q2.Resize(0);
