@@ -10,6 +10,10 @@ on:
   pull_request:
     branches: [ master ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   build:
     name: CrossSection:${{matrix.cross_section}} ${{matrix.parallelization == 'ON'}} GCC ${{matrix.gcc}}
@@ -155,7 +159,6 @@ jobs:
     strategy:
       matrix:
         parallelization: [OFF, ON]
-      max-parallel: 1
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v4
@@ -185,7 +188,6 @@ jobs:
     strategy:
       matrix:
         parallelization: [OFF, ON]
-      max-parallel: 1
     runs-on: ubuntu-latest
     container: openscad/mxe-x86_64-gui:latest
     steps:
