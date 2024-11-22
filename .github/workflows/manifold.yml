@@ -74,7 +74,7 @@ jobs:
         cd ../
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
+        lcov --remove ./code_coverage_total.info '/usr/*' '/*/test/*' '/*/extras/*' '/*/bindings/*' --output-file ./code_coverage.info
         cd ../
     - uses: codecov/codecov-action@v5
       if: matrix.parallelization == 'OFF'
