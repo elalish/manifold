@@ -213,7 +213,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config googletest assimp
+        brew install pkgconf googletest assimp
         pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallelization == 'ON'
@@ -244,7 +244,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config googletest
+        brew install pkgconf googletest
         pip install trimesh pytest
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
@@ -272,7 +272,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config googletest
+        brew install pkgconf googletest
         pip install trimesh pytest
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
