@@ -444,7 +444,7 @@ TEST(Smooth, SDF) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    ExportMesh("smoothGyroid.glb", gyroid.GetMeshGL(), options2);
+    ExportMesh("smoothGyroid.glb", smoothed.GetMeshGL(), options2);
   }
 #endif
 }
