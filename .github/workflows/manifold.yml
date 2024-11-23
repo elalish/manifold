@@ -79,6 +79,7 @@ jobs:
     - uses: codecov/codecov-action@v5
       if: matrix.parallelization == 'OFF'
       with:
+        disable_search: true
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallelization}}
