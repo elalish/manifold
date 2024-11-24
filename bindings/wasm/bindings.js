@@ -294,7 +294,7 @@ Module.setup = function() {
     const polygonsVec = this._Project();
     const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
     disposePolygons(polygonsVec);
-    return result.simplify(this.tolerance);
+    return result;
   };
 
   Module.Manifold.prototype.split = function(manifold) {
