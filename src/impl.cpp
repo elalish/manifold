@@ -21,8 +21,8 @@
 
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
+#include "./parallel.h"
 #include "./svd.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;

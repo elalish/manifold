@@ -10,6 +10,10 @@ on:
   pull_request:
     branches: [ master ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   build:
     name: CrossSection:${{matrix.cross_section}} ${{matrix.parallelization == 'ON'}} GCC ${{matrix.gcc}}
@@ -63,21 +67,24 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -DCODE_COVERAGE=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_PAR=${{matrix.parallelization}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
         cd test
         ./manifold_test
         cd ../
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --remove ./code_coverage_total.info '/usr/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
+        lcov --extract ./code_coverage_total.info "/*/manifold/src/*" --output-file ./code_coverage.info
         cd ../
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       if: matrix.parallelization == 'OFF'
       with:
+        disable_search: true
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallelization}}
+        token: ${{secrets.CODECOV_TOKEN}}
+        verbose: true
     - name: test cmake consumer
       run: |
         cd build
@@ -108,9 +115,6 @@ jobs:
   build_wasm:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        exception: [ON, OFF]
     steps:
     - name: Install dependencies
       run: |
@@ -130,7 +134,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_EXCEPTIONS=${{matrix.exception}} .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
     - name: Test WASM
       run: |
         cd build/test
@@ -144,7 +148,7 @@ jobs:
         cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v4
-      if: matrix.exception == 'ON' && github.event_name == 'push'
+      if: github.event_name == 'push'
       with:
         name: wasm
         path: bindings/wasm/examples/dist/
@@ -156,7 +160,6 @@ jobs:
     strategy:
       matrix:
         parallelization: [OFF, ON]
-      max-parallel: 1
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v4
@@ -186,7 +189,6 @@ jobs:
     strategy:
       matrix:
         parallelization: [OFF, ON]
-      max-parallel: 1
     runs-on: ubuntu-latest
     container: openscad/mxe-x86_64-gui:latest
     steps:
@@ -212,11 +214,11 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config googletest assimp
+        brew install googletest assimp
         pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallelization == 'ON'
-      run: brew install tbb onedpl
+      run: brew install tbb
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
     - name: Build
@@ -235,24 +237,60 @@ jobs:
         sudo cmake --install .
         cd ..
         ./scripts/test-cmake.sh
+        LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
+
+  build_mac_builtin_tbb:
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+    - name: Install common dependencies
+      run: |
+        brew install googletest
+        pip install trimesh pytest
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
+    - name: Test
+      run: |
+        cd build/test
+        ./manifold_test
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./scripts/test-cmake.sh
+        LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
+
+  build_mac_builtin_tbb_subdir:
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+    - name: Install common dependencies
+      run: |
+        brew install googletest
+        pip install trimesh pytest
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: test cmake consumer
+      run: |
+        cd ..
+        ./manifold/scripts/test-cmake-subdir.sh
 
   build_nix:
     timeout-minutes: 30
     strategy:
       matrix:
-        # variant: [none, tbb, js]
-        # disabling js variant for now
-        variant: [none, tbb]
+        variant: [manifold-none, manifold-tbb, manifold-js, manifold3d]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v22
-    - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
+    - uses: DeterminateSystems/nix-installer-action@main
+    - uses: DeterminateSystems/magic-nix-cache-action@main
+    - run: nix build -L '.?submodules=1#${{matrix.variant}}'
 
-  build_nix_python:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v22
-    - run: nix build -L '.?submodules=1#manifold3d'

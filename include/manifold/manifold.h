@@ -166,7 +166,7 @@ using MeshGL = MeshGLP<float>;
 /**
  * @brief Double-precision, 64-bit indices - best for huge meshes.
  */
-using MeshGL64 = MeshGLP<double, size_t>;
+using MeshGL64 = MeshGLP<double, uint64_t>;
 
 /**
  * @brief This library's internal representation of an oriented, 2-manifold,

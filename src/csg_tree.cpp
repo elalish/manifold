@@ -25,7 +25,7 @@
 #include "./csg_tree.h"
 #include "./impl.h"
 #include "./mesh_fixes.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 constexpr int kParallelThreshold = 4096;
 
@@ -468,35 +468,32 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     return std::make_shared<Manifold::Impl>(boolean.Result(operation));
   }
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
-  if (!ManifoldParams().deterministic) {
-    tbb::task_group group;
-    tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(
-        results.size());
-    for (auto result : results) {
-      queue.emplace(result);
-    }
-    results.clear();
-    std::function<void()> process = [&]() {
-      while (queue.size() > 1) {
-        SharedImpl a, b;
-        if (!queue.try_pop(a)) continue;
-        if (!queue.try_pop(b)) {
-          queue.push(a);
-          continue;
-        }
-        group.run([&, a, b]() {
-          Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
-          queue.emplace(
-              std::make_shared<Manifold::Impl>(boolean.Result(operation)));
-          return group.run(process);
-        });
-      }
-    };
-    group.run_and_wait(process);
-    SharedImpl r;
-    queue.try_pop(r);
-    return *std::get_if<std::shared_ptr<Manifold::Impl>>(&r);
+  tbb::task_group group;
+  tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(results.size());
+  for (auto result : results) {
+    queue.emplace(result);
   }
+  results.clear();
+  std::function<void()> process = [&]() {
+    while (queue.size() > 1) {
+      SharedImpl a, b;
+      if (!queue.try_pop(a)) continue;
+      if (!queue.try_pop(b)) {
+        queue.push(a);
+        continue;
+      }
+      group.run([&, a, b]() {
+        Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
+        queue.emplace(
+            std::make_shared<Manifold::Impl>(boolean.Result(operation)));
+        return group.run(process);
+      });
+    }
+  };
+  group.run_and_wait(process);
+  SharedImpl r;
+  queue.try_pop(r);
+  return *std::get_if<std::shared_ptr<Manifold::Impl>>(&r);
 #endif
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
@@ -604,10 +601,8 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
   if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
     impl->forcedToLeafNodes_ = true;
-    for_each(impl->children_.size() > 1 && !ManifoldParams().deterministic
-                 ? ExecutionPolicy::Par
-                 : ExecutionPolicy::Seq,
-             impl->children_.begin(), impl->children_.end(), [](auto &child) {
+    for_each(ExecutionPolicy::Par, impl->children_.begin(),
+             impl->children_.end(), [](auto &child) {
                if (child->GetNodeType() != CsgNodeType::Leaf) {
                  child = child->ToLeafNode();
                }

@@ -19,4 +19,10 @@ suite('CrossSection Bindings', () => {
     expect(polygons[0]).toContainEqual([1, 0]);
     expect(polygons[0]).toContainEqual([1, 1]);
   });
+
+  test('project creates a valid polygon', () => {
+    const cs = manifoldModule.Manifold.sphere(1).project();
+    expect(cs.numContour()).toEqual(1);
+    expect(cs.area()).to.be.greaterThan(0);
+  });
 });

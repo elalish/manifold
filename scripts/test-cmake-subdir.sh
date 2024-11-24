@@ -5,7 +5,8 @@ cd cmake-consumer
 cat <<EOT > CMakeLists.txt
 cmake_minimum_required(VERSION 3.18)
 project(testing LANGUAGES CXX)
-find_package(manifold "3.0.0" REQUIRED)
+set(MANIFOLD_PAR ON)
+add_subdirectory(manifold EXCLUDE_FROM_ALL)
 add_executable(testing test.cpp)
 target_link_libraries(testing PRIVATE manifold::manifold)
 EOT
@@ -13,16 +14,13 @@ EOT
 cat <<EOT > test.cpp
 #include <manifold/manifold.h>
 #include <manifold/version.h>
-
-#if MANIFOLD_VERSION < MANIFOLD_VERSION_NUMBER(2, 5, 1)
-# error "Unexpected: minimum version number not available"
-#endif
-
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
+cp -r ../manifold ./
 mkdir build
 cd build
 cmake ..
 make
 ./testing
+

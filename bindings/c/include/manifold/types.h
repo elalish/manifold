@@ -27,6 +27,7 @@ typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
+typedef struct ManifoldTriangulation ManifoldTriangulation;
 
 #ifdef MANIFOLD_EXPORT
 typedef struct ManifoldMaterial ManifoldMaterial;

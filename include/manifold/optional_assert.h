@@ -14,34 +14,53 @@
 
 #pragma once
 
-#ifdef MANIFOLD_EXCEPTIONS
-#include <stdexcept>
-#endif
-
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
-template <typename Ex>
-void Assert(bool condition, const char* file, int line, const std::string& cond,
-            const std::string& msg) {
-  if (!condition) {
-    std::ostringstream output;
-    output << "Error in file: " << file << " (" << line << "): \'" << cond
-           << "\' is false: " << msg;
-    throw Ex(output.str());
-  }
-}
-#define DEBUG_ASSERT(condition, EX, msg) \
-  Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
-#else
-#define DEBUG_ASSERT(condition, EX, msg)
-#endif
+/** @addtogroup Debug
+ * @{
+ */
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+using logicErr = std::logic_error;
 
-#ifdef MANIFOLD_EXCEPTIONS
+template <typename Ex>
+void AssertFail(const char* file, int line, const char* cond, const char* msg) {
+  std::ostringstream output;
+  output << "Error in file: " << file << " (" << line << "): \'" << cond
+         << "\' is false: " << msg;
+  throw Ex(output.str());
+}
+
+template <typename Ex>
+void AssertFail(const char* file, int line, const std::string& cond,
+                const std::string& msg) {
+  std::ostringstream output;
+  output << "Error in file: " << file << " (" << line << "): \'" << cond
+         << "\' is false: " << msg;
+  throw Ex(output.str());
+}
+
+// DEBUG_ASSERT is slightly slower due to the function call, but gives more
+// detailed info.
+#define DEBUG_ASSERT(condition, EX, msg) \
+  if (!(condition)) AssertFail<EX>(__FILE__, __LINE__, #condition, msg);
+// ASSERT has almost no overhead, so better to use for frequent calls like
+// vector bounds checking.
 #define ASSERT(condition, EX) \
   if (!(condition)) throw(EX);
 #else
+#define DEBUG_ASSERT(condition, EX, msg)
 #define ASSERT(condition, EX)
 #endif
+/** @} */

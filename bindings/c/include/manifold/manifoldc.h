@@ -55,11 +55,12 @@ ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
 
 ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
                                     size_t n_verts, size_t n_props,
-                                    size_t *tri_verts, size_t n_tris);
+                                    uint64_t *tri_verts, size_t n_tris);
 
 ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
                                                size_t n_verts, size_t n_props,
-                                               size_t *tri_verts, size_t n_tris,
+                                               uint64_t *tri_verts,
+                                               size_t n_tris,
                                                double *halfedge_tangent);
 ManifoldMeshGL64 *manifold_get_meshgl64(void *mem, ManifoldManifold *m);
 ManifoldMeshGL64 *manifold_meshgl64_copy(void *mem, ManifoldMeshGL64 *m);
@@ -406,14 +407,21 @@ size_t manifold_meshgl64_run_transform_length(ManifoldMeshGL64 *m);
 size_t manifold_meshgl64_face_id_length(ManifoldMeshGL64 *m);
 size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64 *m);
 double *manifold_meshgl64_vert_properties(void *mem, ManifoldMeshGL64 *m);
-size_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m);
-size_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m);
-size_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m);
-size_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m);
+uint64_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m);
+uint64_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m);
+uint64_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m);
+uint64_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m);
 uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m);
 double *manifold_meshgl64_run_transform(void *mem, ManifoldMeshGL64 *m);
-size_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m);
+uint64_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m);
 double *manifold_meshgl64_halfedge_tangent(void *mem, ManifoldMeshGL64 *m);
+
+// Triangulation
+
+ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps,
+                                            double epsilon);
+size_t manifold_triangulation_num_tri(ManifoldTriangulation *m);
+int *manifold_triangulation_tri_verts(void *mem, ManifoldTriangulation *m);
 
 // memory size
 
@@ -429,6 +437,7 @@ size_t manifold_meshgl64_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_curvature_size();
+size_t manifold_triangulation_size();
 
 // allocation
 
@@ -442,6 +451,7 @@ ManifoldMeshGL *manifold_alloc_meshgl();
 ManifoldMeshGL64 *manifold_alloc_meshgl64();
 ManifoldBox *manifold_alloc_box();
 ManifoldRect *manifold_alloc_rect();
+ManifoldTriangulation *manifold_alloc_triangulation();
 
 // destruction
 
@@ -455,6 +465,7 @@ void manifold_destruct_meshgl(ManifoldMeshGL *m);
 void manifold_destruct_meshgl64(ManifoldMeshGL64 *m);
 void manifold_destruct_box(ManifoldBox *b);
 void manifold_destruct_rect(ManifoldRect *b);
+void manifold_destruct_triangulation(ManifoldTriangulation *M);
 
 // pointer free + destruction
 
@@ -468,6 +479,7 @@ void manifold_delete_meshgl(ManifoldMeshGL *m);
 void manifold_delete_meshgl64(ManifoldMeshGL64 *m);
 void manifold_delete_box(ManifoldBox *b);
 void manifold_delete_rect(ManifoldRect *b);
+void manifold_delete_triangulation(ManifoldTriangulation *m);
 
 // MeshIO / Export
 

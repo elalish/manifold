@@ -412,9 +412,12 @@ void CheckStrictly(const Manifold& manifold) {
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 
-void CheckGL(const Manifold& manifold) {
+void CheckGL(const Manifold& manifold, bool noMerge) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
+  if (noMerge) {
+    EXPECT_EQ(manifold.NumVert(), meshGL.NumVert());
+  }
   EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
   EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.NumVert() - manifold.NumVert());
   EXPECT_EQ(meshGL.runIndex.size(), meshGL.runOriginalID.size() + 1);
