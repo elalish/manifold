@@ -286,7 +286,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        variant: [manifold-none, manifold-tbb, manifold-js, manifold3d]
+        variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

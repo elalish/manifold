@@ -17,6 +17,10 @@
 #include "manifold/polygon.h"
 #include "test.h"
 
+#if (MANIFOLD_PAR == 1)
+#include <tbb/parallel_for.h>
+#endif
+
 // we need to call some tracy API to establish the connection
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>
@@ -44,6 +48,23 @@ int main(int argc, char** argv) {
 
   const char* name = "test setup";
   FrameMarkStart(name);
+
+  // warmup tbb for emscripten, according to
+  // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
+#if defined(__EMSCRIPTEN__) && (MANIFOLD_PAR == 1)
+  int num_threads = tbb::this_task_arena::max_concurrency();
+  std::atomic<int> barrier{num_threads};
+  tbb::parallel_for(
+      0, num_threads,
+      [&barrier](int) {
+        barrier--;
+        while (barrier > 0) {
+          // Send browser thread to event loop
+          std::this_thread::yield();
+        }
+      },
+      tbb::static_partitioner{});
+#endif
 
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
