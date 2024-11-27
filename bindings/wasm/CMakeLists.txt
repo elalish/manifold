@@ -50,7 +50,7 @@ add_custom_command(
   TARGET js_deps
   POST_BUILD
   # fix js file
-  COMMAND 
+  COMMAND
     ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fixup.py
     ${CMAKE_CURRENT_BINARY_DIR}/manifold.js
   # copy WASM build back here for publishing to npm
