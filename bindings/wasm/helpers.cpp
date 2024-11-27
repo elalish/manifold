@@ -208,7 +208,7 @@ Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
 Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
                   double level, double tolerance) {
   double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
-  return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance);
+  return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

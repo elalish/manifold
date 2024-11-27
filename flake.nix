@@ -112,7 +112,7 @@
               cd ../
             '';
           };
-        manifold-emscripten = { doCheck ? true }: pkgs.buildEmscriptenPackage {
+        manifold-emscripten = { doCheck ? true, parallel ? false }: pkgs.buildEmscriptenPackage {
           name = "manifold-js";
           version = manifold-version;
           src = self;
@@ -126,7 +126,9 @@
             mkdir build
             cd build
             emcmake cmake -DCMAKE_BUILD_TYPE=Release \
+            -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
+            -DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src} \
             -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
           '';
           buildPhase = ''
@@ -148,6 +150,7 @@
           manifold-tbb = manifold { };
           manifold-none = manifold { parallel = false; };
           manifold-js = manifold-emscripten { };
+          manifold-js-tbb = manifold-emscripten { parallel = true; };
           # but how should we make it work with other python versions?
           manifold3d = with pkgs.python3Packages; buildPythonPackage {
             pname = "manifold3d";
@@ -197,6 +200,7 @@
             # useful tools
             clang-tools_18
             clang_18
+            llvmPackages_18.bintools
             tracy
           ];
         };
