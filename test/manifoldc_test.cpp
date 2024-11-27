@@ -294,10 +294,15 @@ TEST(CBIND, properties) {
 
   ManifoldManifold *cube =
       manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
+  EXPECT_EQ(manifold_num_prop(cube), 0);
+
   ManifoldManifold *cube_props =
       manifold_set_properties(alloc_manifold_buffer(), cube, 1, props, NULL);
+  EXPECT_EQ(manifold_num_prop(cube_props), 1);
+
   ManifoldManifold *cube_props_context = manifold_set_properties(
       alloc_manifold_buffer(), cube, 1, propscontext, context);
+  EXPECT_EQ(manifold_num_prop(cube_props_context), 1);
 
   manifold_destruct_manifold(cube);
   manifold_destruct_manifold(cube_props);

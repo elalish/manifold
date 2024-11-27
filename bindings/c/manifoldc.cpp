@@ -633,6 +633,7 @@ ManifoldError manifold_status(ManifoldManifold *m) {
 size_t manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
 size_t manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
 size_t manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
+size_t manifold_num_prop(ManifoldManifold *m) { return from_c(m)->NumProp(); };
 int manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
 
 double manifold_surface_area(ManifoldManifold *m) {
