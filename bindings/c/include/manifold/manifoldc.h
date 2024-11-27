@@ -195,6 +195,7 @@ ManifoldError manifold_status(ManifoldManifold *m);
 size_t manifold_num_vert(ManifoldManifold *m);
 size_t manifold_num_edge(ManifoldManifold *m);
 size_t manifold_num_tri(ManifoldManifold *m);
+size_t manifold_num_prop(ManifoldManifold *m);
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
 double manifold_epsilon(ManifoldManifold *m);
 int manifold_genus(ManifoldManifold *m);
