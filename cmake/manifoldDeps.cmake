@@ -219,10 +219,6 @@ if(MANIFOLD_TEST)
   endif()
 endif()
 
-if(EMSCRIPTEN)
-  find_package(Python REQUIRED)
-endif()
-
 if(MANIFOLD_FUZZ)
   logmissingdep("fuzztest" , "MANIFOLD_FUZZ")
   FetchContent_Declare(

@@ -125,7 +125,7 @@ if(EMSCRIPTEN)
     add_link_options(-sMALLOC=mimalloc)
     # The default stack size apparently causes problem when parallelization is
     # enabled.
-    add_link_options(-sSTACK_SIZE=16MB)
+    add_link_options(-sSTACK_SIZE=20MB)
     add_link_options(-sINITIAL_MEMORY=20MB)
   endif()
   if(MANIFOLD_DEBUG)
