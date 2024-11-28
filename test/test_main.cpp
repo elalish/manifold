@@ -18,7 +18,6 @@
 #include "test.h"
 
 #if (MANIFOLD_PAR == 1)
-#include <oneapi/tbb/global_control.h>
 #include <oneapi/tbb/parallel_for.h>
 #endif
 
@@ -54,8 +53,6 @@ int main(int argc, char** argv) {
   // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
 #if defined(__EMSCRIPTEN__) && (MANIFOLD_PAR == 1)
   int num_threads = tbb::this_task_arena::max_concurrency();
-  oneapi::tbb::global_control global_limit(
-      tbb::global_control::thread_stack_size, 16 * 1024 * 1024);
   std::atomic<int> barrier{num_threads};
   tbb::parallel_for(
       0, num_threads,
