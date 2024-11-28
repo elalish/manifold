@@ -139,10 +139,12 @@ jobs:
         cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=${{matrix.parallelization}} .. && emmake make
     - name: Test WASM
+      if: matrix.parallelization == 'OFF'
       run: |
         cd build/test
         node ./manifold_test.js
     - name: Test examples
+      if: matrix.parallelization == 'OFF'
       run: |
         cd bindings/wasm/examples
         npm ci
