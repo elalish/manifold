@@ -18,8 +18,8 @@
 #include "test.h"
 
 #if (MANIFOLD_PAR == 1)
-#include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/global_control.h>
+#include <oneapi/tbb/parallel_for.h>
 #endif
 
 // we need to call some tracy API to establish the connection
