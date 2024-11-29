@@ -137,7 +137,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=${{matrix.parallelization}} .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} .. && emmake make
     - name: Test WASM
       if: matrix.parallelization == 'OFF'
       run: |
