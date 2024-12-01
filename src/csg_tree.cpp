@@ -532,14 +532,19 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
       if (frame->op_node->cache_ == nullptr) switch (frame->op_node->op_) {
           case OpType::Add:
             BatchUnion(frame->left_children);
-            frame->op_node->cache_ = frame->left_children[0];
+            impl->children_ = {frame->left_children[0]};
+            frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
+                frame->left_children[0]->Transform(frame->op_node->transform_));
             break;
           case OpType::Intersect: {
             std::vector<std::shared_ptr<const Manifold::Impl>> impls;
             for (auto &child : frame->left_children)
               impls.push_back(child->GetImpl());
-            frame->op_node->cache_ = {std::make_shared<CsgLeafNode>(
-                BatchBoolean(OpType::Intersect, impls))};
+            auto result = BatchBoolean(OpType::Intersect, impls);
+            impl->children_ = {std::make_shared<CsgLeafNode>(result)};
+            frame->op_node->cache_ =
+                std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
+                    result->Transform(frame->op_node->transform_)));
             break;
           };
           case OpType::Subtract:
@@ -553,20 +558,24 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
                 Boolean3 boolean(*frame->left_children[0]->GetImpl(),
                                  *frame->right_children[0]->GetImpl(),
                                  OpType::Subtract);
+                Manifold::Impl result = boolean.Result(OpType::Subtract);
+                impl->children_ = {std::make_shared<CsgLeafNode>(
+                    std::make_shared<Manifold::Impl>(result))};
                 frame->op_node->cache_ = std::make_shared<CsgLeafNode>(
                     std::make_shared<Manifold::Impl>(
-                        boolean.Result(OpType::Subtract)));
+                        result.Transform(frame->op_node->transform_)));
               } else {
-                frame->op_node->cache_ = frame->left_children[0];
+                impl->children_ = {frame->left_children[0]};
+                frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
+                    frame->left_children[0]->Transform(
+                        frame->op_node->transform_));
               }
             }
             break;
         }
       if (frame->parent_children != nullptr)
         frame->parent_children->push_back(std::static_pointer_cast<CsgLeafNode>(
-            frame->op_node->cache_->Transform(
-                frame->transform * Mat4(frame->op_node->transform_))));
-      impl->children_ = {frame->op_node->cache_};
+            frame->op_node->cache_->Transform(frame->transform)));
       stack.pop_back();
     } else {
       auto add_children =
