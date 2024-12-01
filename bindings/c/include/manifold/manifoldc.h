@@ -215,7 +215,7 @@ double manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
                         double searchLength);
 ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int normal_idx,
-                                             int min_sharp_angle);
+                                             double min_sharp_angle);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection *manifold_cross_section_empty(void *mem);
