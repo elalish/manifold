@@ -624,6 +624,8 @@ CsgNodeType CsgOpNode::GetNodeType() const {
     case OpType::Intersect:
       return CsgNodeType::Intersection;
   }
+  // unreachable...
+  return CsgNodeType::Leaf;
 }
 
 mat3x4 CsgOpNode::GetTransform() const { return transform_; }
