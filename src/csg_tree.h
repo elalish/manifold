@@ -77,7 +77,7 @@ class CsgOpNode final : public CsgNode {
 
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
 
-  CsgNodeType GetNodeType() const override { return op_; }
+  CsgNodeType GetNodeType() const override;
 
   mat3x4 GetTransform() const override;
 
@@ -87,22 +87,10 @@ class CsgOpNode final : public CsgNode {
     bool forcedToLeafNodes_ = false;
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
-  CsgNodeType op_;
+  OpType op_;
   mat3x4 transform_ = la::identity;
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
-
-  void SetOp(OpType);
-  bool IsOp(OpType op);
-
-  static std::shared_ptr<Manifold::Impl> BatchBoolean(
-      OpType operation,
-      std::vector<std::shared_ptr<const Manifold::Impl>> &results);
-
-  void BatchUnion() const;
-
-  std::vector<std::shared_ptr<CsgNode>> &GetChildren(
-      bool forceToLeafNodes = true) const;
 };
 
 }  // namespace manifold
