@@ -68,7 +68,7 @@ if(MANIFOLD_PAR)
     FetchContent_Declare(
       TBB
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-      GIT_TAG v2021.11.0
+      GIT_TAG v2022.0.0
       GIT_PROGRESS TRUE
       EXCLUDE_FROM_ALL
     )
@@ -112,7 +112,8 @@ if(MANIFOLD_CROSS_SECTION)
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      GIT_TAG ff378668baae3570e9d8070aa9eb339bdd5a6aba
+      # Nov 22, 2024
+      GIT_TAG a8269cafe92cdbf92572bceda5e9fdacc4684b51
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR CPP
       EXCLUDE_FROM_ALL
@@ -216,10 +217,6 @@ if(MANIFOLD_TEST)
   if(NOT TARGET GTest::gtest_main)
     add_library(GTest::gtest_main ALIAS gtest_main)
   endif()
-endif()
-
-if(EMSCRIPTEN)
-  find_package(Python REQUIRED)
 endif()
 
 if(MANIFOLD_FUZZ)

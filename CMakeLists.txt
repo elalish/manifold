@@ -123,9 +123,11 @@ if(EMSCRIPTEN)
     add_compile_options(-pthread)
     # mimalloc is needed for good performance
     add_link_options(-sMALLOC=mimalloc)
+    add_link_options(-sPTHREAD_POOL_SIZE=4)
     # The default stack size apparently causes problem when parallelization is
     # enabled.
-    add_link_options(-sSTACK_SIZE=10MB)
+    add_link_options(-sSTACK_SIZE=30MB)
+    add_link_options(-sINITIAL_MEMORY=32MB)
   endif()
   if(MANIFOLD_DEBUG)
     list(APPEND MANIFOLD_FLAGS -fexceptions)

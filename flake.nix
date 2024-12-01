@@ -125,7 +125,7 @@
             export EM_CACHE=$(pwd)/.emscriptencache
             mkdir build
             cd build
-            emcmake cmake -DCMAKE_BUILD_TYPE=Release \
+            emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
             -DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src} \
@@ -134,11 +134,12 @@
           buildPhase = ''
             emmake make -j''${NIX_BUILD_CORES}
           '';
-          checkPhase = if doCheck then ''
-            cd test
-            node manifold_test.js
-            cd ../
-          '' else "";
+          checkPhase =
+            if doCheck then ''
+              cd test
+              node manifold_test.js
+              cd ../
+            '' else "";
           installPhase = ''
             mkdir -p $out
             cp bindings/wasm/manifold.* $out/
@@ -150,7 +151,11 @@
           manifold-tbb = manifold { };
           manifold-none = manifold { parallel = false; };
           manifold-js = manifold-emscripten { };
-          manifold-js-tbb = manifold-emscripten { parallel = true; };
+          manifold-js-tbb = manifold-emscripten {
+            parallel = true;
+            doCheck =
+              false;
+          };
           # but how should we make it work with other python versions?
           manifold3d = with pkgs.python3Packages; buildPythonPackage {
             pname = "manifold3d";

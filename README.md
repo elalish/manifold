@@ -137,6 +137,10 @@ The build instructions used by our CI are in [manifold.yml](https://github.com/e
 
 ### WASM
 
+> Note: While we support compiling with `MANIFOLD_PAR=ON` in recent emscripten
+> versions, this is not recommended as there can potentially be memory
+> corruption issues.
+
 To build the JS WASM library, first install NodeJS and set up emscripten:
 
 (on Mac):
@@ -158,7 +162,7 @@ Then build:
 cd manifold
 mkdir buildWASM
 cd buildWASM
-emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make
 node test/manifold_test.js
 ```
 
