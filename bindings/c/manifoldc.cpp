@@ -680,7 +680,7 @@ double manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
 
 ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int normal_idx,
-                                             int min_sharp_angle) {
+                                             double min_sharp_angle) {
   auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
   return to_c(new (mem) Manifold(man));
 }
