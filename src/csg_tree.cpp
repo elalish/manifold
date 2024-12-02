@@ -99,11 +99,12 @@ namespace manifold {
 
 std::shared_ptr<CsgNode> CsgNode::Boolean(
     const std::shared_ptr<CsgNode> &second, OpType op) {
-  if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(second)) {
+  if (second->GetNodeType() != CsgNodeType::Leaf) {
     // "this" is not a CsgOpNode (which overrides Boolean), but if "second" is
     // and the operation is commutative, we let it built the tree.
     if ((op == OpType::Add || op == OpType::Intersect)) {
-      return opNode->Boolean(shared_from_this(), op);
+      return std::static_pointer_cast<CsgOpNode>(second)->Boolean(
+          shared_from_this(), op);
     }
   }
   std::vector<std::shared_ptr<CsgNode>> children({shared_from_this(), second});
@@ -443,14 +444,11 @@ void BatchUnion(std::vector<std::shared_ptr<CsgLeafNode>> &children) {
     std::vector<std::shared_ptr<const Manifold::Impl>> impls;
     for (auto &set : disjointSets) {
       if (set.size() == 1) {
-        impls.push_back(
-            std::static_pointer_cast<CsgLeafNode>(children[start + set[0]])
-                ->GetImpl());
+        impls.push_back(children[start + set[0]]->GetImpl());
       } else {
         std::vector<std::shared_ptr<CsgLeafNode>> tmp;
         for (size_t j : set) {
-          tmp.push_back(
-              std::dynamic_pointer_cast<CsgLeafNode>(children[start + j]));
+          tmp.push_back(children[start + j]);
         }
         impls.push_back(
             std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
