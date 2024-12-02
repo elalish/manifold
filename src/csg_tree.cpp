@@ -501,7 +501,7 @@ struct CsgStackFrame {
   bool finalize;
   OpType parent_op;
   mat3x4 transform;
-  std::vector<std::shared_ptr<CsgLeafNode>> *parent;
+  std::vector<std::shared_ptr<CsgLeafNode>> *destination;
   std::shared_ptr<const CsgOpNode> op_node;
   std::vector<std::shared_ptr<CsgLeafNode>> left_children;
   std::vector<std::shared_ptr<CsgLeafNode>> right_children;
@@ -512,27 +512,87 @@ struct CsgStackFrame {
       : finalize(finalize),
         parent_op(parent_op),
         transform(transform),
-        parent(parent),
+        destination(parent),
         op_node(op_node) {}
 };
 
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   if (cache_ != nullptr) return cache_;
+
+  // Note: We do need a pointer here to avoid vector pointers from being
+  // invalidated after pushing elements into the explicit stack.
+  // It is a `shared_ptr` because we may want to drop the stack frame while
+  // still referring to some of the elements inside the old frame.
+  // It is possible to use `unique_ptr`, extending the lifetime of the frame
+  // when we remove it from the stack, but it is a bit more complicated and
+  // there is no measurable overhead from using `shared_ptr` here...
   std::vector<std::shared_ptr<CsgStackFrame>> stack;
+  // initial node, destination is a nullptr because we don't need to put the
+  // result anywhere else (except in the cache_).
   stack.push_back(std::make_shared<CsgStackFrame>(
       false, op_, la::identity, nullptr,
       std::static_pointer_cast<const CsgOpNode>(shared_from_this())));
 
+  // Instead of actually using recursion in the algorithm, we use an explicit
+  // stack, do DFS and store the intermediate states into `CsgStackFrame` to
+  // avoid stack overflow.
+  //
+  // Before performing boolean operations, we should make sure that all children
+  // are `CsgLeafNodes`, i.e. are actual meshes that can be operated on. Hence,
+  // we do it in two steps:
+  // 1. Populate `children` (`left_children` and `right_children`, see below)
+  //    If the child is a `CsgOpNode`, we either flatten it or compute its
+  //    boolean operation result.
+  // 2. Performs boolean after populating the `children` set.
+  //    After a boolean operation is completed, we put the result back to its
+  //    parent's `children` set.
+  //
+  // When we populate `children`, we perform flattening on-the-fly.
+  // For example, we want to turn `(Union a (Union b c))` into `(Union a b c)`.
+  // This allows more efficient `BatchBoolean`/`BatchUnion` calls.
+  // We can do this when the child operation is the same as the parent
+  // operation, except when the operation is `Subtract` (see below).
+  // Note that to avoid repeating work, we will not flatten nodes that are
+  // reused.
+  // Instead of moving `b` and `c` into the parent, and running this flattening
+  // check until a fixed point, we remember the `destination` where we should
+  // put the `CsgLeafNode` into. Normally, the `destination` pointer point to
+  // the parent `children` set. However, when a child is being flattened, we
+  // keep using the old `destination` pointer for the grandchildren. Hence,
+  // removing a node by flattening takes O(1) time. We also need to store the
+  // parent operation type for checking if the node is eligible for flattening,
+  // and transform matrix because we need to re-apply the transformation to the
+  // children.
+  //
+  // `Subtract` is handled differently from `Add` and `Intersect`. It is treated
+  // as two `Add` nodes, `left_children` and `right_children`, that should be
+  // subtracted later. This allows flattening children `Add` nodes. For normal
+  // `Add` and `Intersect`, we only use `left_children`.
+  //
+  // `impl->children_` should always contain either the raw set of children or
+  // the NOT transformed result, while `cache_` should contain the transformed
+  // result. This is because `impl` can be shared between `CsgOpNode` that
+  // differ in `transform_`, so we want it to be able to share the result.
   while (!stack.empty()) {
     std::shared_ptr<CsgStackFrame> frame = stack.back();
+    // Because `CsgOpNode` may be shared and we may encounter some evaluated
+    // nodes that are evaluated during the DFS, we can skip calculation by
+    // checking for `cache_` early.
+    // This is probably not a very useful optimization, because in those cases
+    // the `children_` set only contains one element, and `BatchUnion`,
+    // `BatchBoolean` or `Subtract` on this is already a no-op...
+    if (frame->op_node->cache_) {
+      frame->destination->push_back(std::static_pointer_cast<CsgLeafNode>(
+          frame->op_node->cache_->Transform(frame->transform)));
+      stack.pop_back();
+      continue;
+    }
     auto impl = frame->op_node->impl_.GetGuard();
     if (frame->finalize) {
       if (frame->op_node->cache_ == nullptr) switch (frame->op_node->op_) {
           case OpType::Add:
             BatchUnion(frame->left_children);
             impl->children_ = {frame->left_children[0]};
-            frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
-                frame->left_children[0]->Transform(frame->op_node->transform_));
             break;
           case OpType::Intersect: {
             std::vector<std::shared_ptr<const Manifold::Impl>> impls;
@@ -540,18 +600,18 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
               impls.push_back(child->GetImpl());
             auto result = BatchBoolean(OpType::Intersect, impls);
             impl->children_ = {std::make_shared<CsgLeafNode>(result)};
-            frame->op_node->cache_ =
-                std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
-                    result->Transform(frame->op_node->transform_)));
             break;
           };
           case OpType::Subtract:
             if (frame->left_children.empty()) {
-              frame->op_node->cache_ = std::make_shared<CsgLeafNode>(
-                  std::make_shared<Manifold::Impl>());
+              // nothing to subtract from, so the result is empty.
+              impl->children_ = {std::make_shared<CsgLeafNode>()};
             } else {
               BatchUnion(frame->left_children);
-              if (!frame->right_children.empty()) {
+              if (frame->right_children.empty()) {
+                // nothing to subtract, result equal to the LHS.
+                impl->children_ = {frame->left_children[0]};
+              } else {
                 BatchUnion(frame->right_children);
                 Boolean3 boolean(*frame->left_children[0]->GetImpl(),
                                  *frame->right_children[0]->GetImpl(),
@@ -559,41 +619,36 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
                 Manifold::Impl result = boolean.Result(OpType::Subtract);
                 impl->children_ = {std::make_shared<CsgLeafNode>(
                     std::make_shared<Manifold::Impl>(result))};
-                frame->op_node->cache_ = std::make_shared<CsgLeafNode>(
-                    std::make_shared<Manifold::Impl>(
-                        result.Transform(frame->op_node->transform_)));
-              } else {
-                impl->children_ = {frame->left_children[0]};
-                frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
-                    frame->left_children[0]->Transform(
-                        frame->op_node->transform_));
               }
             }
             break;
         }
-      if (frame->parent != nullptr)
-        frame->parent->push_back(std::static_pointer_cast<CsgLeafNode>(
+      frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
+          impl->children_[0]->Transform(frame->op_node->transform_));
+      if (frame->destination != nullptr)
+        frame->destination->push_back(std::static_pointer_cast<CsgLeafNode>(
             frame->op_node->cache_->Transform(frame->transform)));
       stack.pop_back();
     } else {
-      auto add_children =
-          [&](std::shared_ptr<CsgNode> &node, OpType op, mat3x4 transform,
-              std::vector<std::shared_ptr<CsgLeafNode>> *children) {
-            if (node->GetNodeType() == CsgNodeType::Leaf)
-              children->push_back(std::static_pointer_cast<CsgLeafNode>(
-                  node->Transform(transform)));
-            else
-              stack.push_back(std::make_shared<CsgStackFrame>(
-                  false, op, transform, children,
-                  std::static_pointer_cast<const CsgOpNode>(node)));
-          };
+      auto add_children = [&](std::shared_ptr<CsgNode> &node, OpType op,
+                              mat3x4 transform, auto *children) {
+        if (node->GetNodeType() == CsgNodeType::Leaf)
+          children->push_back(std::static_pointer_cast<CsgLeafNode>(
+              node->Transform(transform)));
+        else
+          stack.push_back(std::make_shared<CsgStackFrame>(
+              false, op, transform, children,
+              std::static_pointer_cast<const CsgOpNode>(node)));
+      };
       frame->finalize = true;
       if (frame->op_node->op_ == OpType::Subtract) {
         for (size_t i = 0; i < impl->children_.size(); i++)
           add_children(impl->children_[i], OpType::Add, la::identity,
                        i == 0 ? &frame->left_children : &frame->right_children);
       } else {
-        bool skipFinalize = frame->parent != nullptr &&
+        // op_node use_count == 2 because it is both inside one CsgOpNode
+        // and in our stack.
+        bool skipFinalize = frame->destination != nullptr &&
                             frame->op_node->op_ == frame->parent_op &&
                             frame->op_node.use_count() <= 2 &&
                             frame->op_node->impl_.UseCount() == 1;
@@ -601,10 +656,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
         auto transform =
             skipFinalize ? (frame->transform * Mat4(frame->op_node->transform_))
                          : la::identity;
-        for (size_t i = 0; i < impl->children_.size(); i++) {
-          add_children(impl->children_[i], frame->op_node->op_, transform,
-                       skipFinalize ? frame->parent : &frame->left_children);
-        }
+        for (auto child : impl->children_)
+          add_children(
+              child, frame->op_node->op_, transform,
+              skipFinalize ? frame->destination : &frame->left_children);
       }
     }
   }
