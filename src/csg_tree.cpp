@@ -501,18 +501,18 @@ struct CsgStackFrame {
   bool finalize;
   OpType parent_op;
   mat3x4 transform;
-  std::vector<std::shared_ptr<CsgLeafNode>> *parent_children;
+  std::vector<std::shared_ptr<CsgLeafNode>> *parent;
   std::shared_ptr<const CsgOpNode> op_node;
   std::vector<std::shared_ptr<CsgLeafNode>> left_children;
   std::vector<std::shared_ptr<CsgLeafNode>> right_children;
 
   CsgStackFrame(bool finalize, OpType parent_op, mat3x4 transform,
-                std::vector<std::shared_ptr<CsgLeafNode>> *parent_children,
+                std::vector<std::shared_ptr<CsgLeafNode>> *parent,
                 std::shared_ptr<const CsgOpNode> op_node)
       : finalize(finalize),
         parent_op(parent_op),
         transform(transform),
-        parent_children(parent_children),
+        parent(parent),
         op_node(op_node) {}
 };
 
@@ -571,8 +571,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
             }
             break;
         }
-      if (frame->parent_children != nullptr)
-        frame->parent_children->push_back(std::static_pointer_cast<CsgLeafNode>(
+      if (frame->parent != nullptr)
+        frame->parent->push_back(std::static_pointer_cast<CsgLeafNode>(
             frame->op_node->cache_->Transform(frame->transform)));
       stack.pop_back();
     } else {
@@ -584,7 +584,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
                   node->Transform(transform)));
             else
               stack.push_back(std::make_shared<CsgStackFrame>(
-                  false, OpType::Add, transform, children,
+                  false, op, transform, children,
                   std::static_pointer_cast<const CsgOpNode>(node)));
           };
       frame->finalize = true;
@@ -593,19 +593,17 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
           add_children(impl->children_[i], OpType::Add, la::identity,
                        i == 0 ? &frame->left_children : &frame->right_children);
       } else {
-        // Note: the op_node is both inside some parent node AND inside this
-        // stack frame, so it is unique if the count equals 2.
-        bool skipFinalize = frame->parent_children != nullptr &&
+        bool skipFinalize = frame->parent != nullptr &&
                             frame->op_node->op_ == frame->parent_op &&
-                            frame->op_node.use_count() <= 2;
+                            frame->op_node.use_count() <= 2 &&
+                            frame->op_node->impl_.UseCount() == 1;
         if (skipFinalize) stack.pop_back();
         auto transform =
             skipFinalize ? (frame->transform * Mat4(frame->op_node->transform_))
                          : la::identity;
         for (size_t i = 0; i < impl->children_.size(); i++) {
-          add_children(
-              impl->children_[i], frame->op_node->op_, transform,
-              skipFinalize ? frame->parent_children : &frame->left_children);
+          add_children(impl->children_[i], frame->op_node->op_, transform,
+                       skipFinalize ? frame->parent : &frame->left_children);
         }
       }
     }
