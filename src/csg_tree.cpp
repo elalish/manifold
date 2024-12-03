@@ -614,13 +614,13 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
       stack.pop_back();
     } else {
       auto add_children = [&stack](std::shared_ptr<CsgNode> &node, OpType op,
-                                   mat3x4 transform, auto *children) {
+                                   mat3x4 transform, auto *destination) {
         if (node->GetNodeType() == CsgNodeType::Leaf)
-          children->push_back(std::static_pointer_cast<CsgLeafNode>(
+          destination->push_back(std::static_pointer_cast<CsgLeafNode>(
               node->Transform(transform)));
         else
           stack.push_back(std::make_shared<CsgStackFrame>(
-              false, op, transform, children,
+              false, op, transform, destination,
               std::static_pointer_cast<const CsgOpNode>(node)));
       };
       if (frame->op_node->op_ == OpType::Subtract) {
