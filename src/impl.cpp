@@ -251,6 +251,7 @@ void Manifold::Impl::CreateFaces() {
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (abs(dot(v - base, normal)) < tolerance_) {
         meshRelation_.triRef[h / 3].faceID = tp.tri;
+
         if (!interiorHalfedges.empty() &&
             h == halfedge_[interiorHalfedges.back()].pairedHalfedge) {
           interiorHalfedges.pop_back();
