@@ -54,7 +54,7 @@ class CsgLeafNode final : public CsgNode {
 
   mat3x4 GetTransform() const override;
 
-  static Manifold::Impl Compose(
+  static std::shared_ptr<CsgLeafNode> Compose(
       const std::vector<std::shared_ptr<CsgLeafNode>> &nodes);
 
  private:
