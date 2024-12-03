@@ -229,8 +229,8 @@ void Manifold::Impl::CreateFaces() {
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
-    std::deque<int> interiorHalfedges = {3 * tp.tri, 3 * tp.tri + 1,
-                                         3 * tp.tri + 2};
+    std::vector<int> interiorHalfedges = {3 * tp.tri, 3 * tp.tri + 1,
+                                          3 * tp.tri + 2};
     while (!interiorHalfedges.empty()) {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
@@ -240,19 +240,15 @@ void Manifold::Impl::CreateFaces() {
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (abs(dot(v - base, normal)) < tolerance_) {
         meshRelation_.triRef[h / 3].faceID = tp.tri;
-        if (!interiorHalfedges.empty() &&
-            h == halfedge_[interiorHalfedges.back()].pairedHalfedge) {
-          interiorHalfedges.pop_back();
-        } else {
+
+        if (interiorHalfedges.empty() ||
+            h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
           interiorHalfedges.push_back(h);
+        } else {
+          interiorHalfedges.pop_back();
         }
         const int hNext = NextHalfedge(h);
-        if (!interiorHalfedges.empty() &&
-            hNext == halfedge_[interiorHalfedges.front()].pairedHalfedge) {
-          interiorHalfedges.pop_front();
-        } else {
-          interiorHalfedges.push_back(hNext);
-        }
+        interiorHalfedges.push_back(hNext);
       }
     }
   }
