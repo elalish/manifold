@@ -178,26 +178,28 @@ void Manifold::Impl::SimplifyTopology() {
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
-  {
+  while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
+    numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0_uz), nbEdges,
                [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
       if (bFlags[i]) {
-        CollapseEdge(i, scratchBuffer);
+        if (CollapseEdge(i, scratchBuffer)) numFlagged++;
         scratchBuffer.resize(0);
-        numFlagged++;
       }
     }
-  }
+
+    if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " colinear edges to collapse"
-              << std::endl;
-  }
+    if (ManifoldParams().verbose && numFlagged > 0) {
+      std::cout << "found " << numFlagged << " colinear edges to collapse"
+                << std::endl;
+    }
 #endif
+  }
 
   {
     ZoneScopedN("RecursiveEdgeSwap");
@@ -408,12 +410,12 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // topologically if the collapse would have resulted in a 4-manifold edge. Do
 // not collapse an edge if startVert is pinched - the vert will be marked NaN,
 // but other edges may still be pointing to it.
-void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
+bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
   Vec<ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
-  if (toRemove.pairedHalfedge < 0) return;
+  if (toRemove.pairedHalfedge < 0) return false;
 
   const int endVert = toRemove.endVert;
   const ivec3 tri0edge = TriOf(edge);
@@ -447,20 +449,14 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     if (!ref.SameFace(refCheck)) {
       refCheck = triRef[edge / 3];
       if (!ref.SameFace(refCheck)) {
-        return;
-      } else {
-        // Don't collapse if the edges separating the faces are not colinear
-        // (can happen when the two faces are coplanar).
-        // if (CCW(projection * pOld, projection * pLast, projection * pNew,
-        //         epsilon_) != 0)
-        //   return;
+        return false;
       }
     }
 
     // Don't collapse edge if it would cause a triangle to invert.
     if (CCW(projection * pNext, projection * pLast, projection * pNew,
             epsilon_) < 0)
-      return;
+      return false;
 
     pLast = pNext;
     current = halfedge_[current].pairedHalfedge;
@@ -506,6 +502,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   UpdateVert(endVert, start, tri0edge[2]);
   CollapseTri(tri0edge);
   RemoveIfFolded(start);
+  return true;
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
