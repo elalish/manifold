@@ -27,7 +27,6 @@ class CsgNode : public std::enable_shared_from_this<CsgNode> {
   virtual std::shared_ptr<CsgLeafNode> ToLeafNode() const = 0;
   virtual std::shared_ptr<CsgNode> Transform(const mat3x4 &m) const = 0;
   virtual CsgNodeType GetNodeType() const = 0;
-  virtual mat3x4 GetTransform() const = 0;
 
   virtual std::shared_ptr<CsgNode> Boolean(
       const std::shared_ptr<CsgNode> &second, OpType op);
@@ -52,8 +51,6 @@ class CsgLeafNode final : public CsgNode {
 
   CsgNodeType GetNodeType() const override;
 
-  mat3x4 GetTransform() const override;
-
   static std::shared_ptr<CsgLeafNode> Compose(
       const std::vector<std::shared_ptr<CsgLeafNode>> &nodes);
 
@@ -68,8 +65,6 @@ class CsgOpNode final : public CsgNode {
 
   CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children, OpType op);
 
-  CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children, OpType op);
-
   std::shared_ptr<CsgNode> Boolean(const std::shared_ptr<CsgNode> &second,
                                    OpType op) override;
 
@@ -78,8 +73,6 @@ class CsgOpNode final : public CsgNode {
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
 
   CsgNodeType GetNodeType() const override;
-
-  mat3x4 GetTransform() const override;
 
  private:
   struct Impl {

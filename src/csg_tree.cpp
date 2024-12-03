@@ -19,7 +19,6 @@
 #endif
 
 #include <algorithm>
-#include <variant>
 
 #include "./boolean3.h"
 #include "./csg_tree.h"
@@ -31,51 +30,6 @@ constexpr int kParallelThreshold = 4096;
 
 namespace {
 using namespace manifold;
-struct Transform4x3 {
-  mat3x4 transform;
-
-  vec3 operator()(vec3 position) const {
-    return transform * vec4(position, 1.0);
-  }
-};
-
-struct UpdateHalfedge {
-  const int nextVert;
-  const int nextEdge;
-  const int nextFace;
-
-  Halfedge operator()(Halfedge edge) {
-    edge.startVert += nextVert;
-    edge.endVert += nextVert;
-    edge.pairedHalfedge += nextEdge;
-    return edge;
-  }
-};
-
-struct UpdateTriProp {
-  const int nextProp;
-
-  ivec3 operator()(ivec3 tri) {
-    tri += nextProp;
-    return tri;
-  }
-};
-
-struct UpdateMeshIDs {
-  const int offset;
-
-  TriRef operator()(TriRef ref) {
-    ref.meshID += offset;
-    return ref;
-  }
-};
-
-struct CheckOverlap {
-  VecView<const Box> boxes;
-  const size_t i;
-  bool operator()(size_t j) { return boxes[i].DoesOverlap(boxes[j]); }
-};
-
 struct MeshCompare {
   bool operator()(const std::shared_ptr<CsgLeafNode> &a,
                   const std::shared_ptr<CsgLeafNode> &b) {
@@ -143,8 +97,6 @@ std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
   transform_ = la::identity;
   return pImpl_;
 }
-
-mat3x4 CsgLeafNode::GetTransform() const { return transform_; }
 
 std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
   return std::make_shared<CsgLeafNode>(*this);
@@ -236,18 +188,30 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         copy(node->pImpl_->halfedgeTangent_.begin(),
              node->pImpl_->halfedgeTangent_.end(),
              combined.halfedgeTangent_.begin() + edgeIndices[i]);
-        transform(
-            node->pImpl_->halfedge_.begin(), node->pImpl_->halfedge_.end(),
-            combined.halfedge_.begin() + edgeIndices[i],
-            UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
+        const int nextVert = vertIndices[i];
+        const int nextEdge = edgeIndices[i];
+        const int nextFace = triIndices[i];
+        transform(node->pImpl_->halfedge_.begin(),
+                  node->pImpl_->halfedge_.end(),
+                  combined.halfedge_.begin() + edgeIndices[i],
+                  [nextVert, nextEdge, nextFace](Halfedge edge) {
+                    edge.startVert += nextVert;
+                    edge.endVert += nextVert;
+                    edge.pairedHalfedge += nextEdge;
+                    return edge;
+                  });
 
         if (numPropOut > 0) {
           auto start =
               combined.meshRelation_.triProperties.begin() + triIndices[i];
           if (node->pImpl_->NumProp() > 0) {
             auto &triProp = node->pImpl_->meshRelation_.triProperties;
+            const int nextProp = propVertIndices[i];
             transform(triProp.begin(), triProp.end(), start,
-                      UpdateTriProp({propVertIndices[i]}));
+                      [nextProp](ivec3 tri) {
+                        tri += nextProp;
+                        return tri;
+                      });
 
             const int numProp = node->pImpl_->NumProp();
             auto &oldProp = node->pImpl_->meshRelation_.properties;
@@ -276,8 +240,11 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         } else {
           // no need to apply the transform to the node, just copy the vertices
           // and face normals and apply transform on the fly
+          const mat3x4 transform = node->transform_;
           auto vertPosBegin = TransformIterator(
-              node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
+              node->pImpl_->vertPos_.begin(), [&transform](vec3 position) {
+                return transform * vec4(position, 1.0);
+              });
           mat3 normalTransform =
               la::inverse(la::transpose(mat3(node->transform_)));
           auto faceNormalBegin =
@@ -305,7 +272,10 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         transform(node->pImpl_->meshRelation_.triRef.begin(),
                   node->pImpl_->meshRelation_.triRef.end(),
                   combined.meshRelation_.triRef.begin() + triIndices[i],
-                  UpdateMeshIDs({offset}));
+                  [offset](TriRef ref) {
+                    ref.meshID += offset;
+                    return ref;
+                  });
       });
 
   for (size_t i = 0; i < nodes.size(); i++) {
@@ -420,8 +390,9 @@ void BatchUnion(std::vector<std::shared_ptr<CsgLeafNode>> &children) {
     std::vector<Vec<size_t>> disjointSets;
     for (size_t i = 0; i < boxes.size(); i++) {
       auto lambda = [&boxes, i](const Vec<size_t> &set) {
-        return std::find_if(set.begin(), set.end(), CheckOverlap({boxes, i})) ==
-               set.end();
+        return std::find_if(set.begin(), set.end(), [&boxes, i](size_t j) {
+                 return boxes[i].DoesOverlap(boxes[j]);
+               }) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {
@@ -455,13 +426,6 @@ void BatchUnion(std::vector<std::shared_ptr<CsgLeafNode>> &children) {
 CsgOpNode::CsgOpNode() {}
 
 CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
-                     OpType op)
-    : impl_(Impl{}), op_(op) {
-  auto impl = impl_.GetGuard();
-  impl->children_ = children;
-}
-
-CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
                      OpType op)
     : impl_(Impl{}), op_(op) {
   auto impl = impl_.GetGuard();
@@ -570,6 +534,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
     // the `children_` set only contains one element, and `BatchUnion`,
     // `BatchBoolean` or `Subtract` on this is already a no-op...
     if (frame->op_node->cache_) {
+      // destination can only be nullptr for the outermost frame, and in that
+      // case the cache_ cannot be non-empty.
       frame->destination->push_back(std::static_pointer_cast<CsgLeafNode>(
           frame->op_node->cache_->Transform(frame->transform)));
       stack.pop_back();
@@ -665,7 +631,5 @@ CsgNodeType CsgOpNode::GetNodeType() const {
   // unreachable...
   return CsgNodeType::Leaf;
 }
-
-mat3x4 CsgOpNode::GetTransform() const { return transform_; }
 
 }  // namespace manifold
