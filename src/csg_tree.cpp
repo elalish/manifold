@@ -623,12 +623,12 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
               false, op, transform, children,
               std::static_pointer_cast<const CsgOpNode>(node)));
       };
-      frame->finalize = true;
       if (frame->op_node->op_ == OpType::Subtract) {
         for (size_t i = 0; i < impl->children_.size(); i++)
           add_children(
               impl->children_[i], OpType::Add, la::identity,
               i == 0 ? &frame->positive_children : &frame->negative_children);
+        frame->finalize = true;
       } else {
         // op_node use_count == 2 because it is both inside one CsgOpNode
         // and in our stack.
@@ -636,7 +636,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
                                   frame->op_node->op_ == frame->parent_op &&
                                   frame->op_node.use_count() <= 2 &&
                                   frame->op_node->impl_.UseCount() == 1;
-        if (skipFinalize) stack.pop_back();
+        if (skipFinalize)
+          stack.pop_back();
+        else
+          frame->finalize = true;
         const mat3x4 transform =
             skipFinalize ? (frame->transform * Mat4(frame->op_node->transform_))
                          : la::identity;
