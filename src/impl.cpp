@@ -195,7 +195,7 @@ int GetLabels(std::vector<int>& components,
 
 void DedupePropVerts(manifold::Vec<ivec3>& triProp,
                      const Vec<std::pair<int, int>>& vert2vert,
-                     int numPropVert) {
+                     size_t numPropVert) {
   ZoneScoped;
   std::vector<int> vertLabels;
   const int numLabels = GetLabels(vertLabels, vert2vert, numPropVert);
