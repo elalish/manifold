@@ -555,7 +555,7 @@ TEST(Manifold, Merge) {
   CheckCube(cubeSTL);
 }
 
-TEST(Manifold, Crash) {
+TEST(Manifold, MergeEmpty) {
   MeshGL shape;
   shape.numProp = 7;
   shape.triVerts = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
@@ -599,7 +599,8 @@ TEST(Manifold, Crash) {
                           -0.0, -0.5, -0.43450000882149, 0.0, 0.0, 1.0, 0.0};
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
-  EXPECT_NEAR(man.Volume(), 1, 0.01);
+  EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(man.IsEmpty());
 }
 
 TEST(Manifold, PinchedVert) {
