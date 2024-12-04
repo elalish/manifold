@@ -289,6 +289,8 @@ void Manifold::Impl::DedupePropVerts() {
         const int prop1 =
             meshRelation_
                 .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
+        if (prop0 == prop1) return;
+
         bool propEqual = true;
         for (size_t p = 0; p < numProp; ++p) {
           if (meshRelation_.properties[numProp * prop0 + p] !=
@@ -303,10 +305,11 @@ void Manifold::Impl::DedupePropVerts() {
       });
 
   std::vector<int> vertLabels;
-  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
+  const size_t numPropVert = NumPropVert();
+  const int numLabels = GetLabels(vertLabels, vert2vert, numPropVert);
 
   std::vector<int> label2vert(numLabels);
-  for (size_t v = 0; v < vert2vert.size(); ++v) label2vert[vertLabels[v]] = v;
+  for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
   for (auto& prop : meshRelation_.triProperties)
     for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }

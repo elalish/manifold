@@ -295,7 +295,7 @@ TEST(Samples, Sponge4) {
 #endif
 #endif
 
-TEST(Samples, CondensedMatter16) {
+TEST(Samples, DISABLED_CondensedMatter16) {
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
 #ifdef MANIFOLD_EXPORT

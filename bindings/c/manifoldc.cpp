@@ -633,6 +633,7 @@ ManifoldError manifold_status(ManifoldManifold *m) {
 size_t manifold_num_vert(ManifoldManifold *m) { return from_c(m)->NumVert(); }
 size_t manifold_num_edge(ManifoldManifold *m) { return from_c(m)->NumEdge(); }
 size_t manifold_num_tri(ManifoldManifold *m) { return from_c(m)->NumTri(); }
+size_t manifold_num_prop(ManifoldManifold *m) { return from_c(m)->NumProp(); };
 int manifold_genus(ManifoldManifold *m) { return from_c(m)->Genus(); }
 
 double manifold_surface_area(ManifoldManifold *m) {
@@ -679,7 +680,7 @@ double manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
 
 ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int normal_idx,
-                                             int min_sharp_angle) {
+                                             double min_sharp_angle) {
   auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
   return to_c(new (mem) Manifold(man));
 }

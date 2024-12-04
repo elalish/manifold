@@ -195,6 +195,7 @@ ManifoldError manifold_status(ManifoldManifold *m);
 size_t manifold_num_vert(ManifoldManifold *m);
 size_t manifold_num_edge(ManifoldManifold *m);
 size_t manifold_num_tri(ManifoldManifold *m);
+size_t manifold_num_prop(ManifoldManifold *m);
 ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
 double manifold_epsilon(ManifoldManifold *m);
 int manifold_genus(ManifoldManifold *m);
@@ -214,7 +215,7 @@ double manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
                         double searchLength);
 ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int normal_idx,
-                                             int min_sharp_angle);
+                                             double min_sharp_angle);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection *manifold_cross_section_empty(void *mem);

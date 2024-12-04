@@ -69,10 +69,6 @@
             })
           ];
         };
-        onetbb = pkgs.tbb_2021_11.overrideAttrs (_: {
-          version = onetbb-src.rev;
-          src = onetbb-src;
-        });
         gersemi = with pkgs.python3Packages; buildPythonPackage {
           pname = "gersemi";
           version = "0.17.0";
@@ -95,7 +91,7 @@
               (python3.withPackages
                 (ps: with ps; [ nanobind trimesh pytest ]))
               gtest
-            ]) ++ (if parallel then [ onetbb ] else [ ]);
+            ]) ++ (if parallel then [ pkgs.tbb_2021_11 ] else [ ]);
             buildInputs = with pkgs; [
               clipper2
               assimp
@@ -106,13 +102,14 @@
               "-DBUILD_SHARED_LIBS=ON"
               "-DMANIFOLD_PAR=${if parallel then "ON" else "OFF"}"
             ];
+            doCheck = true;
             checkPhase = ''
               cd test
               ./manifold_test
               cd ../
             '';
           };
-        manifold-emscripten = { doCheck ? true }: pkgs.buildEmscriptenPackage {
+        manifold-emscripten = { doCheck ? true, parallel ? false }: pkgs.buildEmscriptenPackage {
           name = "manifold-js";
           version = manifold-version;
           src = self;
@@ -125,18 +122,21 @@
             export EM_CACHE=$(pwd)/.emscriptencache
             mkdir build
             cd build
-            emcmake cmake -DCMAKE_BUILD_TYPE=Release \
+            emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
+            -DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src} \
             -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
           '';
           buildPhase = ''
             emmake make -j''${NIX_BUILD_CORES}
           '';
-          checkPhase = if doCheck then ''
-            cd test
-            node manifold_test.js
-            cd ../
-          '' else "";
+          checkPhase =
+            if doCheck then ''
+              cd test
+              node manifold_test.js
+              cd ../
+            '' else "";
           installPhase = ''
             mkdir -p $out
             cp bindings/wasm/manifold.* $out/
@@ -148,13 +148,18 @@
           manifold-tbb = manifold { };
           manifold-none = manifold { parallel = false; };
           manifold-js = manifold-emscripten { };
+          manifold-js-tbb = manifold-emscripten {
+            parallel = true;
+            doCheck =
+              false;
+          };
           # but how should we make it work with other python versions?
           manifold3d = with pkgs.python3Packages; buildPythonPackage {
             pname = "manifold3d";
             version = manifold-version;
             src = self;
             propagatedBuildInputs = [ numpy ];
-            buildInputs = [ onetbb pkgs.clipper2 ];
+            buildInputs = with pkgs; [ clipper2 tbb_2021_11 ];
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
@@ -188,7 +193,7 @@
 
             ninja
             cmake
-            onetbb
+            tbb_2021_11
             gtest
             assimp
             clipper2
@@ -197,6 +202,7 @@
             # useful tools
             clang-tools_18
             clang_18
+            llvmPackages_18.bintools
             tracy
           ];
         };
