@@ -59,12 +59,12 @@ size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec *csv) {
 }
 
 ManifoldCrossSection *manifold_cross_section_vec_get(
-    void *mem, ManifoldCrossSectionVec *csv, int idx) {
+    void *mem, ManifoldCrossSectionVec *csv, size_t idx) {
   auto cs = (*from_c(csv))[idx];
   return to_c(new (mem) CrossSection(cs));
 }
 
-void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, int idx,
+void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, size_t idx,
                                     ManifoldCrossSection *cs) {
   (*from_c(csv))[idx] = *from_c(cs);
 }

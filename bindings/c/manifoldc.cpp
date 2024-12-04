@@ -73,24 +73,24 @@ size_t manifold_polygons_length(ManifoldPolygons *ps) {
   return from_c(ps)->size();
 }
 
-size_t manifold_polygons_simple_length(ManifoldPolygons *ps, int idx) {
+size_t manifold_polygons_simple_length(ManifoldPolygons *ps, size_t idx) {
   return (*from_c(ps))[idx].size();
 }
 
 ManifoldVec2 manifold_simple_polygon_get_point(ManifoldSimplePolygon *p,
-                                               int idx) {
+                                               size_t idx) {
   return to_c((*from_c(p))[idx]);
 }
 
 ManifoldSimplePolygon *manifold_polygons_get_simple(void *mem,
                                                     ManifoldPolygons *ps,
-                                                    int idx) {
+                                                    size_t idx) {
   auto sp = (*from_c(ps))[idx];
   return to_c(new (mem) SimplePolygon(sp));
 }
 
-ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons *ps, int simple_idx,
-                                         int pt_idx) {
+ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons *ps,
+                                         size_t simple_idx, size_t pt_idx) {
   return to_c((*from_c(ps))[simple_idx][pt_idx]);
 }
 
@@ -111,12 +111,12 @@ size_t manifold_manifold_vec_length(ManifoldManifoldVec *ms) {
 }
 
 ManifoldManifold *manifold_manifold_vec_get(void *mem, ManifoldManifoldVec *ms,
-                                            int idx) {
+                                            size_t idx) {
   auto m = (*from_c(ms))[idx];
   return to_c(new (mem) Manifold(m));
 }
 
-void manifold_manifold_vec_set(ManifoldManifoldVec *ms, int idx,
+void manifold_manifold_vec_set(ManifoldManifoldVec *ms, size_t idx,
                                ManifoldManifold *m) {
   (*from_c(ms))[idx] = *from_c(m);
 }
