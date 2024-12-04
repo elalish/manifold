@@ -183,6 +183,18 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
+ManifoldManifold *manifold_minkowski_sum(void *mem, ManifoldManifold *a,
+                                         ManifoldManifold *b) {
+  auto m = (*from_c(a)).MinkowskiSum(*from_c(b));
+  return to_c(new (mem) Manifold(m));
+}
+
+ManifoldManifold *manifold_minkowski_difference(void *mem, ManifoldManifold *a,
+                                                ManifoldManifold *b) {
+  auto m = (*from_c(a)).MinkowskiDifference(*from_c(b));
+  return to_c(new (mem) Manifold(m));
+}
+
 ManifoldPolygons *manifold_slice(void *mem, ManifoldManifold *m,
                                  double height) {
   auto poly = from_c(m)->Slice(height);

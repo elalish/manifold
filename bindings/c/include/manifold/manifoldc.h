@@ -115,6 +115,10 @@ ManifoldManifoldPair manifold_split_by_plane(void *mem_first, void *mem_second,
 ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
                                          double normal_x, double normal_y,
                                          double normal_z, double offset);
+ManifoldManifold *manifold_minkowski_sum(void *mem, ManifoldManifold *a,
+                                         ManifoldManifold *b);
+ManifoldManifold *manifold_minkowski_difference(void *mem, ManifoldManifold *a,
+                                                ManifoldManifold *b);
 
 // 3D to 2D
 
