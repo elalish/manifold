@@ -69,10 +69,6 @@
             })
           ];
         };
-        onetbb = pkgs.tbb_2021_11.overrideAttrs (_: {
-          version = onetbb-src.rev;
-          src = onetbb-src;
-        });
         gersemi = with pkgs.python3Packages; buildPythonPackage {
           pname = "gersemi";
           version = "0.17.0";
@@ -95,7 +91,7 @@
               (python3.withPackages
                 (ps: with ps; [ nanobind trimesh pytest ]))
               gtest
-            ]) ++ (if parallel then [ onetbb ] else [ ]);
+            ]) ++ (if parallel then [ pkgs.tbb_2021_11 ] else [ ]);
             buildInputs = with pkgs; [
               clipper2
               assimp
@@ -163,7 +159,7 @@
             version = manifold-version;
             src = self;
             propagatedBuildInputs = [ numpy ];
-            buildInputs = [ onetbb pkgs.clipper2 ];
+            buildInputs = with pkgs; [ clipper2 tbb_2021_11 ];
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
@@ -197,7 +193,7 @@
 
             ninja
             cmake
-            onetbb
+            tbb_2021_11
             gtest
             assimp
             clipper2
