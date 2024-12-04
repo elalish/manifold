@@ -38,7 +38,7 @@ struct Material {
   vec3 color = vec3(1.0);
   /// Alpha multiplier to apply to the whole mesh (each value between 0
   /// and 1).
-  int alpha = 1.0;
+  double alpha = 1.0;
   /// Gives the property index where the first normal channel
   /// can be found. 0 indicates the first three property channels following
   /// position. A negative value does not save normals.
