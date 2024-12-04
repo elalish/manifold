@@ -106,6 +106,7 @@
               "-DBUILD_SHARED_LIBS=ON"
               "-DMANIFOLD_PAR=${if parallel then "ON" else "OFF"}"
             ];
+            doCheck = true;
             checkPhase = ''
               cd test
               ./manifold_test
