@@ -186,6 +186,7 @@ let timesAccessor: Accessor;
 let weightsAccessor: Accessor;
 let weightsSampler: AnimationSampler;
 let hasAnimation: boolean;
+let t0 = 0;
 
 export function cleanup() {
   for (const obj of memoryRegistry) {
@@ -736,6 +737,10 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
     to3mf.items.push({objectID: `${object2globalID.get(manifold)}`});
   }
 
+  const t1 = performance.now();
+  console.log(`Manifold took ${
+      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+
   if (!hasAnimation) {
     timesAccessor.dispose();
     weightsAccessor.dispose();
@@ -758,6 +763,10 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   const blob3MF = new Blob(
       [zipFile],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
+
+  const t2 = performance.now();
+  console.log(`Exporting GLB & 3MF took ${
+      (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
 
   return ({
     glbURL: URL.createObjectURL(blobGLB),
@@ -786,6 +795,7 @@ function evaluateCADToManifold(code: string) {
 }
 
 export async function evaluateCADToModel(code: string) {
+  t0 = performance.now();
   const {globalDefaults, manifold} = evaluateCADToManifold(code);
   return await exportModels(globalDefaults, manifold);
 }
