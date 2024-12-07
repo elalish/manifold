@@ -498,7 +498,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   // Before performing boolean operations, we should make sure that all children
   // are `CsgLeafNodes`, i.e. are actual meshes that can be operated on. Hence,
   // we do it in two steps:
-  // 1. Populate `children` (`positive_children` and `positive_children`)
+  // 1. Populate `children` (`positive_children` and `negative_children`)
   //    If the child is a `CsgOpNode`, we either collapse it or compute its
   //    boolean operation result.
   // 2. Performs boolean after populating the `children` set.
