@@ -310,8 +310,8 @@ ManifoldCrossSection *manifold_cross_section_offset(
 // CrossSection Info
 
 double manifold_cross_section_area(ManifoldCrossSection *cs);
-int manifold_cross_section_num_vert(ManifoldCrossSection *cs);
-int manifold_cross_section_num_contour(ManifoldCrossSection *cs);
+size_t manifold_cross_section_num_vert(ManifoldCrossSection *cs);
+size_t manifold_cross_section_num_contour(ManifoldCrossSection *cs);
 int manifold_cross_section_is_empty(ManifoldCrossSection *cs);
 ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);

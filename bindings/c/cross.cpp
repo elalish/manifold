@@ -213,11 +213,11 @@ double manifold_cross_section_area(ManifoldCrossSection *cs) {
   return from_c(cs)->Area();
 }
 
-int manifold_cross_section_num_vert(ManifoldCrossSection *cs) {
+size_t manifold_cross_section_num_vert(ManifoldCrossSection *cs) {
   return from_c(cs)->NumVert();
 }
 
-int manifold_cross_section_num_contour(ManifoldCrossSection *cs) {
+size_t manifold_cross_section_num_contour(ManifoldCrossSection *cs) {
   return from_c(cs)->NumContour();
 }
 
