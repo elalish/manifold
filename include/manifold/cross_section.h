@@ -119,8 +119,8 @@ class CrossSection {
    */
   ///@{
   bool IsEmpty() const;
-  int NumVert() const;
-  int NumContour() const;
+  size_t NumVert() const;
+  size_t NumContour() const;
   Rect Bounds() const;
   double Area() const;
   ///@}
