@@ -25,6 +25,10 @@
 #include "./parallel.h"
 #include "./svd.h"
 
+#ifdef MANIFOLD_EXPORT
+#include <iostream>
+#endif
+
 namespace {
 using namespace manifold;
 
