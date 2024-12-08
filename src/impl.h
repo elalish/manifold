@@ -354,6 +354,9 @@ struct Manifold::Impl {
 #ifdef MANIFOLD_DEBUG
 extern std::mutex dump_lock;
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
+#endif
+
+#ifdef MANIFOLD_EXPORT
 MeshGL64 ImportMeshGL64(std::istream& stream);
 #endif
 }  // namespace manifold

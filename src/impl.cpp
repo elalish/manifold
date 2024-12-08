@@ -704,7 +704,9 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }
+#endif
 
+#ifdef MANIFOLD_EXPORT
 MeshGL64 ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   stream.precision(17);
