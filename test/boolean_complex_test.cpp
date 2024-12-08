@@ -15,6 +15,10 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
+#include <fstream>
+#include <iostream>
+
+#include "../src/impl.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -1014,6 +1018,28 @@ TEST(BooleanComplex, SimpleOffset) {
   }
   // See above discussion
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, UnionDifferenceSelfIntersect) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  MeshGL64 a, b;
+  std::ifstream f;
+  try {
+    f.open(dir + "/models/UnionDifference1.obj");
+    a = ImportMeshGL64(f);
+    f.close();
+    f.open(dir + "/models/UnionDifference2.obj");
+    b = ImportMeshGL64(f);
+    f.close();
+  } catch (std::exception& err) {
+    std::cout << err.what() << std::endl;
+    FAIL();
+  }
+  Manifold x(a);
+  Manifold y(b);
+  Manifold result = x + y;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
 #endif
