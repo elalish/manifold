@@ -14,6 +14,8 @@
 
 #include "./impl.h"
 
+#include <string.h>
+
 #include <algorithm>
 #include <atomic>
 #include <map>
@@ -685,5 +687,75 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(VecView<const vec3> vertsIn,
   else
     return collider_.Collisions<false, false>(vertsIn);
 }
+
+#ifdef MANIFOLD_DEBUG
+std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
+  stream << std::setprecision(17);  // for double precision
+  stream << "# ======= begin mesh ======" << std::endl;
+  stream << "# tolerance = " << impl.tolerance_ << std::endl;
+  // TODO: Mesh relation, vertex normal and face normal
+
+  for (const vec3& v : impl.vertPos_)
+    stream << "v " << v.x << " " << v.y << " " << v.z << std::endl;
+  for (size_t i = 0; i < impl.halfedge_.size(); i += 3)
+    stream << "f " << impl.halfedge_[i].startVert + 1 << " "
+           << impl.halfedge_[i + 1].startVert + 1 << " "
+           << impl.halfedge_[i + 2].startVert + 1 << std::endl;
+  stream << "# ======== end mesh =======" << std::endl;
+  return stream;
+}
+
+MeshGL64 ImportMeshGL64(std::istream& stream) {
+  MeshGL64 mesh;
+  stream.precision(17);
+  while (true) {
+    char c = stream.get();
+    if (stream.eof()) break;
+    switch (c) {
+      case '#': {
+        char c = stream.get();
+        if (c == ' ') {
+          constexpr int SIZE = 13;
+          std::array<char, SIZE> tmp;
+          stream.get(tmp.data(), SIZE, '\n');
+          if (strncmp(tmp.data(), "tolerance = ", SIZE) == 0) {
+            stream >> mesh.tolerance;
+          } else {
+            // add it back because it is not what we want
+            int end = 0;
+            while (tmp[end] != 0 && end < SIZE) end++;
+            while (--end > -1) stream.putback(tmp[end]);
+          }
+          c = stream.get();
+        }
+        // just skip the remaining comment
+        while (c != '\n' && !stream.eof()) {
+          c = stream.get();
+        }
+        break;
+      }
+      case 'v':
+        for (int i : {0, 1, 2}) {
+          double x;
+          stream >> x;
+          mesh.vertProperties.push_back(x);
+        }
+        break;
+      case 'f':
+        for (int i : {0, 1, 2}) {
+          uint64_t x;
+          stream >> x;
+          mesh.triVerts.push_back(x - 1);
+        }
+        break;
+      case '\n':
+        break;
+      default:
+        DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL64 import");
+    }
+  }
+  return mesh;
+}
+#endif
 
 }  // namespace manifold
