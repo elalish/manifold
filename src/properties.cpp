@@ -231,7 +231,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
     // distance epsilon squared
     for (int i : {0, 1, 2})
       for (int j : {0, 1, 2})
-        if (linalg::distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
+        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
 
     if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
 #ifdef MANIFOLD_DEBUG

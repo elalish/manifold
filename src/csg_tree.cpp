@@ -109,14 +109,6 @@ std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4 &m) const {
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl &&impl) {
-#ifdef MANIFOLD_DEBUG
-  if (impl.IsSelfIntersecting()) {
-    dump_lock.lock();
-    std::cout << "self-intersection detected" << std::endl;
-    dump_lock.unlock();
-    throw logicErr("self intersection detected");
-  }
-#endif
   return std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(impl));
 }
 
@@ -126,7 +118,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
   try {
     Boolean3 boolean(a, b, op);
     auto impl = boolean.Result(op);
-    if (impl.IsSelfIntersecting()) {
+    if (ManifoldParams().intermediateChecks && impl.IsSelfIntersecting()) {
       dump_lock.lock();
       std::cout << "self-intersection detected" << std::endl;
       dump_lock.unlock();
