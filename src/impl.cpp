@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
+#include <optional>
 
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
@@ -697,22 +698,28 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(17);  // for double precision
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
+  stream << "# epsilon = " << impl.epsilon_ << std::endl;
   // TODO: Mesh relation, vertex normal and face normal
-
   for (const vec3& v : impl.vertPos_)
     stream << "v " << v.x << " " << v.y << " " << v.z << std::endl;
+  std::vector<ivec3> triangles;
+  triangles.reserve(impl.halfedge_.size() / 3);
   for (size_t i = 0; i < impl.halfedge_.size(); i += 3)
-    stream << "f " << impl.halfedge_[i].startVert + 1 << " "
-           << impl.halfedge_[i + 1].startVert + 1 << " "
-           << impl.halfedge_[i + 2].startVert + 1 << std::endl;
+    triangles.emplace_back(impl.halfedge_[i].startVert + 1,
+                           impl.halfedge_[i + 1].startVert + 1,
+                           impl.halfedge_[i + 2].startVert + 1);
+  sort(triangles.begin(), triangles.end());
+  for (const auto& tri : triangles)
+    stream << "f " << tri.x << " " << tri.y << " " << tri.z << std::endl;
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }
 #endif
 
 #ifdef MANIFOLD_EXPORT
-MeshGL64 ImportMeshGL64(std::istream& stream) {
+Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
+  std::optional<double> epsilon;
   stream.precision(17);
   while (true) {
     char c = stream.get();
@@ -721,11 +728,17 @@ MeshGL64 ImportMeshGL64(std::istream& stream) {
       case '#': {
         char c = stream.get();
         if (c == ' ') {
-          constexpr int SIZE = 13;
+          constexpr int SIZE = 10;
           std::array<char, SIZE> tmp;
           stream.get(tmp.data(), SIZE, '\n');
-          if (strncmp(tmp.data(), "tolerance = ", SIZE) == 0) {
+          if (strncmp(tmp.data(), "tolerance", SIZE) == 0) {
+            // skip 3 letters
+            for (int i : {0, 1, 2}) stream.get();
             stream >> mesh.tolerance;
+          } else if (strncmp(tmp.data(), "epsilon =", SIZE) == 0) {
+            double tmp;
+            stream >> tmp;
+            epsilon = {tmp};
           } else {
             // add it back because it is not what we want
             int end = 0;
@@ -760,7 +773,9 @@ MeshGL64 ImportMeshGL64(std::istream& stream) {
         DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL64 import");
     }
   }
-  return mesh;
+  auto m = std::make_shared<Manifold::Impl>(mesh);
+  if (epsilon) m->SetEpsilon(*epsilon);
+  return Manifold(m);
 }
 #endif
 

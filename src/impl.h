@@ -202,7 +202,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetEpsilon(-1, std::is_same<Precision, float>::value);
+    SetEpsilon(meshGL.tolerance, std::is_same<Precision, float>::value);
 
     SplitPinchedVerts();
 
@@ -354,9 +354,5 @@ struct Manifold::Impl {
 #ifdef MANIFOLD_DEBUG
 extern std::mutex dump_lock;
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
-#endif
-
-#ifdef MANIFOLD_EXPORT
-MeshGL64 ImportMeshGL64(std::istream& stream);
 #endif
 }  // namespace manifold
