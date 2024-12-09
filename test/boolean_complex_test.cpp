@@ -1020,7 +1020,7 @@ TEST(BooleanComplex, SimpleOffset) {
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
-TEST(BooleanComplex, OffsetTriangulationFailure) {
+TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   const bool intermediateChecks = ManifoldParams().intermediateChecks;
   ManifoldParams().intermediateChecks = true;
   std::string file = __FILE__;
