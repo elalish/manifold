@@ -202,7 +202,7 @@ struct Manifold::Impl {
       MarkFailure(Error::NonFiniteVertex);
       return;
     }
-    SetEpsilon(meshGL.tolerance, std::is_same<Precision, float>::value);
+    SetEpsilon(-1, std::is_same<Precision, float>::value);
 
     SplitPinchedVerts();
 
