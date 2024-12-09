@@ -14,8 +14,6 @@
 
 #include "./impl.h"
 
-#include <string.h>
-
 #include <algorithm>
 #include <atomic>
 #include <map>
@@ -27,6 +25,10 @@
 
 #ifdef MANIFOLD_EXPORT
 #include <iostream>
+#endif
+
+#ifdef MANIFOLD_DEBUG
+#include <string.h>
 #endif
 
 namespace {

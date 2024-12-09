@@ -117,6 +117,10 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
 #ifdef MANIFOLD_DEBUG
   auto dump = [&]() {
     if (ManifoldParams().verbose) {
+      std::cout << "LHS self-intersecting: " << a.IsSelfIntersecting()
+                << std::endl;
+      std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
+                << std::endl;
       dump_lock.lock();
       if (op == OpType::Add)
         std::cout << "Add";
