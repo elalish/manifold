@@ -116,12 +116,12 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
                                            const Manifold::Impl &b, OpType op) {
 #ifdef MANIFOLD_DEBUG
   auto dump = [&]() {
+    dump_lock.lock();
+    std::cout << "LHS self-intersecting: " << a.IsSelfIntersecting()
+              << std::endl;
+    std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
+              << std::endl;
     if (ManifoldParams().verbose) {
-      std::cout << "LHS self-intersecting: " << a.IsSelfIntersecting()
-                << std::endl;
-      std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
-                << std::endl;
-      dump_lock.lock();
       if (op == OpType::Add)
         std::cout << "Add";
       else if (op == OpType::Intersect)
@@ -131,13 +131,16 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
       std::cout << std::endl;
       std::cout << a;
       std::cout << b;
-      dump_lock.unlock();
     }
+    dump_lock.unlock();
   };
   try {
     Boolean3 boolean(a, b, op);
     auto impl = boolean.Result(op);
     if (ManifoldParams().intermediateChecks && impl.IsSelfIntersecting()) {
+      dump_lock.lock();
+      std::cout << "self intersections detected" << std::endl;
+      dump_lock.unlock();
       throw logicErr("self intersection detected");
     }
     return ImplToLeaf(std::move(impl));
