@@ -24,11 +24,9 @@
 #include "./svd.h"
 
 #ifdef MANIFOLD_EXPORT
-#include <iostream>
-#endif
-
-#ifdef MANIFOLD_DEBUG
 #include <string.h>
+
+#include <iostream>
 #endif
 
 namespace {
