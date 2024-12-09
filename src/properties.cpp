@@ -234,6 +234,25 @@ bool Manifold::Impl::IsSelfIntersecting() const {
         if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
 
     if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
+      // try to move the triangles around the normal of the other face
+      std::array<vec3, 3> tmp_x, tmp_y;
+      for (int i : {0, 1, 2})
+        tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0)
+        return true;
+      for (int i : {0, 1, 2})
+        tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0)
+        return true;
+      for (int i : {0, 1, 2})
+        tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0)
+        return true;
+      for (int i : {0, 1, 2})
+        tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0)
+        return true;
+
 #ifdef MANIFOLD_DEBUG
       if (verbose) {
         dump_lock.lock();
