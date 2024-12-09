@@ -1020,16 +1020,18 @@ TEST(BooleanComplex, SimpleOffset) {
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
-TEST(BooleanComplex, UnionDifferenceSelfIntersect) {
+TEST(BooleanComplex, OffsetTriangulationFailure) {
+  const bool intermediateChecks = ManifoldParams().intermediateChecks;
+  ManifoldParams().intermediateChecks = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   MeshGL64 a, b;
   std::ifstream f;
   try {
-    f.open(dir + "/models/UnionDifference1.obj");
+    f.open(dir + "/models/Offset1.obj");
     a = ImportMeshGL64(f);
     f.close();
-    f.open(dir + "/models/UnionDifference2.obj");
+    f.open(dir + "/models/Offset2.obj");
     b = ImportMeshGL64(f);
     f.close();
   } catch (std::exception& err) {
@@ -1040,6 +1042,7 @@ TEST(BooleanComplex, UnionDifferenceSelfIntersect) {
   Manifold y(b);
   Manifold result = x + y;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = intermediateChecks;
 }
 
 #endif
