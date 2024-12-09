@@ -112,6 +112,50 @@ std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl &&impl) {
   return std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(impl));
 }
 
+std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
+                                           const Manifold::Impl &b, OpType op) {
+#ifdef MANIFOLD_DEBUG
+  auto dump = [&]() {
+    dump_lock.lock();
+    std::cout << "LHS self-intersecting: " << a.IsSelfIntersecting()
+              << std::endl;
+    std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
+              << std::endl;
+    if (ManifoldParams().verbose) {
+      if (op == OpType::Add)
+        std::cout << "Add";
+      else if (op == OpType::Intersect)
+        std::cout << "Intersect";
+      else
+        std::cout << "Subtract";
+      std::cout << std::endl;
+      std::cout << a;
+      std::cout << b;
+    }
+    dump_lock.unlock();
+  };
+  try {
+    Boolean3 boolean(a, b, op);
+    auto impl = boolean.Result(op);
+    if (ManifoldParams().intermediateChecks && impl.IsSelfIntersecting()) {
+      dump_lock.lock();
+      std::cout << "self intersections detected" << std::endl;
+      dump_lock.unlock();
+      throw logicErr("self intersection detected");
+    }
+    return ImplToLeaf(std::move(impl));
+  } catch (logicErr &err) {
+    dump();
+    throw err;
+  } catch (geometryErr &err) {
+    dump();
+    throw err;
+  }
+#else
+  return ImplToLeaf(Boolean3(a, b, op).Result(op));
+#endif
+}
+
 /**
  * Efficient union of a set of pairwise disjoint meshes.
  */
@@ -306,10 +350,9 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   // common cases
   if (results.size() == 0) return std::make_shared<CsgLeafNode>();
   if (results.size() == 1) return results.front();
-  if (results.size() == 2) {
-    Boolean3 boolean(*results[0]->GetImpl(), *results[1]->GetImpl(), operation);
-    return ImplToLeaf(boolean.Result(operation));
-  }
+  if (results.size() == 2)
+    return SimpleBoolean(*results[0]->GetImpl(), *results[1]->GetImpl(),
+                         operation);
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
   tbb::concurrent_priority_queue<std::shared_ptr<CsgLeafNode>, MeshCompare>
@@ -327,8 +370,7 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
         continue;
       }
       group.run([&, a, b]() {
-        Boolean3 boolean(*a->GetImpl(), *b->GetImpl(), operation);
-        queue.emplace(ImplToLeaf(boolean.Result(operation)));
+        queue.emplace(SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation));
         return group.run(process);
       });
     }
@@ -351,11 +393,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
     auto b = std::move(results.back());
     results.pop_back();
     // boolean operation
-    Boolean3 boolean(*a->GetImpl(), *b->GetImpl(), operation);
-    auto result = ImplToLeaf(boolean.Result(operation));
-    if (results.size() == 0) {
-      return result;
-    }
+    auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
+    if (results.size() == 0) return result;
     results.push_back(result);
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
@@ -598,10 +637,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
               // nothing to subtract, result equal to the LHS.
               impl->children_ = {frame->positive_children[0]};
             } else {
-              Boolean3 boolean(*positive->GetImpl(),
-                               *BatchUnion(frame->negative_children)->GetImpl(),
-                               OpType::Subtract);
-              impl->children_ = {ImplToLeaf(boolean.Result(OpType::Subtract))};
+              auto negative = BatchUnion(frame->negative_children);
+              impl->children_ = {SimpleBoolean(*positive->GetImpl(),
+                                               *negative->GetImpl(),
+                                               OpType::Subtract)};
             }
           }
           break;
