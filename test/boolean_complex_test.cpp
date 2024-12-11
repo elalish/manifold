@@ -15,6 +15,9 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
+#include <fstream>
+#include <iostream>
+
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -1014,6 +1017,43 @@ TEST(BooleanComplex, SimpleOffset) {
   }
   // See above discussion
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
+  const bool intermediateChecks = ManifoldParams().intermediateChecks;
+  ManifoldParams().intermediateChecks = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold a, b;
+  std::ifstream f;
+  f.open(dir + "/models/Offset1.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset2.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
+  Manifold result = a + b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = intermediateChecks;
+}
+
+TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
+  const bool intermediateChecks = ManifoldParams().intermediateChecks;
+  ManifoldParams().intermediateChecks = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold a, b;
+  std::ifstream f;
+  f.open(dir + "/models/Offset3.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset4.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
+
+  Manifold result = a + b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = intermediateChecks;
 }
 
 #endif
