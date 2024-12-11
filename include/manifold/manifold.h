@@ -331,6 +331,8 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(vec3 normal,
                                              double originOffset) const;
   Manifold TrimByPlane(vec3 normal, double originOffset) const;
+  Manifold MinkowskiSum(const Manifold&) const;
+  Manifold MinkowskiDifference(const Manifold&) const;
   ///@}
 
   /** @name Properties
@@ -391,6 +393,8 @@ class Manifold {
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;
+
+  Manifold Minkowski(const Manifold&, bool inset = false) const;
 };
 /** @} */
 
