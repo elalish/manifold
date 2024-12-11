@@ -212,6 +212,7 @@ struct Manifold::Impl {
       InitializeOriginal();
     }
 
+    DedupePropVerts();
     CreateFaces();
 
     SimplifyTopology();
@@ -246,6 +247,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces();
+  void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triVerts);
@@ -308,7 +310,7 @@ struct Manifold::Impl {
   void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
-  void CollapseEdge(int edge, std::vector<int>& edges);
+  bool CollapseEdge(int edge, std::vector<int>& edges);
   void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
