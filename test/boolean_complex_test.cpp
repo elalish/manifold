@@ -1026,17 +1026,12 @@ TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   std::string dir = file.substr(0, file.rfind('/'));
   Manifold a, b;
   std::ifstream f;
-  try {
-    f.open(dir + "/models/Offset1.obj");
-    a = Manifold::ImportMeshGL64(f);
-    f.close();
-    f.open(dir + "/models/Offset2.obj");
-    b = Manifold::ImportMeshGL64(f);
-    f.close();
-  } catch (std::exception& err) {
-    std::cout << err.what() << std::endl;
-    FAIL();
-  }
+  f.open(dir + "/models/Offset1.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset2.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().intermediateChecks = intermediateChecks;
@@ -1049,22 +1044,15 @@ TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
   std::string dir = file.substr(0, file.rfind('/'));
   Manifold a, b;
   std::ifstream f;
-  try {
-    f.open(dir + "/models/Offset3.obj");
-    a = Manifold::ImportMeshGL64(f);
-    f.close();
-    f.open(dir + "/models/Offset4.obj");
-    b = Manifold::ImportMeshGL64(f);
-    f.close();
-  } catch (std::exception& err) {
-    std::cout << err.what() << std::endl;
-    FAIL();
-  }
+  f.open(dir + "/models/Offset3.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset4.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
 
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().intermediateChecks = intermediateChecks;
-
   ManifoldParams().intermediateChecks = intermediateChecks;
 }
 
