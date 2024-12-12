@@ -78,7 +78,7 @@ endif()
 
 # If we're building cross_section, we need Clipper2
 if(MANIFOLD_CROSS_SECTION)
-  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2)
+  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
     find_package(Clipper2 QUIET)
     if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
       pkg_check_modules(Clipper2 Clipper2)
