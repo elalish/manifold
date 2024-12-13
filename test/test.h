@@ -56,6 +56,6 @@ void ExpectMeshes(const Manifold& manifold,
 void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold, bool noMerge = true);
 #ifdef MANIFOLD_EXPORT
-Manifold ReadMesh(const std::string& filename);
+MeshGL ReadMesh(const std::string& filename);
 #endif
 void RegisterPolygonTests();

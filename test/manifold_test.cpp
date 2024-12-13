@@ -713,3 +713,14 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_FALSE(squashed.IsEmpty());
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
+
+#ifdef MANIFOLD_EXPORT
+TEST(Manifold, MergeRefine) {
+  MeshGL mesh = ReadMesh("B2179.obj");
+  mesh.tolerance = 1e-5;
+  mesh.Merge();
+  Manifold manifold(mesh);
+  manifold = manifold.RefineToLength(1.0);
+  EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
+}
+#endif

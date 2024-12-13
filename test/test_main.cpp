@@ -457,9 +457,9 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
 }
 
 #ifdef MANIFOLD_EXPORT
-Manifold ReadMesh(const std::string& filename) {
+MeshGL ReadMesh(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  return Manifold(ImportMesh(dir + "/models/" + filename));
+  return ImportMesh(dir + "/models/" + filename);
 }
 #endif
