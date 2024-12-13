@@ -24,11 +24,12 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 
 ### Bindings & Packages
 
-If C++ isn't your cup of tea, Manifold also has bindings to many other languages, some maintained in this repository, and others elsewhere.
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
 | C | N/A | N/A | internal |
+| C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | internal |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
 | Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
@@ -84,8 +85,6 @@ If you use vertex properties for things like interpolated normals or texture UV 
 Manifold provides an optional [`MeshIO`](https://manifoldcad.org/docs/html/group___mesh_i_o.html) component based on [Assimp](https://assimp.org/), but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/examples/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.  
 
 ## Building
-
-The library can be built from source, or via [vcpkg](https://github.com/microsoft/vcpkg.git).
 
 Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.
 
