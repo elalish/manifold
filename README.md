@@ -85,6 +85,8 @@ Manifold provides an optional [`MeshIO`](https://manifoldcad.org/docs/html/group
 
 ## Building
 
+The library can be built from source, or via [vcpkg](https://github.com/microsoft/vcpkg.git).
+
 Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.
 
 Build and test (Ubuntu or similar):
