@@ -29,7 +29,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
 | C | N/A | N/A | internal |
-| C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | internal |
+| C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
 | Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
