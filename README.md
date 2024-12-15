@@ -24,11 +24,12 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 
 ### Bindings & Packages
 
-If C++ isn't your cup of tea, Manifold also has bindings to many other languages, some maintained in this repository, and others elsewhere.
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
 | C | N/A | N/A | internal |
+| C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
 | Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
