@@ -43,7 +43,7 @@ void TriangulationNoCrash(
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
-        } catch (manifold::geometryErr e) {
+        } catch (geometryErr e) {
           // geometryErr is fine
           faulted.store(false);
         } catch (...) {
