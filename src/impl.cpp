@@ -280,8 +280,10 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   auto policy = autoPolicy(NumVert(), 1e5);
   for_each(policy, halfedge_.cbegin(), halfedge_.cend(),
            [&vertOld2New](Halfedge h) {
-             reinterpret_cast<std::atomic<int>*>(&vertOld2New[h.startVert])
-                 ->store(1, std::memory_order_relaxed);
+             if (h.startVert >= 0) {
+               reinterpret_cast<std::atomic<int>*>(&vertOld2New[h.startVert])
+                   ->store(1, std::memory_order_relaxed);
+             }
            });
 
   const Vec<vec3> oldVertPos = vertPos_;
@@ -305,8 +307,10 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
 
   for_each(policy, halfedge_.begin(), halfedge_.end(),
            [&vertOld2New](Halfedge& h) {
-             h.startVert = vertOld2New[h.startVert];
-             h.endVert = vertOld2New[h.endVert];
+             if (h.startVert >= 0) {
+               h.startVert = vertOld2New[h.startVert];
+               h.endVert = vertOld2New[h.endVert];
+             }
            });
 }
 
@@ -436,7 +440,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     return edge[a] < edge[b];
   });
 
-  // Mark opposed triangles for removal
+  // Mark opposed triangles for removal. Note when opposed triangles are
+  // removed, they may strand unreferenced verts. These get removed by
+  // RemoveUnreferencedVerts() later.
   const int numEdge = numHalfedge / 2;
   for (int i = 0; i < numEdge; ++i) {
     const int pair0 = ids[i];
@@ -466,9 +472,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     halfedge_[pair0].pairedHalfedge = pair1;
     halfedge_[pair1].pairedHalfedge = pair0;
   });
-
-  // When opposed triangles are removed, they may strand unreferenced verts.
-  RemoveUnreferencedVerts();
 }
 
 /**

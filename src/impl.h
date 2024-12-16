@@ -215,6 +215,7 @@ struct Manifold::Impl {
     CreateFaces();
 
     SimplifyTopology();
+    RemoveUnreferencedVerts();
     Finish();
 
     // A Manifold created from an input mesh is never an original - the input is
