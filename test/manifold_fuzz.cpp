@@ -33,7 +33,7 @@ auto CsgDomain = VectorOf(PairOf(VectorOf(TransformDomain).WithMaxSize(20),
                                  ElementOf({0, 1})))
                      .WithMaxSize(100);
 
-void SimpleSpheres(
+void SimpleCube(
     const std::vector<std::pair<
         std::vector<std::pair<Transform, std::array<double, 3>>>, int>>
         &inputs) {
@@ -41,23 +41,23 @@ void SimpleSpheres(
   manifold::ManifoldParams().processOverlaps = false;
   manifold::Manifold result;
   for (const auto &input : inputs) {
-    auto sphere = manifold::Manifold::Sphere(1);
+    auto cube = manifold::Manifold::Cube();
     for (const auto &transform : input.first) {
       switch (transform.first) {
         case Transform::Translate:
-          sphere = sphere.Translate({std::get<0>(transform.second),
-                                     std::get<1>(transform.second),
-                                     std::get<2>(transform.second)});
-          break;
-        case Transform::Rotate:
-          sphere = sphere.Rotate(std::get<0>(transform.second),
-                                 std::get<1>(transform.second),
-                                 std::get<2>(transform.second));
-          break;
-        case Transform::Scale:
-          sphere = sphere.Scale({std::get<0>(transform.second),
+          cube = cube.Translate({std::get<0>(transform.second),
                                  std::get<1>(transform.second),
                                  std::get<2>(transform.second)});
+          break;
+        case Transform::Rotate:
+          cube = cube.Rotate(std::get<0>(transform.second),
+                             std::get<1>(transform.second),
+                             std::get<2>(transform.second));
+          break;
+        case Transform::Scale:
+          cube = cube.Scale({std::get<0>(transform.second),
+                             std::get<1>(transform.second),
+                             std::get<2>(transform.second)});
           break;
       }
     }
@@ -65,12 +65,12 @@ void SimpleSpheres(
     std::atomic<pid_t> tid;
     std::atomic<bool> faulted(true);
     auto asyncFuture = std::async(
-        std::launch::async, [&result, &faulted, &tid, &sphere, &input]() {
+        std::launch::async, [&result, &faulted, &tid, &cube, &input]() {
           tid.store(gettid());
           if (input.second) {
-            result += sphere;
+            result += cube;
           } else {
-            result -= sphere;
+            result -= cube;
           }
           EXPECT_EQ(result.Status(), manifold::Manifold::Error::NoError);
           faulted.store(false);
@@ -86,13 +86,14 @@ void SimpleSpheres(
   }
 }
 
-FUZZ_TEST(ManifoldFuzz, SimpleSpheres).WithDomains(CsgDomain);
+FUZZ_TEST(ManifoldFuzz, SimpleCube).WithDomains(CsgDomain);
 
-TEST(ManifoldFuzz, SimpleSpheresRegression) {
-  SimpleSpheres(
-      {{{}, 1},
-       {{{Transform::Rotate,
-          {0.12968745822201236, -0.10000000000000001, 0.10000275736461019}}},
-        1},
-       {{}, 0}});
+TEST(ManifoldFuzz, SimpleCubeRegression) {
+  SimpleCube({{{{static_cast<Transform>(1),
+                 {-0.10000000000000001, 0.10000000000000001, -1.}}},
+               1},
+              {{}, 1},
+              {{{static_cast<Transform>(1),
+                 {-0.10000000000000001, -0.10000000000066571, -1.}}},
+               0}});
 }
