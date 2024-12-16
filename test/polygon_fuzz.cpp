@@ -19,6 +19,7 @@
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
 #include "manifold/polygon.h"
+#include "manifold/optional_assert.h"
 
 using namespace fuzztest;
 
