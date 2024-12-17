@@ -38,8 +38,10 @@ void print_usage() {
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
   printf("  -e: Export GLB models of samples\n");
+  printf("  -c: Enable intermediate checks (needs MANIFOLD_DEBUG)\n");
   printf(
-      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
+      "  -v: Enable verbose output and intermediate checks (only works if "
+      "compiled with MANIFOLD_DEBUG "
       "flag)\n");
 }
 
@@ -87,6 +89,9 @@ int main(int argc, char** argv) {
       case 'v':
         options.params.verbose = true;
         manifold::ManifoldParams().verbose = true;
+        manifold::ManifoldParams().intermediateChecks = true;
+        break;
+      case 'c':
         manifold::ManifoldParams().intermediateChecks = true;
         break;
       default:
@@ -452,9 +457,9 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
 }
 
 #ifdef MANIFOLD_EXPORT
-Manifold ReadMesh(const std::string& filename) {
+MeshGL ReadMesh(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  return Manifold(ImportMesh(dir + "/models/" + filename));
+  return ImportMesh(dir + "/models/" + filename);
 }
 #endif
