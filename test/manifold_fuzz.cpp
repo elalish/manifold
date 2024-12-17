@@ -21,43 +21,50 @@
 
 using namespace fuzztest;
 
-enum class Transform { Translate, Rotate, Scale };
+enum class TransformType { Translate, Rotate, Scale };
+struct Transform {
+  TransformType ty;
+  std::array<double, 3> vector;
+};
+struct CubeOp {
+  std::vector<Transform> transforms;
+  bool isUnion;
+};
 
 // larger numbers may cause precision issues, prefer to test them later
 auto GoodNumbers = OneOf(InRange(0.1, 10.0), InRange(-10.0, -0.1));
 auto Vec3Domain = ArrayOf<3>(GoodNumbers);
-auto TransformDomain = PairOf(
-    ElementOf({Transform::Translate, Transform::Rotate, Transform::Scale}),
+auto TransformDomain = StructOf<Transform>(
+    ElementOf({TransformType::Translate, TransformType::Rotate,
+               TransformType::Scale}),
     Vec3Domain);
-auto CsgDomain = VectorOf(PairOf(VectorOf(TransformDomain).WithMaxSize(20),
-                                 ElementOf({0, 1})))
-                     .WithMaxSize(100);
+auto CsgDomain =
+    VectorOf(StructOf<CubeOp>(VectorOf(TransformDomain).WithMaxSize(20),
+                              ElementOf({false, true})))
+        .WithMaxSize(100);
 
-void SimpleCube(
-    const std::vector<std::pair<
-        std::vector<std::pair<Transform, std::array<double, 3>>>, int>>
-        &inputs) {
+void SimpleCube(const std::vector<CubeOp> &inputs) {
   manifold::ManifoldParams().intermediateChecks = true;
   manifold::ManifoldParams().processOverlaps = false;
   manifold::Manifold result;
   for (const auto &input : inputs) {
     auto cube = manifold::Manifold::Cube();
-    for (const auto &transform : input.first) {
-      switch (transform.first) {
-        case Transform::Translate:
-          cube = cube.Translate({std::get<0>(transform.second),
-                                 std::get<1>(transform.second),
-                                 std::get<2>(transform.second)});
+    for (const auto &transform : input.transforms) {
+      switch (transform.ty) {
+        case TransformType::Translate:
+          cube = cube.Translate({std::get<0>(transform.vector),
+                                 std::get<1>(transform.vector),
+                                 std::get<2>(transform.vector)});
           break;
-        case Transform::Rotate:
-          cube = cube.Rotate(std::get<0>(transform.second),
-                             std::get<1>(transform.second),
-                             std::get<2>(transform.second));
+        case TransformType::Rotate:
+          cube = cube.Rotate(std::get<0>(transform.vector),
+                             std::get<1>(transform.vector),
+                             std::get<2>(transform.vector));
           break;
-        case Transform::Scale:
-          cube = cube.Scale({std::get<0>(transform.second),
-                             std::get<1>(transform.second),
-                             std::get<2>(transform.second)});
+        case TransformType::Scale:
+          cube = cube.Scale({std::get<0>(transform.vector),
+                             std::get<1>(transform.vector),
+                             std::get<2>(transform.vector)});
           break;
       }
     }
@@ -67,7 +74,7 @@ void SimpleCube(
     auto asyncFuture = std::async(
         std::launch::async, [&result, &faulted, &tid, &cube, &input]() {
           tid.store(gettid());
-          if (input.second) {
+          if (input.isUnion) {
             result += cube;
           } else {
             result -= cube;
@@ -89,11 +96,11 @@ void SimpleCube(
 FUZZ_TEST(ManifoldFuzz, SimpleCube).WithDomains(CsgDomain);
 
 TEST(ManifoldFuzz, SimpleCubeRegression) {
-  SimpleCube({{{{static_cast<Transform>(1),
+  SimpleCube({{{{static_cast<TransformType>(1),
                  {-0.10000000000000001, 0.10000000000000001, -1.}}},
                1},
               {{}, 1},
-              {{{static_cast<Transform>(1),
+              {{{static_cast<TransformType>(1),
                  {-0.10000000000000001, -0.10000000000066571, -1.}}},
                0}});
 }
