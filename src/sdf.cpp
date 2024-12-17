@@ -525,7 +525,6 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   triVerts.resize(index[0]);
 
   pImpl_->CreateHalfedges(triVerts);
-  pImpl_->RemoveUnreferencedVerts();
   pImpl_->CleanupTopology();
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
