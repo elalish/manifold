@@ -198,10 +198,6 @@ struct Manifold::Impl {
     }
 
     CalculateBBox();
-    if (!IsFinite()) {
-      MarkFailure(Error::NonFiniteVertex);
-      return;
-    }
     SetEpsilon(-1, std::is_same<Precision, float>::value);
 
     SplitPinchedVerts();
@@ -215,7 +211,13 @@ struct Manifold::Impl {
     CreateFaces();
 
     SimplifyTopology();
+    RemoveUnreferencedVerts();
     Finish();
+
+    if (!IsFinite()) {
+      MarkFailure(Error::NonFiniteVertex);
+      return;
+    }
 
     // A Manifold created from an input mesh is never an original - the input is
     // the original.

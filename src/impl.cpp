@@ -276,38 +276,21 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
   ZoneScoped;
-  Vec<int> vertOld2New(NumVert(), 0);
-  auto policy = autoPolicy(NumVert(), 1e5);
-  for_each(policy, halfedge_.cbegin(), halfedge_.cend(),
-           [&vertOld2New](Halfedge h) {
-             reinterpret_cast<std::atomic<int>*>(&vertOld2New[h.startVert])
-                 ->store(1, std::memory_order_relaxed);
-           });
-
-  const Vec<vec3> oldVertPos = vertPos_;
-
-  Vec<size_t> tmpBuffer(oldVertPos.size());
-  auto vertIdIter = TransformIterator(countAt(0_uz), [&vertOld2New](size_t i) {
-    if (vertOld2New[i] > 0) return i;
-    return std::numeric_limits<size_t>::max();
+  const int numVert = NumVert();
+  Vec<int> keep(numVert, 0);
+  auto policy = autoPolicy(numVert, 1e5);
+  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
+    if (h.startVert >= 0) {
+      reinterpret_cast<std::atomic<int>*>(&keep[h.startVert])
+          ->store(1, std::memory_order_relaxed);
+    }
   });
 
-  auto next =
-      copy_if(vertIdIter, vertIdIter + tmpBuffer.size(), tmpBuffer.begin(),
-              [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
-  if (next == tmpBuffer.end()) return;
-
-  gather(tmpBuffer.begin(), next, oldVertPos.begin(), vertPos_.begin());
-
-  vertPos_.resize(std::distance(tmpBuffer.begin(), next));
-
-  exclusive_scan(vertOld2New.begin(), vertOld2New.end(), vertOld2New.begin());
-
-  for_each(policy, halfedge_.begin(), halfedge_.end(),
-           [&vertOld2New](Halfedge& h) {
-             h.startVert = vertOld2New[h.startVert];
-             h.endVert = vertOld2New[h.endVert];
-           });
+  for_each_n(policy, countAt(0), numVert, [&keep, this](int v) {
+    if (keep[v] == 0) {
+      vertPos_[v] = vec3(NAN);
+    }
+  });
 }
 
 void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
@@ -436,7 +419,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     return edge[a] < edge[b];
   });
 
-  // Mark opposed triangles for removal
+  // Mark opposed triangles for removal - this may strand unreferenced verts
+  // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
   for (int i = 0; i < numEdge; ++i) {
     const int pair0 = ids[i];
@@ -448,6 +432,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
+        h0 = {-1, -1, -1};
+        h1 = {-1, -1, -1};
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -463,12 +449,11 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    halfedge_[pair0].pairedHalfedge = pair1;
-    halfedge_[pair1].pairedHalfedge = pair0;
+    if (halfedge_[pair0].startVert >= 0) {
+      halfedge_[pair0].pairedHalfedge = pair1;
+      halfedge_[pair1].pairedHalfedge = pair0;
+    }
   });
-
-  // When opposed triangles are removed, they may strand unreferenced verts.
-  RemoveUnreferencedVerts();
 }
 
 /**
