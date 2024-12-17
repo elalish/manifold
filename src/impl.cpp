@@ -419,7 +419,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     return edge[a] < edge[b];
   });
 
-  // Mark opposed triangles for removal.
+  // Mark opposed triangles for removal - this may strand unreferenced verts
+  // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
   for (int i = 0; i < numEdge; ++i) {
     const int pair0 = ids[i];
@@ -453,9 +454,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       halfedge_[pair1].pairedHalfedge = pair0;
     }
   });
-
-  // When opposed triangles are removed, they may strand unreferenced verts.
-  RemoveUnreferencedVerts();
 }
 
 /**
