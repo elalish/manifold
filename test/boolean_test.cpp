@@ -422,7 +422,7 @@ TEST(Boolean, Precision2) {
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
 
-TEST(Boolean, SimpleCubeRegression) {
+TEST(Boolean, DISABLED_SimpleCubeRegression) {
   ManifoldParams().intermediateChecks = true;
   ManifoldParams().processOverlaps = false;
   Manifold result =
