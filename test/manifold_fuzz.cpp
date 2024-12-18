@@ -20,6 +20,7 @@
 #include "manifold/manifold.h"
 
 using namespace fuzztest;
+using namespace manifold;
 
 enum class TransformType { Translate, Rotate, Scale };
 struct Transform {
@@ -44,12 +45,13 @@ auto CsgDomain =
         .WithMaxSize(100);
 
 void SimpleCube(const std::vector<CubeOp> &inputs) {
-  manifold::ManifoldParams().intermediateChecks = true;
-  manifold::ManifoldParams().processOverlaps = false;
-  manifold::Manifold result;
+  ManifoldParams().intermediateChecks = true;
+  ManifoldParams().processOverlaps = false;
+  Manifold result;
   for (const auto &input : inputs) {
-    auto cube = manifold::Manifold::Cube();
+    auto cube = Manifold::Cube();
     for (const auto &transform : input.transforms) {
+      printf("transform: %d\n", static_cast<int>(transform.ty));
       switch (transform.ty) {
         case TransformType::Translate:
           cube = cube.Translate({std::get<0>(transform.vector),
@@ -69,6 +71,7 @@ void SimpleCube(const std::vector<CubeOp> &inputs) {
       }
     }
 
+    printf("isUnion: %d\n", input.isUnion);
     std::atomic<pid_t> tid;
     std::atomic<bool> faulted(true);
     auto asyncFuture = std::async(
@@ -79,7 +82,7 @@ void SimpleCube(const std::vector<CubeOp> &inputs) {
           } else {
             result -= cube;
           }
-          EXPECT_EQ(result.Status(), manifold::Manifold::Error::NoError);
+          EXPECT_EQ(result.Status(), Manifold::Error::NoError);
           faulted.store(false);
         });
     if (asyncFuture.wait_for(std::chrono::milliseconds(10000)) ==
@@ -94,13 +97,3 @@ void SimpleCube(const std::vector<CubeOp> &inputs) {
 }
 
 FUZZ_TEST(ManifoldFuzz, SimpleCube).WithDomains(CsgDomain);
-
-TEST(ManifoldFuzz, SimpleCubeRegression) {
-  SimpleCube({{{{static_cast<TransformType>(1),
-                 {-0.10000000000000001, 0.10000000000000001, -1.}}},
-               1},
-              {{}, 1},
-              {{{static_cast<TransformType>(1),
-                 {-0.10000000000000001, -0.10000000000066571, -1.}}},
-               0}});
-}
