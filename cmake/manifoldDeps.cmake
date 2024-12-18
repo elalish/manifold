@@ -82,8 +82,22 @@ if(MANIFOLD_CROSS_SECTION)
     find_package(Clipper2 QUIET)
     if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
       pkg_check_modules(Clipper2 Clipper2)
-    endif()
-  endif()
+      if(Clipper2_FOUND)
+        add_library(Clipper2 SHARED IMPORTED)
+        set_property(
+          TARGET Clipper2
+          PROPERTY IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES}
+        )
+        if(WIN32)
+          set_property(
+            TARGET Clipper2
+            PROPERTY IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES}
+          )
+        endif()
+        target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
+      endif(Clipper2_FOUND)
+    endif(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
+  endif(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
   if(NOT Clipper2_FOUND)
     logmissingdep("Clipper2" , "cross_section")
     set(MANIFOLD_USE_BUILTIN_CLIPPER2 ON)
