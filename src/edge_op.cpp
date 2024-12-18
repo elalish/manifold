@@ -33,27 +33,6 @@ bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
-struct FlagEdge {
-  VecView<const Halfedge> halfedge;
-  VecView<const TriRef> triRef;
-
-  bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
-    // Flag redundant edges - those where the startVert is surrounded by only
-    // two original triangles.
-    const TriRef ref0 = triRef[edge / 3];
-    int current = NextHalfedge(halfedge[edge].pairedHalfedge);
-    const TriRef ref1 = triRef[current / 3];
-    while (current != edge) {
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-      int tri = current / 3;
-      const TriRef ref = triRef[tri];
-      if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) return false;
-    }
-    return true;
-  }
-};
-
 struct SwappableEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
@@ -180,10 +159,29 @@ void Manifold::Impl::SimplifyTopology() {
 
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
+    for_each_n(policy, countAt(0_uz), nbEdges, [&bFlags, this](size_t edge) {
+      if (halfedge_[edge].pairedHalfedge < 0) {
+        bFlags[edge] = false;
+        return;
+      }
+      // Flag redundant edges - those where the startVert is surrounded by only
+      // two original triangles.
+      const TriRef ref0 = meshRelation_.triRef[edge / 3];
+      int current = NextHalfedge(halfedge_[edge].pairedHalfedge);
+      const TriRef ref1 = meshRelation_.triRef[current / 3];
+      while (current != edge) {
+        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+        int tri = current / 3;
+        const TriRef ref = meshRelation_.triRef[tri];
+        if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) {
+          bFlags[edge] = false;
+          return;
+        }
+      }
+      bFlags[edge] = true;
+    });
+
     numFlagged = 0;
-    FlagEdge se{halfedge_, meshRelation_.triRef};
-    for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bFlags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
       if (bFlags[i]) {
         if (CollapseEdge(i, scratchBuffer)) numFlagged++;
@@ -436,27 +434,36 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
   current = start;
-  TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
+  int tri = toRemove.pairedHalfedge / 3;
+  TriRef refCheck = triRef[tri];
+  mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
   vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
     vec3 pNext = vertPos_[halfedge_[current].endVert];
-    const int tri = current / 3;
-    const TriRef ref = triRef[tri];
-    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+    const TriRef ref = triRef[current / 3];
     // Don't collapse if the edge is not redundant (this may have changed due
     // to the collapse of neighbors).
     if (!ref.SameFace(refCheck)) {
-      refCheck = triRef[edge / 3];
+      tri = edge / 3;
+      refCheck = triRef[tri];
+      projection = GetAxisAlignedProjection(faceNormal_[tri]);
       if (!ref.SameFace(refCheck)) {
         return false;
+      } else {
+        // Don't collapse if the edges separating the faces are not colinear
+        // (can happen when the two faces are coplanar).
+        if (CCW(projection * pOld, projection * pLast, projection * pNew,
+                tolerance_) != 0)
+          return false;
       }
     }
 
     // Don't collapse edge if it would cause a triangle to invert.
     if (CCW(projection * pNext, projection * pLast, projection * pNew,
-            epsilon_) < 0)
+            epsilon_) < 0) {
       return false;
+    }
 
     pLast = pNext;
     current = halfedge_[current].pairedHalfedge;

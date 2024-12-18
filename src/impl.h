@@ -280,6 +280,7 @@ struct Manifold::Impl {
   double GetProperty(Property prop) const;
   void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
+  int TriCCW(size_t tri, double epsilon) const;
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
   void SetEpsilon(double minEpsilon = -1, bool useSingle = false);

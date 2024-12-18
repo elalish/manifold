@@ -856,6 +856,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   UpdateReference(outR, inP_, inQ_, invertQ);
 
+  outR.CreateFaces();
   outR.SimplifyTopology();
   outR.RemoveUnreferencedVerts();
 

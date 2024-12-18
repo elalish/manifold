@@ -227,6 +227,7 @@ void Manifold::Impl::CreateFaces() {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    const int meshID = meshRelation_.triRef[tp.tri].meshID;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
     std::vector<int> interiorHalfedges = {3 * tp.tri, 3 * tp.tri + 1,
@@ -235,11 +236,17 @@ void Manifold::Impl::CreateFaces() {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
       interiorHalfedges.pop_back();
-      if (meshRelation_.triRef[h / 3].faceID >= 0) continue;
+      const int tri = h / 3;
+      TriRef& ref = meshRelation_.triRef[tri];
+      if (ref.faceID >= 0) continue;
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
-      if (abs(dot(v - base, normal)) < tolerance_) {
-        meshRelation_.triRef[h / 3].faceID = tp.tri;
+
+      if (abs(dot(v - base, normal)) < tolerance_ &&
+          (ref.meshID == meshID || TriCCW(tri, tolerance_) == 0)) {
+        faceNormal_[tri] = faceNormal_[tp.tri];
+        ref.meshID = meshID;
+        ref.faceID = tp.tri;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
