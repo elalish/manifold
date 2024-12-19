@@ -42,6 +42,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   Manifold result = cube + cube.Translate({1, 1, 0});
 
   ASSERT_LT(result.OriginalID(), 0);
+  EXPECT_LE(result.NumDegenerateTris(), 0);
   ExpectMeshes(result, {{18, 32}});
   RelatedGL(result, {original});
 
@@ -50,6 +51,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
+  EXPECT_LE(result2.NumDegenerateTris(), 0);
   ExpectMeshes(result2, {{16, 28}});
   RelatedGL(result2, {original});
 
