@@ -108,6 +108,7 @@ if(MANIFOLD_FUZZ)
   set(FUZZTEST_FUZZING_MODE ON)
   # address sanitizer required
   add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
 endif()
 
 if(TRACY_ENABLE)

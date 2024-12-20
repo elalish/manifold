@@ -78,26 +78,27 @@ endif()
 
 # If we're building cross_section, we need Clipper2
 if(MANIFOLD_CROSS_SECTION)
-  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2)
+  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
     find_package(Clipper2 QUIET)
     if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
       pkg_check_modules(Clipper2 Clipper2)
-    endif()
-  endif()
-  if(Clipper2_FOUND)
-    add_library(Clipper2 SHARED IMPORTED)
-    set_property(
-      TARGET Clipper2
-      PROPERTY IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES}
-    )
-    if(WIN32)
-      set_property(
-        TARGET Clipper2
-        PROPERTY IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES}
-      )
-    endif()
-    target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
-  else()
+      if(Clipper2_FOUND)
+        add_library(Clipper2 SHARED IMPORTED)
+        set_property(
+          TARGET Clipper2
+          PROPERTY IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES}
+        )
+        if(WIN32)
+          set_property(
+            TARGET Clipper2
+            PROPERTY IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES}
+          )
+        endif()
+        target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
+      endif(Clipper2_FOUND)
+    endif(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
+  endif(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
+  if(NOT Clipper2_FOUND)
     logmissingdep("Clipper2" , "cross_section")
     set(MANIFOLD_USE_BUILTIN_CLIPPER2 ON)
     set(CLIPPER2_UTILS OFF)
@@ -224,7 +225,7 @@ if(MANIFOLD_FUZZ)
   FetchContent_Declare(
     fuzztest
     GIT_REPOSITORY https://github.com/google/fuzztest.git
-    GIT_TAG 2606e04a43e5a7730e437a849604a61f1cb0ff28
+    GIT_TAG 7b107216fa6cd62659234366aee493d6f8832d46
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(fuzztest)
