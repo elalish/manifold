@@ -51,6 +51,9 @@ set(
   tri_dist.h
   utils.h
   vec.h
+  sdf/eval.h
+  sdf/interval.h
+  sdf/tape.h
 )
 
 # Include directories
