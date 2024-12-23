@@ -26,6 +26,11 @@ struct Interval {
   Domain lower;
   Domain upper;
 
+  Interval()
+      : lower(-std::numeric_limits<Domain>::infinity()),
+        upper(std::numeric_limits<Domain>::infinity()) {}
+  Interval(Domain v) : lower(v), upper(v) {}
+  Interval(Domain lower, Domain upper) : lower(lower), upper(upper) {}
   static Interval constant(Domain v) { return {v, v}; }
 
   constexpr Interval operator+(const Interval &other) const {
