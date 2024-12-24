@@ -13,8 +13,8 @@
 // limitations under the License.
 #pragma once
 
-#include <unordered_map>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -68,7 +68,8 @@ class Context {
 
   std::vector<uint8_t> tmpTape;
   std::vector<double> tmpBuffer;
-  std::map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>, Operand> cache;
+  std::map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>, Operand>
+      cache;
 
   Operand addInstructionNoCache(OpCode op, Operand a = Operand::none(),
                                 Operand b = Operand::none(),
