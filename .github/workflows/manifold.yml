@@ -164,8 +164,9 @@ jobs:
       if: matrix.shared == 'ON'
       shell: bash
       run: |
-        ls ./build/lib
-        [ ! -f ./build/lib/Release/manifold.dll ] && exit 1
+        ls ./build/lib/Release
+        [ -f ./build/lib/Release/manifold.dll ]
+        [ -f ./build/lib/Release/manifoldc.dll ]
     - name: Test ${{matrix.parallelization}}
       shell: bash
       run: |
