@@ -265,6 +265,14 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
   std::vector<uint8_t> opToReg;
   std::vector<uint8_t> availableReg;
 
+  auto getReg = [&](Operand operand) {
+    if (operand.isResult())
+      return opToReg[operand.toInstIndex()];
+    else if (operand.isConst())
+      return constantToReg[operand.toConstIndex()];
+    return static_cast<uint8_t>(-(operand.id + 1));
+  };
+
   // FIXME: handle spills
   for (size_t i = 0; i < operations.size(); i++) {
     if (operations[i] == OpCode::NOP) {
@@ -274,10 +282,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
     if (operations[i] == OpCode::RETURN) {
       auto operand = operands[i][0];
       tape.push_back(static_cast<uint8_t>(operations[i]));
-      if (operand.isResult())
-        tape.push_back(opToReg[operand.toInstIndex()]);
-      else
-        tape.push_back(constantToReg[operand.toConstIndex()]);
+      tape.push_back(getReg(operand));
       dumpOpCode(operations[i]);
       std::cout << " r" << static_cast<int>(tape.back()) << std::endl;
       break;
@@ -316,10 +321,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
     tape.push_back(reg);
     for (auto operand : operands[i]) {
       if (operand.isNone()) break;
-      if (operand.isResult())
-        tape.push_back(opToReg[operand.toInstIndex()]);
-      else
-        tape.push_back(constantToReg[operand.toConstIndex()]);
+      tape.push_back(getReg(operand));
       std::cout << " r" << static_cast<int>(tape.back());
     }
     std::cout << std::endl;

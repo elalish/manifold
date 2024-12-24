@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
+
 #include "./hashtable.h"
 #include "./impl.h"
 #include "./parallel.h"
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
-#include <chrono>
 
 namespace {
 using namespace manifold;
@@ -491,7 +492,10 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
                                  origin, spacing, gridSize, level, sdf);
       });
   auto end = std::chrono::high_resolution_clock::now();
-  printf("sdf evaluations: %d, %ld\n", sdf_counter.load(), std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+  printf("sdf evaluations: %d, %dus\n", sdf_counter.load(),
+         static_cast<int>(
+             std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+                 .count()));
 
   size_t tableSize = std::min(
       2 * maxIndex, static_cast<Uint64>(10 * la::pow(maxIndex, 0.667)));

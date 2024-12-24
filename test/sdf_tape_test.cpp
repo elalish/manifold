@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
 #include <iostream>
 
 #include "../src/sdf/tape.h"
@@ -59,20 +60,44 @@ TEST(TAPE, Gyroid) {
   Value constantKPi4 = Value::Constant(kPi / 4);
   auto x = Value::X() - constantKPi4;
   auto y = Value::Y() - constantKPi4;
-  auto z = Value::Y() - constantKPi4;
+  auto z = Value::Z() - constantKPi4;
 
   auto result = x.cos() * y.sin() + y.cos() * z.sin() + z.cos() * x.sin();
   auto tape = result.genTape();
+
+  // verify by comparing with grid evaluation results
+  auto gyroid = [](vec3 p) {
+    p -= kPi / 4;
+    return std::cos(p.x) * std::sin(p.y) + std::cos(p.y) * std::sin(p.z) +
+           std::cos(p.z) * std::sin(p.x);
+  };
+
+  EvalContext<double> ctxSimple{
+      tape.first, VecView(tape.second.data(), tape.second.size())};
+  for (double x = -period; x < period; x += period / n) {
+    for (double y = -period; y < period; y += period / n) {
+      for (double z = -period; z < period; z += period / n) {
+        ctxSimple.buffer[0] = x;
+        ctxSimple.buffer[1] = y;
+        ctxSimple.buffer[2] = z;
+        ASSERT_NEAR(ctxSimple.eval(), gyroid({x, y, z}), 1e-12);
+      }
+    }
+  }
+
   std::vector<Interval<double>> intervalBuffer;
   for (auto d : tape.second) intervalBuffer.push_back(Interval(d));
   EvalContext<Interval<double>> ctx{
       tape.first, VecView(intervalBuffer.data(), intervalBuffer.size())};
+  auto start = std::chrono::high_resolution_clock::now();
   std::cout << recursive_interval(ctx, vec3(-period), vec3(period * 2),
                                   period / n, -0.4)
             << std::endl;
-  std::cout << recursive_interval(ctx, vec3(-period), vec3(period * 2),
-                                  period / n, 0.4)
-            << std::endl;
+  auto end = std::chrono::high_resolution_clock::now();
+  auto time = static_cast<int>(
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count());
+  printf("interval evaluation: %dus\n", time);
 }
 
 TEST(TAPE, Blobs) {
@@ -109,10 +134,37 @@ TEST(TAPE, Blobs) {
   }
   auto tape = d.genTape();
 
+  auto blobs = [&balls](vec3 p) {
+    double d = 0;
+    for (const auto& ball : balls) {
+      d += (ball.w > 0 ? 1 : -1) *
+           smoothstep(-1, 1, std::abs(ball.w) - la::length(vec3(ball) - p));
+    }
+    return d;
+  };
+  EvalContext<double> ctxSimple{
+      tape.first, VecView(tape.second.data(), tape.second.size())};
+  for (double x = -5; x < 5; x += 0.05) {
+    for (double y = -5; y < 5; y += 0.05) {
+      for (double z = -5; z < 5; z += 0.05) {
+        ctxSimple.buffer[0] = x;
+        ctxSimple.buffer[1] = y;
+        ctxSimple.buffer[2] = z;
+        ASSERT_NEAR(ctxSimple.eval(), blobs({x, y, z}), 1e-12);
+      }
+    }
+  }
+
   std::vector<Interval<double>> intervalBuffer;
   for (auto d : tape.second) intervalBuffer.push_back(Interval(d));
   EvalContext<Interval<double>> ctx{
       tape.first, VecView(intervalBuffer.data(), intervalBuffer.size())};
+  auto start = std::chrono::high_resolution_clock::now();
   std::cout << recursive_interval(ctx, vec3(-5), vec3(10), 0.05, 0.5)
             << std::endl;
+  auto end = std::chrono::high_resolution_clock::now();
+  auto time = static_cast<int>(
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count());
+  printf("interval evaluation: %dus\n", time);
 }
