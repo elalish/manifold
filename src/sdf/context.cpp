@@ -367,7 +367,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       spills.insert({lru.front().operand, slot});
       tape.push_back(static_cast<uint8_t>(OpCode::STORE));
       std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
-      std::memcpy(tmpBuffer.begin(), &slot, sizeof(uint32_t));
+      std::memcpy(tmpBuffer.data(), &slot, sizeof(uint32_t));
       for (auto byte : tmpBuffer) tape.push_back(byte);
       auto reg = lru.front().reg;
       tape.push_back(reg);
@@ -401,14 +401,14 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
         tape.push_back(static_cast<uint8_t>(OpCode::CONST));
         tape.push_back(reg);
         std::array<uint8_t, sizeof(double)> tmpBuffer;
-        std::memcpy(tmpBuffer.begin(), &constants[operand.toConstIndex()],
+        std::memcpy(tmpBuffer.data(), &constants[operand.toConstIndex()],
                     sizeof(double));
         for (auto byte : tmpBuffer) tape.push_back(byte);
       } else {
         tape.push_back(static_cast<uint8_t>(OpCode::LOAD));
         tape.push_back(reg);
         std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
-        std::memcpy(tmpBuffer.begin(), &iter->second, sizeof(uint32_t));
+        std::memcpy(tmpBuffer.data(), &iter->second, sizeof(uint32_t));
         for (auto byte : tmpBuffer) tape.push_back(byte);
         spillSlots.push_back(iter->second);
         spills.erase(iter);
