@@ -277,7 +277,7 @@ void Context::optimizeFMA() {
 void Context::reschedule() {
   DEBUG_ASSERT(!operations.empty() && operations.back() == OpCode::RETURN,
                logicErr, "return expected");
-
+  cache.clear();
   auto oldOperations = std::move(operations);
   auto oldOperands = std::move(operands);
   opUses.clear();
