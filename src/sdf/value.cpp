@@ -196,8 +196,6 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
       case ValueKind::OPERATION: {
         auto iter = cache.find(std::get<VO>(x.v));
         if (iter != cache.end()) return iter->second;
-        // stack.push_back(std::get<VO>(x.v));
-        // ready = false;
         f(x);
         return Operand::none();
       }

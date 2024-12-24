@@ -145,8 +145,36 @@ Operand Context::addConstant(double d) {
   return result.first->second;
 }
 
-// TODO: hashconsing
 Operand Context::addInstruction(OpCode op, Operand a, Operand b, Operand c) {
+  switch (op) {
+    case OpCode::ADD:
+    case OpCode::MUL:
+    case OpCode::MIN:
+    case OpCode::MAX:
+    case OpCode::EQ:
+    case OpCode::AND:
+    case OpCode::OR:
+    case OpCode::FMA:
+      // first two operands commutative, sort them
+      // makes it more likely to find common subexpressions
+      if (a.id > b.id) std::swap(a, b);
+      break;
+    default:
+      break;
+  }
+  // common subexpression elimination
+  auto key = std::make_pair(op, std::make_tuple(a, b, c));
+  auto entry = cache.find(key);
+  if (entry != cache.end()) return entry->second;
+  auto result = addInstructionNoCache(op, a, b, c);
+  cache.insert({key, result});
+  return result;
+}
+
+// bypass the cache because we don't expect to have more common subexpressions
+// after optimizations
+Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
+                                       Operand c) {
   // constant choice
   if (op == OpCode::CHOICE && a.isConst()) {
     if (constants[a.toConstIndex()] == 1.0) return b;
@@ -363,14 +391,14 @@ void Context::reschedule() {
           stack.push_back(operand.toInstIndex());
     } else {
       stack.pop_back();
-      Operand result = addInstruction(
+      Operand result = addInstructionNoCache(
           oldOperations[back], toNewOperand(curOperands[0]),
           toNewOperand(curOperands[1]), toNewOperand(curOperands[2]));
       computedInst.insert({back, result});
     }
   }
-  addInstruction(OpCode::RETURN,
-                 computedInst[oldOperands.back()[0].toInstIndex()]);
+  addInstructionNoCache(OpCode::RETURN,
+                        computedInst[oldOperands.back()[0].toInstIndex()]);
 }
 
 std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {

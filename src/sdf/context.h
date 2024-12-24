@@ -14,6 +14,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -32,6 +33,7 @@ struct Operand {
   size_t toInstIndex() const { return static_cast<size_t>(id - 1); }
   bool operator==(const Operand& other) const { return id == other.id; }
   bool operator!=(const Operand& other) const { return id != other.id; }
+  bool operator<(const Operand& other) const { return id < other.id; }
 };
 
 class Context {
@@ -66,6 +68,11 @@ class Context {
 
   std::vector<uint8_t> tmpTape;
   std::vector<double> tmpBuffer;
+  std::map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>, Operand> cache;
+
+  Operand addInstructionNoCache(OpCode op, Operand a = Operand::none(),
+                                Operand b = Operand::none(),
+                                Operand c = Operand::none());
 };
 
 }  // namespace manifold::sdf
