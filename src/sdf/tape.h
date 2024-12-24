@@ -115,11 +115,11 @@ struct EvalContext {
         Domain x = operand(tape[i + 2]);
         operand(tape[i + 1]) = handle_unary(current, x);
         i += 3;
-      // } else if (current == OpCode::CONST) {
-      //   double x;
-      //   std::memcpy(&x, tape.data() + i + 2, sizeof(x));
-      //   operand(tape[i + 1]) = x;
-      //   i += 2 + sizeof(x);
+        // } else if (current == OpCode::CONST) {
+        //   double x;
+        //   std::memcpy(&x, tape.data() + i + 2, sizeof(x));
+        //   operand(tape[i + 1]) = x;
+        //   i += 2 + sizeof(x);
       } else if (current == OpCode::RETURN) {
         return operand(tape[i + 1]);
       } else {

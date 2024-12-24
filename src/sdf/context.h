@@ -28,8 +28,8 @@ struct Operand {
   bool isConst() const { return id <= -4; }
   bool isResult() const { return id > 0; }
   bool isNone() const { return id == 0; }
-  int toConstIndex() const { return -(id + 4); }
-  int toInstIndex() const { return id - 1; }
+  size_t toConstIndex() const { return static_cast<size_t>(-(id + 4)); }
+  size_t toInstIndex() const { return static_cast<size_t>(id - 1); }
   bool operator==(const Operand& other) const { return id == other.id; }
   bool operator!=(const Operand& other) const { return id != other.id; }
 };
