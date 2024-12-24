@@ -209,7 +209,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
         return Operand{-2};
       case ValueKind::Z:
         return Operand{-3};
-      case ValueKind::INVALID:
+      default:
         return Operand::none();
     }
   };
