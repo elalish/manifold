@@ -200,7 +200,7 @@ Operand Context::addInstruction(OpCode op, Operand a, Operand b, Operand c) {
 }
 
 void Context::optimizeFMA() {
-  auto tryApply = [&](int i, Operand lhs, Operand rhs) {
+  auto tryApply = [&](size_t i, Operand lhs, Operand rhs) {
     if (!lhs.isResult()) return false;
     auto lhsInst = lhs.toInstIndex();
     if (operations[lhsInst] != OpCode::MUL || opUses[lhsInst].size() != 1)
