@@ -167,9 +167,10 @@ jobs:
         ls ./build/lib/Release
         [ -f ./build/lib/Release/manifold.dll ]
         [ -f ./build/lib/Release/manifoldc.dll ]
-    - name: Test ${{matrix.parallelization}}
+    - name: Test
       shell: bash
       run: |
+        cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
         ./manifold_test.exe
         cd ../../
