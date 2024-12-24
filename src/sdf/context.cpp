@@ -242,6 +242,137 @@ void Context::optimizeFMA() {
   }
 }
 
+// this does dead code elimination as well
+// assumes the last instruction is return
+// and note that this is not optimal, and cannot be optimal without dealing with
+// NP-hard stuff...
+void Context::reschedule() {
+  DEBUG_ASSERT(!operations.empty() && operations.back() == OpCode::RETURN,
+               logicErr, "return expected");
+
+  auto oldOperations = std::move(operations);
+  auto oldOperands = std::move(operands);
+  opUses.clear();
+  for (auto &uses : constantUses) uses.clear();
+
+  std::unordered_map<size_t, Operand> computedInst;
+  std::vector<size_t> stack;
+  if (oldOperands.back()[0].isResult())
+    stack.push_back(oldOperands.back()[0].toInstIndex());
+
+  std::unordered_map<size_t, uint8_t> bitset;
+  std::unordered_map<size_t, size_t> distances;
+  std::vector<size_t> tmpStack;
+
+  auto requiresComputation = [&computedInst](Operand operand) {
+    return operand.isResult() &&
+           computedInst.find(operand.toInstIndex()) == computedInst.end();
+  };
+  auto toNewOperand = [&computedInst](Operand old) {
+    if (old.isResult()) return computedInst[old.toInstIndex()];
+    return old;
+  };
+
+  while (!stack.empty()) {
+    int numResults = 0;
+    auto back = stack.back();
+    auto &curOperands = oldOperands[back];
+    for (auto operand : curOperands)
+      if (requiresComputation(operand)) numResults += 1;
+    if (numResults > 1) {
+      // find common results first
+      // does this by recursively marking instructions to be the transitive
+      // dependency of operands
+      // we use a bitset, so if the bitset & (1 << (numResults + 1)) - 1,
+      // it means that the instruction is the common dependency for all operands
+      uint8_t mask = (1 << (numResults + 1)) - 1;
+      numResults = 0;
+      for (auto operand : curOperands) {
+        if (!requiresComputation(operand)) continue;
+        tmpStack.push_back(operand.toInstIndex());
+        while (!tmpStack.empty()) {
+          auto current = tmpStack.back();
+          tmpStack.pop_back();
+          // already computed
+          if (computedInst.find(current) != computedInst.end()) continue;
+          auto iter = bitset.find(current);
+          if (iter == bitset.end()) {
+            // new dependency
+            bitset.insert({current, 1 << numResults});
+          } else {
+            iter->second |= 1 << numResults;
+          }
+          for (auto x : oldOperands[current]) {
+            if (!x.isResult()) continue;
+            tmpStack.push_back(x.toInstIndex());
+          }
+        }
+        numResults += 1;
+      }
+      // compute operand costs as distance in the dependency graph
+      std::array<size_t, 3> costs = {0, 0, 0};
+      std::array<size_t, 3> ids = {0, 1, 2};
+      for (int i = 0; i < curOperands.size(); i++) {
+        auto operand = curOperands[i];
+        if (!requiresComputation(operand)) continue;
+        tmpStack.push_back(operand.toInstIndex());
+        while (!tmpStack.empty()) {
+          auto current = tmpStack.back();
+          size_t maxDistance = 0;
+          for (auto x : oldOperands[current]) {
+            if (!x.isResult()) continue;
+            auto inst = x.toInstIndex();
+
+            // computed, doesn't affect distance
+            if (computedInst.find(inst) != computedInst.end()) continue;
+
+            auto iter1 = bitset.find(inst);
+            DEBUG_ASSERT(iter1 != bitset.end(), logicErr, "should be found");
+            // shared dependency between operands, also doesn't affect distance
+            if ((iter1->second & mask) == mask) continue;
+
+            auto iter2 = distances.find(inst);
+            if (iter2 == distances.end()) {
+              // not computed
+              tmpStack.push_back(x.toInstIndex());
+              maxDistance = std::numeric_limits<size_t>::max();
+            } else {
+              maxDistance = std::max(maxDistance, iter2->second);
+            }
+          }
+          if (maxDistance != std::numeric_limits<size_t>::max()) {
+            tmpStack.pop_back();
+            distances.insert({current, maxDistance + 1});
+          }
+        }
+        costs[i] = distances[operand.toInstIndex()];
+        distances.clear();
+      }
+      std::sort(ids.begin(), ids.end(),
+                [&costs](size_t x, size_t y) { return costs[x] < costs[y]; });
+      // expensive operands are placed at the top of the stack, i.e. scheduled
+      // earlier
+      for (size_t x : ids)
+        if (requiresComputation(curOperands[x]))
+          stack.push_back(curOperands[x].toInstIndex());
+
+      bitset.clear();
+    } else if (numResults == 1) {
+      for (auto operand : curOperands)
+        if (requiresComputation(operand))
+          stack.push_back(operand.toInstIndex());
+    } else {
+      stack.pop_back();
+      Operand result = addInstruction(
+          oldOperations[back], toNewOperand(curOperands[0]),
+          toNewOperand(curOperands[1]), toNewOperand(curOperands[2]));
+      computedInst.insert({back, result});
+    }
+  }
+  addInstruction(OpCode::RETURN,
+                 computedInst[oldOperands.back()[0].toInstIndex()]);
+}
+
 std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
   std::vector<uint8_t> tape;
   std::vector<double> buffer;
@@ -313,6 +444,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
     } else {
       reg = availableReg.back();
       availableReg.pop_back();
+      regUsed[reg] = true;
     }
     opToReg.push_back(reg);
     tape.push_back(static_cast<uint8_t>(operations[i]));

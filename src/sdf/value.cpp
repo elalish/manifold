@@ -237,6 +237,8 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
   ctx.dump();
   ctx.optimizeFMA();
   ctx.dump();
+  ctx.reschedule();
+  ctx.dump();
   return ctx.genTape();
 }
 

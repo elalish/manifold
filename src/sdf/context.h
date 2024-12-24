@@ -41,7 +41,7 @@ class Context {
                          Operand b = Operand::none(),
                          Operand c = Operand::none());
   void optimizeFMA();
-  // TODO: DCE
+  void reschedule();
 
   std::pair<std::vector<uint8_t>, std::vector<double>> genTape();
 
