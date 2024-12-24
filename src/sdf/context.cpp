@@ -312,7 +312,7 @@ void Context::reschedule() {
       // compute operand costs as distance in the dependency graph
       std::array<size_t, 3> costs = {0, 0, 0};
       std::array<size_t, 3> ids = {0, 1, 2};
-      for (int i = 0; i < curOperands.size(); i++) {
+      for (size_t i = 0; i < curOperands.size(); i++) {
         auto operand = curOperands[i];
         if (!requiresComputation(operand)) continue;
         tmpStack.push_back(operand.toInstIndex());
@@ -414,8 +414,6 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       auto operand = operands[i][0];
       tape.push_back(static_cast<uint8_t>(operations[i]));
       tape.push_back(getReg(operand));
-      dumpOpCode(operations[i]);
-      std::cout << " r" << static_cast<int>(tape.back()) << std::endl;
       break;
     }
     // free up operand registers if possible
@@ -448,17 +446,12 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
     }
     opToReg.push_back(reg);
     tape.push_back(static_cast<uint8_t>(operations[i]));
-    dumpOpCode(operations[i]);
-    std::cout << " r" << static_cast<int>(reg);
     tape.push_back(reg);
     for (auto operand : operands[i]) {
       if (operand.isNone()) break;
       tape.push_back(getReg(operand));
-      std::cout << " r" << static_cast<int>(tape.back());
     }
-    std::cout << std::endl;
   }
-  std::cout << "-----------" << std::endl;
   return std::make_pair(std::move(tape), std::move(buffer));
 }
 

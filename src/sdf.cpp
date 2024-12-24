@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <chrono>
-
 #include "./hashtable.h"
 #include "./impl.h"
 #include "./parallel.h"
@@ -123,8 +121,6 @@ vec3 Bound(vec3 pos, vec3 origin, vec3 spacing, ivec3 gridSize) {
   return min(max(pos, origin), origin + spacing * (vec3(gridSize) - 1));
 }
 
-static std::atomic_int32_t sdf_counter;
-
 double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
                   double level, std::function<double(vec3)> sdf) {
   const ivec3 xyz(gridIndex);
@@ -135,7 +131,6 @@ double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
   if (boundDist < 0) {
     return 0.0;
   }
-  sdf_counter.fetch_add(1, std::memory_order_relaxed);
   const double d = sdf(Position(gridIndex, origin, spacing)) - level;
   return boundDist == 0 ? std::min(d, 0.0) : d;
 }
@@ -482,20 +477,13 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
 
   const vec3 origin = bounds.min;
   Vec<double> voxels(maxIndex);
-  sdf_counter.store(0);
 
-  auto start = std::chrono::high_resolution_clock::now();
   for_each_n(
       pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
         voxels[idx] = BoundedSDF(DecodeIndex(idx, gridPow) - kVoxelOffset,
                                  origin, spacing, gridSize, level, sdf);
       });
-  auto end = std::chrono::high_resolution_clock::now();
-  printf("sdf evaluations: %d, %dus\n", sdf_counter.load(),
-         static_cast<int>(
-             std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-                 .count()));
 
   size_t tableSize = std::min(
       2 * maxIndex, static_cast<Uint64>(10 * la::pow(maxIndex, 0.667)));

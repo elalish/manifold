@@ -234,11 +234,8 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
   Operand result = getOperand(*this, [](Value _) {});
   ctx.addInstruction(OpCode::RETURN, result, Operand::none(), Operand::none());
 
-  ctx.dump();
   ctx.optimizeFMA();
-  ctx.dump();
   ctx.reschedule();
-  ctx.dump();
   return ctx.genTape();
 }
 
