@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: GCC (CrossSection:${{matrix.cross_section}} TBB:${{matrix.parallelization == 'ON'}} GCC:${{matrix.gcc}})
+    name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
     timeout-minutes: 45
     strategy:
       matrix:
@@ -93,7 +93,7 @@ jobs:
         ./scripts/test-cmake.sh
 
   build_wasm:
-    name: WASM (TBB:${{matrix.parallelization}} DEBUG:${{matrix.debug}})
+    name: WASM (TBB:${{matrix.parallelization}}, DEBUG:${{matrix.debug}})
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     strategy:
@@ -143,7 +143,7 @@ jobs:
         overwrite: true
 
   build_windows:
-    name: Windows (TBB:${{matrix.parallelization}} SHARED:${{matrix.shared}})
+    name: Windows (TBB:${{matrix.parallelization}}, SHARED:${{matrix.shared}})
     timeout-minutes: 30
     strategy:
       matrix:
