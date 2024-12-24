@@ -15,9 +15,9 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <limits>
+#include <string>
 
 #include "interval.h"
 #include "manifold/vec_view.h"
@@ -27,7 +27,9 @@ namespace manifold::sdf {
 enum class OpCode : uint8_t {
   NOP,
   RETURN,
-  // CONST,
+  CONST,
+  STORE,
+  LOAD,
 
   // unary operations
   ABS,
@@ -69,8 +71,6 @@ struct EvalContext {
   VecView<const uint8_t> tape;
   VecView<Domain> buffer;
 
-  Domain& operand(uint32_t x) { return buffer[x]; }
-
   static Domain handle_unary(OpCode op, Domain operand);
 
   static Domain handle_binary(OpCode op, Domain lhs, Domain rhs);
@@ -86,42 +86,52 @@ struct EvalContext {
         // loop is needed to force the compiler to use a tight code layout
         do {
           size_t result = tape[i + 1];
-          Domain lhs = operand(tape[i + 2]);
-          Domain rhs = operand(tape[i + 3]);
+          Domain lhs = buffer[tape[i + 2]];
+          Domain rhs = buffer[tape[i + 3]];
           i += 4;
           if (current <= OpCode::MUL) {
             if (current == OpCode::ADD)
-              operand(result) = lhs + rhs;
+              buffer[result] = lhs + rhs;
             else if (current == OpCode::SUB)
-              operand(result) = lhs - rhs;
+              buffer[result] = lhs - rhs;
             else
-              operand(result) = lhs * rhs;
+              buffer[result] = lhs * rhs;
           } else {
-            Domain z = operand(tape[i++]);
+            Domain z = buffer[tape[i++]];
             if (current == OpCode::FMA)
-              operand(result) = lhs * rhs + z;
+              buffer[result] = lhs * rhs + z;
             else
-              operand(result) = handle_choice(lhs, rhs, z);
+              buffer[result] = handle_choice(lhs, rhs, z);
           }
           current = static_cast<OpCode>(tape[i]);
         } while (current >= OpCode::ADD);
       }
       if (current >= OpCode::DIV) {
-        Domain lhs = operand(tape[i + 2]);
-        Domain rhs = operand(tape[i + 3]);
-        operand(tape[i + 1]) = handle_binary(current, lhs, rhs);
+        Domain lhs = buffer[tape[i + 2]];
+        Domain rhs = buffer[tape[i + 3]];
+        buffer[tape[i + 1]] = handle_binary(current, lhs, rhs);
         i += 4;
       } else if (current >= OpCode::ABS) {
-        Domain x = operand(tape[i + 2]);
-        operand(tape[i + 1]) = handle_unary(current, x);
+        Domain x = buffer[tape[i + 2]];
+        buffer[tape[i + 1]] = handle_unary(current, x);
         i += 3;
-        // } else if (current == OpCode::CONST) {
-        //   double x;
-        //   std::memcpy(&x, tape.data() + i + 2, sizeof(x));
-        //   operand(tape[i + 1]) = x;
-        //   i += 2 + sizeof(x);
+      } else if (current == OpCode::CONST) {
+        double x;
+        std::memcpy(&x, tape.data() + i + 2, sizeof(x));
+        buffer[tape[i + 1]] = Domain(x);
+        i += 2 + sizeof(x);
+      } else if (current == OpCode::LOAD) {
+        uint32_t x;
+        std::memcpy(&x, tape.data() + i + 2, sizeof(x));
+        buffer[tape[i + 1]] = buffer[x];
+        i += 2 + sizeof(x);
+      } else if (current == OpCode::STORE) {
+        uint32_t x;
+        std::memcpy(&x, tape.data() + i + 1, sizeof(x));
+        buffer[x] = buffer[tape[i + 1 + sizeof(x)]];
+        i += 2 + sizeof(x);
       } else if (current == OpCode::RETURN) {
-        return operand(tape[i + 1]);
+        return buffer[tape[i + 1]];
       } else {
         i += 1;
       }
@@ -279,6 +289,75 @@ inline Interval<double> EvalContext<Interval<double>>::handle_choice(
     return rhs;
   }
   return lhs.merge(rhs);
+}
+
+inline std::string dumpOpCode(OpCode op) {
+  switch (op) {
+    case OpCode::NOP:
+      return "NOP";
+    case OpCode::RETURN:
+      return "RETURN";
+    case OpCode::CONST:
+      return "CONST";
+    case OpCode::LOAD:
+      return "LOAD";
+    case OpCode::STORE:
+      return "STORE";
+    case OpCode::ABS:
+      return "ABS";
+    case OpCode::NEG:
+      return "NEG";
+    case OpCode::EXP:
+      return "EXP";
+    case OpCode::LOG:
+      return "LOG";
+    case OpCode::SQRT:
+      return "SQRT";
+    case OpCode::FLOOR:
+      return "FLOOR";
+    case OpCode::CEIL:
+      return "CEIL";
+    case OpCode::ROUND:
+      return "ROUND";
+    case OpCode::SIN:
+      return "SIN";
+    case OpCode::COS:
+      return "COS";
+    case OpCode::TAN:
+      return "TAN";
+    case OpCode::ASIN:
+      return "ASIN";
+    case OpCode::ACOS:
+      return "ACOS";
+    case OpCode::ATAN:
+      return "ATAN";
+    case OpCode::DIV:
+      return "DIV";
+    case OpCode::MOD:
+      return "MOD";
+    case OpCode::MIN:
+      return "MIN";
+    case OpCode::MAX:
+      return "MAX";
+    case OpCode::EQ:
+      return "EQ";
+    case OpCode::GT:
+      return "GT";
+    case OpCode::AND:
+      return "AND";
+    case OpCode::OR:
+      return "OR";
+    case OpCode::ADD:
+      return "ADD";
+    case OpCode::SUB:
+      return "SUB";
+    case OpCode::MUL:
+      return "MUL";
+    case OpCode::FMA:
+      return "FMA";
+    case OpCode::CHOICE:
+      return "CHOICE";
+  }
 }
 
 }  // namespace manifold::sdf

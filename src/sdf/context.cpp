@@ -15,108 +15,26 @@
 #include "context.h"
 
 #include <algorithm>
+
+#ifdef MANIFOLD_DEBUG
 #include <iostream>
+#endif
 
 #include "manifold/optional_assert.h"
 
+template <>
+struct std::hash<manifold::sdf::Operand> {
+  size_t operator()(const manifold::sdf::Operand &operand) const {
+    return std::hash<int>()(operand.id);
+  }
+};
+
 namespace manifold::sdf {
 
-void dumpOpCode(OpCode op) {
-  switch (op) {
-    case OpCode::NOP:
-      std::cout << "NOP";
-      break;
-    case OpCode::RETURN:
-      std::cout << "RETURN";
-      break;
-    case OpCode::ABS:
-      std::cout << "ABS";
-      break;
-    case OpCode::NEG:
-      std::cout << "NEG";
-      break;
-    case OpCode::EXP:
-      std::cout << "EXP";
-      break;
-    case OpCode::LOG:
-      std::cout << "LOG";
-      break;
-    case OpCode::SQRT:
-      std::cout << "SQRT";
-      break;
-    case OpCode::FLOOR:
-      std::cout << "FLOOR";
-      break;
-    case OpCode::CEIL:
-      std::cout << "CEIL";
-      break;
-    case OpCode::ROUND:
-      std::cout << "ROUND";
-      break;
-    case OpCode::SIN:
-      std::cout << "SIN";
-      break;
-    case OpCode::COS:
-      std::cout << "COS";
-      break;
-    case OpCode::TAN:
-      std::cout << "TAN";
-      break;
-    case OpCode::ASIN:
-      std::cout << "ASIN";
-      break;
-    case OpCode::ACOS:
-      std::cout << "ACOS";
-      break;
-    case OpCode::ATAN:
-      std::cout << "ATAN";
-      break;
-    case OpCode::DIV:
-      std::cout << "DIV";
-      break;
-    case OpCode::MOD:
-      std::cout << "MOD";
-      break;
-    case OpCode::MIN:
-      std::cout << "MIN";
-      break;
-    case OpCode::MAX:
-      std::cout << "MAX";
-      break;
-    case OpCode::EQ:
-      std::cout << "EQ";
-      break;
-    case OpCode::GT:
-      std::cout << "GT";
-      break;
-    case OpCode::AND:
-      std::cout << "AND";
-      break;
-    case OpCode::OR:
-      std::cout << "OR";
-      break;
-    case OpCode::ADD:
-      std::cout << "ADD";
-      break;
-    case OpCode::SUB:
-      std::cout << "SUB";
-      break;
-    case OpCode::MUL:
-      std::cout << "MUL";
-      break;
-    case OpCode::FMA:
-      std::cout << "FMA";
-      break;
-    case OpCode::CHOICE:
-      std::cout << "CHOICE";
-      break;
-  }
-}
-
 void Context::dump() const {
+#ifdef MANIFOLD_DEBUG
   for (size_t i = 0; i < operations.size(); i++) {
     std::cout << i << " ";
-    dumpOpCode(operations[i]);
     std::cout << " ";
     for (Operand operand : operands[i]) {
       if (operand.isNone()) break;
@@ -133,6 +51,7 @@ void Context::dump() const {
     std::cout << "}" << std::endl;
   }
   std::cout << "-----------" << std::endl;
+#endif
 }
 
 Operand Context::addConstant(double d) {
@@ -401,83 +320,165 @@ void Context::reschedule() {
                         computedInst[oldOperands.back()[0].toInstIndex()]);
 }
 
+struct LruEntry {
+  size_t lastUse;
+  Operand operand;
+  uint8_t reg;
+
+  bool operator<(const LruEntry &other) const {
+    return lastUse < other.lastUse ||
+           (lastUse == other.lastUse && operand.id < other.operand.id);
+  }
+};
+
 std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
   std::vector<uint8_t> tape;
   std::vector<double> buffer;
   std::vector<uint8_t> constantToReg;
   for (int i : {0, 1, 2})  // x, y, z
     buffer.push_back(0.0);
-  // handle constants by putting them inside the buffer/register
-  // they are different because they require static lifetime, and cannot be
-  // changed in an execution
-  // FIXME: this is just temporary, we should optimize by encoding some
-  // constants with a minimal number of uses into the read-only code when there
-  // is a register pressure (more than 255...)
-  for (size_t i = 0; i < constants.size(); i++) {
-    constantToReg.push_back(0);
-    if (constantUses[i].empty()) continue;
-    constantToReg.back() = static_cast<uint8_t>(buffer.size());
-    buffer.push_back(constants[i]);
-  }
 
-  std::vector<bool> regUsed(buffer.size(), true);
-  std::vector<uint8_t> opToReg;
   std::vector<uint8_t> availableReg;
+  // we may want to make this wrap around...
+  std::vector<LruEntry> lru;
+  std::unordered_map<Operand, uint32_t> spills;
+  std::vector<uint32_t> spillSlots;
 
-  auto getReg = [&](Operand operand) {
-    if (operand.isResult())
-      return opToReg[operand.toInstIndex()];
-    else if (operand.isConst())
-      return constantToReg[operand.toConstIndex()];
-    return static_cast<uint8_t>(-(operand.id + 1));
+  auto insertLru = [&](LruEntry entry) {
+    lru.insert(std::lower_bound(lru.begin(), lru.end(), entry), entry);
+  };
+  auto allocateReg = [&]() {
+    if (!availableReg.empty()) {
+      auto reg = availableReg.back();
+      availableReg.pop_back();
+      return reg;
+    }
+    // used too many registers, need to spill something
+    // note: tested with a limit of 10, spills correctly
+    if (buffer.size() > 255) {
+      uint32_t slot;
+      if (spillSlots.empty()) {
+        slot = buffer.size();
+        buffer.push_back(0.0);
+      } else {
+        slot = spillSlots.back();
+        spillSlots.pop_back();
+      }
+      spills.insert({lru.front().operand, slot});
+      tape.push_back(static_cast<uint8_t>(OpCode::STORE));
+      std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
+      std::memcpy(tmpBuffer.begin(), &slot, sizeof(uint32_t));
+      for (auto byte : tmpBuffer) tape.push_back(byte);
+      auto reg = lru.front().reg;
+      tape.push_back(reg);
+      lru.erase(lru.begin());
+      return reg;
+    }
+    auto reg = static_cast<uint8_t>(buffer.size());
+    buffer.push_back(0.0);
+    return reg;
+  };
+  auto handleOperands = [&](std::array<Operand, 3> instOperands, size_t inst) {
+    auto getReg = [&](Operand operand, size_t inst) {
+      if (operand.isNone()) return static_cast<uint8_t>(0);
+      // special xyz
+      if (!operand.isConst() && !operand.isResult())
+        return static_cast<uint8_t>(-(operand.id + 1));
+      // Assume last use was updated, the operand, if present, must be at the
+      // end of the lru cache. Just do a linear scan from the back
+      for (auto it = lru.rbegin(); it != lru.rend(); ++it) {
+        // no result
+        if (it->lastUse != inst) break;
+        if (it->operand == operand) {
+          return it->reg;
+        }
+      }
+      auto reg = allocateReg();
+      auto iter = spills.find(operand);
+      if (iter == spills.end()) {
+        DEBUG_ASSERT(operand.isConst(), logicErr,
+                     "can only materialize constants");
+        tape.push_back(static_cast<uint8_t>(OpCode::CONST));
+        tape.push_back(reg);
+        std::array<uint8_t, sizeof(double)> tmpBuffer;
+        std::memcpy(tmpBuffer.begin(), &constants[operand.toConstIndex()],
+                    sizeof(double));
+        for (auto byte : tmpBuffer) tape.push_back(byte);
+      } else {
+        tape.push_back(static_cast<uint8_t>(OpCode::LOAD));
+        tape.push_back(reg);
+        std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
+        std::memcpy(tmpBuffer.begin(), &iter->second, sizeof(uint32_t));
+        for (auto byte : tmpBuffer) tape.push_back(byte);
+        spillSlots.push_back(iter->second);
+        spills.erase(iter);
+      }
+      insertLru({inst, operand, reg});
+      return reg;
+    };
+    auto getUses = [&](Operand operand) {
+      if (operand.isResult()) {
+        return &opUses[operand.toInstIndex()];
+      } else if (operand.isConst()) {
+        return &constantUses[operand.toConstIndex()];
+      } else {
+        return static_cast<std::vector<size_t> *>(nullptr);
+      }
+    };
+    auto updateLru = [&](Operand operand, size_t inst) {
+      std::vector<size_t> *uses = getUses(operand);
+      if (uses == nullptr) return;
+      auto i = std::distance(
+          uses->begin(), std::lower_bound(uses->begin(), uses->end(), inst));
+      if (i == 0 && !operand.isResult()) return;
+      size_t lastUse = i == 0 ? operand.toInstIndex() : uses->at(i - 1);
+      // when finding the entry, register field doesn't matter
+      auto iter = std::lower_bound(lru.begin(), lru.end(),
+                                   LruEntry{lastUse, operand, 0});
+      if (iter != lru.end() && iter->operand == operand) {
+        auto entry = *iter;
+        entry.lastUse = inst;
+        lru.erase(iter);
+        insertLru(entry);
+      }
+    };
+    std::array<uint8_t, 3> regs;
+    for (size_t i : {0, 1, 2}) updateLru(instOperands[i], inst);
+    for (size_t i : {0, 1, 2}) regs[i] = getReg(instOperands[i], inst);
+    // after potential rematerialization, see if they are at the end of their
+    // lifetime
+    for (size_t i : {0, 1, 2}) {
+      if (!instOperands[i].isConst() && !instOperands[i].isResult()) continue;
+      if (getUses(instOperands[i])->back() != inst) continue;
+      // remove from lru, note that it is possible that it can be removed
+      // earlier from another operand
+      for (auto it = lru.rbegin(); it != lru.rend(); ++it) {
+        if (it->lastUse != inst) break;
+        if (it->reg == regs[i]) {
+          availableReg.push_back(regs[i]);
+          lru.erase(std::next(it).base());
+        }
+      }
+    }
+    return regs;
   };
 
-  // FIXME: handle spills
   for (size_t i = 0; i < operations.size(); i++) {
-    if (operations[i] == OpCode::NOP) {
-      opToReg.push_back(0);
-      continue;
-    }
+    if (operations[i] == OpCode::NOP) continue;
+    auto tmp = handleOperands(operands[i], i);
     if (operations[i] == OpCode::RETURN) {
-      auto operand = operands[i][0];
       tape.push_back(static_cast<uint8_t>(operations[i]));
-      tape.push_back(getReg(operand));
+      tape.push_back(tmp[0]);
       break;
     }
-    // free up operand registers if possible
-    for (auto operand : operands[i]) {
-      if (!operand.isResult()) continue;
-      auto operandInst = operand.toInstIndex();
-      // not the last instruction, cannot free it up
-      if (opUses[operandInst].back() != i) continue;
-      uint8_t reg = opToReg[operandInst];
-      // already freed, probably due to identical arguments
-      if (!regUsed[reg]) continue;
-      regUsed[reg] = false;
-      availableReg.push_back(reg);
-    }
     // allocate register
-    uint8_t reg;
-    if (availableReg.empty()) {
-      // GG if we used too many registers, need spilling
-      if (buffer.size() == 255) {
-        // just return some nonsense that will not crash
-        return {{static_cast<uint8_t>(OpCode::RETURN), 0}, {0.0}};
-      }
-      reg = buffer.size();
-      buffer.push_back(0.0);
-      regUsed.push_back(true);
-    } else {
-      reg = availableReg.back();
-      availableReg.pop_back();
-      regUsed[reg] = true;
-    }
-    opToReg.push_back(reg);
+    uint8_t reg = allocateReg();
+    insertLru({i, Operand{static_cast<int>(i) + 1}, reg});
     tape.push_back(static_cast<uint8_t>(operations[i]));
     tape.push_back(reg);
-    for (auto operand : operands[i]) {
-      if (operand.isNone()) break;
-      tape.push_back(getReg(operand));
+    for (size_t j : {0, 1, 2}) {
+      if (operands[i][j].isNone()) break;
+      tape.push_back(tmp[j]);
     }
   }
   return std::make_pair(std::move(tape), std::move(buffer));
