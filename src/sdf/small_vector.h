@@ -272,8 +272,8 @@ class small_vector {
       ptr_--;
       return i;
     }
-    self_type operator+(size_t i) { return self_type(ptr_ + i); }
-    self_type operator-(size_t i) { return self_type(ptr_ - i); }
+    self_type operator+(size_type i) { return self_type(ptr_ + i); }
+    self_type operator-(size_type i) { return self_type(ptr_ - i); }
     reference operator*() { return *ptr_; }
     pointer operator->() { return ptr_; }
     bool operator==(const self_type &rhs) { return ptr_ == rhs.ptr_; }
@@ -310,8 +310,8 @@ class small_vector {
       ptr_--;
       return i;
     }
-    self_type operator+(size_t i) { return self_type(ptr_ + i); }
-    self_type operator-(size_t i) { return self_type(ptr_ - i); }
+    self_type operator+(size_type i) { return self_type(ptr_ + i); }
+    self_type operator-(size_type i) { return self_type(ptr_ - i); }
     const value_type &operator*() { return *ptr_; }
     const pointer operator->() { return ptr_; }
     bool operator==(const self_type &rhs) { return ptr_ == rhs.ptr_; }
@@ -358,7 +358,7 @@ class small_vector {
   const_iterator end() const { return cend(); }
 
   void erase(iterator iter) {
-    size_t i = std::distance(begin(), iter);
+    size_type i = std::distance(begin(), iter);
     if (size_ <= N) {
       std::move_backward(stack_.begin() + i + 1, stack_.begin() + size_,
                          stack_.begin() + i);
@@ -373,7 +373,7 @@ class small_vector {
   }
 
   void insert(iterator iter, const T &value) {
-    size_t i = std::distance(begin(), iter);
+    size_type i = std::distance(begin(), iter);
     if (size_ < N) {
       if (i + 1 < size_)
         std::move_backward(stack_.begin() + i, stack_.begin() + size_,
@@ -388,7 +388,7 @@ class small_vector {
   }
 
   void insert(const_iterator iter, const T &value) {
-    insert(cbegin() + std::distance(cbegin(), iter), value);
+    insert(begin() + std::distance(cbegin(), iter), value);
   }
 };
 
