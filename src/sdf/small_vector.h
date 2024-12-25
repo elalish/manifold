@@ -258,7 +258,7 @@ class small_vector {
       ptr_++;
       return *this;
     }
-    self_type operator++(int) const {
+    self_type operator++(int) {
       self_type i = *this;
       ptr_++;
       return i;
@@ -267,7 +267,7 @@ class small_vector {
       ptr_--;
       return *this;
     }
-    self_type operator--(int) const {
+    self_type operator--(int) {
       self_type i = *this;
       ptr_--;
       return i;
@@ -298,7 +298,7 @@ class small_vector {
       ptr_++;
       return *this;
     }
-    self_type operator++(int) const {
+    self_type operator++(int) {
       self_type i = *this;
       ptr_++;
       return i;
@@ -307,7 +307,7 @@ class small_vector {
       ptr_--;
       return *this;
     }
-    self_type operator--(int) const {
+    self_type operator--(int) {
       self_type i = *this;
       ptr_--;
       return i;
