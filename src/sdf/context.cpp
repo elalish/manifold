@@ -120,12 +120,17 @@ Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
   opUses.emplace_back();
   // update uses
   for (auto operand : {a, b, c}) {
-    small_vector<size_t, 4> *target = getUses(operand);
+    auto target = getUses(operand);
     if (target == nullptr) continue;
     // avoid duplicates
     if (target->empty() || target->back() != i) target->push_back(i);
   }
   return {static_cast<int>(i) + 1};
+}
+
+Context::UsesVector::const_iterator findUse(const Context::UsesVector &uses,
+                                            size_t inst) {
+  return std::lower_bound(uses.cbegin(), uses.cend(), inst);
 }
 
 void Context::optimizeFMA() {
@@ -146,10 +151,10 @@ void Context::optimizeFMA() {
     auto updateUses = [&](Operand x) {
       if (!x.isResult() && !x.isConst()) return;
       auto uses = getUses(x);
-      auto iter1 = std::lower_bound(uses->cbegin(), uses->cend(), lhsInst);
+      auto iter1 = findUse(*uses, lhsInst);
       DEBUG_ASSERT(*iter1 == lhsInst, logicErr, "expected use");
       uses->erase(iter1);
-      auto iter2 = std::lower_bound(uses->cbegin(), uses->cend(), i);
+      auto iter2 = findUse(*uses, i);
       // make sure there is no duplicate
       if (iter2 == uses->cend() || *iter2 != i) uses->insert(iter2, i);
     };
@@ -306,6 +311,13 @@ struct RegEntry {
   }
 };
 
+template <typename T>
+void addImmediate(std::vector<uint8_t> &tape, T imm) {
+  std::array<uint8_t, sizeof(T)> tmpBuffer;
+  std::memcpy(tmpBuffer.data(), &imm, sizeof(T));
+  for (auto byte : tmpBuffer) tape.push_back(byte);
+}
+
 std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
   std::vector<uint8_t> tape;
   size_t bufferSize = 3;
@@ -330,20 +342,21 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
     // used too many registers, need to spill something
     // note: tested with a limit of 7, spills correctly
     if (bufferSize > 255) {
-      uint32_t slot;
-      if (spillSlots.empty()) {
-        slot = bufferSize++;
-      } else {
-        slot = spillSlots.back();
-        spillSlots.pop_back();
-      }
-      spills.insert({regCache.front().operand, slot});
-      tape.push_back(static_cast<uint8_t>(OpCode::STORE));
-      std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
-      std::memcpy(tmpBuffer.data(), &slot, sizeof(uint32_t));
-      for (auto byte : tmpBuffer) tape.push_back(byte);
       auto reg = regCache.front().reg;
-      tape.push_back(reg);
+      // we can just discard constants, so only spill instruction results
+      if (regCache.front().operand.isResult()) {
+        uint32_t slot;
+        if (spillSlots.empty()) {
+          slot = bufferSize++;
+        } else {
+          slot = spillSlots.back();
+          spillSlots.pop_back();
+        }
+        spills.insert({regCache.front().operand, slot});
+        tape.push_back(static_cast<uint8_t>(OpCode::STORE));
+        addImmediate(tape, slot);
+        tape.push_back(reg);
+      }
       regCache.erase(regCache.begin());
       return reg;
     }
@@ -359,9 +372,8 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
         return static_cast<uint8_t>(-(operand.id + 1));
       // the operand, if present, must be at the end of the cache due to how the
       // cache is ordered
-      for (auto it = regCache.rbegin(); it != regCache.rend(); ++it) {
-        // no result
-        if (it->nextUse != inst) break;
+      for (auto it = regCache.rbegin();
+           it != regCache.rend() && it->nextUse == inst; ++it) {
         if (it->operand == operand) {
           return it->reg;
         }
@@ -380,9 +392,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       } else {
         tape.push_back(static_cast<uint8_t>(OpCode::LOAD));
         tape.push_back(reg);
-        std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
-        std::memcpy(tmpBuffer.data(), &iter->second, sizeof(uint32_t));
-        for (auto byte : tmpBuffer) tape.push_back(byte);
+        addImmediate(tape, iter->second);
         spillSlots.push_back(iter->second);
         spills.erase(iter);
       }
@@ -416,9 +426,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
         // insert it back with new next use
         // because it is not at the end of its lifetime, the incremented
         // iterator is guaranteed to be valid
-        insertRegCache(
-            {*(std::lower_bound(uses->cbegin(), uses->cend(), inst) + 1),
-             instOperands[i], regs[i]});
+        insertRegCache({*(findUse(*uses, inst) + 1), instOperands[i], regs[i]});
       }
     }
     return regs;

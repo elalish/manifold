@@ -70,6 +70,8 @@ struct std::hash<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>> {
 namespace manifold::sdf {
 class Context {
  public:
+  using UsesVector = small_vector<size_t, 4>;
+
   Operand addConstant(double d);
   Operand addInstruction(OpCode op, Operand a = Operand::none(),
                          Operand b = Operand::none(),
@@ -88,11 +90,11 @@ class Context {
   std::vector<double> constants;
   // constant use vector, elements are instruction indices
   // constant with ID -4 is mapped to 0, etc.
-  std::vector<small_vector<size_t, 4>> constantUses;
+  std::vector<UsesVector> constantUses;
   // instructions, index 0 is mapped to ID 1, etc.
   std::vector<OpCode> operations;
   // instruction value use vector, elements are instruction indices
-  std::vector<small_vector<size_t, 4>> opUses;
+  std::vector<UsesVector> opUses;
   // operands, 0 is invalid (uses fewer operands)
   // +ve are instruction results
   // -ve are constants
