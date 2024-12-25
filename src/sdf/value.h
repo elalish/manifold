@@ -62,7 +62,7 @@ class Value {
   Value atan() const;
 
   // internal use only
-  std::pair<std::vector<uint8_t>, std::vector<double>> genTape() const;
+  std::pair<std::vector<uint8_t>, size_t> genTape() const;
 
  private:
   ValueKind kind = ValueKind::INVALID;

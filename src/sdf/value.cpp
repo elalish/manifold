@@ -184,17 +184,17 @@ Value Value::atan() const {
                                                 Invalid()));
 }
 
-std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
+std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
   using VO = std::shared_ptr<ValueOperation>;
   Context ctx;
-  std::unordered_map<VO, Operand> cache;
-  std::vector<VO> stack;
-  if (kind == ValueKind::OPERATION) stack.push_back(std::get<VO>(v));
+  std::unordered_map<ValueOperation*, Operand> cache;
+  std::vector<ValueOperation*> stack;
+  if (kind == ValueKind::OPERATION) stack.push_back(std::get<VO>(v).get());
 
   auto getOperand = [&](Value x, std::function<void(Value)> f) {
     switch (x.kind) {
       case ValueKind::OPERATION: {
-        auto iter = cache.find(std::get<VO>(x.v));
+        auto iter = cache.find(std::get<VO>(x.v).get());
         if (iter != cache.end()) return iter->second;
         f(x);
         return Operand::none();
@@ -213,9 +213,9 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Value::genTape() const {
   };
   while (!stack.empty()) {
     bool ready = true;
-    VO current = stack.back();
+    auto current = stack.back();
     auto f = [&](Value x) {
-      stack.push_back(std::get<VO>(x.v));
+      stack.push_back(std::get<VO>(x.v).get());
       ready = false;
     };
     Operand a = getOperand(current->operands[0], f);

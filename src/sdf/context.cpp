@@ -22,20 +22,12 @@
 
 #include "manifold/optional_assert.h"
 
-template <>
-struct std::hash<manifold::sdf::Operand> {
-  size_t operator()(const manifold::sdf::Operand &operand) const {
-    return std::hash<int>()(operand.id);
-  }
-};
-
 namespace manifold::sdf {
-
 void Context::dump() const {
 #ifdef MANIFOLD_DEBUG
   for (size_t i = 0; i < operations.size(); i++) {
     std::cout << i << " ";
-    std::cout << " ";
+    std::cout << " " << dumpOpCode(operations[i]) << " ";
     for (Operand operand : operands[i]) {
       if (operand.isNone()) break;
       if (operand.isResult())
@@ -102,11 +94,7 @@ Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
   // constant propagation
   bool all_constants = true;
   for (auto operand : {a, b, c}) {
-    if (operand.isNone()) break;
-    if (!operand.isConst()) {
-      all_constants = false;
-      break;
-    }
+    if (!operand.isConst() && !operand.isNone()) all_constants = false;
   }
   if (all_constants) {
     tmpTape.clear();
@@ -132,7 +120,7 @@ Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
   opUses.emplace_back();
   // update uses
   for (auto operand : {a, b, c}) {
-    std::vector<size_t> *target;
+    small_vector<size_t, 4> *target;
     if (operand.isResult()) {
       target = &opUses[operand.toInstIndex()];
     } else if (operand.isConst()) {
@@ -155,13 +143,10 @@ void Context::optimizeFMA() {
     operations[i] = OpCode::FMA;
     Operand a = operands[lhsInst][0];
     Operand b = operands[lhsInst][1];
-    operands[i][0] = a;
-    operands[i][1] = b;
-    operands[i][2] = rhs;
+    operands[i] = {a, b, rhs};
     // remove instruction
     operations[lhsInst] = OpCode::NOP;
-    operands[lhsInst][0] = Operand::none();
-    operands[lhsInst][1] = Operand::none();
+    operands[lhsInst] = {Operand::none(), Operand::none(), Operand::none()};
     // update uses, note that we need to maintain the order of the indices
     opUses[lhsInst].clear();
     auto updateUses = [&](Operand x) {
@@ -173,7 +158,7 @@ void Context::optimizeFMA() {
       uses.erase(iter1);
       auto iter2 = std::lower_bound(uses.begin(), uses.end(), i);
       // make sure there is no duplicate
-      if (iter2 == uses.end() || *iter2 != i + 1) uses.insert(iter2, i);
+      if (iter2 == uses.end() || *iter2 != i) uses.insert(iter2, i);
     };
     updateUses(a);
     if (a != b) updateUses(b);
@@ -202,18 +187,19 @@ void Context::reschedule() {
   opUses.clear();
   for (auto &uses : constantUses) uses.clear();
 
-  std::unordered_map<size_t, Operand> computedInst;
+  std::vector<Operand> computedInst(oldOperands.size(), Operand::none());
   std::vector<size_t> stack;
+  stack.reserve(64);
   if (oldOperands.back()[0].isResult())
     stack.push_back(oldOperands.back()[0].toInstIndex());
 
-  std::unordered_map<size_t, uint8_t> bitset;
-  std::unordered_map<size_t, size_t> distances;
+  std::vector<uint8_t> bitset(oldOperands.size(), 0);
+  std::vector<size_t> distances(oldOperands.size(), 0);
   std::vector<size_t> tmpStack;
+  tmpStack.reserve(64);
 
   auto requiresComputation = [&computedInst](Operand operand) {
-    return operand.isResult() &&
-           computedInst.find(operand.toInstIndex()) == computedInst.end();
+    return operand.isResult() && computedInst[operand.toInstIndex()].isNone();
   };
   auto toNewOperand = [&computedInst](Operand old) {
     if (old.isResult()) return computedInst[old.toInstIndex()];
@@ -241,14 +227,8 @@ void Context::reschedule() {
           auto current = tmpStack.back();
           tmpStack.pop_back();
           // already computed
-          if (computedInst.find(current) != computedInst.end()) continue;
-          auto iter = bitset.find(current);
-          if (iter == bitset.end()) {
-            // new dependency
-            bitset.insert({current, 1 << numResults});
-          } else {
-            iter->second |= 1 << numResults;
-          }
+          if (!computedInst[current].isNone()) continue;
+          bitset[current] |= 1 << numResults;
           for (auto x : oldOperands[current]) {
             if (!x.isResult()) continue;
             tmpStack.push_back(x.toInstIndex());
@@ -271,29 +251,27 @@ void Context::reschedule() {
             auto inst = x.toInstIndex();
 
             // computed, doesn't affect distance
-            if (computedInst.find(inst) != computedInst.end()) continue;
+            if (!computedInst[inst].isNone()) continue;
 
-            auto iter1 = bitset.find(inst);
-            DEBUG_ASSERT(iter1 != bitset.end(), logicErr, "should be found");
             // shared dependency between operands, also doesn't affect distance
-            if ((iter1->second & mask) == mask) continue;
+            if ((bitset[inst] & mask) == mask) continue;
 
-            auto iter2 = distances.find(inst);
-            if (iter2 == distances.end()) {
+            auto d = distances[inst];
+            if (d == 0) {
               // not computed
               tmpStack.push_back(x.toInstIndex());
               maxDistance = std::numeric_limits<size_t>::max();
             } else {
-              maxDistance = std::max(maxDistance, iter2->second);
+              maxDistance = std::max(maxDistance, d);
             }
           }
           if (maxDistance != std::numeric_limits<size_t>::max()) {
             tmpStack.pop_back();
-            distances.insert({current, maxDistance + 1});
+            distances[current] = maxDistance + 1;
           }
         }
         costs[i] = distances[operand.toInstIndex()];
-        distances.clear();
+        std::fill(distances.begin(), distances.end(), 0);
       }
       std::sort(ids.begin(), ids.end(),
                 [&costs](size_t x, size_t y) { return costs[x] < costs[y]; });
@@ -303,7 +281,7 @@ void Context::reschedule() {
         if (requiresComputation(curOperands[x]))
           stack.push_back(curOperands[x].toInstIndex());
 
-      bitset.clear();
+      std::fill(bitset.begin(), bitset.end(), 0);
     } else if (numResults == 1) {
       for (auto operand : curOperands)
         if (requiresComputation(operand))
@@ -313,7 +291,7 @@ void Context::reschedule() {
       Operand result = addInstructionNoCache(
           oldOperations[back], toNewOperand(curOperands[0]),
           toNewOperand(curOperands[1]), toNewOperand(curOperands[2]));
-      computedInst.insert({back, result});
+      computedInst[back] = result;
     }
   }
   addInstructionNoCache(OpCode::RETURN,
@@ -325,19 +303,15 @@ struct LruEntry {
   Operand operand;
   uint8_t reg;
 
-  bool operator<(const LruEntry &other) const {
+  inline bool operator<(const LruEntry &other) const {
     return lastUse < other.lastUse ||
            (lastUse == other.lastUse && operand.id < other.operand.id);
   }
 };
 
-std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
+std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
   std::vector<uint8_t> tape;
-  std::vector<double> buffer;
-  std::vector<uint8_t> constantToReg;
-  for (int i : {0, 1, 2})  // x, y, z
-    buffer.push_back(0.0);
-
+  size_t bufferSize = 3;
   std::vector<uint8_t> availableReg;
   // we may want to make this wrap around...
   std::vector<LruEntry> lru;
@@ -355,11 +329,10 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
     }
     // used too many registers, need to spill something
     // note: tested with a limit of 10, spills correctly
-    if (buffer.size() > 255) {
+    if (bufferSize > 255) {
       uint32_t slot;
       if (spillSlots.empty()) {
-        slot = buffer.size();
-        buffer.push_back(0.0);
+        slot = bufferSize++;
       } else {
         slot = spillSlots.back();
         spillSlots.pop_back();
@@ -374,8 +347,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       lru.erase(lru.begin());
       return reg;
     }
-    auto reg = static_cast<uint8_t>(buffer.size());
-    buffer.push_back(0.0);
+    auto reg = static_cast<uint8_t>(bufferSize++);
     return reg;
   };
   auto handleOperands = [&](std::array<Operand, 3> instOperands, size_t inst) {
@@ -422,11 +394,11 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       } else if (operand.isConst()) {
         return &constantUses[operand.toConstIndex()];
       } else {
-        return static_cast<std::vector<size_t> *>(nullptr);
+        return static_cast<small_vector<size_t, 4> *>(nullptr);
       }
     };
     auto updateLru = [&](Operand operand, size_t inst) {
-      std::vector<size_t> *uses = getUses(operand);
+      const auto uses = getUses(operand);
       if (uses == nullptr) return;
       auto i = std::distance(
           uses->begin(), std::lower_bound(uses->begin(), uses->end(), inst));
@@ -471,7 +443,6 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       tape.push_back(tmp[0]);
       break;
     }
-    // allocate register
     uint8_t reg = allocateReg();
     insertLru({i, Operand{static_cast<int>(i) + 1}, reg});
     tape.push_back(static_cast<uint8_t>(operations[i]));
@@ -481,7 +452,7 @@ std::pair<std::vector<uint8_t>, std::vector<double>> Context::genTape() {
       tape.push_back(tmp[j]);
     }
   }
-  return std::make_pair(std::move(tape), std::move(buffer));
+  return std::make_pair(std::move(tape), bufferSize);
 }
 
 }  // namespace manifold::sdf

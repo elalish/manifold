@@ -13,11 +13,11 @@
 // limitations under the License.
 #pragma once
 
-#include <map>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "small_vector.h"
 #include "tape.h"
 
 namespace manifold::sdf {
@@ -35,7 +35,39 @@ struct Operand {
   bool operator!=(const Operand& other) const { return id != other.id; }
   bool operator<(const Operand& other) const { return id < other.id; }
 };
+}  // namespace manifold::sdf
 
+using namespace manifold::sdf;
+
+inline void hash_combine(std::size_t& seed) {}
+
+template <typename T, typename... Rest>
+inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
+  std::hash<T> hasher;
+  seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  hash_combine(seed, rest...);
+}
+
+template <>
+struct std::hash<Operand> {
+  size_t operator()(const Operand& operand) const {
+    return std::hash<int>()(operand.id);
+  }
+};
+
+template <>
+struct std::hash<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>> {
+  size_t operator()(
+      const std::pair<OpCode, std::tuple<Operand, Operand, Operand>>& pair)
+      const {
+    size_t h = std::hash<uint8_t>()(static_cast<uint8_t>(pair.first));
+    hash_combine(h, std::get<0>(pair.second), std::get<1>(pair.second),
+                 std::get<2>(pair.second));
+    return h;
+  }
+};
+
+namespace manifold::sdf {
 class Context {
  public:
   Operand addConstant(double d);
@@ -45,7 +77,7 @@ class Context {
   void optimizeFMA();
   void reschedule();
 
-  std::pair<std::vector<uint8_t>, std::vector<double>> genTape();
+  std::pair<std::vector<uint8_t>, size_t> genTape();
 
   void dump() const;
 
@@ -56,11 +88,11 @@ class Context {
   std::vector<double> constants;
   // constant use vector, elements are instruction indices
   // constant with ID -4 is mapped to 0, etc.
-  std::vector<std::vector<size_t>> constantUses;
+  std::vector<small_vector<size_t, 4>> constantUses;
   // instructions, index 0 is mapped to ID 1, etc.
   std::vector<OpCode> operations;
   // instruction value use vector, elements are instruction indices
-  std::vector<std::vector<size_t>> opUses;
+  std::vector<small_vector<size_t, 4>> opUses;
   // operands, 0 is invalid (uses fewer operands)
   // +ve are instruction results
   // -ve are constants
@@ -68,7 +100,8 @@ class Context {
 
   std::vector<uint8_t> tmpTape;
   std::vector<double> tmpBuffer;
-  std::map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>, Operand>
+  std::unordered_map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>,
+                     Operand>
       cache;
 
   Operand addInstructionNoCache(OpCode op, Operand a = Operand::none(),

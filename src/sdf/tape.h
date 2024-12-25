@@ -358,6 +358,7 @@ inline std::string dumpOpCode(OpCode op) {
     case OpCode::CHOICE:
       return "CHOICE";
   }
+  return "";
 }
 
 }  // namespace manifold::sdf
