@@ -258,7 +258,7 @@ class small_vector {
       ptr_++;
       return *this;
     }
-    self_type operator++(int) {
+    self_type operator++(int) const {
       self_type i = *this;
       ptr_++;
       return i;
@@ -267,17 +267,19 @@ class small_vector {
       ptr_--;
       return *this;
     }
-    self_type operator--(int) {
+    self_type operator--(int) const {
       self_type i = *this;
       ptr_--;
       return i;
     }
-    self_type operator+(size_type i) { return self_type(ptr_ + i); }
-    self_type operator-(size_type i) { return self_type(ptr_ - i); }
+    self_type operator+(size_type i) const { return self_type(ptr_ + i); }
+    self_type operator-(size_type i) const { return self_type(ptr_ - i); }
     reference operator*() { return *ptr_; }
+    const value_type &operator*() const { return *ptr_; }
     pointer operator->() { return ptr_; }
-    bool operator==(const self_type &rhs) { return ptr_ == rhs.ptr_; }
-    bool operator!=(const self_type &rhs) { return ptr_ != rhs.ptr_; }
+    const pointer operator->() const { return ptr_; }
+    bool operator==(const self_type &rhs) const { return ptr_ == rhs.ptr_; }
+    bool operator!=(const self_type &rhs) const { return ptr_ != rhs.ptr_; }
 
    private:
     pointer ptr_;
@@ -296,7 +298,7 @@ class small_vector {
       ptr_++;
       return *this;
     }
-    self_type operator++(int) {
+    self_type operator++(int) const {
       self_type i = *this;
       ptr_++;
       return i;
@@ -305,17 +307,17 @@ class small_vector {
       ptr_--;
       return *this;
     }
-    self_type operator--(int) {
+    self_type operator--(int) const {
       self_type i = *this;
       ptr_--;
       return i;
     }
-    self_type operator+(size_type i) { return self_type(ptr_ + i); }
-    self_type operator-(size_type i) { return self_type(ptr_ - i); }
-    const value_type &operator*() { return *ptr_; }
-    const pointer operator->() { return ptr_; }
-    bool operator==(const self_type &rhs) { return ptr_ == rhs.ptr_; }
-    bool operator!=(const self_type &rhs) { return ptr_ != rhs.ptr_; }
+    self_type operator+(size_type i) const { return self_type(ptr_ + i); }
+    self_type operator-(size_type i) const { return self_type(ptr_ - i); }
+    reference operator*() const { return *ptr_; }
+    pointer operator->() const { return ptr_; }
+    bool operator==(const self_type &rhs) const { return ptr_ == rhs.ptr_; }
+    bool operator!=(const self_type &rhs) const { return ptr_ != rhs.ptr_; }
 
    private:
     pointer ptr_;
