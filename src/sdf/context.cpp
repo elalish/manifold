@@ -120,14 +120,8 @@ Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
   opUses.emplace_back();
   // update uses
   for (auto operand : {a, b, c}) {
-    small_vector<size_t, 4> *target;
-    if (operand.isResult()) {
-      target = &opUses[operand.toInstIndex()];
-    } else if (operand.isConst()) {
-      target = &constantUses[operand.toConstIndex()];
-    } else {
-      continue;
-    }
+    small_vector<size_t, 4> *target = getUses(operand);
+    if (target == nullptr) continue;
     // avoid duplicates
     if (target->empty() || target->back() != i) target->push_back(i);
   }
@@ -151,14 +145,13 @@ void Context::optimizeFMA() {
     opUses[lhsInst].clear();
     auto updateUses = [&](Operand x) {
       if (!x.isResult() && !x.isConst()) return;
-      auto &uses = x.isResult() ? opUses[x.toInstIndex()]
-                                : constantUses[x.toConstIndex()];
-      auto iter1 = std::lower_bound(uses.begin(), uses.end(), lhsInst);
+      auto uses = getUses(x);
+      auto iter1 = std::lower_bound(uses->cbegin(), uses->cend(), lhsInst);
       DEBUG_ASSERT(*iter1 == lhsInst, logicErr, "expected use");
-      uses.erase(iter1);
-      auto iter2 = std::lower_bound(uses.begin(), uses.end(), i);
+      uses->erase(iter1);
+      auto iter2 = std::lower_bound(uses->cbegin(), uses->cend(), i);
       // make sure there is no duplicate
-      if (iter2 == uses.end() || *iter2 != i) uses.insert(iter2, i);
+      if (iter2 == uses->cend() || *iter2 != i) uses->insert(iter2, i);
     };
     updateUses(a);
     if (a != b) updateUses(b);
@@ -209,6 +202,10 @@ void Context::reschedule() {
   while (!stack.empty()) {
     int numResults = 0;
     auto back = stack.back();
+    if (!computedInst[back].isNone()) {
+      stack.pop_back();
+      continue;
+    }
     auto &curOperands = oldOperands[back];
     for (auto operand : curOperands)
       if (requiresComputation(operand)) numResults += 1;
@@ -298,28 +295,31 @@ void Context::reschedule() {
                         computedInst[oldOperands.back()[0].toInstIndex()]);
 }
 
-struct LruEntry {
-  size_t lastUse;
+struct RegEntry {
+  size_t nextUse;
   Operand operand;
   uint8_t reg;
 
-  inline bool operator<(const LruEntry &other) const {
-    return lastUse < other.lastUse ||
-           (lastUse == other.lastUse && operand.id < other.operand.id);
+  inline bool operator<(const RegEntry &other) const {
+    return nextUse > other.nextUse ||
+           (nextUse == other.nextUse && operand.id < other.operand.id);
   }
 };
 
 std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
   std::vector<uint8_t> tape;
   size_t bufferSize = 3;
-  std::vector<uint8_t> availableReg;
-  // we may want to make this wrap around...
-  std::vector<LruEntry> lru;
   std::unordered_map<Operand, uint32_t> spills;
   std::vector<uint32_t> spillSlots;
 
-  auto insertLru = [&](LruEntry entry) {
-    lru.insert(std::lower_bound(lru.begin(), lru.end(), entry), entry);
+  std::vector<uint8_t> availableReg;
+  // register cache, ordered by next use of the variable
+  // when spilling is needed, we will evict the variable where the next use is
+  // the furthest
+  std::vector<RegEntry> regCache;
+  auto insertRegCache = [&](RegEntry entry) {
+    regCache.insert(std::lower_bound(regCache.cbegin(), regCache.cend(), entry),
+                    entry);
   };
   auto allocateReg = [&]() {
     if (!availableReg.empty()) {
@@ -328,7 +328,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       return reg;
     }
     // used too many registers, need to spill something
-    // note: tested with a limit of 10, spills correctly
+    // note: tested with a limit of 7, spills correctly
     if (bufferSize > 255) {
       uint32_t slot;
       if (spillSlots.empty()) {
@@ -337,30 +337,31 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
         slot = spillSlots.back();
         spillSlots.pop_back();
       }
-      spills.insert({lru.front().operand, slot});
+      spills.insert({regCache.front().operand, slot});
       tape.push_back(static_cast<uint8_t>(OpCode::STORE));
       std::array<uint8_t, sizeof(uint32_t)> tmpBuffer;
       std::memcpy(tmpBuffer.data(), &slot, sizeof(uint32_t));
       for (auto byte : tmpBuffer) tape.push_back(byte);
-      auto reg = lru.front().reg;
+      auto reg = regCache.front().reg;
       tape.push_back(reg);
-      lru.erase(lru.begin());
+      regCache.erase(regCache.begin());
       return reg;
     }
     auto reg = static_cast<uint8_t>(bufferSize++);
     return reg;
   };
   auto handleOperands = [&](std::array<Operand, 3> instOperands, size_t inst) {
-    auto getReg = [&](Operand operand, size_t inst) {
+    auto getOperandReg = [&](Operand operand, size_t inst) {
+      // will not be used, so we can return whatever we like
       if (operand.isNone()) return static_cast<uint8_t>(0);
-      // special xyz
+      // special xyz variables with fixed register
       if (!operand.isConst() && !operand.isResult())
         return static_cast<uint8_t>(-(operand.id + 1));
-      // Assume last use was updated, the operand, if present, must be at the
-      // end of the lru cache. Just do a linear scan from the back
-      for (auto it = lru.rbegin(); it != lru.rend(); ++it) {
+      // the operand, if present, must be at the end of the cache due to how the
+      // cache is ordered
+      for (auto it = regCache.rbegin(); it != regCache.rend(); ++it) {
         // no result
-        if (it->lastUse != inst) break;
+        if (it->nextUse != inst) break;
         if (it->operand == operand) {
           return it->reg;
         }
@@ -385,51 +386,39 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
         spillSlots.push_back(iter->second);
         spills.erase(iter);
       }
-      insertLru({inst, operand, reg});
+      insertRegCache({inst, operand, reg});
       return reg;
     };
-    auto getUses = [&](Operand operand) {
-      if (operand.isResult()) {
-        return &opUses[operand.toInstIndex()];
-      } else if (operand.isConst()) {
-        return &constantUses[operand.toConstIndex()];
-      } else {
-        return static_cast<small_vector<size_t, 4> *>(nullptr);
-      }
-    };
-    auto updateLru = [&](Operand operand, size_t inst) {
-      const auto uses = getUses(operand);
-      if (uses == nullptr) return;
-      auto i = std::distance(
-          uses->begin(), std::lower_bound(uses->begin(), uses->end(), inst));
-      if (i == 0 && !operand.isResult()) return;
-      size_t lastUse = i == 0 ? operand.toInstIndex() : uses->at(i - 1);
-      // when finding the entry, register field doesn't matter
-      auto iter = std::lower_bound(lru.begin(), lru.end(),
-                                   LruEntry{lastUse, operand, 0});
-      if (iter != lru.end() && iter->operand == operand) {
-        auto entry = *iter;
-        entry.lastUse = inst;
-        lru.erase(iter);
-        insertLru(entry);
-      }
-    };
     std::array<uint8_t, 3> regs;
-    for (size_t i : {0, 1, 2}) updateLru(instOperands[i], inst);
-    for (size_t i : {0, 1, 2}) regs[i] = getReg(instOperands[i], inst);
-    // after potential rematerialization, see if they are at the end of their
-    // lifetime
+    // note that we have to get the registers first, because we cannot spill the
+    // first register and reuse it in the second for example
+    for (size_t i : {0, 1, 2}) regs[i] = getOperandReg(instOperands[i], inst);
+    // update register cache
     for (size_t i : {0, 1, 2}) {
       if (!instOperands[i].isConst() && !instOperands[i].isResult()) continue;
-      if (getUses(instOperands[i])->back() != inst) continue;
-      // remove from lru, note that it is possible that it can be removed
-      // earlier from another operand
-      for (auto it = lru.rbegin(); it != lru.rend(); ++it) {
-        if (it->lastUse != inst) break;
-        if (it->reg == regs[i]) {
-          availableReg.push_back(regs[i]);
-          lru.erase(std::next(it).base());
+      bool erased = false;
+      for (auto it = regCache.rbegin();
+           it != regCache.rend() && it->nextUse == inst; ++it) {
+        if (it->operand == instOperands[i]) {
+          regCache.erase(std::next(it).base());
+          erased = true;
+          break;
         }
+      }
+      // if not found at the end of the cache, this means that it is handled by
+      // another operand
+      if (!erased) continue;
+      auto uses = getUses(instOperands[i]);
+      if (uses->back() == inst) {
+        // end of lifetime, free register
+        availableReg.push_back(regs[i]);
+      } else {
+        // insert it back with new next use
+        // because it is not at the end of its lifetime, the incremented
+        // iterator is guaranteed to be valid
+        insertRegCache(
+            {*(std::lower_bound(uses->cbegin(), uses->cend(), inst) + 1),
+             instOperands[i], regs[i]});
       }
     }
     return regs;
@@ -443,8 +432,16 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       tape.push_back(tmp[0]);
       break;
     }
+    // note that we may spill the operand register, but that is fine
     uint8_t reg = allocateReg();
-    insertLru({i, Operand{static_cast<int>(i) + 1}, reg});
+    auto instOp = Operand{static_cast<int>(i) + 1};
+    auto uses = getUses(instOp);
+    if (uses->empty()) {
+      // immediately available
+      availableReg.push_back(reg);
+    } else {
+      insertRegCache({uses->front(), instOp, reg});
+    }
     tape.push_back(static_cast<uint8_t>(operations[i]));
     tape.push_back(reg);
     for (size_t j : {0, 1, 2}) {

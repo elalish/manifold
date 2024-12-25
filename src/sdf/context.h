@@ -107,6 +107,16 @@ class Context {
   Operand addInstructionNoCache(OpCode op, Operand a = Operand::none(),
                                 Operand b = Operand::none(),
                                 Operand c = Operand::none());
+
+  small_vector<size_t, 4>* getUses(Operand operand) {
+    if (operand.isResult()) {
+      return &opUses[operand.toInstIndex()];
+    } else if (operand.isConst()) {
+      return &constantUses[operand.toConstIndex()];
+    } else {
+      return static_cast<small_vector<size_t, 4>*>(nullptr);
+    }
+  };
 };
 
 }  // namespace manifold::sdf
