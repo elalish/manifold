@@ -364,8 +364,8 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       // special xyz variables with fixed register
       if (!operand.isConst() && !operand.isResult())
         return static_cast<uint8_t>(-(operand.id + 1));
-      // the operand, if present, must be at the end of the cache, due to how the
-      // cache is ordered
+      // the operand, if present, must be at the end of the cache, due to how
+      // the cache is ordered
       for (auto it = regCache.rbegin();
            it != regCache.rend() && it->nextUse == inst; ++it)
         if (it->operand == operand) return it->reg;
