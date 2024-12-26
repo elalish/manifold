@@ -225,12 +225,13 @@ std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
       stack.pop_back();
       // check if inserted... can happen when evaluating with a DAG
       if (cache.find(current) != cache.end()) continue;
-      cache.insert({current, ctx.addInstruction(current->op, a, b, c)});
+      cache.insert({current, ctx.addInstruction(current->op, {a, b, c})});
     }
   }
 
   Operand result = getOperand(*this, [](Value _) {});
-  ctx.addInstruction(OpCode::RETURN, result, Operand::none(), Operand::none());
+  ctx.addInstruction(OpCode::RETURN,
+                     {result, Operand::none(), Operand::none()});
 
   ctx.optimizeFMA();
   ctx.reschedule();

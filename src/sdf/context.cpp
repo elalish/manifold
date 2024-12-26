@@ -56,7 +56,7 @@ Operand Context::addConstant(double d) {
   return result.first->second;
 }
 
-Operand Context::addInstruction(OpCode op, Operand a, Operand b, Operand c) {
+Operand Context::addInstruction(OpCode op, std::array<Operand, 3> operands) {
   switch (op) {
     case OpCode::ADD:
     case OpCode::MUL:
@@ -68,58 +68,53 @@ Operand Context::addInstruction(OpCode op, Operand a, Operand b, Operand c) {
     case OpCode::FMA:
       // first two operands commutative, sort them
       // makes it more likely to find common subexpressions
-      if (a.id > b.id) std::swap(a, b);
+      if (operands[0].id > operands[1].id) std::swap(operands[0], operands[1]);
       break;
     default:
       break;
   }
   // common subexpression elimination
-  auto key = std::make_pair(op, std::make_tuple(a, b, c));
+  auto key = std::make_pair(op, operands);
   auto entry = cache.find(key);
   if (entry != cache.end()) return entry->second;
-  auto result = addInstructionNoCache(op, a, b, c);
+  auto result = addInstructionNoCache(op, operands);
   cache.insert({key, result});
   return result;
 }
 
 // bypass the cache because we don't expect to have more common subexpressions
 // after optimizations
-Operand Context::addInstructionNoCache(OpCode op, Operand a, Operand b,
-                                       Operand c) {
+Operand Context::addInstructionNoCache(OpCode op,
+                                       std::array<Operand, 3> operands) {
   // constant choice
-  if (op == OpCode::CHOICE && a.isConst()) {
-    if (constants[a.toConstIndex()] == 1.0) return b;
-    return c;
+  if (op == OpCode::CHOICE && operands[0].isConst()) {
+    if (constants[operands[0].toConstIndex()] == 1.0) return operands[1];
+    return operands[2];
   }
   // constant propagation
   bool all_constants = true;
-  for (auto operand : {a, b, c}) {
+  for (auto operand : operands) {
     if (!operand.isConst() && !operand.isNone()) all_constants = false;
   }
   if (all_constants) {
-    tmpTape.clear();
-    tmpBuffer.clear();
-    tmpTape.push_back(static_cast<uint8_t>(op));
-    tmpTape.push_back(0);
-    tmpBuffer.push_back(0.0);
-    for (Operand x : {a, b, c}) {
+    tmpTape = {static_cast<uint8_t>(op), 0};
+    tmpBuffer = {0.0};
+    for (Operand x : operands) {
       if (!x.isConst()) break;
       tmpTape.push_back(tmpBuffer.size());
       tmpBuffer.push_back(constants[x.toConstIndex()]);
     }
-    tmpTape.push_back(static_cast<uint8_t>(OpCode::RETURN));
-    tmpTape.push_back(0);
-    return addConstant(EvalContext<double>{
-        tmpTape, VecView(tmpBuffer.data(), tmpBuffer.size())}
-                           .eval());
+    tmpTape.insert(tmpTape.end(), {static_cast<uint8_t>(OpCode::RETURN), 0});
+    auto bufferView = VecView(tmpBuffer.data(), tmpBuffer.size());
+    return addConstant(EvalContext<double>{tmpTape, bufferView}.eval());
   }
 
   size_t i = operations.size();
   operations.push_back(op);
-  operands.push_back({a, b, c});
+  this->operands.push_back(operands);
   opUses.emplace_back();
   // update uses
-  for (auto operand : {a, b, c}) {
+  for (auto operand : operands) {
     auto target = getUses(operand);
     if (target == nullptr) continue;
     // avoid duplicates
@@ -290,14 +285,15 @@ void Context::reschedule() {
           stack.push_back(operand.toInstIndex());
     } else {
       stack.pop_back();
-      Operand result = addInstructionNoCache(
-          oldOperations[back], toNewOperand(curOperands[0]),
-          toNewOperand(curOperands[1]), toNewOperand(curOperands[2]));
+      std::array<Operand, 3> newOperands;
+      for (int i : {0, 1, 2}) newOperands[i] = toNewOperand(curOperands[i]);
+      Operand result = addInstructionNoCache(oldOperations[back], newOperands);
       computedInst[back] = result;
     }
   }
   addInstructionNoCache(OpCode::RETURN,
-                        computedInst[oldOperands.back()[0].toInstIndex()]);
+                        {computedInst[oldOperands.back()[0].toInstIndex()],
+                         Operand::none(), Operand::none()});
 }
 
 struct RegEntry {
@@ -318,6 +314,13 @@ void addImmediate(std::vector<uint8_t> &tape, T imm) {
   for (auto byte : tmpBuffer) tape.push_back(byte);
 }
 
+template <typename V>
+typename V::value_type pop_back(V &v) {
+  auto x = v.back();
+  v.pop_back();
+  return x;
+}
+
 std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
   std::vector<uint8_t> tape;
   size_t bufferSize = 3;
@@ -333,25 +336,17 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
     regCache.insert(std::lower_bound(regCache.cbegin(), regCache.cend(), entry),
                     entry);
   };
+
   auto allocateReg = [&]() {
-    if (!availableReg.empty()) {
-      auto reg = availableReg.back();
-      availableReg.pop_back();
-      return reg;
-    }
+    if (!availableReg.empty()) return pop_back(availableReg);
     // used too many registers, need to spill something
     // note: tested with a limit of 7, spills correctly
     if (bufferSize > 255) {
       auto reg = regCache.front().reg;
       // we can just discard constants, so only spill instruction results
       if (regCache.front().operand.isResult()) {
-        uint32_t slot;
-        if (spillSlots.empty()) {
-          slot = bufferSize++;
-        } else {
-          slot = spillSlots.back();
-          spillSlots.pop_back();
-        }
+        uint32_t slot =
+            spillSlots.empty() ? bufferSize++ : pop_back(spillSlots);
         spills.insert({regCache.front().operand, slot});
         tape.push_back(static_cast<uint8_t>(OpCode::STORE));
         addImmediate(tape, slot);
@@ -360,8 +355,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       regCache.erase(regCache.begin());
       return reg;
     }
-    auto reg = static_cast<uint8_t>(bufferSize++);
-    return reg;
+    return static_cast<uint8_t>(bufferSize++);
   };
   auto handleOperands = [&](std::array<Operand, 3> instOperands, size_t inst) {
     auto getOperandReg = [&](Operand operand, size_t inst) {
@@ -370,28 +364,22 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
       // special xyz variables with fixed register
       if (!operand.isConst() && !operand.isResult())
         return static_cast<uint8_t>(-(operand.id + 1));
-      // the operand, if present, must be at the end of the cache due to how the
+      // the operand, if present, must be at the end of the cache, due to how the
       // cache is ordered
       for (auto it = regCache.rbegin();
-           it != regCache.rend() && it->nextUse == inst; ++it) {
-        if (it->operand == operand) {
-          return it->reg;
-        }
-      }
+           it != regCache.rend() && it->nextUse == inst; ++it)
+        if (it->operand == operand) return it->reg;
+      // if not found, either a spill or a constant
       auto reg = allocateReg();
-      auto iter = spills.find(operand);
+      // we will never spill constants
+      auto iter = operand.isResult() ? spills.find(operand) : spills.end();
       if (iter == spills.end()) {
         DEBUG_ASSERT(operand.isConst(), logicErr,
                      "can only materialize constants");
-        tape.push_back(static_cast<uint8_t>(OpCode::CONST));
-        tape.push_back(reg);
-        std::array<uint8_t, sizeof(double)> tmpBuffer;
-        std::memcpy(tmpBuffer.data(), &constants[operand.toConstIndex()],
-                    sizeof(double));
-        for (auto byte : tmpBuffer) tape.push_back(byte);
+        tape.insert(tape.end(), {static_cast<uint8_t>(OpCode::CONST), reg});
+        addImmediate(tape, constants[operand.toConstIndex()]);
       } else {
-        tape.push_back(static_cast<uint8_t>(OpCode::LOAD));
-        tape.push_back(reg);
+        tape.insert(tape.end(), {static_cast<uint8_t>(OpCode::LOAD), reg});
         addImmediate(tape, iter->second);
         spillSlots.push_back(iter->second);
         spills.erase(iter);
@@ -436,8 +424,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
     if (operations[i] == OpCode::NOP) continue;
     auto tmp = handleOperands(operands[i], i);
     if (operations[i] == OpCode::RETURN) {
-      tape.push_back(static_cast<uint8_t>(operations[i]));
-      tape.push_back(tmp[0]);
+      tape.insert(tape.end(), {static_cast<uint8_t>(operations[i]), tmp[0]});
       break;
     }
     // note that we may spill the operand register, but that is fine
@@ -450,8 +437,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
     } else {
       insertRegCache({uses->front(), instOp, reg});
     }
-    tape.push_back(static_cast<uint8_t>(operations[i]));
-    tape.push_back(reg);
+    tape.insert(tape.end(), {static_cast<uint8_t>(operations[i]), reg});
     for (size_t j : {0, 1, 2}) {
       if (operands[i][j].isNone()) break;
       tape.push_back(tmp[j]);

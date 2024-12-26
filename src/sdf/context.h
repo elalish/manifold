@@ -56,13 +56,11 @@ struct std::hash<Operand> {
 };
 
 template <>
-struct std::hash<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>> {
+struct std::hash<std::pair<OpCode, std::array<Operand, 3>>> {
   size_t operator()(
-      const std::pair<OpCode, std::tuple<Operand, Operand, Operand>>& pair)
-      const {
+      const std::pair<OpCode, std::array<Operand, 3>>& pair) const {
     size_t h = std::hash<uint8_t>()(static_cast<uint8_t>(pair.first));
-    hash_combine(h, std::get<0>(pair.second), std::get<1>(pair.second),
-                 std::get<2>(pair.second));
+    hash_combine(h, pair.second[0], pair.second[1], pair.second[2]);
     return h;
   }
 };
@@ -73,9 +71,7 @@ class Context {
   using UsesVector = small_vector<size_t, 4>;
 
   Operand addConstant(double d);
-  Operand addInstruction(OpCode op, Operand a = Operand::none(),
-                         Operand b = Operand::none(),
-                         Operand c = Operand::none());
+  Operand addInstruction(OpCode op, std::array<Operand, 3> operands);
   void optimizeFMA();
   void reschedule();
 
@@ -102,13 +98,9 @@ class Context {
 
   std::vector<uint8_t> tmpTape;
   std::vector<double> tmpBuffer;
-  std::unordered_map<std::pair<OpCode, std::tuple<Operand, Operand, Operand>>,
-                     Operand>
-      cache;
+  std::unordered_map<std::pair<OpCode, std::array<Operand, 3>>, Operand> cache;
 
-  Operand addInstructionNoCache(OpCode op, Operand a = Operand::none(),
-                                Operand b = Operand::none(),
-                                Operand c = Operand::none());
+  Operand addInstructionNoCache(OpCode op, std::array<Operand, 3> operands);
 
   small_vector<size_t, 4>* getUses(Operand operand) {
     if (operand.isResult()) {
