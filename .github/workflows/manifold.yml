@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: CrossSection:${{matrix.cross_section}} ${{matrix.parallelization == 'ON'}} GCC ${{matrix.gcc}}
+    name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
     timeout-minutes: 45
     strategy:
       matrix:
@@ -92,32 +92,14 @@ jobs:
         cd ..
         ./scripts/test-cmake.sh
 
-  build_cbind:
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
-    steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get -y update
-        DEBIAN_FRONTEND=noninteractive sudo apt install -y libgtest-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev python3 python3-distutils python3-pip
-    - uses: actions/checkout@v4
-    - uses: jwlawson/actions-setup-cmake@v2
-    - name: Build C bindings with TBB
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=ON .. && make
-    - name: Test
-      run: |
-        cd build/test
-        ./manifold_test --gtest_filter=CBIND.*
-
   build_wasm:
+    name: WASM (TBB:${{matrix.parallelization}}, DEBUG:${{matrix.debug}})
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     strategy:
       matrix:
         parallelization: [OFF, ON]
+        debug: [OFF, ON]
     steps:
     - name: Install dependencies
       run: |
@@ -137,7 +119,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_DEBUG=${{matrix.debug}} .. && emmake make
     - name: Test WASM
       if: matrix.parallelization == 'OFF'
       run: |
@@ -153,7 +135,7 @@ jobs:
         cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v4
-      if: github.event_name == 'push' && matrix.parallelization == 'OFF'
+      if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasm
         path: bindings/wasm/examples/dist/
@@ -161,10 +143,12 @@ jobs:
         overwrite: true
 
   build_windows:
+    name: Windows (TBB:${{matrix.parallelization}}, SHARED:${{matrix.shared}})
     timeout-minutes: 30
     strategy:
       matrix:
         parallelization: [OFF, ON]
+        shared: [OFF, ON]
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v4
@@ -173,12 +157,20 @@ jobs:
     - name: Build ${{matrix.parallelization}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
-    - name: Test ${{matrix.parallelization}}
+    - name: Test dll location
+      if: matrix.shared == 'ON'
       shell: bash
       run: |
+        ls ./build/lib/Release
+        [ -f ./build/lib/Release/manifold.dll ]
+        [ -f ./build/lib/Release/manifoldc.dll ]
+    - name: Test
+      shell: bash
+      run: |
+        cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
         ./manifold_test.exe
         cd ../../
@@ -190,6 +182,7 @@ jobs:
         ./scripts/test-cmake.sh
 
   build_mxe:
+    name: MXE (TBB:${{matrix.parallelization == 'ON'}})
     timeout-minutes: 30
     strategy:
       matrix:
@@ -208,9 +201,10 @@ jobs:
         export MXETARGETDIR=$MXEDIR/usr/$MXE_TARGETS
         export PATH=/mxe/usr/bin:$PATH
         export CMAKE=$MXE_TARGETS-cmake
-        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
+        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
 
   build_mac:
+    name: MacOS (TBB:${{matrix.parallelization == 'ON'}})
     timeout-minutes: 30
     strategy:
       matrix:
