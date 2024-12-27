@@ -63,6 +63,7 @@ class Value {
 
   // internal use only
   std::pair<std::vector<uint8_t>, size_t> genTape() const;
+  ~Value();
 
  private:
   ValueKind kind = ValueKind::INVALID;

@@ -183,6 +183,23 @@ Value Value::atan() const {
                                                 Invalid()));
 }
 
+Value::~Value() {
+  using VO = std::shared_ptr<ValueOperation>;
+  std::vector<VO> stack;
+  auto push = [&stack](VO&& vo) {
+    if (vo.use_count() == 1) stack.emplace_back(vo);
+  };
+  if (kind == ValueKind::OPERATION) push(std::get<VO>(std::move(v)));
+  while (!stack.empty()) {
+    auto back = std::move(stack.back());
+    stack.pop_back();
+    for (auto& value : back->operands) {
+      if (value.kind == ValueKind::OPERATION)
+        push(std::get<VO>(std::move(value.v)));
+    }
+  }
+}
+
 std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
   using VO = std::shared_ptr<ValueOperation>;
   Context ctx;
