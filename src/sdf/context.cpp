@@ -82,9 +82,7 @@ Operand Context::addInstruction(Instruction inst) {
   return result;
 }
 
-// bypass the cache because we don't expect to have more common subexpressions
-// after optimizations
-Operand Context::addInstructionNoCache(Instruction inst) {
+std::optional<Operand> Context::trySimplify(Instruction inst) {
   // constant choice
   auto op = inst.op;
   auto &operands = inst.operands;
@@ -161,11 +159,68 @@ Operand Context::addInstructionNoCache(Instruction inst) {
     return addConstant(result);
   }
 
+  // simple simplifications
+  if (op == OpCode::ADD) {
+    // add is commutative, so if there is a constant, it must be on the left
+    // 0 + x => x
+    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 0.0)
+      return operands[1];
+  }
+  if (op == OpCode::SUB) {
+    // x - 0 => x
+    if (operands[1].isConst() && constants[operands[1].toConstIndex()] == 0.0)
+      return operands[0];
+  }
+  if (op == OpCode::MUL) {
+    // mul is commutative, so if there is a constant, it must be on the left
+    // 0 * x => 0
+    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 0.0)
+      return operands[0];
+    // 1 * x => x
+    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 1.0)
+      return operands[1];
+  }
+  if (op == OpCode::DIV) {
+    if (operands[1].isConst() && constants[operands[1].toConstIndex()] == 1.0)
+      return operands[0];
+  }
+
+  return {};
+}
+
+Instruction Context::strengthReduction(Instruction inst) {
+  // strength reduction: reduce instructions to simpler variants
+  // not very helpful for point evaluation in a vm because instruction decoding
+  // is the most time consuming part.
+  // This can be useful if we want to do JIT, interval evaluation or bulk
+  // evaluation.
+  if (inst.op == OpCode::MUL && inst.operands[1].isConst() &&
+      constants[inst.operands[1].toConstIndex()] == 2.0) {
+    // x * 2 => x + x
+    return {OpCode::ADD, {inst.operands[0], inst.operands[1], Operand::none()}};
+  }
+  if (inst.op == OpCode::DIV && inst.operands[1].isConst()) {
+    // x / c => x * (1/c)
+    return {OpCode::MUL,
+            {inst.operands[0],
+             addConstant(1.0 / constants[inst.operands[1].toConstIndex()]),
+             Operand::none()}};
+  }
+  return inst;
+}
+
+// bypass the cache because we don't expect to have more common subexpressions
+// after optimizations
+Operand Context::addInstructionNoCache(Instruction inst) {
+  auto simplified = trySimplify(inst);
+  if (simplified.has_value()) return simplified.value();
+  inst = strengthReduction(inst);
+
   size_t i = instructions.size();
-  instructions.push_back({op, operands});
+  instructions.push_back(inst);
   opUses.emplace_back();
   // update uses
-  for (auto operand : operands) {
+  for (auto operand : inst.operands) {
     auto target = getUses(operand);
     if (target == nullptr) continue;
     // avoid duplicates

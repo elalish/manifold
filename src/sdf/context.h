@@ -13,6 +13,7 @@
 // limitations under the License.
 #pragma once
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -104,6 +105,8 @@ class Context {
   std::vector<UsesVector> opUses;
   unordered_map<Instruction, Operand> cache;
 
+  std::optional<Operand> trySimplify(Instruction);
+  Instruction strengthReduction(Instruction);
   Operand addInstructionNoCache(Instruction);
 
   UsesVector* getUses(Operand operand) {
