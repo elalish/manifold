@@ -471,8 +471,8 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
     : impl_(children), op_(op) {}
 
 CsgOpNode::~CsgOpNode() {
-  auto impl = impl_.GetGuard();
-  if (impl.UseCount() == 1) {
+  if (impl_.UseCount() == 1) {
+    auto impl = impl_.GetGuard();
     std::vector<std::shared_ptr<CsgOpNode>> toProcess;
     auto handleChildren =
         [&toProcess](std::vector<std::shared_ptr<CsgNode>> &children) {
@@ -489,8 +489,10 @@ CsgOpNode::~CsgOpNode() {
     while (!toProcess.empty()) {
       auto child = std::move(toProcess.back());
       toProcess.pop_back();
-      auto childImpl = child->impl_.GetGuard();
-      if (impl.UseCount() == 1) handleChildren(*childImpl);
+      if (impl_.UseCount() == 1) {
+        auto childImpl = child->impl_.GetGuard();
+        handleChildren(*childImpl);
+      }
     }
   }
 }
