@@ -108,20 +108,24 @@ class ConcurrentSharedPtr {
       : impl(other.impl), mutex(other.mutex) {}
   class SharedPtrGuard {
    public:
-    SharedPtrGuard(std::recursive_mutex* mutex, T* content)
-        : mutex(mutex), content(content) {
+    SharedPtrGuard(std::recursive_mutex* mutex, std::shared_ptr<T>& content)
+        : mutex(mutex), content(content.get()) {
       mutex->lock();
+      // query the use_count only after we lock the pointer
+      useCount = content.use_count();
     }
     ~SharedPtrGuard() { mutex->unlock(); }
 
     T& operator*() { return *content; }
     T* operator->() { return content; }
+    unsigned int UseCount() { return useCount; };
 
    private:
     std::recursive_mutex* mutex;
     T* content;
+    unsigned int useCount;
   };
-  SharedPtrGuard GetGuard() { return SharedPtrGuard(mutex.get(), impl.get()); };
+  SharedPtrGuard GetGuard() { return SharedPtrGuard(mutex.get(), impl); };
   unsigned int UseCount() { return impl.use_count(); };
 
  private:
