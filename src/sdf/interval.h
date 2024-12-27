@@ -14,6 +14,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "manifold/common.h"
@@ -33,15 +34,13 @@ struct Interval {
   Interval(Domain lower, Domain upper) : lower(lower), upper(upper) {}
   static Interval constant(Domain v) { return {v, v}; }
 
-  constexpr Interval operator+(const Interval &other) const {
+  Interval operator+(const Interval &other) const {
     return {lower + other.lower, upper + other.upper};
   }
 
-  constexpr Interval operator-() const { return {-upper, -lower}; }
+  Interval operator-() const { return {-upper, -lower}; }
 
-  constexpr Interval operator-(const Interval &other) const {
-    return *this + (-other);
-  }
+  Interval operator-(const Interval &other) const { return *this + (-other); }
 
   Interval operator*(const Interval &other) const {
     Domain a1b1 = lower * other.lower;
@@ -86,7 +85,7 @@ struct Interval {
 
   constexpr bool is_const() const { return lower == upper; }
 
-  constexpr Interval operator==(const Interval &other) const {
+  Interval operator==(const Interval &other) const {
     if (is_const() && other.is_const() && lower == other.lower)
       return constant(1);  // must be equal
     if (lower > other.upper || upper < other.lower)
@@ -96,49 +95,49 @@ struct Interval {
 
   constexpr bool operator==(double d) const { return is_const() && lower == d; }
 
-  constexpr Interval operator>(const Interval &other) const {
+  Interval operator>(const Interval &other) const {
     if (lower > other.upper) return constant(1);
     if (upper < other.lower) return constant(0);
     return {0, 1};
   }
 
-  constexpr Interval operator<(const Interval &other) const {
+  Interval operator<(const Interval &other) const {
     if (upper < other.lower) return constant(1);
     if (lower > other.upper) return constant(0);
     return {0, 1};
   }
 
-  constexpr Interval min(const Interval &other) const {
+  Interval min(const Interval &other) const {
     return {std::min(lower, other.lower), std::min(upper, other.upper)};
   }
 
-  constexpr Interval max(const Interval &other) const {
+  Interval max(const Interval &other) const {
     return {std::max(lower, other.lower), std::max(upper, other.upper)};
   }
 
-  constexpr Interval merge(const Interval &other) const {
+  Interval merge(const Interval &other) const {
     return {std::min(lower, other.lower), std::max(upper, other.upper)};
   }
 
   template <typename F>
-  constexpr Interval monotone_map(F f) const {
+  Interval monotone_map(F f) const {
     if (is_const()) return constant(f(lower));
     return {f(lower), f(upper)};
   }
 
   template <typename F>
-  constexpr Interval antimonotone_map(F f) const {
+  Interval antimonotone_map(F f) const {
     if (is_const()) return constant(f(lower));
     return {f(upper), f(lower)};
   }
 
-  constexpr Interval abs() const {
+  Interval abs() const {
     if (lower >= 0) return *this;
     if (upper <= 0) return {-upper, -lower};
     return {0.0, std::max(-lower, upper)};
   }
 
-  constexpr Interval mod(double m) const {
+  Interval mod(double m) const {
     // FIXME: cannot deal with negative m right now...
     Domain diff = std::fmod(lower, m);
     if (diff < 0) diff += m;
@@ -148,17 +147,17 @@ struct Interval {
     return {diff, upper - cycle_min};
   }
 
-  constexpr Interval logical_and(const Interval &other) const {
+  Interval logical_and(const Interval &other) const {
     return {lower == 0.0 || other.lower == 0.0 ? 0.0 : 1.0,
             upper == 1.0 && other.upper == 1.0 ? 1.0 : 0.0};
   }
 
-  constexpr Interval logical_or(const Interval &other) const {
+  Interval logical_or(const Interval &other) const {
     return {lower == 0.0 && other.lower == 0.0 ? 0.0 : 1.0,
             upper == 1.0 || other.upper == 1.0 ? 1.0 : 0.0};
   }
 
-  constexpr Interval sin() const {
+  Interval sin() const {
     if (is_const()) return constant(std::sin(lower));
     // largely similar to cos
     int64_t min_pis = static_cast<int64_t>(std::floor((lower - kHalfPi) / kPi));
@@ -176,7 +175,7 @@ struct Interval {
     return {new_min, new_max};
   }
 
-  constexpr Interval cos() const {
+  Interval cos() const {
     if (is_const()) return constant(std::cos(lower));
     int64_t min_pis = static_cast<int64_t>(std::floor(lower / kPi));
     int64_t max_pis = static_cast<int64_t>(std::floor(upper / kPi));
@@ -193,7 +192,7 @@ struct Interval {
     return {new_min, new_max};
   }
 
-  constexpr Interval tan() const {
+  Interval tan() const {
     if (is_const()) return constant(std::tan(lower));
     int64_t min_pis = static_cast<int64_t>(std::floor((lower + kHalfPi) / kPi));
     int64_t max_pis = static_cast<int64_t>(std::floor((upper + kHalfPi) / kPi));
