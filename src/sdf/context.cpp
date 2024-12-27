@@ -25,10 +25,10 @@
 namespace manifold::sdf {
 void Context::dump() const {
 #ifdef MANIFOLD_DEBUG
-  for (size_t i = 0; i < operations.size(); i++) {
+  for (size_t i = 0; i < instructions.size(); i++) {
     std::cout << i << " ";
-    std::cout << " " << dumpOpCode(operations[i]) << " ";
-    for (Operand operand : operands[i]) {
+    std::cout << " " << dumpOpCode(instructions[i].op) << " ";
+    for (Operand operand : instructions[i].operands) {
       if (operand.isNone()) break;
       if (operand.isResult())
         std::cout << "r" << operand.toInstIndex();
@@ -56,8 +56,8 @@ Operand Context::addConstant(double d) {
   return result.first->second;
 }
 
-Operand Context::addInstruction(OpCode op, std::array<Operand, 3> operands) {
-  switch (op) {
+Operand Context::addInstruction(Instruction inst) {
+  switch (inst.op) {
     case OpCode::ADD:
     case OpCode::MUL:
     case OpCode::MIN:
@@ -68,25 +68,26 @@ Operand Context::addInstruction(OpCode op, std::array<Operand, 3> operands) {
     case OpCode::FMA:
       // first two operands commutative, sort them
       // makes it more likely to find common subexpressions
-      if (operands[0].id > operands[1].id) std::swap(operands[0], operands[1]);
+      if (inst.operands[0].id > inst.operands[1].id)
+        std::swap(inst.operands[0], inst.operands[1]);
       break;
     default:
       break;
   }
   // common subexpression elimination
-  auto key = std::make_pair(op, operands);
-  auto entry = cache.find(key);
+  auto entry = cache.find(inst);
   if (entry != cache.end()) return entry->second;
-  auto result = addInstructionNoCache(op, operands);
-  cache.insert({key, result});
+  auto result = addInstructionNoCache(inst);
+  cache.insert({inst, result});
   return result;
 }
 
 // bypass the cache because we don't expect to have more common subexpressions
 // after optimizations
-Operand Context::addInstructionNoCache(OpCode op,
-                                       std::array<Operand, 3> operands) {
+Operand Context::addInstructionNoCache(Instruction inst) {
   // constant choice
+  auto op = inst.op;
+  auto &operands = inst.operands;
   if (op == OpCode::CHOICE && operands[0].isConst()) {
     if (constants[operands[0].toConstIndex()] == 1.0) return operands[1];
     return operands[2];
@@ -96,22 +97,72 @@ Operand Context::addInstructionNoCache(OpCode op,
   for (auto operand : operands) {
     if (!operand.isConst() && !operand.isNone()) all_constants = false;
   }
-  if (all_constants) {
-    tmpTape = {static_cast<uint8_t>(op), 0};
-    tmpBuffer = {0.0};
-    for (Operand x : operands) {
-      if (!x.isConst()) break;
-      tmpTape.push_back(tmpBuffer.size());
-      tmpBuffer.push_back(constants[x.toConstIndex()]);
+  // we should not do anything about returning a constant...
+  if (all_constants && op != OpCode::RETURN) {
+    double result = 0.0;
+    switch (op) {
+      case OpCode::NOP:
+      case OpCode::RETURN:
+      case OpCode::CONST:
+      case OpCode::STORE:
+      case OpCode::LOAD:
+        break;
+      case OpCode::ABS:
+      case OpCode::NEG:
+      case OpCode::EXP:
+      case OpCode::LOG:
+      case OpCode::SQRT:
+      case OpCode::FLOOR:
+      case OpCode::CEIL:
+      case OpCode::ROUND:
+      case OpCode::SIN:
+      case OpCode::COS:
+      case OpCode::TAN:
+      case OpCode::ASIN:
+      case OpCode::ACOS:
+      case OpCode::ATAN:
+        result = EvalContext<double>::handle_unary(
+            op, constants[operands[0].toConstIndex()]);
+        break;
+      case OpCode::DIV:
+      case OpCode::MOD:
+      case OpCode::MIN:
+      case OpCode::MAX:
+      case OpCode::EQ:
+      case OpCode::GT:
+      case OpCode::AND:
+      case OpCode::OR:
+        result = EvalContext<double>::handle_binary(
+            op, constants[operands[0].toConstIndex()],
+            constants[operands[1].toConstIndex()]);
+        break;
+      case OpCode::ADD:
+        result = constants[operands[0].toConstIndex()] +
+                 constants[operands[1].toConstIndex()];
+        break;
+      case OpCode::SUB:
+        result = constants[operands[0].toConstIndex()] -
+                 constants[operands[1].toConstIndex()];
+        break;
+      case OpCode::MUL:
+        result = constants[operands[0].toConstIndex()] *
+                 constants[operands[1].toConstIndex()];
+        break;
+      case OpCode::FMA:
+        result = constants[operands[0].toConstIndex()] *
+                     constants[operands[1].toConstIndex()] +
+                 constants[operands[2].toConstIndex()];
+        break;
+      case OpCode::CHOICE:
+        // should be unreachable
+        DEBUG_ASSERT(false, logicErr, "unreachable");
+        break;
     }
-    tmpTape.insert(tmpTape.end(), {static_cast<uint8_t>(OpCode::RETURN), 0});
-    auto bufferView = VecView(tmpBuffer.data(), tmpBuffer.size());
-    return addConstant(EvalContext<double>{tmpTape, bufferView}.eval());
+    return addConstant(result);
   }
 
-  size_t i = operations.size();
-  operations.push_back(op);
-  this->operands.push_back(operands);
+  size_t i = instructions.size();
+  instructions.push_back({op, operands});
   opUses.emplace_back();
   // update uses
   for (auto operand : operands) {
@@ -128,19 +179,18 @@ Context::UsesVector::const_iterator findUse(const Context::UsesVector &uses,
   return std::lower_bound(uses.cbegin(), uses.cend(), inst);
 }
 
-void Context::optimizeFMA() {
+void Context::peephole() {
   auto tryApply = [&](size_t i, Operand lhs, Operand rhs) {
     if (!lhs.isResult()) return false;
     auto lhsInst = lhs.toInstIndex();
-    if (operations[lhsInst] != OpCode::MUL || opUses[lhsInst].size() != 1)
+    if (instructions[lhsInst].op != OpCode::MUL || opUses[lhsInst].size() != 1)
       return false;
-    operations[i] = OpCode::FMA;
-    Operand a = operands[lhsInst][0];
-    Operand b = operands[lhsInst][1];
-    operands[i] = {a, b, rhs};
+    Operand a = instructions[lhsInst].operands[0];
+    Operand b = instructions[lhsInst].operands[1];
+    instructions[i] = {OpCode::FMA, {a, b, rhs}};
     // remove instruction
-    operations[lhsInst] = OpCode::NOP;
-    operands[lhsInst] = {Operand::none(), Operand::none(), Operand::none()};
+    auto none = Operand::none();
+    instructions[lhsInst] = {OpCode::NOP, {none, none, none}};
     // update uses, note that we need to maintain the order of the indices
     opUses[lhsInst].clear();
     auto updateUses = [&](Operand x) {
@@ -157,143 +207,15 @@ void Context::optimizeFMA() {
     if (a != b) updateUses(b);
     return true;
   };
-  for (size_t i = 0; i < operations.size(); i++) {
-    if (operations[i] == OpCode::ADD) {
+  for (size_t i = 0; i < instructions.size(); i++) {
+    auto &inst = instructions[i];
+    if (inst.op == OpCode::ADD) {
       // check if lhs/rhs comes from MUL with no other uses
-      auto lhs = operands[i][0];
-      auto rhs = operands[i][1];
+      auto lhs = inst.operands[0];
+      auto rhs = inst.operands[1];
       if (!tryApply(i, lhs, rhs)) tryApply(i, rhs, lhs);
     }
   }
-}
-
-// this does dead code elimination as well
-// assumes the last instruction is return
-// and note that this is not optimal, and cannot be optimal without dealing with
-// NP-hard stuff...
-void Context::reschedule() {
-  DEBUG_ASSERT(!operations.empty() && operations.back() == OpCode::RETURN,
-               logicErr, "return expected");
-  cache.clear();
-  auto oldOperations = std::move(operations);
-  auto oldOperands = std::move(operands);
-  opUses.clear();
-  for (auto &uses : constantUses) uses.clear();
-
-  std::vector<Operand> computedInst(oldOperands.size(), Operand::none());
-  std::vector<size_t> stack;
-  stack.reserve(64);
-  if (oldOperands.back()[0].isResult())
-    stack.push_back(oldOperands.back()[0].toInstIndex());
-
-  std::vector<uint8_t> bitset(oldOperands.size(), 0);
-  std::vector<size_t> distances(oldOperands.size(), 0);
-  std::vector<size_t> tmpStack;
-  tmpStack.reserve(64);
-
-  auto requiresComputation = [&computedInst](Operand operand) {
-    return operand.isResult() && computedInst[operand.toInstIndex()].isNone();
-  };
-  auto toNewOperand = [&computedInst](Operand old) {
-    if (old.isResult()) return computedInst[old.toInstIndex()];
-    return old;
-  };
-
-  while (!stack.empty()) {
-    int numResults = 0;
-    auto back = stack.back();
-    if (!computedInst[back].isNone()) {
-      stack.pop_back();
-      continue;
-    }
-    auto &curOperands = oldOperands[back];
-    for (auto operand : curOperands)
-      if (requiresComputation(operand)) numResults += 1;
-    if (numResults > 1) {
-      // find common results first
-      // does this by recursively marking instructions to be the transitive
-      // dependency of operands
-      // we use a bitset, so if the bitset & (1 << (numResults + 1)) - 1,
-      // it means that the instruction is the common dependency for all operands
-      uint8_t mask = (1 << (numResults + 1)) - 1;
-      numResults = 0;
-      for (auto operand : curOperands) {
-        if (!requiresComputation(operand)) continue;
-        tmpStack.push_back(operand.toInstIndex());
-        while (!tmpStack.empty()) {
-          auto current = tmpStack.back();
-          tmpStack.pop_back();
-          // already computed
-          if (!computedInst[current].isNone()) continue;
-          bitset[current] |= 1 << numResults;
-          for (auto x : oldOperands[current]) {
-            if (!x.isResult()) continue;
-            tmpStack.push_back(x.toInstIndex());
-          }
-        }
-        numResults += 1;
-      }
-      // compute operand costs as distance in the dependency graph
-      std::array<size_t, 3> costs = {0, 0, 0};
-      std::array<size_t, 3> ids = {0, 1, 2};
-      for (size_t i = 0; i < curOperands.size(); i++) {
-        auto operand = curOperands[i];
-        if (!requiresComputation(operand)) continue;
-        tmpStack.push_back(operand.toInstIndex());
-        while (!tmpStack.empty()) {
-          auto current = tmpStack.back();
-          size_t maxDistance = 0;
-          for (auto x : oldOperands[current]) {
-            if (!x.isResult()) continue;
-            auto inst = x.toInstIndex();
-
-            // computed, doesn't affect distance
-            if (!computedInst[inst].isNone()) continue;
-
-            // shared dependency between operands, also doesn't affect distance
-            if ((bitset[inst] & mask) == mask) continue;
-
-            auto d = distances[inst];
-            if (d == 0) {
-              // not computed
-              tmpStack.push_back(x.toInstIndex());
-              maxDistance = std::numeric_limits<size_t>::max();
-            } else {
-              maxDistance = std::max(maxDistance, d);
-            }
-          }
-          if (maxDistance != std::numeric_limits<size_t>::max()) {
-            tmpStack.pop_back();
-            distances[current] = maxDistance + 1;
-          }
-        }
-        costs[i] = distances[operand.toInstIndex()];
-        std::fill(distances.begin(), distances.end(), 0);
-      }
-      std::sort(ids.begin(), ids.end(),
-                [&costs](size_t x, size_t y) { return costs[x] < costs[y]; });
-      // expensive operands are placed at the top of the stack, i.e. scheduled
-      // earlier
-      for (size_t x : ids)
-        if (requiresComputation(curOperands[x]))
-          stack.push_back(curOperands[x].toInstIndex());
-
-      std::fill(bitset.begin(), bitset.end(), 0);
-    } else if (numResults == 1) {
-      for (auto operand : curOperands)
-        if (requiresComputation(operand))
-          stack.push_back(operand.toInstIndex());
-    } else {
-      stack.pop_back();
-      std::array<Operand, 3> newOperands;
-      for (int i : {0, 1, 2}) newOperands[i] = toNewOperand(curOperands[i]);
-      Operand result = addInstructionNoCache(oldOperations[back], newOperands);
-      computedInst[back] = result;
-    }
-  }
-  addInstructionNoCache(OpCode::RETURN,
-                        {computedInst[oldOperands.back()[0].toInstIndex()],
-                         Operand::none(), Operand::none()});
 }
 
 struct RegEntry {
@@ -324,7 +246,7 @@ typename V::value_type pop_back(V &v) {
 std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
   std::vector<uint8_t> tape;
   size_t bufferSize = 3;
-  std::unordered_map<Operand, uint32_t> spills;
+  unordered_map<Operand, uint32_t> spills;
   std::vector<uint32_t> spillSlots;
 
   std::vector<uint8_t> availableReg;
@@ -420,26 +342,24 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
     return regs;
   };
 
-  for (size_t i = 0; i < operations.size(); i++) {
-    if (operations[i] == OpCode::NOP) continue;
-    auto tmp = handleOperands(operands[i], i);
-    if (operations[i] == OpCode::RETURN) {
-      tape.insert(tape.end(), {static_cast<uint8_t>(operations[i]), tmp[0]});
+  for (size_t i = 0; i < instructions.size(); i++) {
+    auto &inst = instructions[i];
+    if (inst.op == OpCode::NOP) continue;
+    auto instOp = Operand{static_cast<int>(i) + 1};
+    auto uses = getUses(instOp);
+    // avoid useless ops
+    if (inst.op != OpCode::RETURN && uses->empty()) continue;
+    auto tmp = handleOperands(inst.operands, i);
+    if (inst.op == OpCode::RETURN) {
+      tape.insert(tape.end(), {static_cast<uint8_t>(inst.op), tmp[0]});
       break;
     }
     // note that we may spill the operand register, but that is fine
     uint8_t reg = allocateReg();
-    auto instOp = Operand{static_cast<int>(i) + 1};
-    auto uses = getUses(instOp);
-    if (uses->empty()) {
-      // immediately available
-      availableReg.push_back(reg);
-    } else {
-      insertRegCache({uses->front(), instOp, reg});
-    }
-    tape.insert(tape.end(), {static_cast<uint8_t>(operations[i]), reg});
+    insertRegCache({uses->front(), instOp, reg});
+    tape.insert(tape.end(), {static_cast<uint8_t>(inst.op), reg});
     for (size_t j : {0, 1, 2}) {
-      if (operands[i][j].isNone()) break;
+      if (inst.operands[j].isNone()) break;
       tape.push_back(tmp[j]);
     }
   }

@@ -35,6 +35,15 @@
 
 #include "./parallel.h"
 
+#if __has_include(<parallel_hashmap/phmap.h>)
+#include <parallel_hashmap/phmap.h>
+template <typename K, typename V>
+using unordered_map = phmap::flat_hash_map<K, V>;
+#else
+template <typename K, typename V>
+using unordered_map = std::unordered_map<K, V>;
+#endif
+
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>
 #else

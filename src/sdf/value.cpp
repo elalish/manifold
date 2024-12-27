@@ -14,8 +14,7 @@
 
 #include "value.h"
 
-#include <unordered_map>
-
+#include "../utils.h"
 #include "context.h"
 #include "tape.h"
 
@@ -187,17 +186,26 @@ Value Value::atan() const {
 std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
   using VO = std::shared_ptr<ValueOperation>;
   Context ctx;
-  std::unordered_map<ValueOperation*, Operand> cache;
+  unordered_map<ValueOperation*, Operand> cache;
   std::vector<ValueOperation*> stack;
+  cache.reserve(128);
+  stack.reserve(128);
+
   if (kind == ValueKind::OPERATION) stack.push_back(std::get<VO>(v).get());
 
-  auto getOperand = [&](Value x, std::function<void(Value)> f) {
+  auto none = Operand::none();
+
+  bool ready = true;
+  auto getOperand = [&](const Value& x, bool pushStack) {
     switch (x.kind) {
       case ValueKind::OPERATION: {
         auto iter = cache.find(std::get<VO>(x.v).get());
         if (iter != cache.end()) return iter->second;
-        f(x);
-        return Operand::none();
+        if (pushStack) {
+          ready = false;
+          stack.push_back(std::get<VO>(x.v).get());
+        }
+        return none;
       }
       case ValueKind::CONSTANT:
         return ctx.addConstant(std::get<double>(x.v));
@@ -208,33 +216,26 @@ std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
       case ValueKind::Z:
         return Operand{-3};
       default:
-        return Operand::none();
+        return none;
     }
   };
   while (!stack.empty()) {
-    bool ready = true;
+    ready = true;
     auto current = stack.back();
-    auto f = [&](Value x) {
-      stack.push_back(std::get<VO>(x.v).get());
-      ready = false;
-    };
-    Operand a = getOperand(current->operands[0], f);
-    Operand b = getOperand(current->operands[1], f);
-    Operand c = getOperand(current->operands[2], f);
+    Operand a = getOperand(current->operands[0], true);
+    Operand b = getOperand(current->operands[1], true);
+    Operand c = getOperand(current->operands[2], true);
     if (ready) {
       stack.pop_back();
       // check if inserted... can happen when evaluating with a DAG
       if (cache.find(current) != cache.end()) continue;
-      cache.insert({current, ctx.addInstruction(current->op, {a, b, c})});
+      cache.insert({current, ctx.addInstruction({current->op, {a, b, c}})});
     }
   }
 
-  Operand result = getOperand(*this, [](Value _) {});
-  ctx.addInstruction(OpCode::RETURN,
-                     {result, Operand::none(), Operand::none()});
-
-  ctx.optimizeFMA();
-  ctx.reschedule();
+  Operand result = getOperand(*this, false);
+  ctx.addInstruction({OpCode::RETURN, {result, none, none}});
+  ctx.peephole();
   return ctx.genTape();
 }
 

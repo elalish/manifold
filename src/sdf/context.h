@@ -13,15 +13,18 @@
 // limitations under the License.
 #pragma once
 
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "../utils.h"
 #include "small_vector.h"
 #include "tape.h"
 
 namespace manifold::sdf {
 
+// operands, 0 is invalid (uses fewer operands)
+// +ve are instruction results
+// -ve are constants
 struct Operand {
   int id;
 
@@ -35,12 +38,23 @@ struct Operand {
   bool operator!=(const Operand& other) const { return id != other.id; }
   bool operator<(const Operand& other) const { return id < other.id; }
 };
+
+struct Instruction {
+  OpCode op;
+  std::array<Operand, 3> operands;
+  bool operator==(const Instruction& other) const {
+    if (op != other.op) return false;
+    return operands[0] == other.operands[0] &&
+           operands[1] == other.operands[1] && operands[2] == other.operands[2];
+  }
+};
 }  // namespace manifold::sdf
 
 using namespace manifold::sdf;
 
 inline void hash_combine(std::size_t& seed) {}
 
+// note: ankerl hash combine function is too costly
 template <typename T, typename... Rest>
 inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
   std::hash<T> hasher;
@@ -50,17 +64,14 @@ inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
 
 template <>
 struct std::hash<Operand> {
-  size_t operator()(const Operand& operand) const {
-    return std::hash<int>()(operand.id);
-  }
+  size_t operator()(const Operand& operand) const { return operand.id; }
 };
 
 template <>
-struct std::hash<std::pair<OpCode, std::array<Operand, 3>>> {
-  size_t operator()(
-      const std::pair<OpCode, std::array<Operand, 3>>& pair) const {
-    size_t h = std::hash<uint8_t>()(static_cast<uint8_t>(pair.first));
-    hash_combine(h, pair.second[0], pair.second[1], pair.second[2]);
+struct std::hash<Instruction> {
+  size_t operator()(const Instruction& inst) const {
+    size_t h = static_cast<size_t>(inst.op);
+    hash_combine(h, inst.operands[0], inst.operands[1], inst.operands[2]);
     return h;
   }
 };
@@ -71,8 +82,8 @@ class Context {
   using UsesVector = small_vector<size_t, 4>;
 
   Operand addConstant(double d);
-  Operand addInstruction(OpCode op, std::array<Operand, 3> operands);
-  void optimizeFMA();
+  Operand addInstruction(Instruction);
+  void peephole();
   void reschedule();
 
   std::pair<std::vector<uint8_t>, size_t> genTape();
@@ -82,33 +93,26 @@ class Context {
  private:
   // constants have negative IDs, starting from -4
   // -1, -2 and -3 are reserved for x y z
-  std::unordered_map<double, Operand> constantsIds;
+  unordered_map<double, Operand> constantsIds;
   std::vector<double> constants;
   // constant use vector, elements are instruction indices
   // constant with ID -4 is mapped to 0, etc.
   std::vector<UsesVector> constantUses;
   // instructions, index 0 is mapped to ID 1, etc.
-  std::vector<OpCode> operations;
+  std::vector<Instruction> instructions;
   // instruction value use vector, elements are instruction indices
   std::vector<UsesVector> opUses;
-  // operands, 0 is invalid (uses fewer operands)
-  // +ve are instruction results
-  // -ve are constants
-  std::vector<std::array<Operand, 3>> operands;
+  unordered_map<Instruction, Operand> cache;
 
-  std::vector<uint8_t> tmpTape;
-  std::vector<double> tmpBuffer;
-  std::unordered_map<std::pair<OpCode, std::array<Operand, 3>>, Operand> cache;
+  Operand addInstructionNoCache(Instruction);
 
-  Operand addInstructionNoCache(OpCode op, std::array<Operand, 3> operands);
-
-  small_vector<size_t, 4>* getUses(Operand operand) {
+  UsesVector* getUses(Operand operand) {
     if (operand.isResult()) {
       return &opUses[operand.toInstIndex()];
     } else if (operand.isConst()) {
       return &constantUses[operand.toConstIndex()];
     } else {
-      return static_cast<small_vector<size_t, 4>*>(nullptr);
+      return static_cast<UsesVector*>(nullptr);
     }
   };
 };
