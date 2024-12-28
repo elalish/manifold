@@ -458,6 +458,8 @@ void Context::optimizeAffine() {
           auto constant = addConstant(result.b);
           addUse(constant, i);
           instructions[i] = {OpCode::ADD, {constant, result.var, none}};
+        } else if (result.a == -1.0 && result.b == 0.0) {
+          instructions[i] = {OpCode::NEG, {result.var, none, none}};
         } else if (result.a == -1.0) {
           auto constant = addConstant(result.b);
           addUse(constant, i);
