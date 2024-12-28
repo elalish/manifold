@@ -27,7 +27,7 @@ namespace manifold::sdf {
 enum class OpCode : uint8_t {
   NOP,
   RETURN,
-  CONST,
+  CONSTANT,
   STORE,
   LOAD,
 
@@ -54,8 +54,6 @@ enum class OpCode : uint8_t {
   MAX,
   EQ,
   GT,
-  AND,
-  OR,
 
   // fast binary operations
   ADD,
@@ -115,7 +113,7 @@ struct EvalContext {
         Domain x = buffer[tape[i + 2]];
         buffer[tape[i + 1]] = handle_unary(current, x);
         i += 3;
-      } else if (current == OpCode::CONST) {
+      } else if (current == OpCode::CONSTANT) {
         double x;
         std::memcpy(&x, tape.data() + i + 2, sizeof(x));
         buffer[tape[i + 1]] = Domain(x);
@@ -192,10 +190,6 @@ inline double EvalContext<double>::handle_binary(OpCode op, double lhs,
       return lhs == rhs ? 1.0 : 0.0;
     case OpCode::GT:
       return lhs > rhs ? 1.0 : 0.0;
-    case OpCode::AND:
-      return (lhs == 1.0 && rhs == 1.0) ? 1.0 : 0.0;
-    case OpCode::OR:
-      return (lhs == 1.0 || rhs == 1.0) ? 1.0 : 0.0;
     default:
       return 0;
   }
@@ -204,7 +198,7 @@ inline double EvalContext<double>::handle_binary(OpCode op, double lhs,
 template <>
 inline double EvalContext<double>::handle_choice(double cond, double lhs,
                                                  double rhs) {
-  if (cond == 1.0) return lhs;
+  if (cond != 0.0) return lhs;
   return rhs;
 }
 
@@ -272,10 +266,6 @@ inline Interval<double> EvalContext<Interval<double>>::handle_binary(
       return lhs == rhs;
     case OpCode::GT:
       return lhs > rhs;
-    case OpCode::AND:
-      return lhs.logical_and(rhs);
-    case OpCode::OR:
-      return lhs.logical_or(rhs);
     default:
       return {0.0, 0.0};
   }
@@ -285,7 +275,7 @@ template <>
 inline Interval<double> EvalContext<Interval<double>>::handle_choice(
     Interval<double> cond, Interval<double> lhs, Interval<double> rhs) {
   if (cond.is_const()) {
-    if (cond.lower == 1.0) return lhs;
+    if (cond.lower != 0.0) return lhs;
     return rhs;
   }
   return lhs.merge(rhs);
@@ -297,7 +287,7 @@ inline std::string dumpOpCode(OpCode op) {
       return "NOP";
     case OpCode::RETURN:
       return "RETURN";
-    case OpCode::CONST:
+    case OpCode::CONSTANT:
       return "CONST";
     case OpCode::LOAD:
       return "LOAD";
@@ -343,10 +333,6 @@ inline std::string dumpOpCode(OpCode op) {
       return "EQ";
     case OpCode::GT:
       return "GT";
-    case OpCode::AND:
-      return "AND";
-    case OpCode::OR:
-      return "OR";
     case OpCode::ADD:
       return "ADD";
     case OpCode::SUB:

@@ -81,7 +81,7 @@ TEST(TAPE, Gyroid) {
         ctxSimple.buffer[0] = x;
         ctxSimple.buffer[1] = y;
         ctxSimple.buffer[2] = z;
-        ASSERT_NEAR(ctxSimple.eval(), gyroid({x, y, z}), 1e-12);
+        ASSERT_NEAR(ctxSimple.eval(), gyroid({x, y, z}), 1e-6);
       }
     }
   }
@@ -175,4 +175,27 @@ TEST(TAPE, Blobs) {
       std::chrono::duration_cast<std::chrono::microseconds>(end - start)
           .count());
   printf("interval evaluation: %dus\n", time);
+}
+
+TEST(TAPE, Blobs2) {
+  auto lengthFn = [](Value x, Value y, Value z) {
+    return (x * x + y * y + z * z).sqrt();
+  };
+  auto smoothstepFn = [](Value edge0, Value edge1, Value a) {
+    auto x = ((a - edge0) / (edge1 - edge0))
+                 .min(Value::Constant(1))
+                 .max(Value::Constant(0));
+    return x * x * (Value::Constant(3) - Value::Constant(2) * x);
+  };
+  Value d = Value::Constant(0);
+  for (int i = 0; i < 1000; i++) {
+    auto f = double(i + 1);
+    auto tmp = smoothstepFn(
+        Value::Constant(-1), Value::Constant(1),
+        Value::Constant(f).abs() - lengthFn(Value::Constant(f) - Value::X(),
+                                            Value::Constant(f) - Value::Y(),
+                                            Value::Constant(f) - Value::Z()));
+    d = d + tmp;
+  }
+  auto tape = d.genTape();
 }

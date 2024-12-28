@@ -80,11 +80,11 @@ struct std::hash<Instruction> {
 namespace manifold::sdf {
 class Context {
  public:
-  using UsesVector = small_vector<size_t, 4>;
+  using UsesVector = std::vector<size_t>;
 
   Operand addConstant(double d);
   Operand addInstruction(Instruction);
-  void peephole();
+  void optimize();
   void reschedule();
 
   std::pair<std::vector<uint8_t>, size_t> genTape();
@@ -106,8 +106,12 @@ class Context {
   unordered_map<Instruction, Operand> cache;
 
   std::optional<Operand> trySimplify(Instruction);
-  Instruction strengthReduction(Instruction);
   Operand addInstructionNoCache(Instruction);
+  void combineFMA();
+  void optimizeAffine();
+  void addUse(Operand operand, size_t inst);
+  void removeUse(Operand operand, size_t inst);
+  void schedule();
 
   UsesVector* getUses(Operand operand) {
     if (operand.isResult()) {

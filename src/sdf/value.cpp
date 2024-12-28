@@ -14,6 +14,8 @@
 
 #include "value.h"
 
+#include <chrono>
+
 #include "../utils.h"
 #include "context.h"
 #include "tape.h"
@@ -91,12 +93,12 @@ Value Value::operator>(const Value& other) const {
 
 Value Value::operator&&(const Value& other) const {
   return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::AND, *this, other, Invalid()));
+                                         OpCode::MUL, *this, other, Invalid()));
 }
 
 Value Value::operator||(const Value& other) const {
   return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::OR, *this, other, Invalid()));
+                                         OpCode::ADD, *this, other, Invalid()));
 }
 
 Value Value::abs() const {
@@ -205,13 +207,8 @@ std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
   Context ctx;
   unordered_map<ValueOperation*, Operand> cache;
   std::vector<ValueOperation*> stack;
-  cache.reserve(128);
-  stack.reserve(128);
 
-  if (kind == ValueKind::OPERATION) stack.push_back(std::get<VO>(v).get());
-
-  auto none = Operand::none();
-
+  const auto none = Operand::none();
   bool ready = true;
   auto getOperand = [&](const Value& x, bool pushStack) {
     switch (x.kind) {
@@ -236,7 +233,13 @@ std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
         return none;
     }
   };
+
+  auto start = std::chrono::high_resolution_clock::now();
+  if (kind == ValueKind::OPERATION) stack.push_back(std::get<VO>(v).get());
+
+  int count = 0;
   while (!stack.empty()) {
+    count++;
     ready = true;
     auto current = stack.back();
     Operand a = getOperand(current->operands[0], true);
@@ -252,8 +255,28 @@ std::pair<std::vector<uint8_t>, size_t> Value::genTape() const {
 
   Operand result = getOperand(*this, false);
   ctx.addInstruction({OpCode::RETURN, {result, none, none}});
-  ctx.peephole();
-  return ctx.genTape();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto time = static_cast<int>(
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count());
+  printf("serialization: %dus with %d nodes\n", time, count);
+  start = std::chrono::high_resolution_clock::now();
+  ctx.optimize();
+  end = std::chrono::high_resolution_clock::now();
+  time = static_cast<int>(
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count());
+  printf("optimize: %dus\n", time);
+
+  start = std::chrono::high_resolution_clock::now();
+  auto tape = ctx.genTape();
+  end = std::chrono::high_resolution_clock::now();
+  time = static_cast<int>(
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count());
+  printf("codegen: %dus with length %ld\n", time, tape.first.size());
+
+  return tape;
 }
 
 }  // namespace manifold::sdf
