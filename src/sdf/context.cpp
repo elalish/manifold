@@ -98,6 +98,11 @@ Operand Context::addInstruction(Instruction inst) {
   // common subexpression elimination
   auto entry = cache.find(inst);
   if (entry != cache.end()) return entry->second;
+  auto simplified = trySimplify(inst);
+  if (simplified.has_value()) {
+    cache.insert({inst, simplified.value()});
+    return simplified.value();
+  }
   auto result = addInstructionNoCache(inst);
   cache.insert({inst, result});
   return result;
@@ -210,9 +215,6 @@ std::optional<Operand> Context::trySimplify(Instruction inst) {
 // bypass the cache because we don't expect to have more common subexpressions
 // after optimizations
 Operand Context::addInstructionNoCache(Instruction inst) {
-  auto simplified = trySimplify(inst);
-  if (simplified.has_value()) return simplified.value();
-
   size_t i = instructions.size();
   instructions.push_back(inst);
   opUses.emplace_back();
