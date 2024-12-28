@@ -216,6 +216,7 @@ class small_vector {
         // currently, all data on heap
         // move back to stack
         std::move(heap_.begin(), heap_.end(), stack_.begin());
+        heap_.clear();
       } else {
         // all data already on stack
         // just update size
@@ -233,9 +234,7 @@ class small_vector {
   }
 
   void clear() {
-    if (size_ > N) {
-      heap_.clear();
-    }
+    if (size_ > N) heap_.clear();
     size_ = 0;
   }
 
@@ -360,12 +359,18 @@ class small_vector {
   const_iterator end() const { return cend(); }
 
   void erase(iterator iter) {
+    if (size_ == 0) return;
     size_type i = std::distance(begin(), iter);
     if (size_ <= N) {
-      std::move_backward(stack_.begin() + i + 1, stack_.begin() + size_,
-                         stack_.begin() + i);
+      if (i < size_ - 1)
+        std::move(stack_.begin() + i + 1, stack_.begin() + size_,
+                  stack_.begin() + i);
     } else {
       heap_.erase(heap_.begin() + i);
+      if (size_ == N + 1) {
+        std::copy(heap_.begin(), heap_.end(), stack_.begin());
+        heap_.clear();
+      }
     }
     size_ -= 1;
   }
@@ -377,13 +382,14 @@ class small_vector {
   void insert(iterator iter, const T &value) {
     size_type i = std::distance(begin(), iter);
     if (size_ < N) {
-      if (i + 1 < size_)
+      if (i < size_)
         std::move_backward(stack_.begin() + i, stack_.begin() + size_,
-                           stack_.begin() + i + 1);
+                           stack_.begin() + size_ + 1);
       stack_[i] = value;
     } else {
-      if (size_ == N)
-        std::move(stack_.begin(), stack_.end(), std::back_inserter(heap_));
+      if (size_ == N) {
+        std::copy(stack_.begin(), stack_.end(), std::back_inserter(heap_));
+      }
       heap_.insert(heap_.begin() + i, value);
     }
     size_ += 1;
