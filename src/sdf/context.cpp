@@ -450,7 +450,6 @@ void Context::optimizeAffine() {
         for (auto operand : inst.operands) removeUse(operand, i);
         addUse(result.var, i);
         // modify instruction
-        // FIXME: handle constant uses...
         if (result.a == 1.0 && result.b == 0.0 && result.var.isResult()) {
           // this result is being optimized away, replace uses with the value
           pair.first->second = result.var.toInstIndex();
