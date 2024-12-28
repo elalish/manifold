@@ -30,6 +30,8 @@ struct Operand {
   int id;
 
   static Operand none() { return {0}; }
+  static Operand fromInstIndex(size_t i) { return {static_cast<int>(i) + 1}; }
+  static Operand fromConstIndex(size_t i) { return {-static_cast<int>(i) - 4}; }
   bool isConst() const { return id <= -4; }
   bool isResult() const { return id > 0; }
   bool isNone() const { return id == 0; }

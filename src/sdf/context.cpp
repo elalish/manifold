@@ -24,13 +24,12 @@
 
 struct AffineValue {
   // value = var * a + b
-  int var;
+  Operand var;
   double a;
   double b;
 
-  AffineValue(int var, double a, double b) : var(var), a(a), b(b) {}
-  AffineValue(double constant)
-      : var(std::numeric_limits<uint32_t>::max()), a(0.0), b(constant) {}
+  AffineValue(Operand var, double a, double b) : var(var), a(a), b(b) {}
+  AffineValue(double constant) : var(Operand::none()), a(0.0), b(constant) {}
   bool operator==(const AffineValue &other) const {
     return var == other.var && a == other.a && b == other.b;
   }
@@ -39,7 +38,7 @@ struct AffineValue {
 template <>
 struct std::hash<AffineValue> {
   size_t operator()(const AffineValue &value) const {
-    size_t h = std::hash<uint32_t>()(value.var);
+    size_t h = std::hash<int>()(value.var.id);
     hash_combine(h, value.a, value.b);
     return h;
   }
@@ -71,8 +70,8 @@ void Context::dump() const {
 }
 
 Operand Context::addConstant(double d) {
-  auto result = constantsIds.insert(
-      {d, Operand{-4 - static_cast<int>(constants.size())}});
+  auto result =
+      constantsIds.insert({d, Operand::fromConstIndex(constants.size())});
   if (result.second) {
     constants.push_back(d);
     constantUses.emplace_back();
@@ -224,7 +223,7 @@ Operand Context::addInstructionNoCache(Instruction inst) {
     // avoid duplicates
     if (target->empty() || target->back() != i) target->push_back(i);
   }
-  return {static_cast<int>(i) + 1};
+  return Operand::fromInstIndex(i);
 }
 
 Context::UsesVector::const_iterator findUse(const Context::UsesVector &uses,
@@ -293,8 +292,8 @@ void Context::optimizeAffine() {
   };
 
   auto replaceInst = [&](int from, int to) {
-    auto fromInst = Operand{from + 1};
-    auto toInst = Operand{to + 1};
+    auto fromInst = Operand::fromInstIndex(from);
+    auto toInst = Operand::fromInstIndex(to);
     for (auto use : opUses[from]) {
       for (auto &operand : instructions[use].operands)
         if (operand == fromInst) operand = toInst;
@@ -309,7 +308,7 @@ void Context::optimizeAffine() {
   // interpretation can generate constants
   for (size_t i = 0; i < instructions.size(); i++) {
     auto &inst = instructions[i];
-    AffineValue result = AffineValue(static_cast<int>(i), 1, 0);
+    AffineValue result = AffineValue(Operand::fromInstIndex(i), 1, 0);
     switch (inst.op) {
       // notably, neg is special among these unary opcode
       case OpCode::ABS:
@@ -439,7 +438,7 @@ void Context::optimizeAffine() {
         break;
     }
     affineValues.push_back(result);
-    if (result.var != static_cast<int>(i)) {
+    if (result.var != Operand::fromInstIndex(i)) {
       // we did evaluate something
       auto pair = avcache.insert({result, static_cast<int>(i)});
       if (!pair.second) {
@@ -447,34 +446,32 @@ void Context::optimizeAffine() {
         replaceInst(static_cast<int>(i), pair.first->second);
       } else {
         for (auto operand : inst.operands) removeUse(operand, i);
-        addUse(Operand{result.var + 1}, i);
+        addUse(result.var, i);
         // modify instruction
         // FIXME: handle constant uses...
-        if (result.a == 1.0 && result.b == 0.0) {
+        if (result.a == 1.0 && result.b == 0.0 && result.var.isResult()) {
           // this result is being optimized away, replace uses with the value
-          pair.first->second = result.var;
-          replaceInst(static_cast<int>(i), result.var);
+          pair.first->second = result.var.toInstIndex();
+          replaceInst(static_cast<int>(i),
+                      static_cast<int>(result.var.toInstIndex()));
         } else if (result.a == 1.0) {
           auto constant = addConstant(result.b);
           addUse(constant, i);
-          instructions[i] = {OpCode::ADD,
-                             {constant, Operand{result.var + 1}, none}};
+          instructions[i] = {OpCode::ADD, {constant, result.var, none}};
         } else if (result.a == -1.0) {
           auto constant = addConstant(result.b);
           addUse(constant, i);
-          instructions[i] = {OpCode::SUB,
-                             {constant, Operand{result.var + 1}, none}};
+          instructions[i] = {OpCode::SUB, {constant, result.var, none}};
         } else if (result.b == 0.0) {
           auto constant = addConstant(result.a);
           addUse(constant, i);
-          instructions[i] = {OpCode::MUL,
-                             {constant, Operand{result.var + 1}, none}};
+          instructions[i] = {OpCode::MUL, {constant, result.var, none}};
         } else {
           auto a = addConstant(result.a);
           auto b = addConstant(result.b);
           addUse(a, i);
           addUse(b, i);
-          instructions[i] = {OpCode::FMA, {a, Operand{result.var + 1}, b}};
+          instructions[i] = {OpCode::FMA, {a, result.var, b}};
         }
       }
     }
@@ -681,7 +678,7 @@ std::pair<std::vector<uint8_t>, size_t> Context::genTape() {
 
   for (size_t i = 0; i < instructions.size(); i++) {
     auto &inst = instructions[i];
-    auto instOp = Operand{static_cast<int>(i) + 1};
+    auto instOp = Operand::fromInstIndex(i);
     auto uses = getUses(instOp);
     if (inst.op == OpCode::NOP) continue;
     // if (inst.op != OpCode::RETURN && uses->empty()) continue;
