@@ -57,7 +57,6 @@ using namespace manifold::sdf;
 
 inline void hash_combine(std::size_t& seed) {}
 
-// note: ankerl hash combine function is too costly
 template <typename T, typename... Rest>
 inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
   std::hash<T> hasher;

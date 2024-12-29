@@ -15,6 +15,7 @@
 
 #include <vector>
 
+#include "affine_value.h"
 #include "interval.h"
 #include "manifold/vec_view.h"
 
@@ -58,7 +59,7 @@ class OptimizerContext {
    * For dependencies, we use relative index to track them.
    *   ID = current ID - value
    * - If value is 0, this means the operand is not being used, i.e. the
-   *   instruction does not have 3 operands.
+   *   instruction does not have that operand.
    * - If value is 255, this means the dependency is too far away, and we
    *   should look it up in far dependencies.
    * Ideally, we should not have too many far dependencies.
@@ -80,10 +81,9 @@ class OptimizerContext {
    * memory operations, we reuse them.
    *
    * - `buffer` is the regular register buffer for tape evaluation.
-   * - `constantOffset` is a constant that adds to a corresponding register.
-   *   This can be constant folded.
-   * - `results` contains instruction id + register id, indicating the
-   *   predetermined branch result for choice/min/max function.
+   * - `affineValue` is the affine value associated with a register.
+   * - `results` contains instruction id + affine value, indicating the
+   *   optimized result for some instruction.
    *   Note that this must be sorted according to instruction id.
    * - `uses` is the temporary use count vector that is mutable in each
    *   evaluation. It is reset before each evaluation.
@@ -91,8 +91,8 @@ class OptimizerContext {
    *   elimination.
    */
   VecView<Interval<double>> buffer;
-  VecView<double> constantOffset;
-  std::vector<std::pair<uint32_t, uint8_t>> results;
+  VecView<AffineValue> affineValues;
+  std::vector<std::pair<uint32_t, AffineValue>> results;
   std::vector<uint8_t> uses;
   std::vector<uint32_t> dead;
 };
