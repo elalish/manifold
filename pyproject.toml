@@ -32,7 +32,8 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
-cmake.minimum-version = "3.18"
+cmake.version = ">=3.18"
+ninja.version = ">=1.11"
 sdist.exclude = [
     ".github",
     "bindings/c",
