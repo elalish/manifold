@@ -19,8 +19,6 @@
 
 namespace manifold {
 
-// note that this will not work with non-trivial data (custom
-// constructor/destructor)
 template <class T, std::size_t N>
 class small_vector {
   std::array<T, N> stack_;
@@ -34,15 +32,16 @@ class small_vector {
   using const_reference = const value_type &;
   using pointer = T *;
   using const_pointer = const T *;
+  using iterator = T *;
+  using const_iterator = const T *;
 
   small_vector() = default;
 
   explicit small_vector(size_type count, const T &value = T()) {
     if (count <= N) {
-      std::fill(stack_.begin(), stack_.begin() + count, value);
+      std::uninitialized_fill_n(stack_.begin(), count, value);
     } else {
-      // use heap
-      heap_.resize(count, value);
+      heap_ = std::vector<T>(count, value);
     }
     size_ = count;
   }
@@ -58,7 +57,7 @@ class small_vector {
   small_vector(std::initializer_list<T> initlist) {
     const auto input_size = initlist.size();
     if (input_size <= N) {
-      std::copy(initlist.begin(), initlist.end(), stack_.begin());
+      std::uninitialized_copy(initlist.begin(), initlist.end(), stack_.begin());
     } else {
       std::copy(initlist.begin(), initlist.end(), std::back_inserter(heap_));
     }
@@ -66,23 +65,34 @@ class small_vector {
   }
 
   small_vector &operator=(const small_vector &rhs) {
-    stack_ = rhs.stack_;
-    heap_ = rhs.heap_;
+    if (this == &rhs) return *this;
+    if (size_ <= N) clear();  // clear initialized data
+    if (rhs.size_ <= N) {
+      std::uninitialized_copy(rhs.begin(), rhs.end(), stack_.begin());
+    } else {
+      heap_ = rhs.heap_;
+    }
     size_ = rhs.size_;
     return *this;
   }
 
   small_vector &operator=(small_vector &&rhs) {
-    stack_ = std::move(rhs.stack_);
-    heap_ = std::move(rhs.heap_);
+    if (this == &rhs) return *this;
+    if (size_ <= N) clear();  // clear initialized data
+    if (rhs.size_ <= N) {
+      std::uninitialized_move(rhs.begin(), rhs.end(), stack_.begin());
+    } else {
+      heap_ = std::move(rhs.heap_);
+    }
     size_ = rhs.size_;
     rhs.size_ = 0;
     return *this;
   }
 
   small_vector &operator=(std::initializer_list<value_type> rhs) {
+    if (size_ <= N) clear();  // clear initialized data
     if (rhs.size() <= N) {
-      stack_ = rhs;
+      std::uninitialized_copy(rhs.begin(), rhs.end(), stack_.begin());
     } else {
       heap_ = rhs;
     }
@@ -90,83 +100,37 @@ class small_vector {
   }
 
   reference at(size_type pos) {
-    if (size_ <= N) {
-      return stack_.at(pos);
-    } else {
-      return heap_.at(pos);
-    }
+    return size_ <= N ? stack_.at(pos) : heap_.at(pos);
   }
 
   const_reference at(size_type pos) const {
-    if (size_ <= N) {
-      return stack_.at(pos);
-    } else {
-      return heap_.at(pos);
-    }
+    return size_ <= N ? stack_.at(pos) : heap_.at(pos);
   }
 
   reference operator[](size_type pos) {
-    if (size_ <= N) {
-      return stack_[pos];
-    } else {
-      return heap_[pos];
-    }
+    return size_ <= N ? stack_[pos] : heap_[pos];
   }
 
   const_reference operator[](size_type pos) const {
-    if (size_ <= N) {
-      return stack_[pos];
-    } else {
-      return heap_[pos];
-    }
+    return size_ <= N ? stack_[pos] : heap_[pos];
   }
 
-  reference front() {
-    if (size_ <= N) {
-      return stack_.front();
-    } else {
-      return heap_.front();
-    }
-  }
+  reference front() { return size_ <= N ? stack_.front() : heap_.front(); }
 
   const_reference front() const {
-    if (size_ <= N) {
-      return stack_.front();
-    } else {
-      return heap_.front();
-    }
+    return size_ <= N ? stack_.front() : heap_.front();
   }
 
-  reference back() {
-    if (size_ <= N) {
-      return stack_[size_ - 1];
-    } else {
-      return heap_[size_ - 1];
-    }
-  }
+  reference back() { return size_ <= N ? stack_[size_ - 1] : heap_.back(); }
 
   const_reference back() const {
-    if (size_ <= N) {
-      return stack_[size_ - 1];
-    } else {
-      return heap_[size_ - 1];
-    }
+    return size_ <= N ? stack_[size_ - 1] : heap_.back();
   }
 
-  pointer data() noexcept {
-    if (size_ <= N) {
-      return stack_.data();
-    } else {
-      return heap_.data();
-    }
-  }
+  pointer data() noexcept { return size_ <= N ? stack_.data() : heap_.data(); }
 
   const_pointer data() const noexcept {
-    if (size_ <= N) {
-      return stack_.data();
-    } else {
-      return heap_.data();
-    }
+    return size_ <= N ? stack_.data() : heap_.data();
   }
 
   bool empty() const { return size_ == 0; }
@@ -174,18 +138,15 @@ class small_vector {
   size_type size() const { return size_; }
 
   void shrink_to_fit() {
-    if (size_ > N) {
-      heap_.shrink_to_fit();
-    }
+    if (size_ > N) heap_.shrink_to_fit();
   }
 
   void push_back(const T &value) {
     if (size_ < N) {
-      stack_[size_] = value;
+      stack_[size_] = &value;
     } else {
-      if (size_ == N) {
+      if (size_ == N)
         std::move(stack_.begin(), stack_.end(), std::back_inserter(heap_));
-      }
       heap_.emplace_back(value);
     }
     size_ += 1;
@@ -195,6 +156,7 @@ class small_vector {
     if (size_ == 0) return;
     if (size_ <= N) {
       size_ -= 1;
+      std::destroy_at(&stack_[size_]);
     } else {
       // currently using heap
       heap_.pop_back();
@@ -202,7 +164,7 @@ class small_vector {
       // now check if all data can fit on stack
       // if so, move back to stack
       if (size_ <= N) {
-        std::move(heap_.begin(), heap_.end(), stack_.begin());
+        std::uninitialized_move(heap_.begin(), heap_.end(), stack_.begin());
         heap_.clear();
       }
     }
@@ -215,26 +177,33 @@ class small_vector {
       if (size_ >= N) {
         // currently, all data on heap
         // move back to stack
-        std::move(heap_.begin(), heap_.end(), stack_.begin());
+        std::uninitialized_move(heap_.begin(), heap_.begin() + count,
+                                stack_.begin());
         heap_.clear();
       } else {
-        // all data already on stack
-        // just update size
+        if (size_ < count)
+          std::uninitialized_fill(stack_.begin() + size_,
+                                  stack_.begin() + count, value);
+        else if (count < size_)
+          std::destroy(stack_.begin() + count, stack_.begin() + size_);
       }
     } else {
       // new `count` of data is going to be on the heap
       // check if data is currently on the stack
-      if (size_ <= N) {
-        // move to heap
-        std::move(stack_.begin(), stack_.end(), std::back_inserter(heap_));
-      }
+      if (size_ <= N)
+        std::move(stack_.begin(), stack_.begin() + size_,
+                  std::back_inserter(heap_));
       heap_.resize(count, value);
     }
     size_ = count;
   }
 
   void clear() {
-    if (size_ > N) heap_.clear();
+    if (size_ > N) {
+      heap_.clear();
+    } else {
+      std::destroy(begin(), end());
+    }
     size_ = 0;
   }
 
@@ -244,114 +213,16 @@ class small_vector {
     std::swap(size_, other.size_);
   };
 
-  class iterator {
-   public:
-    using self_type = iterator;
-    using value_type = T;
-    using reference = T &;
-    using pointer = T *;
-    using difference_type = int;
-    using iterator_category = std::bidirectional_iterator_tag;
-    iterator(pointer ptr) : ptr_(ptr) {}
-    self_type operator++() {
-      ptr_++;
-      return *this;
-    }
-    self_type operator++(int) {
-      self_type i = *this;
-      ptr_++;
-      return i;
-    }
-    self_type operator--() {
-      ptr_--;
-      return *this;
-    }
-    self_type operator--(int) {
-      self_type i = *this;
-      ptr_--;
-      return i;
-    }
-    self_type operator+(size_type i) const { return self_type(ptr_ + i); }
-    self_type operator-(size_type i) const { return self_type(ptr_ - i); }
-    reference operator*() { return *ptr_; }
-    const value_type &operator*() const { return *ptr_; }
-    pointer operator->() { return ptr_; }
-    const pointer operator->() const { return ptr_; }
-    bool operator==(const self_type &rhs) const { return ptr_ == rhs.ptr_; }
-    bool operator!=(const self_type &rhs) const { return ptr_ != rhs.ptr_; }
+  iterator begin() { return size_ <= N ? stack_.data() : heap_.data(); }
 
-   private:
-    pointer ptr_;
-  };
-
-  class const_iterator {
-   public:
-    using self_type = const_iterator;
-    using value_type = T;
-    using reference = const T &;
-    using pointer = const T *;
-    using difference_type = int;
-    using iterator_category = std::bidirectional_iterator_tag;
-    const_iterator(pointer ptr) : ptr_(ptr) {}
-    self_type operator++() {
-      ptr_++;
-      return *this;
-    }
-    self_type operator++(int) {
-      self_type i = *this;
-      ptr_++;
-      return i;
-    }
-    self_type operator--() {
-      ptr_--;
-      return *this;
-    }
-    self_type operator--(int) {
-      self_type i = *this;
-      ptr_--;
-      return i;
-    }
-    self_type operator+(size_type i) const { return self_type(ptr_ + i); }
-    self_type operator-(size_type i) const { return self_type(ptr_ - i); }
-    reference operator*() const { return *ptr_; }
-    pointer operator->() const { return ptr_; }
-    bool operator==(const self_type &rhs) const { return ptr_ == rhs.ptr_; }
-    bool operator!=(const self_type &rhs) const { return ptr_ != rhs.ptr_; }
-
-   private:
-    pointer ptr_;
-  };
-
-  iterator begin() {
-    if (size_ <= N) {
-      return iterator(stack_.data());
-    } else {
-      return iterator(heap_.data());
-    }
-  }
-
-  iterator end() {
-    if (size_ <= N) {
-      return iterator(stack_.data() + size_);
-    } else {
-      return iterator(heap_.data() + size_);
-    }
-  }
+  iterator end() { return (size_ <= N ? stack_.data() : heap_.data()) + size_; }
 
   const_iterator cbegin() const {
-    if (size_ <= N) {
-      return const_iterator(stack_.data());
-    } else {
-      return const_iterator(heap_.data());
-    }
+    return size_ <= N ? stack_.data() : heap_.data();
   }
 
   const_iterator cend() const {
-    if (size_ <= N) {
-      return const_iterator(stack_.data() + size_);
-    } else {
-      return const_iterator(heap_.data() + size_);
-    }
+    return (size_ <= N ? stack_.data() : heap_.data()) + size_;
   }
 
   const_iterator begin() const { return cbegin(); }
@@ -363,12 +234,14 @@ class small_vector {
     size_type i = std::distance(begin(), iter);
     if (size_ <= N) {
       if (i < size_ - 1)
+        // probably need a custom loop if we want to work with non-trivial data
+        // type
         std::move(stack_.begin() + i + 1, stack_.begin() + size_,
                   stack_.begin() + i);
     } else {
       heap_.erase(heap_.begin() + i);
       if (size_ == N + 1) {
-        std::copy(heap_.begin(), heap_.end(), stack_.begin());
+        std::uninitialized_move(heap_.begin(), heap_.end(), stack_.begin());
         heap_.clear();
       }
     }
@@ -383,13 +256,14 @@ class small_vector {
     size_type i = std::distance(begin(), iter);
     if (size_ < N) {
       if (i < size_)
+        // probably need a custom loop if we want to work with non-trivial data
+        // type
         std::move_backward(stack_.begin() + i, stack_.begin() + size_,
                            stack_.begin() + size_ + 1);
       stack_[i] = value;
     } else {
-      if (size_ == N) {
-        std::copy(stack_.begin(), stack_.end(), std::back_inserter(heap_));
-      }
+      if (size_ == N)
+        std::move(stack_.begin(), stack_.end(), std::back_inserter(heap_));
       heap_.insert(heap_.begin() + i, value);
     }
     size_ += 1;
