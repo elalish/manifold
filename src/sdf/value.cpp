@@ -40,150 +40,51 @@ Value Value::Y() { return Value(ValueKind::Y, 0.0); }
 
 Value Value::Z() { return Value(ValueKind::Z, 0.0); }
 
-Value Value::operator+(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::ADD, *this, other, Invalid()));
-}
-
-Value Value::operator-(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::SUB, *this, other, Invalid()));
-}
-
-Value Value::operator*(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::MUL, *this, other, Invalid()));
-}
-
-Value Value::operator/(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::DIV, *this, other, Invalid()));
-}
-
 Value Value::cond(const Value& then, const Value& otherwise) const {
   return Value(
       ValueKind::OPERATION,
       std::make_shared<ValueOperation>(OpCode::CHOICE, *this, then, otherwise));
 }
 
-Value Value::mod(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::MOD, *this, other, Invalid()));
-}
+#define MAKE_UNARY(NAME, OPCODE)                                          \
+  Value Value::NAME() const {                                             \
+    return Value(ValueKind::OPERATION,                                    \
+                 std::make_shared<ValueOperation>(OpCode::OPCODE, *this,  \
+                                                  Invalid(), Invalid())); \
+  }
+#define MAKE_BINARY(NAME, OPCODE)                                        \
+  Value Value::NAME(const Value& other) const {                          \
+    return Value(ValueKind::OPERATION,                                   \
+                 std::make_shared<ValueOperation>(OpCode::OPCODE, *this, \
+                                                  other, Invalid()));    \
+  }
 
-Value Value::min(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::MIN, *this, other, Invalid()));
-}
+MAKE_UNARY(abs, ABS)
+MAKE_UNARY(operator-, NEG)
+MAKE_UNARY(exp, EXP)
+MAKE_UNARY(log, LOG)
+MAKE_UNARY(sqrt, SQRT)
+MAKE_UNARY(floor, FLOOR)
+MAKE_UNARY(ceil, CEIL)
+MAKE_UNARY(round, ROUND)
+MAKE_UNARY(sin, SIN)
+MAKE_UNARY(cos, COS)
+MAKE_UNARY(tan, TAN)
+MAKE_UNARY(asin, ASIN)
+MAKE_UNARY(acos, ACOS)
+MAKE_UNARY(atan, ATAN)
 
-Value Value::max(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::MAX, *this, other, Invalid()));
-}
-
-Value Value::operator==(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::EQ, *this, other, Invalid()));
-}
-
-Value Value::operator>(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::GT, *this, other, Invalid()));
-}
-
-Value Value::operator&&(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::MUL, *this, other, Invalid()));
-}
-
-Value Value::operator||(const Value& other) const {
-  return Value(ValueKind::OPERATION, std::make_shared<ValueOperation>(
-                                         OpCode::ADD, *this, other, Invalid()));
-}
-
-Value Value::abs() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::ABS, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::operator-() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::NEG, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::exp() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::EXP, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::log() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::LOG, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::sqrt() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::SQRT, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::floor() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::FLOOR, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::ceil() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::CEIL, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::round() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::ROUND, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::sin() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::SIN, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::cos() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::COS, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::tan() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::TAN, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::asin() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::ASIN, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::acos() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::ACOS, *this, Invalid(),
-                                                Invalid()));
-}
-
-Value Value::atan() const {
-  return Value(ValueKind::OPERATION,
-               std::make_shared<ValueOperation>(OpCode::ATAN, *this, Invalid(),
-                                                Invalid()));
-}
+MAKE_BINARY(operator+, ADD)
+MAKE_BINARY(operator-, SUB)
+MAKE_BINARY(operator*, MUL)
+MAKE_BINARY(operator/, DIV)
+MAKE_BINARY(mod, MOD)
+MAKE_BINARY(min, MIN)
+MAKE_BINARY(max, MAX)
+MAKE_BINARY(operator==, EQ)
+MAKE_BINARY(operator>, GT)
+MAKE_BINARY(operator&&, MUL)
+MAKE_BINARY(operator||, ADD)
 
 Value::~Value() {
   using VO = std::shared_ptr<ValueOperation>;
