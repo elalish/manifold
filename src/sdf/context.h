@@ -107,7 +107,7 @@ class Context {
   std::vector<UsesVector> opUses;
   unordered_map<Instruction, Operand> cache;
 
-  std::optional<Operand> trySimplify(Instruction);
+  // std::optional<Operand> trySimplify(Instruction);
   Operand addInstructionNoCache(Instruction);
   void combineFMA();
   void optimizeAffine();

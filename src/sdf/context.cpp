@@ -98,118 +98,9 @@ Operand Context::addInstruction(Instruction inst) {
   // common subexpression elimination
   auto entry = cache.find(inst);
   if (entry != cache.end()) return entry->second;
-  auto simplified = trySimplify(inst);
-  if (simplified.has_value()) {
-    cache.insert({inst, simplified.value()});
-    return simplified.value();
-  }
   auto result = addInstructionNoCache(inst);
   cache.insert({inst, result});
   return result;
-}
-
-std::optional<Operand> Context::trySimplify(Instruction inst) {
-  // constant choice
-  auto op = inst.op;
-  auto &operands = inst.operands;
-  if (op == OpCode::CHOICE && operands[0].isConst()) {
-    if (constants[operands[0].toConstIndex()] == 1.0) return operands[1];
-    return operands[2];
-  }
-  // constant propagation
-  bool all_constants = true;
-  for (auto operand : operands) {
-    if (!operand.isConst() && !operand.isNone()) all_constants = false;
-  }
-  // we should not do anything about returning a constant...
-  if (all_constants && op != OpCode::RETURN) {
-    double result = 0.0;
-    switch (op) {
-      case OpCode::NOP:
-      case OpCode::RETURN:
-      case OpCode::CONSTANT:
-      case OpCode::STORE:
-      case OpCode::LOAD:
-        break;
-      case OpCode::ABS:
-      case OpCode::NEG:
-      case OpCode::EXP:
-      case OpCode::LOG:
-      case OpCode::SQRT:
-      case OpCode::FLOOR:
-      case OpCode::CEIL:
-      case OpCode::ROUND:
-      case OpCode::SIN:
-      case OpCode::COS:
-      case OpCode::TAN:
-      case OpCode::ASIN:
-      case OpCode::ACOS:
-      case OpCode::ATAN:
-        result = EvalContext<double>::handle_unary(
-            op, constants[operands[0].toConstIndex()]);
-        break;
-      case OpCode::DIV:
-      case OpCode::MOD:
-      case OpCode::MIN:
-      case OpCode::MAX:
-      case OpCode::EQ:
-      case OpCode::GT:
-        result = EvalContext<double>::handle_binary(
-            op, constants[operands[0].toConstIndex()],
-            constants[operands[1].toConstIndex()]);
-        break;
-      case OpCode::ADD:
-        result = constants[operands[0].toConstIndex()] +
-                 constants[operands[1].toConstIndex()];
-        break;
-      case OpCode::SUB:
-        result = constants[operands[0].toConstIndex()] -
-                 constants[operands[1].toConstIndex()];
-        break;
-      case OpCode::MUL:
-        result = constants[operands[0].toConstIndex()] *
-                 constants[operands[1].toConstIndex()];
-        break;
-      case OpCode::FMA:
-        result = constants[operands[0].toConstIndex()] *
-                     constants[operands[1].toConstIndex()] +
-                 constants[operands[2].toConstIndex()];
-        break;
-      case OpCode::CHOICE:
-        // should be unreachable
-        DEBUG_ASSERT(false, logicErr, "unreachable");
-        break;
-    }
-    return addConstant(result);
-  }
-
-  // simple simplifications
-  if (op == OpCode::ADD) {
-    // add is commutative, so if there is a constant, it must be on the left
-    // 0 + x => x
-    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 0.0)
-      return operands[1];
-  }
-  if (op == OpCode::SUB) {
-    // x - 0 => x
-    if (operands[1].isConst() && constants[operands[1].toConstIndex()] == 0.0)
-      return operands[0];
-  }
-  if (op == OpCode::MUL) {
-    // mul is commutative, so if there is a constant, it must be on the left
-    // 0 * x => 0
-    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 0.0)
-      return operands[0];
-    // 1 * x => x
-    if (operands[0].isConst() && constants[operands[0].toConstIndex()] == 1.0)
-      return operands[1];
-  }
-  if (op == OpCode::DIV) {
-    if (operands[1].isConst() && constants[operands[1].toConstIndex()] == 1.0)
-      return operands[0];
-  }
-
-  return {};
 }
 
 // bypass the cache because we don't expect to have more common subexpressions
@@ -312,6 +203,12 @@ void Context::optimizeAffine() {
     auto &inst = instructions[i];
     AffineValue result = AffineValue(Operand::fromInstIndex(i), 1, 0);
     switch (inst.op) {
+      case OpCode::NOP:
+      case OpCode::RETURN:
+      case OpCode::CONSTANT:
+      case OpCode::LOAD:
+      case OpCode::STORE:
+        break;
       // notably, neg is special among these unary opcode
       case OpCode::ABS:
       case OpCode::EXP:
@@ -391,6 +288,7 @@ void Context::optimizeAffine() {
             result.b += other.b;
           }
         }
+        break;
       }
       case OpCode::SUB: {
         auto x = inst.operands[0];
@@ -435,9 +333,40 @@ void Context::optimizeAffine() {
         }
         break;
       }
-      default:
-        // TODO: handle FMA as well?
+      case OpCode::FMA: {
+        auto x = inst.operands[0];
+        auto y = inst.operands[1];
+        auto z = inst.operands[2];
+        auto a = getConstant(x);
+        auto b = getConstant(y);
+        auto c = getConstant(z);
+        // various cases...
+        if (b.has_value() && c.has_value()) {
+          result = affineValues[x.toInstIndex()];
+          result.a *= b.value();
+          result.b = result.b * b.value() + c.value();
+        } else if (a.has_value() && c.has_value()) {
+          result = affineValues[y.toInstIndex()];
+          result.a *= a.value();
+          result.b = result.b * a.value() + c.value();
+        } else if (a.has_value() && b.has_value()) {
+          result = affineValues[z.toInstIndex()];
+          result.b += a.value() * b.value();
+        }
         break;
+      }
+      case OpCode::CHOICE: {
+        auto c = getConstant(inst.operands[0]);
+        auto a = inst.operands[1];
+        auto b = inst.operands[2];
+        if (c.has_value()) {
+          if (c.value() == 0.0)
+            result = affineValues[b.toInstIndex()];
+          else
+            result = affineValues[a.toInstIndex()];
+        }
+        break;
+      }
     }
     affineValues.push_back(result);
     if (result.var != Operand::fromInstIndex(i)) {
@@ -448,7 +377,7 @@ void Context::optimizeAffine() {
         replaceInst(static_cast<int>(i), pair.first->second);
       } else {
         for (auto operand : inst.operands) removeUse(operand, i);
-        addUse(result.var, i);
+        if (!result.var.isNone()) addUse(result.var, i);
         // modify instruction
         if (result.a == 1.0 && result.b == 0.0 && result.var.isResult()) {
           // this result is being optimized away, replace uses with the value
@@ -469,6 +398,12 @@ void Context::optimizeAffine() {
           auto constant = addConstant(result.a);
           addUse(constant, i);
           instructions[i] = {OpCode::MUL, {constant, result.var, none}};
+        } else if (result.a == 0.0) {
+          auto a = addConstant(0.0);
+          auto b = addConstant(result.b);
+          addUse(a, i);
+          addUse(b, i);
+          instructions[i] = {OpCode::ADD, {b, a, none}};
         } else {
           auto a = addConstant(result.a);
           auto b = addConstant(result.b);
@@ -551,7 +486,6 @@ void Context::optimize() {
   optimizeAffine();
   combineFMA();
   schedule();
-  dump();
 }
 
 struct RegEntry {
