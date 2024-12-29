@@ -28,6 +28,7 @@ dependencies = [
 requires = [
     "nanobind>=1.8.0,<3.0.0",
     "scikit-build-core",
+    "ninja"
 ]
 build-backend = "scikit_build_core.build"
 
