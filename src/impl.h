@@ -208,6 +208,7 @@ struct Manifold::Impl {
       InitializeOriginal();
     }
 
+    DedupePropVerts();
     CreateFaces();
 
     SimplifyTopology();
@@ -248,6 +249,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces();
+  void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triVerts);
@@ -278,6 +280,7 @@ struct Manifold::Impl {
   double GetProperty(Property prop) const;
   void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
+  int TriCCW(size_t tri, double epsilon) const;
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
   void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
@@ -310,7 +313,7 @@ struct Manifold::Impl {
   void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
-  void CollapseEdge(int edge, std::vector<int>& edges);
+  bool CollapseEdge(int edge, std::vector<int>& edges);
   void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
