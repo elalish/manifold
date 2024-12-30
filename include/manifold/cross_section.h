@@ -109,7 +109,7 @@ class CrossSection {
    */
   ///@{
   std::vector<CrossSection> Decompose() const;
-  static CrossSection Compose(std::vector<CrossSection>&);
+  static CrossSection Compose(const std::vector<CrossSection>&);
   static CrossSection Square(const vec2 dims, bool center = false);
   static CrossSection Circle(double radius, int circularSegments = 0);
   ///@}

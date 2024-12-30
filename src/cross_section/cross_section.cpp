@@ -446,7 +446,8 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
  * Construct a CrossSection from a vector of other CrossSections (batch
  * boolean union).
  */
-CrossSection CrossSection::Compose(std::vector<CrossSection>& crossSections) {
+CrossSection CrossSection::Compose(
+    const std::vector<CrossSection>& crossSections) {
   return BatchBoolean(crossSections, OpType::Add);
 }
 
