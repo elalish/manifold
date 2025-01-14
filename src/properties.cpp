@@ -123,53 +123,18 @@ struct CheckHalfedges {
     return good;
   }
 };
-
-struct CheckCCW {
-  VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
-  VecView<const vec3> triNormal;
-  const double tol;
-
-  bool operator()(size_t face) const {
-    if (halfedges[3 * face].pairedHalfedge < 0) return true;
-
-    const mat2x3 projection = GetAxisAlignedProjection(triNormal[face]);
-    vec2 v[3];
-    for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-
-    int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
-    bool check = tol > 0 ? ccw >= 0 : ccw == 0;
-
-#ifdef MANIFOLD_DEBUG
-    if (tol > 0 && !check) {
-      vec2 v1 = v[1] - v[0];
-      vec2 v2 = v[2] - v[0];
-      double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
-      double base = std::sqrt(base2);
-      vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = la::cross(V1 - V0, V2 - V0);
-      printf(
-          "Tri %ld does not match normal, approx height = %g, base = %g\n"
-          "tol = %g, area2 = %g, base2*tol2 = %g\n"
-          "normal = %g, %g, %g\n"
-          "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          static_cast<long>(face), area / base, base, tol, area * area,
-          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
-          triNormal[face].z, norm.x, norm.y, norm.z,
-          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
-          halfedges[3 * face + 2].startVert);
-    }
-#endif
-    return check;
-  }
-};
 }  // namespace
 
 namespace manifold {
+
+int Manifold::Impl::TriCCW(size_t tri, double tol) const {
+  if (halfedge_[3 * tri].pairedHalfedge < 0) return true;
+  const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+  vec2 v[3];
+  for (int i : {0, 1, 2})
+    v[i] = projection * vertPos_[halfedge_[3 * tri + i].startVert];
+  return CCW(v[0], v[1], v[2], std::abs(tol));
+}
 
 /**
  * Returns true if this manifold is in fact an oriented even manifold and all of
@@ -267,18 +232,25 @@ bool Manifold::Impl::IsSelfIntersecting() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(countAt(0_uz), countAt(NumTri()),
-                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * epsilon_}));
+  return all_of(countAt(0_uz), countAt(NumTri()), [this](size_t tri) {
+    if (halfedge_[3 * tri].startVert < 0) return true;
+    const vec3 normal = faceNormal_[tri];
+    const vec3 p(dot(normal, vertPos_[halfedge_[3 * tri].startVert]),
+                 dot(normal, vertPos_[halfedge_[3 * tri + 1].startVert]),
+                 dot(normal, vertPos_[halfedge_[3 * tri + 2].startVert]));
+    return maxelem(p) - minelem(p) <= 2 * tolerance_ &&
+           TriCCW(tri, 2 * epsilon_) >= 0;
+  });
 }
 
 /**
  * Returns the number of triangles that are colinear within epsilon_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
-  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return count_if(
-      countAt(0_uz), countAt(NumTri()),
-      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * epsilon_ / 2}));
+  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
+  return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t tri) {
+    return TriCCW(tri, epsilon_ / 2) == 0;
+  });
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
