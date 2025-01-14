@@ -31,6 +31,7 @@ set(
   hull_test.cpp
   samples_test.cpp
   boolean_complex_test.cpp
+  sdf_tape_test.cpp
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
   $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc_test.cpp>
 )

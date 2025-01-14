@@ -477,6 +477,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
 
   const vec3 origin = bounds.min;
   Vec<double> voxels(maxIndex);
+
   for_each_n(
       pol, countAt(0_uz), maxIndex,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](Uint64 idx) {
