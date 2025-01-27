@@ -1024,9 +1024,10 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   } else if (!aConvex && !bConvex) {
     for (size_t aFace = 0; aFace < aImpl->NumTri(); aFace++) {
       for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
-        const bool coplanar = glm::all(glm::equal(aImpl->faceNormal_[aFace],
+        const bool coplanar =
+            linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
                                                   bImpl->faceNormal_[bFace])) ||
-                              glm::all(glm::equal(aImpl->faceNormal_[aFace],
+            linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
                                                   -bImpl->faceNormal_[bFace]));
         if (coplanar) continue;  // Skip Coplanar Triangles
 

@@ -711,15 +711,15 @@ bool Manifold::Impl::IsConvex(float tolerance) const {
         Halfedge edge = pImpl->halfedge_[idx];
         if (!edge.IsForward()) return;
 
-        const vec3 normal0 = pImpl->faceNormal_[edge.face];
-        const vec3 normal1 =
-            pImpl->faceNormal_[pImpl->halfedge_[edge.pairedHalfedge].face];
-        if (glm::all(glm::equal(normal0, normal1))) return;
+        const vec3 normal0 = pImpl->faceNormal_[idx / 3];
+        const vec3 normal1 = pImpl->faceNormal_[edge.pairedHalfedge / 3];
+
+        if (linalg::all(linalg::equal(normal0, normal1))) return;
 
         const vec3 edgeVec =
             pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
         const bool convex =
-            glm::dot(edgeVec, glm::cross(normal0, normal1)) > tolerance;
+            linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > tolerance;
         if (!convex) anyConcave = true;
       });
 
