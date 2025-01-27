@@ -365,8 +365,6 @@ TEST(Boolean, ConvexConvexMinkowski) {
 }
 
 TEST(Boolean, NonConvexConvexMinkowski) {
-  //bool oldDeterministic = ManifoldParams().deterministic;
-  //ManifoldParams().deterministic = true;
   ManifoldParams().processOverlaps = true;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
@@ -387,13 +385,10 @@ TEST(Boolean, NonConvexConvexMinkowski) {
     ExportMesh("minkowski-nonconvex-convex.glb", sum.GetMeshGL(), {});
 #endif
 
-  //ManifoldParams().deterministic = oldDeterministic;
   ManifoldParams().processOverlaps = false;
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowski) {
-  //bool oldDeterministic = ManifoldParams().deterministic;
-  //ManifoldParams().deterministic = true;
   ManifoldParams().processOverlaps = true;
 
   Manifold tet = Manifold::Tetrahedron();
@@ -415,7 +410,6 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
     ExportMesh("minkowski-nonconvex-nonconvex.glb", sum.GetMeshGL(), {});
 #endif
 
-  //ManifoldParams().deterministic = oldDeterministic;
   ManifoldParams().processOverlaps = false;
 }
 

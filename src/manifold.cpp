@@ -1026,9 +1026,9 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
       for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
         const bool coplanar =
             linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
-                                                  bImpl->faceNormal_[bFace])) ||
+                                      bImpl->faceNormal_[bFace])) ||
             linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
-                                                  -bImpl->faceNormal_[bFace]));
+                                      -bImpl->faceNormal_[bFace]));
         if (coplanar) continue;  // Skip Coplanar Triangles
 
         vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
