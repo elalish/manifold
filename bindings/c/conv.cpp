@@ -49,6 +49,10 @@ ManifoldMeshGL *to_c(manifold::MeshGL *m) {
   return reinterpret_cast<ManifoldMeshGL *>(m);
 }
 
+ManifoldMeshGL64 *to_c(manifold::MeshGL64 *m) {
+  return reinterpret_cast<ManifoldMeshGL64 *>(m);
+}
+
 ManifoldOpType to_c(manifold::OpType optype) {
   ManifoldOpType op = MANIFOLD_ADD;
   switch (optype) {
@@ -120,8 +124,8 @@ ManifoldVec3 to_c(vec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldIVec3 to_c(ivec3 v) { return {v.x, v.y, v.z}; }
 
-ManifoldProperties to_c(manifold::Properties p) {
-  return {p.surfaceArea, p.volume};
+ManifoldTriangulation *to_c(std::vector<ivec3> *m) {
+  return reinterpret_cast<ManifoldTriangulation *>(m);
 }
 
 const manifold::Manifold *from_c(ManifoldManifold *m) {
@@ -150,6 +154,10 @@ const manifold::Polygons *from_c(ManifoldPolygons *m) {
 
 const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
+}
+
+const manifold::MeshGL64 *from_c(ManifoldMeshGL64 *m) {
+  return reinterpret_cast<manifold::MeshGL64 const *>(m);
 }
 
 OpType from_c(ManifoldOpType optype) {
@@ -215,6 +223,10 @@ vec3 from_c(ManifoldVec3 v) { return vec3(v.x, v.y, v.z); }
 ivec3 from_c(ManifoldIVec3 v) { return ivec3(v.x, v.y, v.z); }
 
 vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
+
+const std::vector<ivec3> *from_c(ManifoldTriangulation *m) {
+  return reinterpret_cast<std::vector<ivec3> const *>(m);
+}
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length) {
   auto vec = std::vector<vec3>();

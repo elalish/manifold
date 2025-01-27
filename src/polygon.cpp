@@ -19,6 +19,7 @@
 #include <set>
 
 #include "./collider.h"
+#include "./parallel.h"
 #include "./utils.h"
 #include "manifold/optional_assert.h"
 
@@ -29,7 +30,7 @@ static ExecutionParams params;
 
 constexpr double kBest = -std::numeric_limits<double>::infinity();
 
-// it seems that MSVC cannot optimize glm::determinant(mat2(a, b))
+// it seems that MSVC cannot optimize la::determinant(mat2(a, b))
 constexpr double determinant2x2(vec2 a, vec2 b) {
   return a.x * b.y - a.y * b.x;
 }
@@ -107,7 +108,7 @@ void CheckTopology(const std::vector<ivec3> &triangles,
 }
 
 void CheckGeometry(const std::vector<ivec3> &triangles,
-                   const PolygonsIdx &polys, double precision) {
+                   const PolygonsIdx &polys, double epsilon) {
   std::unordered_map<int, vec2> vertPos;
   for (const auto &poly : polys) {
     for (size_t i = 0; i < poly.size(); ++i) {
@@ -115,15 +116,15 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
     }
   }
   DEBUG_ASSERT(std::all_of(triangles.begin(), triangles.end(),
-                           [&vertPos, precision](const ivec3 &tri) {
+                           [&vertPos, epsilon](const ivec3 &tri) {
                              return CCW(vertPos[tri[0]], vertPos[tri[1]],
-                                        vertPos[tri[2]], precision) >= 0;
+                                        vertPos[tri[2]], epsilon) >= 0;
                            }),
                geometryErr, "triangulation is not entirely CCW!");
 }
 
-void Dump(const PolygonsIdx &polys, double precision) {
-  std::cout << "Polygon 0 " << precision << " " << polys.size() << std::endl;
+void Dump(const PolygonsIdx &polys, double epsilon) {
+  std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
     std::cout << poly.size() << std::endl;
     for (auto v : poly) {
@@ -141,16 +142,16 @@ void Dump(const PolygonsIdx &polys, double precision) {
 }
 
 void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
-                  std::vector<ivec3> &triangles, double precision) {
+                  std::vector<ivec3> &triangles, double epsilon) {
   std::cout << "-----------------------------------" << std::endl;
-  std::cout << "Triangulation failed! Precision = " << precision << std::endl;
+  std::cout << "Triangulation failed! Precision = " << epsilon << std::endl;
   std::cout << e.what() << std::endl;
   if (triangles.size() > 1000 && !PolygonParams().verbose) {
     std::cout << "Output truncated due to producing " << triangles.size()
               << " triangles." << std::endl;
     return;
   }
-  Dump(polys, precision);
+  Dump(polys, epsilon);
   std::cout << "produced this triangulation:" << std::endl;
   for (size_t j = 0; j < triangles.size(); ++j) {
     std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
@@ -169,21 +170,20 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
  * Exactly colinear edges and zero-length edges are treated conservatively as
  * reflex. Does not check for overlaps.
  */
-bool IsConvex(const PolygonsIdx &polys, double precision) {
+bool IsConvex(const PolygonsIdx &polys, double epsilon) {
   for (const SimplePolygonIdx &poly : polys) {
     const vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
     // Zero-length edges comes out NaN, which won't trip the early return, but
     // it's okay because that zero-length edge will also get tested
     // non-normalized and will trip det == 0.
-    vec2 lastEdge = glm::normalize(firstEdge);
+    vec2 lastEdge = la::normalize(firstEdge);
     for (size_t v = 0; v < poly.size(); ++v) {
       const vec2 edge =
           v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
       const double det = determinant2x2(lastEdge, edge);
-      if (det <= 0 ||
-          (std::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+      if (det <= 0 || (std::abs(det) < epsilon && la::dot(lastEdge, edge) < 0))
         return false;
-      lastEdge = glm::normalize(edge);
+      lastEdge = la::normalize(edge);
     }
   }
   return true;
@@ -229,12 +229,12 @@ std::vector<ivec3> TriangulateConvex(const PolygonsIdx &polys) {
  * The main adjustments for robustness involve clipping the sharpest ears first
  * (a known technique to get higher triangle quality), and doing an exhaustive
  * search to determine ear convexity exactly if the first geometric result is
- * within precision.
+ * within epsilon.
  */
 
 class EarClip {
  public:
-  EarClip(const PolygonsIdx &polys, double precision) : precision_(precision) {
+  EarClip(const PolygonsIdx &polys, double epsilon) : epsilon_(epsilon) {
     ZoneScoped;
 
     size_t numVert = 0;
@@ -268,7 +268,7 @@ class EarClip {
     return triangles_;
   }
 
-  double GetPrecision() const { return precision_; }
+  double GetPrecision() const { return epsilon_; }
 
  private:
   struct Vert;
@@ -302,12 +302,13 @@ class EarClip {
   std::vector<ivec3> triangles_;
   // Bounding box of the entire set of polygons
   Rect bBox_;
-  // Working precision: max of float error and input value.
-  double precision_;
+  // Working epsilon: max of float error and input value.
+  double epsilon_;
 
   struct IdxCollider {
     Collider collider;
     std::vector<VertItr> itr;
+    SparseIndices ind;
   };
 
   // A circularly-linked list representing the polygon(s) that still need to be
@@ -320,33 +321,32 @@ class EarClip {
     vec2 pos, rightDir;
     VertItr left, right;
 
-    // Shorter than half of precision, to be conservative so that it doesn't
-    // cause CW triangles that exceed precision due to rounding error.
-    bool IsShort(double precision) const {
+    // Shorter than half of epsilon, to be conservative so that it doesn't
+    // cause CW triangles that exceed epsilon due to rounding error.
+    bool IsShort(double epsilon) const {
       const vec2 edge = right->pos - pos;
-      return glm::dot(edge, edge) * 4 < precision * precision;
+      return la::dot(edge, edge) * 4 < epsilon * epsilon;
     }
 
     // Like CCW, returns 1 if v is on the inside of the angle formed at this
-    // vert, -1 on the outside, and 0 if it's within precision of the boundary.
-    // Ensure v is more than precision from pos, as case this will not return 0.
-    int Interior(vec2 v, double precision) const {
+    // vert, -1 on the outside, and 0 if it's within epsilon of the boundary.
+    // Ensure v is more than epsilon from pos, as case this will not return 0.
+    int Interior(vec2 v, double epsilon) const {
       const vec2 diff = v - pos;
-      if (glm::dot(diff, diff) < precision * precision) {
+      if (la::dot(diff, diff) < epsilon * epsilon) {
         return 0;
       }
-      return CCW(pos, left->pos, right->pos, precision) +
-             CCW(pos, right->pos, v, precision) +
-             CCW(pos, v, left->pos, precision);
+      return CCW(pos, left->pos, right->pos, epsilon) +
+             CCW(pos, right->pos, v, epsilon) + CCW(pos, v, left->pos, epsilon);
     }
 
     // Returns true if Vert is on the inside of the edge that goes from tail to
     // tail->right. This will walk the edges if necessary until a clear answer
-    // is found (beyond precision). If toLeft is true, this Vert will walk its
+    // is found (beyond epsilon). If toLeft is true, this Vert will walk its
     // edges to the left. This should be chosen so that the edges walk in the
     // same general direction - tail always walks to the right.
-    bool InsideEdge(VertItr tail, double precision, bool toLeft) const {
-      const double p2 = precision * precision;
+    bool InsideEdge(VertItr tail, double epsilon, bool toLeft) const {
+      const double p2 = epsilon * epsilon;
       VertItr nextL = left->right;
       VertItr nextR = tail->right;
       VertItr center = tail;
@@ -355,21 +355,21 @@ class EarClip {
       while (nextL != nextR && tail != nextR &&
              nextL != (toLeft ? right : left)) {
         const vec2 edgeL = nextL->pos - center->pos;
-        const double l2 = glm::dot(edgeL, edgeL);
+        const double l2 = la::dot(edgeL, edgeL);
         if (l2 <= p2) {
           nextL = toLeft ? nextL->left : nextL->right;
           continue;
         }
 
         const vec2 edgeR = nextR->pos - center->pos;
-        const double r2 = glm::dot(edgeR, edgeR);
+        const double r2 = la::dot(edgeR, edgeR);
         if (r2 <= p2) {
           nextR = nextR->right;
           continue;
         }
 
         const vec2 vecLR = nextR->pos - nextL->pos;
-        const double lr2 = glm::dot(vecLR, vecLR);
+        const double lr2 = la::dot(vecLR, vecLR);
         if (lr2 <= p2) {
           last = center;
           center = nextL;
@@ -379,10 +379,10 @@ class EarClip {
           continue;
         }
 
-        int convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
+        int convexity = CCW(nextL->pos, center->pos, nextR->pos, epsilon);
         if (center != last) {
-          convexity += CCW(last->pos, center->pos, nextL->pos, precision) +
-                       CCW(nextR->pos, center->pos, last->pos, precision);
+          convexity += CCW(last->pos, center->pos, nextL->pos, epsilon) +
+                       CCW(nextR->pos, center->pos, last->pos, epsilon);
         }
         if (convexity != 0) return convexity > 0;
 
@@ -404,40 +404,40 @@ class EarClip {
     // function walks down the kinks in a degenerate portion of a polygon until
     // it finds a clear geometric result. In the vast majority of cases the loop
     // will only need one or two iterations.
-    bool IsConvex(double precision) const {
-      const int convexity = CCW(left->pos, pos, right->pos, precision);
+    bool IsConvex(double epsilon) const {
+      const int convexity = CCW(left->pos, pos, right->pos, epsilon);
       if (convexity != 0) {
         return convexity > 0;
       }
-      if (glm::dot(left->pos - pos, right->pos - pos) <= 0) {
+      if (la::dot(left->pos - pos, right->pos - pos) <= 0) {
         return true;
       }
-      return left->InsideEdge(left->right, precision, true);
+      return left->InsideEdge(left->right, epsilon, true);
     }
 
     // Subtly different from !IsConvex because IsConvex will return true for
     // colinear non-folded verts, while IsReflex will always check until actual
     // certainty is determined.
-    bool IsReflex(double precision) const {
-      return !left->InsideEdge(left->right, precision, true);
+    bool IsReflex(double epsilon) const {
+      return !left->InsideEdge(left->right, epsilon, true);
     }
 
     // Returns the x-value on this edge corresponding to the start.y value,
     // returning NAN if the edge does not cross the value from below to above,
-    // right of start - all within a precision tolerance. If onTop != 0, this
-    // restricts which end is allowed to terminate within the precision band.
-    double InterpY2X(vec2 start, int onTop, double precision) const {
-      if (glm::abs(pos.y - start.y) <= precision) {
-        if (right->pos.y <= start.y + precision || onTop == 1) {
+    // right of start - all within a epsilon tolerance. If onTop != 0, this
+    // restricts which end is allowed to terminate within the epsilon band.
+    double InterpY2X(vec2 start, int onTop, double epsilon) const {
+      if (la::abs(pos.y - start.y) <= epsilon) {
+        if (right->pos.y <= start.y + epsilon || onTop == 1) {
           return NAN;
         } else {
           return pos.x;
         }
-      } else if (pos.y < start.y - precision) {
-        if (right->pos.y > start.y + precision) {
+      } else if (pos.y < start.y - epsilon) {
+        if (right->pos.y > start.y + epsilon) {
           return pos.x + (start.y - pos.y) * (right->pos.x - pos.x) /
                              (right->pos.y - pos.y);
-        } else if (right->pos.y < start.y - precision || onTop == -1) {
+        } else if (right->pos.y < start.y - epsilon || onTop == -1) {
           return NAN;
         } else {
           return right->pos.x;
@@ -451,22 +451,22 @@ class EarClip {
     // of the ear. Points are valid even when they touch, so long as their edge
     // goes to the outside. No need to check the other side, since all verts are
     // processed in the EarCost loop.
-    double SignedDist(VertItr v, vec2 unit, double precision) const {
+    double SignedDist(VertItr v, vec2 unit, double epsilon) const {
       double d = determinant2x2(unit, v->pos - pos);
-      if (std::abs(d) < precision) {
+      if (std::abs(d) < epsilon) {
         double dR = determinant2x2(unit, v->right->pos - pos);
-        if (std::abs(dR) > precision) return dR;
+        if (std::abs(dR) > epsilon) return dR;
         double dL = determinant2x2(unit, v->left->pos - pos);
-        if (std::abs(dL) > precision) return dL;
+        if (std::abs(dL) > epsilon) return dL;
       }
       return d;
     }
 
     // Find the cost of Vert v within this ear, where openSide is the unit
     // vector from Verts right to left - passed in for reuse.
-    double Cost(VertItr v, vec2 openSide, double precision) const {
-      double cost = std::min(SignedDist(v, rightDir, precision),
-                             SignedDist(v, left->rightDir, precision));
+    double Cost(VertItr v, vec2 openSide, double epsilon) const {
+      double cost = std::min(SignedDist(v, rightDir, epsilon),
+                             SignedDist(v, left->rightDir, epsilon));
 
       const double openCost = determinant2x2(openSide, v->pos - right->pos);
       return std::min(cost, openCost);
@@ -475,8 +475,8 @@ class EarClip {
     // For verts outside the ear, apply a cost based on the Delaunay condition
     // to aid in prioritization and produce cleaner triangulations. This doesn't
     // affect robustness, but may be adjusted to improve output.
-    static double DelaunayCost(vec2 diff, double scale, double precision) {
-      return -precision - scale * glm::dot(diff, diff);
+    static double DelaunayCost(vec2 diff, double scale, double epsilon) {
+      return -epsilon - scale * la::dot(diff, diff);
     }
 
     // This is the expensive part of the algorithm, checking this ear against
@@ -484,45 +484,50 @@ class EarClip {
     // triangulator cost down from O(n^2) to O(nlogn) for most large polygons.
     //
     // Think of a cost as vaguely a distance metric - 0 is right on the edge of
-    // being invalid. cost > precision is definitely invalid. Cost < -precision
+    // being invalid. cost > epsilon is definitely invalid. Cost < -epsilon
     // is definitely valid, so all improvement costs are designed to always give
-    // values < -precision so they will never affect validity. The first
+    // values < -epsilon so they will never affect validity. The first
     // totalCost is designed to give priority to sharper angles. Any cost < (-1
-    // - precision) has satisfied the Delaunay condition.
-    double EarCost(double precision, const IdxCollider &collider) const {
+    // - epsilon) has satisfied the Delaunay condition.
+    double EarCost(double epsilon, IdxCollider &collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
-      const double scale = 4 / glm::dot(openSide, openSide);
-      const double radius = glm::length(openSide) / 2;
-      openSide = glm::normalize(openSide);
+      const double scale = 4 / la::dot(openSide, openSide);
+      const double radius = la::length(openSide) / 2;
+      openSide = la::normalize(openSide);
 
-      double totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
-      if (CCW(pos, left->pos, right->pos, precision) == 0) {
+      double totalCost = la::dot(left->rightDir, rightDir) - 1 - epsilon;
+      if (CCW(pos, left->pos, right->pos, epsilon) == 0) {
         // Clip folded ears first
         return totalCost;
       }
 
-      Vec<Box> earBox;
-      earBox.push_back({vec3(center.x - radius, center.y - radius, 0),
-                        vec3(center.x + radius, center.y + radius, 0)});
-      earBox.back().Union(vec3(pos, 0));
-      const SparseIndices toTest = collider.collider.Collisions(earBox.cview());
+      Box earBox = Box{vec3(center.x - radius, center.y - radius, 0),
+                       vec3(center.x + radius, center.y + radius, 0)};
+      earBox.Union(vec3(pos, 0));
+      collider.collider.Collisions(VecView<const Box>(&earBox, 1),
+                                   collider.ind);
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-      for (size_t i = 0; i < toTest.size(); ++i) {
-        const VertItr test = collider.itr[toTest.Get(i, true)];
-        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
-            test->mesh_idx != lid &&
-            test->mesh_idx != rid) {  // Skip duplicated verts
-          double cost = Cost(test, openSide, precision);
-          if (cost < -precision) {
-            cost = DelaunayCost(test->pos - center, scale, precision);
-          }
-          totalCost = std::max(totalCost, cost);
-        }
-      }
 
+      totalCost = transform_reduce(
+          countAt(0), countAt(collider.ind.size()), totalCost,
+          [](double a, double b) { return std::max(a, b); },
+          [&](size_t i) {
+            const VertItr test = collider.itr[collider.ind.Get(i, true)];
+            if (!Clipped(test) && test->mesh_idx != mesh_idx &&
+                test->mesh_idx != lid &&
+                test->mesh_idx != rid) {  // Skip duplicated verts
+              double cost = Cost(test, openSide, epsilon);
+              if (cost < -epsilon) {
+                cost = DelaunayCost(test->pos - center, scale, epsilon);
+              }
+              return cost;
+            }
+            return std::numeric_limits<double>::lowest();
+          });
+      collider.ind.Clear();
       return totalCost;
     }
 
@@ -537,7 +542,7 @@ class EarClip {
   };
 
   static vec2 SafeNormalize(vec2 v) {
-    vec2 n = glm::normalize(v);
+    vec2 n = la::normalize(v);
     return std::isfinite(n.x) ? n : vec2(0, 0);
   }
 
@@ -607,10 +612,10 @@ class EarClip {
     if (ear->left == ear->right) {
       return;
     }
-    if (ear->IsShort(precision_) ||
-        (CCW(ear->left->pos, ear->pos, ear->right->pos, precision_) == 0 &&
-         glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
-         ear->IsConvex(precision_))) {
+    if (ear->IsShort(epsilon_) ||
+        (CCW(ear->left->pos, ear->pos, ear->right->pos, epsilon_) == 0 &&
+         la::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
+         ear->IsConvex(epsilon_))) {
       ClipEar(ear);
       ClipIfDegenerate(ear->left);
       ClipIfDegenerate(ear->right);
@@ -643,7 +648,7 @@ class EarClip {
       Link(last, first);
     }
 
-    if (precision_ < 0) precision_ = bBox_.Scale() * kTolerance;
+    if (epsilon_ < 0) epsilon_ = bBox_.Scale() * kPrecision;
 
     // Slightly more than enough, since each hole can cause two extra triangles.
     triangles_.reserve(polygon_.size() + 2 * starts.size());
@@ -683,7 +688,7 @@ class EarClip {
 
     area += areaCompensation;
     const vec2 size = bBox.Size();
-    const double minArea = precision_ * std::max(size.x, size.y);
+    const double minArea = epsilon_ * std::max(size.x, size.y);
 
     if (std::isfinite(maxX) && area < -minArea) {
       holes_.insert(start);
@@ -698,24 +703,24 @@ class EarClip {
 
   // All holes must be key-holed (attached to an outer polygon) before ear
   // clipping can commence. Instead of relying on sorting, which may be
-  // incorrect due to precision, we check for polygon edges both ahead and
+  // incorrect due to epsilon, we check for polygon edges both ahead and
   // behind to ensure all valid options are found.
   void CutKeyhole(const VertItr start) {
     const Rect bBox = hole2BBox_[start];
-    const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
-                      : start->pos.y <= bBox.min.y + precision_ ? -1
-                                                                : 0;
+    const int onTop = start->pos.y >= bBox.max.y - epsilon_   ? 1
+                      : start->pos.y <= bBox.min.y + epsilon_ ? -1
+                                                              : 0;
     VertItr connector = polygon_.end();
 
     auto CheckEdge = [&](VertItr edge) {
-      const double x = edge->InterpY2X(start->pos, onTop, precision_);
-      if (std::isfinite(x) && start->InsideEdge(edge, precision_, true) &&
+      const double x = edge->InterpY2X(start->pos, onTop, epsilon_);
+      if (std::isfinite(x) && start->InsideEdge(edge, epsilon_, true) &&
           (connector == polygon_.end() ||
            CCW({x, start->pos.y}, connector->pos, connector->right->pos,
-               precision_) == 1 ||
+               epsilon_) == 1 ||
            (connector->pos.y < edge->pos.y
-                ? edge->InsideEdge(connector, precision_, false)
-                : !connector->InsideEdge(edge, precision_, false)))) {
+                ? edge->InsideEdge(connector, epsilon_, false)
+                : !connector->InsideEdge(edge, epsilon_, false)))) {
         connector = edge;
       }
     };
@@ -752,19 +757,18 @@ class EarClip {
         : edge->right->pos.y - start->pos.y > start->pos.y - edge->pos.y
             ? edge
             : edge->right;
-    if (glm::abs(connector->pos.y - start->pos.y) <= precision_) {
+    if (la::abs(connector->pos.y - start->pos.y) <= epsilon_) {
       return connector;
     }
     const double above = connector->pos.y > start->pos.y ? 1 : -1;
 
     auto CheckVert = [&](VertItr vert) {
       const double inside =
-          above * CCW(start->pos, vert->pos, connector->pos, precision_);
-      if (vert->pos.x > start->pos.x - precision_ &&
-          vert->pos.y * above > start->pos.y * above - precision_ &&
+          above * CCW(start->pos, vert->pos, connector->pos, epsilon_);
+      if (vert->pos.x > start->pos.x - epsilon_ &&
+          vert->pos.y * above > start->pos.y * above - epsilon_ &&
           (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x)) &&
-          vert->InsideEdge(edge, precision_, true) &&
-          vert->IsReflex(precision_)) {
+          vert->InsideEdge(edge, epsilon_, true) && vert->IsReflex(epsilon_)) {
         connector = vert;
       }
     };
@@ -799,16 +803,16 @@ class EarClip {
 
   // Recalculate the cost of the Vert v ear, updating it in the queue by
   // removing and reinserting it.
-  void ProcessEar(VertItr v, const IdxCollider &collider) {
+  void ProcessEar(VertItr v, IdxCollider &collider) {
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
     }
-    if (v->IsShort(precision_)) {
+    if (v->IsShort(epsilon_)) {
       v->cost = kBest;
       v->ear = earsQueue_.insert(v);
-    } else if (v->IsConvex(2 * precision_)) {
-      v->cost = v->EarCost(precision_, collider);
+    } else if (v->IsConvex(2 * epsilon_)) {
+      v->cost = v->EarCost(epsilon_, collider);
       v->ear = earsQueue_.insert(v);
     } else {
       v->cost = 1;  // not used, but marks reflex verts for debug
@@ -816,7 +820,7 @@ class EarClip {
   }
 
   // Create a collider of all vertices in this polygon, each expanded by
-  // precision_. Each ear uses this BVH to quickly find a subset of vertices to
+  // epsilon_. Each ear uses this BVH to quickly find a subset of vertices to
   // check for cost.
   IdxCollider VertCollider(VertItr start) const {
     Vec<Box> vertBox;
@@ -827,7 +831,7 @@ class EarClip {
     Loop(start, [&vertBox, &vertMorton, &itr, &box, this](VertItr v) {
       itr.push_back(v);
       const vec3 pos(v->pos, 0);
-      vertBox.push_back({pos - precision_, pos + precision_});
+      vertBox.push_back({pos - epsilon_, pos + epsilon_});
       vertMorton.push_back(Collider::MortonCode(pos, box));
     });
 
@@ -855,7 +859,7 @@ class EarClip {
   void TriangulatePoly(VertItr start) {
     ZoneScoped;
 
-    const IdxCollider vertCollider = VertCollider(start);
+    IdxCollider vertCollider = VertCollider(start);
 
     if (vertCollider.itr.empty()) {
       PRINT("Empty poly");
@@ -880,7 +884,7 @@ class EarClip {
       const qItr ear = earsQueue_.begin();
       if (ear != earsQueue_.end()) {
         v = *ear;
-        // Cost should always be negative, generally < -precision.
+        // Cost should always be negative, generally < -epsilon.
         v->PrintVert();
         earsQueue_.erase(ear);
       } else {
@@ -938,43 +942,39 @@ namespace manifold {
  * @param polys The set of polygons, wound CCW and representing multiple
  * polygons and/or holes. These have 2D-projected positions as well as
  * references back to the original vertices.
- * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
  * @return std::vector<ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
   std::vector<ivec3> triangles;
-  double updatedPrecision = precision;
-#ifdef MANIFOLD_EXCEPTIONS
+  double updatedEpsilon = epsilon;
+#ifdef MANIFOLD_DEBUG
   try {
 #endif
-    if (IsConvex(polys, precision)) {  // fast path
+    if (IsConvex(polys, epsilon)) {  // fast path
       triangles = TriangulateConvex(polys);
     } else {
-      EarClip triangulator(polys, precision);
+      EarClip triangulator(polys, epsilon);
       triangles = triangulator.Triangulate();
-      updatedPrecision = triangulator.GetPrecision();
+      updatedEpsilon = triangulator.GetPrecision();
     }
-#ifdef MANIFOLD_EXCEPTIONS
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * updatedPrecision);
+        CheckGeometry(triangles, polys, 2 * updatedEpsilon);
       }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles, updatedPrecision);
+      PrintFailure(e, polys, triangles, updatedEpsilon);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles, updatedPrecision);
+    PrintFailure(e, polys, triangles, updatedEpsilon);
     throw;
-#else
-  } catch (const std::exception &e) {
-#endif
   }
 #endif
   return triangles;
@@ -987,12 +987,12 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double precision) {
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
  * @return std::vector<ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, double precision) {
+std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
   for (const auto &poly : polygons) {
@@ -1002,7 +1002,7 @@ std::vector<ivec3> Triangulate(const Polygons &polygons, double precision) {
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
-  return TriangulateIdx(polygonsIndexed, precision);
+  return TriangulateIdx(polygonsIndexed, epsilon);
 }
 
 ExecutionParams &PolygonParams() { return params; }

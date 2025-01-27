@@ -128,7 +128,6 @@
     "-DMANIFOLD_PYBIND=ON",
     "-DMANIFOLD_EXPORT=ON",
     "-DMANIFOLD_DEBUG=ON",
-    "-DMANIFOLD_EXCEPTIONS=ON",
     "-DMANIFOLD_PAR=ON",
     "-DCODE_COVERAGE=OFF",
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"

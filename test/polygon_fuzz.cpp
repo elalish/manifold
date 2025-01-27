@@ -18,6 +18,7 @@
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
+#include "manifold/optional_assert.h"
 #include "manifold/polygon.h"
 
 using namespace fuzztest;
@@ -43,7 +44,7 @@ void TriangulationNoCrash(
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
-        } catch (manifold::geometryErr e) {
+        } catch (geometryErr e) {
           // geometryErr is fine
           faulted.store(false);
         } catch (...) {

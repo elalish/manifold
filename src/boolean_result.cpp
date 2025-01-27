@@ -17,8 +17,8 @@
 #include <map>
 
 #include "./boolean3.h"
+#include "./parallel.h"
 #include "./utils.h"
-#include "manifold/parallel.h"
 
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -201,6 +201,13 @@ struct EdgePos {
   bool isStart;
 };
 
+// thread sanitizer doesn't really know how to check when there are too many
+// mutex
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+__attribute__((no_sanitize("thread")))
+#endif
+#endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
@@ -246,7 +253,7 @@ void AddNewEdgeVerts(
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
-  if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
+  if (p1q2.size() > kParallelThreshold) {
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
@@ -320,12 +327,12 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
-      edge.edgePos = glm::dot(outR.vertPos_[edge.vert], edgeVec);
+      edge.edgePos = la::dot(outR.vertPos_[edge.vert], edgeVec);
     }
 
     int inclusion = i03[vStart];
     EdgePos edgePos = {vP2R[vStart],
-                       glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
+                       la::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
@@ -333,7 +340,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     inclusion = i03[vEnd];
-    edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
+    edgePos = {vP2R[vEnd], la::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
@@ -479,9 +486,7 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       bool forward) {
   ZoneScoped;
   for_each_n(
-      ManifoldParams().deterministic ? ExecutionPolicy::Seq
-                                     : autoPolicy(inP.halfedge_.size()),
-      countAt(0), inP.halfedge_.size(),
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
@@ -526,7 +531,7 @@ struct Barycentric {
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
   VecView<const Halfedge> halfedgeR;
-  const double precision;
+  const double epsilon;
 
   void operator()(const int tri) {
     const TriRef refPQ = ref[tri];
@@ -543,7 +548,7 @@ struct Barycentric {
 
     for (const int i : {0, 1, 2}) {
       const int vert = halfedgeR[3 * tri + i].startVert;
-      uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, precision);
+      uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, epsilon);
     }
   }
 };
@@ -564,7 +569,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
                           inQ.vertPos_, outR.vertPos_, inP.halfedge_,
-                          inQ.halfedge_, outR.halfedge_, outR.precision_}));
+                          inQ.halfedge_, outR.halfedge_, outR.epsilon_}));
 
   using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -645,7 +650,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
           vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] = properties[oldNumProp * triProp[j] + p];
-          outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+          outR.meshRelation_.properties.push_back(la::dot(uvw, oldProps));
         } else {
           outR.meshRelation_.properties.push_back(0);
         }
@@ -669,23 +674,23 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
+  if (inP_.status_ != Manifold::Error::NoError) {
+    auto impl = Manifold::Impl();
+    impl.status_ = inP_.status_;
+    return impl;
+  }
+  if (inQ_.status_ != Manifold::Error::NoError) {
+    auto impl = Manifold::Impl();
+    impl.status_ = inQ_.status_;
+    return impl;
+  }
+
   if (inP_.IsEmpty()) {
-    if (inP_.status_ != Manifold::Error::NoError ||
-        inQ_.status_ != Manifold::Error::NoError) {
-      auto impl = Manifold::Impl();
-      impl.status_ = Manifold::Error::InvalidConstruction;
-      return impl;
-    }
     if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
   } else if (inQ_.IsEmpty()) {
-    if (inQ_.status_ != Manifold::Error::NoError) {
-      auto impl = Manifold::Impl();
-      impl.status_ = Manifold::Error::InvalidConstruction;
-      return impl;
-    }
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }
@@ -738,7 +743,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   if (numVertR == 0) return outR;
 
-  outR.precision_ = std::max(inP_.precision_, inQ_.precision_);
+  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
+  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
 
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
@@ -772,11 +778,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false);
 
+  v12R.clear();
+  v21R.clear();
+
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
+
+  i12.clear();
+  i21.clear();
 
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
@@ -793,13 +805,27 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
                      i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
 
+  edgesP.clear();
+  edgesQ.clear();
+
   AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
                  inP_.NumTri());
+
+  edgesNew.clear();
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
                    facePQ2R.cview(0, inP_.NumTri()), true);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false);
+
+  wholeHalfedgeP.clear();
+  wholeHalfedgeQ.clear();
+  facePtrR.clear();
+  facePQ2R.clear();
+  i03.clear();
+  i30.clear();
+  vP2R.clear();
+  vQ2R.clear();
 
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
@@ -813,6 +839,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, halfedgeRef);
+  halfedgeRef.clear();
+  faceEdge.clear();
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
@@ -829,6 +857,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   UpdateReference(outR, inP_, inQ_, invertQ);
 
   outR.SimplifyTopology();
+  outR.RemoveUnreferencedVerts();
 
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,

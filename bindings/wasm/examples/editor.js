@@ -434,16 +434,11 @@ function disableCancel() {
   runButton.classList.remove('red', 'cancel');
 }
 
-let t0 = performance.now();
-
 function finishRun() {
   disableCancel();
-  const t1 = performance.now();
   const log = consoleElement.textContent;
   // Remove "Running..."
   consoleElement.textContent = log.substring(log.indexOf('\n') + 1);
-  console.log(
-      `Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 }
 
 const output = {
@@ -501,7 +496,6 @@ async function run() {
   console.log('Running...');
   const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
   manifoldWorker.postMessage(output.outputFiles[0].text);
-  t0 = performance.now();
 }
 
 function cancel() {

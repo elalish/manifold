@@ -17,7 +17,7 @@
 
 namespace manifold {
 
-/** @defgroup Samples
+/** @addtogroup Samples
  * @brief Examples of usage and interesting designs
  *
  * These are mostly 3D-printable designs I've invented over the years,

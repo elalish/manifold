@@ -73,12 +73,11 @@ def run(warp_single=False):
         m3 = ax_rotate(2, psi)
 
         v = v[:, None, :] @ m1 @ m2 @ m3
-        pts[:] = v[:, 0, :3]
+        return v[:, 0, :3]
 
     def func_single(v):
         pts = np.array([v])
-        func(pts)
-        return pts[0]
+        return func(pts)[0]
 
     if warp_single:
         return Manifold.revolve(circle, int(m)).warp(func_single)

@@ -59,12 +59,12 @@ size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec *csv) {
 }
 
 ManifoldCrossSection *manifold_cross_section_vec_get(
-    void *mem, ManifoldCrossSectionVec *csv, int idx) {
+    void *mem, ManifoldCrossSectionVec *csv, size_t idx) {
   auto cs = (*from_c(csv))[idx];
   return to_c(new (mem) CrossSection(cs));
 }
 
-void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, int idx,
+void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, size_t idx,
                                     ManifoldCrossSection *cs) {
   (*from_c(csv))[idx] = *from_c(cs);
 }
@@ -176,7 +176,7 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        double x1, double y1,
                                                        double x2, double y2,
                                                        double x3, double y3) {
-  auto mat = mat3x2(x1, y1, x2, y2, x3, y3);
+  auto mat = mat2x3({x1, y1}, {x2, y2}, {x3, y3});
   auto transformed = from_c(cs)->Transform(mat);
   return to_c(new (mem) CrossSection(transformed));
 }
@@ -213,11 +213,11 @@ double manifold_cross_section_area(ManifoldCrossSection *cs) {
   return from_c(cs)->Area();
 }
 
-int manifold_cross_section_num_vert(ManifoldCrossSection *cs) {
+size_t manifold_cross_section_num_vert(ManifoldCrossSection *cs) {
   return from_c(cs)->NumVert();
 }
 
-int manifold_cross_section_num_contour(ManifoldCrossSection *cs) {
+size_t manifold_cross_section_num_contour(ManifoldCrossSection *cs) {
   return from_c(cs)->NumContour();
 }
 

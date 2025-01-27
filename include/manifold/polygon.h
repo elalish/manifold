@@ -17,12 +17,12 @@
 
 namespace manifold {
 
-/** @addtogroup Private
+/** @addtogroup Structs
  *  @{
  */
 
 /**
- * Polygon vertex.
+ * @brief Polygon vertex.
  */
 struct PolyVert {
   /// X-Y position
@@ -31,17 +31,31 @@ struct PolyVert {
   int idx;
 };
 
+/**
+ * @brief Single polygon contour, wound CCW, with indices. First and last point
+ * are implicitly connected. Should ensure all input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
 using SimplePolygonIdx = std::vector<PolyVert>;
-using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
-std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
-                                  double precision = -1);
+/**
+ * @brief Set of indexed polygons with holes. Order of contours is arbitrary.
+ * Can contain any depth of nested holes and any number of separate polygons.
+ * Should ensure all input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
+using PolygonsIdx = std::vector<SimplePolygonIdx>;
 /** @} */
 
-/** @ingroup Connections
+/** @addtogroup Triangulation
+ *  @ingroup Core
+ * @brief Polygon triangulation
  *  @{
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, double precision = -1);
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
+                                  double epsilon = -1);
+
+std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon = -1);
 
 ExecutionParams &PolygonParams();
 /** @} */

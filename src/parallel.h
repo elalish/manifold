@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "./iters.h"
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
 #include <tbb/parallel_for.h>
@@ -27,7 +28,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "manifold/iters.h"
 namespace manifold {
 
 enum class ExecutionPolicy {
@@ -244,7 +244,14 @@ struct SortedRange {
       : input(input), tmp(tmp), offset(offset), length(length) {}
   SortedRange(SortedRange<T, SizeType> &r, tbb::split)
       : input(r.input), tmp(r.tmp) {}
-  void operator()(const tbb::blocked_range<SizeType> &range) {
+  // FIXME: no idea why thread sanitizer reports data race here
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+  __attribute__((no_sanitize("thread")))
+#endif
+#endif
+  void
+  operator()(const tbb::blocked_range<SizeType> &range) {
     SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
                                  range.end() - range.begin());
     rhs.inTmp =

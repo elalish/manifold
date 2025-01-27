@@ -16,7 +16,7 @@
 
 #include <limits>
 
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 using namespace manifold;
 
@@ -123,9 +123,9 @@ inline std::pair<int, vec2> Shadow01(
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
       vec3 diff = vertPosQ[q1s] - vertPosP[p0];
-      const double start2 = glm::dot(diff, diff);
+      const double start2 = la::dot(diff, diff);
       diff = vertPosQ[q1e] - vertPosP[p0];
-      const double end2 = glm::dot(diff, diff);
+      const double end2 = la::dot(diff, diff);
       const double dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
       if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
     } else {
@@ -211,7 +211,7 @@ struct Kernel11 {
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
           pRL[k] = vertPosP[p0[i]];
-          qRL[k] = vec3(pRL[k].x, yz01);
+          qRL[k] = vec3(pRL[k].x, yz01.x, yz01.y);
           ++k;
         }
       }
@@ -229,7 +229,7 @@ struct Kernel11 {
         if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
           shadows = s10 != 0;
           qRL[k] = vertPosQ[q0[i]];
-          pRL[k] = vec3(qRL[k].x, yz10);
+          pRL[k] = vec3(qRL[k].x, yz10.x, yz10.y);
           ++k;
         }
       }
@@ -244,9 +244,9 @@ struct Kernel11 {
       const int p1s = halfedgeP[p1].startVert;
       const int p1e = halfedgeP[p1].endVert;
       vec3 diff = vertPosP[p1s] - vec3(xyzz11);
-      const double start2 = glm::dot(diff, diff);
+      const double start2 = la::dot(diff, diff);
       diff = vertPosP[p1e] - vec3(xyzz11);
-      const double end2 = glm::dot(diff, diff);
+      const double end2 = la::dot(diff, diff);
       const double dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
 
       if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
@@ -307,7 +307,7 @@ struct Kernel02 {
       if (!forward) {
         const int qVert = halfedgeQ[q1F].startVert;
         const vec3 diff = posP - vertPosQ[qVert];
-        const double metric = glm::dot(diff, diff);
+        const double metric = la::dot(diff, diff);
         if (metric < minMetric) {
           minMetric = metric;
           closestVert = qVert;
@@ -572,6 +572,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   std::tie(x21_, v21_) =
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
+
+  s11.clear();
+  xyzz11.clear();
+  z02.clear();
+  z20.clear();
 
   Vec<int> p0 = p0q2.Copy(false);
   p0q2.Resize(0);

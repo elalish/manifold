@@ -24,6 +24,7 @@
     "three": "0.164.1"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "@vitest/ui": "^1.6.0",
     "typescript": "5.2.2",
     "vite": "^4.5.0",

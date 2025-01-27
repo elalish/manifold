@@ -18,14 +18,14 @@ jobs:
         exclude: '*/third_party'
         extensions: 'h,cpp,js,ts,html'
         clangFormatVersion: 18
-    - uses: psf/black@stable
-      with:
-        options: "--check --verbose"
-        src: "./bindings/python/examples"
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12' 
         cache: 'pip'
+    - uses: psf/black@stable
+      with:
+        options: "--check --verbose"
+        src: "./bindings/python/examples"
     - name: "gersemi cmake check"
       run: |
         pip3 install gersemi

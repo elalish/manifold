@@ -1,9 +1,11 @@
 name: Deploy documentation 
 
 on:
-  push:
-    branches:
-      - master
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+    branches: [master]
 
 jobs:
   deploy_github_pages:
@@ -13,7 +15,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Doxygen Action
-      uses: mattnotmitt/doxygen-action@v1
+      uses: mattnotmitt/doxygen-action@edge
 
     - name: Move deployables
       run: |
@@ -22,14 +24,17 @@ jobs:
         mv ./docs ./public
 
     - name: Download built examples
-      uses: dawidd6/action-download-artifact@v3
+      uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
-        event: push
+        # specific to the triggering workflow
+        run_id: ${{github.event.workflow_run.id}}
+        # do not download from old run
+        check_artifacts: true 
         name: wasm
         path: ./public
-        
+
     - name: Deploy Javascript Docs to Github Pages
       run: |
         cd bindings/wasm

@@ -19,12 +19,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#ifdef MANIFOLD_DEBUG
-#include <chrono>
-#include <iomanip>
-#include <iostream>
-#endif
-
 #include "./vec.h"
 #include "manifold/common.h"
 
@@ -39,7 +33,7 @@
 #endif
 #endif
 
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>
@@ -55,11 +49,6 @@
 
 namespace manifold {
 
-/** @defgroup Private
- *  @brief Internal classes of the library; not currently part of the public API
- *  @{
- */
-
 /**
  * Stand-in for C++23's operator""uz (P0330R8)[https://wg21.link/P0330R8].
  */
@@ -68,7 +57,7 @@ namespace manifold {
   return n;
 }
 
-constexpr double kTolerance = 1e-12;
+constexpr double kPrecision = 1e-12;
 
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);
@@ -223,122 +212,16 @@ inline int CCW(vec2 p0, vec2 p1, vec2 p2, double tol) {
   vec2 v1 = p1 - p0;
   vec2 v2 = p2 - p0;
   double area = fma(v1.x, v2.y, -v1.y * v2.x);
-  double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  double base2 = la::max(la::dot(v1, v1), la::dot(v2, v2));
   if (area * area * 4 <= base2 * tol * tol)
     return 0;
   else
     return area > 0 ? 1 : -1;
 }
 
-/**
- * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
- * object. Turns along the shortest path from given up-vector to (0, 0, 1).
- *
- * @param up The vector to be turned to point upwards. Length does not matter.
- */
-inline mat4x3 RotateUp(vec3 up) {
-  up = glm::normalize(up);
-  vec3 axis = glm::cross(up, {0, 0, 1});
-  double angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<double>() - angle;
-  return mat4x3(glm::rotate(mat4(1), angle, axis));
+inline mat4 Mat4(mat3x4 a) {
+  return mat4({a[0], 0}, {a[1], 0}, {a[2], 0}, {a[3], 1});
 }
+inline mat3 Mat3(mat2x3 a) { return mat3({a[0], 0}, {a[1], 0}, {a[2], 1}); }
 
-/** @} */
-
-/** @defgroup Debug
- *  @brief Debugging features
- *
- * The features require compiler flags to be enabled. Assertions are enabled
- * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
- *  @{
- */
-#ifdef MANIFOLD_DEBUG
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec3<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z;
-}
-
-template <typename T>
-inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
-  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
-                << ", w = " << v.w;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat3& mat) {
-  mat3 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const mat4x3& mat) {
-  mat3x4 tam = glm::transpose(mat);
-  return stream << tam[0] << std::endl
-                << tam[1] << std::endl
-                << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-/**
- * Print the contents of this vector to standard output. Only exists if compiled
- * with MANIFOLD_DEBUG flag.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (size_t i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-template <typename T>
-void Diff(const std::vector<T>& a, const std::vector<T>& b) {
-  std::cout << "Diff = " << std::endl;
-  if (a.size() != b.size()) {
-    std::cout << "a and b must have the same length, aborting Diff"
-              << std::endl;
-    return;
-  }
-  for (size_t i = 0; i < a.size(); ++i) {
-    if (a[i] != b[i])
-      std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-struct Timer {
-  std::chrono::high_resolution_clock::time_point start, end;
-
-  void Start() { start = std::chrono::high_resolution_clock::now(); }
-
-  void Stop() { end = std::chrono::high_resolution_clock::now(); }
-
-  float Elapsed() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-        .count();
-  }
-  void Print(std::string message) {
-    std::cout << "----------- " << std::round(Elapsed()) << " ms for "
-              << message << std::endl;
-  }
-};
-#endif
-/** @} */
 }  // namespace manifold

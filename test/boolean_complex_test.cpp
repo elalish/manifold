@@ -15,6 +15,9 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
+#include <fstream>
+#include <iostream>
+
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "test.h"
@@ -27,9 +30,8 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = Manifold::Sphere(1.0, 12);
-  MeshGL sphereGL = WithPositionColors(sphere);
-  sphere = Manifold(sphereGL);
+  Manifold sphere = WithPositionColors(Manifold::Sphere(1.0, 12));
+  MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold sphere2 = sphere.Translate(vec3(0.5));
   Manifold result = sphere - sphere2;
@@ -44,15 +46,15 @@ TEST(BooleanComplex, Sphere) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels)
     ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
 #endif
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  MeshGL gyroidMeshGL = WithPositionColors(Gyroid());
-  Manifold gyroid(gyroidMeshGL);
+  Manifold gyroid = WithPositionColors(Gyroid()).AsOriginal();
+  MeshGL gyroidMeshGL = gyroid.GetMeshGL();
 
   Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 
@@ -65,7 +67,7 @@ TEST(BooleanComplex, MeshRelation) {
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
-  opt.mat.colorChannels = ivec4(3, 4, 5, -1);
+  opt.mat.colorIdx = 0;
   if (options.exportModels)
     ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
 #endif
@@ -73,9 +75,8 @@ TEST(BooleanComplex, MeshRelation) {
   EXPECT_TRUE(result.MatchesTriNormals());
   EXPECT_LE(result.NumDegenerateTris(), 12);
   EXPECT_EQ(result.Decompose().size(), 1);
-  auto prop = result.GetProperties();
-  EXPECT_NEAR(prop.volume, 226, 1);
-  EXPECT_NEAR(prop.surfaceArea, 387, 1);
+  EXPECT_NEAR(result.Volume(), 226, 1);
+  EXPECT_NEAR(result.SurfaceArea(), 387, 1);
 
   RelatedGL(result, {gyroidMeshGL});
 }
@@ -89,7 +90,6 @@ TEST(BooleanComplex, Cylinders) {
       {0, 0, 1, 2,    //
        -1, 0, 0, 3,   //
        0, -1, 0, 8},  //
-
       {0, 0, 1, 1,    //
        -1, 0, 0, 2,   //
        0, -1, 0, 7},  //
@@ -142,7 +142,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m1;
   for (auto& array : arrays1) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -153,7 +153,7 @@ TEST(BooleanComplex, Cylinders) {
 
   Manifold m2;
   for (auto& array : arrays2) {
-    mat4x3 mat;
+    mat3x4 mat;
     for (const int i : {0, 1, 2, 3}) {
       for (const int j : {0, 1, 2}) {
         mat[i][j] = array[j * 4 + i];
@@ -236,13 +236,11 @@ TEST(BooleanComplex, Close) {
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
     // std::cout << i << std::endl;
-    result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
+    result ^= a.Translate({a.GetEpsilon() / 10 * i, 0.0, 0.0});
   }
-  auto prop = result.GetProperties();
   const double tol = 0.004;
-  EXPECT_NEAR(prop.volume, (4.0 / 3.0) * glm::pi<double>() * r * r * r,
-              tol * r * r * r);
-  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<double>() * r * r, tol * r * r);
+  EXPECT_NEAR(result.Volume(), (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
+  EXPECT_NEAR(result.SurfaceArea(), 4 * kPi * r * r, tol * r * r);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
@@ -252,38 +250,34 @@ TEST(BooleanComplex, Close) {
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
-  mat4 m = glm::translate(mat4(1.0), vec3(1.0));
-
   // Define solids which volumes are easy to compute w/ bit arithmetics:
   // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
   // m3 = m1 + m2
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
-  auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0), vec3(1.0, 0, 0))));
-  auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      mat4x3(glm::translate(mat4(1.0), vec3(3.0, 0, 0))));
+  auto m2 = Manifold::Cube({2, 1, 1}).Translate({1, 0, 0});
+  auto m4 = Manifold::Cube({4, 1, 1}).Translate({3, 0, 0});
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 
-  EXPECT_FLOAT_EQ((m1 ^ m2).GetProperties().volume, 0);
-  EXPECT_FLOAT_EQ((m1 + m2 + m4).GetProperties().volume, 7);
-  EXPECT_FLOAT_EQ((m1 + m2 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m1 + (m2 ^ m4)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ m4).GetProperties().volume, 4);
-  EXPECT_FLOAT_EQ((m7 ^ m3 ^ m1).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ (m1 + m2)).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4 - m2).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m7 - m1)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
+  EXPECT_FLOAT_EQ((m1 ^ m2).Volume(), 0);
+  EXPECT_FLOAT_EQ((m1 + m2 + m4).Volume(), 7);
+  EXPECT_FLOAT_EQ((m1 + m2 - m4).Volume(), 3);
+  EXPECT_FLOAT_EQ((m1 + (m2 ^ m4)).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 ^ m4).Volume(), 4);
+  EXPECT_FLOAT_EQ((m7 ^ m3 ^ m1).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 ^ (m1 + m2)).Volume(), 3);
+  EXPECT_FLOAT_EQ((m7 - m4).Volume(), 3);
+  EXPECT_FLOAT_EQ((m7 - m4 - m2).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 - (m7 - m1)).Volume(), 1);
+  EXPECT_FLOAT_EQ((m7 - (m1 + m2)).Volume(), 4);
 }
 
 TEST(BooleanComplex, Spiral) {
   const int d = 2;
   std::function<Manifold(const int, const double, const double)> spiral =
       [&](const int rec, const double r, const double add) {
-        const double rot = 360.0 / (glm::pi<double>() * r * 2) * d;
+        const double rot = 360.0 / (kPi * r * 2) * d;
         const double rNext = r + add / 360 * rot;
         const Manifold cube =
             Manifold::Cube(vec3(1), true).Translate({0, r, 0});
@@ -301,9 +295,9 @@ TEST(BooleanComplex, Sweep) {
 
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](double angle) {
-    double div = angle / glm::two_pi<double>();
+    double div = angle / kTwoPi;
     double wholeDiv = floor(div);
-    return angle - wholeDiv * glm::two_pi<double>();
+    return angle - wholeDiv * kTwoPi;
   };
 
   // calculate determinant
@@ -318,7 +312,7 @@ TEST(BooleanComplex, Sweep) {
     std::vector<vec2> arcPoints;
 
     for (int i = 0; i < numberOfArcPoints; i++) {
-      double angle = i * glm::pi<double>() / numberOfArcPoints;
+      double angle = i * kPi / numberOfArcPoints;
       double y = arcCenterPoint.y - cos(angle) * filletRadius;
       double x = arcCenterPoint.x + sin(angle) * filletRadius;
       arcPoints.push_back(vec2(x, y));
@@ -349,8 +343,7 @@ TEST(BooleanComplex, Sweep) {
       totalAngle = posEndAngle - startAngle;
     }
 
-    int nSegments =
-        ceil(totalAngle / glm::two_pi<double>() * nSegmentsPerRotation + 1);
+    int nSegments = ceil(totalAngle / kTwoPi * nSegmentsPerRotation + 1);
     if (nSegments < 2) {
       nSegments = 2;
     }
@@ -389,7 +382,7 @@ TEST(BooleanComplex, Sweep) {
         Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
             .Translate(vec3(distance, 0, 0))
-            .Rotate(0, 0, angle * 180 / glm::pi<double>())
+            .Rotate(0, 0, angle * 180 / kPi)
             .Translate(vec3(p1.x, p1.y, 0));
 
     std::vector<Manifold> result;
@@ -412,97 +405,96 @@ TEST(BooleanComplex, Sweep) {
     return newPath;
   };
 
-  std::vector<vec2> pathPoints = {
-      vec2(-21.707751473606564, 10.04202769267855),
-      vec2(-21.840846948218307, 9.535474475521578),
-      vec2(-21.940954413815387, 9.048287386171369),
-      vec2(-22.005569458385835, 8.587741145234093),
-      vec2(-22.032187669917704, 8.16111047331591),
-      vec2(-22.022356960178296, 7.755456475810721),
-      vec2(-21.9823319178086, 7.356408291345673),
-      vec2(-21.91208498286602, 6.964505631629036),
-      vec2(-21.811437268778267, 6.579251589515578),
-      vec2(-21.68020988897306, 6.200149257860059),
-      vec2(-21.51822395687812, 5.82670172951726),
-      vec2(-21.254086890521585, 5.336709200579579),
-      vec2(-21.01963533308061, 4.974523796623895),
-      vec2(-20.658228140926262, 4.497743844638198),
-      vec2(-20.350337020134603, 4.144115181723373),
-      vec2(-19.9542029967, 3.7276501717684054),
-      vec2(-20.6969129296381, 3.110639833377638),
-      vec2(-21.026318197401537, 2.793796378245609),
-      vec2(-21.454710558515973, 2.3418076758544806),
-      vec2(-21.735944543382722, 2.014266362004704),
-      vec2(-21.958999535447845, 1.7205197644485681),
-      vec2(-22.170169612837164, 1.3912359628761894),
-      vec2(-22.376940405634056, 1.0213515348242117),
-      vec2(-22.62545385249271, 0.507889651991388),
-      vec2(-22.77620002102207, 0.13973666928102288),
-      vec2(-22.8689989640578, -0.135962138067232),
-      vec2(-22.974385239894364, -0.5322784681448909),
-      vec2(-23.05966775687304, -0.9551466941218276),
-      vec2(-23.102914137841445, -1.2774406685179822),
-      vec2(-23.14134824916783, -1.8152432718003662),
-      vec2(-23.152085124298473, -2.241104719188421),
-      vec2(-23.121576743285054, -2.976332948223073),
-      vec2(-23.020491352156856, -3.6736813934577914),
-      vec2(-22.843552165110886, -4.364810769710428),
-      vec2(-22.60334013490563, -5.033012850282157),
-      vec2(-22.305015243491663, -5.67461444847819),
-      vec2(-21.942709324216615, -6.330962778427178),
-      vec2(-21.648491707764062, -6.799117771996025),
-      vec2(-21.15330508818782, -7.496539096945377),
-      vec2(-21.10687739725184, -7.656798276710632),
-      vec2(-21.01253055778545, -8.364144493707382),
-      vec2(-20.923211927856293, -8.782280691344269),
-      vec2(-20.771325204062215, -9.258087073404687),
-      vec2(-20.554404009259198, -9.72613360625344),
-      vec2(-20.384050989017144, -9.985885743112847),
-      vec2(-20.134404839253612, -10.263023004626703),
-      vec2(-19.756998832033442, -10.613109670467736),
-      vec2(-18.83161393127597, -15.68768837402245),
-      vec2(-19.155593463785983, -17.65410871259763),
-      vec2(-17.930304365744544, -19.005810988385562),
-      vec2(-16.893408103100064, -19.50558228186199),
-      vec2(-16.27514960757635, -19.8288501942628),
-      vec2(-15.183033464853374, -20.47781203017123),
-      vec2(-14.906850387751492, -20.693472553142833),
-      vec2(-14.585198957236713, -21.015257964547136),
-      vec2(-11.013839210807205, -34.70394287828328),
-      vec2(-8.79778020674896, -36.17434400175442),
-      vec2(-7.850491148257242, -36.48835987119041),
-      vec2(-6.982497182376991, -36.74546968896842),
-      vec2(-6.6361688522576, -36.81653354539242),
-      vec2(-6.0701080598244035, -36.964332993204),
-      vec2(-5.472439187922815, -37.08824838436714),
-      vec2(-4.802871164820756, -37.20127157090685),
-      vec2(-3.6605994233344745, -37.34427653957914),
-      vec2(-1.7314396363710867, -37.46415201430501),
-      vec2(-0.7021130485987349, -37.5),
-      vec2(0.01918509410483974, -37.49359541901704),
-      vec2(1.2107837650065625, -37.45093992812552),
-      vec2(3.375529069920302, 32.21823383780513),
-      vec2(1.9041980552754056, 32.89839543047101),
-      vec2(1.4107184651094313, 33.16556804736585),
-      vec2(1.1315552947605065, 33.34344755450097),
-      vec2(0.8882931135353977, 33.52377699790175),
-      vec2(0.6775397019893341, 33.708817857198056),
-      vec2(0.49590284067753837, 33.900831612019715),
-      vec2(0.2291596803839543, 34.27380625039597),
-      vec2(0.03901816126171688, 34.66402375075138),
-      vec2(-0.02952797094655369, 34.8933309389416),
-      vec2(-0.0561772851849209, 35.044928843125824),
-      vec2(-0.067490756643705, 35.27129875796868),
-      vec2(-0.05587453990569748, 35.42204271802184),
-      vec2(0.013497378362074697, 35.72471438137191),
-      vec2(0.07132375113026912, 35.877348797053145),
-      vec2(0.18708820875448923, 36.108917464873215),
-      vec2(0.39580614140195136, 36.424415957998825),
-      vec2(0.8433687814267005, 36.964365016108914),
-      vec2(0.7078417131710703, 37.172455373435916),
-      vec2(0.5992848016685662, 37.27482757003058),
-      vec2(0.40594743344375905, 37.36664006036318),
-      vec2(0.1397973410299913, 37.434752779117005)};
+  std::vector<vec2> pathPoints = {{-21.707751473606564, 10.04202769267855},
+                                  {-21.840846948218307, 9.535474475521578},
+                                  {-21.940954413815387, 9.048287386171369},
+                                  {-22.005569458385835, 8.587741145234093},
+                                  {-22.032187669917704, 8.16111047331591},
+                                  {-22.022356960178296, 7.755456475810721},
+                                  {-21.9823319178086, 7.356408291345673},
+                                  {-21.91208498286602, 6.964505631629036},
+                                  {-21.811437268778267, 6.579251589515578},
+                                  {-21.68020988897306, 6.200149257860059},
+                                  {-21.51822395687812, 5.82670172951726},
+                                  {-21.254086890521585, 5.336709200579579},
+                                  {-21.01963533308061, 4.974523796623895},
+                                  {-20.658228140926262, 4.497743844638198},
+                                  {-20.350337020134603, 4.144115181723373},
+                                  {-19.9542029967, 3.7276501717684054},
+                                  {-20.6969129296381, 3.110639833377638},
+                                  {-21.026318197401537, 2.793796378245609},
+                                  {-21.454710558515973, 2.3418076758544806},
+                                  {-21.735944543382722, 2.014266362004704},
+                                  {-21.958999535447845, 1.7205197644485681},
+                                  {-22.170169612837164, 1.3912359628761894},
+                                  {-22.376940405634056, 1.0213515348242117},
+                                  {-22.62545385249271, 0.507889651991388},
+                                  {-22.77620002102207, 0.13973666928102288},
+                                  {-22.8689989640578, -0.135962138067232},
+                                  {-22.974385239894364, -0.5322784681448909},
+                                  {-23.05966775687304, -0.9551466941218276},
+                                  {-23.102914137841445, -1.2774406685179822},
+                                  {-23.14134824916783, -1.8152432718003662},
+                                  {-23.152085124298473, -2.241104719188421},
+                                  {-23.121576743285054, -2.976332948223073},
+                                  {-23.020491352156856, -3.6736813934577914},
+                                  {-22.843552165110886, -4.364810769710428},
+                                  {-22.60334013490563, -5.033012850282157},
+                                  {-22.305015243491663, -5.67461444847819},
+                                  {-21.942709324216615, -6.330962778427178},
+                                  {-21.648491707764062, -6.799117771996025},
+                                  {-21.15330508818782, -7.496539096945377},
+                                  {-21.10687739725184, -7.656798276710632},
+                                  {-21.01253055778545, -8.364144493707382},
+                                  {-20.923211927856293, -8.782280691344269},
+                                  {-20.771325204062215, -9.258087073404687},
+                                  {-20.554404009259198, -9.72613360625344},
+                                  {-20.384050989017144, -9.985885743112847},
+                                  {-20.134404839253612, -10.263023004626703},
+                                  {-19.756998832033442, -10.613109670467736},
+                                  {-18.83161393127597, -15.68768837402245},
+                                  {-19.155593463785983, -17.65410871259763},
+                                  {-17.930304365744544, -19.005810988385562},
+                                  {-16.893408103100064, -19.50558228186199},
+                                  {-16.27514960757635, -19.8288501942628},
+                                  {-15.183033464853374, -20.47781203017123},
+                                  {-14.906850387751492, -20.693472553142833},
+                                  {-14.585198957236713, -21.015257964547136},
+                                  {-11.013839210807205, -34.70394287828328},
+                                  {-8.79778020674896, -36.17434400175442},
+                                  {-7.850491148257242, -36.48835987119041},
+                                  {-6.982497182376991, -36.74546968896842},
+                                  {-6.6361688522576, -36.81653354539242},
+                                  {-6.0701080598244035, -36.964332993204},
+                                  {-5.472439187922815, -37.08824838436714},
+                                  {-4.802871164820756, -37.20127157090685},
+                                  {-3.6605994233344745, -37.34427653957914},
+                                  {-1.7314396363710867, -37.46415201430501},
+                                  {-0.7021130485987349, -37.5},
+                                  {0.01918509410483974, -37.49359541901704},
+                                  {1.2107837650065625, -37.45093992812552},
+                                  {3.375529069920302, 32.21823383780513},
+                                  {1.9041980552754056, 32.89839543047101},
+                                  {1.4107184651094313, 33.16556804736585},
+                                  {1.1315552947605065, 33.34344755450097},
+                                  {0.8882931135353977, 33.52377699790175},
+                                  {0.6775397019893341, 33.708817857198056},
+                                  {0.49590284067753837, 33.900831612019715},
+                                  {0.2291596803839543, 34.27380625039597},
+                                  {0.03901816126171688, 34.66402375075138},
+                                  {-0.02952797094655369, 34.8933309389416},
+                                  {-0.0561772851849209, 35.044928843125824},
+                                  {-0.067490756643705, 35.27129875796868},
+                                  {-0.05587453990569748, 35.42204271802184},
+                                  {0.013497378362074697, 35.72471438137191},
+                                  {0.07132375113026912, 35.877348797053145},
+                                  {0.18708820875448923, 36.108917464873215},
+                                  {0.39580614140195136, 36.424415957998825},
+                                  {0.8433687814267005, 36.964365016108914},
+                                  {0.7078417131710703, 37.172455373435916},
+                                  {0.5992848016685662, 37.27482757003058},
+                                  {0.40594743344375905, 37.36664006036318},
+                                  {0.1397973410299913, 37.434752779117005}};
 
   int numPoints = pathPoints.size();
   pathPoints = scalePath(pathPoints, 0.9);
@@ -521,16 +513,14 @@ TEST(BooleanComplex, Sweep) {
 
   // all primitives should be valid
   for (Manifold primitive : result) {
-    manifold::Properties properties = primitive.GetProperties();
-    if (properties.volume < 0) {
+    if (primitive.Volume() < 0) {
       std::cerr << "INVALID PRIMITIVE" << std::endl;
     }
   }
 
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
-  auto prop = shape.GetProperties();
 
-  EXPECT_NEAR(prop.volume, 3757, 1);
+  EXPECT_NEAR(shape.Volume(), 3757, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
@@ -765,117 +755,61 @@ TEST(BooleanComplex, InterpolatedNormals) {
       411.5867004394531, -66.51548767089844, -500, 0.29619815945625305,
       0.1710100769996643, 0.9396926164627075, 880.5440063476562,
       600.0000610351562};
-  a.triVerts = {// 0
-                0, 1, 2,
-                // 1
-                3, 4, 5,
-                // 2
-                6, 0, 2,
-                // 3
-                7, 8, 9,
-                // 4
-                10, 11, 12,
-                // 5
-                13, 14, 15,
-                // 6
-                0, 16, 1,
-                // 7
-                17, 18, 19,
-                // 8
-                9, 20, 7,
-                // 9
-                18, 21, 19,
-                // 10
-                22, 23, 24,
-                // 11
-                14, 25, 15,
-                // 12
-                26, 12, 27,
-                // 13
-                14, 28, 25,
-                // 14
-                29, 30, 31,
-                // 15
-                29, 31, 32,
-                // 16
-                12, 33, 27,
-                // 17
-                34, 35, 36,
-                // 18
-                5, 4, 37,
-                // 19
-                17, 38, 18,
-                // 20
-                31, 39, 32,
-                // 21
-                40, 38, 17,
-                // 22
-                9, 41, 20,
-                // 23
-                39, 42, 32,
-                // 24
-                41, 43, 20,
-                // 25
-                6, 2, 44,
-                // 26
-                6, 45, 46,
-                // 27
-                26, 10, 12,
-                // 28
-                47, 13, 15,
-                // 29
-                48, 24, 23,
-                // 30
-                6, 44, 45,
-                // 31
-                26, 49, 10,
-                // 32
-                49, 34, 10,
-                // 33
-                34, 36, 10,
-                // 34
-                50, 51, 52,
-                // 35
-                51, 53, 54,
-                // 36
-                51, 54, 52,
-                // 37
-                55, 56, 57,
-                // 38
-                52, 54, 58,
-                // 39
-                59, 57, 56,
-                // 40
-                60, 61, 62,
-                // 41
-                63, 64, 65,
-                // 42
-                52, 66, 67,
-                // 43
-                59, 68, 57,
-                // 44
-                69, 62, 61,
-                // 45
-                65, 70, 63,
-                // 46
-                71, 72, 73,
-                // 47
-                52, 58, 66,
-                // 48
-                74, 72, 71,
-                // 49
-                74, 75, 72,
-                // 50
-                62, 69, 76,
-                // 51
-                77, 78, 79,
-                // 52
-                79, 80, 77,
-                // 53
-                69, 81, 76,
-                // 54
-                63, 70, 82,
-                // 55
+  a.triVerts = {0,  1,  2,   //
+                3,  4,  5,   //
+                6,  0,  2,   //
+                7,  8,  9,   //
+                10, 11, 12,  //
+                13, 14, 15,  //
+                0,  16, 1,   //
+                17, 18, 19,  //
+                9,  20, 7,   //
+                18, 21, 19,  //
+                22, 23, 24,  //
+                14, 25, 15,  //
+                26, 12, 27,  //
+                14, 28, 25,  //
+                29, 30, 31,  //
+                29, 31, 32,  //
+                12, 33, 27,  //
+                34, 35, 36,  //
+                5,  4,  37,  //
+                17, 38, 18,  //
+                31, 39, 32,  //
+                40, 38, 17,  //
+                9,  41, 20,  //
+                39, 42, 32,  //
+                41, 43, 20,  //
+                6,  2,  44,  //
+                6,  45, 46,  //
+                26, 10, 12,  //
+                47, 13, 15,  //
+                48, 24, 23,  //
+                6,  44, 45,  //
+                26, 49, 10,  //
+                49, 34, 10,  //
+                34, 36, 10,  //
+                50, 51, 52,  //
+                51, 53, 54,  //
+                51, 54, 52,  //
+                55, 56, 57,  //
+                52, 54, 58,  //
+                59, 57, 56,  //
+                60, 61, 62,  //
+                63, 64, 65,  //
+                52, 66, 67,  //
+                59, 68, 57,  //
+                69, 62, 61,  //
+                65, 70, 63,  //
+                71, 72, 73,  //
+                52, 58, 66,  //
+                74, 72, 71,  //
+                74, 75, 72,  //
+                62, 69, 76,  //
+                77, 78, 79,  //
+                79, 80, 77,  //
+                69, 81, 76,  //
+                63, 70, 82,  //
                 76, 83, 62};
   a.mergeFromVert = {3,  4,  11, 12, 13, 18, 21, 22, 23, 24, 31, 33, 35, 36,
                      38, 39, 42, 44, 45, 46, 47, 48, 50, 51, 52, 53, 54, 55,
@@ -888,77 +822,41 @@ TEST(BooleanComplex, InterpolatedNormals) {
 
   MeshGL b;
   b.numProp = 8;
-  b.vertProperties = {// 0
-                      -1700, -600, -1000, -1, 0, 0, 1200, 0,
-                      // 1
-                      -1700, -600, 1000, -1, 0, 0, 1200, 2000,
-                      // 2
-                      -1700, 600, -1000, -1, 0, 0, 0, 0,
-                      // 3
-                      -1700, -600, -1000, 0, -1, 0, 0, 0,
-                      // 4
-                      300, -600, -1000, 0, -1, 0, 2000, 0,
-                      // 5
-                      -1700, -600, 1000, 0, -1, 0, 0, 2000,
-                      // 6
-                      -1700, -600, -1000, 0, 0, -1, 0, 1200,
-                      // 7
-                      -1700, 600, -1000, 0, 0, -1, 0, 0,
-                      // 8
-                      300, -600, -1000, 0, 0, -1, 2000, 1200,
-                      // 9
-                      -1700, -600, 1000, 0, 0, 1, 0, 0,
-                      // 10
-                      300, -600, 1000, 0, 0, 1, 2000, 0,
-                      // 11
-                      -1700, 600, 1000, 0, 0, 1, 0, 1200,
-                      // 12
-                      -1700, 600, 1000, -1, 0, 0, 0, 2000,
-                      // 13
-                      -1700, 600, -1000, 0, 1, 0, 2000, 0,
-                      // 14
-                      -1700, 600, 1000, 0, 1, 0, 2000, 2000,
-                      // 15
-                      300, 600, 1000, 0, 1, 0, 0, 2000,
-                      // 16
-                      300, -600, -1000, 1, 0, 0, 0, 0,
-                      // 17
-                      300, 600, -1000, 1, 0, 0, 1200, 0,
-                      // 18
-                      300, -600, 1000, 1, 0, 0, 0, 2000,
-                      // 19
-                      300, -600, 1000, 0, -1, 0, 2000, 2000,
-                      // 20
-                      300, 600, -1000, 0, 0, -1, 2000, 0,
-                      // 21
-                      300, 600, -1000, 0, 1, 0, 0, 0,
-                      // 22
-                      300, 600, 1000, 0, 0, 1, 2000, 1200,
-                      // 23
-                      300, 600, 1000, 1, 0, 0, 1200, 2000};
-  b.triVerts = {// 0
-                0, 1, 2,
-                // 1
-                3, 4, 5,
-                // 2
-                6, 7, 8,
-                // 3
-                9, 10, 11,
-                // 4
-                1, 12, 2,
-                // 5
-                13, 14, 15,
-                // 6
-                16, 17, 18,
-                // 7
-                4, 19, 5,
-                // 8
-                7, 20, 8,
-                // 9
-                21, 13, 15,
-                // 10
-                10, 22, 11,
-                // 11
+  b.vertProperties = {-1700, -600, -1000, -1, 0,  0,  1200, 0,     //
+                      -1700, -600, 1000,  -1, 0,  0,  1200, 2000,  //
+                      -1700, 600,  -1000, -1, 0,  0,  0,    0,     //
+                      -1700, -600, -1000, 0,  -1, 0,  0,    0,     //
+                      300,   -600, -1000, 0,  -1, 0,  2000, 0,     //
+                      -1700, -600, 1000,  0,  -1, 0,  0,    2000,  //
+                      -1700, -600, -1000, 0,  0,  -1, 0,    1200,  //
+                      -1700, 600,  -1000, 0,  0,  -1, 0,    0,     //
+                      300,   -600, -1000, 0,  0,  -1, 2000, 1200,  //
+                      -1700, -600, 1000,  0,  0,  1,  0,    0,     //
+                      300,   -600, 1000,  0,  0,  1,  2000, 0,     //
+                      -1700, 600,  1000,  0,  0,  1,  0,    1200,  //
+                      -1700, 600,  1000,  -1, 0,  0,  0,    2000,  //
+                      -1700, 600,  -1000, 0,  1,  0,  2000, 0,     //
+                      -1700, 600,  1000,  0,  1,  0,  2000, 2000,  //
+                      300,   600,  1000,  0,  1,  0,  0,    2000,  //
+                      300,   -600, -1000, 1,  0,  0,  0,    0,     //
+                      300,   600,  -1000, 1,  0,  0,  1200, 0,     //
+                      300,   -600, 1000,  1,  0,  0,  0,    2000,  //
+                      300,   -600, 1000,  0,  -1, 0,  2000, 2000,  //
+                      300,   600,  -1000, 0,  0,  -1, 2000, 0,     //
+                      300,   600,  -1000, 0,  1,  0,  0,    0,     //
+                      300,   600,  1000,  0,  0,  1,  2000, 1200,  //
+                      300,   600,  1000,  1,  0,  0,  1200, 2000};
+  b.triVerts = {0,  1,  2,   //
+                3,  4,  5,   //
+                6,  7,  8,   //
+                9,  10, 11,  //
+                1,  12, 2,   //
+                13, 14, 15,  //
+                16, 17, 18,  //
+                4,  19, 5,   //
+                7,  20, 8,   //
+                21, 13, 15,  //
+                10, 22, 11,  //
                 17, 23, 18};
   b.mergeFromVert = {3, 5, 6, 7, 8, 9, 12, 13, 14, 16, 18, 19, 20, 21, 22, 23};
   b.mergeToVert = {0, 1, 0, 2, 4, 1, 11, 2, 11, 4, 10, 10, 17, 17, 15, 15};
@@ -971,11 +869,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
 
   auto aMinusB = aManifold - bManifold;
 
-  std::vector<MeshGL> meshList;
-  meshList.emplace_back(a);
-  meshList.emplace_back(b);
-
-  RelatedGL(aMinusB, meshList, false, false);
+  RelatedGL(aMinusB, {a, b}, false, false);
 }
 
 #ifdef MANIFOLD_EXPORT
@@ -989,8 +883,6 @@ TEST(BooleanComplex, SelfIntersect) {
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7081) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
   Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
   Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
@@ -999,8 +891,6 @@ TEST(BooleanComplex, GenericTwinBooleanTest7081) {
 
 TEST(BooleanComplex, GenericTwinBooleanTest7863) {
   manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
   Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
   Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
@@ -1010,8 +900,6 @@ TEST(BooleanComplex, GenericTwinBooleanTest7863) {
 
 TEST(BooleanComplex, Havocglass8Bool) {
   manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
   Manifold m1 = ReadMesh("Havocglass8_left.glb");
   Manifold m2 = ReadMesh("Havocglass8_right.glb");
   Manifold res = m1 + m2;  // Union
@@ -1020,8 +908,6 @@ TEST(BooleanComplex, Havocglass8Bool) {
 }
 
 TEST(BooleanComplex, CraycloudBool) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
   Manifold m1 = ReadMesh("Cray_left.glb");
   Manifold m2 = ReadMesh("Cray_right.glb");
   Manifold res = m1 - m2;
@@ -1034,6 +920,140 @@ TEST(BooleanComplex, HullMask) {
   Manifold mask = ReadMesh("hull-mask.glb");
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMeshGL();
+}
+
+// Note - For the moment, the Status() checks are included in the loops to
+// (more or less) mimic the BRL-CAD behavior of checking the mesh for
+// unexpected output after each iteration.  Doing so is not ideal - it
+// *massively* slows the overall evaluation - but it also seems to be
+// triggering behavior that avoids a triangulation failure.
+//
+// Eventually, once other issues are resolved, the in-loop checks should be
+// removed in favor of the top level checks.
+TEST(BooleanComplex, SimpleOffset) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  MeshGL seeds = ImportMesh(dir + "/models/" + "Generic_Twin_91.1.t0.glb");
+  EXPECT_TRUE(seeds.NumTri() > 10);
+  EXPECT_TRUE(seeds.NumVert() > 10);
+  // Unique edges
+  std::vector<std::pair<int, int>> edges;
+  for (size_t i = 0; i < seeds.NumTri(); i++) {
+    const int k[3] = {1, 2, 0};
+    for (const int j : {0, 1, 2}) {
+      int v1 = seeds.triVerts[i * 3 + j];
+      int v2 = seeds.triVerts[i * 3 + k[j]];
+      if (v2 > v1) edges.push_back(std::make_pair(v1, v2));
+    }
+  }
+  manifold::Manifold c;
+  // Vertex Spheres
+  Manifold sph = Manifold::Sphere(1, 8);
+  for (size_t i = 0; i < seeds.NumVert(); i++) {
+    vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
+              seeds.vertProperties[3 * i + 2]);
+    Manifold vsph = sph.Translate(vpos);
+    c += vsph;
+  }
+  // Edge Cylinders
+  for (size_t i = 0; i < edges.size(); i++) {
+    vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
+                    seeds.vertProperties[3 * edges[i].first + 1],
+                    seeds.vertProperties[3 * edges[i].first + 2]);
+    vec3 ev2 = vec3(seeds.vertProperties[3 * edges[i].second + 0],
+                    seeds.vertProperties[3 * edges[i].second + 1],
+                    seeds.vertProperties[3 * edges[i].second + 2]);
+    vec3 edge = ev2 - ev1;
+    double len = la::length(edge);
+    if (len < std::numeric_limits<float>::min()) continue;
+    manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
+    vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
+    quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
+    manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
+    c += right;
+  }
+  // Triangle Volumes
+  for (size_t i = 0; i < seeds.NumTri(); i++) {
+    int eind[3];
+    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
+    std::vector<vec3> ev;
+    for (int j = 0; j < 3; j++) {
+      ev.push_back(vec3(seeds.vertProperties[3 * eind[j] + 0],
+                        seeds.vertProperties[3 * eind[j] + 1],
+                        seeds.vertProperties[3 * eind[j] + 2]));
+    }
+    vec3 a = ev[0] - ev[2];
+    vec3 b = ev[1] - ev[2];
+    vec3 n = la::normalize(la::cross(a, b));
+    if (!all(isfinite(n))) continue;
+    // Extrude the points above and below the plane of the triangle
+    vec3 pnts[6];
+    for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
+    for (int j = 3; j < 6; j++) pnts[j] = ev[j - 3] - n;
+    // Construct the points and faces of the new manifold
+    double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
+                         pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
+                         pnts[1].y, pnts[1].z, pnts[5].x, pnts[5].y, pnts[5].z,
+                         pnts[2].x, pnts[2].y, pnts[2].z};
+    int faces[24] = {
+        faces[0] = 0,  faces[1] = 1,  faces[2] = 4,   // 1 2 5
+        faces[3] = 2,  faces[4] = 3,  faces[5] = 5,   // 3 4 6
+        faces[6] = 1,  faces[7] = 0,  faces[8] = 3,   // 2 1 4
+        faces[9] = 3,  faces[10] = 2, faces[11] = 1,  // 4 3 2
+        faces[12] = 3, faces[13] = 0, faces[14] = 4,  // 4 1 5
+        faces[15] = 4, faces[16] = 5, faces[17] = 3,  // 5 6 4
+        faces[18] = 5, faces[19] = 4, faces[20] = 1,  // 6 5 2
+        faces[21] = 1, faces[22] = 2, faces[23] = 5   // 2 3 6
+    };
+    manifold::MeshGL64 tri_m;
+    for (int j = 0; j < 18; j++)
+      tri_m.vertProperties.insert(tri_m.vertProperties.end(), pts[j]);
+    for (int j = 0; j < 24; j++)
+      tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
+    manifold::Manifold right(tri_m);
+    c += right;
+    // See above discussion
+    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  }
+  // See above discussion
+  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
+  const bool intermediateChecks = ManifoldParams().intermediateChecks;
+  ManifoldParams().intermediateChecks = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold a, b;
+  std::ifstream f;
+  f.open(dir + "/models/Offset1.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset2.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
+  Manifold result = a + b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = intermediateChecks;
+}
+
+TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
+  const bool intermediateChecks = ManifoldParams().intermediateChecks;
+  ManifoldParams().intermediateChecks = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold a, b;
+  std::ifstream f;
+  f.open(dir + "/models/Offset3.obj");
+  a = Manifold::ImportMeshGL64(f);
+  f.close();
+  f.open(dir + "/models/Offset4.obj");
+  b = Manifold::ImportMeshGL64(f);
+  f.close();
+
+  Manifold result = a + b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = intermediateChecks;
 }
 
 #endif

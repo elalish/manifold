@@ -18,7 +18,6 @@
 
 namespace {
 using namespace manifold;
-using namespace glm;
 using manifold::vec3;
 
 constexpr double AtomicRadiusN2 = 0.65;
@@ -131,14 +130,21 @@ Manifold GraphiteCell(int fn, vec3 xyz = {1.0, 1.0, 1.0}) {
 }  // namespace
 
 namespace manifold {
+
+/**
+ * A demonstration of molecular bonding.
+ *
+ * @param fn Number of circular segments.
+ */
 Manifold CondensedMatter(int fn) {
   std::vector<Manifold> parts;
   double siOffset = 3.0 * LatticeCellSizeSi / 8.0;
   for (int x = -3; x <= 3; x++)
     for (int y = -1; y <= 2; y++)
       parts.push_back(
-          GraphiteCell(fn, {x + (y % 2 == 0 ? 0.0 : 0.5), y,
-                            LayerSeperationC * 0.5 + LatticeCellSizeSi * 1.5})
+          GraphiteCell(fn,
+                       {x + (y % 2 == 0 ? 0.0 : 0.5), static_cast<double>(y),
+                        LayerSeperationC * 0.5 + LatticeCellSizeSi * 1.5})
               .Translate({0, -siOffset, 0})
               .Rotate(0, 0, 45));
 

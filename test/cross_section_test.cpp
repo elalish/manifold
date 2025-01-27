@@ -28,7 +28,7 @@ TEST(CrossSection, Square) {
   auto a = Manifold::Cube({5, 5, 5});
   auto b = Manifold::Extrude(CrossSection::Square({5, 5}).ToPolygons(), 5);
 
-  EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
+  EXPECT_FLOAT_EQ((a - b).Volume(), 0.);
 }
 
 TEST(CrossSection, MirrorUnion) {
@@ -43,7 +43,7 @@ TEST(CrossSection, MirrorUnion) {
 #endif
 
   EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
-  EXPECT_TRUE(a.Mirror(vec2(0)).IsEmpty());
+  EXPECT_TRUE(a.Mirror(vec2(0.0)).IsEmpty());
 }
 
 TEST(CrossSection, RoundOffset) {
@@ -58,7 +58,7 @@ TEST(CrossSection, RoundOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.GetProperties().volume, 4386, 1);
+  EXPECT_NEAR(result.Volume(), 4386, 1);
   EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
 
@@ -88,17 +88,17 @@ TEST(CrossSection, Transform) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Rotate(45).Scale({2, 3}).Translate({4, 5});
 
-  mat3 trans(1.0, 0.0, 0.0,  //
-             0.0, 1.0, 0.0,  //
-             4.0, 5.0, 1.0);
-  mat3 rot(cosd(45), sind(45), 0.0,   //
-           -sind(45), cosd(45), 0.0,  //
-           0.0, 0.0, 1.0);
-  mat3 scale(2.0, 0.0, 0.0,  //
-             0.0, 3.0, 0.0,  //
-             0.0, 0.0, 1.0);
+  mat3 trans({1.0, 0.0, 0.0},  //
+             {0.0, 1.0, 0.0},  //
+             {4.0, 5.0, 1.0});
+  mat3 rot({cosd(45), sind(45), 0.0},   //
+           {-sind(45), cosd(45), 0.0},  //
+           {0.0, 0.0, 1.0});
+  mat3 scale({2.0, 0.0, 0.0},  //
+             {0.0, 3.0, 0.0},  //
+             {0.0, 0.0, 1.0});
 
-  auto b = sq.Transform(mat3x2(trans * scale * rot));
+  auto b = sq.Transform(mat2x3(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
   auto ex_b = Manifold::Extrude(b.ToPolygons(), 1.).GetMeshGL();

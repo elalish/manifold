@@ -19,7 +19,8 @@
 
 namespace manifold {
 
-/** @defgroup MeshIO
+/** @addtogroup MeshIO
+ *  @ingroup Optional
  *  @brief 3D model file I/O based on Assimp
  * @{
  */
@@ -32,19 +33,24 @@ struct Material {
   double roughness = 0.2;
   /// Metalness value, generally either 0 (dielectric) or 1 (metal).
   double metalness = 1;
-  /// Color (RGBA) multiplier to apply to the whole mesh (each value between 0
+  /// Color (RGB) multiplier to apply to the whole mesh (each value between 0
   /// and 1).
-  vec4 color = vec4(1.0);
-  /// Optional: If non-empty, must match Mesh.vertPos. Provides an RGBA color
-  /// for each vertex, linearly interpolated across triangles. Colors are
-  /// linear, not sRGB. Only used with Mesh export, not MeshGL.
-  std::vector<vec4> vertColor;
-  /// For MeshGL export, gives the property indicies where the normal channels
-  /// can be found. Must be >= 3, since the first three are position.
-  ivec3 normalChannels = ivec3(-1);
-  /// For MeshGL export, gives the property indicies where the color channels
-  /// can be found. Any index < 0 will output all 1.0 for that channel.
-  ivec4 colorChannels = ivec4(-1);
+  vec3 color = vec3(1.0);
+  /// Alpha multiplier to apply to the whole mesh (each value between 0
+  /// and 1).
+  double alpha = 1.0;
+  /// Gives the property index where the first normal channel
+  /// can be found. 0 indicates the first three property channels following
+  /// position. A negative value does not save normals.
+  int normalIdx = -1;
+  /// Gives the property index where the first color channel
+  /// can be found. 0 indicates the first three property channels following
+  /// position. A negative value does not save vertex colors.
+  int colorIdx = -1;
+  /// Gives the property index where the alpha channel
+  /// can be found. 0 indicates the first property channel following
+  /// position. A negative value does not save vertex alpha.
+  int alphaIdx = -1;
 };
 
 /**

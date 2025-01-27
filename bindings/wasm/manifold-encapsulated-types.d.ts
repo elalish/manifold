@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @param epsilon The value of epsilon, bounding the uncertainty of the input
  * @return The triangles, referencing the original polygon points in order.
  */
-export function triangulate(polygons: Polygons, precision?: number): Vec3[];
+export function triangulate(polygons: Polygons, epsilon?: number): Vec3[];
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -569,14 +569,14 @@ export class Manifold {
    * performance.
    * @param level You can inset your Mesh by using a positive value, or outset
    * it with a negative value.
-   * @param precision Ensure each vertex is within this distance of the true
+   * @param tolerance Ensure each vertex is within this distance of the true
    * surface. Defaults to -1, which will return the interpolated
    * crossing-point based on the two nearest grid points. Small positive values
    * will require more sdf evaluations per output vertex.
    */
   static levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-      level?: number, precision?: number): Manifold;
+      level?: number, tolerance?: number): Manifold;
 
   // Transformations
 
@@ -697,17 +697,17 @@ export class Manifold {
 
   /**
    * Increase the density of the mesh by splitting each edge into pieces such
-   * that any point on the resulting triangles is roughly within precision of
+   * that any point on the resulting triangles is roughly within tolerance of
    * the smoothly curved surface defined by the tangent vectors. This means
    * tightly curving regions will be divided more finely than smoother regions.
    * If halfedgeTangents are not present, the result will simply be a copy of
    * the original. Quads will ignore their interior triangle bisector.
    *
-   * @param precision The desired maximum distance between the faceted mesh
+   * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
    * on the surface, within rounding error.
    */
-  refineToPrecision(precision: number): Manifold;
+  refineToTolerance(tolerance: number): Manifold;
 
   /**
    * Create a new copy of this manifold with updated vertex properties by
@@ -945,14 +945,20 @@ export class Manifold {
   boundingBox(): Box;
 
   /**
-   * Returns the precision of this Manifold's vertices, which tracks the
+   * Returns the tolerance of this Manifold's vertices, which tracks the
    * approximate rounding error over all the transforms and operations that have
-   * led to this state. Any triangles that are colinear within this precision
+   * led to this state. Any triangles that are colinear within this tolerance
    * are considered degenerate and removed. This is the value of &epsilon;
    * defining
    * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
    */
-  precision(): number;
+  tolerance(): number;
+
+  /**
+   * Return a copy of the manifold with the set tolerance value.
+   * This performs mesh simplification when the tolerance value is increased.
+   */
+  setTolerance(tolerance: number): Manifold;
 
   /**
    * The genus is a topological property of the manifold, representing the
@@ -962,13 +968,14 @@ export class Manifold {
   genus(): number;
 
   /**
-   * Returns the surface area and volume of the manifold. These properties are
-   * clamped to zero for a given face if they are within the Precision(). This
-   * means degenerate manifolds can by identified by testing these properties as
-   * == 0.
+   * Returns the surface area of the manifold.
    */
-  getProperties(): Properties;
+  surfaceArea(): number;
 
+  /**
+   * Returns the volume of the manifold.
+   */
+  volume(): number;
 
   /**
    * Returns the minimum gap between two manifolds. Returns a float between
@@ -984,14 +991,15 @@ export class Manifold {
    * includes relations to all the input meshes that form a part of this result
    * and the transforms applied to each.
    *
-   * @param normalIdx If the original Mesh inputs that formed this manifold had
-   * properties corresponding to normal vectors, you can specify which property
-   * channels these are (x, y, z), which will cause this output Mesh to
-   * automatically update these normals according to the applied transforms and
-   * front/back side. Each channel must be >= 3 and < numProp, and all original
-   * Meshes must use the same channels for their normals.
+   * @param normalIdx If the original MeshGL inputs that formed this manifold
+   * had properties corresponding to normal vectors, you can specify the first
+   * of the three consecutive property channels forming the (x, y, z) normals,
+   * which will cause this output MeshGL to automatically update these normals
+   * according to the applied transforms and front/back side. normalIdx + 3 must
+   * be <= numProp, and all original MeshGLs must use the same channels for
+   * their normals.
    */
-  getMesh(normalIdx?: Vec3): Mesh;
+  getMesh(normalIdx?: number): Mesh;
 
   // ID Management
 
@@ -1153,8 +1161,8 @@ export class Mesh {
    * Updates the mergeFromVert and mergeToVert vectors in order to create a
    * manifold solid. If the MeshGL is already manifold, no change will occur and
    * the function will return false. Otherwise, this will merge verts along open
-   * edges within precision (the maximum of the MeshGL precision and the
-   * baseline bounding-box precision), keeping any from the existing merge
+   * edges within tolerance (the maximum of the MeshGL tolerance and the
+   * baseline bounding-box tolerance), keeping any from the existing merge
    * vectors.
    *
    * There is no guarantee the result will be manifold - this is a best-effort

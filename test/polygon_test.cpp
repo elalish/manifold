@@ -27,7 +27,7 @@ using namespace manifold;
 Polygons Turn180(Polygons polys) {
   for (SimplePolygon &poly : polys) {
     for (vec2 &vert : poly) {
-      vert *= -1;
+      vert *= -1.0;
     }
   }
   return polys;
@@ -56,17 +56,17 @@ Polygons Duplicate(Polygons polys) {
 }
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
-              double precision = -1.0) {
+              double epsilon = -1.0) {
   PolygonParams().verbose = options.params.verbose;
 
   std::vector<ivec3> triangles;
-  EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
+  EXPECT_NO_THROW(triangles = Triangulate(polys, epsilon));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
+  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), epsilon));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
+  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), epsilon));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
   PolygonParams().verbose = false;
@@ -75,12 +75,12 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 class PolygonTestFixture : public testing::Test {
  public:
   Polygons polys;
-  double precision;
+  double epsilon;
   int expectedNumTri;
-  explicit PolygonTestFixture(Polygons polys, double precision,
+  explicit PolygonTestFixture(Polygons polys, double epsilon,
                               int expectedNumTri)
-      : polys(polys), precision(precision), expectedNumTri(expectedNumTri) {}
-  void TestBody() { TestPoly(polys, expectedNumTri, precision); }
+      : polys(polys), epsilon(epsilon), expectedNumTri(expectedNumTri) {}
+  void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
 void RegisterPolygonTestsFile(const std::string &filename) {
@@ -88,7 +88,7 @@ void RegisterPolygonTestsFile(const std::string &filename) {
   EXPECT_TRUE(f.is_open());
 
   // for each test:
-  //   test name, expectedNumTri, precision, num polygons
+  //   test name, expectedNumTri, epsilon, num polygons
   //   for each polygon:
   //     num points
   //     for each vertex:
@@ -97,13 +97,13 @@ void RegisterPolygonTestsFile(const std::string &filename) {
   // note that we should not have commas in the file
 
   std::string name;
-  double precision, x, y;
+  double epsilon, x, y;
   int expectedNumTri, numPolys, numPoints;
 
   while (1) {
     f >> name;
     if (f.eof()) break;
-    f >> expectedNumTri >> precision >> numPolys;
+    f >> expectedNumTri >> epsilon >> numPolys;
     Polygons polys;
     for (int i = 0; i < numPolys; i++) {
       polys.emplace_back();
@@ -116,7 +116,7 @@ void RegisterPolygonTestsFile(const std::string &filename) {
     testing::RegisterTest(
         "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
         [=, polys = std::move(polys)]() -> PolygonTestFixture * {
-          return new PolygonTestFixture(polys, precision, expectedNumTri);
+          return new PolygonTestFixture(polys, epsilon, expectedNumTri);
         });
   }
   f.close();

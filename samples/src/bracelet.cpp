@@ -35,15 +35,15 @@ Manifold Base(double width, double radius, double decorRadius,
   }
 
   Polygons stretch(1);
-  double dPhiRad = 2 * glm::pi<double>() / nCut;
+  double dPhiRad = 2 * kPi / nCut;
   vec2 p0(outerRadius, 0.0);
   vec2 p1(innerRadius, -cut);
   vec2 p2(innerRadius, cut);
   for (int i = 0; i < nCut; ++i) {
-    stretch[0].push_back(glm::rotate(p0, dPhiRad * i));
-    stretch[0].push_back(glm::rotate(p1, dPhiRad * i));
-    stretch[0].push_back(glm::rotate(p2, dPhiRad * i));
-    stretch[0].push_back(glm::rotate(p0, dPhiRad * i));
+    stretch[0].push_back(la::rot(dPhiRad * i, p0));
+    stretch[0].push_back(la::rot(dPhiRad * i, p1));
+    stretch[0].push_back(la::rot(dPhiRad * i, p2));
+    stretch[0].push_back(la::rot(dPhiRad * i, p0));
   }
 
   base = Manifold::Extrude(stretch, width) ^ base;
@@ -75,11 +75,11 @@ namespace manifold {
 Manifold StretchyBracelet(double radius, double height, double width,
                           double thickness, int nDecor, int nCut,
                           int nDivision) {
-  double twistRadius = glm::pi<double>() * radius / nDecor;
+  double twistRadius = kPi * radius / nDecor;
   double decorRadius = twistRadius * 1.5;
   double outerRadius = radius + (decorRadius + twistRadius) * 0.5;
   double innerRadius = outerRadius - height;
-  double cut = 0.5 * (glm::pi<double>() * 2 * innerRadius / nCut - thickness);
+  double cut = 0.5 * (kPi * 2 * innerRadius / nCut - thickness);
   double adjThickness = 0.5 * thickness * height / cut;
 
   return Base(width, radius, decorRadius, twistRadius, nDecor,

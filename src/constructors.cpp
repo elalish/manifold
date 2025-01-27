@@ -14,7 +14,7 @@
 
 #include "./csg_tree.h"
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 #include "manifold/polygon.h"
 
 namespace manifold {
@@ -68,7 +68,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  * No higher-order derivatives are considered, as the interpolation is
  * independent per triangle, only sharing constraints on their boundaries.
  *
- * @param meshGL input MeshGL.
+ * @param meshGL64 input MeshGL64.
  * @param sharpenedEdges If desired, you can supply a vector of sharpened
  * halfedges, which should in general be a small subset of all halfedges. Order
  * of entries doesn't matter, as each one specifies the desired smoothness
@@ -113,10 +113,11 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || glm::length(size) == 0.) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
-  mat4x3 m(glm::translate(center ? (-size / 2.0) : vec3(0)) * glm::scale(size));
+  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
+           center ? (-size / 2.0) : vec3(0.0));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -176,8 +177,8 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
       [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
-               v = glm::cos(glm::half_pi<double>() * (1.0 - v));
-               v = radius * glm::normalize(v);
+               v = la::cos(kHalfPi * (1.0 - v));
+               v = radius * la::normalize(v);
                if (std::isnan(v.x)) v = vec3(0.0);
              });
   pImpl_->Finish();
@@ -236,9 +237,9 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   for (int i = 1; i < nDivisions + 1; ++i) {
     double alpha = i / double(nDivisions);
     double phi = alpha * twistDegrees;
-    vec2 scale = glm::mix(vec2(1.0), scaleTop, alpha);
-    mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
-    mat2 transform = mat2(scale.x, 0.0, 0.0, scale.y) * rotation;
+    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
+    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
+    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
     size_t j = 0;
     size_t idx = 0;
     for (const auto& poly : crossSection) {
@@ -247,14 +248,16 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
         size_t thisVert = vert + offset;
         size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
         if (i == nDivisions && isCone) {
-          triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
-                              thisVert - nCrossSection});
+          triVerts.push_back(ivec3(nCrossSection * i + j,
+                                   lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
         } else {
           vec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
-              {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
+              ivec3(thisVert, lastVert, thisVert - nCrossSection));
+          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
         }
       }
       ++j;
@@ -383,18 +386,18 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
         if (isFullRevolution || slice > 0) {
           const int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
           if (currPolyVertex.x > 0.0) {
-            triVerts.push_back(
-                {startPosIndex + slice, startPosIndex + lastSlice,
-                 // "Reuse" vertex of first slice if it lies on the revolve axis
-                 (prevPolyVertex.x == 0.0 ? prevStartPosIndex
-                                          : prevStartPosIndex + lastSlice)});
+            triVerts.push_back(ivec3(
+                startPosIndex + slice, startPosIndex + lastSlice,
+                // "Reuse" vertex of first slice if it lies on the revolve axis
+                (prevPolyVertex.x == 0.0 ? prevStartPosIndex
+                                         : prevStartPosIndex + lastSlice)));
           }
 
           if (prevPolyVertex.x > 0.0) {
             triVerts.push_back(
-                {prevStartPosIndex + lastSlice, prevStartPosIndex + slice,
-                 (currPolyVertex.x == 0.0 ? startPosIndex
-                                          : startPosIndex + slice)});
+                ivec3(prevStartPosIndex + lastSlice, prevStartPosIndex + slice,
+                      (currPolyVertex.x == 0.0 ? startPosIndex
+                                               : startPosIndex + slice)));
           }
         }
       }
@@ -404,8 +407,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
-    std::vector<ivec3> frontTriangles =
-        Triangulate(polygons, pImpl_->precision_);
+    std::vector<ivec3> frontTriangles = Triangulate(polygons, pImpl_->epsilon_);
     for (auto& t : frontTriangles) {
       triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
     }
@@ -434,7 +436,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   for (const auto& manifold : manifolds) {
     children.push_back(manifold.pNode_->ToLeafNode());
   }
-  return Manifold(std::make_shared<Impl>(CsgLeafNode::Compose(children)));
+  return Manifold(CsgLeafNode::Compose(children));
 }
 
 /**
@@ -465,7 +467,8 @@ std::vector<Manifold> Manifold::Decompose() const {
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
-    impl->precision_ = pImpl_->precision_;
+    impl->epsilon_ = pImpl_->epsilon_;
+    impl->tolerance_ = pImpl_->tolerance_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert =

@@ -1,0 +1,51 @@
+cross_section__warp__warp_func:
+  Move the vertices of this CrossSection (creating a new one) according to
+  any arbitrary input function, followed by a union operation (with a
+  Positive fill rule) that ensures any introduced intersections are not
+  included in the result.
+  :param warp_func: A function that takes the original vertex position and
+  return the new position.
+cross_section__warp_batch__warp_func:
+  Same as CrossSection::warp but calls warpFunc with
+  an ndarray[n, 2] instead of processing only one vertex at a time.
+  :param warp_func: A function that takes multiple vertex positions as an
+  ndarray[n, 2] and returns the new vertex positions.
+manifold__warp__warp_func:
+  This function does not change the topology, but allows the vertices to be
+  moved according to any arbitrary input function. It is easy to create a
+  function that warps a geometrically valid object into one which overlaps, but
+  that is not checked here, so it is up to the user to choose their function
+  with discretion.
+  :param warp_func: A function that takes the original vertex position and
+  return the new position.
+manifold__warp_batch__warp_func:
+  Same as Manifold::warp but calls warpFunc with with
+  an ndarray[n, 3] instead of processing only one vertex at a time.
+  :param warp_func: A function that takes multiple vertex positions as an
+  ndarray[n, 3] and returns the new vertex positions. The result should have the
+  same shape as the input.
+manifold__smooth__mesh_gl__sharpened_edges:
+  Constructs a smooth version of the input mesh by creating tangents; this
+  method will throw if you have supplied tangents with your mesh already. The
+  actual triangle resolution is unchanged; use the Refine() method to
+  interpolate to a higher-resolution curve.
+  By default, every edge is calculated for maximum smoothness (very much
+  approximately), attempting to minimize the maximum mean Curvature magnitude.
+  No higher-order derivatives are considered, as the interpolation is
+  independent per triangle, only sharing constraints on their boundaries.
+  :param mesh: input Mesh.
+  :param sharpened_edges: If desired, you can supply a vector of sharpened
+  halfedges, which should in general be a small subset of all halfedges. Order
+  of entries doesn't matter, as each one specifies the desired smoothness
+  (between zero and one, with one the default for all unspecified halfedges)
+  and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+  between triVert 0 and 1, etc).
+  :param edge_smoothness: Smoothness values associated to each halfedge defined
+  in sharpened_edges. At a smoothness value of zero, a sharp crease is made. The
+  smoothness is interpolated along each edge, so the specified value should be
+  thought of as an average. Where exactly two sharpened edges meet at a vertex,
+  their tangents are rotated to be colinear so that the sharpened edge can be
+  continuous. Vertices with only one sharpened edge are completely smooth,
+  allowing sharpened edges to smoothly vanish at termination. A single vertex
+  can be sharpened by sharping all edges that are incident on it, allowing cones
+  to be formed.

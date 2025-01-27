@@ -98,6 +98,18 @@ collect(f"{base}/include/manifold/common.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 
+with open(f"{base}/bindings/python/docstring_override.txt") as f:
+    key = ""
+    for l in f:
+        if l.startswith("  "):
+            comments[key] += l[2:]
+        else:
+            key = l[:-2]
+            if key not in comments.keys():
+                print(f"Error, unknown docstring override key {key}")
+                exit(-1)
+            comments[key] = ""
+
 gen_h = "autogen_docstrings.inl"
 with open(gen_h, "w") as f:
     f.write("#pragma once\n\n")

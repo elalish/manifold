@@ -90,11 +90,12 @@ def all_manifold():
     n = m.num_tri()
     n = m.num_vert()
     i = m.original_id()
-    p = m.precision()
+    p = m.get_tolerance()
+    pp = m.set_tolerance(0.0001)
     c = m.project()
     m = m.refine(2)
     m = m.refine_to_length(0.1)
-    m = m.refine_to_precision(0.01)
+    m = m.refine_to_tolerance(0.01)
     m = m.smooth_out()
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
@@ -112,10 +113,12 @@ def all_manifold():
     m = m.translate((0, 0, 0))
     m = m.trim_by_plane((0, 0, 1), 0)
     m = m.warp(lambda p: (p[0] + 1, p[1] / 2, p[2] * 2))
-    m = m.warp_batch(lambda ps: ps * [1, 0.5, 2] + [1, 0, 0])
+    m = m.warp_batch(lambda ps: ps * 2 + [1, 0, 0])
     m = Manifold.cube()
     m2 = Manifold.cube().translate([2, 0, 0])
     d = m.min_gap(m2, 2)
+    mesh2 = m.to_mesh64()
+    ok = mesh.merge()
 
 
 def run():

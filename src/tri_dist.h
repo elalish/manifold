@@ -15,7 +15,6 @@
 #pragma once
 
 #include <array>
-#include <glm/glm.hpp>
 
 #include "manifold/common.h"
 
@@ -43,11 +42,11 @@ inline void EdgeEdgeDist(vec3& x, vec3& y,  // closest points
                          const vec3& b)  // seg 2 origin, vector
 {
   const vec3 T = q - p;
-  const auto ADotA = glm::dot(a, a);
-  const auto BDotB = glm::dot(b, b);
-  const auto ADotB = glm::dot(a, b);
-  const auto ADotT = glm::dot(a, T);
-  const auto BDotT = glm::dot(b, T);
+  const auto ADotA = la::dot(a, a);
+  const auto BDotB = la::dot(b, b);
+  const auto ADotB = la::dot(a, b);
+  const auto ADotT = la::dot(a, T);
+  const auto BDotT = la::dot(b, T);
 
   // t parameterizes ray (p, a)
   // u parameterizes ray (q, b)
@@ -57,7 +56,7 @@ inline void EdgeEdgeDist(vec3& x, vec3& y,  // closest points
 
   double t;  // We will clamp result so t is on the segment (p, a)
   t = Denom != 0.0
-          ? glm::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0)
+          ? la::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0)
           : 0.0;
 
   // find u for point on ray (q, b) closest to point at t
@@ -69,14 +68,14 @@ inline void EdgeEdgeDist(vec3& x, vec3& y,  // closest points
     // otherwise, clamp u, recompute and clamp t
     if (u < 0.0) {
       u = 0.0;
-      t = ADotA != 0.0 ? glm::clamp(ADotT / ADotA, 0.0, 1.0) : 0.0;
+      t = ADotA != 0.0 ? la::clamp(ADotT / ADotA, 0.0, 1.0) : 0.0;
     } else if (u > 1.0) {
       u = 1.0;
-      t = ADotA != 0.0 ? glm::clamp((ADotB + ADotT) / ADotA, 0.0, 1.0) : 0.0;
+      t = ADotA != 0.0 ? la::clamp((ADotB + ADotT) / ADotA, 0.0, 1.0) : 0.0;
     }
   } else {
     u = 0.0;
-    t = ADotA != 0.0 ? glm::clamp(ADotT / ADotA, 0.0, 1.0) : 0.0;
+    t = ADotA != 0.0 ? la::clamp(ADotT / ADotA, 0.0, 1.0) : 0.0;
   }
   x = p + a * t;
   y = q + b * u;
@@ -115,7 +114,7 @@ inline auto DistanceTriangleTriangleSquared(const std::array<vec3, 3>& p,
       vec3 cq;
       EdgeEdgeDist(cp, cq, p[i], Sv[i], q[j], Tv[j]);
       const vec3 V = cq - cp;
-      const auto dd = glm::dot(V, V);
+      const auto dd = la::dot(V, V);
 
       if (dd <= mindd) {
         mindd = dd;
@@ -123,14 +122,14 @@ inline auto DistanceTriangleTriangleSquared(const std::array<vec3, 3>& p,
         uint32_t id = i + 2;
         if (id >= 3) id -= 3;
         vec3 Z = p[id] - cp;
-        auto a = glm::dot(Z, V);
+        auto a = la::dot(Z, V);
         id = j + 2;
         if (id >= 3) id -= 3;
         Z = q[id] - cq;
-        auto b = glm::dot(Z, V);
+        auto b = la::dot(Z, V);
 
         if ((a <= 0.0) && (b >= 0.0)) {
-          return glm::dot(V, V);
+          return la::dot(V, V);
         };
 
         if (a <= 0.0)
@@ -143,12 +142,12 @@ inline auto DistanceTriangleTriangleSquared(const std::array<vec3, 3>& p,
     }
   }
 
-  vec3 Sn = glm::cross(Sv[0], Sv[1]);
-  auto Snl = glm::dot(Sn, Sn);
+  vec3 Sn = la::cross(Sv[0], Sv[1]);
+  auto Snl = la::dot(Sn, Sn);
 
   if (Snl > 1e-15) {
-    const vec3 Tp(glm::dot(p[0] - q[0], Sn), glm::dot(p[0] - q[1], Sn),
-                  glm::dot(p[0] - q[2], Sn));
+    const vec3 Tp(la::dot(p[0] - q[0], Sn), la::dot(p[0] - q[1], Sn),
+                  la::dot(p[0] - q[2], Sn));
 
     int index = -1;
     if ((Tp[0] > 0.0) && (Tp[1] > 0.0) && (Tp[2] > 0.0)) {
@@ -165,29 +164,29 @@ inline auto DistanceTriangleTriangleSquared(const std::array<vec3, 3>& p,
       const vec3& qIndex = q[index];
 
       vec3 V = qIndex - p[0];
-      vec3 Z = glm::cross(Sn, Sv[0]);
-      if (glm::dot(V, Z) > 0.0) {
+      vec3 Z = la::cross(Sn, Sv[0]);
+      if (la::dot(V, Z) > 0.0) {
         V = qIndex - p[1];
-        Z = glm::cross(Sn, Sv[1]);
-        if (glm::dot(V, Z) > 0.0) {
+        Z = la::cross(Sn, Sv[1]);
+        if (la::dot(V, Z) > 0.0) {
           V = qIndex - p[2];
-          Z = glm::cross(Sn, Sv[2]);
-          if (glm::dot(V, Z) > 0.0) {
+          Z = la::cross(Sn, Sv[2]);
+          if (la::dot(V, Z) > 0.0) {
             vec3 cp = qIndex + Sn * Tp[index] / Snl;
             vec3 cq = qIndex;
-            return glm::dot(cp - cq, cp - cq);
+            return la::dot(cp - cq, cp - cq);
           }
         }
       }
     }
   }
 
-  vec3 Tn = glm::cross(Tv[0], Tv[1]);
-  auto Tnl = glm::dot(Tn, Tn);
+  vec3 Tn = la::cross(Tv[0], Tv[1]);
+  auto Tnl = la::dot(Tn, Tn);
 
   if (Tnl > 1e-15) {
-    const vec3 Sp(glm::dot(q[0] - p[0], Tn), glm::dot(q[0] - p[1], Tn),
-                  glm::dot(q[0] - p[2], Tn));
+    const vec3 Sp(la::dot(q[0] - p[0], Tn), la::dot(q[0] - p[1], Tn),
+                  la::dot(q[0] - p[2], Tn));
 
     int index = -1;
     if ((Sp[0] > 0.0) && (Sp[1] > 0.0) && (Sp[2] > 0.0)) {
@@ -204,17 +203,17 @@ inline auto DistanceTriangleTriangleSquared(const std::array<vec3, 3>& p,
       const vec3& pIndex = p[index];
 
       vec3 V = pIndex - q[0];
-      vec3 Z = glm::cross(Tn, Tv[0]);
-      if (glm::dot(V, Z) > 0.0) {
+      vec3 Z = la::cross(Tn, Tv[0]);
+      if (la::dot(V, Z) > 0.0) {
         V = pIndex - q[1];
-        Z = glm::cross(Tn, Tv[1]);
-        if (glm::dot(V, Z) > 0.0) {
+        Z = la::cross(Tn, Tv[1]);
+        if (la::dot(V, Z) > 0.0) {
           V = pIndex - q[2];
-          Z = glm::cross(Tn, Tv[2]);
-          if (glm::dot(V, Z) > 0.0) {
+          Z = la::cross(Tn, Tv[2]);
+          if (la::dot(V, Z) > 0.0) {
             vec3 cp = pIndex;
             vec3 cq = pIndex + Tn * Sp[index] / Tnl;
-            return glm::dot(cp - cq, cp - cq);
+            return la::dot(cp - cq, cp - cq);
           }
         }
       }

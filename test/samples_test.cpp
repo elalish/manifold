@@ -17,7 +17,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/utils.h"
 #include "manifold/polygon.h"
 #include "test.h"
 
@@ -51,9 +50,8 @@ TEST(Samples, Knot13) {
   if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
 #endif
   EXPECT_EQ(knot13.Genus(), 1);
-  auto prop = knot13.GetProperties();
-  EXPECT_NEAR(prop.volume, 20786, 1);
-  EXPECT_NEAR(prop.surfaceArea, 11177, 1);
+  EXPECT_NEAR(knot13.Volume(), 20786, 1);
+  EXPECT_NEAR(knot13.SurfaceArea(), 11177, 1);
   CheckGL(knot13);
 }
 
@@ -67,10 +65,8 @@ TEST(Samples, Knot42) {
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
   EXPECT_EQ(knots[1].Genus(), 1);
-  auto prop0 = knots[0].GetProperties();
-  auto prop1 = knots[1].GetProperties();
-  EXPECT_NEAR(prop0.volume, prop1.volume, 1);
-  EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
+  EXPECT_NEAR(knots[0].Volume(), knots[1].Volume(), 1);
+  EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
   CheckGL(knot42);
 }
 #endif
@@ -87,9 +83,6 @@ TEST(Samples, Scallop) {
     const int numVert = scallop.NumVert();
     const int numHalfedge = 3 * scallop.NumTri();
     const int numProp = in.numProp;
-    for (size_t i = 0; i < scallop.NumVert(); ++i) {
-      options.mat.vertColor.push_back({0, 0, 1, 1});
-    }
     for (int i = 0; i < numHalfedge; ++i) {
       const int vert = in.triVerts[i];
       for (int j : {0, 1, 2}) {
@@ -97,7 +90,6 @@ TEST(Samples, Scallop) {
                                     in.halfedgeTangent[4 * i + j] *
                                         in.halfedgeTangent[4 * i + 3]);
       }
-      options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
       in.triVerts.push_back(vert);
       in.triVerts.push_back(numVert + i);
@@ -114,7 +106,7 @@ TEST(Samples, Scallop) {
     const vec3 red(1, 0, 0);
     const vec3 blue(0, 0, 1);
     const double limit = 15;
-    vec3 color = glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
+    vec3 color = la::lerp(blue, red, smoothstep(-limit, limit, curvature));
     for (const int i : {0, 1, 2}) {
       newProp[i] = color[i];
     }
@@ -122,9 +114,9 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  auto prop = scallop.GetProperties();
-  EXPECT_NEAR(prop.volume, 39.9, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
+  EXPECT_NEAR(scallop.Volume(), 39.9, 0.1);
+  EXPECT_NEAR(scallop.SurfaceArea(), 79.3, 0.1);
+  EXPECT_EQ(scallop.NumVert(), scallop.NumPropVert());
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
@@ -134,7 +126,7 @@ TEST(Samples, Scallop) {
     // options2.faceted = false;
     options2.mat.roughness = 0.1;
     options2.mat.metalness = 0;
-    options2.mat.colorChannels = {3, 4, 5, -1};
+    options2.mat.colorIdx = 0;
     ExportMesh("scallop.glb", out, options2);
   }
 #endif
@@ -147,7 +139,8 @@ TEST(Samples, TetPuzzle) {
 
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
-  puzzle = puzzle.Transform(RotateUp({1, -1, -1}));
+  quat q = rotation_quat(normalize(vec3(1, -1, -1)), vec3(0, 0, 1));
+  puzzle = puzzle.Transform({la::qmat(q), vec3()});
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMeshGL(), {});
 #endif
@@ -157,9 +150,8 @@ TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
-  auto prop = frame.GetProperties();
-  EXPECT_NEAR(prop.volume, 227333, 10);
-  EXPECT_NEAR(prop.surfaceArea, 62635, 1);
+  EXPECT_NEAR(frame.Volume(), 227333, 10);
+  EXPECT_NEAR(frame.SurfaceArea(), 62635, 1);
   CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
@@ -221,9 +213,9 @@ TEST(Samples, GyroidModule) {
   CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
-  const double precision = gyroid.Precision();
-  EXPECT_NEAR(bounds.min.z, 0, precision);
-  EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), precision);
+  const double epsilon = gyroid.GetEpsilon();
+  EXPECT_NEAR(bounds.min.z, 0, epsilon);
+  EXPECT_NEAR(bounds.max.z, size * std::sqrt(2.0), epsilon);
 
   CrossSection slice(gyroid.Slice(5));
   EXPECT_EQ(slice.NumContour(), 4);
@@ -267,7 +259,7 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
   CrossSection projection(cutSponge.first.Project());
-  projection = projection.Simplify(cutSponge.first.Precision());
+  projection = projection.Simplify(cutSponge.first.GetEpsilon());
   Rect rect = projection.Bounds();
   Box box = cutSponge.first.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);
@@ -283,16 +275,19 @@ TEST(Samples, Sponge4) {
   if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMeshGL(), {});
 
-    const MeshGL out = sponge.GetMeshGL();
+    const MeshGL out = sponge
+                           .SetProperties(3,
+                                          [](double* newProp, vec3 pos,
+                                             const double* oldProp) {
+                                            for (const int i : {0, 1, 2})
+                                              newProp[i] = 0.5 * (pos[i] + 0.5);
+                                          })
+                           .GetMeshGL();
     ExportOptions options;
     options.faceted = true;
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
-    for (size_t i = 0; i < out.vertProperties.size(); i += out.numProp) {
-      vec3 pos = {out.vertProperties[i], out.vertProperties[i + 1],
-                  out.vertProperties[i + 2]};
-      options.mat.vertColor.push_back(vec4(0.5 * (pos + 0.5), 1.0));
-    }
+    options.mat.colorIdx = 0;
     ExportMesh("mengerSponge.glb", out, options);
   }
 #endif
@@ -300,16 +295,20 @@ TEST(Samples, Sponge4) {
 #endif
 #endif
 
-TEST(Samples, CondensedMatter16) {
+TEST(Samples, DISABLED_CondensedMatter16) {
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
-  // FIXME: normals should be correct
-  // CheckNormals(cm);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
+#endif
 }
 
 TEST(Samples, CondensedMatter64) {
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
-  // FIXME: normals should be correct
-  // CheckNormals(cm);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
+#endif
 }

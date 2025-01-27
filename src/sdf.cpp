@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <glm/gtc/integer.hpp>
-
 #include "./hashtable.h"
 #include "./impl.h"
+#include "./parallel.h"
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -119,13 +117,15 @@ vec3 Position(ivec4 gridIndex, vec3 origin, vec3 spacing) {
   return origin + spacing * (vec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
 }
 
+vec3 Bound(vec3 pos, vec3 origin, vec3 spacing, ivec3 gridSize) {
+  return min(max(pos, origin), origin + spacing * (vec3(gridSize) - 1));
+}
+
 double BoundedSDF(ivec4 gridIndex, vec3 origin, vec3 spacing, ivec3 gridSize,
                   double level, std::function<double(vec3)> sdf) {
-  auto Min = [](ivec3 p) { return std::min(p.x, std::min(p.y, p.z)); };
-
   const ivec3 xyz(gridIndex);
-  const int lowerBoundDist = Min(xyz);
-  const int upperBoundDist = Min(gridSize - xyz);
+  const int lowerBoundDist = minelem(xyz);
+  const int upperBoundDist = minelem(gridSize - xyz);
   const int boundDist = std::min(lowerBoundDist, upperBoundDist - gridIndex.w);
 
   if (boundDist < 0) {
@@ -148,15 +148,15 @@ inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1, double tol,
   // Sole tuning parameter, k: (0, 1) - smaller value gets better median
   // performance, but also hits the worst case more often.
   const double k = 0.1;
-  const double check = 2 * tol / glm::length(pos0 - pos1);
+  const double check = 2 * tol / la::length(pos0 - pos1);
   double frac = 1;
   double biFrac = 1;
   while (frac > check) {
-    const double t = glm::mix(d0 / (d0 - d1), 0.5, k);
+    const double t = la::lerp(d0 / (d0 - d1), 0.5, k);
     const double r = biFrac / frac - 0.5;
-    const double x = glm::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
+    const double x = la::abs(t - 0.5) < r ? t : 0.5 - r * (t < 0.5 ? 1 : -1);
 
-    const vec3 mid = glm::mix(pos0, pos1, x);
+    const vec3 mid = la::lerp(pos0, pos1, x);
     const double d = sdf(mid) - level;
 
     if ((d > 0) == (d0 > 0)) {
@@ -171,7 +171,7 @@ inline vec3 FindSurface(vec3 pos0, double d0, vec3 pos1, double d1, double tol,
     biFrac /= 2;
   }
 
-  return glm::mix(pos0, pos1, d0 / (d0 - d1));
+  return la::lerp(pos0, pos1, d0 / (d0 - d1));
 }
 
 /**
@@ -217,7 +217,7 @@ struct NearSurface {
 
     const ivec4 gridIndex = DecodeIndex(index, gridPow);
 
-    if (glm::any(glm::greaterThan(ivec3(gridIndex), gridSize))) return;
+    if (la::any(la::greater(ivec3(gridIndex), gridSize))) return;
 
     GridVert gridVert;
     gridVert.distance = voxels[EncodeIndex(gridIndex + kVoxelOffset, gridPow)];
@@ -239,14 +239,14 @@ struct NearSurface {
           ++opposedVerts;
         }
         // Approximate bound on vert movement.
-        if (glm::abs(val) > kD * glm::abs(gridVert.distance) &&
-            glm::abs(val) > glm::abs(vMax)) {
+        if (la::abs(val) > kD * la::abs(gridVert.distance) &&
+            la::abs(val) > la::abs(vMax)) {
           vMax = val;
           closestNeighbor = i;
         }
       } else if (!gridVert.SameSide(valOp) &&
-                 glm::abs(valOp) > kD * glm::abs(gridVert.distance) &&
-                 glm::abs(valOp) > glm::abs(vMax)) {
+                 la::abs(valOp) > kD * la::abs(gridVert.distance) &&
+                 la::abs(valOp) > la::abs(vMax)) {
         vMax = valOp;
         closestNeighbor = i + 7;
       }
@@ -264,9 +264,9 @@ struct NearSurface {
                                    Position(neighborIndex, origin, spacing),
                                    vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
-      if (glm::all(glm::lessThan(glm::abs(pos - gridPos), kS * spacing))) {
+      if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
-        vertPos[idx] = pos;
+        vertPos[idx] = Bound(pos, origin, spacing, gridSize);
         gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
           if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
@@ -325,9 +325,10 @@ struct ComputeVerts {
       }
 
       const int idx = AtomicAdd(vertIndex[0], 1);
-      vertPos[idx] = FindSurface(position, gridVert.distance,
-                                 Position(neighborIndex, origin, spacing), val,
-                                 tol, level, sdf);
+      const vec3 pos = FindSurface(position, gridVert.distance,
+                                   Position(neighborIndex, origin, spacing),
+                                   val, tol, level, sdf);
+      vertPos[idx] = Bound(pos, origin, spacing, gridSize);
       gridVert.edgeVerts[i] = idx;
     }
   }
@@ -423,30 +424,26 @@ struct BuildTris {
 
 namespace manifold {
 
-/** @addtogroup Core
- *  @{
- */
-
 /**
  * Constructs a level-set manifold from the input Signed-Distance Function
- * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
- * better for manifoldness). Instead of using a cubic grid, it uses a
- * body-centered cubic grid (two shifted cubic grids). This means if your
- * function's interior exceeds the given bounds, you will see a kind of
- * egg-crate shape closing off the manifold, which is due to the underlying
- * grid.
+ * (SDF). This uses a form of Marching Tetrahedra (akin to Marching
+ * Cubes, but better for manifoldness). Instead of using a cubic grid, it uses a
+ * body-centered cubic grid (two shifted cubic grids). These grid points are
+ * snapped to the surface where possible to keep short edges from forming.
  *
  * @param sdf The signed-distance functor, containing this function signature:
  * `double operator()(vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
- * negative outside.
+ * negative outside. There is no requirement that the function be a true
+ * distance, or even continuous.
  * @param bounds An axis-aligned box that defines the extent of the grid.
  * @param edgeLength Approximate maximum edge length of the triangles in the
  * final result. This affects grid spacing, and hence has a strong effect on
  * performance.
- * @param level You can inset your Mesh by using a positive value, or outset
- * it with a negative value.
- * @param precision Ensure each vertex is within this distance of the true
+ * @param level Extract the surface at this value of your sdf; defaults to
+ * zero. You can inset your mesh by using a positive value, or outset it with a
+ * negative value.
+ * @param tolerance Ensure each vertex is within this distance of the true
  * surface. Defaults to -1, which will return the interpolated
  * crossing-point based on the two nearest grid points. Small positive values
  * will require more sdf evaluations per output vertex.
@@ -456,10 +453,10 @@ namespace manifold {
  * active.
  */
 Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
-                            double edgeLength, double level, double precision,
+                            double edgeLength, double level, double tolerance,
                             bool canParallel) {
-  if (precision <= 0) {
-    precision = std::numeric_limits<double>::infinity();
+  if (tolerance <= 0) {
+    tolerance = std::numeric_limits<double>::infinity();
   }
 
   auto pImpl_ = std::make_shared<Impl>();
@@ -469,7 +466,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const ivec3 gridPow(glm::log2(gridSize + 2) + 1);
+  const ivec3 gridPow(la::log2(gridSize + 2) + 1);
   const Uint64 maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
@@ -488,7 +485,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       });
 
   size_t tableSize = std::min(
-      2 * maxIndex, static_cast<Uint64>(10 * glm::pow(maxIndex, 0.667)));
+      2 * maxIndex, static_cast<Uint64>(10 * la::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize(gridVerts.Size() * 7);
 
@@ -496,12 +493,12 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
                NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                            gridSize, gridPow, spacing, level, precision}));
+                            gridSize, gridPow, spacing, level, tolerance}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const vec3 lastVert = vertPos[index[0] - 1];
       const Uint64 lastIndex =
-          EncodeIndex(ivec4((lastVert - origin) / spacing, 1), gridPow);
+          EncodeIndex(ivec4(ivec3((lastVert - origin) / spacing), 1), gridPow);
       const double ratio = static_cast<double>(maxIndex) / lastIndex;
 
       if (ratio > 1000)  // do not trust the ratio if it is too large
@@ -514,7 +511,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       for_each_n(
           pol, countAt(0), gridVerts.Size(),
           ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                        gridSize, gridPow, spacing, level, precision}));
+                        gridSize, gridPow, spacing, level, tolerance}));
       vertPos.resize(index[0]);
       break;
     }
@@ -529,9 +526,9 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
 
   pImpl_->CreateHalfedges(triVerts);
   pImpl_->CleanupTopology();
+  pImpl_->RemoveUnreferencedVerts();
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
-/** @} */
 }  // namespace manifold

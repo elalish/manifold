@@ -83,7 +83,7 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-val GetMeshJS(const Manifold& manifold, const ivec3& normalIdx) {
+val GetMeshJS(const Manifold& manifold, int normalIdx) {
   MeshGL mesh = manifold.GetMeshGL(normalIdx);
   return MeshGL2JS(mesh);
 }
@@ -140,7 +140,7 @@ CrossSection IntersectionN(const std::vector<CrossSection>& cross_sections) {
 
 CrossSection Transform(CrossSection& cross_section, const val& mat) {
   std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
-  mat3x2 matrix;
+  mat2x3 matrix;
   for (const int col : {0, 1, 2})
     for (const int row : {0, 1}) matrix[col][row] = array[col * 3 + row];
   return cross_section.Transform(matrix);
@@ -188,7 +188,7 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 
 Manifold Transform(Manifold& manifold, const val& mat) {
   std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
-  mat4x3 matrix;
+  mat3x4 matrix;
   for (const int col : {0, 1, 2, 3})
     for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);
@@ -206,9 +206,9 @@ Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
 }
 
 Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
-                  double level, double precision) {
+                  double level, double tolerance) {
   double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
-  return Manifold::LevelSet(f, bounds, edgeLength, level, precision);
+  return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

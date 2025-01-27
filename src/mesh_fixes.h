@@ -27,7 +27,7 @@ struct TransformNormals {
   mat3 transform;
 
   vec3 operator()(vec3 normal) const {
-    normal = glm::normalize(transform * normal);
+    normal = la::normalize(transform * normal);
     if (std::isnan(normal.x)) normal = vec3(0.0);
     return normal;
   }

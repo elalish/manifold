@@ -23,45 +23,57 @@ using namespace manifold;
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
-TEST(Properties, GetProperties) {
+TEST(Properties, Measurements) {
   Manifold cube = Manifold::Cube();
-  auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
+  EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 
   cube = cube.Scale(vec3(-1.0));
-  prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0);
+  EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
+  EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 }
 
-TEST(Properties, Precision) {
+TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.Precision(), kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.Precision(), 10 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * kPrecision);
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kPrecision);
 }
 
-TEST(Properties, Precision2) {
+TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
 }
 
-TEST(Properties, Precision3) {
-  Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
-  const auto prop = cylinder.GetProperties();
+TEST(Properties, Tolerance) {
+  double degrees = 1;
+  double tol = sind(degrees);
+  Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
 
-  MeshGL mesh = cylinder.GetMeshGL();
-  mesh.precision = 0.001;
-  mesh.faceID.clear();
-  Manifold cylinder2(mesh);
+  Manifold imperfect2 = imperfect.SetTolerance(tol);
+  MeshGL mesh = imperfect.GetMeshGL();
+  mesh.tolerance = tol;
+  Manifold imperfect3(mesh);
 
-  const auto prop2 = cylinder2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 0.001);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.001);
+  EXPECT_EQ(imperfect.NumTri(), 28);
+  EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
+  EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
+
+  EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
+  EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);
+  EXPECT_NEAR(imperfect2.Volume(), imperfect3.Volume(), 0.01);
+  EXPECT_NEAR(imperfect2.SurfaceArea(), imperfect3.SurfaceArea(), 0.02);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tolerance.glb", imperfect2.GetMeshGL(), {});
+    ExportMesh("tolerance2.glb", imperfect3.GetMeshGL(), {});
+  }
+#endif
 }
 
 /**

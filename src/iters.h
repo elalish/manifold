@@ -34,7 +34,7 @@ struct TransformIterator {
   using iterator_category = typename std::iterator_traits<
       std::remove_const_t<Iter>>::iterator_category;
 
-  TransformIterator(Iter iter, F f) : iter(iter), f(f) {}
+  constexpr TransformIterator(Iter iter, F f) : iter(iter), f(f) {}
 
   TransformIterator& operator=(const TransformIterator& other) {
     if (this == &other) return *this;
@@ -43,9 +43,9 @@ struct TransformIterator {
     return *this;
   }
 
-  reference operator*() const { return f(*iter); }
+  constexpr reference operator*() const { return f(*iter); }
 
-  reference operator[](size_t i) const { return f(iter[i]); }
+  constexpr reference operator[](size_t i) const { return f(iter[i]); }
 
   // prefix increment
   TransformIterator& operator++() {
@@ -73,7 +73,7 @@ struct TransformIterator {
     return old;
   }
 
-  TransformIterator operator+(size_t n) const {
+  constexpr TransformIterator operator+(size_t n) const {
     return TransformIterator(iter + n, f);
   }
 
@@ -82,7 +82,7 @@ struct TransformIterator {
     return *this;
   }
 
-  TransformIterator operator-(size_t n) const {
+  constexpr TransformIterator operator-(size_t n) const {
     return TransformIterator(iter - n, f);
   }
 
@@ -91,19 +91,23 @@ struct TransformIterator {
     return *this;
   }
 
-  bool operator==(TransformIterator other) const { return iter == other.iter; }
+  constexpr bool operator==(TransformIterator other) const {
+    return iter == other.iter;
+  }
 
-  bool operator!=(TransformIterator other) const {
+  constexpr bool operator!=(TransformIterator other) const {
     return !(iter == other.iter);
   }
 
-  bool operator<(TransformIterator other) const { return iter < other.iter; }
+  constexpr bool operator<(TransformIterator other) const {
+    return iter < other.iter;
+  }
 
-  difference_type operator-(TransformIterator other) const {
+  constexpr difference_type operator-(TransformIterator other) const {
     return iter - other.iter;
   }
 
-  operator TransformIterator<F, const Iter>() const {
+  constexpr operator TransformIterator<F, const Iter>() const {
     return TransformIterator(f, iter);
   }
 };
@@ -122,8 +126,8 @@ struct CountingIterator {
 
   constexpr CountingIterator(T counter) : counter(counter) {}
 
-  value_type operator*() const { return counter; }
-  value_type operator[](T i) const { return counter + i; }
+  constexpr value_type operator*() const { return counter; }
+  constexpr value_type operator[](T i) const { return counter + i; }
 
   // prefix increment
   CountingIterator& operator++() {
@@ -151,7 +155,7 @@ struct CountingIterator {
     return old;
   }
 
-  CountingIterator operator+(T n) const {
+  constexpr CountingIterator operator+(T n) const {
     return CountingIterator(counter + n);
   }
 
@@ -160,7 +164,7 @@ struct CountingIterator {
     return *this;
   }
 
-  CountingIterator operator-(T n) const {
+  constexpr CountingIterator operator-(T n) const {
     return CountingIterator(counter - n);
   }
 
@@ -169,23 +173,24 @@ struct CountingIterator {
     return *this;
   }
 
-  friend bool operator==(CountingIterator a, CountingIterator b) {
+  constexpr friend bool operator==(CountingIterator a, CountingIterator b) {
     return a.counter == b.counter;
   }
 
-  friend bool operator!=(CountingIterator a, CountingIterator b) {
+  constexpr friend bool operator!=(CountingIterator a, CountingIterator b) {
     return a.counter != b.counter;
   }
 
-  friend bool operator<(CountingIterator a, CountingIterator b) {
+  constexpr friend bool operator<(CountingIterator a, CountingIterator b) {
     return a.counter < b.counter;
   }
 
-  friend difference_type operator-(CountingIterator a, CountingIterator b) {
+  constexpr friend difference_type operator-(CountingIterator a,
+                                             CountingIterator b) {
     return a.counter - b.counter;
   }
 
-  operator CountingIterator<const T>() const {
+  constexpr operator CountingIterator<const T>() const {
     return CountingIterator(counter);
   }
 };
@@ -214,15 +219,16 @@ struct StridedRange {
     using iterator_category = typename std::iterator_traits<
         std::remove_const_t<Iter>>::iterator_category;
 
-    StridedRangeIter(Iter iter, int stride) : iter(iter), stride(stride) {}
+    constexpr StridedRangeIter(Iter iter, int stride)
+        : iter(iter), stride(stride) {}
 
-    reference operator*() { return *iter; }
+    constexpr reference operator*() { return *iter; }
 
-    std::add_const_t<reference> operator*() const { return *iter; }
+    constexpr std::add_const_t<reference> operator*() const { return *iter; }
 
-    reference operator[](size_t i) { return iter[i * stride]; }
+    constexpr reference operator[](size_t i) { return iter[i * stride]; }
 
-    std::add_const_t<reference> operator[](size_t i) const {
+    constexpr std::add_const_t<reference> operator[](size_t i) const {
       return iter[i * stride];
     }
 
@@ -252,7 +258,7 @@ struct StridedRange {
       return old;
     }
 
-    StridedRangeIter operator+(size_t n) const {
+    constexpr StridedRangeIter operator+(size_t n) const {
       return StridedRangeIter(iter + n * stride, stride);
     }
 
@@ -261,7 +267,7 @@ struct StridedRange {
       return *this;
     }
 
-    StridedRangeIter operator-(size_t n) const {
+    constexpr StridedRangeIter operator-(size_t n) const {
       return StridedRangeIter(iter - n * stride, stride);
     }
 
@@ -270,19 +276,20 @@ struct StridedRange {
       return *this;
     }
 
-    friend bool operator==(StridedRangeIter a, StridedRangeIter b) {
+    constexpr friend bool operator==(StridedRangeIter a, StridedRangeIter b) {
       return a.iter == b.iter;
     }
 
-    friend bool operator!=(StridedRangeIter a, StridedRangeIter b) {
+    constexpr friend bool operator!=(StridedRangeIter a, StridedRangeIter b) {
       return !(a.iter == b.iter);
     }
 
-    friend bool operator<(StridedRangeIter a, StridedRangeIter b) {
+    constexpr friend bool operator<(StridedRangeIter a, StridedRangeIter b) {
       return a.iter < b.iter;
     }
 
-    friend difference_type operator-(StridedRangeIter a, StridedRangeIter b) {
+    constexpr friend difference_type operator-(StridedRangeIter a,
+                                               StridedRangeIter b) {
       // note that this is not well-defined if a.stride != b.stride...
       return (a.iter - b.iter) / a.stride;
     }
@@ -291,12 +298,14 @@ struct StridedRange {
   const size_t stride;
 
  public:
-  StridedRange(Iter start, Iter end, size_t stride)
+  constexpr StridedRange(Iter start, Iter end, size_t stride)
       : _start(start), _end(end), stride(stride) {}
 
-  StridedRangeIter begin() const { return StridedRangeIter(_start, stride); }
+  constexpr StridedRangeIter begin() const {
+    return StridedRangeIter(_start, stride);
+  }
 
-  StridedRangeIter end() const {
+  constexpr StridedRangeIter end() const {
     return StridedRangeIter(_start, stride) +
            ((std::distance(_start, _end) + (stride - 1)) / stride);
   }

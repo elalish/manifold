@@ -23,13 +23,6 @@
 #include "manifold/meshIO.h"
 #endif
 
-// somehow gcc11 + gtest 1.11.0 is unable to print ivec3
-namespace glm {
-inline void PrintTo(const ivec3& point, std::ostream* os) {
-  *os << "(" << point.x << "," << point.y << "," << point.x << ")";
-}
-}  // namespace glm
-
 using namespace manifold;
 
 struct Options {
@@ -51,8 +44,7 @@ Manifold Gyroid();
 MeshGL TetGL();
 MeshGL CubeSTL();
 MeshGL CubeUV();
-MeshGL WithIndexColors(const MeshGL& in);
-MeshGL WithPositionColors(const Manifold& in);
+Manifold WithPositionColors(const Manifold& in);
 float GetMaxProperty(const MeshGL& mesh, int channel);
 float GetMinProperty(const MeshGL& mesh, int channel);
 void CheckFinite(const MeshGL& mesh);
@@ -62,8 +54,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckStrictly(const Manifold& manifold);
-void CheckGL(const Manifold& manifold);
+void CheckGL(const Manifold& manifold, bool noMerge = true);
 #ifdef MANIFOLD_EXPORT
-Manifold ReadMesh(const std::string& filename);
+MeshGL ReadMesh(const std::string& filename);
 #endif
 void RegisterPolygonTests();

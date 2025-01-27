@@ -17,6 +17,9 @@ Module.setup = function() {
   if (_ManifoldInitialized) return;
   _ManifoldInitialized = true;
 
+  // warmup tbb for emscripten, according to
+  // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
+  Module.initTBB();
   // conversion utilities
 
   function toVec(vec, list, f = x => x) {
@@ -228,14 +231,6 @@ Module.setup = function() {
     return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
-  Module.Manifold.prototype.asOriginal = function(propertyTolerance = []) {
-    const tol = new Module.Vector_f64();
-    toVec(tol, propertyTolerance);
-    const result = this._AsOriginal(tol);
-    tol.delete();
-    return result
-  };
-
   Module.Manifold.prototype.setProperties = function(numProp, func) {
     const oldNumProp = this.numProp();
     const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
@@ -302,7 +297,7 @@ Module.setup = function() {
     const polygonsVec = this._Project();
     const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
     disposePolygons(polygonsVec);
-    return result.simplify(this.precision);
+    return result;
   };
 
   Module.Manifold.prototype.split = function(manifold) {
@@ -409,9 +404,7 @@ Module.setup = function() {
 
   Module.Mesh = Mesh;
 
-  Module.Manifold.prototype.getMesh = function(normalIdx = [0, 0, 0]) {
-    if (normalIdx instanceof Array)
-      normalIdx = {0: normalIdx[0], 1: normalIdx[1], 2: normalIdx[2]};
+  Module.Manifold.prototype.getMesh = function(normalIdx = -1) {
     return new Mesh(this._GetMeshJS(normalIdx));
   };
 
@@ -648,7 +641,7 @@ Module.setup = function() {
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 
   Module.Manifold.levelSet = function(
-      sdf, bounds, edgeLength, level = 0, precision = -1) {
+      sdf, bounds, edgeLength, level = 0, tolerance = -1) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
@@ -661,7 +654,7 @@ Module.setup = function() {
       return sdf(vert);
     }, 'di');
     const out =
-        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, precision);
+        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
     removeFunction(wasmFuncPtr);
     return out;
   };
@@ -705,10 +698,10 @@ Module.setup = function() {
 
   // Top-level functions
 
-  Module.triangulate = function(polygons, precision = -1) {
+  Module.triangulate = function(polygons, epsilon = -1) {
     const polygonsVec = polygons2vec(polygons);
     const result = fromVec(
-        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
+        Module._Triangulate(polygonsVec, epsilon), (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   };

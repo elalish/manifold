@@ -22,6 +22,30 @@
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 
+#if (MANIFOLD_PAR == 1)
+#include <tbb/parallel_for.h>
+
+#include <atomic>
+#endif
+
+// https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
+void initTBB() {
+#if (MANIFOLD_PAR == 1)
+  int num_threads = tbb::this_task_arena::max_concurrency();
+  std::atomic<int> barrier{num_threads};
+  tbb::parallel_for(
+      0, num_threads,
+      [&barrier](int) {
+        barrier--;
+        while (barrier > 0) {
+          // Send browser thread to event loop
+          std::this_thread::yield();
+        }
+      },
+      tbb::static_partitioner{});
+#endif
+}
+
 using namespace emscripten;
 using namespace manifold;
 
@@ -77,10 +101,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Smoothness>("smoothness")
       .field("halfedge", &Smoothness::halfedge)
       .field("smoothness", &Smoothness::smoothness);
-
-  value_object<Properties>("properties")
-      .field("surfaceArea", &Properties::surfaceArea)
-      .field("volume", &Properties::volume);
 
   register_vector<ivec3>("Vector_ivec3");
   register_vector<vec3>("Vector_vec3");
@@ -143,7 +163,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
-      .function("refineToPrecision", &Manifold::RefineToPrecision)
+      .function("refineToTolerance", &Manifold::RefineToTolerance)
       .function("smoothByNormals", &Manifold::SmoothByNormals)
       .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
@@ -163,14 +183,16 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numProp", &Manifold::NumProp)
       .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
-      .function("precision", &Manifold::Precision)
+      .function("tolerance", &Manifold::GetTolerance)
+      .function("setTolerance", &Manifold::SetTolerance)
       .function("genus", &Manifold::Genus)
-      .function("getProperties", &Manifold::GetProperties)
+      .function("volume", &Manifold::Volume)
+      .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)
-      .function("_AsOriginal", &Manifold::AsOriginal);
+      .function("asOriginal", &Manifold::AsOriginal);
 
   // Manifold Static Methods
   function("_Cube", &Manifold::Cube);
@@ -199,4 +221,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);
+
+  function("initTBB", &initTBB);
 }

@@ -19,7 +19,7 @@
 #include "./boolean3.h"
 #include "./csg_tree.h"
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 namespace {
 using namespace manifold;
@@ -47,33 +47,35 @@ struct UpdateProperties {
 };
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
-  normal = glm::normalize(normal);
+  normal = la::normalize(normal);
   Manifold cutter = Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
-  double size = glm::length(bBox.Center() - normal * originOffset) +
-                0.5 * glm::length(bBox.Size());
+  double size = la::length(bBox.Center() - normal * originOffset) +
+                0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
-  double yDeg = glm::degrees(-std::asin(normal.z));
-  double zDeg = glm::degrees(std::atan2(normal.y, normal.x));
+  double yDeg = degrees(-std::asin(normal.z));
+  double zDeg = degrees(std::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 
 template <typename Precision, typename I>
 MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
-                                    ivec3 normalIdx) {
+                                    int normalIdx) {
   ZoneScoped;
   const int numProp = impl.NumProp();
   const int numVert = impl.NumPropVert();
   const int numTri = impl.NumTri();
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
-  const bool updateNormals =
-      !isOriginal && glm::all(glm::greaterThan(normalIdx, ivec3(2)));
+  const bool updateNormals = !isOriginal && normalIdx >= 0;
 
   MeshGLP<Precision, I> out;
-  out.precision =
-      std::max(impl.precision_,
-               std::numeric_limits<Precision>::epsilon() * impl.bBox_.Scale());
   out.numProp = 3 + numProp;
+  out.tolerance = impl.tolerance_;
+  if (std::is_same<Precision, float>::value)
+    out.tolerance =
+        std::max(out.tolerance,
+                 static_cast<Precision>(std::numeric_limits<float>::epsilon() *
+                                        impl.bBox_.Scale()));
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
@@ -195,11 +197,11 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {
-            normal[i] = out.vertProperties[start + normalIdx[i]];
+            normal[i] = out.vertProperties[start + 3 + normalIdx + i];
           }
-          normal = glm::normalize(runNormalTransform[run] * normal);
+          normal = la::normalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
-            out.vertProperties[start + normalIdx[i]] = normal[i];
+            out.vertProperties[start + 3 + normalIdx + i] = normal[i];
           }
         }
 
@@ -281,14 +283,7 @@ Manifold::Manifold(const MeshGL& meshGL)
  * unique originalID for each material, and sort the materials into triangle
  * runs.
  *
- * @param meshGL The input MeshGL.
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * properties in the [-1, 1] range.
+ * @param meshGL64 The input MeshGL64.
  */
 Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
@@ -300,13 +295,14 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
-MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
+MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
   return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
@@ -318,15 +314,16 @@ MeshGL Manifold::GetMeshGL(ivec3 normalIdx) const {
  * that form a part of this result and the transforms applied to each.
  *
  * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify which property
- * channels these are (x, y, z), which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. Each channel must be >= 3 and < numProp, and all original
- * MeshGLs must use the same channels for their normals.
+ * properties corresponding to normal vectors, you can specify the first of the
+ * three consecutive property channels forming the (x, y, z) normals, which will
+ * cause this output MeshGL to automatically update these normals according to
+ * the applied transforms and front/back side. normalIdx + 3 must be <=
+ * numProp, and all original MeshGLs must use the same channels for their
+ * normals.
  */
-MeshGL64 Manifold::GetMeshGL64(ivec3 normalIdx) const {
+MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<double, size_t>(impl, normalIdx);
+  return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
 }
 
 /**
@@ -339,7 +336,7 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  * combined into a new Manifold via operations, the status reverts to NoError,
  * simply processing the problem mesh as empty. Likewise, empty meshes may still
  * show NoError, for instance if they are small enough relative to their
- * precision to be collapsed to nothing.
+ * tolerance to be collapsed to nothing.
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
@@ -381,14 +378,41 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the precision of this Manifold's vertices, which tracks the
+ * Returns the epsilon value of this Manifold's vertices, which tracks the
  * approximate rounding error over all the transforms and operations that have
- * led to this state. Any triangles that are colinear within this precision are
- * considered degenerate and removed. This is the value of &epsilon; defining
+ * led to this state. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-double Manifold::Precision() const {
-  return GetCsgLeafNode().GetImpl()->precision_;
+double Manifold::GetEpsilon() const {
+  return GetCsgLeafNode().GetImpl()->epsilon_;
+}
+
+/**
+ * Returns the tolerance value of this Manifold. Triangles that are coplanar
+ * within tolerance tend to be merged and edges shorter than tolerance tend to
+ * be collapsed.
+ */
+double Manifold::GetTolerance() const {
+  return GetCsgLeafNode().GetImpl()->tolerance_;
+}
+
+/**
+ * Return a copy of the manifold with the set tolerance value.
+ * This performs mesh simplification when the tolerance value is increased.
+ */
+Manifold Manifold::SetTolerance(double tolerance) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (tolerance > impl->tolerance_) {
+    impl->tolerance_ = tolerance;
+    impl->CreateFaces();
+    impl->SimplifyTopology();
+    impl->Finish();
+  } else {
+    // for reducing tolerance, we need to make sure it is still at least
+    // equal to epsilon.
+    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
+  }
+  return Manifold(impl);
 }
 
 /**
@@ -402,10 +426,17 @@ int Manifold::Genus() const {
 }
 
 /**
- * Returns the surface area and volume of the manifold.
+ * Returns the surface area of the manifold.
  */
-Properties Manifold::GetProperties() const {
-  return GetCsgLeafNode().GetImpl()->GetProperties();
+double Manifold::SurfaceArea() const {
+  return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::SurfaceArea);
+}
+
+/**
+ * Returns the volume of the manifold.
+ */
+double Manifold::Volume() const {
+  return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::Volume);
 }
 
 /**
@@ -418,21 +449,12 @@ int Manifold::OriginalID() const {
 }
 
 /**
- * This function condenses all coplanar faces in the relation, and
- * collapses those edges. In the process the relation to ancestor meshes is lost
- * and this new Manifold is marked an original. Properties are preserved, so if
- * they do not match across an edge, that edge will be kept.
- *
- * @param propertyTolerance A vector of precision values for each property
- * beyond position. If specified, the propertyTolerance vector must have size =
- * numProp - 3. This is the amount of interpolation error allowed before two
- * neighboring triangles are considered to be on a property boundary edge.
- * Property boundary edges will be retained across operations even if the
- * triangles are coplanar. Defaults to 1e-5, which works well for most
- * single-precision properties in the [-1, 1] range.
+ * This removes all relations (originalID, faceID, transform) to ancestor meshes
+ * and this new Manifold is marked an original. It also collapses colinear edges
+ * - these don't get collapsed at boundaries where originalID changes, so the
+ * reset may allow flat faces to be further simplified.
  */
-Manifold Manifold::AsOriginal(
-    const std::vector<double>& propertyTolerance) const {
+Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
   if (oldImpl->status_ != Error::NoError) {
     auto newImpl = std::make_shared<Impl>();
@@ -441,9 +463,10 @@ Manifold Manifold::AsOriginal(
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces(propertyTolerance);
+  newImpl->CreateFaces();
   newImpl->SimplifyTopology();
   newImpl->Finish();
+  newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
@@ -532,7 +555,7 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-Manifold Manifold::Transform(const mat4x3& m) const {
+Manifold Manifold::Transform(const mat3x4& m) const {
   return Manifold(pNode_->Transform(m));
 }
 
@@ -545,11 +568,11 @@ Manifold Manifold::Transform(const mat4x3& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  if (glm::length(normal) == 0.) {
+  if (la::length(normal) == 0.) {
     return Manifold();
   }
-  auto n = glm::normalize(normal);
-  auto m = mat4x3(mat3(1.0) - 2.0 * glm::outerProduct(n, n));
+  auto n = la::normalize(normal);
+  auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
   return Manifold(pNode_->Transform(m));
 }
 
@@ -780,40 +803,40 @@ Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Refine([length](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
-    return static_cast<int>(glm::length(edge) / length);
+    return static_cast<int>(la::length(edge) / length);
   });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
 /**
  * Increase the density of the mesh by splitting each edge into pieces such that
- * any point on the resulting triangles is roughly within precision of the
+ * any point on the resulting triangles is roughly within tolerance of the
  * smoothly curved surface defined by the tangent vectors. This means tightly
  * curving regions will be divided more finely than smoother regions. If
  * halfedgeTangents are not present, the result will simply be a copy of the
  * original. Quads will ignore their interior triangle bisector.
  *
- * @param precision The desired maximum distance between the faceted mesh
+ * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
  * the surface, within rounding error.
  */
-Manifold Manifold::RefineToPrecision(double precision) const {
-  precision = std::abs(precision);
+Manifold Manifold::RefineToTolerance(double tolerance) const {
+  tolerance = std::abs(tolerance);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
-        [precision](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
-          const vec3 edgeNorm = glm::normalize(edge);
+        [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
+          const vec3 edgeNorm = la::normalize(edge);
           // Weight heuristic
           const vec3 tStart = vec3(tangentStart);
           const vec3 tEnd = vec3(tangentEnd);
           // Perpendicular to edge
-          const vec3 start = tStart - edgeNorm * glm::dot(edgeNorm, tStart);
-          const vec3 end = tEnd - edgeNorm * glm::dot(edgeNorm, tEnd);
+          const vec3 start = tStart - edgeNorm * la::dot(edgeNorm, tStart);
+          const vec3 end = tEnd - edgeNorm * la::dot(edgeNorm, tEnd);
           // Circular arc result plus heuristic term for non-circular curves
-          const double d = 0.5 * (glm::length(start) + glm::length(end)) +
-                           glm::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * precision)));
+          const double d = 0.5 * (la::length(start) + la::length(end)) +
+                           la::length(start - end);
+          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
         },
         true);
   }
@@ -1107,9 +1130,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
   auto intersect = *this ^ other;
-  auto prop = intersect.GetProperties();
-
-  if (prop.volume != 0) return 0.0;
+  if (!intersect.IsEmpty()) return 0.0;
 
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);

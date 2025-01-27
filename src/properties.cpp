@@ -15,34 +15,11 @@
 #include <limits>
 
 #include "./impl.h"
+#include "./parallel.h"
 #include "./tri_dist.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
-
-struct FaceAreaVolume {
-  VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
-  const double precision;
-
-  std::pair<double, double> operator()(int face) {
-    double perimeter = 0;
-    vec3 edge[3];
-    for (int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      edge[i] = vertPos[halfedges[3 * face + j].startVert] -
-                vertPos[halfedges[3 * face + i].startVert];
-      perimeter += glm::length(edge[i]);
-    }
-    vec3 crossP = glm::cross(edge[0], edge[1]);
-
-    double area = glm::length(crossP);
-    double volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
-
-    return std::make_pair(area / 2.0, volume / 6.0);
-  }
-};
 
 struct CurvatureAngles {
   VecView<double> meanCurvature;
@@ -60,24 +37,24 @@ struct CurvatureAngles {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
       edge[i] = vertPos[endVert] - vertPos[startVert];
-      edgeLength[i] = glm::length(edge[i]);
+      edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
-          std::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
-                             edge[i]));
+          std::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
+                            edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
       AtomicAdd(degree[startVert], 1.0);
     }
 
     vec3 phi;
-    phi[0] = std::acos(-glm::dot(edge[2], edge[0]));
-    phi[1] = std::acos(-glm::dot(edge[0], edge[1]));
-    phi[2] = glm::pi<double>() - phi[0] - phi[1];
+    phi[0] = std::acos(-la::dot(edge[2], edge[0]));
+    phi[1] = std::acos(-la::dot(edge[0], edge[1]));
+    phi[2] = kPi - phi[0] - phi[1];
     const double area3 = edgeLength[0] * edgeLength[1] *
-                         glm::length(glm::cross(edge[0], edge[1])) / 6;
+                         la::length(la::cross(edge[0], edge[1])) / 6;
 
     for (int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
@@ -90,6 +67,7 @@ struct CurvatureAngles {
 struct UpdateProperties {
   VecView<ivec3> triProp;
   VecView<double> properties;
+  VecView<uint8_t> counters;
 
   VecView<const double> oldProperties;
   VecView<const Halfedge> halfedge;
@@ -100,7 +78,6 @@ struct UpdateProperties {
   const int gaussianIdx;
   const int meanIdx;
 
-  // FIXME: race condition
   void operator()(const size_t tri) {
     for (const int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
@@ -108,6 +85,11 @@ struct UpdateProperties {
         triProp[tri][i] = vert;
       }
       const int propVert = triProp[tri][i];
+
+      auto old = std::atomic_exchange(
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
+      if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -126,15 +108,11 @@ struct UpdateProperties {
 
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
 
   bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
-
-    if (!std::isfinite(vertPos[halfedge.startVert][0])) return false;
-    if (!std::isfinite(vertPos[halfedge.endVert][0])) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
@@ -155,7 +133,7 @@ struct CheckCCW {
   bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
-    const mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    const mat2x3 projection = GetAxisAlignedProjection(triNormal[face]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
@@ -168,21 +146,22 @@ struct CheckCCW {
       vec2 v1 = v[1] - v[0];
       vec2 v2 = v[2] - v[0];
       double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(glm::dot(v1, v1), glm::dot(v2, v2));
+      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
       double base = std::sqrt(base2);
       vec3 V0 = vertPos[halfedges[3 * face].startVert];
       vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
       vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = glm::cross(V1 - V0, V2 - V0);
+      vec3 norm = la::cross(V1 - V0, V2 - V0);
       printf(
           "Tri %ld does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
           "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          face, area / base, base, tol, area * area, base2 * tol * tol,
-          triNormal[face].x, triNormal[face].y, triNormal[face].z, norm.x,
-          norm.y, norm.z, halfedges[3 * face].startVert,
-          halfedges[3 * face + 1].startVert, halfedges[3 * face + 2].startVert);
+          static_cast<long>(face), area / base, base, tol, area * area,
+          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
+          triNormal[face].z, norm.x, norm.y, norm.z,
+          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
+          halfedges[3 * face + 2].startVert);
     }
 #endif
     return check;
@@ -199,7 +178,7 @@ namespace manifold {
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   return all_of(countAt(0_uz), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_, vertPos_}));
+                CheckHalfedges({halfedge_}));
 }
 
 /**
@@ -214,7 +193,7 @@ bool Manifold::Impl::Is2Manifold() const {
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
-      countAt(0_uz), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+      countAt(0_uz), countAt(2 * NumEdge() - 1), [&halfedge](size_t edge) {
         const Halfedge h = halfedge[edge];
         if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
           return true;
@@ -223,47 +202,115 @@ bool Manifold::Impl::Is2Manifold() const {
       });
 }
 
+#ifdef MANIFOLD_DEBUG
+std::mutex dump_lock;
+#endif
+
+/**
+ * Returns true if this manifold is self-intersecting.
+ * Note that this is not checking for epsilon-validity.
+ */
+bool Manifold::Impl::IsSelfIntersecting() const {
+  const double epsilonSq = epsilon_ * epsilon_;
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
+  GetFaceBoxMorton(faceBox, faceMorton);
+  SparseIndices collisions = collider_.Collisions<true>(faceBox.cview());
+
+  const bool verbose = ManifoldParams().verbose;
+  return !all_of(countAt(0), countAt(collisions.size()), [&](size_t i) {
+    size_t x = collisions.Get(i, false);
+    size_t y = collisions.Get(i, true);
+    std::array<vec3, 3> tri_x, tri_y;
+    for (int i : {0, 1, 2}) {
+      tri_x[i] = vertPos_[halfedge_[3 * x + i].startVert];
+      tri_y[i] = vertPos_[halfedge_[3 * y + i].startVert];
+    }
+    // if triangles x and y share a vertex, return true to skip the
+    // check. we relax the sharing criteria a bit to allow for at most
+    // distance epsilon squared
+    for (int i : {0, 1, 2})
+      for (int j : {0, 1, 2})
+        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
+
+    if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
+      // try to move the triangles around the normal of the other face
+      std::array<vec3, 3> tmp_x, tmp_y;
+      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+
+#ifdef MANIFOLD_DEBUG
+      if (verbose) {
+        dump_lock.lock();
+        std::cout << "intersecting:" << std::endl;
+        for (int i : {0, 1, 2}) std::cout << tri_x[i] << " ";
+        std::cout << std::endl;
+        for (int i : {0, 1, 2}) std::cout << tri_y[i] << " ";
+        std::cout << std::endl;
+        dump_lock.unlock();
+      }
+#endif
+      return false;
+    }
+    return true;
+  });
+}
+
 /**
  * Returns true if all triangles are CCW relative to their triNormals_.
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(countAt(0_uz), countAt(NumTri()),
-                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
+                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * epsilon_}));
 }
 
 /**
- * Returns the number of triangles that are colinear within precision_.
+ * Returns the number of triangles that are colinear within epsilon_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(
       countAt(0_uz), countAt(NumTri()),
-      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
+      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * epsilon_ / 2}));
 }
 
-Properties Manifold::Impl::GetProperties() const {
+double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
-  if (IsEmpty()) return {0, 0};
-  // Kahan summation
-  double area = 0;
-  double volume = 0;
-  double areaCompensation = 0;
-  double volumeCompensation = 0;
-  for (size_t i = 0; i < NumTri(); ++i) {
-    auto [area1, volume1] =
-        FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
-    const double t1 = area + area1;
-    const double t2 = volume + volume1;
-    areaCompensation += (area - t1) + area1;
-    volumeCompensation += (volume - t2) + volume1;
-    area = t1;
-    volume = t2;
-  }
-  area += areaCompensation;
-  volume += volumeCompensation;
+  if (IsEmpty()) return 0;
 
-  return {area, volume};
+  auto Volume = [this](size_t tri) {
+    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+    vec3 crossP = la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
+                            vertPos_[halfedge_[3 * tri + 2].startVert] - v);
+    return la::dot(crossP, v) / 6.0;
+  };
+
+  auto Area = [this](size_t tri) {
+    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+    return la::length(
+               la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
+                         vertPos_[halfedge_[3 * tri + 2].startVert] - v)) /
+           2.0;
+  };
+
+  // Kahan summation
+  double value = 0;
+  double valueCompensation = 0;
+  for (size_t i = 0; i < NumTri(); ++i) {
+    const double value1 = prop == Property::SurfaceArea ? Area(i) : Volume(i);
+    const double t = value + value1;
+    valueCompensation += (value - t) + value1;
+    value = t;
+  }
+  value += valueCompensation;
+  return value;
 }
 
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
@@ -271,7 +318,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
   Vec<double> vertMeanCurvature(NumVert(), 0);
-  Vec<double> vertGaussianCurvature(NumVert(), glm::two_pi<double>());
+  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
   Vec<double> vertArea(NumVert(), 0);
   Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
@@ -295,18 +342,18 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
     meshRelation_.triProperties.resize(NumTri());
   }
 
+  const Vec<uint8_t> counters(NumPropVert(), 0);
   for_each_n(
       policy, countAt(0_uz), NumTri(),
       UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
-                        oldProperties, halfedge_, vertMeanCurvature,
+                        counters, oldProperties, halfedge_, vertMeanCurvature,
                         vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
                         meanIdx}));
 }
 
 /**
  * Calculates the bounding box of the entire manifold, which is stored
- * internally to short-cut Boolean operations and to serve as the precision
- * range for Morton code calculation. Ignores NaNs.
+ * internally to short-cut Boolean operations. Ignores NaNs.
  */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min =
@@ -314,14 +361,14 @@ void Manifold::Impl::CalculateBBox() {
              vec3(std::numeric_limits<double>::infinity()), [](auto a, auto b) {
                if (std::isnan(a.x)) return b;
                if (std::isnan(b.x)) return a;
-               return glm::min(a, b);
+               return la::min(a, b);
              });
   bBox_.max = reduce(vertPos_.begin(), vertPos_.end(),
                      vec3(-std::numeric_limits<double>::infinity()),
                      [](auto a, auto b) {
                        if (std::isnan(a.x)) return b;
                        if (std::isnan(b.x)) return a;
-                       return glm::max(a, b);
+                       return la::max(a, b);
                      });
 }
 
@@ -333,7 +380,7 @@ bool Manifold::Impl::IsFinite() const {
   return transform_reduce(
       vertPos_.begin(), vertPos_.end(), true,
       [](bool a, bool b) { return a && b; },
-      [](auto v) { return glm::all(glm::isfinite(v)); });
+      [](auto v) { return la::all(la::isfinite(v)); });
 }
 
 /**
