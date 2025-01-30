@@ -68,12 +68,20 @@ struct FlagEdge {
     // two original triangles.
     const TriRef ref0 = triRef[edge / 3];
     int current = NextHalfedge(halfedge[edge].pairedHalfedge);
-    const TriRef ref1 = triRef[current / 3];
+    TriRef ref1 = triRef[current / 3];
+    bool ref1Updated = !ref0.SameFace(ref1);
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
       const TriRef ref = triRef[tri];
-      if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) return false;
+      if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) {
+        if (!ref1Updated) {
+          ref1 = ref;
+          ref1Updated = true;
+        } else {
+          return false;
+        }
+      }
     }
     return true;
   }
