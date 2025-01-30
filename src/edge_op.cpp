@@ -109,14 +109,75 @@ struct SwappableEdge {
   }
 };
 
-struct SortEntry {
-  int start;
-  int end;
-  size_t index;
-  inline bool operator<(const SortEntry& other) const {
-    return start == other.start ? end < other.end : start < other.start;
+struct FlagStore {
+#if MANIFOLD_PAR == 1
+  tbb::combinable<std::vector<size_t>> store;
+#endif
+  std::vector<size_t> s;
+
+  template <typename Pred, typename F>
+  void run_seq(size_t n, Pred pred, F f) {
+    for (size_t i = 0; i < n; ++i)
+      if (pred(i)) s.push_back(i);
+    for (size_t i : s) f(i);
+    s.clear();
+  }
+
+#if MANIFOLD_PAR == 1
+  template <typename Pred, typename F>
+  void run_par(size_t n, Pred pred, F f) {
+    auto& store = this->store;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
+                      [&store, &pred, f](const auto& r) {
+                        auto& local = store.local();
+                        for (auto i = r.begin(); i < r.end(); ++i) {
+                          if (pred(i)) local.push_back(i);
+                        }
+                      });
+
+    std::vector<std::vector<size_t>> stores;
+    // first index: index within the vector
+    // second index: vector index within stores
+    using P = std::pair<size_t, size_t>;
+    auto cmp = [&stores](P a, P b) {
+      return stores[a.second][a.first] < stores[b.second][b.first];
+    };
+    std::vector<P> s;
+
+    store.combine_each([&stores, &s, &cmp](std::vector<size_t>& local) {
+      if (local.empty()) return;
+      stores.emplace_back(std::move(local));
+      s.push_back(std::make_pair(0, stores.size() - 1));
+      std::push_heap(s.begin(), s.end(), cmp);
+    });
+    while (!s.empty()) {
+      std::pop_heap(s.begin(), s.end());
+      auto [a, b] = s.back();
+      auto i = stores[b][a];
+      if (a + 1 == stores[b].size()) {
+        s.pop_back();
+      } else {
+        s.back().first++;
+        std::push_heap(s.begin(), s.end(), cmp);
+      }
+      f(i);
+    }
+  }
+#endif
+
+  template <typename Pred, typename F>
+  void run(size_t n, Pred pred, F f) {
+#if MANIFOLD_PAR == 1
+    if (n > 1e5) {
+      run_par(n, pred, f);
+    } else
+#endif
+    {
+      run_seq(n, pred, f);
+    }
   }
 };
+
 }  // namespace
 
 namespace manifold {
@@ -132,30 +193,62 @@ void Manifold::Impl::CleanupTopology() {
   // verts. They must be removed before edge collapse.
   SplitPinchedVerts();
 
+  Vec<int> entries;
+  FlagStore s;
   while (1) {
     ZoneScopedN("DedupeEdge");
 
     const size_t nbEdges = halfedge_.size();
     size_t numFlagged = 0;
 
-    Vec<SortEntry> entries;
-    entries.reserve(nbEdges / 2);
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (halfedge_[i].IsForward()) {
-        entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
+#if MANIFOLD_PAR == 1
+    if (nbEdges > 1e5) {
+      entries.resize_nofill(nbEdges);
+      sequence(entries.begin(), entries.end());
+      stable_sort(entries.begin(), entries.end(), [&](int a, int b) {
+        const auto& self = halfedge_[a];
+        const auto& other = halfedge_[b];
+        // place all backward edges at the end
+        if (!other.IsForward()) return true;
+        if (!self.IsForward()) return false;
+        // dictionary order based on start and end vertices
+        return self.startVert == other.startVert
+                   ? self.endVert < other.endVert
+                   : self.startVert < other.startVert;
+      });
+      entries.resize(nbEdges / 2);
+    } else
+#endif
+    {
+      entries.clear(true);
+      entries.reserve(nbEdges / 2);
+      for (size_t i = 0; i < nbEdges; ++i) {
+        if (halfedge_[i].IsForward()) {
+          entries.push_back(i);
+        }
       }
+      stable_sort(entries.begin(), entries.end(), [&](int a, int b) {
+        const auto& self = halfedge_[a];
+        const auto& other = halfedge_[b];
+        // dictionary order based on start and end vertices
+        return self.startVert == other.startVert
+                   ? self.endVert < other.endVert
+                   : self.startVert < other.startVert;
+      });
     }
 
-    stable_sort(entries.begin(), entries.end());
-    for (size_t i = 0; i < entries.size() - 1; ++i) {
-      const int h0 = entries[i].index;
-      const int h1 = entries[i + 1].index;
-      if (halfedge_[h0].startVert == halfedge_[h1].startVert &&
-          halfedge_[h0].endVert == halfedge_[h1].endVert) {
-        DedupeEdge(entries[i].index);
-        numFlagged++;
-      }
-    }
+    s.run(
+        entries.size() - 1,
+        [&](int i) {
+          const int h0 = entries[i];
+          const int h1 = entries[i + 1];
+          return (halfedge_[h0].startVert == halfedge_[h1].startVert &&
+                  halfedge_[h0].endVert == halfedge_[h1].endVert);
+        },
+        [&](int i) {
+          DedupeEdge(entries[i]);
+          numFlagged++;
+        });
 
     if (numFlagged == 0) break;
 
@@ -199,23 +292,20 @@ void Manifold::Impl::SimplifyTopology() {
   const size_t nbEdges = halfedge_.size();
   auto policy = autoPolicy(nbEdges, 1e5);
   size_t numFlagged = 0;
-  Vec<uint8_t> bFlags(nbEdges);
 
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
+
+  FlagStore s;
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
     ShortEdge se{halfedge_, vertPos_, epsilon_};
-    for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bFlags[i] = se(i); });
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (bFlags[i]) {
-        CollapseEdge(i, scratchBuffer);
-        scratchBuffer.resize(0);
-        numFlagged++;
-      }
-    }
+    s.run(nbEdges, se, [&](size_t i) {
+      CollapseEdge(i, scratchBuffer);
+      scratchBuffer.resize(0);
+      numFlagged++;
+    });
   }
 
 #ifdef MANIFOLD_DEBUG
@@ -229,15 +319,11 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
-    for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bFlags[i] = se(i); });
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (bFlags[i]) {
-        CollapseEdge(i, scratchBuffer);
-        scratchBuffer.resize(0);
-        numFlagged++;
-      }
-    }
+    s.run(nbEdges, se, [&](size_t i) {
+      CollapseEdge(i, scratchBuffer);
+      scratchBuffer.resize(0);
+      numFlagged++;
+    });
   }
 
 #ifdef MANIFOLD_DEBUG
@@ -251,23 +337,19 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
     SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_};
-    for_each_n(policy, countAt(0_uz), nbEdges,
-               [&](size_t i) { bFlags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
-    for (size_t i = 0; i < nbEdges; ++i) {
-      if (bFlags[i]) {
-        numFlagged++;
-        tag++;
-        RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
-        while (!edgeSwapStack.empty()) {
-          int last = edgeSwapStack.back();
-          edgeSwapStack.pop_back();
-          RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
-        }
+    s.run(nbEdges, se, [&](size_t i) {
+      numFlagged++;
+      tag++;
+      RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
+      while (!edgeSwapStack.empty()) {
+        int last = edgeSwapStack.back();
+        edgeSwapStack.pop_back();
+        RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
       }
-    }
+    });
   }
 
 #ifdef MANIFOLD_DEBUG
