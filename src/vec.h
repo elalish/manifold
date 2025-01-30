@@ -186,6 +186,13 @@ class Vec : public VecView<T> {
     if (shrink) shrink_to_fit();
   }
 
+  void resize_nofill(size_t newSize) {
+    bool shrink = this->size_ > 2 * newSize;
+    reserve(newSize);
+    this->size_ = newSize;
+    if (shrink) shrink_to_fit();
+  }
+
   void pop_back() { resize(this->size_ - 1); }
 
   void clear(bool shrink = true) {

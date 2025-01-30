@@ -639,12 +639,12 @@ Manifold Manifold::SetProperties(
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
-    triProperties.resize(0);
-    pImpl->meshRelation_.properties.resize(0);
+    triProperties.clear();
+    pImpl->meshRelation_.properties.clear();
   } else {
     if (triProperties.size() == 0) {
       const int numTri = NumTri();
-      triProperties.resize(numTri);
+      triProperties.resize_nofill(numTri);
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
           triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;

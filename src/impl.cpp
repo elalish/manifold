@@ -297,7 +297,7 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
-  triRef.resize(NumTri());
+  triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, keepFaceID, &triRef](const int tri) {
                triRef[tri] = {meshID, meshID, tri,
@@ -390,8 +390,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   const size_t numTri = triVerts.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
-  halfedge_.resize(0);
-  halfedge_.resize(numHalfedge);
+  halfedge_.clear(true);
+  halfedge_.resize_nofill(numHalfedge);
   Vec<uint64_t> edge(numHalfedge);
   Vec<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
@@ -470,11 +470,11 @@ void Manifold::Impl::Update() {
 
 void Manifold::Impl::MarkFailure(Error status) {
   bBox_ = Box();
-  vertPos_.resize(0);
-  halfedge_.resize(0);
-  vertNormal_.resize(0);
-  faceNormal_.resize(0);
-  halfedgeTangent_.resize(0);
+  vertPos_.clear();
+  halfedge_.clear();
+  vertNormal_.clear();
+  faceNormal_.clear();
+  halfedgeTangent_.clear();
   meshRelation_ = MeshRelationD();
   status_ = status;
 }
@@ -493,7 +493,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     return;
   }
   Update();
-  faceNormal_.resize(0);  // force recalculation of triNormal
+  faceNormal_.clear();  // force recalculation of triNormal
   CalculateNormals();
   SetEpsilon();
   Finish();

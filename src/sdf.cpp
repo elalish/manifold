@@ -487,7 +487,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   size_t tableSize = std::min(
       2 * maxIndex, static_cast<Uint64>(10 * la::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
-  vertPos.resize(gridVerts.Size() * 7);
+  vertPos.resize_nofill(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);

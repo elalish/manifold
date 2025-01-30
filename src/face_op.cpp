@@ -44,7 +44,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
   Vec<TriRef>& triRef = meshRelation_.triRef;
-  triRef.resize(0);
+  triRef.clear();
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
                          int face) {
     const int firstEdge = faceEdge[face];
