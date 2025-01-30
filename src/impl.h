@@ -200,8 +200,6 @@ struct Manifold::Impl {
     CalculateBBox();
     SetEpsilon(-1, std::is_same<Precision, float>::value);
 
-    SplitPinchedVerts();
-
     CalculateNormals();
 
     if (meshGL.runOriginalID.empty()) {
