@@ -209,12 +209,12 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.vertPos_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
   combined.faceNormal_.resize_nofill(numTri);
-  combined.halfedgeTangent_.resize_nofill(2 * numEdge);
+  combined.halfedgeTangent_.resize(2 * numEdge);
   combined.meshRelation_.triRef.resize_nofill(numTri);
   if (numPropOut > 0) {
     combined.meshRelation_.numProp = numPropOut;
     combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
-    combined.meshRelation_.triProperties.resize(numTri, ivec3(0));
+    combined.meshRelation_.triProperties.resize_nofill(numTri);
   }
   auto policy = autoPolicy(numTri);
 
