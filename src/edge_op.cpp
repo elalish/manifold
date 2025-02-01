@@ -134,6 +134,9 @@ struct FlagStore {
 #if MANIFOLD_PAR == 1
   template <typename Pred, typename F>
   void run_par(size_t n, Pred pred, F f) {
+    // Test pred in parallel, store i into thread-local vectors when pred(i) is
+    // true. After testing pred, iterate and call f over the indices in
+    // ascending order by using a heap in a single thread
     auto& store = this->store;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
                       [&store, &pred, f](const auto& r) {
@@ -211,14 +214,18 @@ void Manifold::Impl::CleanupTopology() {
 
 #if MANIFOLD_PAR == 1
     if (nbEdges > 1e5) {
+      // Note that this is slightly different from the single thread version
+      // because we store all indices instead of just indices of forward
+      // halfedges. Backward halfedges are placed at the end by modifying the
+      // comparison function.
       entries.resize_nofill(nbEdges);
       sequence(entries.begin(), entries.end());
       stable_sort(entries.begin(), entries.end(), [&](int a, int b) {
         const auto& self = halfedge_[a];
         const auto& other = halfedge_[b];
         // place all backward edges at the end
-        if (!other.IsForward()) return true;
         if (!self.IsForward()) return false;
+        if (!other.IsForward()) return true;
         // dictionary order based on start and end vertices
         return self.startVert == other.startVert
                    ? self.endVert < other.endVert
