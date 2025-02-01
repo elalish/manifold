@@ -214,7 +214,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   if (numPropOut > 0) {
     combined.meshRelation_.numProp = numPropOut;
     combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
-    combined.meshRelation_.triProperties.resize_nofill(numTri);
+    combined.meshRelation_.triProperties.resize(numTri, ivec3(0));
   }
   auto policy = autoPolicy(numTri);
 
