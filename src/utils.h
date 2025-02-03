@@ -72,7 +72,7 @@ inline int Prev3(int i) {
 template <typename T, typename T1>
 void Permute(Vec<T>& inOut, const Vec<T1>& new2Old) {
   Vec<T> tmp(std::move(inOut));
-  inOut.resize(new2Old.size());
+  inOut.resize_nofill(new2Old.size());
   gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
 }
 

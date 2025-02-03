@@ -770,7 +770,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   ZoneScoped;
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.resize(0);
+  halfedgeTangent_.clear();
   Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
@@ -854,7 +854,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.resize(0);
+  halfedgeTangent_.clear();
   Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
@@ -994,7 +994,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
                InterpTri({vertPos_, vertBary, &old}));
   }
 
-  halfedgeTangent_.resize(0);
+  halfedgeTangent_.clear();
   Finish();
   CreateFaces();
   meshRelation_.originalID = -1;

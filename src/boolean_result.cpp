@@ -154,7 +154,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
-  outR.faceNormal_.resize(numFaceR);
+  outR.faceNormal_.resize_nofill(numFaceR);
 
   Vec<size_t> tmpBuffer(outR.faceNormal_.size());
   auto faceIds = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
@@ -563,7 +563,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
-  outR.meshRelation_.triProperties.resize(numTri);
+  outR.meshRelation_.triProperties.resize_nofill(numTri);
 
   Vec<vec3> bary(outR.halfedge_.size());
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
@@ -746,7 +746,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
 
-  outR.vertPos_.resize(numVertR);
+  outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
   for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(),
