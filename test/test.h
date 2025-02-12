@@ -54,8 +54,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckStrictly(const Manifold& manifold);
-void CheckGL(const Manifold& manifold);
+void CheckGL(const Manifold& manifold, bool noMerge = true);
 #ifdef MANIFOLD_EXPORT
-Manifold ReadMesh(const std::string& filename);
+MeshGL ReadMesh(const std::string& filename);
 #endif
 void RegisterPolygonTests();

@@ -294,10 +294,15 @@ TEST(CBIND, properties) {
 
   ManifoldManifold *cube =
       manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
+  EXPECT_EQ(manifold_num_prop(cube), 0);
+
   ManifoldManifold *cube_props =
       manifold_set_properties(alloc_manifold_buffer(), cube, 1, props, NULL);
+  EXPECT_EQ(manifold_num_prop(cube_props), 1);
+
   ManifoldManifold *cube_props_context = manifold_set_properties(
       alloc_manifold_buffer(), cube, 1, propscontext, context);
+  EXPECT_EQ(manifold_num_prop(cube_props_context), 1);
 
   manifold_destruct_manifold(cube);
   manifold_destruct_manifold(cube_props);
@@ -382,4 +387,28 @@ TEST(CBIND, polygons) {
   manifold_destruct_polygons(ps);
   free(sp);
   free(ps);
+}
+
+TEST(CBIND, triangulation) {
+  ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {1, 2}};
+  ManifoldSimplePolygon *sp =
+      manifold_simple_polygon(manifold_alloc_simple_polygon(), vs, 3);
+  ManifoldSimplePolygon *sps[] = {sp};
+  ManifoldPolygons *ps = manifold_polygons(manifold_alloc_polygons(), sps, 1);
+  ManifoldTriangulation *triangulation =
+      manifold_triangulate(manifold_alloc_triangulation(), ps, 1e-6);
+
+  manifold_delete_simple_polygon(sp);
+  manifold_delete_polygons(ps);
+
+  size_t num_tri = manifold_triangulation_num_tri(triangulation);
+  int *tri_verts = (int *)manifold_triangulation_tri_verts(
+      malloc(num_tri * 3 * sizeof(int)), triangulation);
+
+  EXPECT_EQ(num_tri, 1);
+  EXPECT_EQ(tri_verts[0], 0);
+  EXPECT_EQ(tri_verts[1], 1);
+  EXPECT_EQ(tri_verts[2], 2);
+  manifold_delete_triangulation(triangulation);
+  free(tri_verts);
 }

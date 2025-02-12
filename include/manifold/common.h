@@ -14,8 +14,11 @@
 
 #pragma once
 #include <limits>
-#include <stdexcept>
 #include <vector>
+
+#ifdef MANIFOLD_DEBUG
+#include <chrono>
+#endif
 
 #include "manifold/linalg.h"
 
@@ -25,9 +28,7 @@ namespace manifold {
  * @brief Simple math operations.
  * */
 
-/** @addtogroup Scalar
- * @ingroup Math
- *  @brief Simple scalar operations.
+/** @addtogroup LinAlg
  *  @{
  */
 namespace la = linalg;
@@ -47,6 +48,13 @@ using ivec2 = la::vec<int, 2>;
 using ivec3 = la::vec<int, 3>;
 using ivec4 = la::vec<int, 4>;
 using quat = la::vec<double, 4>;
+/** @} */
+
+/** @addtogroup Scalar
+ * @ingroup Math
+ *  @brief Simple scalar operations.
+ *  @{
+ */
 
 constexpr double kPi = 3.14159265358979323846264338327950288;
 constexpr double kTwoPi = 6.28318530717958647692528676655900576;
@@ -556,24 +564,6 @@ class Quality {
 };
 /** @} */
 
-/** @addtogroup Exceptions
- *  @ingroup Optional
- *  @brief Custom Exceptions. Exceptions are only thrown if the
- * MANIFOLD_EXCEPTIONS flag is set.
- * @{
- */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
-/** @} */
-
 /** @addtogroup Debug
  * @ingroup Optional
  * @{
@@ -596,10 +586,65 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Deterministic outputs. Will disable some parallel optimizations.
-  bool deterministic = false;
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
 };
 /** @} */
+
+#ifdef MANIFOLD_DEBUG
+inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
+}
+
+/**
+ * Print the contents of this vector to standard output. Only exists if compiled
+ * with MANIFOLD_DEBUG flag.
+ */
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (size_t i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+
+template <typename T>
+void Diff(const std::vector<T>& a, const std::vector<T>& b) {
+  std::cout << "Diff = " << std::endl;
+  if (a.size() != b.size()) {
+    std::cout << "a and b must have the same length, aborting Diff"
+              << std::endl;
+    return;
+  }
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (a[i] != b[i])
+      std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
+  }
+  std::cout << std::endl;
+}
+
+struct Timer {
+  std::chrono::high_resolution_clock::time_point start, end;
+
+  void Start() { start = std::chrono::high_resolution_clock::now(); }
+
+  void Stop() { end = std::chrono::high_resolution_clock::now(); }
+
+  float Elapsed() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+        .count();
+  }
+  void Print(std::string message) {
+    std::cout << "----------- " << std::round(Elapsed()) << " ms for "
+              << message << std::endl;
+  }
+};
+#endif
 }  // namespace manifold

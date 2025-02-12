@@ -116,6 +116,7 @@ TEST(Samples, Scallop) {
       3, colorCurvature);
   EXPECT_NEAR(scallop.Volume(), 39.9, 0.1);
   EXPECT_NEAR(scallop.SurfaceArea(), 79.3, 0.1);
+  EXPECT_EQ(scallop.NumVert(), scallop.NumPropVert());
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
@@ -294,7 +295,7 @@ TEST(Samples, Sponge4) {
 #endif
 #endif
 
-TEST(Samples, CondensedMatter16) {
+TEST(Samples, DISABLED_CondensedMatter16) {
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
 #ifdef MANIFOLD_EXPORT

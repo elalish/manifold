@@ -19,7 +19,7 @@
 #include "./boolean3.h"
 #include "./csg_tree.h"
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 namespace {
 using namespace manifold;
@@ -323,7 +323,7 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  return GetMeshGLImpl<double, size_t>(impl, normalIdx);
+  return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
 }
 
 /**
@@ -639,12 +639,12 @@ Manifold Manifold::SetProperties(
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
-    triProperties.resize(0);
-    pImpl->meshRelation_.properties.resize(0);
+    triProperties.clear();
+    pImpl->meshRelation_.properties.clear();
   } else {
     if (triProperties.size() == 0) {
       const int numTri = NumTri();
-      triProperties.resize(numTri);
+      triProperties.resize_nofill(numTri);
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
           triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;

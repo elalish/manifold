@@ -21,7 +21,7 @@
 #endif
 #include <vector>
 
-#include "manifold/parallel.h"
+#include "./parallel.h"
 #include "manifold/vec_view.h"
 
 namespace manifold {
@@ -182,6 +182,13 @@ class Vec : public VecView<T> {
       fill(autoPolicy(newSize - this->size_), this->ptr_ + this->size_,
            this->ptr_ + newSize, val);
     }
+    this->size_ = newSize;
+    if (shrink) shrink_to_fit();
+  }
+
+  void resize_nofill(size_t newSize) {
+    bool shrink = this->size_ > 2 * newSize;
+    reserve(newSize);
     this->size_ = newSize;
     if (shrink) shrink_to_fit();
   }

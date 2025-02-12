@@ -16,6 +16,10 @@
 #include <functional>
 #include <memory>
 
+#ifdef MANIFOLD_EXPORT
+#include <iostream>
+#endif
+
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
 
@@ -166,7 +170,7 @@ using MeshGL = MeshGLP<float>;
 /**
  * @brief Double-precision, 64-bit indices - best for huge meshes.
  */
-using MeshGL64 = MeshGLP<double, size_t>;
+using MeshGL64 = MeshGLP<double, uint64_t>;
 
 /**
  * @brief This library's internal representation of an oriented, 2-manifold,
@@ -375,6 +379,10 @@ class Manifold {
   ///@}
 
   struct Impl;
+
+#ifdef MANIFOLD_EXPORT
+  static Manifold ImportMeshGL64(std::istream& stream);
+#endif
 
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);

@@ -421,3 +421,15 @@ TEST(Boolean, Precision2) {
   cube2 = cube2.Translate(vec3(scale * kPrecision));
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
+
+TEST(Boolean, DISABLED_SimpleCubeRegression) {
+  ManifoldParams().intermediateChecks = true;
+  ManifoldParams().processOverlaps = false;
+  Manifold result =
+      Manifold::Cube().Rotate(-0.10000000000000001, 0.10000000000000001, -1.) +
+      Manifold::Cube() -
+      Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  ManifoldParams().intermediateChecks = false;
+  ManifoldParams().processOverlaps = true;
+}

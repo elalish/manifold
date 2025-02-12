@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #pragma once
+#include "./parallel.h"
 #include "./sparse.h"
 #include "./utils.h"
 #include "./vec.h"
 #include "manifold/common.h"
-#include "manifold/parallel.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -278,7 +278,7 @@ class Collider {
                  "vectors must be the same length");
     int num_nodes = 2 * leafBB.size() - 1;
     // assign and allocate members
-    nodeBBox_.resize(num_nodes);
+    nodeBBox_.resize_nofill(num_nodes);
     nodeParent_.resize(num_nodes, -1);
     internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
     // organize tree

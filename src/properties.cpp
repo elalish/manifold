@@ -15,8 +15,8 @@
 #include <limits>
 
 #include "./impl.h"
+#include "./parallel.h"
 #include "./tri_dist.h"
-#include "manifold/parallel.h"
 
 namespace {
 using namespace manifold;
@@ -89,7 +89,7 @@ struct UpdateProperties {
       auto old = std::atomic_exchange(
           reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
           static_cast<uint8_t>(1));
-      if (old == 1) return;
+      if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -157,10 +157,11 @@ struct CheckCCW {
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
           "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          face, area / base, base, tol, area * area, base2 * tol * tol,
-          triNormal[face].x, triNormal[face].y, triNormal[face].z, norm.x,
-          norm.y, norm.z, halfedges[3 * face].startVert,
-          halfedges[3 * face + 1].startVert, halfedges[3 * face + 2].startVert);
+          static_cast<long>(face), area / base, base, tol, area * area,
+          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
+          triNormal[face].z, norm.x, norm.y, norm.z,
+          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
+          halfedges[3 * face + 2].startVert);
     }
 #endif
     return check;
@@ -192,13 +193,73 @@ bool Manifold::Impl::Is2Manifold() const {
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
-      countAt(0_uz), countAt(2 * NumEdge() - 1), [halfedge](size_t edge) {
+      countAt(0_uz), countAt(2 * NumEdge() - 1), [&halfedge](size_t edge) {
         const Halfedge h = halfedge[edge];
         if (h.startVert == -1 && h.endVert == -1 && h.pairedHalfedge == -1)
           return true;
         return h.startVert != halfedge[edge + 1].startVert ||
                h.endVert != halfedge[edge + 1].endVert;
       });
+}
+
+#ifdef MANIFOLD_DEBUG
+std::mutex dump_lock;
+#endif
+
+/**
+ * Returns true if this manifold is self-intersecting.
+ * Note that this is not checking for epsilon-validity.
+ */
+bool Manifold::Impl::IsSelfIntersecting() const {
+  const double epsilonSq = epsilon_ * epsilon_;
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
+  GetFaceBoxMorton(faceBox, faceMorton);
+  SparseIndices collisions = collider_.Collisions<true>(faceBox.cview());
+
+  const bool verbose = ManifoldParams().verbose;
+  return !all_of(countAt(0), countAt(collisions.size()), [&](size_t i) {
+    size_t x = collisions.Get(i, false);
+    size_t y = collisions.Get(i, true);
+    std::array<vec3, 3> tri_x, tri_y;
+    for (int i : {0, 1, 2}) {
+      tri_x[i] = vertPos_[halfedge_[3 * x + i].startVert];
+      tri_y[i] = vertPos_[halfedge_[3 * y + i].startVert];
+    }
+    // if triangles x and y share a vertex, return true to skip the
+    // check. we relax the sharing criteria a bit to allow for at most
+    // distance epsilon squared
+    for (int i : {0, 1, 2})
+      for (int j : {0, 1, 2})
+        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
+
+    if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
+      // try to move the triangles around the normal of the other face
+      std::array<vec3, 3> tmp_x, tmp_y;
+      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+
+#ifdef MANIFOLD_DEBUG
+      if (verbose) {
+        dump_lock.lock();
+        std::cout << "intersecting:" << std::endl;
+        for (int i : {0, 1, 2}) std::cout << tri_x[i] << " ";
+        std::cout << std::endl;
+        for (int i : {0, 1, 2}) std::cout << tri_y[i] << " ";
+        std::cout << std::endl;
+        dump_lock.unlock();
+      }
+#endif
+      return false;
+    }
+    return true;
+  });
 }
 
 /**

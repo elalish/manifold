@@ -11,14 +11,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019, macos-latest]
+        # macos-13: x86-64
+        # macos-14: arm64
+        os: [ubuntu-22.04, windows-2019, macos-14, macos-13]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
+      - if: matrix.os == 'macos-14'
+        run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.19
+        uses: pypa/cibuildwheel@v2.21.3
       - uses: actions/upload-artifact@v4
         with:
           name: python-${{ matrix.os }}
@@ -32,7 +36,11 @@ jobs:
     - name: Build SDist
       run: pipx run build --sdist
     - name: Confirm SDist can be built
-      run: pip wheel dist/*.tar.gz
+      run: |
+        # FIXME: why doesn't scikit_build_core automatically download ninja?
+        sudo apt-get update
+        sudo apt-get install ninja-build
+        pip wheel dist/*.tar.gz
     - uses: actions/upload-artifact@v4
       with:
         name: python-sdist

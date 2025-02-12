@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "./impl.h"
-#include "manifold/parallel.h"
+#include "./parallel.h"
 
 template <>
 struct std::hash<manifold::ivec4> {
@@ -113,7 +113,7 @@ class Partition {
     }
     const int offset = interiorOffset - newVerts.size();
     size_t old = newVerts.size();
-    newVerts.resize(vertBary.size());
+    newVerts.resize_nofill(vertBary.size());
     std::iota(newVerts.begin() + old, newVerts.end(), old + offset);
 
     const int numTri = triVert.size();
@@ -684,7 +684,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
   vertPos_ = newVertPos;
 
-  faceNormal_.resize(0);
+  faceNormal_.clear();
 
   if (meshRelation_.numProp > 0) {
     const int numPropVert = NumPropVert();

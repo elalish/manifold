@@ -16,7 +16,7 @@ if(NOT MANIFOLD_CROSS_SECTION)
   return()
 endif()
 
-if(NOT EMSCRIPTEN AND MANIFOLD_CBIND)
+if(MANIFOLD_CBIND)
   add_subdirectory(c)
 endif()
 

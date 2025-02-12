@@ -96,6 +96,27 @@ struct Manifold::Impl {
       return;
     }
 
+    if (!manifold::all_of(meshGL.vertProperties.begin(),
+                          meshGL.vertProperties.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MarkFailure(Error::NonFiniteVertex);
+      return;
+    }
+
+    if (!manifold::all_of(meshGL.runTransform.begin(),
+                          meshGL.runTransform.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MarkFailure(Error::InvalidConstruction);
+      return;
+    }
+
+    if (!manifold::all_of(meshGL.halfedgeTangent.begin(),
+                          meshGL.halfedgeTangent.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MarkFailure(Error::InvalidConstruction);
+      return;
+    }
+
     std::vector<int> prop2vert(numVert);
     std::iota(prop2vert.begin(), prop2vert.end(), 0);
     for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
@@ -110,11 +131,11 @@ struct Manifold::Impl {
 
     const auto numProp = meshGL.numProp - 3;
     meshRelation_.numProp = numProp;
-    meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    meshRelation_.properties.resize_nofill(meshGL.NumVert() * numProp);
     tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
-    vertPos_.resize(meshGL.NumVert());
+    vertPos_.resize_nofill(meshGL.NumVert());
 
     for (size_t i = 0; i < meshGL.NumVert(); ++i) {
       for (const int j : {0, 1, 2})
@@ -124,7 +145,7 @@ struct Manifold::Impl {
             meshGL.vertProperties[meshGL.numProp * i + 3 + j];
     }
 
-    halfedgeTangent_.resize(meshGL.halfedgeTangent.size() / 4);
+    halfedgeTangent_.resize_nofill(meshGL.halfedgeTangent.size() / 4);
     for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
       for (const int j : {0, 1, 2, 3})
         halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
@@ -139,7 +160,7 @@ struct Manifold::Impl {
       } else if (runIndex.size() == meshGL.runOriginalID.size()) {
         runIndex.push_back(runEnd);
       }
-      triRef.resize(meshGL.NumTri());
+      triRef.resize_nofill(meshGL.NumTri());
       const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
       for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
         const int meshID = startID + i;
@@ -198,13 +219,7 @@ struct Manifold::Impl {
     }
 
     CalculateBBox();
-    if (!IsFinite()) {
-      MarkFailure(Error::NonFiniteVertex);
-      return;
-    }
     SetEpsilon(-1, std::is_same<Precision, float>::value);
-
-    SplitPinchedVerts();
 
     CalculateNormals();
 
@@ -216,7 +231,13 @@ struct Manifold::Impl {
     CreateFaces();
 
     SimplifyTopology();
+    RemoveUnreferencedVerts();
     Finish();
+
+    if (!IsFinite()) {
+      MarkFailure(Error::NonFiniteVertex);
+      return;
+    }
 
     // A Manifold created from an input mesh is never an original - the input is
     // the original.
@@ -273,7 +294,7 @@ struct Manifold::Impl {
                           : meshRelation_.properties.size() / NumProp();
   }
 
-  // properties.cu
+  // properties.cpp
   enum class Property { Volume, SurfaceArea };
   double GetProperty(Property prop) const;
   void CalculateCurvature(int gaussianIdx, int meanIdx);
@@ -283,11 +304,12 @@ struct Manifold::Impl {
   void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
   bool IsManifold() const;
   bool Is2Manifold() const;
+  bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
   double MinGap(const Impl& other, double searchLength) const;
 
-  // sort.cu
+  // sort.cpp
   void Finish();
   void SortVerts();
   void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
@@ -297,7 +319,7 @@ struct Manifold::Impl {
   void GatherFaces(const Vec<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
 
-  // face_op.cu
+  // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
@@ -305,7 +327,7 @@ struct Manifold::Impl {
   Polygons Slice(double height) const;
   Polygons Project() const;
 
-  // edge_op.cu
+  // edge_op.cpp
   void CleanupTopology();
   void SimplifyTopology();
   void DedupeEdge(int edge);
@@ -351,4 +373,9 @@ struct Manifold::Impl {
   // quickhull.cpp
   void Hull(VecView<vec3> vertPos);
 };
+
+#ifdef MANIFOLD_DEBUG
+extern std::mutex dump_lock;
+std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
+#endif
 }  // namespace manifold

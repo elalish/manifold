@@ -17,6 +17,9 @@ Module.setup = function() {
   if (_ManifoldInitialized) return;
   _ManifoldInitialized = true;
 
+  // warmup tbb for emscripten, according to
+  // https://github.com/oneapi-src/oneTBB/blob/master/WASM_Support.md#limitations
+  Module.initTBB();
   // conversion utilities
 
   function toVec(vec, list, f = x => x) {
@@ -294,7 +297,7 @@ Module.setup = function() {
     const polygonsVec = this._Project();
     const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
     disposePolygons(polygonsVec);
-    return result.simplify(this.tolerance);
+    return result;
   };
 
   Module.Manifold.prototype.split = function(manifold) {
