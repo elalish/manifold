@@ -3,11 +3,11 @@
     "clipper2-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1728932753,
-        "narHash": "sha256-m/uKGB3BHFRk0wrd71+/oURqxIR1/qQngm77No41la0=",
+        "lastModified": 1739063104,
+        "narHash": "sha256-HlqSh/b05pi1I5iS2QjBUagseUJcQ7ehEgfwJNx39NI=",
         "owner": "AngusJohnson",
         "repo": "Clipper2",
-        "rev": "ed98928c66707988d4eb2c49a31c41380a08931c",
+        "rev": "c86619cf4feb470a91464b06cfdaad0ca6012914",
         "type": "github"
       },
       "original": {
@@ -70,11 +70,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1731139594,
-        "narHash": "sha256-IigrKK3vYRpUu+HEjPL/phrfh7Ox881er1UEsZvw9Q4=",
+        "lastModified": 1739214665,
+        "narHash": "sha256-26L8VAu3/1YRxS8MHgBOyOM8xALdo6N0I04PgorE7UM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+        "rev": "64e75cd44acf21c7933d61d7721e812eac1b5a0a",
         "type": "github"
       },
       "original": {
