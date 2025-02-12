@@ -727,7 +727,7 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
           } else {
             // add it back because it is not what we want
             int end = 0;
-            while (tmp[end] != 0 && end < SIZE) end++;
+            while (end < SIZE && tmp[end] != 0) end++;
             while (--end > -1) stream.putback(tmp[end]);
           }
           c = stream.get();

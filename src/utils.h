@@ -106,6 +106,12 @@ class ConcurrentSharedPtr {
   ConcurrentSharedPtr(T value) : impl(std::make_shared<T>(value)) {}
   ConcurrentSharedPtr(const ConcurrentSharedPtr<T>& other)
       : impl(other.impl), mutex(other.mutex) {}
+  ConcurrentSharedPtr& operator=(const ConcurrentSharedPtr<T>& other) {
+    if (this == &other) return *this;
+    impl = other.impl;
+    mutex = other.mutex;
+    return *this;
+  }
   class SharedPtrGuard {
    public:
     SharedPtrGuard(std::recursive_mutex* mutex, T* content)

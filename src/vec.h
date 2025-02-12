@@ -45,16 +45,16 @@ class Vec : public VecView<T> {
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  Vec(size_t size) {
+  Vec(size_t size) : VecView<T>() {
     reserve(size);
     this->size_ = size;
   }
 
-  Vec(size_t size, T val) { resize(size, val); }
+  Vec(size_t size, T val) : VecView<T>() { resize(size, val); }
 
-  Vec(const Vec<T> &vec) { *this = Vec(vec.view()); }
+  Vec(const Vec<T> &vec) : VecView<T>() { *this = Vec(vec.view()); }
 
-  Vec(const VecView<const T> &vec) {
+  Vec(const VecView<const T> &vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -66,7 +66,7 @@ class Vec : public VecView<T> {
     }
   }
 
-  Vec(const std::vector<T> &vec) {
+  Vec(const std::vector<T> &vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -78,7 +78,7 @@ class Vec : public VecView<T> {
     }
   }
 
-  Vec(Vec<T> &&vec) {
+  Vec(Vec<T> &&vec) : VecView<T>() {
     this->ptr_ = vec.ptr_;
     this->size_ = vec.size_;
     capacity_ = vec.capacity_;
