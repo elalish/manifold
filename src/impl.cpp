@@ -238,7 +238,7 @@ void Manifold::Impl::CreateFaces() {
       if (meshRelation_.triRef[h / 3].faceID >= 0) continue;
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
-      if (abs(dot(v - base, normal)) < tolerance_) {
+      if (std::abs(dot(v - base, normal)) < tolerance_) {
         meshRelation_.triRef[h / 3].faceID = tp.tri;
 
         if (interiorHalfedges.empty() ||
