@@ -272,8 +272,8 @@ class EarClip {
 
  private:
   struct Vert;
-  typedef std::vector<Vert>::iterator VertItr;
-  typedef std::vector<Vert>::const_iterator VertItrC;
+  using VertItr = std::vector<Vert>::iterator;
+  using VertItrC = std::vector<Vert>::const_iterator;
   struct MaxX {
     bool operator()(const VertItr &a, const VertItr &b) const {
       return a->pos.x > b->pos.x;
@@ -284,7 +284,7 @@ class EarClip {
       return a->cost < b->cost;
     }
   };
-  typedef std::set<VertItr, MinCost>::iterator qItr;
+  using qItr = std::set<VertItr, MinCost>::iterator;
 
   // The flat list where all the Verts are stored. Not used much for traversal.
   std::vector<Vert> polygon_;
@@ -625,9 +625,16 @@ class EarClip {
   // Build the circular list polygon structures.
   std::vector<VertItr> Initialize(const PolygonsIdx &polys) {
     std::vector<VertItr> starts;
+    const auto invalidItr = polygon_.begin();
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
-      polygon_.push_back({vert->idx, 0.0, earsQueue_.end(), vert->pos});
+      polygon_.push_back({vert->idx,
+                          0.0,
+                          earsQueue_.end(),
+                          vert->pos,
+                          {0, 0},
+                          invalidItr,
+                          invalidItr});
       const VertItr first = std::prev(polygon_.end());
 
       bBox_.Union(first->pos);
@@ -639,7 +646,13 @@ class EarClip {
       for (++vert; vert != poly.end(); ++vert) {
         bBox_.Union(vert->pos);
 
-        polygon_.push_back({vert->idx, 0.0, earsQueue_.end(), vert->pos});
+        polygon_.push_back({vert->idx,
+                            0.0,
+                            earsQueue_.end(),
+                            vert->pos,
+                            {0, 0},
+                            invalidItr,
+                            invalidItr});
         VertItr next = std::prev(polygon_.end());
 
         Link(last, next);
@@ -836,7 +849,7 @@ class EarClip {
     });
 
     if (itr.empty()) {
-      return {Collider(), itr};
+      return {Collider(), itr, {}};
     }
 
     const int numVert = itr.size();
@@ -851,7 +864,7 @@ class EarClip {
     Permute(vertBox, vertNew2Old);
     Permute(itr, vertNew2Old);
 
-    return {Collider(vertBox, vertMorton), itr};
+    return {Collider(vertBox, vertMorton), itr, {}};
   }
 
   // The main ear-clipping loop. This is called once for each simple polygon -

@@ -1067,7 +1067,7 @@ functions, as well as a set of standard reductions.
  */
 template <class T, int M>
 struct mat<T, M, 1> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x;
   constexpr mat() : x() {}
   constexpr mat(const V &x_) : x(x_) {}
@@ -1076,8 +1076,8 @@ struct mat<T, M, 1> {
   template <class U>
   constexpr explicit mat(const mat<U, M, 1> &m) : mat(V(m.x)) {}
   constexpr vec<T, 1> row(int i) const { return {x[i]}; }
-  constexpr const V &operator[](int j) const { return x; }
-  LINALG_CONSTEXPR14 V &operator[](int j) { return x; }
+  constexpr const V &operator[](int) const { return x; }
+  LINALG_CONSTEXPR14 V &operator[](int) { return x; }
 
   template <class U, class = detail::conv_t<mat, U>>
   constexpr mat(const U &u) : mat(converter<mat, U>{}(u)) {}
@@ -1088,7 +1088,7 @@ struct mat<T, M, 1> {
 };
 template <class T, int M>
 struct mat<T, M, 2> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y;
   constexpr mat() : x(), y() {}
   constexpr mat(const V &x_, const V &y_) : x(x_), y(y_) {}
@@ -1111,7 +1111,7 @@ struct mat<T, M, 2> {
 };
 template <class T, int M>
 struct mat<T, M, 3> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y, z;
   constexpr mat() : x(), y(), z() {}
   constexpr mat(const V &x_, const V &y_, const V &z_) : x(x_), y(y_), z(z_) {}
@@ -1141,7 +1141,7 @@ struct mat<T, M, 3> {
 };
 template <class T, int M>
 struct mat<T, M, 4> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y, z, w;
   constexpr mat() : x(), y(), z(), w() {}
   constexpr mat(const V &x_, const V &y_, const V &z_, const V &w_)

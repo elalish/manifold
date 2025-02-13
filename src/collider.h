@@ -40,7 +40,7 @@ constexpr int kRoot = 1;
 #ifdef _MSC_VER
 
 #ifndef _WINDEF_
-typedef unsigned long DWORD;
+using DWORD = unsigned long;
 #endif
 
 uint32_t inline ctz(uint32_t value) {

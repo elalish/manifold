@@ -371,7 +371,7 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
 // gets -1, and if there are more than one it gets -2.
 Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
   Vec<int> vertFlatFace(NumVert(), -1);
-  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1});
+  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1, -1});
   for (size_t tri = 0; tri < NumTri(); ++tri) {
     if (flatFaces[tri]) {
       for (const int j : {0, 1, 2}) {
