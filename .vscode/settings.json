@@ -146,6 +146,7 @@
     "Gyroid",
     "halfedge",
     "halfedges",
+    "Minkowski",
     "Tris",
     "Verts",
     "Voxel",
