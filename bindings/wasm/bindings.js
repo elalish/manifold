@@ -164,6 +164,10 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
+  Module.CrossSection.prototype.simplify = function(epsilon = 1e-6) {
+    return this._Simplify(epsilon);
+  };
+
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {

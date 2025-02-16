@@ -25,4 +25,10 @@ suite('CrossSection Bindings', () => {
     expect(cs.numContour()).toEqual(1);
     expect(cs.area()).to.be.greaterThan(0);
   });
+
+  test('simplify argument is defaulted', () => {
+    const cs = manifoldModule.CrossSection.circle(1).simplify();
+    expect(cs.numContour()).toEqual(1);
+    expect(cs.area()).to.be.greaterThan(0);
+  });
 });
