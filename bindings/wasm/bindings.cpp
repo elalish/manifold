@@ -129,7 +129,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numVert", &CrossSection::NumVert)
       .function("numContour", &CrossSection::NumContour)
       .function("_Bounds", &CrossSection::Bounds)
-      .function("simplify", &CrossSection::Simplify)
+      .function("_Simplify", &CrossSection::Simplify)
       .function("_Offset", &cross_js::Offset)
       .function("_ToPolygons", &CrossSection::ToPolygons)
       .function("hull",
