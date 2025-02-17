@@ -48,12 +48,15 @@ struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   const double tolerance;
+  const size_t firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0 ||
+        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+      return false;
     // Flag short edges
-    const vec3 delta =
-        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
+    const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
     return la::dot(delta, delta) < tolerance * tolerance;
   }
 };
@@ -61,13 +64,17 @@ struct ShortEdge {
 struct FlagEdge {
   VecView<const Halfedge> halfedge;
   VecView<const TriRef> triRef;
+  const size_t firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0 ||
+        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+      return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
     const TriRef ref0 = triRef[edge / 3];
-    int current = NextHalfedge(halfedge[edge].pairedHalfedge);
+    int current = NextHalfedge(half.pairedHalfedge);
     TriRef ref1 = triRef[current / 3];
     bool ref1Updated = !ref0.SameFace(ref1);
     while (current != edge) {
@@ -92,9 +99,13 @@ struct SwappableEdge {
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
   const double tolerance;
+  const size_t firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0 ||
+        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+      return false;
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
@@ -106,7 +117,7 @@ struct SwappableEdge {
       return false;
 
     // Switch to neighbor's projection.
-    edge = halfedge[edge].pairedHalfedge;
+    edge = half.pairedHalfedge;
     tri = edge / 3;
     triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
@@ -295,7 +306,7 @@ void Manifold::Impl::CleanupTopology() {
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::SimplifyTopology() {
+void Manifold::Impl::SimplifyTopology(size_t firstNewVert) {
   if (!halfedge_.size()) return;
 
   CleanupTopology();
@@ -315,7 +326,7 @@ void Manifold::Impl::SimplifyTopology() {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
-    ShortEdge se{halfedge_, vertPos_, epsilon_};
+    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
       if (didCollapse) numFlagged++;
@@ -332,7 +343,7 @@ void Manifold::Impl::SimplifyTopology() {
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
-    FlagEdge se{halfedge_, meshRelation_.triRef};
+    FlagEdge se{halfedge_, meshRelation_.triRef, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
       if (didCollapse) numFlagged++;
@@ -350,7 +361,7 @@ void Manifold::Impl::SimplifyTopology() {
   {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_};
+    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_, 0};
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;

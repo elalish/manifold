@@ -138,6 +138,14 @@ TEST(Boolean, Cubes) {
 #endif
 }
 
+TEST(Boolean, Simplify) {
+  Manifold cube = Manifold::Cube().Refine(10);
+  Manifold result = cube + cube.Translate({1, 0, 0});
+  EXPECT_EQ(result.NumTri(), 2000);
+  result = result.Simplify();
+  EXPECT_EQ(result.NumTri(), 20);
+}
+
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
   Manifold oct = Manifold::Sphere(1, 4);

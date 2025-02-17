@@ -912,6 +912,8 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadMesh("Cray_right.glb");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(res.IsEmpty());
+  res = res.SetTolerance(res.GetTolerance() * 1.01);
   EXPECT_TRUE(res.IsEmpty());
 }
 
