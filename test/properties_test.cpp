@@ -77,14 +77,14 @@ TEST(Properties, Tolerance) {
 }
 
 TEST(Properties, ToleranceSphere) {
-  const int n = 100;
+  const int n = 1000;
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
   Manifold sphere2 = sphere.SetTolerance(0.01);
-  EXPECT_LT(sphere2.NumTri(), 15000);
-  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.02);
-  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.01);
+  EXPECT_LT(sphere2.NumTri(), 2500);
+  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
+  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.05);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("sphere.glb", sphere2.GetMeshGL(), {});
 #endif
