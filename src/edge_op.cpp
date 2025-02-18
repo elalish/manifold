@@ -94,13 +94,10 @@ struct SwappableEdge {
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
   const double tolerance;
-  const size_t firstNewVert;
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0 ||
-        (half.startVert < firstNewVert && half.endVert < firstNewVert))
-      return false;
+    if (half.pairedHalfedge < 0) return false;
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
@@ -356,7 +353,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_, 0};
+    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_};
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
