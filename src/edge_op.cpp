@@ -48,11 +48,10 @@ struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   const double tolerance;
-  const size_t firstNewVert;
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0 || half.startVert < firstNewVert) return false;
+    if (half.pairedHalfedge < 0) return false;
     // Flag short edges
     const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
     return la::dot(delta, delta) < tolerance * tolerance;
@@ -322,7 +321,7 @@ void Manifold::Impl::SimplifyTopology(size_t firstNewVert) {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
-    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
+    ShortEdge se{halfedge_, vertPos_, epsilon_};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
       if (didCollapse) numFlagged++;
