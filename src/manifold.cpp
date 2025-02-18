@@ -432,10 +432,6 @@ Manifold Manifold::Simplify(double tolerance) const {
   }
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);
-  // const double oldTolerance = GetCsgLeafNode().GetImpl()->tolerance_;
-  // Manifold result = SetTolerance(tolerance);
-  // result.GetCsgLeafNode().GetImpl()->tolerance_ = oldTolerance;
-  // return result;
 }
 
 /**
