@@ -61,7 +61,7 @@ struct ShortEdge {
 struct FlagEdge {
   VecView<const Halfedge> halfedge;
   VecView<const TriRef> triRef;
-  const size_t firstNewVert;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
@@ -301,7 +301,7 @@ void Manifold::Impl::CleanupTopology() {
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::SimplifyTopology(size_t firstNewVert) {
+void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   if (!halfedge_.size()) return;
 
   CleanupTopology();
