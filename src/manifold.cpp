@@ -424,7 +424,7 @@ Manifold Manifold::Simplify(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const double oldTolerance = impl->tolerance_;
   if (tolerance == 0) tolerance = oldTolerance;
-  if (tolerance > oldTolerance) {
+  if (tolerance >= oldTolerance) {
     impl->tolerance_ = tolerance;
     impl->CreateFaces();
     impl->SimplifyTopology();

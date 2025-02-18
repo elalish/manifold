@@ -52,9 +52,7 @@ struct ShortEdge {
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0 ||
-        (half.startVert < firstNewVert && half.endVert < firstNewVert))
-      return false;
+    if (half.pairedHalfedge < 0 || half.startVert < firstNewVert) return false;
     // Flag short edges
     const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
     return la::dot(delta, delta) < tolerance * tolerance;
@@ -68,9 +66,7 @@ struct FlagEdge {
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0 ||
-        (half.startVert < firstNewVert && half.endVert < firstNewVert))
-      return false;
+    if (half.pairedHalfedge < 0 || half.startVert < firstNewVert) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
     const TriRef ref0 = triRef[edge / 3];

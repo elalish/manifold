@@ -141,7 +141,7 @@ TEST(Boolean, Cubes) {
 TEST(Boolean, Simplify) {
   Manifold cube = Manifold::Cube().Refine(10);
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), 2000);
+  EXPECT_EQ(result.NumTri(), 1974);
   result = result.Simplify();
   EXPECT_EQ(result.NumTri(), 20);
 }
