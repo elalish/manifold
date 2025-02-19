@@ -581,16 +581,9 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   const vec3 delta = pNew - pOld;
   const bool shortEdge = la::dot(delta, delta) < epsilon_ * epsilon_;
 
-  // Orbit endVert
-  int current = halfedge_[tri0edge[1]].pairedHalfedge;
-  while (current != tri1edge[2]) {
-    current = NextHalfedge(current);
-    edges.push_back(current);
-    current = halfedge_[current].pairedHalfedge;
-  }
-
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
+  int current = tri1edge[2];
   if (!shortEdge) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
@@ -616,6 +609,16 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
         return false;
 
       pLast = pNext;
+      current = halfedge_[current].pairedHalfedge;
+    }
+  }
+
+  // Orbit endVert
+  {
+    int current = halfedge_[tri0edge[1]].pairedHalfedge;
+    while (current != tri1edge[2]) {
+      current = NextHalfedge(current);
+      edges.push_back(current);
       current = halfedge_[current].pairedHalfedge;
     }
   }
