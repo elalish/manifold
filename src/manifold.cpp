@@ -416,6 +416,25 @@ Manifold Manifold::SetTolerance(double tolerance) const {
 }
 
 /**
+ * Return a copy of the manifold simplified to the given tolerance, but with its
+ * actual tolerance value unchanged. If no tolerance is given, the current
+ * tolerance is used for simplification.
+ */
+Manifold Manifold::Simplify(double tolerance) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  const double oldTolerance = impl->tolerance_;
+  if (tolerance == 0) tolerance = oldTolerance;
+  if (tolerance >= oldTolerance) {
+    impl->tolerance_ = tolerance;
+    impl->CreateFaces();
+    impl->SimplifyTopology();
+    impl->Finish();
+  }
+  impl->tolerance_ = oldTolerance;
+  return Manifold(impl);
+}
+
+/**
  * The genus is a topological property of the manifold, representing the number
  * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
  * mesh, so it is best to call Decompose() first.
