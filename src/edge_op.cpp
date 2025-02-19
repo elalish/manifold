@@ -204,66 +204,71 @@ void Manifold::Impl::CleanupTopology() {
   // verts. They must be removed before edge collapse.
   SplitPinchedVerts();
 
-  Vec<int> entries;
-  FlagStore s;
   while (1) {
     ZoneScopedN("DedupeEdge");
 
     const size_t nbEdges = halfedge_.size();
-    size_t numFlagged = 0;
-
+    std::vector<size_t> problematic;
+    auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
+                         Vec<int>& endVerts, std::vector<size_t>& results) {
+      for (auto i = start; i < end; ++i) {
+        if (local[i] || halfedge_[i].startVert == -1 ||
+            halfedge_[i].endVert == -1)
+          continue;
+        local[i] = true;
+        endVerts.clear(false);
+        ForVert(i, [&local, &endVerts, &results, this](int current) {
+          local[current] = true;
+          if (halfedge_[current].startVert == -1 ||
+              halfedge_[current].endVert == -1) {
+            return;
+          }
+          if (std::find(endVerts.begin(), endVerts.end(),
+                        halfedge_[current].endVert) != endVerts.end()) {
+            results.push_back(current);
+          } else {
+            endVerts.push_back(halfedge_[current].endVert);
+          }
+        });
+      }
+    };
 #if MANIFOLD_PAR == 1
-    if (nbEdges > 1e5) {
-      // Note that this is slightly different from the single thread version
-      // because we store all indices instead of just indices of forward
-      // halfedges. Backward halfedges are placed at the end by modifying the
-      // comparison function.
-      entries.resize_nofill(nbEdges);
-      sequence(entries.begin(), entries.end());
-      stable_sort(entries.begin(), entries.end(), [&](int a, int b) {
-        const auto& self = halfedge_[a];
-        const auto& other = halfedge_[b];
-        // place all backward edges at the end
-        if (!self.IsForward()) return false;
-        if (!other.IsForward()) return true;
-        // dictionary order based on start and end vertices
-        return self.startVert == other.startVert
-                   ? self.endVert < other.endVert
-                   : self.startVert < other.startVert;
-      });
-      entries.resize(nbEdges / 2);
+    if (nbEdges > 1e4) {
+      std::mutex mutex;
+      tbb::combinable<std::vector<bool>> store(
+          [nbEdges]() { return std::vector<bool>(nbEdges, false); });
+      tbb::parallel_for(
+          tbb::blocked_range<size_t>(0, nbEdges),
+          [&store, &mutex, &problematic, this, &localLoop](const auto& r) {
+            auto& local = store.local();
+            Vec<int> endVerts;
+            endVerts.reserve(10);
+            std::vector<size_t> problematicLocal;
+            localLoop(r.begin(), r.end(), local, endVerts, problematicLocal);
+            if (!problematicLocal.empty()) {
+              std::lock_guard<std::mutex> lock(mutex);
+              problematic.insert(problematic.end(), problematicLocal.begin(),
+                                 problematicLocal.end());
+            }
+          });
     } else
 #endif
     {
-      entries.clear(true);
-      entries.reserve(nbEdges / 2);
-      for (size_t i = 0; i < nbEdges; ++i) {
-        if (halfedge_[i].IsForward()) {
-          entries.push_back(i);
-        }
-      }
-      stable_sort(entries.begin(), entries.end(), [&](int a, int b) {
-        const auto& self = halfedge_[a];
-        const auto& other = halfedge_[b];
-        // dictionary order based on start and end vertices
-        return self.startVert == other.startVert
-                   ? self.endVert < other.endVert
-                   : self.startVert < other.startVert;
-      });
+      std::vector<bool> local(nbEdges, false);
+      Vec<int> endVerts;
+      endVerts.reserve(10);
+      localLoop(0, nbEdges, local, endVerts, problematic);
     }
 
-    s.run(
-        entries.size() - 1,
-        [&](int i) {
-          const int h0 = entries[i];
-          const int h1 = entries[i + 1];
-          return (halfedge_[h0].startVert == halfedge_[h1].startVert &&
-                  halfedge_[h0].endVert == halfedge_[h1].endVert);
-        },
-        [&](int i) {
-          DedupeEdge(entries[i]);
-          numFlagged++;
-        });
+    size_t numFlagged = 0;
+    // there may be duplicates
+    std::vector<bool> handled(nbEdges, false);
+    for (size_t i : problematic) {
+      if (handled[i]) continue;
+      DedupeEdge(i);
+      numFlagged++;
+      handled[i] = true;
+    }
 
     if (numFlagged == 0) break;
 
@@ -772,22 +777,77 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
 
 void Manifold::Impl::SplitPinchedVerts() {
   ZoneScoped;
-  std::vector<bool> vertProcessed(NumVert(), false);
-  std::vector<bool> halfedgeProcessed(halfedge_.size(), false);
-  for (size_t i = 0; i < halfedge_.size(); ++i) {
-    if (halfedgeProcessed[i]) continue;
-    int vert = halfedge_[i].startVert;
-    if (vertProcessed[vert]) {
-      vertPos_.push_back(vertPos_[vert]);
-      vert = NumVert() - 1;
-    } else {
-      vertProcessed[vert] = true;
+
+  auto nbEdges = halfedge_.size();
+#if MANIFOLD_PAR == 1
+  if (nbEdges > 1e4) {
+    std::mutex mutex;
+    std::vector<size_t> problematic;
+    std::vector<size_t> largestEdge(NumVert(),
+                                    std::numeric_limits<size_t>::max());
+    tbb::combinable<std::vector<bool>> store(
+        [nbEdges]() { return std::vector<bool>(nbEdges, false); });
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, nbEdges),
+        [&store, &mutex, &problematic, &largestEdge, this](const auto& r) {
+          auto& local = store.local();
+          std::vector<size_t> problematicLocal;
+          for (auto i = r.begin(); i < r.end(); ++i) {
+            if (local[i]) continue;
+            local[i] = true;
+            const int vert = halfedge_[i].startVert;
+            size_t largest = i;
+            ForVert(i, [&local, &largest](int current) {
+              local[current] = true;
+              largest = std::max(largest, static_cast<size_t>(current));
+            });
+            auto expected = std::numeric_limits<size_t>::max();
+            if (!reinterpret_cast<std::atomic<size_t>*>(largestEdge.data() +
+                                                        vert)
+                     ->compare_exchange_strong(expected, largest) &&
+                expected != largest) {
+              // we know that there is another loop...
+              problematicLocal.push_back(largest);
+            }
+          }
+          if (!problematicLocal.empty()) {
+            std::lock_guard<std::mutex> lock(mutex);
+            problematic.insert(problematic.end(), problematicLocal.begin(),
+                               problematicLocal.end());
+          }
+        });
+
+    std::vector<bool> halfedgeProcessed(nbEdges, false);
+    for (size_t i : problematic) {
+      if (halfedgeProcessed[i]) continue;
+      vertPos_.push_back(vertPos_[halfedge_[i].startVert]);
+      const int vert = NumVert() - 1;
+      ForVert(i, [this, vert, &halfedgeProcessed](int current) {
+        halfedgeProcessed[current] = true;
+        halfedge_[current].startVert = vert;
+        halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
+      });
     }
-    ForVert(i, [this, &halfedgeProcessed, vert](int current) {
-      halfedgeProcessed[current] = true;
-      halfedge_[current].startVert = vert;
-      halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
-    });
+  } else
+#endif
+  {
+    std::vector<bool> vertProcessed(NumVert(), false);
+    std::vector<bool> halfedgeProcessed(nbEdges, false);
+    for (size_t i = 0; i < nbEdges; ++i) {
+      if (halfedgeProcessed[i]) continue;
+      int vert = halfedge_[i].startVert;
+      if (vertProcessed[vert]) {
+        vertPos_.push_back(vertPos_[vert]);
+        vert = NumVert() - 1;
+      } else {
+        vertProcessed[vert] = true;
+      }
+      ForVert(i, [this, &halfedgeProcessed, vert](int current) {
+        halfedgeProcessed[current] = true;
+        halfedge_[current].startVert = vert;
+        halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
+      });
+    }
   }
 }
 }  // namespace manifold
