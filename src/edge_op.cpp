@@ -210,7 +210,7 @@ void Manifold::Impl::CleanupTopology() {
     ZoneScopedN("DedupeEdge");
 
     const size_t nbEdges = halfedge_.size();
-    std::vector<size_t> problematic;
+    std::vector<size_t> duplicates;
     auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
                          std::vector<size_t>& results) {
       // Iterate over all halfedges that start with the same vertex, and check
@@ -268,27 +268,27 @@ void Manifold::Impl::CleanupTopology() {
           [nbEdges]() { return std::vector<bool>(nbEdges, false); });
       tbb::parallel_for(
           tbb::blocked_range<size_t>(0, nbEdges),
-          [&store, &mutex, &problematic, this, &localLoop](const auto& r) {
+          [&store, &mutex, &duplicates, this, &localLoop](const auto& r) {
             auto& local = store.local();
-            std::vector<size_t> problematicLocal;
-            localLoop(r.begin(), r.end(), local, problematicLocal);
-            if (!problematicLocal.empty()) {
+            std::vector<size_t> duplicatesLocal;
+            localLoop(r.begin(), r.end(), local, duplicatesLocal);
+            if (!duplicatesLocal.empty()) {
               std::lock_guard<std::mutex> lock(mutex);
-              problematic.insert(problematic.end(), problematicLocal.begin(),
-                                 problematicLocal.end());
+              duplicates.insert(duplicates.end(), duplicatesLocal.begin(),
+                                duplicatesLocal.end());
             }
           });
     } else
 #endif
     {
       std::vector<bool> local(nbEdges, false);
-      localLoop(0, nbEdges, local, problematic);
+      localLoop(0, nbEdges, local, duplicates);
     }
 
     size_t numFlagged = 0;
     // there may be duplicates
     std::vector<bool> handled(nbEdges, false);
-    for (size_t i : problematic) {
+    for (size_t i : duplicates) {
       if (handled[i]) continue;
       DedupeEdge(i);
       numFlagged++;
@@ -807,7 +807,7 @@ void Manifold::Impl::SplitPinchedVerts() {
 #if MANIFOLD_PAR == 1
   if (nbEdges > 1e4) {
     std::mutex mutex;
-    std::vector<size_t> problematic;
+    std::vector<size_t> pinched;
     // This parallelized version is non-trivial so we can't reuse the code
     //
     // The idea here is to identify cycles of halfedges that can be iterated
@@ -829,9 +829,9 @@ void Manifold::Impl::SplitPinchedVerts() {
         [nbEdges]() { return std::vector<bool>(nbEdges, false); });
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, nbEdges),
-        [&store, &mutex, &problematic, &largestEdge, this](const auto& r) {
+        [&store, &mutex, &pinched, &largestEdge, this](const auto& r) {
           auto& local = store.local();
-          std::vector<size_t> problematicLocal;
+          std::vector<size_t> pinchedLocal;
           for (auto i = r.begin(); i < r.end(); ++i) {
             if (local[i]) continue;
             local[i] = true;
@@ -847,18 +847,18 @@ void Manifold::Impl::SplitPinchedVerts() {
                      ->compare_exchange_strong(expected, largest) &&
                 expected != largest) {
               // we know that there is another loop...
-              problematicLocal.push_back(largest);
+              pinchedLocal.push_back(largest);
             }
           }
-          if (!problematicLocal.empty()) {
+          if (!pinchedLocal.empty()) {
             std::lock_guard<std::mutex> lock(mutex);
-            problematic.insert(problematic.end(), problematicLocal.begin(),
-                               problematicLocal.end());
+            pinched.insert(pinched.end(), pinchedLocal.begin(),
+                           pinchedLocal.end());
           }
         });
 
     std::vector<bool> halfedgeProcessed(nbEdges, false);
-    for (size_t i : problematic) {
+    for (size_t i : pinched) {
       if (halfedgeProcessed[i]) continue;
       vertPos_.push_back(vertPos_[halfedge_[i].startVert]);
       const int vert = NumVert() - 1;
