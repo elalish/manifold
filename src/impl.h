@@ -188,10 +188,8 @@ struct Manifold::Impl {
 
     Vec<ivec3> triVerts;
     triVerts.reserve(numTri);
-    if (triRef.size() > 0)
-      meshRelation_.triRef.reserve(numTri);
-    if (numProp > 0)
-      meshRelation_.triProperties.reserve(numTri);
+    if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
+    if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 tri;
       for (const size_t j : {0, 1, 2}) {
