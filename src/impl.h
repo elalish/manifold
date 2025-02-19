@@ -246,7 +246,8 @@ struct Manifold::Impl {
     meshRelation_.originalID = -1;
   }
 
-  inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
+  template<typename F>
+  inline void ForVert(int halfedge, F func) {
     int current = halfedge;
     do {
       current = NextHalfedge(halfedge_[current].pairedHalfedge);
