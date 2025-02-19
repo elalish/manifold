@@ -205,105 +205,7 @@ void Manifold::Impl::CleanupTopology() {
   // In the case of a very bad triangulation, it is possible to create pinched
   // verts. They must be removed before edge collapse.
   SplitPinchedVerts();
-
-  while (1) {
-    ZoneScopedN("DedupeEdge");
-
-    const size_t nbEdges = halfedge_.size();
-    std::vector<size_t> duplicates;
-    auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
-                         std::vector<size_t>& results) {
-      // Iterate over all halfedges that start with the same vertex, and check
-      // for halfedges with the same ending vertex.
-      // Note: we use Vec and linear search when the number of neighbor is
-      // small because unordered_set requires allocations and is expensive.
-      // We switch to unordered_set when the number of neighbor is
-      // larger to avoid making things quadratic.
-      //
-      // The local store is to store the processed halfedges, so to avoid
-      // repetitive processing. Note that it only approximates the processed
-      // halfedges because it is thread local. This is why we need a vector to
-      // deduplicate the probematic halfedges we found.
-      Vec<int> endVerts;
-      std::unordered_set<int> endVertSet;
-      for (auto i = start; i < end; ++i) {
-        if (local[i] || halfedge_[i].startVert == -1 ||
-            halfedge_[i].endVert == -1)
-          continue;
-        local[i] = true;
-        // we want to keep the allocation
-        endVerts.clear(false);
-        endVertSet.clear();
-        ForVert(
-            i, [&local, &endVerts, &endVertSet, &results, this](int current) {
-              local[current] = true;
-              if (halfedge_[current].startVert == -1 ||
-                  halfedge_[current].endVert == -1) {
-                return;
-              }
-              if (endVertSet.empty()) {
-                if (std::find(endVerts.begin(), endVerts.end(),
-                              halfedge_[current].endVert) != endVerts.end()) {
-                  results.push_back(current);
-                } else {
-                  endVerts.push_back(halfedge_[current].endVert);
-                  // switch to hashset for vertices with many neighbors
-                  if (endVerts.size() > 32) {
-                    endVertSet.insert(endVerts.begin(), endVerts.end());
-                    endVerts.clear(false);
-                  }
-                }
-              } else {
-                if (!endVertSet.insert(halfedge_[current].endVert).second) {
-                  results.push_back(current);
-                }
-              }
-            });
-      }
-    };
-#if MANIFOLD_PAR == 1
-    if (nbEdges > 1e4) {
-      std::mutex mutex;
-      tbb::combinable<std::vector<bool>> store(
-          [nbEdges]() { return std::vector<bool>(nbEdges, false); });
-      tbb::parallel_for(
-          tbb::blocked_range<size_t>(0, nbEdges),
-          [&store, &mutex, &duplicates, this, &localLoop](const auto& r) {
-            auto& local = store.local();
-            std::vector<size_t> duplicatesLocal;
-            localLoop(r.begin(), r.end(), local, duplicatesLocal);
-            if (!duplicatesLocal.empty()) {
-              std::lock_guard<std::mutex> lock(mutex);
-              duplicates.insert(duplicates.end(), duplicatesLocal.begin(),
-                                duplicatesLocal.end());
-            }
-          });
-    } else
-#endif
-    {
-      std::vector<bool> local(nbEdges, false);
-      localLoop(0, nbEdges, local, duplicates);
-    }
-
-    size_t numFlagged = 0;
-    // there may be duplicates
-    std::vector<bool> handled(nbEdges, false);
-    for (size_t i : duplicates) {
-      if (handled[i]) continue;
-      DedupeEdge(i);
-      numFlagged++;
-      handled[i] = true;
-    }
-
-    if (numFlagged == 0) break;
-
-#ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose) {
-      std::cout << "found " << numFlagged << " duplicate edges to split"
-                << std::endl;
-    }
-#endif
-  }
+  DedupeEdges();
 }
 
 /**
@@ -888,6 +790,107 @@ void Manifold::Impl::SplitPinchedVerts() {
         halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
       });
     }
+  }
+}
+
+void Manifold::Impl::DedupeEdges() {
+  while (1) {
+    ZoneScopedN("DedupeEdge");
+
+    const size_t nbEdges = halfedge_.size();
+    std::vector<size_t> duplicates;
+    auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
+                         std::vector<size_t>& results) {
+      // Iterate over all halfedges that start with the same vertex, and check
+      // for halfedges with the same ending vertex.
+      // Note: we use Vec and linear search when the number of neighbor is
+      // small because unordered_set requires allocations and is expensive.
+      // We switch to unordered_set when the number of neighbor is
+      // larger to avoid making things quadratic.
+      //
+      // The local store is to store the processed halfedges, so to avoid
+      // repetitive processing. Note that it only approximates the processed
+      // halfedges because it is thread local. This is why we need a vector to
+      // deduplicate the probematic halfedges we found.
+      Vec<int> endVerts;
+      std::unordered_set<int> endVertSet;
+      for (auto i = start; i < end; ++i) {
+        if (local[i] || halfedge_[i].startVert == -1 ||
+            halfedge_[i].endVert == -1)
+          continue;
+        local[i] = true;
+        // we want to keep the allocation
+        endVerts.clear(false);
+        endVertSet.clear();
+        ForVert(
+            i, [&local, &endVerts, &endVertSet, &results, this](int current) {
+              local[current] = true;
+              if (halfedge_[current].startVert == -1 ||
+                  halfedge_[current].endVert == -1) {
+                return;
+              }
+              if (endVertSet.empty()) {
+                if (std::find(endVerts.begin(), endVerts.end(),
+                              halfedge_[current].endVert) != endVerts.end()) {
+                  results.push_back(current);
+                } else {
+                  endVerts.push_back(halfedge_[current].endVert);
+                  // switch to hashset for vertices with many neighbors
+                  if (endVerts.size() > 32) {
+                    endVertSet.insert(endVerts.begin(), endVerts.end());
+                    endVerts.clear(false);
+                  }
+                }
+              } else {
+                if (!endVertSet.insert(halfedge_[current].endVert).second) {
+                  results.push_back(current);
+                }
+              }
+            });
+      }
+    };
+#if MANIFOLD_PAR == 1
+    if (nbEdges > 1e4) {
+      std::mutex mutex;
+      tbb::combinable<std::vector<bool>> store(
+          [nbEdges]() { return std::vector<bool>(nbEdges, false); });
+      tbb::parallel_for(
+          tbb::blocked_range<size_t>(0, nbEdges),
+          [&store, &mutex, &duplicates, this, &localLoop](const auto& r) {
+            auto& local = store.local();
+            std::vector<size_t> duplicatesLocal;
+            localLoop(r.begin(), r.end(), local, duplicatesLocal);
+            if (!duplicatesLocal.empty()) {
+              std::lock_guard<std::mutex> lock(mutex);
+              duplicates.insert(duplicates.end(), duplicatesLocal.begin(),
+                                duplicatesLocal.end());
+            }
+          });
+    } else
+#endif
+    {
+      std::vector<bool> local(nbEdges, false);
+      localLoop(0, nbEdges, local, duplicates);
+    }
+
+    size_t numFlagged = 0;
+    // there may be duplicates
+    std::vector<bool> handled(nbEdges, false);
+    for (size_t i : duplicates) {
+      if (handled[i]) continue;
+      DedupeEdge(i);
+      numFlagged++;
+      handled[i] = true;
+    }
+
+    if (numFlagged == 0) break;
+
+#ifdef MANIFOLD_DEBUG
+    if (ManifoldParams().verbose) {
+      std::cout << "found " << numFlagged << " duplicate edges to split"
+                << std::endl;
+    }
+#endif
   }
 }
 }  // namespace manifold

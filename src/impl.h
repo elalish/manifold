@@ -344,6 +344,7 @@ struct Manifold::Impl {
   void FormLoop(int current, int end);
   void CollapseTri(const ivec3& triEdge);
   void SplitPinchedVerts();
+  void DedupeEdges();
 
   // subdivision.cpp
   int GetNeighbor(int tri) const;
