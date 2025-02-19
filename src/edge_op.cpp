@@ -725,8 +725,11 @@ void Manifold::Impl::SplitPinchedVerts() {
     // repetitive processing. Note that it only approximates the processed
     // halfedges because it is thread local. This is why we need a vector to
     // deduplicate the probematic halfedges we found.
-    std::vector<size_t> largestEdge(NumVert(),
-                                    std::numeric_limits<size_t>::max());
+    std::vector<std::atomic<size_t>> largestEdge(NumVert());
+    for_each(ExecutionPolicy::Par, countAt(0), countAt(NumVert()),
+             [&largestEdge](size_t i) {
+               largestEdge[i].store(std::numeric_limits<size_t>::max());
+             });
     tbb::combinable<std::vector<bool>> store(
         [nbEdges]() { return std::vector<bool>(nbEdges, false); });
     tbb::parallel_for(
@@ -743,10 +746,8 @@ void Manifold::Impl::SplitPinchedVerts() {
               local[current] = true;
               largest = std::max(largest, static_cast<size_t>(current));
             });
-            auto expected = std::numeric_limits<size_t>::max();
-            if (!reinterpret_cast<std::atomic<size_t>*>(largestEdge.data() +
-                                                        vert)
-                     ->compare_exchange_strong(expected, largest) &&
+            size_t expected = std::numeric_limits<size_t>::max();
+            if (!largestEdge[vert].compare_exchange_strong(expected, largest) &&
                 expected != largest) {
               // we know that there is another loop...
               pinchedLocal.push_back(largest);
