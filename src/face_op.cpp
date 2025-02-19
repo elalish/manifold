@@ -25,8 +25,94 @@
 
 namespace manifold {
 
-using GeneralTriangulation = std::function<std::vector<ivec3>(int)>;
-using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
+template <typename GeneralTriangulation, typename AddTriangle>
+struct ProcessFace {
+  GeneralTriangulation general;
+  AddTriangle addTri;
+  VecView<const int> faceEdge;
+  VecView<const vec3> faceNormal;
+  VecView<const Halfedge> halfedge;
+  VecView<const TriRef> halfedgeRef;
+  VecView<const vec3> vertPos;
+  double epsilon;
+
+  void operator()(size_t face) {
+    const int firstEdge = faceEdge[face];
+    const int lastEdge = faceEdge[face + 1];
+    const int numEdge = lastEdge - firstEdge;
+    DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
+    const vec3 normal = faceNormal[face];
+
+    if (numEdge == 3) {  // Single triangle
+      int mapping[3] = {halfedge[firstEdge].startVert,
+                        halfedge[firstEdge + 1].startVert,
+                        halfedge[firstEdge + 2].startVert};
+      ivec3 tri(halfedge[firstEdge].startVert,
+                halfedge[firstEdge + 1].startVert,
+                halfedge[firstEdge + 2].startVert);
+      ivec3 ends(halfedge[firstEdge].endVert, halfedge[firstEdge + 1].endVert,
+                 halfedge[firstEdge + 2].endVert);
+      if (ends[0] == tri[2]) {
+        std::swap(tri[1], tri[2]);
+        std::swap(ends[1], ends[2]);
+      }
+      DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+                   topologyErr, "These 3 edges do not form a triangle!");
+
+      addTri(face, tri, normal, halfedgeRef[firstEdge]);
+    } else if (numEdge == 4) {  // Pair of triangles
+      int mapping[4] = {
+          halfedge[firstEdge].startVert, halfedge[firstEdge + 1].startVert,
+          halfedge[firstEdge + 2].startVert, halfedge[firstEdge + 3].startVert};
+      const mat2x3 projection = GetAxisAlignedProjection(normal);
+      auto triCCW = [&projection, this](const ivec3 tri) {
+        return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
+                   projection * vertPos[tri[2]], epsilon) >= 0;
+      };
+
+      ivec3 tri0(halfedge[firstEdge].startVert, halfedge[firstEdge].endVert,
+                 -1);
+      ivec3 tri1(-1, -1, tri0[0]);
+      for (const int i : {1, 2, 3}) {
+        if (halfedge[firstEdge + i].startVert == tri0[1]) {
+          tri0[2] = halfedge[firstEdge + i].endVert;
+          tri1[0] = tri0[2];
+        }
+        if (halfedge[firstEdge + i].endVert == tri0[0]) {
+          tri1[1] = halfedge[firstEdge + i].startVert;
+        }
+      }
+      DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
+                       la::all(la::gequal(tri1, ivec3(0))),
+                   topologyErr, "non-manifold quad!");
+      bool firstValid = triCCW(tri0) && triCCW(tri1);
+      tri0[2] = tri1[1];
+      tri1[2] = tri0[1];
+      bool secondValid = triCCW(tri0) && triCCW(tri1);
+
+      if (!secondValid) {
+        tri0[2] = tri1[0];
+        tri1[2] = tri0[0];
+      } else if (firstValid) {
+        vec3 firstCross = vertPos[tri0[0]] - vertPos[tri1[0]];
+        vec3 secondCross = vertPos[tri0[1]] - vertPos[tri1[1]];
+        if (la::dot(firstCross, firstCross) <
+            la::dot(secondCross, secondCross)) {
+          tri0[2] = tri1[0];
+          tri1[2] = tri0[0];
+        }
+      }
+
+      for (const auto& tri : {tri0, tri1}) {
+        addTri(face, tri, normal, halfedgeRef[firstEdge]);
+      }
+    } else {  // General triangulation
+      for (const auto& tri : general(face)) {
+        addTri(face, tri, normal, halfedgeRef[firstEdge]);
+      }
+    }
+  }
+};
 
 /**
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
@@ -45,85 +131,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   Vec<vec3> triNormal;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
-  auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
-                         int face) {
-    const int firstEdge = faceEdge[face];
-    const int lastEdge = faceEdge[face + 1];
-    const int numEdge = lastEdge - firstEdge;
-    DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
-    const vec3 normal = faceNormal_[face];
-
-    if (numEdge == 3) {  // Single triangle
-      int mapping[3] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert};
-      ivec3 tri(halfedge_[firstEdge].startVert,
-                halfedge_[firstEdge + 1].startVert,
-                halfedge_[firstEdge + 2].startVert);
-      ivec3 ends(halfedge_[firstEdge].endVert, halfedge_[firstEdge + 1].endVert,
-                 halfedge_[firstEdge + 2].endVert);
-      if (ends[0] == tri[2]) {
-        std::swap(tri[1], tri[2]);
-        std::swap(ends[1], ends[2]);
-      }
-      DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-                   topologyErr, "These 3 edges do not form a triangle!");
-
-      addTri(face, tri, normal, halfedgeRef[firstEdge]);
-    } else if (numEdge == 4) {  // Pair of triangles
-      int mapping[4] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert,
-                        halfedge_[firstEdge + 3].startVert};
-      const mat2x3 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, this](const ivec3 tri) {
-        return CCW(projection * this->vertPos_[tri[0]],
-                   projection * this->vertPos_[tri[1]],
-                   projection * this->vertPos_[tri[2]], epsilon_) >= 0;
-      };
-
-      ivec3 tri0(halfedge_[firstEdge].startVert, halfedge_[firstEdge].endVert,
-                 -1);
-      ivec3 tri1(-1, -1, tri0[0]);
-      for (const int i : {1, 2, 3}) {
-        if (halfedge_[firstEdge + i].startVert == tri0[1]) {
-          tri0[2] = halfedge_[firstEdge + i].endVert;
-          tri1[0] = tri0[2];
-        }
-        if (halfedge_[firstEdge + i].endVert == tri0[0]) {
-          tri1[1] = halfedge_[firstEdge + i].startVert;
-        }
-      }
-      DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
-                       la::all(la::gequal(tri1, ivec3(0))),
-                   topologyErr, "non-manifold quad!");
-      bool firstValid = triCCW(tri0) && triCCW(tri1);
-      tri0[2] = tri1[1];
-      tri1[2] = tri0[1];
-      bool secondValid = triCCW(tri0) && triCCW(tri1);
-
-      if (!secondValid) {
-        tri0[2] = tri1[0];
-        tri1[2] = tri0[0];
-      } else if (firstValid) {
-        vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
-        vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
-        if (la::dot(firstCross, firstCross) <
-            la::dot(secondCross, secondCross)) {
-          tri0[2] = tri1[0];
-          tri1[2] = tri0[0];
-        }
-      }
-
-      for (const auto& tri : {tri0, tri1}) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      }
-    } else {  // General triangulation
-      for (const auto& tri : general(face)) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      }
-    }
-  };
   auto generalTriangulation = [&](int face) {
     const vec3 normal = faceNormal_[face];
     const mat2x3 projection = GetAxisAlignedProjection(normal);
@@ -159,32 +166,37 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
 
-  auto processFace2 = std::bind(
-      processFace, [&](size_t face) { return std::move(results[face]); },
-      [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
-        triVerts[triCount[face]] = tri;
-        triNormal[triCount[face]] = normal;
-        triRef[triCount[face]] = r;
-        triCount[face]++;
-      },
-      std::placeholders::_1);
+  auto general = [&](size_t face) { return std::move(results[face]); };
+  auto addTri = [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
+    triVerts[triCount[face]] = tri;
+    triNormal[triCount[face]] = normal;
+    triRef[triCount[face]] = r;
+    triCount[face]++;
+  };
+  ProcessFace<decltype(general), decltype(addTri)> processFace{
+      general,           addTri,
+      faceEdge.cview(),  faceNormal_.cview(),
+      halfedge_.cview(), halfedgeRef.cview(),
+      vertPos_.cview(),  epsilon_};
   // set triangles in parallel
   for_each(autoPolicy(faceEdge.size(), 1e4), countAt(0_uz),
-           countAt(faceEdge.size() - 1), processFace2);
+           countAt(faceEdge.size() - 1), processFace);
 #else
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());
   triRef.reserve(faceEdge.size());
-  auto processFace2 = std::bind(
-      processFace, generalTriangulation,
-      [&](size_t _face, ivec3 tri, vec3 normal, TriRef r) {
-        triVerts.push_back(tri);
-        triNormal.push_back(normal);
-        triRef.push_back(r);
-      },
-      std::placeholders::_1);
+  auto addTri = [&](size_t _face, ivec3 tri, vec3 normal, TriRef r) {
+    triVerts.push_back(tri);
+    triNormal.push_back(normal);
+    triRef.push_back(r);
+  };
+  ProcessFace<decltype(generalTriangulation), decltype(addTri)> processFace{
+      generalTriangulation, addTri,
+      faceEdge.cview(),     faceNormal_.cview(),
+      halfedge_.cview(),    halfedgeRef.cview(),
+      vertPos_.cview(),     epsilon_};
   for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
-    processFace2(face);
+    processFace(face);
   }
 #endif
 
