@@ -223,14 +223,17 @@ void Manifold::Impl::CreateFaces() {
   stable_sort(triPriority.begin(), triPriority.end(),
               [](auto a, auto b) { return a.area2 > b.area2; });
 
+  Vec<int> interiorHalfedges;
   for (const auto tp : triPriority) {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
-    std::vector<int> interiorHalfedges = {3 * tp.tri, 3 * tp.tri + 1,
-                                          3 * tp.tri + 2};
+    interiorHalfedges.resize(3);
+    interiorHalfedges[0] = 3 * tp.tri;
+    interiorHalfedges[1] = 3 * tp.tri + 1;
+    interiorHalfedges[2] = 3 * tp.tri + 2;
     while (!interiorHalfedges.empty()) {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
