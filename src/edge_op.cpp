@@ -213,9 +213,17 @@ void Manifold::Impl::CleanupTopology() {
     std::vector<size_t> problematic;
     auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
                          std::vector<size_t>& results) {
-      // note: we use Vec and linear search when the number of neighbor is
-      // small, but switch to unordered_set when the number of neighbor is
-      // larger to avoid making things quadratic
+      // Iterate over all halfedges that start with the same vertex, and check
+      // for halfedges with the same ending vertex.
+      // Note: we use Vec and linear search when the number of neighbor is
+      // small because unordered_set requires allocations and is expensive.
+      // We switch to unordered_set when the number of neighbor is
+      // larger to avoid making things quadratic.
+      //
+      // The local store is to store the processed halfedges, so to avoid
+      // repetitive processing. Note that it only approximates the processed
+      // halfedges because it is thread local. This is why we need a vector to
+      // deduplicate the probematic halfedges we found.
       Vec<int> endVerts;
       std::unordered_set<int> endVertSet;
       for (auto i = start; i < end; ++i) {
@@ -800,6 +808,21 @@ void Manifold::Impl::SplitPinchedVerts() {
   if (nbEdges > 1e4) {
     std::mutex mutex;
     std::vector<size_t> problematic;
+    // This parallelized version is non-trivial so we can't reuse the code
+    //
+    // The idea here is to identify cycles of halfedges that can be iterated
+    // through using ForVert. Pinched verts are vertices where there are
+    // multiple cycles associated with the vertex. Each cycle is identified with
+    // the largest halfedge index within the cycle, and when there are multiple
+    // cycles associated with the same starting vertex but with different ids,
+    // it means we have a pinched vertex. This check is done by using a single
+    // atomic cas operation, the expected case is either invalid id (the vertex
+    // was not processed) or with the same id.
+    //
+    // The local store is to store the processed halfedges, so to avoid
+    // repetitive processing. Note that it only approximates the processed
+    // halfedges because it is thread local. This is why we need a vector to
+    // deduplicate the probematic halfedges we found.
     std::vector<size_t> largestEdge(NumVert(),
                                     std::numeric_limits<size_t>::max());
     tbb::combinable<std::vector<bool>> store(
