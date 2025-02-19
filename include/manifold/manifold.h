@@ -311,6 +311,7 @@ class Manifold {
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
   Manifold SetTolerance(double) const;
+  Manifold Simplify(double tolerance = 0) const;
   ///@}
 
   /** @name Boolean

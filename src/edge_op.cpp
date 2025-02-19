@@ -48,12 +48,15 @@ struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   const double tolerance;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0 ||
+        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+      return false;
     // Flag short edges
-    const vec3 delta =
-        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
+    const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
     return la::dot(delta, delta) < tolerance * tolerance;
   }
 };
@@ -61,13 +64,15 @@ struct ShortEdge {
 struct FlagEdge {
   VecView<const Halfedge> halfedge;
   VecView<const TriRef> triRef;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0 || half.startVert < firstNewVert) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
     const TriRef ref0 = triRef[edge / 3];
-    int current = NextHalfedge(halfedge[edge].pairedHalfedge);
+    int current = NextHalfedge(half.pairedHalfedge);
     TriRef ref1 = triRef[current / 3];
     bool ref1Updated = !ref0.SameFace(ref1);
     while (current != edge) {
@@ -92,9 +97,15 @@ struct SwappableEdge {
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
   const double tolerance;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const Halfedge& half = halfedge[edge];
+    if (half.pairedHalfedge < 0) return false;
+    if (half.startVert < firstNewVert && half.endVert < firstNewVert &&
+        halfedge[NextHalfedge(edge)].endVert < firstNewVert &&
+        halfedge[NextHalfedge(half.pairedHalfedge)].endVert < firstNewVert)
+      return false;
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
@@ -106,7 +117,7 @@ struct SwappableEdge {
       return false;
 
     // Switch to neighbor's projection.
-    edge = halfedge[edge].pairedHalfedge;
+    edge = half.pairedHalfedge;
     tri = edge / 3;
     triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
@@ -295,7 +306,7 @@ void Manifold::Impl::CleanupTopology() {
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::SimplifyTopology() {
+void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   if (!halfedge_.size()) return;
 
   CleanupTopology();
@@ -315,43 +326,43 @@ void Manifold::Impl::SimplifyTopology() {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
-    ShortEdge se{halfedge_, vertPos_, epsilon_};
+    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
-      CollapseEdge(i, scratchBuffer);
+      const bool didCollapse = CollapseEdge(i, scratchBuffer);
+      if (didCollapse) numFlagged++;
       scratchBuffer.resize(0);
-      numFlagged++;
     });
-  }
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " short edges to collapse"
-              << std::endl;
-  }
+    if (ManifoldParams().verbose && numFlagged > 0) {
+      std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
+    }
 #endif
+  }
 
-  {
+  while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
-    FlagEdge se{halfedge_, meshRelation_.triRef};
+    FlagEdge se{halfedge_, meshRelation_.triRef, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
-      CollapseEdge(i, scratchBuffer);
+      const bool didCollapse = CollapseEdge(i, scratchBuffer);
+      if (didCollapse) numFlagged++;
       scratchBuffer.resize(0);
-      numFlagged++;
     });
-  }
+    if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " colinear edges to collapse"
-              << std::endl;
-  }
+    if (ManifoldParams().verbose && numFlagged > 0) {
+      std::cout << "collapsed " << numFlagged << " colinear edges" << std::endl;
+    }
 #endif
+  }
 
   {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_};
+    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_,
+                     firstNewVert};
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
@@ -365,13 +376,13 @@ void Manifold::Impl::SimplifyTopology() {
         RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
       }
     });
-  }
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose && numFlagged > 0) {
-    std::cout << "found " << numFlagged << " edges to swap" << std::endl;
-  }
+    if (ManifoldParams().verbose && numFlagged > 0) {
+      std::cout << "swapped " << numFlagged << " edges" << std::endl;
+    }
 #endif
+  }
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
@@ -549,16 +560,17 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
-// Collapses the given edge by removing startVert. May split the mesh
-// topologically if the collapse would have resulted in a 4-manifold edge. Do
-// not collapse an edge if startVert is pinched - the vert will be marked NaN,
-// but other edges may still be pointing to it.
-void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
+// Collapses the given edge by removing startVert - returns false if the edge
+// cannot be collapsed. May split the mesh topologically if the collapse would
+// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
+// pinched - the vert would be marked NaN, but other edges could still be
+// pointing to it.
+bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
   Vec<ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
-  if (toRemove.pairedHalfedge < 0) return;
+  if (toRemove.pairedHalfedge < 0) return false;
 
   const int endVert = toRemove.endVert;
   const ivec3 tri0edge = TriOf(edge);
@@ -567,7 +579,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[toRemove.startVert];
   const vec3 delta = pNew - pOld;
-  const bool shortEdge = la::dot(delta, delta) < tolerance_ * tolerance_;
+  const bool shortEdge = la::dot(delta, delta) < epsilon_ * epsilon_;
 
   // Orbit endVert
   int current = halfedge_[tri0edge[1]].pairedHalfedge;
@@ -594,20 +606,14 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       if (!ref.SameFace(refCheck)) {
         refCheck = triRef[edge / 3];
         if (!ref.SameFace(refCheck)) {
-          return;
-        } else {
-          // Don't collapse if the edges separating the faces are not colinear
-          // (can happen when the two faces are coplanar).
-          if (CCW(projection * pOld, projection * pLast, projection * pNew,
-                  epsilon_) != 0)
-            return;
+          return false;
         }
       }
 
       // Don't collapse edge if it would cause a triangle to invert.
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               epsilon_) < 0)
-        return;
+        return false;
 
       pLast = pNext;
       current = halfedge_[current].pairedHalfedge;
@@ -654,6 +660,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   UpdateVert(endVert, start, tri0edge[2]);
   CollapseTri(tri0edge);
   RemoveIfFolded(start);
+  return true;
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
