@@ -48,10 +48,13 @@ struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   const double tolerance;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0) return false;
+    if (half.pairedHalfedge < 0 ||
+        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+      return false;
     // Flag short edges
     const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
     return la::dot(delta, delta) < tolerance * tolerance;
@@ -94,10 +97,15 @@ struct SwappableEdge {
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
   const double tolerance;
+  const int firstNewVert;
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
     if (half.pairedHalfedge < 0) return false;
+    if (half.startVert < firstNewVert && half.endVert < firstNewVert &&
+        halfedge[NextHalfedge(edge)].endVert < firstNewVert &&
+        halfedge[NextHalfedge(half.pairedHalfedge)].endVert < firstNewVert)
+      return false;
 
     int tri = edge / 3;
     ivec3 triEdge = TriOf(edge);
@@ -318,7 +326,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
-    ShortEdge se{halfedge_, vertPos_, epsilon_};
+    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
       if (didCollapse) numFlagged++;
@@ -353,7 +361,8 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_};
+    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_,
+                     firstNewVert};
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;
