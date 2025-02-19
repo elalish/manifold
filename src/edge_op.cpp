@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unordered_set>
+
 #include "./impl.h"
 #include "./parallel.h"
 
@@ -210,26 +212,45 @@ void Manifold::Impl::CleanupTopology() {
     const size_t nbEdges = halfedge_.size();
     std::vector<size_t> problematic;
     auto localLoop = [&](size_t start, size_t end, std::vector<bool>& local,
-                         Vec<int>& endVerts, std::vector<size_t>& results) {
+                         std::vector<size_t>& results) {
+      // note: we use Vec and linear search when the number of neighbor is
+      // small, but switch to unordered_set when the number of neighbor is
+      // larger to avoid making things quadratic
+      Vec<int> endVerts;
+      std::unordered_set<int> endVertSet;
       for (auto i = start; i < end; ++i) {
         if (local[i] || halfedge_[i].startVert == -1 ||
             halfedge_[i].endVert == -1)
           continue;
         local[i] = true;
+        // we want to keep the allocation
         endVerts.clear(false);
-        ForVert(i, [&local, &endVerts, &results, this](int current) {
-          local[current] = true;
-          if (halfedge_[current].startVert == -1 ||
-              halfedge_[current].endVert == -1) {
-            return;
-          }
-          if (std::find(endVerts.begin(), endVerts.end(),
-                        halfedge_[current].endVert) != endVerts.end()) {
-            results.push_back(current);
-          } else {
-            endVerts.push_back(halfedge_[current].endVert);
-          }
-        });
+        endVertSet.clear();
+        ForVert(
+            i, [&local, &endVerts, &endVertSet, &results, this](int current) {
+              local[current] = true;
+              if (halfedge_[current].startVert == -1 ||
+                  halfedge_[current].endVert == -1) {
+                return;
+              }
+              if (endVertSet.empty()) {
+                if (std::find(endVerts.begin(), endVerts.end(),
+                              halfedge_[current].endVert) != endVerts.end()) {
+                  results.push_back(current);
+                } else {
+                  endVerts.push_back(halfedge_[current].endVert);
+                  // switch to hashset for vertices with many neighbors
+                  if (endVerts.size() > 32) {
+                    endVertSet.insert(endVerts.begin(), endVerts.end());
+                    endVerts.clear(false);
+                  }
+                }
+              } else {
+                if (!endVertSet.insert(halfedge_[current].endVert).second) {
+                  results.push_back(current);
+                }
+              }
+            });
       }
     };
 #if MANIFOLD_PAR == 1
@@ -241,10 +262,8 @@ void Manifold::Impl::CleanupTopology() {
           tbb::blocked_range<size_t>(0, nbEdges),
           [&store, &mutex, &problematic, this, &localLoop](const auto& r) {
             auto& local = store.local();
-            Vec<int> endVerts;
-            endVerts.reserve(10);
             std::vector<size_t> problematicLocal;
-            localLoop(r.begin(), r.end(), local, endVerts, problematicLocal);
+            localLoop(r.begin(), r.end(), local, problematicLocal);
             if (!problematicLocal.empty()) {
               std::lock_guard<std::mutex> lock(mutex);
               problematic.insert(problematic.end(), problematicLocal.begin(),
@@ -255,9 +274,7 @@ void Manifold::Impl::CleanupTopology() {
 #endif
     {
       std::vector<bool> local(nbEdges, false);
-      Vec<int> endVerts;
-      endVerts.reserve(10);
-      localLoop(0, nbEdges, local, endVerts, problematic);
+      localLoop(0, nbEdges, local, problematic);
     }
 
     size_t numFlagged = 0;
