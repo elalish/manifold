@@ -255,12 +255,12 @@ struct make_seq_impl<A, 4> {
 template <int A, int B>
 using make_seq = typename make_seq_impl<A, B - A>::type;
 template <class T, int M, int... I>
-vec<T, sizeof...(I)> constexpr swizzle(const vec<T, M> &v, seq<I...> i) {
+vec<T, sizeof...(I)> constexpr swizzle(const vec<T, M> &v, seq<I...>) {
   return {getter<I>{}(v)...};
 }
 template <class T, int M, int N, int... I, int... J>
 mat<T, sizeof...(I), sizeof...(J)> constexpr swizzle(const mat<T, M, N> &m,
-                                                     seq<I...> i, seq<J...> j) {
+                                                     seq<I...> i, seq<J...>) {
   return {swizzle(getter<J>{}(m), i)...};
 }
 
@@ -860,8 +860,8 @@ struct vec<T, 1> {
   // with initializing its single element from zero
   template <class U>
   constexpr explicit vec(const vec<U, 1> &v) : vec(static_cast<T>(v.x)) {}
-  constexpr const T &operator[](int i) const { return x; }
-  LINALG_CONSTEXPR14 T &operator[](int i) { return x; }
+  constexpr const T &operator[](int) const { return x; }
+  LINALG_CONSTEXPR14 T &operator[](int) { return x; }
 
   template <class U, class = detail::conv_t<vec, U>>
   constexpr vec(const U &u) : vec(converter<vec, U>{}(u)) {}
@@ -1515,10 +1515,10 @@ constexpr auto operator>>=(A &a, const B &b) -> decltype(a = a >> b) {
 }
 /** @} */
 
-/** @addtogroup swizzles
+/** @defgroup swizzles Swizzles
+ * Swizzles and subobjects.
  * @ingroup LinAlg
- * @brief Swizzles and subobjects.
- *  @{
+ * @{
  */
 /**
  * @brief Returns a vector containing the specified ordered indices, e.g.
@@ -1728,9 +1728,9 @@ constexpr apply_t<detail::lerp, A, B, T> lerp(const A &a, const B &b,
 }
 /** @} */
 
-/** @addtogroup vec_algebra
+/** @defgroup vec_algebra Vector Algebra
+ * Support for vector algebra.
  * @ingroup LinAlg
- * @brief Support for vector algebra.
  *  @{
  */
 /**
@@ -1882,10 +1882,10 @@ vec<T, M> slerp(const vec<T, M> &a, const vec<T, M> &b, T t) {
 }
 /** @} */
 
-/** @addtogroup quaternions
+/** @defgroup quaternions Quaternions
+ * Support for quaternion algebra using 4D vectors of
+ * arbitrary length, representing xi + yj + zk + w.
  * @ingroup LinAlg
- * @brief Support for quaternion algebra using 4D vectors of arbitrary length,
- * representing xi + yj + zk + w.
  *  @{
  */
 /**
@@ -1960,9 +1960,9 @@ constexpr vec<T, 4> qmul(const vec<T, 4> &a, R... r) {
 }
 /** @} */
 
-/** @addtogroup quaternion_rotation
+/** @defgroup quaternion_rotation Quaternion Rotations
+ * Support for 3D spatial rotations using normalized quaternions.
  * @ingroup LinAlg
- * @brief Support for 3D spatial rotations using normalized quaternions.
  *  @{
  */
 /**
@@ -2191,7 +2191,7 @@ constexpr mat<T, 1, M> transpose(const vec<T, M> &m) {
   return transpose(mat<T, M, 1>(m));
 }
 template <class T>
-constexpr mat<T, 1, 1> adjugate(const mat<T, 1, 1> &a) {
+constexpr mat<T, 1, 1> adjugate(const mat<T, 1, 1> &) {
   return {vec<T, 1>{1}};
 }
 template <class T>
