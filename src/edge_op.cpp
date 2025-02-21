@@ -235,6 +235,9 @@ void Manifold::Impl::CleanupTopology() {
  * meshes, thus decreasing the Genus(). It only increases when meshes that have
  * collapsed to just a pair of triangles are removed entirely.
  *
+ * Verts with index less than firstNewVert will be left uncollapsed. This is
+ * zero by default so that everything can be collapsed.
+ *
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
@@ -258,6 +261,10 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
+    // Short edges get to skip several checks and hence remove more classes of
+    // degenerate triangles than flagged edges do, but this could in theory lead
+    // to error stacking where a vertex moves too far. For this reason this is
+    // restricted to epsilon, rather than tolerance.
     ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
@@ -275,6 +282,11 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
+    // Collapse colinear edges, but only remove new verts, i.e. verts with index
+    // >= firstNewVert. This is used to keep the Boolean from changing the
+    // non-intersecting parts of the input meshes. Colinear is defined not by a
+    // local check, but by the global CreateFaces function, which keeps this
+    // from being vulnerable to error stacking.
     FlagEdge se{halfedge_, meshRelation_.triRef, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
       const bool didCollapse = CollapseEdge(i, scratchBuffer);
