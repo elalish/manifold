@@ -176,7 +176,7 @@ class Vec : public VecView<T> {
   }
 
   void resize(size_t newSize, T val = T()) {
-    bool shrink = this->size_ > 2 * newSize;
+    bool shrink = this->size_ > 2 * newSize && this->size_ > 16;
     reserve(newSize);
     if (this->size_ < newSize) {
       fill(autoPolicy(newSize - this->size_), this->ptr_ + this->size_,
@@ -187,13 +187,13 @@ class Vec : public VecView<T> {
   }
 
   void resize_nofill(size_t newSize) {
-    bool shrink = this->size_ > 2 * newSize;
+    bool shrink = this->size_ > 2 * newSize && this->size_ > 16;
     reserve(newSize);
     this->size_ = newSize;
     if (shrink) shrink_to_fit();
   }
 
-  void pop_back() { resize(this->size_ - 1); }
+  void pop_back() { resize_nofill(this->size_ - 1); }
 
   void clear(bool shrink = true) {
     this->size_ = 0;

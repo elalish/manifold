@@ -188,6 +188,8 @@ struct Manifold::Impl {
 
     Vec<ivec3> triVerts;
     triVerts.reserve(numTri);
+    if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
+    if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 tri;
       for (const size_t j : {0, 1, 2}) {
@@ -244,7 +246,8 @@ struct Manifold::Impl {
     meshRelation_.originalID = -1;
   }
 
-  inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
+  template <typename F>
+  inline void ForVert(int halfedge, F func) {
     int current = halfedge;
     do {
       current = NextHalfedge(halfedge_[current].pairedHalfedge);
@@ -341,6 +344,7 @@ struct Manifold::Impl {
   void FormLoop(int current, int end);
   void CollapseTri(const ivec3& triEdge);
   void SplitPinchedVerts();
+  void DedupeEdges();
 
   // subdivision.cpp
   int GetNeighbor(int tri) const;
