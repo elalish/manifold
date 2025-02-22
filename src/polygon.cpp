@@ -144,6 +144,7 @@ void Dump(const PolygonsIdx &polys, double epsilon) {
 
 void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
                   std::vector<ivec3> &triangles, double epsilon) {
+  std::cout << std::setprecision(16);;
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << epsilon << std::endl;
   std::cout << e.what() << std::endl;
