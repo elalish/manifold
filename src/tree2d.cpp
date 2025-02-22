@@ -24,13 +24,14 @@ namespace manifold {
 // Recursive sorting is not the most efficient, but simple and guaranteed to
 // result in a balanced tree.
 void BuildTwoDTreeImpl(VecView<PolyVert> points, bool sortX) {
-  auto cmpx = [](const PolyVert& a, const PolyVert& b) {
+  using CmpFn = std::function<bool(const PolyVert&, const PolyVert&)>;
+  CmpFn cmpx = [](const PolyVert& a, const PolyVert& b) {
     return a.pos.x < b.pos.x;
   };
-  auto cmpy = [](const PolyVert& a, const PolyVert& b) {
+  CmpFn cmpy = [](const PolyVert& a, const PolyVert& b) {
     return a.pos.y < b.pos.y;
   };
-  stable_sort(points.begin(), points.end(), sortX ? cmpx : cmpy);
+  manifold::stable_sort(points.begin(), points.end(), sortX ? cmpx : cmpy);
   if (points.size() < 2) return;
   BuildTwoDTreeImpl(points.view(0, points.size() / 2), !sortX);
   BuildTwoDTreeImpl(points.view(points.size() / 2 + 1), !sortX);
