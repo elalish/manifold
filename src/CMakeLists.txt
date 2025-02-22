@@ -29,6 +29,7 @@ set(
   smoothing.cpp
   sort.cpp
   subdivision.cpp
+  tree2d.cpp
   # optional source files
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
   $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO/meshIO.cpp>
@@ -48,6 +49,7 @@ set(
   shared.h
   sparse.h
   svd.h
+  tree2d.h
   tri_dist.h
   utils.h
   vec.h

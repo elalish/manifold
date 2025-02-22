@@ -14,45 +14,22 @@
 
 #pragma once
 
-#include <algorithm>
-
-#include "./utils.h"
 #include "manifold/common.h"
 #include "manifold/optional_assert.h"
+#include "manifold/polygon.h"
 #include "manifold/vec_view.h"
 
 namespace manifold {
 
-template <typename P, bool sortX = true>
-void BuildTwoDTreeImpl(VecView<P> points) {
-  std::sort(points.begin(), points.end(), [](const P& a, const P& b) {
-    return sortX ? a.pt.x < b.pt.x : a.pt.y < b.pt.y;
-  });
-  if (points.size() < 2) return;
-  BuildTwoDTreeImpl<P, !sortX>(points.view(0, points.size() / 2));
-  BuildTwoDTreeImpl<P, !sortX>(points.view(points.size() / 2 + 1));
-}
+void BuildTwoDTreeImpl(VecView<PolyVert> points, bool sortX);
 
-// Not really a proper KD-tree, but a kd tree with k = 2 and alternating x/y
-// partition.
-// Recursive sorting is not the most efficient, but simple and guaranteed to
-// result in a balanced tree.
-//
-// Make it multiway...
-template <typename P>
-void BuildTwoDTree(VecView<P> points) {
-  ZoneScoped;
-  // don't even bother...
-  if (points.size() <= 8) return;
-  BuildTwoDTreeImpl<P, true>(points);
-}
+void BuildTwoDTree(VecView<PolyVert> points);
 
-template <typename P, typename F>
-void QueryTwoDTree(VecView<P> points, Rect r, F f) {
-  ZoneScoped;
+template <typename F>
+void QueryTwoDTree(VecView<PolyVert> points, Rect r, F f) {
   if (points.size() <= 8) {
     for (const auto& p : points)
-      if (r.Contains(p.pt)) f(p);
+      if (r.Contains(p.pos)) f(p);
     return;
   }
   Rect current;
@@ -60,16 +37,16 @@ void QueryTwoDTree(VecView<P> points, Rect r, F f) {
   current.max = vec2(std::numeric_limits<double>::infinity());
 
   int level = 0;
-  VecView<P> currentView = points;
+  VecView<PolyVert> currentView = points;
   std::array<Rect, 64> rectStack;
-  std::array<VecView<P>, 64> viewStack;
+  std::array<VecView<PolyVert>, 64> viewStack;
   std::array<int, 64> levelStack;
   int stackPointer = 0;
 
   while (1) {
     if (currentView.size() <= 2) {
       for (const auto& p : currentView)
-        if (r.Contains(p.pt)) f(p);
+        if (r.Contains(p.pos)) f(p);
       if (--stackPointer < 0) break;
       level = levelStack[stackPointer];
       currentView = viewStack[stackPointer];
@@ -80,13 +57,13 @@ void QueryTwoDTree(VecView<P> points, Rect r, F f) {
     // these are conceptual left/right trees
     Rect left = current;
     Rect right = current;
-    const P middle = currentView[currentView.size() / 2];
+    const PolyVert middle = currentView[currentView.size() / 2];
     if (level % 2 == 0)
-      left.max.x = right.min.x = middle.pt.x;
+      left.max.x = right.min.x = middle.pos.x;
     else
-      left.max.y = right.min.y = middle.pt.y;
+      left.max.y = right.min.y = middle.pos.y;
 
-    if (r.Contains(middle.pt)) f(middle);
+    if (r.Contains(middle.pos)) f(middle);
     if (left.DoesOverlap(r)) {
       if (right.DoesOverlap(r)) {
         DEBUG_ASSERT(stackPointer < 64, logicErr, "Stack overflow");

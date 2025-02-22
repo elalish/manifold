@@ -20,7 +20,7 @@
 
 #include "./collider.h"
 #include "./parallel.h"
-#include "./twodtree.h"
+#include "./tree2d.h"
 #include "./utils.h"
 #include "manifold/optional_assert.h"
 
@@ -219,11 +219,6 @@ std::vector<ivec3> TriangulateConvex(const PolygonsIdx &polys) {
   return triangles;
 }
 
-struct PointWrapper {
-  vec2 pt;
-  size_t idx;
-};
-
 /**
  * Ear-clipping triangulator based on David Eberly's approach from Geometric
  * Tools, but adjusted to handle epsilon-valid polygons, and including a
@@ -312,7 +307,7 @@ class EarClip {
   double epsilon_;
 
   struct IdxCollider {
-    Vec<PointWrapper> points;
+    Vec<PolyVert> points;
     std::vector<VertItr> itr;
   };
 
@@ -513,7 +508,7 @@ class EarClip {
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-      QueryTwoDTree(collider.points, earBox, [&](PointWrapper point) {
+      QueryTwoDTree(collider.points, earBox, [&](PolyVert point) {
         const VertItr test = collider.itr[point.idx];
         if (!Clipped(test) && test->mesh_idx != mesh_idx &&
             test->mesh_idx != lid &&
@@ -835,9 +830,9 @@ class EarClip {
   IdxCollider VertCollider(VertItr start) const {
     ZoneScoped;
     std::vector<VertItr> itr;
-    Vec<PointWrapper> points;
+    Vec<PolyVert> points;
     Loop(start, [&itr, &points, this](VertItr v) {
-      points.push_back({v->pos, itr.size()});
+      points.push_back({v->pos, static_cast<int>(itr.size())});
       itr.push_back(v);
     });
 
