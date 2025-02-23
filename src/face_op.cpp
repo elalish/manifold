@@ -192,6 +192,66 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   CreateHalfedges(triVerts);
 }
 
+void Manifold::Impl::FlattenFaces() {
+  Vec<size_t> edgeFace(halfedge_.size());
+  const size_t remove = std::numeric_limits<size_t>::max();
+  const size_t numTri = NumTri();
+  const auto policy = autoPolicy(numTri);
+  for_each_n(policy, countAt(0_uz), numTri, [&edgeFace, this](size_t tri) {
+    for (const int i : {0, 1, 2}) {
+      const int pair = halfedge_[3 * tri + i].pairedHalfedge;
+      const auto& ref = meshRelation_.triRef[tri];
+      edgeFace[3 * tri + i] =
+          ref.SameFace(meshRelation_.triRef[pair / 3])
+              ? remove
+              : (static_cast<size_t>(ref.meshID) << 32) + ref.faceID;
+    }
+  });
+
+  Vec<size_t> newHalf2Old(halfedge_.size());
+  sequence(newHalf2Old.begin(), newHalf2Old.end());
+  stable_sort(
+      newHalf2Old.begin(), newHalf2Old.end(),
+      [&edgeFace](size_t a, size_t b) { return edgeFace[a] < edgeFace[b]; });
+  newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
+                                  [&](const size_t i) {
+                                    return edgeFace[newHalf2Old[i]] == remove;
+                                  }) -
+                     countAt(0_uz));
+
+  Vec<size_t> oldHalf2New(halfedge_.size());
+  for_each_n(policy, countAt(0_uz), newHalf2Old.size(),
+             [&](size_t i) { oldHalf2New[newHalf2Old[i]] = i; });
+
+  Vec<Halfedge> newHalfedge(newHalf2Old.size());
+  Vec<TriRef> newTriRef(newHalf2Old.size());
+  for_each_n(policy, countAt(0_uz), newHalf2Old.size(), [&](size_t i) {
+    newHalfedge[i] = halfedge_[newHalf2Old[i]];
+    newHalfedge[i].pairedHalfedge = oldHalf2New[newHalfedge[i].pairedHalfedge];
+    newTriRef[i] = meshRelation_.triRef[newHalf2Old[i] / 3];
+  });
+
+  halfedge_ = std::move(newHalfedge);
+
+  Vec<int> faceEdge(1, 0);
+  for (size_t i = 1; i < newHalf2Old.size(); ++i) {
+    if (edgeFace[newHalf2Old[i]] != edgeFace[newHalf2Old[i - 1]]) {
+      faceEdge.push_back(i);
+    }
+  }
+  faceEdge.push_back(newHalf2Old.size());
+
+  Vec<vec3> oldFaceNormal = std::move(faceNormal_);
+  faceNormal_.resize(faceEdge.size() - 1);
+  for_each_n(policy, countAt(0_uz), faceEdge.size() - 1, [&](size_t i) {
+    faceNormal_[i] = oldFaceNormal[newHalf2Old[faceEdge[i]] / 3];
+  });
+
+  Face2Tri(faceEdge, newTriRef);
+  RemoveUnreferencedVerts();
+  Finish();
+}
+
 /**
  * Returns a set of 2D polygons formed by the input projection of the vertices
  * of the list of Halfedges, which must be an even-manifold, meaning each vert
