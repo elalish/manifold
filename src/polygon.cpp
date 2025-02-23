@@ -124,6 +124,7 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
 }
 
 void Dump(const PolygonsIdx &polys, double epsilon) {
+  std::cout << std::setprecision(16);
   std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
     std::cout << poly.size() << std::endl;
