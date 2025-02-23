@@ -295,13 +295,17 @@ TEST(Samples, Sponge4) {
 #endif
 #endif
 
-TEST(Samples, DISABLED_CondensedMatter16) {
+TEST(Samples, CondensedMatter16) {
+  // FIXME: Triangulation can be invalid
+  bool old = PolygonParams().processOverlaps;
+  PolygonParams().processOverlaps = true;
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
 #endif
+  PolygonParams().processOverlaps = old;
 }
 
 TEST(Samples, CondensedMatter64) {
