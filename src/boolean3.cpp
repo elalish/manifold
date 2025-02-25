@@ -497,6 +497,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Symbolic perturbation:
   // Union -> expand inP
   // Difference, Intersection -> contract inP
+  constexpr size_t INT_MAX_SZ =
+      static_cast<size_t>(std::numeric_limits<int>::max());
 
 #ifdef MANIFOLD_DEBUG
   Timer broad;
@@ -530,6 +532,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
   p2q0.Sort();
   PRINT("p2q0 size = " << p2q0.size());
+
+  if (3 * p1q2_.size() + 3 * p2q1_.size() > INT_MAX_SZ) {
+    valid = false;
+    return;
+  }
 
   // Find involved edge pairs from Level 3
   SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
@@ -572,6 +579,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   std::tie(x21_, v21_) =
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
+
+  if (x12_.size() > INT_MAX_SZ || x21_.size() > INT_MAX_SZ) {
+    valid = false;
+    return;
+  }
 
   s11.clear();
   xyzz11.clear();

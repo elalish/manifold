@@ -91,6 +91,7 @@ typedef enum ManifoldError {
   MANIFOLD_RUN_INDEX_WRONG_LENGTH,
   MANIFOLD_FACE_ID_WRONG_LENGTH,
   MANIFOLD_INVALID_CONSTRUCTION,
+  MANIFOLD_RESULT_TOO_LARGE,
 } ManifoldError;
 
 typedef enum ManifoldFillRule {
