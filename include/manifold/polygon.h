@@ -56,7 +56,5 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                   double epsilon = -1);
 
 std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon = -1);
-
-ExecutionParams &PolygonParams();
 /** @} */
 }  // namespace manifold

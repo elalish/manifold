@@ -217,7 +217,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   GetFaceBoxMorton(faceBox, faceMorton);
   SparseIndices collisions = collider_.Collisions<true>(faceBox.cview());
 
-  const bool verbose = ManifoldParams().verbose;
+  const bool verbose = ManifoldParams().verbose > 0;
   return !all_of(countAt(0), countAt(collisions.size()), [&](size_t i) {
     size_t x = collisions.Get(i, false);
     size_t y = collisions.Get(i, true);

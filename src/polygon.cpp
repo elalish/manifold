@@ -21,12 +21,13 @@
 #include "./parallel.h"
 #include "./tree2d.h"
 #include "./utils.h"
+#include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 
 namespace {
 using namespace manifold;
 
-static ExecutionParams params;
+constexpr int TRIANGULATOR_VERBOSE_LEVEL = 2;
 
 constexpr double kBest = -std::numeric_limits<double>::infinity();
 
@@ -148,7 +149,8 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << epsilon << std::endl;
   std::cout << e.what() << std::endl;
-  if (triangles.size() > 1000 && !PolygonParams().verbose) {
+  if (triangles.size() > 1000 &&
+      ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) {
     std::cout << "Output truncated due to producing " << triangles.size()
               << " triangles." << std::endl;
     return;
@@ -161,8 +163,9 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   }
 }
 
-#define PRINT(msg) \
-  if (params.verbose) std::cout << msg << std::endl;
+#define PRINT(msg)                                            \
+  if (ManifoldParams().verbose >= TRIANGULATOR_VERBOSE_LEVEL) \
+    std::cout << msg << std::endl;
 #else
 #define PRINT(msg)
 #endif
@@ -528,7 +531,7 @@ class EarClip {
 
     void PrintVert() const {
 #ifdef MANIFOLD_DEBUG
-      if (!params.verbose) return;
+      if (ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cost: " << cost
                 << std::endl;
@@ -748,7 +751,7 @@ class EarClip {
     JoinPolygons(start, connector);
 
 #ifdef MANIFOLD_DEBUG
-    if (params.verbose) {
+    if (ManifoldParams().verbose >= TRIANGULATOR_VERBOSE_LEVEL) {
       std::cout << "connected " << start->mesh_idx << " to "
                 << connector->mesh_idx << std::endl;
     }
@@ -896,7 +899,7 @@ class EarClip {
 
   void Dump(VertItrC start) const {
 #ifdef MANIFOLD_DEBUG
-    if (!params.verbose) return;
+    if (ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) return;
     VertItrC v = start;
     std::cout << "show(array([" << std::setprecision(15) << std::endl;
     do {
@@ -950,14 +953,14 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
       updatedEpsilon = triangulator.GetPrecision();
     }
 #ifdef MANIFOLD_DEBUG
-    if (params.intermediateChecks) {
+    if (ManifoldParams().intermediateChecks) {
       CheckTopology(triangles, polys);
-      if (!params.processOverlaps) {
+      if (!ManifoldParams().processOverlaps) {
         CheckGeometry(triangles, polys, 2 * updatedEpsilon);
       }
     }
   } catch (const geometryErr &e) {
-    if (!params.suppressErrors) {
+    if (!ManifoldParams().suppressErrors) {
       PrintFailure(e, polys, triangles, updatedEpsilon);
     }
     throw;
@@ -993,7 +996,5 @@ std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
   }
   return TriangulateIdx(polygonsIndexed, epsilon);
 }
-
-ExecutionParams &PolygonParams() { return params; }
 
 }  // namespace manifold
