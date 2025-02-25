@@ -106,6 +106,9 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::InvalidConstruction:
       e = MANIFOLD_INVALID_CONSTRUCTION;
       break;
+    case Manifold::Error::ResultTooLarge:
+      e = MANIFOLD_RESULT_TOO_LARGE;
+      break;
   };
   return e;
 }
