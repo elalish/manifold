@@ -430,12 +430,13 @@ TEST(Boolean, Precision2) {
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
 
-TEST(Boolean, DISABLED_SimpleCubeRegression) {
-  ManifoldParams().intermediateChecks = true;
+TEST(Boolean, SimpleCubeRegression) {
+  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+  ManifoldParams().selfIntersectionChecks = true;
   Manifold result =
       Manifold::Cube().Rotate(-0.10000000000000001, 0.10000000000000001, -1.) +
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().intermediateChecks = false;
+  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }

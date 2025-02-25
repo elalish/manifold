@@ -577,6 +577,9 @@ struct ExecutionParams {
   /// Perform extra sanity checks and assertions on the intermediate data
   /// structures.
   bool intermediateChecks = false;
+  /// Perform 3D mesh self-intersection test on intermediate boolean results to
+  /// test for ϵ-validity. For debug purposes only.
+  bool selfIntersectionChecks = false;
   /// Verbose output primarily of the Boolean, including timing info and vector
   /// sizes.
   bool verbose = false;

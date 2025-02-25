@@ -57,7 +57,7 @@ Polygons Duplicate(Polygons polys) {
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
               double epsilon = -1.0) {
-  PolygonParams().verbose = options.params.verbose;
+  ManifoldParams().verbose = options.params.verbose;
 
   std::vector<ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys, epsilon));
@@ -69,7 +69,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), epsilon));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
-  PolygonParams().verbose = false;
+  ManifoldParams().verbose = false;
 }
 
 class PolygonTestFixture : public testing::Test {

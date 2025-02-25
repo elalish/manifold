@@ -10,6 +10,7 @@
 #endif
 
 #include "../src/utils.h"
+#include "manifold/manifold.h"
 #include "manifold/polygon.h"
 
 using namespace manifold;
@@ -110,10 +111,10 @@ void Dump(const Polygons &polys) {
 }
 
 void DumpTriangulation(const Polygons &polys, double precision) {
-  ExecutionParams oldParams = PolygonParams();
-  manifold::PolygonParams().processOverlaps = true;
+  ExecutionParams oldParams = ManifoldParams();
+  manifold::ManifoldParams().processOverlaps = true;
   std::vector<ivec3> result = Triangulate(polys);
-  PolygonParams() = oldParams;
+  ManifoldParams() = oldParams;
   for (const ivec3 &tri : result) {
     std::pair<int, int> xid = findIndex(polys, tri.x);
     std::pair<int, int> yid = findIndex(polys, tri.y);
@@ -305,9 +306,9 @@ int isValid(const Polygons &polys, double precision = -1) {
 }
 
 int main(int argc, char **argv) {
-  PolygonParams().intermediateChecks = true;
-  PolygonParams().processOverlaps = false;
-  PolygonParams().suppressErrors = true;
+  ManifoldParams().intermediateChecks = true;
+  ManifoldParams().processOverlaps = false;
+  ManifoldParams().suppressErrors = true;
 
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0] << " <input file>" << std::endl;
