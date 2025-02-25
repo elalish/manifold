@@ -42,6 +42,9 @@ void print_usage() {
   printf(
       "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
       "flag)\n");
+  printf(
+      "  -vv: Enable extra verbose output for triangulator (only works if "
+      "compiled with MANIFOLD_DEBUG flag)\n");
 }
 
 int main(int argc, char** argv) {
@@ -86,8 +89,10 @@ int main(int argc, char** argv) {
         options.exportModels = true;
         break;
       case 'v':
-        options.params.verbose = true;
-        manifold::ManifoldParams().verbose = true;
+        manifold::ManifoldParams().verbose = 1;
+        if (argv[i][2] == 'v') {
+          manifold::ManifoldParams().verbose = 2;
+        }
         break;
       case 'c':
         manifold::ManifoldParams().selfIntersectionChecks = true;

@@ -266,7 +266,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
     });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose && numFlagged > 0) {
+    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
       std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
     }
 #endif
@@ -284,7 +284,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
     if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose && numFlagged > 0) {
+    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
       std::cout << "collapsed " << numFlagged << " colinear edges" << std::endl;
     }
 #endif
@@ -310,7 +310,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
     });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose && numFlagged > 0) {
+    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
       std::cout << "swapped " << numFlagged << " edges" << std::endl;
     }
 #endif
@@ -897,7 +897,7 @@ void Manifold::Impl::DedupeEdges() {
     if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose) {
+    if (ManifoldParams().verbose > 0) {
       std::cout << "found " << numFlagged << " duplicate edges to split"
                 << std::endl;
     }
