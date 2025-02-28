@@ -325,9 +325,6 @@ struct Manifold::Impl {
   // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
   void FlattenFaces();
-  PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
-                            VecView<Halfedge>::IterC end,
-                            mat2x3 projection) const;
   Polygons Slice(double height) const;
   Polygons Project() const;
 
