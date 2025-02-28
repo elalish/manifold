@@ -102,6 +102,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
+    if (numEdge == 0) return;
     DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const vec3 normal = faceNormal_[face];
 
@@ -304,11 +305,6 @@ void Manifold::Impl::FlattenFaces() {
   faceEdge2[0] = 0;
   Vec<Halfedge> newHalfedge2(newHalfedge.size());
   for_each_n(policy, countAt(0_uz), numFace, [&](size_t face) {
-    const int oldFace = newHalf2Old[faceEdge[face]] / 3;
-    // only fill values that will get read.
-    halfedgeRef[faceEdge[face]] = meshRelation_.triRef[oldFace];
-    faceNormal_[face] = oldFaceNormal[oldFace];
-
     std::vector<std::vector<int>> polys =
         AssembleHalfedges(newHalfedge.cbegin() + faceEdge[face],
                           newHalfedge.cbegin() + faceEdge[face + 1]);
@@ -328,16 +324,24 @@ void Manifold::Impl::FlattenFaces() {
       polys2.push_back({last, start});
     }
 
-    const int start = startFace.fetch_add(polys2.size());
-    std::copy(polys2.begin(), polys2.end(), newHalfedge2.begin() + start);
-    faceEdge2[face + 1] = start + polys2.size();
+    const int numEdge = polys2.size() >= 3 ? polys2.size() : 0;
+    const int start = startFace.fetch_add(numEdge);
+    if (polys2.size() >= 3) {
+      std::copy(polys2.begin(), polys2.end(), newHalfedge2.begin() + start);
+    }
+    faceEdge2[face + 1] = start + numEdge;
+
+    const int oldFace = newHalf2Old[faceEdge[face]] / 3;
+    // only fill values that will get read.
+    halfedgeRef[start] = meshRelation_.triRef[oldFace];
+    faceNormal_[face] = oldFaceNormal[oldFace];
   });
 
   newHalfedge2.resize(startFace);
 
   halfedge_ = std::move(newHalfedge2);
 
-  Face2Tri(faceEdge, halfedgeRef);
+  Face2Tri(faceEdge2, halfedgeRef);
   RemoveUnreferencedVerts();
   Finish();
 }
