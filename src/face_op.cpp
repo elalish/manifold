@@ -247,8 +247,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 }
 
 void Manifold::Impl::FlattenFaces() {
-  Vec<size_t> edgeFace(halfedge_.size());
-  const size_t remove = std::numeric_limits<size_t>::max();
+  Vec<uint64_t> edgeFace(halfedge_.size());
+  constexpr uint64_t remove = std::numeric_limits<uint64_t>::max();
   const size_t numTri = NumTri();
   const auto policy = autoPolicy(numTri);
 
@@ -257,7 +257,7 @@ void Manifold::Impl::FlattenFaces() {
            [](auto& v) { v.store(0); });
 
   for_each_n(policy, countAt(0_uz), numTri,
-             [&edgeFace, &vertDegree, this](size_t tri) {
+             [&edgeFace, &vertDegree, remove, this](size_t tri) {
                for (const int i : {0, 1, 2}) {
                  const int edge = 3 * tri + i;
                  const int pair = halfedge_[edge].pairedHalfedge;
@@ -265,8 +265,8 @@ void Manifold::Impl::FlattenFaces() {
                  if (ref.SameFace(meshRelation_.triRef[pair / 3])) {
                    edgeFace[edge] = remove;
                  } else {
-                   edgeFace[edge] = (static_cast<size_t>(ref.meshID) << 32) +
-                                    static_cast<size_t>(ref.faceID);
+                   edgeFace[edge] = (static_cast<uint64_t>(ref.meshID) << 32) +
+                                    static_cast<uint64_t>(ref.faceID);
                    ++vertDegree[halfedge_[edge].startVert];
                  }
                }
