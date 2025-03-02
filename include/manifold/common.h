@@ -577,9 +577,9 @@ struct ExecutionParams {
   /// Perform extra sanity checks and assertions on the intermediate data
   /// structures.
   bool intermediateChecks = false;
-  /// Verbose output primarily of the Boolean, including timing info and vector
-  /// sizes.
-  bool verbose = false;
+  /// Perform 3D mesh self-intersection test on intermediate boolean results to
+  /// test for ϵ-validity. For debug purposes only.
+  bool selfIntersectionChecks = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
   bool processOverlaps = true;
@@ -588,6 +588,12 @@ struct ExecutionParams {
   bool suppressErrors = false;
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
+  /// Verbose level:
+  /// - 0 for no verbose output
+  /// - 1 for verbose output for the Boolean, including timing info and vector
+  /// sizes.
+  /// - 2 for verbose output with triangulator action as well.
+  int verbose = 0;
 };
 /** @} */
 

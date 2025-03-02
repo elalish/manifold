@@ -137,7 +137,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
   try {
     Boolean3 boolean(a, b, op);
     auto impl = boolean.Result(op);
-    if (ManifoldParams().intermediateChecks && impl.IsSelfIntersecting()) {
+    if (ManifoldParams().selfIntersectionChecks && impl.IsSelfIntersecting()) {
       dump_lock.lock();
       std::cout << "self intersections detected" << std::endl;
       dump_lock.unlock();

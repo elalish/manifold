@@ -263,6 +263,7 @@ class Manifold {
     RunIndexWrongLength,
     FaceIDWrongLength,
     InvalidConstruction,
+    ResultTooLarge,
   };
 
   /** @name Information
@@ -430,6 +431,8 @@ inline std::string ToString(const Manifold::Error& error) {
       return "Face ID Wrong Length";
     case Manifold::Error::InvalidConstruction:
       return "Invalid Construction";
+    case Manifold::Error::ResultTooLarge:
+      return "Result Too Large";
     default:
       return "Unknown Error";
   };

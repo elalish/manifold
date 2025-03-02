@@ -113,8 +113,8 @@ if(MANIFOLD_CROSS_SECTION)
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      # Nov 22, 2024
-      GIT_TAG a8269cafe92cdbf92572bceda5e9fdacc4684b51
+      # Jan 27, 2025
+      GIT_TAG Clipper2_1.5.2
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR CPP
       EXCLUDE_FROM_ALL
@@ -131,7 +131,7 @@ if(TRACY_ENABLE)
   FetchContent_Declare(
     tracy
     GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG v0.10
+    GIT_TAG v0.11.1
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
     EXCLUDE_FROM_ALL
@@ -180,8 +180,7 @@ if(MANIFOLD_PYBIND)
     FetchContent_Declare(
       nanobind
       GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-      GIT_TAG
-        784efa2a0358a4dc5432c74f5685ee026e20f2b6 # v2.2.0
+      GIT_TAG v2.5.0
       GIT_PROGRESS TRUE
       EXCLUDE_FROM_ALL
     )
