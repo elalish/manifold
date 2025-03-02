@@ -296,6 +296,11 @@ void Manifold::Impl::FlattenFaces() {
   const int numFace = faceEdge.size();
   faceEdge.push_back(newHalf2Old.size());
 
+  if (numFace < 4) {
+    MarkFailure(Error::NoError);
+    return;  // empty
+  }
+
   Vec<TriRef> halfedgeRef(halfedge_.size());
   Vec<vec3> oldFaceNormal = std::move(faceNormal_);
   faceNormal_.resize(numFace);
@@ -337,12 +342,15 @@ void Manifold::Impl::FlattenFaces() {
     faceNormal_[face] = oldFaceNormal[oldFace];
   });
 
-  newHalfedge2.resize(startFace);
+  if (startFace == 0) {
+    MarkFailure(Error::NoError);
+    return;  // empty
+  }
 
+  newHalfedge2.resize(startFace);
   halfedge_ = std::move(newHalfedge2);
 
   Face2Tri(faceEdge2, halfedgeRef);
-  RemoveUnreferencedVerts();
   Finish();
 }
 
