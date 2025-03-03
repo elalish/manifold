@@ -38,11 +38,13 @@ void print_usage() {
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
   printf("  -e: Export GLB models of samples\n");
-  printf("  -c: Enable intermediate checks (needs MANIFOLD_DEBUG)\n");
+  printf("  -c: Enable self-intersection checks (needs MANIFOLD_DEBUG)\n");
   printf(
-      "  -v: Enable verbose output and intermediate checks (only works if "
-      "compiled with MANIFOLD_DEBUG "
+      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
       "flag)\n");
+  printf(
+      "  -vv: Enable extra verbose output for triangulator (only works if "
+      "compiled with MANIFOLD_DEBUG flag)\n");
 }
 
 int main(int argc, char** argv) {
@@ -87,12 +89,13 @@ int main(int argc, char** argv) {
         options.exportModels = true;
         break;
       case 'v':
-        options.params.verbose = true;
-        manifold::ManifoldParams().verbose = true;
-        manifold::ManifoldParams().intermediateChecks = true;
+        manifold::ManifoldParams().verbose = 1;
+        if (argv[i][2] == 'v') {
+          manifold::ManifoldParams().verbose = 2;
+        }
         break;
       case 'c':
-        manifold::ManifoldParams().intermediateChecks = true;
+        manifold::ManifoldParams().selfIntersectionChecks = true;
         break;
       default:
         fprintf(stderr, "Unknown option: %s\n", argv[i]);
@@ -101,8 +104,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  manifold::PolygonParams().intermediateChecks = true;
-  manifold::PolygonParams().processOverlaps = false;
+  manifold::ManifoldParams().intermediateChecks = true;
+  manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);
 

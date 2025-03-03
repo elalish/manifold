@@ -18,15 +18,16 @@
 #include <map>
 #include <set>
 
-#include "./collider.h"
 #include "./parallel.h"
+#include "./tree2d.h"
 #include "./utils.h"
+#include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 
 namespace {
 using namespace manifold;
 
-static ExecutionParams params;
+constexpr int TRIANGULATOR_VERBOSE_LEVEL = 2;
 
 constexpr double kBest = -std::numeric_limits<double>::infinity();
 
@@ -124,6 +125,7 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
 }
 
 void Dump(const PolygonsIdx &polys, double epsilon) {
+  std::cout << std::setprecision(16);
   std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
     std::cout << poly.size() << std::endl;
@@ -147,10 +149,12 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
                   std::vector<ivec3> &triangles, double epsilon) {
   // only print the first triangulation failure
   if (numFailures.fetch_add(1) != 0) return;
+  std::cout << std::setprecision(16);
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << epsilon << std::endl;
   std::cout << e.what() << std::endl;
-  if (triangles.size() > 1000 && !PolygonParams().verbose) {
+  if (triangles.size() > 1000 &&
+      ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) {
     std::cout << "Output truncated due to producing " << triangles.size()
               << " triangles." << std::endl;
     return;
@@ -163,8 +167,9 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   }
 }
 
-#define PRINT(msg) \
-  if (params.verbose) std::cout << msg << std::endl;
+#define PRINT(msg)                                            \
+  if (ManifoldParams().verbose >= TRIANGULATOR_VERBOSE_LEVEL) \
+    std::cout << msg << std::endl;
 #else
 #define PRINT(msg)
 #endif
@@ -310,9 +315,8 @@ class EarClip {
   double epsilon_;
 
   struct IdxCollider {
-    Collider collider;
+    Vec<PolyVert> points;
     std::vector<VertItr> itr;
-    SparseIndices ind;
   };
 
   // A circularly-linked list representing the polygon(s) that still need to be
@@ -506,38 +510,32 @@ class EarClip {
         return totalCost;
       }
 
-      Box earBox = Box{vec3(center.x - radius, center.y - radius, 0),
-                       vec3(center.x + radius, center.y + radius, 0)};
-      earBox.Union(vec3(pos, 0));
-      collider.collider.Collisions(VecView<const Box>(&earBox, 1),
-                                   collider.ind);
+      Rect earBox = Rect(vec2(center.x - radius, center.y - radius),
+                         vec2(center.x + radius, center.y + radius));
+      earBox.Union(pos);
+      earBox.min -= epsilon;
+      earBox.max += epsilon;
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-
-      totalCost = transform_reduce(
-          countAt(0), countAt(collider.ind.size()), totalCost,
-          [](double a, double b) { return std::max(a, b); },
-          [&](size_t i) {
-            const VertItr test = collider.itr[collider.ind.Get(i, true)];
-            if (!Clipped(test) && test->mesh_idx != mesh_idx &&
-                test->mesh_idx != lid &&
-                test->mesh_idx != rid) {  // Skip duplicated verts
-              double cost = Cost(test, openSide, epsilon);
-              if (cost < -epsilon) {
-                cost = DelaunayCost(test->pos - center, scale, epsilon);
-              }
-              return cost;
-            }
-            return std::numeric_limits<double>::lowest();
-          });
-      collider.ind.Clear();
+      QueryTwoDTree(collider.points, earBox, [&](PolyVert point) {
+        const VertItr test = collider.itr[point.idx];
+        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
+            test->mesh_idx != lid &&
+            test->mesh_idx != rid) {  // Skip duplicated verts
+          double cost = Cost(test, openSide, epsilon);
+          if (cost < -epsilon) {
+            cost = DelaunayCost(test->pos - center, scale, epsilon);
+          }
+          if (cost > totalCost) totalCost = cost;
+        }
+      });
       return totalCost;
     }
 
     void PrintVert() const {
 #ifdef MANIFOLD_DEBUG
-      if (!params.verbose) return;
+      if (ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cost: " << cost
                 << std::endl;
@@ -757,7 +755,7 @@ class EarClip {
     JoinPolygons(start, connector);
 
 #ifdef MANIFOLD_DEBUG
-    if (params.verbose) {
+    if (ManifoldParams().verbose >= TRIANGULATOR_VERBOSE_LEVEL) {
       std::cout << "connected " << start->mesh_idx << " to "
                 << connector->mesh_idx << std::endl;
     }
@@ -840,35 +838,16 @@ class EarClip {
   // epsilon_. Each ear uses this BVH to quickly find a subset of vertices to
   // check for cost.
   IdxCollider VertCollider(VertItr start) const {
-    Vec<Box> vertBox;
-    Vec<uint32_t> vertMorton;
+    ZoneScoped;
     std::vector<VertItr> itr;
-    const Box box(vec3(bBox_.min, 0), vec3(bBox_.max, 0));
-
-    Loop(start, [&vertBox, &vertMorton, &itr, &box, this](VertItr v) {
+    Vec<PolyVert> points;
+    Loop(start, [&itr, &points, this](VertItr v) {
+      points.push_back({v->pos, static_cast<int>(itr.size())});
       itr.push_back(v);
-      const vec3 pos(v->pos, 0);
-      vertBox.push_back({pos - epsilon_, pos + epsilon_});
-      vertMorton.push_back(Collider::MortonCode(pos, box));
     });
 
-    if (itr.empty()) {
-      return {Collider(), itr, {}};
-    }
-
-    const int numVert = itr.size();
-    Vec<int> vertNew2Old(numVert);
-    sequence(vertNew2Old.begin(), vertNew2Old.end());
-
-    stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
-                [&vertMorton](const int a, const int b) {
-                  return vertMorton[a] < vertMorton[b];
-                });
-    Permute(vertMorton, vertNew2Old);
-    Permute(vertBox, vertNew2Old);
-    Permute(itr, vertNew2Old);
-
-    return {Collider(vertBox, vertMorton), itr, {}};
+    BuildTwoDTree(points);
+    return {std::move(points), std::move(itr)};
   }
 
   // The main ear-clipping loop. This is called once for each simple polygon -
@@ -924,7 +903,7 @@ class EarClip {
 
   void Dump(VertItrC start) const {
 #ifdef MANIFOLD_DEBUG
-    if (!params.verbose) return;
+    if (ManifoldParams().verbose < TRIANGULATOR_VERBOSE_LEVEL) return;
     VertItrC v = start;
     std::cout << "show(array([" << std::setprecision(15) << std::endl;
     do {
@@ -978,14 +957,14 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
       updatedEpsilon = triangulator.GetPrecision();
     }
 #ifdef MANIFOLD_DEBUG
-    if (params.intermediateChecks) {
+    if (ManifoldParams().intermediateChecks) {
       CheckTopology(triangles, polys);
-      if (!params.processOverlaps) {
+      if (!ManifoldParams().processOverlaps) {
         CheckGeometry(triangles, polys, 2 * updatedEpsilon);
       }
     }
   } catch (const geometryErr &e) {
-    if (!params.suppressErrors) {
+    if (!ManifoldParams().suppressErrors) {
       PrintFailure(e, polys, triangles, updatedEpsilon);
     }
     throw;
@@ -1021,7 +1000,5 @@ std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
   }
   return TriangulateIdx(polygonsIndexed, epsilon);
 }
-
-ExecutionParams &PolygonParams() { return params; }
 
 }  // namespace manifold

@@ -697,6 +697,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return inP_;
   }
 
+  if (!valid) {
+    auto impl = Manifold::Impl();
+    impl.status_ = Manifold::Error::ResultTooLarge;
+    return impl;
+  }
+
   const bool invertQ = op == OpType::Subtract;
 
   // Convert winding numbers to inclusion values based on operation type.
