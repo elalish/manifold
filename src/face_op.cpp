@@ -331,7 +331,7 @@ void Manifold::Impl::FlattenFaces() {
 
     const int numEdge = polys2.size();
     if (numEdge < 3) return;
-    const uint64_t inc = (1_uz << 32) + numEdge;
+    const uint64_t inc = (1LL << 32) + numEdge;
     const uint64_t data = faceData.fetch_add(inc);
     const int start = data & 0xFFFFFFFF;
     const int outFace = data >> 32;
