@@ -305,14 +305,14 @@ void Manifold::Impl::FlattenFaces() {
   Vec<vec3> oldFaceNormal = std::move(faceNormal_);
   faceNormal_.resize(numFace);
 
-  std::atomic<int> startFace(0);
+  std::atomic<uint64_t> faceData(0);
   Vec<int> faceEdge2(faceEdge.size());
   faceEdge2[0] = 0;
   Vec<Halfedge> newHalfedge2(newHalfedge.size());
-  for_each_n(policy, countAt(0_uz), numFace, [&](size_t face) {
+  for_each_n(policy, countAt(0_uz), numFace, [&](size_t inFace) {
     std::vector<std::vector<int>> polys =
-        AssembleHalfedges(newHalfedge.cbegin() + faceEdge[face],
-                          newHalfedge.cbegin() + faceEdge[face + 1]);
+        AssembleHalfedges(newHalfedge.cbegin() + faceEdge[inFace],
+                          newHalfedge.cbegin() + faceEdge[inFace + 1]);
     Vec<Halfedge> polys2;
     for (const auto& poly : polys) {
       int start = -1;
@@ -329,18 +329,25 @@ void Manifold::Impl::FlattenFaces() {
       polys2.push_back({last, start});
     }
 
-    const int numEdge = polys2.size() >= 3 ? polys2.size() : 0;
-    const int start = startFace.fetch_add(numEdge);
+    const int numEdge = polys2.size();
+    if (numEdge < 3) return;
+    const uint64_t inc = (1_uz << 32) + numEdge;
+    const uint64_t data = faceData.fetch_add(inc);
+    const int start = data & 0xFFFFFFFF;
+    const int outFace = data >> 32;
     if (numEdge > 0) {
       std::copy(polys2.begin(), polys2.end(), newHalfedge2.begin() + start);
     }
-    faceEdge2[face + 1] = start + numEdge;
+    faceEdge2[outFace + 1] = start + numEdge;
 
-    const int oldFace = newHalf2Old[faceEdge[face]] / 3;
+    const int oldFace = newHalf2Old[faceEdge[inFace]] / 3;
     // only fill values that will get read.
     halfedgeRef[start] = meshRelation_.triRef[oldFace];
-    faceNormal_[face] = oldFaceNormal[oldFace];
+    faceNormal_[outFace] = oldFaceNormal[oldFace];
   });
+
+  const int startFace = faceData & 0xFFFFFFFF;
+  const int outFace = faceData >> 32;
 
   if (startFace == 0) {
     MarkFailure(Error::NoError);
@@ -348,6 +355,7 @@ void Manifold::Impl::FlattenFaces() {
   }
 
   newHalfedge2.resize(startFace);
+  faceEdge2.resize(outFace + 1);
   halfedge_ = std::move(newHalfedge2);
 
   Face2Tri(faceEdge2, halfedgeRef);
