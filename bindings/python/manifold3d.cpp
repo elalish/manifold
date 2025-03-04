@@ -216,7 +216,8 @@ NB_MODULE(manifold3d, m) {
         nb::arg("radius"), get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
-        nb::arg("epsilon") = -1, triangulate__polygons__epsilon);
+        nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
+        triangulate__polygons__epsilon__allow_convex);
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)

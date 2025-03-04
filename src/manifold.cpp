@@ -405,8 +405,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->CreateFaces();
-    impl->SimplifyTopology();
-    impl->Finish();
+    impl->FlattenFaces();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
@@ -427,8 +426,7 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (tolerance >= oldTolerance) {
     impl->tolerance_ = tolerance;
     impl->CreateFaces();
-    impl->SimplifyTopology();
-    impl->Finish();
+    impl->FlattenFaces();
   }
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);
