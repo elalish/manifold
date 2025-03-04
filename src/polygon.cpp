@@ -940,16 +940,21 @@ namespace manifold {
  * references back to the original vertices.
  * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
+ * @param allowConvex If true (default), the triangulator will use a fast
+ * triangulation if the input is convex, falling back to ear-clipping if not.
+ * The triangle quality may be lower, so set to false to disable this
+ * optimization.
  * @return std::vector<ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon,
+                                  bool allowConvex) {
   std::vector<ivec3> triangles;
   double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_DEBUG
   try {
 #endif
-    if (IsConvex(polys, epsilon)) {  // fast path
+    if (allowConvex && IsConvex(polys, epsilon)) {  // fast path
       triangles = TriangulateConvex(polys);
     } else {
       EarClip triangulator(polys, epsilon);
@@ -985,10 +990,15 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon) {
  * polygons and/or holes.
  * @param epsilon The value of &epsilon;, bounding the uncertainty of the
  * input.
+ * @param allowConvex If true (default), the triangulator will use a fast
+ * triangulation if the input is convex, falling back to ear-clipping if not.
+ * The triangle quality may be lower, so set to false to disable this
+ * optimization.
  * @return std::vector<ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
+std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon,
+                               bool allowConvex) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
   for (const auto &poly : polygons) {
@@ -998,7 +1008,7 @@ std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon) {
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
-  return TriangulateIdx(polygonsIndexed, epsilon);
+  return TriangulateIdx(polygonsIndexed, epsilon, allowConvex);
 }
 
 }  // namespace manifold

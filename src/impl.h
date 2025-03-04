@@ -323,7 +323,8 @@ struct Manifold::Impl {
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
 
   // face_op.cpp
-  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
+  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
+                bool allowConvex = false);
   void FlattenFaces();
   Polygons Slice(double height) const;
   Polygons Project() const;

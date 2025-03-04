@@ -91,7 +91,8 @@ using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
  * faceNormal_ values are retained, repeated as necessary.
  */
 void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
-                              const Vec<TriRef>& halfedgeRef) {
+                              const Vec<TriRef>& halfedgeRef,
+                              bool allowConvex) {
   ZoneScoped;
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
@@ -184,7 +185,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         AssembleHalfedges(halfedge_.cbegin() + faceEdge[face],
                           halfedge_.cbegin() + faceEdge[face + 1]),
         vertPos_, projection);
-    return TriangulateIdx(polys, epsilon_);
+    return TriangulateIdx(polys, epsilon_, allowConvex);
   };
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
@@ -358,7 +359,7 @@ void Manifold::Impl::FlattenFaces() {
   faceEdge2.resize(outFace + 1);
   halfedge_ = std::move(newHalfedge2);
 
-  Face2Tri(faceEdge2, halfedgeRef);
+  Face2Tri(faceEdge2, halfedgeRef, false);
   Finish();
 }
 
