@@ -83,6 +83,7 @@ TEST(Properties, ToleranceSphere) {
 
   Manifold sphere2 = sphere.SetTolerance(0.01);
   EXPECT_LT(sphere2.NumTri(), 2500);
+  EXPECT_EQ(sphere2.Genus(), 0);
   EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
   EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
 #ifdef MANIFOLD_EXPORT

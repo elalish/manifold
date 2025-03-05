@@ -319,6 +319,7 @@ void Manifold::Impl::FlattenFaces() {
       int start = -1;
       int last = -1;
       for (const int vert : poly) {
+        // only keep vert touching 3 or more faces
         if (vertDegree[vert] < 3) continue;
         if (start == -1) {
           start = vert;
@@ -358,6 +359,11 @@ void Manifold::Impl::FlattenFaces() {
   newHalfedge2.resize(startFace);
   faceEdge2.resize(outFace + 1);
   halfedge_ = std::move(newHalfedge2);
+
+  // mark unreferenced verts for removal
+  for_each_n(policy, countAt(0_uz), NumVert(), [&](size_t vert) {
+    if (vertDegree[vert] < 3) vertPos_[vert] = vec3(NAN);
+  });
 
   Face2Tri(faceEdge2, halfedgeRef, false);
   Finish();
