@@ -221,7 +221,7 @@ void Manifold::Impl::Finish() {
   SetEpsilon(epsilon_);
   if (!bBox_.IsFinite()) {
     // Decimated out of existence - early out.
-    MarkFailure(Error::NoError);
+    MakeEmpty(Error::NoError);
     return;
   }
 

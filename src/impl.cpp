@@ -391,7 +391,7 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
-void Manifold::Impl::MarkFailure(Error status) {
+void Manifold::Impl::MakeEmpty(Error status) {
   bBox_ = Box();
   vertPos_.clear();
   halfedge_.clear();
@@ -412,7 +412,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   warpFunc(vertPos_.view());
   CalculateBBox();
   if (!IsFinite()) {
-    MarkFailure(Error::NonFiniteVertex);
+    MakeEmpty(Error::NonFiniteVertex);
     return;
   }
   Update();
@@ -434,7 +434,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     return result;
   }
   if (!all(la::isfinite(transform_))) {
-    result.MarkFailure(Error::NonFiniteVertex);
+    result.MakeEmpty(Error::NonFiniteVertex);
     return result;
   }
   result.collider_ = collider_;

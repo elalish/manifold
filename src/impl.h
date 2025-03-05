@@ -69,51 +69,51 @@ struct Manifold::Impl {
     const uint32_t numTri = meshGL.NumTri();
 
     if (meshGL.numProp < 3) {
-      MarkFailure(Error::MissingPositionProperties);
+      MakeEmpty(Error::MissingPositionProperties);
       return;
     }
 
     if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
-      MarkFailure(Error::MergeVectorsDifferentLengths);
+      MakeEmpty(Error::MergeVectorsDifferentLengths);
       return;
     }
 
     if (!meshGL.runTransform.empty() &&
         12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
-      MarkFailure(Error::TransformWrongLength);
+      MakeEmpty(Error::TransformWrongLength);
       return;
     }
 
     if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
         meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
         meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
-      MarkFailure(Error::RunIndexWrongLength);
+      MakeEmpty(Error::RunIndexWrongLength);
       return;
     }
 
     if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
-      MarkFailure(Error::FaceIDWrongLength);
+      MakeEmpty(Error::FaceIDWrongLength);
       return;
     }
 
     if (!manifold::all_of(meshGL.vertProperties.begin(),
                           meshGL.vertProperties.end(),
                           [](Precision x) { return std::isfinite(x); })) {
-      MarkFailure(Error::NonFiniteVertex);
+      MakeEmpty(Error::NonFiniteVertex);
       return;
     }
 
     if (!manifold::all_of(meshGL.runTransform.begin(),
                           meshGL.runTransform.end(),
                           [](Precision x) { return std::isfinite(x); })) {
-      MarkFailure(Error::InvalidConstruction);
+      MakeEmpty(Error::InvalidConstruction);
       return;
     }
 
     if (!manifold::all_of(meshGL.halfedgeTangent.begin(),
                           meshGL.halfedgeTangent.end(),
                           [](Precision x) { return std::isfinite(x); })) {
-      MarkFailure(Error::InvalidConstruction);
+      MakeEmpty(Error::InvalidConstruction);
       return;
     }
 
@@ -123,7 +123,7 @@ struct Manifold::Impl {
       const uint32_t from = meshGL.mergeFromVert[i];
       const uint32_t to = meshGL.mergeToVert[i];
       if (from >= numVert || to >= numVert) {
-        MarkFailure(Error::MergeIndexOutOfBounds);
+        MakeEmpty(Error::MergeIndexOutOfBounds);
         return;
       }
       prop2vert[from] = to;
@@ -195,7 +195,7 @@ struct Manifold::Impl {
       for (const size_t j : {0, 1, 2}) {
         uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
         if (vert >= numVert) {
-          MarkFailure(Error::VertexOutOfBounds);
+          MakeEmpty(Error::VertexOutOfBounds);
           return;
         }
         tri[j] = prop2vert[vert];
@@ -216,7 +216,7 @@ struct Manifold::Impl {
 
     CreateHalfedges(triVerts);
     if (!IsManifold()) {
-      MarkFailure(Error::NotManifold);
+      MakeEmpty(Error::NotManifold);
       return;
     }
 
@@ -237,7 +237,7 @@ struct Manifold::Impl {
     Finish();
 
     if (!IsFinite()) {
-      MarkFailure(Error::NonFiniteVertex);
+      MakeEmpty(Error::NonFiniteVertex);
       return;
     }
 
@@ -279,7 +279,7 @@ struct Manifold::Impl {
   void IncrementMeshIDs();
 
   void Update();
-  void MarkFailure(Error status);
+  void MakeEmpty(Error status);
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
   Impl Transform(const mat3x4& transform) const;

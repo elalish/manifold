@@ -73,6 +73,13 @@ PolygonsIdx ProjectPolygons(const std::vector<std::vector<int>>& polys,
   }  // for poly
   return polygons;
 }
+
+uint64_t PackEdgeFace(int edge, int face) {
+  return static_cast<uint64_t>(edge) << 32 | static_cast<uint64_t>(face);
+}
+
+int UnpackEdge(uint64_t data) { return static_cast<int>(data >> 32); }
+int UnpackFace(uint64_t data) { return static_cast<int>(data & 0xFFFFFFFF); }
 }  // namespace
 
 namespace manifold {
@@ -298,7 +305,7 @@ void Manifold::Impl::FlattenFaces() {
   faceEdge.push_back(newHalf2Old.size());
 
   if (numFace < 4) {
-    MarkFailure(Error::NoError);
+    MakeEmpty(Error::NoError);
     return;  // empty
   }
 
@@ -333,10 +340,10 @@ void Manifold::Impl::FlattenFaces() {
 
     const int numEdge = polys2.size();
     if (numEdge < 3) return;
-    const uint64_t inc = (1LL << 32) + numEdge;
+    const uint64_t inc = PackEdgeFace(numEdge, 1);
     const uint64_t data = faceData.fetch_add(inc);
-    const int start = data & 0xFFFFFFFF;
-    const int outFace = data >> 32;
+    const int start = UnpackEdge(data);
+    const int outFace = UnpackFace(data);
     if (numEdge > 0) {
       std::copy(polys2.begin(), polys2.end(), newHalfedge2.begin() + start);
     }
@@ -348,11 +355,11 @@ void Manifold::Impl::FlattenFaces() {
     faceNormal_[outFace] = oldFaceNormal[oldFace];
   });
 
-  const int startFace = faceData & 0xFFFFFFFF;
-  const int outFace = faceData >> 32;
+  const int startFace = UnpackEdge(faceData);
+  const int outFace = UnpackFace(faceData);
 
   if (startFace == 0) {
-    MarkFailure(Error::NoError);
+    MakeEmpty(Error::NoError);
     return;  // empty
   }
 
