@@ -282,9 +282,8 @@ void Manifold::Impl::FlattenFaces() {
 
   Vec<size_t> newHalf2Old(halfedge_.size());
   sequence(newHalf2Old.begin(), newHalf2Old.end());
-  stable_sort(
-      newHalf2Old.begin(), newHalf2Old.end(),
-      [&edgeFace](size_t a, size_t b) { return edgeFace[a] < edgeFace[b]; });
+  radix_sort_with_key(newHalf2Old.begin(), newHalf2Old.end(),
+                      [&edgeFace](size_t i) { return edgeFace[i]; });
   newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
                                   [&](const size_t i) {
                                     return edgeFace[newHalf2Old[i]] == remove;

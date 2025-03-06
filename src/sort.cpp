@@ -172,10 +172,8 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   Vec<int> vertNew2Old(numOpenVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
-              [&vertMorton](const int& a, const int& b) {
-                return vertMorton[a] < vertMorton[b];
-              });
+  radix_sort_with_key(vertNew2Old.begin(), vertNew2Old.end(),
+                      [&vertMorton](size_t i) { return vertMorton[i]; });
 
   Permute(vertMorton, vertNew2Old);
   Permute(vertBox, vertNew2Old);
@@ -292,10 +290,8 @@ void Manifold::Impl::SortVerts() {
   Vec<int> vertNew2Old(numVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
-              [&vertMorton](const int& a, const int& b) {
-                return vertMorton[a] < vertMorton[b];
-              });
+  radix_sort_with_key(vertNew2Old.begin(), vertNew2Old.end(),
+                      [&vertMorton](size_t i) { return vertMorton[i]; });
 
   ReindexVerts(vertNew2Old, numVert);
 
@@ -407,10 +403,8 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   Vec<int> faceNew2Old(NumTri());
   sequence(faceNew2Old.begin(), faceNew2Old.end());
 
-  stable_sort(faceNew2Old.begin(), faceNew2Old.end(),
-              [&faceMorton](const int& a, const int& b) {
-                return faceMorton[a] < faceMorton[b];
-              });
+  radix_sort_with_key(faceNew2Old.begin(), faceNew2Old.end(),
+                      [&faceMorton](size_t i) { return faceMorton[i]; });
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.

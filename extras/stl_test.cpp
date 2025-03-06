@@ -14,7 +14,7 @@
 
 static constexpr size_t g_Iterations = 5;
 static constexpr size_t g_IterationsDiscard = 1;
-static constexpr size_t g_Sizes[] = {1'000, 10'000, 100'000, 1'000'000,
+static constexpr size_t g_Sizes[] = {1'000, 5'000, 10'000, 50'000, 100'000, 1'000'000,
                                      10'000'000};
 
 template <class Tp>
@@ -238,7 +238,11 @@ struct sort_Rnd_size {  // 25.8.2.1, semi-random input
                         [&dist, &mt] { return dist(mt); });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }
@@ -283,7 +287,11 @@ struct sort_Eq_size {  // 25.8.2.1, equal input
     std::vector<size_t> v;
     return measure([&] { v = std::vector<size_t>(size, 42); },
                    [&] {
-                     manifold::stable_sort(Policy, v.begin(), v.end());
+                     if (Policy == manifold::ExecutionPolicy::Par)
+                       manifold::radix_sort_with_key(v.begin(), v.end(),
+                                                     [](auto x) { return x; });
+                     else
+                       std::stable_sort(v.begin(), v.end());
                      noopt(v);
                    });
   }
@@ -328,7 +336,11 @@ struct sort_Asc_size {  // 25.8.2.1, ascending
           std::iota(v.begin(), v.end(), 0);
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }
@@ -358,7 +370,7 @@ struct sort_roughly_Asc {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<double>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -379,7 +391,7 @@ struct sort_roughly_Asc_size {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<size_t>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -387,7 +399,11 @@ struct sort_roughly_Asc_size {  // 25.8.2.1, ascending + random swaps
           }
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }
@@ -400,7 +416,7 @@ struct sort_roughly_Asc_size_merge {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<size_t>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -447,7 +463,11 @@ struct sort_Des_size {  // 25.8.2.1, descending
                         });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }

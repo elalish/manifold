@@ -90,7 +90,7 @@ class SparseIndices {
 
   void Sort() {
     VecView<int64_t> view = AsVec64();
-    stable_sort(view.begin(), view.end());
+    radix_sort_with_key(view.begin(), view.end(), [](size_t i) { return i; });
   }
 
   void Resize(size_t size) { data_.resize(size * sizeof(int64_t), -1); }
