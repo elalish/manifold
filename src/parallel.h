@@ -28,7 +28,9 @@
 #include <tbb/parallel_scan.h>
 #endif
 #include <algorithm>
+#include <array>
 #include <numeric>
+#include <vector>
 
 namespace manifold {
 
@@ -65,110 +67,8 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
 template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first);
 
-#if (MANIFOLD_PAR == 1)
 namespace details {
 using manifold::kSeqThreshold;
-// implementation from
-// https://duvanenko.tech.blog/2018/01/14/parallel-merge/
-// https://github.com/DragonSpit/ParallelAlgorithms
-// note that the ranges are now [p, r) to fit our convention.
-template <typename SrcIter, typename DestIter, typename Comp>
-void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
-              size_t r2, size_t p3, Comp comp) {
-  size_t length1 = r1 - p1;
-  size_t length2 = r2 - p2;
-  if (length1 < length2) {
-    std::swap(p1, p2);
-    std::swap(r1, r2);
-    std::swap(length1, length2);
-  }
-  if (length1 == 0) return;
-  if (length1 + length2 <= kSeqThreshold) {
-    std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
-  } else {
-    size_t q1 = p1 + length1 / 2;
-    size_t q2 =
-        std::distance(src, std::lower_bound(src + p2, src + r2, src[q1], comp));
-    size_t q3 = p3 + (q1 - p1) + (q2 - p2);
-    dest[q3] = src[q1];
-    tbb::parallel_invoke(
-        [=] { mergeRec(src, dest, p1, q1, p2, q2, p3, comp); },
-        [=] { mergeRec(src, dest, q1 + 1, r1, q2, r2, q3 + 1, comp); });
-  }
-}
-
-template <typename SrcIter, typename DestIter, typename Comp>
-void mergeSortRec(SrcIter src, DestIter dest, size_t begin, size_t end,
-                  Comp comp) {
-  size_t numElements = end - begin;
-  if (numElements <= kSeqThreshold) {
-    std::copy(src + begin, src + end, dest + begin);
-    std::stable_sort(dest + begin, dest + end, comp);
-  } else {
-    size_t middle = begin + numElements / 2;
-    tbb::parallel_invoke([=] { mergeSortRec(dest, src, begin, middle, comp); },
-                         [=] { mergeSortRec(dest, src, middle, end, comp); });
-    mergeRec(src, dest, begin, middle, middle, end, begin, comp);
-  }
-}
-
-template <typename T, typename InputIter, typename OutputIter, typename BinOp>
-struct ScanBody {
-  T sum;
-  T identity;
-  BinOp &f;
-  InputIter input;
-  OutputIter output;
-
-  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
-      : sum(sum), identity(identity), f(f), input(input), output(output) {}
-  ScanBody(ScanBody &b, tbb::split)
-      : sum(b.identity),
-        identity(b.identity),
-        f(b.f),
-        input(b.input),
-        output(b.output) {}
-  template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
-    T temp = sum;
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      T inputTmp = input[i];
-      if (Tag::is_final_scan()) output[i] = temp;
-      temp = f(temp, inputTmp);
-    }
-    sum = temp;
-  }
-  T get_sum() const { return sum; }
-  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
-  void assign(ScanBody &b) { sum = b.sum; }
-};
-
-template <typename InputIter, typename OutputIter, typename P>
-struct CopyIfScanBody {
-  size_t sum;
-  P &pred;
-  InputIter input;
-  OutputIter output;
-
-  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
-      : sum(0), pred(pred), input(input), output(output) {}
-  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
-      : sum(0), pred(b.pred), input(b.input), output(b.output) {}
-  template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
-    size_t temp = sum;
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      if (pred(i)) {
-        temp += 1;
-        if (Tag::is_final_scan()) output[temp - 1] = input[i];
-      }
-    }
-    sum = temp;
-  }
-  size_t get_sum() const { return sum; }
-  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
-  void assign(CopyIfScanBody &b) { sum = b.sum; }
-};
 
 // combine subarray histograms into offsets
 // 0 - (k-1): offset for each block (k blocks in total)
@@ -421,6 +321,109 @@ void radix_sort_with_key_rec(I start, I end, J dest, int bytes, KeyFn &keyfn,
   }
 }
 
+#if (MANIFOLD_PAR == 1)
+// implementation from
+// https://duvanenko.tech.blog/2018/01/14/parallel-merge/
+// https://github.com/DragonSpit/ParallelAlgorithms
+// note that the ranges are now [p, r) to fit our convention.
+template <typename SrcIter, typename DestIter, typename Comp>
+void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
+              size_t r2, size_t p3, Comp comp) {
+  size_t length1 = r1 - p1;
+  size_t length2 = r2 - p2;
+  if (length1 < length2) {
+    std::swap(p1, p2);
+    std::swap(r1, r2);
+    std::swap(length1, length2);
+  }
+  if (length1 == 0) return;
+  if (length1 + length2 <= kSeqThreshold) {
+    std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
+  } else {
+    size_t q1 = p1 + length1 / 2;
+    size_t q2 =
+        std::distance(src, std::lower_bound(src + p2, src + r2, src[q1], comp));
+    size_t q3 = p3 + (q1 - p1) + (q2 - p2);
+    dest[q3] = src[q1];
+    tbb::parallel_invoke(
+        [=] { mergeRec(src, dest, p1, q1, p2, q2, p3, comp); },
+        [=] { mergeRec(src, dest, q1 + 1, r1, q2, r2, q3 + 1, comp); });
+  }
+}
+
+template <typename SrcIter, typename DestIter, typename Comp>
+void mergeSortRec(SrcIter src, DestIter dest, size_t begin, size_t end,
+                  Comp comp) {
+  size_t numElements = end - begin;
+  if (numElements <= kSeqThreshold) {
+    std::copy(src + begin, src + end, dest + begin);
+    std::stable_sort(dest + begin, dest + end, comp);
+  } else {
+    size_t middle = begin + numElements / 2;
+    tbb::parallel_invoke([=] { mergeSortRec(dest, src, begin, middle, comp); },
+                         [=] { mergeSortRec(dest, src, middle, end, comp); });
+    mergeRec(src, dest, begin, middle, middle, end, begin, comp);
+  }
+}
+
+template <typename T, typename InputIter, typename OutputIter, typename BinOp>
+struct ScanBody {
+  T sum;
+  T identity;
+  BinOp &f;
+  InputIter input;
+  OutputIter output;
+
+  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
+      : sum(sum), identity(identity), f(f), input(input), output(output) {}
+  ScanBody(ScanBody &b, tbb::split)
+      : sum(b.identity),
+        identity(b.identity),
+        f(b.f),
+        input(b.input),
+        output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    T temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      T inputTmp = input[i];
+      if (Tag::is_final_scan()) output[i] = temp;
+      temp = f(temp, inputTmp);
+    }
+    sum = temp;
+  }
+  T get_sum() const { return sum; }
+  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
+  void assign(ScanBody &b) { sum = b.sum; }
+};
+
+template <typename InputIter, typename OutputIter, typename P>
+struct CopyIfScanBody {
+  size_t sum;
+  P &pred;
+  InputIter input;
+  OutputIter output;
+
+  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
+      : sum(0), pred(pred), input(input), output(output) {}
+  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
+      : sum(0), pred(b.pred), input(b.input), output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    size_t temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      if (pred(i)) {
+        temp += 1;
+        if (Tag::is_final_scan()) output[temp - 1] = input[i];
+      }
+    }
+    sum = temp;
+  }
+  size_t get_sum() const { return sum; }
+  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
+  void assign(CopyIfScanBody &b) { sum = b.sum; }
+};
+
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type,
           typename Comp = decltype(std::less<T>())>
@@ -462,9 +465,8 @@ struct SortFunctor {
     return mergeSort(policy, first, last, std::less<T>());
   }
 };
-}  // namespace details
-
 #endif
+}  // namespace details
 
 // Applies the function `f` to each element in the range `[first, last)`
 template <typename Iter, typename F>
