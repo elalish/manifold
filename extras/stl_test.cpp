@@ -14,8 +14,8 @@
 
 static constexpr size_t g_Iterations = 5;
 static constexpr size_t g_IterationsDiscard = 1;
-static constexpr size_t g_Sizes[] = {1'000, 5'000, 10'000, 50'000, 100'000, 1'000'000,
-                                     10'000'000};
+static constexpr size_t g_Sizes[] = {1'000,   5'000,     10'000,    50'000,
+                                     100'000, 1'000'000, 10'000'000};
 
 template <class Tp>
 inline void noopt(Tp const &value) {
