@@ -339,7 +339,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
   radix_sort_with_key(ids.begin(), ids.end(),
-                      [&edge](size_t i) { return edge[i]; });
+                      [&edge](int i) { return edge[i]; });
 
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
