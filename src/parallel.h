@@ -126,24 +126,9 @@ void radix_sort_with_key_rec(I start, I end, J dest, int bytes, KeyFn &keyfn,
                              bool writeback) {
   using T = std::remove_reference_t<decltype(*start)>;
   using U = std::invoke_result_t<KeyFn, T>;
-  constexpr size_t MIN_BLOCK_SIZE = 10'000;
+  constexpr size_t MIN_BLOCK_SIZE = 100'000;
   size_t n = std::distance(start, end);
-
-  if ((n <= kSeqThreshold && bytes >= 1) || (n < 2'000)) {
-    if (writeback) {
-      std::stable_sort(start, end, [&keyfn](const T &a, const T &b) {
-        return keyfn(a) < keyfn(b);
-      });
-    } else {
-      std::copy(start, end, dest);
-      std::stable_sort(dest, dest + n, [&keyfn](const T &a, const T &b) {
-        return keyfn(a) < keyfn(b);
-      });
-    }
-    return;
-  }
   auto getByte = ByteGetter(keyfn);
-
   unsigned int hardware_concurrency = std::thread::hardware_concurrency();
   size_t blocks =
       std::max(std::min(hardware_concurrency,
