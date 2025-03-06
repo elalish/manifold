@@ -177,12 +177,7 @@ void radix_sort_with_key_rec(I start, I end, J dest, int bytes, KeyFn &keyfn,
           prev = x;
           hists[i][getByte(curr, bytes)]++;
         }
-        metadata[i] = {.localMin = localMin,
-                       .localMax = localMax,
-                       .prefixMax = localMax,
-                       .suffixMin = localMin,
-                       .sorted = sorted,
-                       .canSkip = false};
+        metadata[i] = {localMin, localMax, localMax, localMin, sorted, false};
       });
     }
     taskgroup.wait();
