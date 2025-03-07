@@ -51,18 +51,24 @@ class CsgLeafNode;
  * OpenGL (and other graphic libraries') buffers and are therefore generally
  * easy to map directly to other applications' data structures.
  *
+ * The triVerts vector has a stride of 3 and specifies triangles as
+ * vertex indices. For triVerts = [2, 4, 5, 3, 1, 6, ...], the triangles are [2,
+ * 4, 5], [3, 1, 6], etc. and likewise the halfedges are [2, 4], [4, 5], [5, 2],
+ * [3, 1], [1, 6], [6, 3], etc.
+ *
  * The triVerts indices should form a manifold mesh: each of the 3 halfedges of
  * each triangle should have exactly one paired halfedge in the list, defined as
- * having the start index of one equal to the end index of the other and
+ * having the first index of one equal to the second index of the other and
  * vice-versa. However, this is not always possible - consider e.g. a cube with
- * normal vector properties. Shared vertices would turn the cube into a ball by
+ * normal-vector properties. Shared vertices would turn the cube into a ball by
  * interpolating normals - the common solution is to duplicate each corner
  * vertex into 3, each with the same position, but different normals
  * corresponding to each face. This is exactly what should be done in MeshGL,
  * however we request two additional vectors in this case: mergeFromVert and
- * mergeToVert. These vectors should be equal length and contain the indices
- * of the vertices that are duplicates, avoiding unreliable floating-point
- * comparisons to recover the manifold topology.
+ * mergeToVert. Each vertex mergeFromVert[i] is merged into vertex
+ * mergeToVert[i], avoiding unreliable floating-point comparisons to recover the
+ * manifold topology. These merges are simply a union, so which is from and to
+ * doesn't matter.
  *
  * If you don't have merge vectors, you can create them with the Merge() method,
  * however this will fail if the mesh is not already manifold within the set
@@ -88,9 +94,15 @@ class CsgLeafNode;
  * can also be used as input, and thus also ensure a lossless roundtrip of data
  * through MeshGL.
  *
- * You can reconstruct polygonal faces by assembling all the triangles that
- * share the same faceID. These faces will be planar within the output
- * tolerance.
+ * As an example, with runIndex = [0, 6, 18, 21] and runOriginalID = [1, 3, 3],
+ * there are 7 triangles, where the first two are from the input mesh with ID 1,
+ * the next 4 are from an input mesh with ID 3, and the last triangle is from a
+ * different copy (instance) of the input mesh with ID 3. These two instances
+ * can be distinguished by their different runTransform matrices.
+ *
+ * You can reconstruct polygonal faces by assembling all the triangles that are
+ * from the same run and share the same faceID. These faces will be planar
+ * within the output tolerance.
  *
  * The halfedgeTangent vector is used to specify the weighted tangent vectors of
  * each halfedge for the purpose of using the Refine methods to create a
