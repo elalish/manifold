@@ -20,7 +20,7 @@ man_bench: man_bench.o
 	c++  -lmanifold -lassimp -L../manifold/build/src -o man_bench man_bench.o
 
 man_bench.o: man_bench.cpp
-	c++ -c -std=c++17 -g -I../manifold/include -I../manifold/build/_deps/tbb-src/include  man_bench.cpp
+	c++ -c -std=c++17 -O3 -I../manifold/include -I../manifold/build/_deps/tbb-src/include  man_bench.cpp
 
 run_man_bench: man_bench
 	DYLD_LIBRARY_PATH=../manifold/build/src \

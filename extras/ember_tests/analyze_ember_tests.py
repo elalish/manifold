@@ -7,7 +7,6 @@ import math
 import matplotlib.pyplot as plt
 
 do_plot = True
-do_trim_outliers = True
 
 benchmark_csv_file = "benchmark.csv"
 
@@ -20,16 +19,6 @@ class TimeSeries:
         self.average = 0.0
         self.min = 0.0
         self.max = 0.0
-
-    def trim_outliers(self, outlier_pct):
-        self.set_stats()
-        spread = self.max - self.min
-        if spread > 0:
-            min_cutoff = self.min + outlier_pct * spread
-            max_cutoff = self.max - outlier_pct * spread
-            self.series = [v for v in self.series \
-                            if v >= min_cutoff and v <= max_cutoff]
-            self.set_stats()
 
     def set_stats(self):
         n = len(self.series)
@@ -79,8 +68,6 @@ for t in thread_values:
         ts.series = [float(row[ts.csv_key]) \
                      for row in data if int(row[threads_key]) == t]
         ts.set_stats()
-        if do_trim_outliers:
-            ts.trim_outliers(0.05)
 
 
 def print_stats():
@@ -118,6 +105,7 @@ def plot_hists_by_ts():
         ax.set_yticks([i+1 for i in range(nthreads)],
                       [str(k) for k in thread_values])
         ax.set_ylim(0.25, nthreads + 0.75)
+        ax.set_xlim(0.0, 300.0)
         ax.set_ylabel("threads")
         ax.set_xlabel("ms")
     plt.show()
