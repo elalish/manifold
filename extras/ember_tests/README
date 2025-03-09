@@ -1,0 +1,31 @@
+The paper EMBER: Exact Mesh Boolean via Efficient & Robust
+Local Arrangments (see https://dl.acm.org/doi/10.1145/3528223.3530181)
+has supplemental material that describes 1000 tests using meshes
+from the Thinki10K dataset (see https://ten-thousand-models.appspot.com/)
+
+The code and files here are for testing Manifold on the same tests.
+
+man_bench is a binary that reads two .stl files and has corresponding
+transform arguments. It converts those to MeshGL, then to Manifold,
+then runs a boolean difference, and converts the result back to MeshGL.
+It times the total time take to do this (not including loading the
+stl files into MeshGL format), and appends a line to a benchmarks.csv
+file with the argument and timing information.
+The Makefile probably needs tweaking (sorry, didn't make a CMakefile).
+
+testfiles/README_TESTIFLES explains how to get the testfiles needed
+(they are too large to put into git).
+
+do_ember_tests.py reads the description of the files and transforms
+from the supplemental material of the Ember paper, and executes
+man_bench on each pair.  This creates a benchmark.csv file (remember
+to remove that file again if you want a clean new run of data).
+
+analyze_ember_tests.py reads the benchmark.csv file and calculates
+statistics and does a plot.
+
+bug-case.json is a single test case that takes abnormally long.
+
+m3max_benchmarks.csv is the benchmarks file gotten by running on my
+Macbook Pro M3 Max (12 performance cores, 4 efficiency cores).
+
