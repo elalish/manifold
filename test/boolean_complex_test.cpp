@@ -52,7 +52,7 @@ TEST(BooleanComplex, Sphere) {
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  Manifold gyroid = WithPositionColors(Gyroid()).AsOriginal();
+  Manifold gyroid = WithPositionColors(Gyroid()).Simplify();
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
 
   Manifold gyroid2 = gyroid.Translate(vec3(2.0));
@@ -912,7 +912,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(res.IsEmpty());
-  res = res.Simplify();
+  res = res.AsOriginal().Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 

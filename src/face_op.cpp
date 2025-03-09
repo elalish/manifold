@@ -307,6 +307,8 @@ void Manifold::Impl::FlattenFaces() {
   if (numFace < 4) {
     MakeEmpty(Error::NoError);
     return;  // empty
+  } else if (numFace == numTri) {
+    return;  // already flat
   }
 
   Vec<TriRef> halfedgeRef(halfedge_.size());

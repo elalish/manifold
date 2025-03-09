@@ -103,10 +103,10 @@ TEST(Hull, Cube) {
 
 TEST(Hull, Empty) {
   const std::vector<vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(tooFew).AsOriginal().IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(tooFew).Simplify().IsEmpty());
 
   const std::vector<vec3> coplanar{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-  EXPECT_TRUE(Manifold::Hull(coplanar).AsOriginal().IsEmpty());
+  EXPECT_TRUE(Manifold::Hull(coplanar).Simplify().IsEmpty());
 }
 
 TEST(Hull, MengerSponge) {

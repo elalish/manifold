@@ -187,7 +187,7 @@ TEST(SDF, SineSurface) {
             return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
           },
           {vec3(-1.75 * kPi), vec3(1.75 * kPi)}, 1)
-          .AsOriginal();
+          .Simplify();
   Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
