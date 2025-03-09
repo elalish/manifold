@@ -161,6 +161,9 @@
               # formatting tools
               gersemi
               black
+
+              # misc
+              matplotlib
             ]))
 
             ninja
