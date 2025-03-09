@@ -421,21 +421,10 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p1q2_ = inQ_.EdgeCollisions(inP_);
   p2q1_ = inP_.EdgeCollisions(inQ_, true);  // inverted
 
-  p1q2_.Sort();
-  PRINT("p1q2 size = " << p1q2_.size());
-
-  p2q1_.Sort();
-  PRINT("p2q1 size = " << p2q1_.size());
-
   // Level 2
   // Find vertices that overlap faces in XY-projection
   SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
   SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
-
-  if (3 * p1q2_.size() + 3 * p2q1_.size() > INT_MAX_SZ) {
-    valid = false;
-    return;
-  }
 
 #ifdef MANIFOLD_DEBUG
   broad.Stop();
