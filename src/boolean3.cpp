@@ -88,18 +88,6 @@ struct CopyFaceEdges {
   }
 };
 
-SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const SparseIndices &p1q2, const SparseIndices &p2q1) {
-  ZoneScoped;
-  SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(autoPolicy(p1q2.size(), 1e5), countAt(0_uz), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_, 0_uz}));
-  for_each_n(autoPolicy(p2q1.size(), 1e5), countAt(0_uz), p2q1.size(),
-             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_, p1q2.size()}));
-  p1q1.Unique();
-  return p1q1;
-}
-
 inline bool Shadows(double p, double q, double dir) {
   return p == q ? dir < 0 : p < q;
 }
@@ -448,10 +436,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
     valid = false;
     return;
   }
-
-  // Find involved edge pairs from Level 3
-  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
-  PRINT("p1q1 size = " << p1q1.size());
 
 #ifdef MANIFOLD_DEBUG
   broad.Stop();
