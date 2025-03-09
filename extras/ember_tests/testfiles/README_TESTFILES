@@ -1,9 +1,0 @@
-The test files are too large to include in Git.
-
-A superset of the files needed can be found at
- https://ten-thousand-models.appspot.com/
-in the Download area.
-
-The actual files for the tests are in
-test_file_ids.csv
-if you want to figure out a script to fetch only those.

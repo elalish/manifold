@@ -2,13 +2,16 @@ import os
 import json
 import subprocess
 import sys
+import pathlib
 
-meshdir = "testfiles"
-testspecfile = "testfiles/ember-benchmark-cases.json"
-man_bench = "./man_bench"
+ember_tests = pathlib.Path(__file__).parent
+root = ember_tests.parent.parent
 
+meshdir = ember_tests.joinpath("testfiles/raw_meshes")
+testspecfile = ember_tests.joinpath("testfiles/ember-benchmark-cases.json")
+man_bench = root.joinpath("build/extras/man_bench")
 
-threads_cases = [1,2,4,6,8,10,12,14,16];
+threads_cases = [1, 2, 4, 6, 8, 10, 12, 14, 16]
 
 meshfiles = os.listdir(meshdir)
 
@@ -22,12 +25,14 @@ for f in meshfiles:
         except:
             pass
 
+
 def file_for_id(id):
     if id in id_to_file:
         file = id_to_file[id]
-        fullfile = meshdir + "/" + file
+        fullfile = meshdir.joinpath(file)
         return fullfile
     return None
+
 
 with open(testspecfile, "r") as file:
     spec_data = json.load(file)
