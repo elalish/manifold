@@ -140,32 +140,31 @@ class Vec : public VecView<T> {
     std::swap(capacity_, other.capacity_);
   }
 
-  inline void push_back(const T &val, bool seq = false) {
+  inline void push_back(const T &val) {
     if (this->size_ >= capacity_) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
-      reserve(capacity_ == 0 ? 128 : capacity_ * 2, seq);
+      reserve(capacity_ == 0 ? 128 : capacity_ * 2);
       this->ptr_[this->size_++] = val_copy;
       return;
     }
     this->ptr_[this->size_++] = val;
   }
 
-  inline void extend(size_t n, bool seq = false) {
+  inline void extend(size_t n) {
     if (this->size_ + n >= capacity_)
-      reserve(capacity_ == 0 ? 128 : std::max(capacity_ * 2, this->size_ + n),
-              seq);
+      reserve(capacity_ == 0 ? 128 : std::max(capacity_ * 2, this->size_ + n));
     this->size_ += n;
   }
 
-  void reserve(size_t n, bool seq = false) {
+  void reserve(size_t n) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
-        manifold::copy(seq ? ExecutionPolicy::Seq : autoPolicy(this->size_),
-                       this->ptr_, this->ptr_ + this->size_, newBuffer);
+        manifold::copy(autoPolicy(this->size_), this->ptr_,
+                       this->ptr_ + this->size_, newBuffer);
       if (this->ptr_ != nullptr) {
         TracyFreeS(this->ptr_, 3);
         free(this->ptr_);
