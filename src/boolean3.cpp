@@ -18,6 +18,10 @@
 
 #include "./parallel.h"
 
+#if (MANIFOLD_PAR == 1)
+#include <tbb/combinable.h>
+#endif
+
 using namespace manifold;
 
 namespace {
@@ -266,22 +270,17 @@ struct F02 {
   }
 };
 
-struct Kernel12 {
-  VecView<int> x;
-  VecView<vec3> v;
+struct F12 {
   VecView<const Halfedge> halfedgesP;
   VecView<const Halfedge> halfedgesQ;
   VecView<const vec3> vertPosP;
   const bool forward;
-  const SparseIndices &p1q2;
   F02 f02;
   F11 f11;
 
-  void operator()(const size_t idx) {
-    int p1 = p1q2.Get(idx, !forward);
-    int q2 = p1q2.Get(idx, forward);
-    int &x12 = x[idx];
-    vec3 &v12 = v[idx];
+  std::pair<int, vec3> operator()(int p1, int q2) {
+    int x12 = 0;
+    vec3 v12 = vec3(NAN);
 
     // For xzyLR-[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -338,6 +337,73 @@ struct Kernel12 {
       v12.y = xzyy[2];
       v12.z = xzyy[1];
     }
+    return std::make_pair(x12, v12);
+  }
+};
+
+struct Kernel12Tmp {
+  SparseIndices p1q2_;
+  Vec<int> x12_;
+  Vec<vec3> v12_;
+};
+
+struct Kernel12Recorder {
+  using LocalT = Kernel12Tmp;
+  F12 &f12;
+  VecView<const TmpEdge> tmpedges;
+  bool forward;
+
+#if MANIFOLD_PAR == 1
+  tbb::combinable<Kernel12Tmp> store;
+  LocalT &local() { return store.local(); }
+#else
+  Kernel12Tmp localStore;
+  LocalT &local() { return localStore; }
+#endif
+
+  void record(int queryIdx, int leafIdx, LocalT &tmp) {
+    queryIdx = tmpedges[queryIdx].halfedgeIdx;
+    const auto [x12, v12] = f12(queryIdx, leafIdx);
+    if (std::isfinite(v12[0])) {
+      if (forward)
+        tmp.p1q2_.Add(queryIdx, leafIdx);
+      else
+        tmp.p1q2_.Add(leafIdx, queryIdx);
+      tmp.x12_.push_back(x12, true);
+      tmp.v12_.push_back(v12, true);
+    }
+  }
+
+  Kernel12Tmp get() {
+#if MANIFOLD_PAR == 1
+    Kernel12Tmp result;
+    std::vector<Kernel12Tmp> tmps;
+    std::vector<SparseIndices> indices;
+    store.combine_each([&](Kernel12Tmp &data) {
+      indices.emplace_back(std::move(data.p1q2_));
+      tmps.emplace_back(std::move(data));
+    });
+    result.p1q2_.Clear();
+    result.p1q2_.FromIndices(indices);
+
+    std::vector<size_t> sizes;
+    size_t total_size = 0;
+    for (const auto &tmp : tmps) {
+      sizes.push_back(total_size);
+      total_size += tmp.x12_.size();
+    }
+    result.x12_.resize(total_size);
+    result.v12_.resize(total_size);
+    for_each_n(ExecutionPolicy::Seq, countAt(0), indices.size(), [&](size_t i) {
+      std::copy(tmps[i].x12_.begin(), tmps[i].x12_.end(),
+                result.x12_.begin() + sizes[i]);
+      std::copy(tmps[i].v12_.begin(), tmps[i].v12_.end(),
+                result.v12_.begin() + sizes[i]);
+    });
+    return result;
+#else
+    return localStore;
+#endif
   }
 };
 
@@ -346,9 +412,6 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                             SparseIndices &p1q2, double expandP,
                                             bool forward) {
   ZoneScoped;
-  Vec<int> x12(p1q2.size());
-  Vec<vec3> v12(p1q2.size());
-
   F02 f02{inP.vertPos_,
           inQ.halfedge_,
           inQ.vertPos_,
@@ -362,13 +425,28 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
           expandP,
           forward ? inP.vertNormal_ : inQ.vertNormal_};
 
-  for_each_n(autoPolicy(p1q2.size(), 1e4), countAt(0_uz), p1q2.size(),
-             Kernel12({x12, v12, inP.halfedge_, inQ.halfedge_, inP.vertPos_,
-                       forward, p1q2, f02, f11}));
+  // inQ.EdgeCollisions(inP)
+  Vec<TmpEdge> tmpedges = CreateTmpEdges(inP.halfedge_);
+  Vec<Box> PEdgeBB(tmpedges.size());
+  {
+    const size_t numEdge = tmpedges.size();
+    const auto &vertPos = inP.vertPos_;
+    auto policy = autoPolicy(numEdge, 1e5);
+    for_each_n(policy, countAt(0), numEdge,
+               [&PEdgeBB, &tmpedges, &vertPos](const int e) {
+                 PEdgeBB[e] = Box(vertPos[tmpedges[e].first],
+                                  vertPos[tmpedges[e].second]);
+               });
+  }
+  F12 f12{inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, f02, f11};
+  Kernel12Recorder recorder{f12, tmpedges, forward};
 
-  p1q2.KeepFinite(v12, x12);
+  inQ.collider_.Collisions<false, Box, Kernel12Recorder>(PEdgeBB.cview(),
+                                                         recorder);
 
-  return std::make_tuple(x12, v12);
+  Kernel12Tmp result = recorder.get();
+  p1q2 = std::move(result.p1q2_);
+  return std::make_tuple(std::move(result.x12_), std::move(result.v12_));
 };
 
 struct Winding03Recorder {
@@ -427,11 +505,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
     w30_.resize(inQ.NumVert(), 0);
     return;
   }
-
-  // Level 3
-  // Find edge-triangle overlaps (broad phase)
-  p1q2_ = inQ_.EdgeCollisions(inP_);
-  p2q1_ = inP_.EdgeCollisions(inQ_, true);  // inverted
 
 #ifdef MANIFOLD_DEBUG
   broad.Stop();
