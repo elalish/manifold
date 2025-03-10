@@ -146,8 +146,8 @@ class SparseIndices {
         data_.size() / sizeof(int32_t));
   }
 
-  inline void Add(int p, int q, bool seq = false) {
-    data_.extend(sizeof(int64_t), seq);
+  inline void Add(int p, int q) {
+    data_.extend(sizeof(int64_t));
     Set(size() - 1, p, q);
   }
 

@@ -230,9 +230,9 @@ struct ParCollisionRecorder {
     // another thread, making thread local unsafe
     // we need to explicitly forbid parallelization by passing a flag
     if (inverted)
-      ind.Add(leafIdx, queryIdx, true);
+      ind.Add(leafIdx, queryIdx);
     else
-      ind.Add(queryIdx, leafIdx, true);
+      ind.Add(queryIdx, leafIdx);
   }
   SparseIndices& local() { return store.local(); }
 };

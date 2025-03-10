@@ -366,11 +366,11 @@ struct Kernel12Recorder {
     const auto [x12, v12] = f12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
-        tmp.p1q2_.Add(queryIdx, leafIdx, true);
+        tmp.p1q2_.Add(queryIdx, leafIdx);
       else
-        tmp.p1q2_.Add(leafIdx, queryIdx, true);
-      tmp.x12_.push_back(x12, true);
-      tmp.v12_.push_back(v12, true);
+        tmp.p1q2_.Add(leafIdx, queryIdx);
+      tmp.x12_.push_back(x12);
+      tmp.v12_.push_back(v12);
     }
   }
 
