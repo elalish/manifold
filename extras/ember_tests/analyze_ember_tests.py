@@ -10,6 +10,9 @@ do_plot = True
 
 benchmark_csv_file = "benchmark.csv"
 
+if len(sys.argv) > 1:
+    benchmark_csv_file = sys.argv[1]
+
 class TimeSeries:
     def __init__(self, name, csv_key, label):
         self.name = name
