@@ -371,8 +371,24 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
   return std::make_tuple(x12, v12);
 };
 
+struct Winding03Recorder {
+  using LocalT = VecView<int>;
+  VecView<int> w03;
+  F02 &f02;
+  bool forward;
+
+  void record(int queryIdx, int leafIdx, VecView<int> &w03) const {
+    const auto [s02, z02] = f02(queryIdx, leafIdx);
+    if (std::isfinite(z02)) {
+      AtomicAdd(w03[queryIdx], s02 * (!forward ? -1 : 1));
+    }
+  }
+
+  LocalT &local() { return w03; }
+};
+
 Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                   SparseIndices p0q2, double expandP, bool forward) {
+                   double expandP, bool forward) {
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
@@ -382,14 +398,10 @@ Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
           expandP,
           forward ? inP.vertNormal_ : inQ.vertNormal_,
           forward};
-  for_each(autoPolicy(p0q2.size()), countAt(0), countAt(p0q2.size()),
-           [&](const size_t i) {
-             const auto [s02, z02] =
-                 f02(p0q2.Get(i, !forward), p0q2.Get(i, forward));
-             if (std::isfinite(z02)) {
-               AtomicAdd(w03[p0q2.Get(i, !forward)], s02 * (!forward ? -1 : 1));
-             }
-           });
+  Winding03Recorder recorder{w03.view(), f02, forward};
+
+  inQ.collider_.Collisions<false, const vec3, Winding03Recorder>(inP.vertPos_,
+                                                                 recorder);
   return w03;
 };
 }  // namespace
@@ -421,11 +433,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p1q2_ = inQ_.EdgeCollisions(inP_);
   p2q1_ = inP_.EdgeCollisions(inQ_, true);  // inverted
 
-  // Level 2
-  // Find vertices that overlap faces in XY-projection
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
-  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
-
 #ifdef MANIFOLD_DEBUG
   broad.Stop();
   Timer intersections;
@@ -448,9 +455,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   }
 
   // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, inQ, p0q2, expandP_, true);
-
-  w30_ = Winding03(inQ, inP, p2q0, expandP_, false);
+  w03_ = Winding03(inP, inQ, expandP_, true);
+  w30_ = Winding03(inQ, inP, expandP_, false);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
