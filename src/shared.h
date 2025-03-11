@@ -15,7 +15,6 @@
 #pragma once
 
 #include "./parallel.h"
-#include "./sparse.h"
 #include "./utils.h"
 #include "./vec.h"
 

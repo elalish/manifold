@@ -17,7 +17,6 @@
 
 #include "./collider.h"
 #include "./shared.h"
-#include "./sparse.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"

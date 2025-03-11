@@ -68,30 +68,6 @@ vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
   return xyzz;
 }
 
-template <const bool inverted>
-struct CopyFaceEdges {
-  const SparseIndices &p1q1;
-  // x can be either vert or edge (0 or 1).
-  SparseIndices &pXq1;
-  VecView<const Halfedge> halfedgesQ;
-  const size_t offset;
-
-  void operator()(const size_t i) {
-    int idx = 3 * (i + offset);
-    int pX = p1q1.Get(i, inverted);
-    int q2 = p1q1.Get(i, !inverted);
-
-    for (const int j : {0, 1, 2}) {
-      const int q1 = 3 * q2 + j;
-      const Halfedge edge = halfedgesQ[q1];
-      int a = pX;
-      int b = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      if (inverted) std::swap(a, b);
-      pXq1.Set(idx + static_cast<size_t>(j), a, b);
-    }
-  }
-};
-
 inline bool Shadows(double p, double q, double dir) {
   return p == q ? dir < 0 : p < q;
 }
