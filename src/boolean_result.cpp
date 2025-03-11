@@ -83,12 +83,12 @@ struct CountNewVerts {
   VecView<int> countP;
   VecView<int> countQ;
   VecView<const int> i12;
-  const SparseIndices &pq;
+  const Vec<std::array<int, 2>> &pq;
   VecView<const Halfedge> halfedges;
 
   void operator()(const int idx) {
-    int edgeP = pq.Get(idx, inverted);
-    int faceQ = pq.Get(idx, !inverted);
+    int edgeP = pq[idx][inverted ? 1 : 0];
+    int faceQ = pq[idx][inverted ? 0 : 1];
     int inclusion = std::abs(i12[idx]);
 
     if (atomic) {
@@ -108,8 +108,8 @@ struct CountNewVerts {
 std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
-    const Vec<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
-    bool invertQ) {
+    const Vec<int> &i21, const Vec<std::array<int, 2>> &p1q2,
+    const Vec<std::array<int, 2>> &p2q1, bool invertQ) {
   ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
@@ -196,8 +196,8 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 }
 
 struct EdgePos {
-  int vert;
   double edgePos;
+  int vert;
   bool isStart;
 };
 
@@ -212,7 +212,7 @@ void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    const SparseIndices &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
+    const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
     const Vec<Halfedge> &halfedgeP, bool forward) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
@@ -222,8 +222,8 @@ void AddNewEdgeVerts(
   // the output vert index. When forward is false, all is reversed.
   auto process = [&](std::function<void(size_t)> lock,
                      std::function<void(size_t)> unlock, size_t i) {
-    const int edgeP = p1q2.Get(i, !forward);
-    const int faceQ = p1q2.Get(i, forward);
+    const int edgeP = p1q2[i][forward ? 0 : 1];
+    const int faceQ = p1q2[i][forward ? 1 : 0];
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
@@ -245,7 +245,7 @@ void AddNewEdgeVerts(
     for (const auto &tuple : edges) {
       lock(std::get<1>(tuple));
       for (int j = 0; j < std::abs(inclusion); ++j)
-        std::get<2>(tuple)->push_back({vert + j, 0.0, std::get<0>(tuple)});
+        std::get<2>(tuple)->push_back({0.0, vert + j, std::get<0>(tuple)});
       unlock(std::get<1>(tuple));
       direction = !direction;
     }
@@ -331,16 +331,15 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     int inclusion = i03[vStart];
-    EdgePos edgePos = {vP2R[vStart],
-                       la::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
-                       inclusion > 0};
+    EdgePos edgePos = {la::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
+                       vP2R[vStart], inclusion > 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
 
     inclusion = i03[vEnd];
-    edgePos = {vP2R[vEnd], la::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
+    edgePos = {la::dot(outR.vertPos_[vP2R[vEnd]], edgeVec), vP2R[vEnd],
                inclusion < 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);

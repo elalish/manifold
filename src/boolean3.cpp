@@ -342,7 +342,7 @@ struct Kernel12 {
 };
 
 struct Kernel12Tmp {
-  SparseIndices p1q2_;
+  Vec<std::array<int, 2>> p1q2_;
   Vec<int> x12_;
   Vec<vec3> v12_;
 };
@@ -366,9 +366,9 @@ struct Kernel12Recorder {
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
-        tmp.p1q2_.Add(queryIdx, leafIdx);
+        tmp.p1q2_.push_back({queryIdx, leafIdx});
       else
-        tmp.p1q2_.Add(leafIdx, queryIdx);
+        tmp.p1q2_.push_back({leafIdx, queryIdx});
       tmp.x12_.push_back(x12);
       tmp.v12_.push_back(v12);
     }
@@ -378,23 +378,20 @@ struct Kernel12Recorder {
 #if MANIFOLD_PAR == 1
     Kernel12Tmp result;
     std::vector<Kernel12Tmp> tmps;
-    std::vector<SparseIndices> indices;
-    store.combine_each([&](Kernel12Tmp &data) {
-      indices.emplace_back(std::move(data.p1q2_));
-      tmps.emplace_back(std::move(data));
-    });
-    result.p1q2_.Clear();
-    result.p1q2_.FromIndices(indices);
-
+    store.combine_each(
+        [&](Kernel12Tmp &data) { tmps.emplace_back(std::move(data)); });
     std::vector<size_t> sizes;
     size_t total_size = 0;
     for (const auto &tmp : tmps) {
       sizes.push_back(total_size);
       total_size += tmp.x12_.size();
     }
+    result.p1q2_.resize(total_size);
     result.x12_.resize(total_size);
     result.v12_.resize(total_size);
-    for_each_n(ExecutionPolicy::Seq, countAt(0), indices.size(), [&](size_t i) {
+    for_each_n(ExecutionPolicy::Seq, countAt(0), tmps.size(), [&](size_t i) {
+      std::copy(tmps[i].p1q2_.begin(), tmps[i].p1q2_.end(),
+                result.p1q2_.begin() + sizes[i]);
       std::copy(tmps[i].x12_.begin(), tmps[i].x12_.end(),
                 result.x12_.begin() + sizes[i]);
       std::copy(tmps[i].v12_.begin(), tmps[i].v12_.end(),
@@ -409,8 +406,8 @@ struct Kernel12Recorder {
 
 std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                             const Manifold::Impl &inQ,
-                                            SparseIndices &p1q2, double expandP,
-                                            bool forward) {
+                                            Vec<std::array<int, 2>> &p1q2,
+                                            double expandP, bool forward) {
   ZoneScoped;
   // a: 1 (edge), b: 2 (face)
   const Manifold::Impl &a = forward ? inP : inQ;
