@@ -188,17 +188,6 @@ Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
   return edges;
 }
 
-template <const bool inverted>
-struct ReindexEdge {
-  VecView<const TmpEdge> edges;
-  SparseIndices& indices;
-
-  void operator()(size_t i) {
-    int& edge = indices.Get(i, inverted);
-    edge = edges[edge].halfedgeIdx;
-  }
-};
-
 #ifdef MANIFOLD_DEBUG
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
   return stream << "startVert = " << edge.startVert

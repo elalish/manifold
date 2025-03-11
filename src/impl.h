@@ -283,9 +283,6 @@ struct Manifold::Impl {
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
   Impl Transform(const mat3x4& transform) const;
-  SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
-  SparseIndices VertexCollisionsZ(VecView<const vec3> vertsIn,
-                                  bool inverted = false) const;
 
   bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }

@@ -425,19 +425,13 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
           expandP,
           forward ? inP.vertNormal_ : inQ.vertNormal_};
 
-  // inQ.EdgeCollisions(inP)
   Vec<TmpEdge> tmpedges = CreateTmpEdges(inP.halfedge_);
   Vec<Box> PEdgeBB(tmpedges.size());
-  {
-    const size_t numEdge = tmpedges.size();
-    const auto &vertPos = inP.vertPos_;
-    auto policy = autoPolicy(numEdge, 1e5);
-    for_each_n(policy, countAt(0), numEdge,
-               [&PEdgeBB, &tmpedges, &vertPos](const int e) {
-                 PEdgeBB[e] = Box(vertPos[tmpedges[e].first],
-                                  vertPos[tmpedges[e].second]);
-               });
-  }
+  for_each_n(autoPolicy(tmpedges.size(), 1e5), countAt(0), tmpedges.size(),
+             [&PEdgeBB, &tmpedges, &inP](const int e) {
+               PEdgeBB[e] = Box(inP.vertPos_[tmpedges[e].first],
+                                inP.vertPos_[tmpedges[e].second]);
+             });
   F12 f12{inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, f02, f11};
   Kernel12Recorder recorder{f12, tmpedges, forward};
 
@@ -494,11 +488,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   constexpr size_t INT_MAX_SZ =
       static_cast<size_t>(std::numeric_limits<int>::max());
 
-#ifdef MANIFOLD_DEBUG
-  Timer broad;
-  broad.Start();
-#endif
-
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
@@ -507,7 +496,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   }
 
 #ifdef MANIFOLD_DEBUG
-  broad.Stop();
   Timer intersections;
   intersections.Start();
 #endif
@@ -535,7 +523,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   intersections.Stop();
 
   if (ManifoldParams().verbose) {
-    broad.Print("Broad phase");
     intersections.Print("Intersections");
   }
 #endif

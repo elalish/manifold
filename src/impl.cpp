@@ -555,52 +555,6 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-/**
- * Returns a sparse array of the bounding box overlaps between the edges of
- * the input manifold, Q and the faces of this manifold. Returned indices only
- * point to forward halfedges.
- */
-SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
-                                             bool inverted) const {
-  ZoneScoped;
-  Vec<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
-  const size_t numEdge = edges.size();
-  Vec<Box> QedgeBB(numEdge);
-  const auto& vertPos = Q.vertPos_;
-  auto policy = autoPolicy(numEdge, 1e5);
-  for_each_n(
-      policy, countAt(0), numEdge, [&QedgeBB, &edges, &vertPos](const int e) {
-        QedgeBB[e] = Box(vertPos[edges[e].first], vertPos[edges[e].second]);
-      });
-
-  SparseIndices q1p2(0);
-  if (inverted)
-    q1p2 = collider_.Collisions<false, true>(QedgeBB.cview());
-  else
-    q1p2 = collider_.Collisions<false, false>(QedgeBB.cview());
-
-  if (inverted)
-    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
-             ReindexEdge<true>({edges, q1p2}));
-  else
-    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
-             ReindexEdge<false>({edges, q1p2}));
-  return q1p2;
-}
-
-/**
- * Returns a sparse array of the input vertices that project inside the XY
- * bounding boxes of the faces of this manifold.
- */
-SparseIndices Manifold::Impl::VertexCollisionsZ(VecView<const vec3> vertsIn,
-                                                bool inverted) const {
-  ZoneScoped;
-  if (inverted)
-    return collider_.Collisions<false, true>(vertsIn);
-  else
-    return collider_.Collisions<false, false>(vertsIn);
-}
-
 #ifdef MANIFOLD_DEBUG
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(17);  // for double precision
