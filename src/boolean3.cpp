@@ -412,6 +412,7 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                             SparseIndices &p1q2, double expandP,
                                             bool forward) {
   ZoneScoped;
+  // a: 1 (edge), b: 2 (face)
   const Manifold::Impl &a = forward ? inP : inQ;
   const Manifold::Impl &b = forward ? inQ : inP;
 
@@ -458,6 +459,7 @@ Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    double expandP, bool forward) {
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
+  // a: 0 (vertex), b: 2 (face)
   const Manifold::Impl &a = forward ? inP : inQ;
   const Manifold::Impl &b = forward ? inQ : inP;
   Vec<int> w03(a.NumVert(), 0);
