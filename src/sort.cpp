@@ -180,17 +180,20 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   Permute(vertMorton, vertNew2Old);
   Permute(vertBox, vertNew2Old);
   Permute(openVerts, vertNew2Old);
-  Collider collider(vertBox, vertMorton);
-  SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
 
+  Collider collider(vertBox, vertMorton);
   UnionFind<> uf(numVert);
+
+  auto f = [&uf, &openVerts](int a, int b) {
+    return uf.unionXY(openVerts[a], openVerts[b]);
+  };
+  Collider::SimpleRecorder<decltype(f)> recorder{f};
+  collider.Collisions<true, Box, decltype(recorder)>(vertBox.cview(), recorder,
+                                                     false);
+
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     uf.unionXY(static_cast<int>(mesh.mergeFromVert[i]),
                static_cast<int>(mesh.mergeToVert[i]));
-  }
-  for (size_t i = 0; i < toMerge.size(); ++i) {
-    uf.unionXY(openVerts[toMerge.Get(i, false)],
-               openVerts[toMerge.Get(i, true)]);
   }
 
   mesh.mergeToVert.clear();

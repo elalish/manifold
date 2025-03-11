@@ -439,22 +439,6 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
   return std::make_tuple(std::move(result.x12_), std::move(result.v12_));
 };
 
-struct Winding03Recorder {
-  using LocalT = VecView<int>;
-  VecView<int> w03;
-  Kernel02 &k02;
-  bool forward;
-
-  void record(int queryIdx, int leafIdx, VecView<int> &w03) const {
-    const auto [s02, z02] = k02(queryIdx, leafIdx);
-    if (std::isfinite(z02)) {
-      AtomicAdd(w03[queryIdx], s02 * (!forward ? -1 : 1));
-    }
-  }
-
-  LocalT &local() { return w03; }
-};
-
 Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    double expandP, bool forward) {
   ZoneScoped;
@@ -465,9 +449,12 @@ Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   Vec<int> w03(a.NumVert(), 0);
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
-  Winding03Recorder recorder{w03.view(), k02, forward};
-
-  b.collider_.Collisions<false, vec3, Winding03Recorder>(a.vertPos_, recorder);
+  auto f = [&](int a, int b) {
+    const auto [s02, z02] = k02(a, b);
+    if (std::isfinite(z02)) AtomicAdd(w03[a], s02 * (!forward ? -1 : 1));
+  };
+  Collider::SimpleRecorder<decltype(f)> recorder{f};
+  b.collider_.Collisions<false, vec3, decltype(recorder)>(a.vertPos_, recorder);
   return w03;
 };
 }  // namespace
