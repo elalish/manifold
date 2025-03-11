@@ -14,6 +14,10 @@
 
 #include <limits>
 
+#if MANIFOLD_PAR == 1
+#include <tbb/combinable.h>
+#endif
+
 #include "./impl.h"
 #include "./parallel.h"
 #include "./tri_dist.h"
@@ -411,7 +415,7 @@ bool Manifold::Impl::IsIndexInBounds(VecView<const ivec3> triVerts) const {
 struct MinDistanceRecorder {
   using LocalT = double;
   const Manifold::Impl &self, &other;
-#if MANIFOLD_PAR == -1
+#if MANIFOLD_PAR == 1
   tbb::combinable<double> store = tbb::combinable<double>(
       []() { return std::numeric_limits<double>::infinity(); });
   LocalT& local() { return store.local(); }
