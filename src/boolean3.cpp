@@ -409,7 +409,19 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
 
   Kernel12Tmp result = recorder.get();
   p1q2 = std::move(result.p1q2_);
-  return std::make_tuple(std::move(result.x12_), std::move(result.v12_));
+  auto x12 = std::move(result.x12_);
+  auto v12 = std::move(result.v12_);
+  // sort p1q2
+  Vec<size_t> i12(p1q2.size());
+  sequence(i12.begin(), i12.end());
+  stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
+    return p1q2[a][0] < p1q2[b][0] ||
+           (p1q2[a][0] == p1q2[b][0] && p1q2[a][1] < p1q2[b][1]);
+  });
+  Permute(p1q2, i12);
+  Permute(x12, i12);
+  Permute(v12, i12);
+  return std::make_tuple(x12, v12);
 };
 
 Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
