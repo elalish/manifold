@@ -132,3 +132,6 @@ CMakeSettings.json
 [._]s[a-v][a-z]
 [._]sw[a-p]
 
+# Benchmark stl files
+extras/ember_tests/testfiles/raw_meshes
+

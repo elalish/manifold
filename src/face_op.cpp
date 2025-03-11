@@ -23,6 +23,65 @@
 #include "./parallel.h"
 #include "manifold/polygon.h"
 
+namespace {
+using namespace manifold;
+
+/**
+ * Returns an assembled set of vertex index loops of the input list of
+ * Halfedges, where each vert must be referenced the same number of times as a
+ * startVert and endVert.
+ */
+std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
+                                                VecView<Halfedge>::IterC end) {
+  std::multimap<int, int> vert_edge;
+  for (auto edge = start; edge != end; ++edge) {
+    vert_edge.emplace(
+        std::make_pair(edge->startVert, static_cast<int>(edge - start)));
+  }
+
+  std::vector<std::vector<int>> polys;
+  int startEdge = 0;
+  int thisEdge = startEdge;
+  while (1) {
+    if (thisEdge == startEdge) {
+      if (vert_edge.empty()) break;
+      startEdge = vert_edge.begin()->second;
+      thisEdge = startEdge;
+      polys.push_back({});
+    }
+    int vert = (start + thisEdge)->startVert;
+    polys.back().push_back(vert);
+    const auto result = vert_edge.find((start + thisEdge)->endVert);
+    DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
+    thisEdge = result->second;
+    vert_edge.erase(result);
+  }
+  return polys;
+}
+
+/**
+ * Add the vertex position projection to the indexed polygons.
+ */
+PolygonsIdx ProjectPolygons(const std::vector<std::vector<int>>& polys,
+                            const Vec<vec3>& vertPos, mat2x3 projection) {
+  PolygonsIdx polygons;
+  for (const auto& poly : polys) {
+    polygons.push_back({});
+    for (const auto& vert : poly) {
+      polygons.back().push_back({projection * vertPos[vert], vert});
+    }  // for vert
+  }  // for poly
+  return polygons;
+}
+
+uint64_t PackEdgeFace(int edge, int face) {
+  return static_cast<uint64_t>(edge) << 32 | static_cast<uint64_t>(face);
+}
+
+int UnpackEdge(uint64_t data) { return static_cast<int>(data >> 32); }
+int UnpackFace(uint64_t data) { return static_cast<int>(data & 0xFFFFFFFF); }
+}  // namespace
+
 namespace manifold {
 
 using GeneralTriangulation = std::function<std::vector<ivec3>(int)>;
@@ -39,17 +98,19 @@ using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
  * faceNormal_ values are retained, repeated as necessary.
  */
 void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
-                              const Vec<TriRef>& halfedgeRef) {
+                              const Vec<TriRef>& halfedgeRef,
+                              bool allowConvex) {
   ZoneScoped;
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
   Vec<TriRef>& triRef = meshRelation_.triRef;
-  triRef.resize(0);
+  triRef.clear();
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
                          int face) {
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
+    if (numEdge == 0) return;
     DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const vec3 normal = faceNormal_[face];
 
@@ -127,10 +188,11 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   auto generalTriangulation = [&](int face) {
     const vec3 normal = faceNormal_[face];
     const mat2x3 projection = GetAxisAlignedProjection(normal);
-    const PolygonsIdx polys =
-        Face2Polygons(halfedge_.cbegin() + faceEdge[face],
-                      halfedge_.cbegin() + faceEdge[face + 1], projection);
-    return TriangulateIdx(polys, epsilon_);
+    const PolygonsIdx polys = ProjectPolygons(
+        AssembleHalfedges(halfedge_.cbegin() + faceEdge[face],
+                          halfedge_.cbegin() + faceEdge[face + 1]),
+        vertPos_, projection);
+    return TriangulateIdx(polys, epsilon_, allowConvex);
   };
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
@@ -192,38 +254,126 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   CreateHalfedges(triVerts);
 }
 
-/**
- * Returns a set of 2D polygons formed by the input projection of the vertices
- * of the list of Halfedges, which must be an even-manifold, meaning each vert
- * must be referenced the same number of times as a startVert and endVert.
- */
-PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
-                                          VecView<Halfedge>::IterC end,
-                                          mat2x3 projection) const {
-  std::multimap<int, int> vert_edge;
-  for (auto edge = start; edge != end; ++edge) {
-    vert_edge.emplace(
-        std::make_pair(edge->startVert, static_cast<int>(edge - start)));
+void Manifold::Impl::FlattenFaces() {
+  Vec<uint64_t> edgeFace(halfedge_.size());
+  constexpr uint64_t remove = std::numeric_limits<uint64_t>::max();
+  const size_t numTri = NumTri();
+  const auto policy = autoPolicy(numTri);
+
+  std::vector<std::atomic<int>> vertDegree(NumVert());
+  for_each(policy, vertDegree.begin(), vertDegree.end(),
+           [](auto& v) { v.store(0); });
+
+  for_each_n(policy, countAt(0_uz), numTri,
+             [&edgeFace, &vertDegree, remove, this](size_t tri) {
+               for (const int i : {0, 1, 2}) {
+                 const int edge = 3 * tri + i;
+                 const int pair = halfedge_[edge].pairedHalfedge;
+                 const auto& ref = meshRelation_.triRef[tri];
+                 if (ref.SameFace(meshRelation_.triRef[pair / 3])) {
+                   edgeFace[edge] = remove;
+                 } else {
+                   edgeFace[edge] = (static_cast<uint64_t>(ref.meshID) << 32) +
+                                    static_cast<uint64_t>(ref.faceID);
+                   ++vertDegree[halfedge_[edge].startVert];
+                 }
+               }
+             });
+
+  Vec<size_t> newHalf2Old(halfedge_.size());
+  sequence(newHalf2Old.begin(), newHalf2Old.end());
+  stable_sort(
+      newHalf2Old.begin(), newHalf2Old.end(),
+      [&edgeFace](size_t a, size_t b) { return edgeFace[a] < edgeFace[b]; });
+  newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
+                                  [&](const size_t i) {
+                                    return edgeFace[newHalf2Old[i]] == remove;
+                                  }) -
+                     countAt(0_uz));
+
+  Vec<Halfedge> newHalfedge(newHalf2Old.size());
+  for_each_n(policy, countAt(0_uz), newHalf2Old.size(),
+             [&](size_t i) { newHalfedge[i] = halfedge_[newHalf2Old[i]]; });
+
+  Vec<int> faceEdge(1, 0);
+  for (size_t i = 1; i < newHalf2Old.size(); ++i) {
+    if (edgeFace[newHalf2Old[i]] != edgeFace[newHalf2Old[i - 1]]) {
+      faceEdge.push_back(i);
+    }
+  }
+  const int numFace = faceEdge.size();
+  faceEdge.push_back(newHalf2Old.size());
+
+  if (numFace < 4) {
+    MakeEmpty(Error::NoError);
+    return;  // empty
   }
 
-  PolygonsIdx polys;
-  int startEdge = 0;
-  int thisEdge = startEdge;
-  while (1) {
-    if (thisEdge == startEdge) {
-      if (vert_edge.empty()) break;
-      startEdge = vert_edge.begin()->second;
-      thisEdge = startEdge;
-      polys.push_back({});
+  Vec<TriRef> halfedgeRef(halfedge_.size());
+  Vec<vec3> oldFaceNormal = std::move(faceNormal_);
+  faceNormal_.resize(numFace);
+
+  std::atomic<uint64_t> faceData(0);
+  Vec<int> faceEdge2(faceEdge.size());
+  faceEdge2[0] = 0;
+  Vec<Halfedge> newHalfedge2(newHalfedge.size());
+  for_each_n(policy, countAt(0_uz), numFace, [&](size_t inFace) {
+    std::vector<std::vector<int>> polys =
+        AssembleHalfedges(newHalfedge.cbegin() + faceEdge[inFace],
+                          newHalfedge.cbegin() + faceEdge[inFace + 1]);
+    Vec<Halfedge> polys2;
+    for (const auto& poly : polys) {
+      int start = -1;
+      int last = -1;
+      for (const int vert : poly) {
+        // only keep vert touching 3 or more faces
+        if (vertDegree[vert] < 3) continue;
+        if (start == -1) {
+          start = vert;
+        } else if (last != -1) {
+          polys2.push_back({last, vert});
+        }
+        last = vert;
+      }
+      polys2.push_back({last, start});
     }
-    int vert = (start + thisEdge)->startVert;
-    polys.back().push_back({projection * vertPos_[vert], vert});
-    const auto result = vert_edge.find((start + thisEdge)->endVert);
-    DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
-    thisEdge = result->second;
-    vert_edge.erase(result);
+
+    const int numEdge = polys2.size();
+    if (numEdge < 3) return;
+    const uint64_t inc = PackEdgeFace(numEdge, 1);
+    const uint64_t data = faceData.fetch_add(inc);
+    const int start = UnpackEdge(data);
+    const int outFace = UnpackFace(data);
+    if (numEdge > 0) {
+      std::copy(polys2.begin(), polys2.end(), newHalfedge2.begin() + start);
+    }
+    faceEdge2[outFace + 1] = start + numEdge;
+
+    const int oldFace = newHalf2Old[faceEdge[inFace]] / 3;
+    // only fill values that will get read.
+    halfedgeRef[start] = meshRelation_.triRef[oldFace];
+    faceNormal_[outFace] = oldFaceNormal[oldFace];
+  });
+
+  const int startFace = UnpackEdge(faceData);
+  const int outFace = UnpackFace(faceData);
+
+  if (startFace == 0) {
+    MakeEmpty(Error::NoError);
+    return;  // empty
   }
-  return polys;
+
+  newHalfedge2.resize(startFace);
+  faceEdge2.resize(outFace + 1);
+  halfedge_ = std::move(newHalfedge2);
+
+  // mark unreferenced verts for removal
+  for_each_n(policy, countAt(0_uz), NumVert(), [&](size_t vert) {
+    if (vertDegree[vert] < 3) vertPos_[vert] = vec3(NAN);
+  });
+
+  Face2Tri(faceEdge2, halfedgeRef, false);
+  Finish();
 }
 
 Polygons Manifold::Impl::Slice(double height) const {
@@ -302,8 +452,8 @@ Polygons Manifold::Impl::Project() const {
           }) -
       cusps.begin());
 
-  PolygonsIdx polysIndexed =
-      Face2Polygons(cusps.cbegin(), cusps.cend(), projection);
+  PolygonsIdx polysIndexed = ProjectPolygons(
+      AssembleHalfedges(cusps.cbegin(), cusps.cend()), vertPos_, projection);
 
   Polygons polys;
   for (const auto& poly : polysIndexed) {

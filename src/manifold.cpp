@@ -405,13 +405,30 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->CreateFaces();
-    impl->SimplifyTopology();
-    impl->Finish();
+    impl->FlattenFaces();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
     impl->tolerance_ = std::max(impl->epsilon_, tolerance);
   }
+  return Manifold(impl);
+}
+
+/**
+ * Return a copy of the manifold simplified to the given tolerance, but with its
+ * actual tolerance value unchanged. If no tolerance is given, the current
+ * tolerance is used for simplification.
+ */
+Manifold Manifold::Simplify(double tolerance) const {
+  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  const double oldTolerance = impl->tolerance_;
+  if (tolerance == 0) tolerance = oldTolerance;
+  if (tolerance >= oldTolerance) {
+    impl->tolerance_ = tolerance;
+    impl->CreateFaces();
+    impl->FlattenFaces();
+  }
+  impl->tolerance_ = oldTolerance;
   return Manifold(impl);
 }
 
@@ -639,12 +656,12 @@ Manifold Manifold::SetProperties(
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
-    triProperties.resize(0);
-    pImpl->meshRelation_.properties.resize(0);
+    triProperties.clear();
+    pImpl->meshRelation_.properties.clear();
   } else {
     if (triProperties.size() == 0) {
       const int numTri = NumTri();
-      triProperties.resize(numTri);
+      triProperties.resize_nofill(numTri);
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
           triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;

@@ -137,7 +137,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
   try {
     Boolean3 boolean(a, b, op);
     auto impl = boolean.Result(op);
-    if (ManifoldParams().intermediateChecks && impl.IsSelfIntersecting()) {
+    if (ManifoldParams().selfIntersectionChecks && impl.IsSelfIntersecting()) {
       dump_lock.lock();
       std::cout << "self intersections detected" << std::endl;
       dump_lock.unlock();
@@ -206,15 +206,15 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   Manifold::Impl combined;
   combined.epsilon_ = epsilon;
   combined.tolerance_ = tolerance;
-  combined.vertPos_.resize(numVert);
-  combined.halfedge_.resize(2 * numEdge);
-  combined.faceNormal_.resize(numTri);
+  combined.vertPos_.resize_nofill(numVert);
+  combined.halfedge_.resize_nofill(2 * numEdge);
+  combined.faceNormal_.resize_nofill(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
-  combined.meshRelation_.triRef.resize(numTri);
+  combined.meshRelation_.triRef.resize_nofill(numTri);
   if (numPropOut > 0) {
     combined.meshRelation_.numProp = numPropOut;
     combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
-    combined.meshRelation_.triProperties.resize(numTri);
+    combined.meshRelation_.triProperties.resize_nofill(numTri);
   }
   auto policy = autoPolicy(numTri);
 

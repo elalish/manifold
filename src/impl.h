@@ -69,30 +69,51 @@ struct Manifold::Impl {
     const uint32_t numTri = meshGL.NumTri();
 
     if (meshGL.numProp < 3) {
-      MarkFailure(Error::MissingPositionProperties);
+      MakeEmpty(Error::MissingPositionProperties);
       return;
     }
 
     if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
-      MarkFailure(Error::MergeVectorsDifferentLengths);
+      MakeEmpty(Error::MergeVectorsDifferentLengths);
       return;
     }
 
     if (!meshGL.runTransform.empty() &&
         12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
-      MarkFailure(Error::TransformWrongLength);
+      MakeEmpty(Error::TransformWrongLength);
       return;
     }
 
     if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
         meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
         meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
-      MarkFailure(Error::RunIndexWrongLength);
+      MakeEmpty(Error::RunIndexWrongLength);
       return;
     }
 
     if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
-      MarkFailure(Error::FaceIDWrongLength);
+      MakeEmpty(Error::FaceIDWrongLength);
+      return;
+    }
+
+    if (!manifold::all_of(meshGL.vertProperties.begin(),
+                          meshGL.vertProperties.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MakeEmpty(Error::NonFiniteVertex);
+      return;
+    }
+
+    if (!manifold::all_of(meshGL.runTransform.begin(),
+                          meshGL.runTransform.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MakeEmpty(Error::InvalidConstruction);
+      return;
+    }
+
+    if (!manifold::all_of(meshGL.halfedgeTangent.begin(),
+                          meshGL.halfedgeTangent.end(),
+                          [](Precision x) { return std::isfinite(x); })) {
+      MakeEmpty(Error::InvalidConstruction);
       return;
     }
 
@@ -102,7 +123,7 @@ struct Manifold::Impl {
       const uint32_t from = meshGL.mergeFromVert[i];
       const uint32_t to = meshGL.mergeToVert[i];
       if (from >= numVert || to >= numVert) {
-        MarkFailure(Error::MergeIndexOutOfBounds);
+        MakeEmpty(Error::MergeIndexOutOfBounds);
         return;
       }
       prop2vert[from] = to;
@@ -110,11 +131,11 @@ struct Manifold::Impl {
 
     const auto numProp = meshGL.numProp - 3;
     meshRelation_.numProp = numProp;
-    meshRelation_.properties.resize(meshGL.NumVert() * numProp);
+    meshRelation_.properties.resize_nofill(meshGL.NumVert() * numProp);
     tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
-    vertPos_.resize(meshGL.NumVert());
+    vertPos_.resize_nofill(meshGL.NumVert());
 
     for (size_t i = 0; i < meshGL.NumVert(); ++i) {
       for (const int j : {0, 1, 2})
@@ -124,7 +145,7 @@ struct Manifold::Impl {
             meshGL.vertProperties[meshGL.numProp * i + 3 + j];
     }
 
-    halfedgeTangent_.resize(meshGL.halfedgeTangent.size() / 4);
+    halfedgeTangent_.resize_nofill(meshGL.halfedgeTangent.size() / 4);
     for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
       for (const int j : {0, 1, 2, 3})
         halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
@@ -139,7 +160,7 @@ struct Manifold::Impl {
       } else if (runIndex.size() == meshGL.runOriginalID.size()) {
         runIndex.push_back(runEnd);
       }
-      triRef.resize(meshGL.NumTri());
+      triRef.resize_nofill(meshGL.NumTri());
       const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
       for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
         const int meshID = startID + i;
@@ -167,12 +188,14 @@ struct Manifold::Impl {
 
     Vec<ivec3> triVerts;
     triVerts.reserve(numTri);
+    if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
+    if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 tri;
       for (const size_t j : {0, 1, 2}) {
         uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
         if (vert >= numVert) {
-          MarkFailure(Error::VertexOutOfBounds);
+          MakeEmpty(Error::VertexOutOfBounds);
           return;
         }
         tri[j] = prop2vert[vert];
@@ -193,14 +216,12 @@ struct Manifold::Impl {
 
     CreateHalfedges(triVerts);
     if (!IsManifold()) {
-      MarkFailure(Error::NotManifold);
+      MakeEmpty(Error::NotManifold);
       return;
     }
 
     CalculateBBox();
     SetEpsilon(-1, std::is_same<Precision, float>::value);
-
-    SplitPinchedVerts();
 
     CalculateNormals();
 
@@ -208,6 +229,7 @@ struct Manifold::Impl {
       InitializeOriginal();
     }
 
+    DedupePropVerts();
     CreateFaces();
 
     SimplifyTopology();
@@ -215,7 +237,7 @@ struct Manifold::Impl {
     Finish();
 
     if (!IsFinite()) {
-      MarkFailure(Error::NonFiniteVertex);
+      MakeEmpty(Error::NonFiniteVertex);
       return;
     }
 
@@ -224,7 +246,8 @@ struct Manifold::Impl {
     meshRelation_.originalID = -1;
   }
 
-  inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
+  template <typename F>
+  inline void ForVert(int halfedge, F func) {
     int current = halfedge;
     do {
       current = NextHalfedge(halfedge_[current].pairedHalfedge);
@@ -248,6 +271,7 @@ struct Manifold::Impl {
   }
 
   void CreateFaces();
+  void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triVerts);
@@ -255,7 +279,7 @@ struct Manifold::Impl {
   void IncrementMeshIDs();
 
   void Update();
-  void MarkFailure(Error status);
+  void MakeEmpty(Error status);
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
   Impl Transform(const mat3x4& transform) const;
@@ -299,18 +323,17 @@ struct Manifold::Impl {
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
 
   // face_op.cpp
-  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
-  PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
-                            VecView<Halfedge>::IterC end,
-                            mat2x3 projection) const;
+  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
+                bool allowConvex = false);
+  void FlattenFaces();
   Polygons Slice(double height) const;
   Polygons Project() const;
 
   // edge_op.cpp
   void CleanupTopology();
-  void SimplifyTopology();
+  void SimplifyTopology(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  void CollapseEdge(int edge, std::vector<int>& edges);
+  bool CollapseEdge(int edge, std::vector<int>& edges);
   void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
@@ -321,6 +344,7 @@ struct Manifold::Impl {
   void CollapseTri(const ivec3& triEdge);
   void SplitPinchedVerts();
   bool IsConvex(float tolerance = 1e-8f) const;
+  void DedupeEdges();
 
   // subdivision.cpp
   int GetNeighbor(int tri) const;

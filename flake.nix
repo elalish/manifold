@@ -38,34 +38,6 @@
                 version = clipper2-src.rev;
                 src = clipper2-src;
               });
-              # https://github.com/NixOS/nixpkgs/pull/343743#issuecomment-2424163602
-              binaryen =
-                let
-                  testsuite = final.fetchFromGitHub {
-                    owner = "WebAssembly";
-                    repo = "testsuite";
-                    rev = "e05365077e13a1d86ffe77acfb1a835b7aa78422";
-                    hash = "sha256-yvZ5AZTPUA6nsD3xpFC0VLthiu2CxVto66RTXBXXeJM=";
-                  };
-                in
-                prev.binaryen.overrideAttrs (_: rec {
-                  version = "119";
-                  src = pkgs.fetchFromGitHub {
-                    owner = "WebAssembly";
-                    repo = "binaryen";
-                    rev = "version_${version}";
-                    hash = "sha256-JYXtN3CW4qm/nnjGRvv3GxQ0x9O9wHtNYQLqHIYTTOA=";
-                  };
-                  preConfigure = ''
-                    if [ $doCheck -eq 1 ]; then
-                      sed -i '/googletest/d' third_party/CMakeLists.txt
-                      rmdir test/spec/testsuite
-                      ln -s ${testsuite} test/spec/testsuite
-                    else
-                      cmakeFlagsArray=($cmakeFlagsArray -DBUILD_TESTS=0)
-                    fi
-                  '';
-                });
             })
           ];
         };
@@ -189,6 +161,9 @@
               # formatting tools
               gersemi
               black
+
+              # misc
+              matplotlib
             ]))
 
             ninja

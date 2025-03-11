@@ -60,8 +60,8 @@ TEST(Properties, Tolerance) {
   Manifold imperfect3(mesh);
 
   EXPECT_EQ(imperfect.NumTri(), 28);
-  EXPECT_EQ(imperfect2.NumTri(), 16);  // TODO: should be 12
-  EXPECT_EQ(imperfect3.NumTri(), 22);  // TODO: should be 12
+  EXPECT_EQ(imperfect2.NumTri(), 12);
+  EXPECT_EQ(imperfect3.NumTri(), 12);
 
   EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
   EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);
@@ -73,6 +73,21 @@ TEST(Properties, Tolerance) {
     ExportMesh("tolerance.glb", imperfect2.GetMeshGL(), {});
     ExportMesh("tolerance2.glb", imperfect3.GetMeshGL(), {});
   }
+#endif
+}
+
+TEST(Properties, ToleranceSphere) {
+  const int n = 1000;
+  Manifold sphere = Manifold::Sphere(1, 4 * n);
+  EXPECT_EQ(sphere.NumTri(), 8 * n * n);
+
+  Manifold sphere2 = sphere.SetTolerance(0.01);
+  EXPECT_LT(sphere2.NumTri(), 2500);
+  EXPECT_EQ(sphere2.Genus(), 0);
+  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
+  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("sphere.glb", sphere2.GetMeshGL(), {});
 #endif
 }
 

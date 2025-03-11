@@ -255,12 +255,12 @@ struct make_seq_impl<A, 4> {
 template <int A, int B>
 using make_seq = typename make_seq_impl<A, B - A>::type;
 template <class T, int M, int... I>
-vec<T, sizeof...(I)> constexpr swizzle(const vec<T, M> &v, seq<I...> i) {
+vec<T, sizeof...(I)> constexpr swizzle(const vec<T, M> &v, seq<I...>) {
   return {getter<I>{}(v)...};
 }
 template <class T, int M, int N, int... I, int... J>
 mat<T, sizeof...(I), sizeof...(J)> constexpr swizzle(const mat<T, M, N> &m,
-                                                     seq<I...> i, seq<J...> j) {
+                                                     seq<I...> i, seq<J...>) {
   return {swizzle(getter<J>{}(m), i)...};
 }
 
@@ -860,8 +860,8 @@ struct vec<T, 1> {
   // with initializing its single element from zero
   template <class U>
   constexpr explicit vec(const vec<U, 1> &v) : vec(static_cast<T>(v.x)) {}
-  constexpr const T &operator[](int i) const { return x; }
-  LINALG_CONSTEXPR14 T &operator[](int i) { return x; }
+  constexpr const T &operator[](int) const { return x; }
+  LINALG_CONSTEXPR14 T &operator[](int) { return x; }
 
   template <class U, class = detail::conv_t<vec, U>>
   constexpr vec(const U &u) : vec(converter<vec, U>{}(u)) {}
@@ -1067,7 +1067,7 @@ functions, as well as a set of standard reductions.
  */
 template <class T, int M>
 struct mat<T, M, 1> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x;
   constexpr mat() : x() {}
   constexpr mat(const V &x_) : x(x_) {}
@@ -1076,8 +1076,8 @@ struct mat<T, M, 1> {
   template <class U>
   constexpr explicit mat(const mat<U, M, 1> &m) : mat(V(m.x)) {}
   constexpr vec<T, 1> row(int i) const { return {x[i]}; }
-  constexpr const V &operator[](int j) const { return x; }
-  LINALG_CONSTEXPR14 V &operator[](int j) { return x; }
+  constexpr const V &operator[](int) const { return x; }
+  LINALG_CONSTEXPR14 V &operator[](int) { return x; }
 
   template <class U, class = detail::conv_t<mat, U>>
   constexpr mat(const U &u) : mat(converter<mat, U>{}(u)) {}
@@ -1088,7 +1088,7 @@ struct mat<T, M, 1> {
 };
 template <class T, int M>
 struct mat<T, M, 2> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y;
   constexpr mat() : x(), y() {}
   constexpr mat(const V &x_, const V &y_) : x(x_), y(y_) {}
@@ -1111,7 +1111,7 @@ struct mat<T, M, 2> {
 };
 template <class T, int M>
 struct mat<T, M, 3> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y, z;
   constexpr mat() : x(), y(), z() {}
   constexpr mat(const V &x_, const V &y_, const V &z_) : x(x_), y(y_), z(z_) {}
@@ -1141,7 +1141,7 @@ struct mat<T, M, 3> {
 };
 template <class T, int M>
 struct mat<T, M, 4> {
-  typedef vec<T, M> V;
+  using V = vec<T, M>;
   V x, y, z, w;
   constexpr mat() : x(), y(), z(), w() {}
   constexpr mat(const V &x_, const V &y_, const V &z_, const V &w_)
@@ -1515,10 +1515,10 @@ constexpr auto operator>>=(A &a, const B &b) -> decltype(a = a >> b) {
 }
 /** @} */
 
-/** @addtogroup swizzles
+/** @defgroup swizzles Swizzles
+ * Swizzles and subobjects.
  * @ingroup LinAlg
- * @brief Swizzles and subobjects.
- *  @{
+ * @{
  */
 /**
  * @brief Returns a vector containing the specified ordered indices, e.g.
@@ -1728,9 +1728,9 @@ constexpr apply_t<detail::lerp, A, B, T> lerp(const A &a, const B &b,
 }
 /** @} */
 
-/** @addtogroup vec_algebra
+/** @defgroup vec_algebra Vector Algebra
+ * Support for vector algebra.
  * @ingroup LinAlg
- * @brief Support for vector algebra.
  *  @{
  */
 /**
@@ -1882,10 +1882,10 @@ vec<T, M> slerp(const vec<T, M> &a, const vec<T, M> &b, T t) {
 }
 /** @} */
 
-/** @addtogroup quaternions
+/** @defgroup quaternions Quaternions
+ * Support for quaternion algebra using 4D vectors of
+ * arbitrary length, representing xi + yj + zk + w.
  * @ingroup LinAlg
- * @brief Support for quaternion algebra using 4D vectors of arbitrary length,
- * representing xi + yj + zk + w.
  *  @{
  */
 /**
@@ -1960,9 +1960,9 @@ constexpr vec<T, 4> qmul(const vec<T, 4> &a, R... r) {
 }
 /** @} */
 
-/** @addtogroup quaternion_rotation
+/** @defgroup quaternion_rotation Quaternion Rotations
+ * Support for 3D spatial rotations using normalized quaternions.
  * @ingroup LinAlg
- * @brief Support for 3D spatial rotations using normalized quaternions.
  *  @{
  */
 /**
@@ -2191,7 +2191,7 @@ constexpr mat<T, 1, M> transpose(const vec<T, M> &m) {
   return transpose(mat<T, M, 1>(m));
 }
 template <class T>
-constexpr mat<T, 1, 1> adjugate(const mat<T, 1, 1> &a) {
+constexpr mat<T, 1, 1> adjugate(const mat<T, 1, 1> &) {
   return {vec<T, 1>{1}};
 }
 template <class T>

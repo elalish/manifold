@@ -154,7 +154,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
-  outR.faceNormal_.resize(numFaceR);
+  outR.faceNormal_.resize_nofill(numFaceR);
 
   Vec<size_t> tmpBuffer(outR.faceNormal_.size());
   auto faceIds = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
@@ -359,8 +359,8 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW. This is only valid if this is a retained vert; it
     // will be ignored later if the vert is new.
-    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
-    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
+    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP, -1};
+    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
 
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
@@ -411,8 +411,8 @@ void AppendNewEdges(
     // add halfedges to result
     const int faceLeft = facePQ2R[faceP];
     const int faceRight = facePQ2R[numFaceP + faceQ];
-    const TriRef forwardRef = {0, -1, faceP};
-    const TriRef backwardRef = {1, -1, faceQ};
+    const TriRef forwardRef = {0, -1, faceP, -1};
+    const TriRef backwardRef = {1, -1, faceQ, -1};
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
@@ -459,8 +459,8 @@ struct DuplicateHalfedges {
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW.
-    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
-    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
+    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP, -1};
+    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
 
     for (int i = 0; i < std::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[newFace], 1);
@@ -563,7 +563,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
-  outR.meshRelation_.triProperties.resize(numTri);
+  outR.meshRelation_.triProperties.resize_nofill(numTri);
 
   Vec<vec3> bary(outR.halfedge_.size());
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
@@ -697,6 +697,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return inP_;
   }
 
+  if (!valid) {
+    auto impl = Manifold::Impl();
+    impl.status_ = Manifold::Error::ResultTooLarge;
+    return impl;
+  }
+
   const bool invertQ = op == OpType::Subtract;
 
   // Convert winding numbers to inclusion values based on operation type.
@@ -746,7 +752,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
 
-  outR.vertPos_.resize(numVertR);
+  outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
   for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(),
@@ -856,7 +862,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   UpdateReference(outR, inP_, inQ_, invertQ);
 
-  outR.SimplifyTopology();
+  outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
   if (ManifoldParams().intermediateChecks)

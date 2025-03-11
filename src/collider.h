@@ -40,7 +40,7 @@ constexpr int kRoot = 1;
 #ifdef _MSC_VER
 
 #ifndef _WINDEF_
-typedef unsigned long DWORD;
+using DWORD = unsigned long;
 #endif
 
 uint32_t inline ctz(uint32_t value) {
@@ -278,7 +278,7 @@ class Collider {
                  "vectors must be the same length");
     int num_nodes = 2 * leafBB.size() - 1;
     // assign and allocate members
-    nodeBBox_.resize(num_nodes);
+    nodeBBox_.resize_nofill(num_nodes);
     nodeParent_.resize(num_nodes, -1);
     internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
     // organize tree

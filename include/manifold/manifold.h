@@ -46,11 +46,71 @@ class CsgLeafNode;
  * @brief Mesh input/output suitable for pushing directly into graphics
  * libraries.
  *
- * This may not be manifold since the verts are duplicated along property
- * boundaries that do not match. The additional merge vectors store this missing
- * information, allowing the manifold to be reconstructed. MeshGL is an alias
- * for the standard single-precision version. Use MeshGL64 to output the full
- * double precision that Manifold uses internally.
+ * The core (non-optional) parts of MeshGL are the triVerts indices buffer and
+ * the vertProperties interleaved vertex buffer, which follow the conventions of
+ * OpenGL (and other graphic libraries') buffers and are therefore generally
+ * easy to map directly to other applications' data structures.
+ *
+ * The triVerts vector has a stride of 3 and specifies triangles as
+ * vertex indices. For triVerts = [2, 4, 5, 3, 1, 6, ...], the triangles are [2,
+ * 4, 5], [3, 1, 6], etc. and likewise the halfedges are [2, 4], [4, 5], [5, 2],
+ * [3, 1], [1, 6], [6, 3], etc.
+ *
+ * The triVerts indices should form a manifold mesh: each of the 3 halfedges of
+ * each triangle should have exactly one paired halfedge in the list, defined as
+ * having the first index of one equal to the second index of the other and
+ * vice-versa. However, this is not always possible - consider e.g. a cube with
+ * normal-vector properties. Shared vertices would turn the cube into a ball by
+ * interpolating normals - the common solution is to duplicate each corner
+ * vertex into 3, each with the same position, but different normals
+ * corresponding to each face. This is exactly what should be done in MeshGL,
+ * however we request two additional vectors in this case: mergeFromVert and
+ * mergeToVert. Each vertex mergeFromVert[i] is merged into vertex
+ * mergeToVert[i], avoiding unreliable floating-point comparisons to recover the
+ * manifold topology. These merges are simply a union, so which is from and to
+ * doesn't matter.
+ *
+ * If you don't have merge vectors, you can create them with the Merge() method,
+ * however this will fail if the mesh is not already manifold within the set
+ * tolerance. For maximum reliablility, always store the merge vectors with the
+ * mesh, e.g. using the EXT_mesh_manifold extension in glTF.
+ *
+ * You can have any number of arbitrary floating-point properties per vertex,
+ * and they will all be interpolated as necessary during operations. It is up to
+ * you to keep track of which channel represents what type of data. A few of
+ * Manifold's methods allow you to specify the channel where normals data
+ * starts, in order to update it automatically for transforms and such. This
+ * will be easier if your meshes all use the same channels for properties, but
+ * this is not a requirement. Operations between meshes with different numbers
+ * of peroperties will simply use the larger numProp and pad the smaller one
+ * with zeroes.
+ *
+ * On output, the triangles are sorted into runs (runIndex, runOriginalID,
+ * runTransform) that correspond to different mesh inputs. Other 3D libraries
+ * may refer to these runs as primitives of a mesh (as in glTF) or draw calls,
+ * as they often represent different materials on different parts of the mesh.
+ * It is generally a good idea to maintain a map of OriginalIDs to materials to
+ * make it easy to reapply them after a set of Boolean operations. These runs
+ * can also be used as input, and thus also ensure a lossless roundtrip of data
+ * through MeshGL.
+ *
+ * As an example, with runIndex = [0, 6, 18, 21] and runOriginalID = [1, 3, 3],
+ * there are 7 triangles, where the first two are from the input mesh with ID 1,
+ * the next 4 are from an input mesh with ID 3, and the last triangle is from a
+ * different copy (instance) of the input mesh with ID 3. These two instances
+ * can be distinguished by their different runTransform matrices.
+ *
+ * You can reconstruct polygonal faces by assembling all the triangles that are
+ * from the same run and share the same faceID. These faces will be planar
+ * within the output tolerance.
+ *
+ * The halfedgeTangent vector is used to specify the weighted tangent vectors of
+ * each halfedge for the purpose of using the Refine methods to create a
+ * smoothly-interpolated surface. They can also be output when calculated
+ * automatically by the Smooth functions.
+ *
+ * MeshGL is an alias for the standard single-precision version. Use MeshGL64 to
+ * output the full double precision that Manifold uses internally.
  */
 template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
@@ -62,7 +122,7 @@ struct MeshGLP {
   I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
-  /// always the position x, y, z.
+  /// always the position x, y, z. The stride of the array is numProp.
   std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
@@ -263,6 +323,7 @@ class Manifold {
     RunIndexWrongLength,
     FaceIDWrongLength,
     InvalidConstruction,
+    ResultTooLarge,
   };
 
   /** @name Information
@@ -311,6 +372,7 @@ class Manifold {
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
   Manifold SetTolerance(double) const;
+  Manifold Simplify(double tolerance = 0) const;
   ///@}
 
   /** @name Boolean
@@ -433,6 +495,8 @@ inline std::string ToString(const Manifold::Error& error) {
       return "Face ID Wrong Length";
     case Manifold::Error::InvalidConstruction:
       return "Invalid Construction";
+    case Manifold::Error::ResultTooLarge:
+      return "Result Too Large";
     default:
       return "Unknown Error";
   };

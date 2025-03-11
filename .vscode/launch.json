@@ -12,7 +12,7 @@
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_catch_exceptions=0",
-        "--gtest_filter=Manifold.MergeRefine"
+        "--gtest_filter=Properties.ToleranceSphere"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

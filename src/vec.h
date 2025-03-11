@@ -45,16 +45,16 @@ class Vec : public VecView<T> {
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  Vec(size_t size) {
+  Vec(size_t size) : VecView<T>() {
     reserve(size);
     this->size_ = size;
   }
 
-  Vec(size_t size, T val) { resize(size, val); }
+  Vec(size_t size, T val) : VecView<T>() { resize(size, val); }
 
-  Vec(const Vec<T> &vec) { *this = Vec(vec.view()); }
+  Vec(const Vec<T> &vec) : VecView<T>() { *this = Vec(vec.view()); }
 
-  Vec(const VecView<const T> &vec) {
+  Vec(const VecView<const T> &vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -66,7 +66,7 @@ class Vec : public VecView<T> {
     }
   }
 
-  Vec(const std::vector<T> &vec) {
+  Vec(const std::vector<T> &vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -78,7 +78,7 @@ class Vec : public VecView<T> {
     }
   }
 
-  Vec(Vec<T> &&vec) {
+  Vec(Vec<T> &&vec) : VecView<T>() {
     this->ptr_ = vec.ptr_;
     this->size_ = vec.size_;
     capacity_ = vec.capacity_;
@@ -176,7 +176,7 @@ class Vec : public VecView<T> {
   }
 
   void resize(size_t newSize, T val = T()) {
-    bool shrink = this->size_ > 2 * newSize;
+    bool shrink = this->size_ > 2 * newSize && this->size_ > 16;
     reserve(newSize);
     if (this->size_ < newSize) {
       fill(autoPolicy(newSize - this->size_), this->ptr_ + this->size_,
@@ -186,7 +186,14 @@ class Vec : public VecView<T> {
     if (shrink) shrink_to_fit();
   }
 
-  void pop_back() { resize(this->size_ - 1); }
+  void resize_nofill(size_t newSize) {
+    bool shrink = this->size_ > 2 * newSize && this->size_ > 16;
+    reserve(newSize);
+    this->size_ = newSize;
+    if (shrink) shrink_to_fit();
+  }
+
+  void pop_back() { resize_nofill(this->size_ - 1); }
 
   void clear(bool shrink = true) {
     this->size_ = 0;

@@ -19,7 +19,6 @@
 #include <iostream>
 
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;
@@ -229,7 +228,7 @@ TEST(BooleanComplex, Subtract) {
 }
 
 TEST(BooleanComplex, Close) {
-  PolygonParams().processOverlaps = true;
+  ManifoldParams().processOverlaps = true;
 
   const double r = 10;
   Manifold a = Manifold::Sphere(r, 256);
@@ -246,7 +245,7 @@ TEST(BooleanComplex, Close) {
   if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
 #endif
 
-  PolygonParams().processOverlaps = false;
+  ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
@@ -291,7 +290,7 @@ TEST(BooleanComplex, Spiral) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(BooleanComplex, Sweep) {
-  PolygonParams().processOverlaps = true;
+  ManifoldParams().processOverlaps = true;
 
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](double angle) {
@@ -525,7 +524,7 @@ TEST(BooleanComplex, Sweep) {
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
 
-  PolygonParams().processOverlaps = false;
+  ManifoldParams().processOverlaps = false;
 }
 #endif
 
@@ -874,12 +873,12 @@ TEST(BooleanComplex, InterpolatedNormals) {
 
 #ifdef MANIFOLD_EXPORT
 TEST(BooleanComplex, SelfIntersect) {
-  manifold::PolygonParams().processOverlaps = true;
+  manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("self_intersectA.glb");
   Manifold m2 = ReadMesh("self_intersectB.glb");
   Manifold res = m1 + m2;
   res.GetMeshGL();  // test crash
-  manifold::PolygonParams().processOverlaps = false;
+  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7081) {
@@ -890,21 +889,21 @@ TEST(BooleanComplex, GenericTwinBooleanTest7081) {
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7863) {
-  manifold::PolygonParams().processOverlaps = true;
+  manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
   Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
+  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, Havocglass8Bool) {
-  manifold::PolygonParams().processOverlaps = true;
+  manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("Havocglass8_left.glb");
   Manifold m2 = ReadMesh("Havocglass8_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
+  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, CraycloudBool) {
@@ -912,6 +911,8 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadMesh("Cray_right.glb");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(res.IsEmpty());
+  res = res.Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 
@@ -1020,8 +1021,8 @@ TEST(BooleanComplex, SimpleOffset) {
 }
 
 TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
-  const bool intermediateChecks = ManifoldParams().intermediateChecks;
-  ManifoldParams().intermediateChecks = true;
+  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+  ManifoldParams().selfIntersectionChecks = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   Manifold a, b;
@@ -1034,12 +1035,12 @@ TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   f.close();
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().intermediateChecks = intermediateChecks;
+  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
 TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
-  const bool intermediateChecks = ManifoldParams().intermediateChecks;
-  ManifoldParams().intermediateChecks = true;
+  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+  ManifoldParams().selfIntersectionChecks = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   Manifold a, b;
@@ -1053,7 +1054,7 @@ TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
 
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().intermediateChecks = intermediateChecks;
+  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
 #endif

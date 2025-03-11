@@ -106,8 +106,7 @@ class VecView {
                   size_t length = std::numeric_limits<size_t>::max()) {
     if (length == std::numeric_limits<size_t>::max())
       length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::view out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
+    ASSERT(offset + length <= this->size_,
            std::out_of_range("Vec::view out of range"));
     return VecView<T>(this->ptr_ + offset, length);
   }
@@ -117,8 +116,7 @@ class VecView {
       size_t length = std::numeric_limits<size_t>::max()) const {
     if (length == std::numeric_limits<size_t>::max())
       length = this->size_ - offset;
-    ASSERT(length >= 0, std::out_of_range("Vec::cview out of range"));
-    ASSERT(offset + length <= this->size_ && offset >= 0,
+    ASSERT(offset + length <= this->size_,
            std::out_of_range("Vec::cview out of range"));
     return VecView<const T>(this->ptr_ + offset, length);
   }
