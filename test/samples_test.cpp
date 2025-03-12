@@ -304,6 +304,8 @@ TEST(Samples, CondensedMatter16) {
   ManifoldParams().processOverlaps = true;
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
+  Manifold cm2 = CondensedMatter(16);
+  CheckGLEquiv(cm.GetMeshGL(), cm2.GetMeshGL());
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
@@ -311,16 +313,16 @@ TEST(Samples, CondensedMatter16) {
   ManifoldParams().processOverlaps = old;
 }
 
+#ifndef __EMSCRIPTEN__
 TEST(Samples, CondensedMatter64) {
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
 
-#ifndef __EMSCRIPTEN__
   Manifold cm2 = CondensedMatter(64);
   CheckGLEquiv(cm.GetMeshGL(), cm2.GetMeshGL());
-#endif
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
 #endif
 }
+#endif
