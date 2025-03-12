@@ -160,32 +160,21 @@ struct FlagStore {
                       });
 
     std::vector<std::vector<size_t>> stores;
-    // first index: index within the vector
-    // second index: vector index within stores
-    using P = std::pair<size_t, size_t>;
-    auto cmp = [&stores](P a, P b) {
-      return stores[a.second][a.first] < stores[b.second][b.first];
-    };
-    std::vector<P> s;
-
-    store.combine_each([&stores, &s, &cmp](std::vector<size_t>& local) {
-      if (local.empty()) return;
-      stores.emplace_back(std::move(local));
-      s.push_back(std::make_pair(0, stores.size() - 1));
-      std::push_heap(s.begin(), s.end(), cmp);
-    });
-    while (!s.empty()) {
-      std::pop_heap(s.begin(), s.end());
-      auto [a, b] = s.back();
-      auto i = stores[b][a];
-      if (a + 1 == stores[b].size()) {
-        s.pop_back();
-      } else {
-        s.back().first++;
-        std::push_heap(s.begin(), s.end(), cmp);
-      }
-      f(i);
+    std::vector<size_t> result;
+    store.combine_each(
+        [&](auto& data) { stores.emplace_back(std::move(data)); });
+    std::vector<size_t> sizes;
+    size_t total_size = 0;
+    for (const auto& tmp : stores) {
+      sizes.push_back(total_size);
+      total_size += tmp.size();
     }
+    result.resize(total_size);
+    for_each_n(ExecutionPolicy::Seq, countAt(0), stores.size(), [&](size_t i) {
+      std::copy(stores[i].begin(), stores[i].end(), result.begin() + sizes[i]);
+    });
+    stable_sort(autoPolicy(result.size()), result.begin(), result.end());
+    for (size_t x : result) f(x);
   }
 #endif
 
