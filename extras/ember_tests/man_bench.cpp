@@ -101,7 +101,8 @@ bool compare_mgls(const MeshGL &mgl1, const MeshGL &mgl2) {
     }
   }
   int nprop = mgl1.numProp;
-  for (int v = 0; v < mgl1.NumVert(); v++) {
+  int nvert = mgl1.NumVert();
+  for (int v = 0; v < nvert; v++) {
     for (int p = 0; p < nprop; p++) {
       if (mgl1.vertProperties[v * nprop + p] !=
           mgl2.vertProperties[v * nprop + p]) {
