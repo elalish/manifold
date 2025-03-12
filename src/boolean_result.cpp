@@ -657,6 +657,39 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
     }
   }
 }
+
+void ReorderHalfedges(VecView<Halfedge> &halfedges) {
+  // halfedges in the same face are added in non-deterministic order, so we have
+  // to reorder them for determinism
+
+  // step 1: reorder within the same face, such that the halfedge with the
+  // smallest starting vertex is placed first
+  for_each(autoPolicy(halfedges.size() / 3), countAt(0),
+           countAt(halfedges.size() / 3), [&halfedges](size_t tri) {
+             std::array<Halfedge, 3> face = {halfedges[tri * 3],
+                                             halfedges[tri * 3 + 1],
+                                             halfedges[tri * 3 + 2]};
+             int index = 0;
+             for (int i : {1, 2})
+               if (face[i].startVert < face[index].startVert) index = i;
+             for (int i : {0, 1, 2})
+               halfedges[tri * 3 + i] = face[(index + i) % 3];
+           });
+  // step 2: fix paired halfedge
+  for_each(autoPolicy(halfedges.size() / 3), countAt(0),
+           countAt(halfedges.size() / 3), [&halfedges](size_t tri) {
+             for (int i : {0, 1, 2}) {
+               Halfedge &curr = halfedges[tri * 3 + i];
+               int oppositeFace = curr.pairedHalfedge / 3;
+               int index = -1;
+               for (int j : {0, 1, 2})
+                 if (curr.startVert == halfedges[oppositeFace * 3 + j].endVert)
+                   index = j;
+               curr.pairedHalfedge = oppositeFace * 3 + index;
+             }
+           });
+}
+
 }  // namespace
 
 namespace manifold {
@@ -846,6 +879,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.Face2Tri(faceEdge, halfedgeRef);
   halfedgeRef.clear();
   faceEdge.clear();
+
+  ReorderHalfedges(outR.halfedge_);
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
