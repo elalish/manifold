@@ -164,9 +164,9 @@ struct FindCollision {
   VecView<const std::pair<int, int>> internalChildren_;
   Recorder& recorder;
 
-  using LocalT = typename Recorder::LocalT;
+  using Local = typename Recorder::Local;
 
-  inline int RecordCollision(int node, const int queryIdx, LocalT& local) {
+  inline int RecordCollision(int node, const int queryIdx, Local& local) {
     bool overlaps = nodeBBox_[node].DoesOverlap(queries[queryIdx]);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
@@ -184,7 +184,7 @@ struct FindCollision {
     int top = -1;
     // Depth-first search
     int node = kRoot;
-    LocalT& local = recorder.local();
+    Local& local = recorder.local();
     while (1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
@@ -238,19 +238,25 @@ constexpr inline uint32_t SpreadBits3(uint32_t v) {
 }
 }  // namespace collider_internal
 
+template <typename F>
+struct SimpleRecorder {
+  using Local = F;
+  F& f;
+
+  inline void record(int queryIdx, int leafIdx, F& f) const {
+    f(queryIdx, leafIdx);
+  }
+  Local& local() { return f; }
+};
+
+template <typename F>
+inline SimpleRecorder<F> MakeSimpleRecorder(F& f) {
+  return SimpleRecorder<F>{f};
+}
+
 /** @ingroup Private */
 class Collider {
  public:
-  template <typename F>
-  struct SimpleRecorder {
-    using LocalT = F;
-    F& f;
-    inline void record(int queryIdx, int leafIdx, F& f) const {
-      f(queryIdx, leafIdx);
-    }
-    LocalT& local() { return f; }
-  };
-
   Collider() {};
 
   Collider(const VecView<const Box>& leafBB,

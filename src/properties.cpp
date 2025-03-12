@@ -263,9 +263,8 @@ bool Manifold::Impl::IsSelfIntersecting() const {
     }
   };
 
-  Collider::SimpleRecorder<decltype(f)> recorder{f};
-  collider_.Collisions<true, Box, decltype(recorder)>(faceBox.cview(),
-                                                      recorder);
+  auto recorder = MakeSimpleRecorder(f);
+  collider_.Collisions<true>(faceBox.cview(), recorder);
 
   return intersecting.load();
 }
@@ -413,12 +412,12 @@ bool Manifold::Impl::IsIndexInBounds(VecView<const ivec3> triVerts) const {
 }
 
 struct MinDistanceRecorder {
-  using LocalT = double;
+  using Local = double;
   const Manifold::Impl &self, &other;
 #if MANIFOLD_PAR == 1
   tbb::combinable<double> store = tbb::combinable<double>(
       []() { return std::numeric_limits<double>::infinity(); });
-  LocalT& local() { return store.local(); }
+  Local& local() { return store.local(); }
   double get() {
     double result = std::numeric_limits<double>::infinity();
     store.combine_each([&](double& val) { result = std::min(result, val); });
@@ -426,7 +425,7 @@ struct MinDistanceRecorder {
   }
 #else
   double result = std::numeric_limits<double>::infinity();
-  LocalT& local() { return result; }
+  Local& local() { return result; }
   double get() { return result; }
 #endif
 

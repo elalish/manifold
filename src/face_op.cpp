@@ -397,9 +397,8 @@ Polygons Manifold::Impl::Slice(double height) const {
     }
   };
 
-  Collider::SimpleRecorder<decltype(recordCollision)> recorder{recordCollision};
-  collider_.Collisions<false, Box, decltype(recorder)>(query.cview(), recorder,
-                                                       false);
+  auto recorder = MakeSimpleRecorder(recordCollision);
+  collider_.Collisions<false>(query.cview(), recorder, false);
 
   Polygons polys;
   while (!tris.empty()) {

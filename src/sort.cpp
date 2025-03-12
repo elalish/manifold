@@ -187,9 +187,8 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   auto f = [&uf, &openVerts](int a, int b) {
     return uf.unionXY(openVerts[a], openVerts[b]);
   };
-  Collider::SimpleRecorder<decltype(f)> recorder{f};
-  collider.Collisions<true, Box, decltype(recorder)>(vertBox.cview(), recorder,
-                                                     false);
+  auto recorder = MakeSimpleRecorder(f);
+  collider.Collisions<true>(vertBox.cview(), recorder, false);
 
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     uf.unionXY(static_cast<int>(mesh.mergeFromVert[i]),

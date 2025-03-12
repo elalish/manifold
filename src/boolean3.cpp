@@ -324,20 +324,20 @@ struct Kernel12Tmp {
 };
 
 struct Kernel12Recorder {
-  using LocalT = Kernel12Tmp;
+  using Local = Kernel12Tmp;
   Kernel12 &k12;
   VecView<const TmpEdge> tmpedges;
   bool forward;
 
 #if MANIFOLD_PAR == 1
   tbb::combinable<Kernel12Tmp> store;
-  LocalT &local() { return store.local(); }
+  Local &local() { return store.local(); }
 #else
   Kernel12Tmp localStore;
-  LocalT &local() { return localStore; }
+  Local &local() { return localStore; }
 #endif
 
-  void record(int queryIdx, int leafIdx, LocalT &tmp) {
+  void record(int queryIdx, int leafIdx, Local &tmp) {
     queryIdx = tmpedges[queryIdx].halfedgeIdx;
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
@@ -438,8 +438,8 @@ Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const auto [s02, z02] = k02(a, b);
     if (std::isfinite(z02)) AtomicAdd(w03[a], s02 * (!forward ? -1 : 1));
   };
-  Collider::SimpleRecorder<decltype(f)> recorder{f};
-  b.collider_.Collisions<false, vec3, decltype(recorder)>(a.vertPos_, recorder);
+  auto recorder = MakeSimpleRecorder(f);
+  b.collider_.Collisions<false>(a.vertPos_.cview(), recorder);
   return w03;
 };
 }  // namespace
