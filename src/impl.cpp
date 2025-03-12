@@ -483,6 +483,11 @@ void Manifold::Impl::CalculateNormals() {
     vertHalfedgeMap[vert] = std::numeric_limits<int>::max();
   });
 
+  auto atomicMin = [&vertHalfedgeMap](int value, int vert) {
+    int old = std::numeric_limits<int>::max();
+    while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
+      if (old < value) break;
+  };
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
@@ -493,11 +498,7 @@ void Manifold::Impl::CalculateNormals() {
       for (int i : {0, 1, 2}) {
         int v = halfedge_[3 * face + i].startVert;
         triVerts[i] = v;
-
-        // basically, atomic min
-        int old = std::numeric_limits<int>::max();
-        while (!vertHalfedgeMap[v].compare_exchange_strong(old, 3 * face + i))
-          if (old < 3 * face + i) break;
+        atomicMin(3 * face + i, v);
       }
 
       vec3 edge[3];
@@ -509,13 +510,8 @@ void Manifold::Impl::CalculateNormals() {
       if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     });
   } else {
-    for_each_n(policy, countAt(0), halfedge_.size(), [&](const int i) {
-      int v = halfedge_[i].startVert;
-      // basically, atomic min
-      int old = std::numeric_limits<int>::max();
-      while (!vertHalfedgeMap[v].compare_exchange_strong(old, i))
-        if (old < i) break;
-    });
+    for_each_n(policy, countAt(0), halfedge_.size(),
+               [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
   }
 
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
