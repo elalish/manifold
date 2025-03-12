@@ -55,6 +55,7 @@ void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold, bool noMerge = true);
+void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2);
 #ifdef MANIFOLD_EXPORT
 MeshGL ReadMesh(const std::string& filename);
 #endif

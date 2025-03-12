@@ -459,6 +459,35 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
   CheckFinite(meshGL);
 }
 
+void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
+  bool verbose = true;
+  EXPECT_EQ(mgl1.NumVert(), mgl2.NumVert());
+  EXPECT_EQ(mgl1.NumTri(), mgl2.NumTri());
+  EXPECT_EQ(mgl1.numProp, mgl2.numProp);
+
+  int ntri = mgl1.NumTri();
+  for (int t = 0; t < ntri; t++) {
+    for (int i = 0; i < 3; i++) {
+      EXPECT_EQ(mgl1.triVerts[3 * t + i], mgl2.triVerts[3 * t + i]);
+      // early return to avoid spam
+      if (mgl1.triVerts[3 * t + i] != mgl2.triVerts[3 * t + i]) return;
+    }
+  }
+
+  int nprop = mgl1.numProp;
+  int nvert = mgl1.NumVert();
+  for (int v = 0; v < nvert; v++) {
+    for (int p = 0; p < nprop; p++) {
+      EXPECT_EQ(mgl1.vertProperties[v * nprop + p],
+                mgl2.vertProperties[v * nprop + p]);
+      // early return to avoid spam
+      if (mgl1.vertProperties[v * nprop + p] !=
+          mgl2.vertProperties[v * nprop + p])
+        return;
+    }
+  }
+}
+
 #ifdef MANIFOLD_EXPORT
 MeshGL ReadMesh(const std::string& filename) {
   std::string file = __FILE__;
