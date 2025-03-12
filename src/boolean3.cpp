@@ -109,7 +109,7 @@ struct Kernel11 {
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
   const double expandP;
-  VecView<const vec3> normal;
+  VecView<const vec3> normalP;
 
   std::pair<int, vec4> operator()(int p1, int q1) {
     vec4 xyzz11 = vec4(NAN);
@@ -126,7 +126,7 @@ struct Kernel11 {
     const int p0[2] = {halfedgeP[p1].startVert, halfedgeP[p1].endVert};
     for (int i : {0, 1}) {
       const auto [s01, yz01] = Shadow01(p0[i], q1, vertPosP, vertPosQ,
-                                        halfedgeQ, expandP, normal, false);
+                                        halfedgeQ, expandP, normalP, false);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -142,7 +142,7 @@ struct Kernel11 {
     const int q0[2] = {halfedgeQ[q1].startVert, halfedgeQ[q1].endVert};
     for (int i : {0, 1}) {
       const auto [s10, yz10] = Shadow01(q0[i], p1, vertPosQ, vertPosP,
-                                        halfedgeP, expandP, normal, true);
+                                        halfedgeP, expandP, normalP, true);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -167,7 +167,7 @@ struct Kernel11 {
       const double start2 = la::dot(diff, diff);
       diff = vertPosP[p1e] - vec3(xyzz11);
       const double end2 = la::dot(diff, diff);
-      const double dir = start2 < end2 ? normal[p1s].z : normal[p1e].z;
+      const double dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
 
       if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
     }
