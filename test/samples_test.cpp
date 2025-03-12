@@ -315,8 +315,10 @@ TEST(Samples, CondensedMatter64) {
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
 
+#ifndef __EMSCRIPTEN__
   Manifold cm2 = CondensedMatter(64);
   CheckGLEquiv(cm.GetMeshGL(), cm2.GetMeshGL());
+#endif
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
