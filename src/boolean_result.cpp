@@ -198,6 +198,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 struct EdgePos {
   double edgePos;
   int vert;
+  int collisionId;
   bool isStart;
 };
 
@@ -213,7 +214,7 @@ void AddNewEdgeVerts(
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const Vec<Halfedge> &halfedgeP, bool forward) {
+    const Vec<Halfedge> &halfedgeP, bool forward, size_t offset) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
@@ -245,12 +246,13 @@ void AddNewEdgeVerts(
     for (const auto &tuple : edges) {
       lock(std::get<1>(tuple));
       for (int j = 0; j < std::abs(inclusion); ++j)
-        std::get<2>(tuple)->push_back({0.0, vert + j, std::get<0>(tuple)});
+        std::get<2>(tuple)->push_back(
+            {0.0, vert + j, static_cast<int>(i + offset), std::get<0>(tuple)});
       unlock(std::get<1>(tuple));
       direction = !direction;
     }
   };
-#if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
   if (p1q2.size() > kParallelThreshold) {
@@ -289,7 +291,11 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
                                [](EdgePos x) { return x.isStart; });
   DEBUG_ASSERT(static_cast<size_t>(middle - edgePos.begin()) == nEdges,
                topologyErr, "Non-manifold edge!");
-  auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
+  auto cmp = [](EdgePos a, EdgePos b) {
+    return a.edgePos < b.edgePos ||
+           // we also sort by collisionId to make things deterministic
+           (a.edgePos == b.edgePos && a.collisionId < b.collisionId);
+  };
   std::stable_sort(edgePos.begin(), middle, cmp);
   std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
@@ -332,7 +338,8 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
 
     int inclusion = i03[vStart];
     EdgePos edgePos = {la::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
-                       vP2R[vStart], inclusion > 0};
+                       vP2R[vStart], std::numeric_limits<int>::max(),
+                       inclusion > 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
@@ -340,7 +347,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
 
     inclusion = i03[vEnd];
     edgePos = {la::dot(outR.vertPos_[vP2R[vEnd]], edgeVec), vP2R[vEnd],
-               inclusion < 0};
+               std::numeric_limits<int>::max(), inclusion < 0};
     for (int j = 0; j < std::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
@@ -813,8 +820,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // This key is the face index of <P, Q>
   concurrent_map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
-  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true);
-  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false);
+  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true, 0);
+  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false,
+                  p1q2_.size());
 
   v12R.clear();
   v21R.clear();
