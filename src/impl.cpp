@@ -486,7 +486,7 @@ void Manifold::Impl::CalculateNormals() {
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
-    for_each_n(policy, countAt(0), NumTri(), [&](const size_t face) {
+    for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
 
       ivec3 triVerts;
@@ -509,7 +509,7 @@ void Manifold::Impl::CalculateNormals() {
       if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     });
   } else {
-    for_each_n(policy, countAt(0), halfedge_.size(), [&](const size_t i) {
+    for_each_n(policy, countAt(0), halfedge_.size(), [&](const int i) {
       int v = halfedge_[i].startVert;
       // basically, atomic min
       int old = std::numeric_limits<int>::max();
