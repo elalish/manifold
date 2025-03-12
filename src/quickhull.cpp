@@ -851,7 +851,6 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   std::tie(halfedge_, vertPos_) = qh.buildMesh();
   CalculateBBox();
   SetEpsilon();
-  CalculateNormals();
   InitializeOriginal();
   Finish();
   CreateFaces();

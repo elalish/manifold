@@ -52,45 +52,6 @@ struct Transform4x3 {
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
-template <bool calculateTriNormal>
-struct AssignNormals {
-  VecView<vec3> faceNormal;
-  VecView<vec3> vertNormal;
-  VecView<const vec3> vertPos;
-  VecView<const Halfedge> halfedges;
-
-  void operator()(const int face) {
-    vec3& triNormal = faceNormal[face];
-
-    ivec3 triVerts;
-    for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
-
-    vec3 edge[3];
-    for (int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      edge[i] = la::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
-    }
-
-    if (calculateTriNormal) {
-      triNormal = la::normalize(la::cross(edge[0], edge[1]));
-      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
-    }
-
-    // corner angles
-    vec3 phi;
-    double dot = -la::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
-    dot = -la::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
-    phi[2] = kPi - phi[0] - phi[1];
-
-    // assign weighted sum
-    for (int i : {0, 1, 2}) {
-      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
-    }
-  }
-};
-
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
@@ -417,7 +378,6 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   }
   Update();
   faceNormal_.clear();  // force recalculation of triNormal
-  CalculateNormals();
   SetEpsilon();
   Finish();
   CreateFaces();
@@ -515,23 +475,74 @@ void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
 void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
-  auto policy = autoPolicy(NumTri(), 1e4);
-  fill(vertNormal_.begin(), vertNormal_.end(), vec3(0.0));
+  auto policy = autoPolicy(NumTri());
   bool calculateTriNormal = false;
+
+  std::vector<std::atomic<int>> vertHalfedgeMap(NumVert());
+  for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
+    vertHalfedgeMap[vert] = std::numeric_limits<int>::max();
+  });
+
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
+    for_each_n(policy, countAt(0), NumTri(), [&](const size_t face) {
+      vec3& triNormal = faceNormal_[face];
+
+      ivec3 triVerts;
+      for (int i : {0, 1, 2}) {
+        int v = halfedge_[3 * face + i].startVert;
+        triVerts[i] = v;
+
+        // basically, atomic min
+        int old = std::numeric_limits<int>::max();
+        while (!vertHalfedgeMap[v].compare_exchange_strong(old, 3 * face + i))
+          if (old < 3 * face + i) break;
+      }
+
+      vec3 edge[3];
+      for (int i : {0, 1, 2}) {
+        const int j = (i + 1) % 3;
+        edge[i] = la::normalize(vertPos_[triVerts[j]] - vertPos_[triVerts[i]]);
+      }
+      triNormal = la::normalize(la::cross(edge[0], edge[1]));
+      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
+    });
+  } else {
+    for_each_n(policy, countAt(0), halfedge_.size(), [&](const size_t i) {
+      int v = halfedge_[i].startVert;
+      // basically, atomic min
+      int old = std::numeric_limits<int>::max();
+      while (!vertHalfedgeMap[v].compare_exchange_strong(old, i))
+        if (old < i) break;
+    });
   }
-  if (calculateTriNormal)
-    for_each_n(
-        policy, countAt(0), NumTri(),
-        AssignNormals<true>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
-  else
-    for_each_n(
-        policy, countAt(0), NumTri(),
-        AssignNormals<false>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
-  for_each(policy, vertNormal_.begin(), vertNormal_.end(),
-           [](vec3& v) { v = SafeNormalize(v); });
+
+  for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
+    int firstEdge = vertHalfedgeMap[vert].load();
+    // not referenced
+    if (firstEdge == std::numeric_limits<int>::max()) {
+      vertNormal_[vert] = vec3(0.0);
+      return;
+    }
+    vec3 normal = vec3(0.0);
+    ForVert(firstEdge, [&](int edge) {
+      ivec3 triVerts = {halfedge_[edge].startVert, halfedge_[edge].endVert,
+                        halfedge_[NextHalfedge(edge)].endVert};
+      vec3 currEdge =
+          la::normalize(vertPos_[triVerts[1]] - vertPos_[triVerts[0]]);
+      vec3 prevEdge =
+          la::normalize(vertPos_[triVerts[0]] - vertPos_[triVerts[2]]);
+
+      // if it is not finite, this means that the triangle is degenerate, and we
+      // should just exclude it from the normal calculation...
+      if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
+      double dot = -la::dot(prevEdge, currEdge);
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+      normal += phi * faceNormal_[edge / 3];
+    });
+    vertNormal_[vert] = SafeNormalize(normal);
+  });
 }
 
 /**

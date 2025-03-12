@@ -222,6 +222,9 @@ struct Manifold::Impl {
     CalculateBBox();
     SetEpsilon(-1, std::is_same<Precision, float>::value);
 
+    // we need to split pinched verts before calculating vertex normals, because
+    // the algorithm doesn't work with pinched verts
+    CleanupTopology();
     CalculateNormals();
 
     if (meshGL.runOriginalID.empty()) {
