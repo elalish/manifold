@@ -80,42 +80,39 @@ static Manifold manifold_from_meshgl(const MeshGL &meshgl,
 }
 
 /* Return true if the meshes are identical, including element order. */
-bool compare_mgls(const MeshGL &mgl1, const MeshGL &mgl2)
-{
-    bool verbose = true;
-    if (mgl1.NumVert() != mgl2.NumVert() ||
-        mgl1.NumTri() != mgl2.NumTri() ||
-        mgl1.numProp != mgl2.numProp) {
+bool compare_mgls(const MeshGL &mgl1, const MeshGL &mgl2) {
+  bool verbose = true;
+  if (mgl1.NumVert() != mgl2.NumVert() || mgl1.NumTri() != mgl2.NumTri() ||
+      mgl1.numProp != mgl2.numProp) {
+    if (verbose) {
+      std::cout << "basic sizes differ\n";
+    }
+    return false;
+  }
+  int ntri = mgl1.NumTri();
+  for (int t = 0; t < ntri; t++) {
+    for (int i = 0; i < 3; i++) {
+      if (mgl1.triVerts[3 * t + i] != mgl2.triVerts[3 * t + i]) {
         if (verbose) {
-            std::cout << "basic sizes differ\n";
+          std::cout << "tri verts differ at t = " << t << "\n";
         }
         return false;
+      }
     }
-    int ntri = mgl1.NumTri();
-    for (int t = 0; t < ntri; t++) {
-        for (int i = 0; i < 3; i++) {
-            if (mgl1.triVerts[3 * t + i] !=
-                mgl2.triVerts[3 * t + i]) {
-                 if (verbose) {
-                    std::cout << "tri verts differ at t = " << t << "\n";
-                 }
-                 return false;
-            }
+  }
+  int nprop = mgl1.numProp;
+  for (int v = 0; v < mgl1.NumVert(); v++) {
+    for (int p = 0; p < nprop; p++) {
+      if (mgl1.vertProperties[v * nprop + p] !=
+          mgl2.vertProperties[v * nprop + p]) {
+        if (verbose) {
+          std::cout << "vert props differ at v = " << v << "\n";
         }
+        return false;
+      }
     }
-    int nprop = mgl1.numProp;
-    for (int v = 0; v < mgl1.NumVert(); v++) {
-        for (int p = 0; p < nprop; p++) {
-            if (mgl1.vertProperties[v * nprop + p] !=
-                mgl2.vertProperties[v * nprop + p]) {
-                if (verbose) {
-                    std::cout << "vert props differ at v = " << v << "\n";
-                }
-                return false;
-            }
-        }
-    }
-    return true;
+  }
+  return true;
 }
 
 /* Do a Difference boolean between the meshes in file1 and file2,
