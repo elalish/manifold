@@ -35,15 +35,20 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-void AtomicAddVec3(vec3& target, const vec3& add) {
-  for (int i : {0, 1, 2}) {
-    std::atomic<double>& tar =
-        reinterpret_cast<std::atomic<double>&>(target[i]);
-    double old_val = tar.load(std::memory_order_relaxed);
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed)) {
-    }
-  }
+// Absolute error <= 6.7e-5
+float acos(float x) {
+  float negate = float(x < 0);
+  x = abs(x);
+  float ret = -0.0187293;
+  ret = ret * x;
+  ret = ret + 0.0742610;
+  ret = ret * x;
+  ret = ret - 0.2121144;
+  ret = ret * x;
+  ret = ret + 1.5707288;
+  ret = ret * sqrt(1.0 - x);
+  ret = ret - 2 * negate * ret;
+  return negate * 3.14159265358979 + ret;
 }
 
 struct Transform4x3 {
@@ -561,7 +566,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : acos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
