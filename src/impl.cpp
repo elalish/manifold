@@ -345,7 +345,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
-  for (int i = 0; i < numEdge; ++i) {
+  auto body = [&](int i, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge h0 = halfedge_[pair0];
     int k = i + numEdge;
@@ -362,9 +362,36 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
         break;
       }
       ++k;
-      if (k >= numHalfedge) break;
+      if (k >= segmentEnd + numEdge) break;
     }
+  };
+
+#if MANIFOLD_PAR == 1
+  Vec<std::pair<int, int>> ranges;
+  int increment = std::min(
+      std::max(numEdge / tbb::this_task_arena::max_concurrency() / 2, 1024),
+      numEdge);
+  auto duplicated = [&](int a, int b) {
+    Halfedge& h0 = halfedge_[ids[a]];
+    Halfedge& h1 = halfedge_[ids[b]];
+    return h0.startVert == h1.startVert && h0.endVert == h1.endVert;
+  };
+  int end = 0;
+  while (end < numEdge) {
+    int start = end;
+    end = std::min(end + increment, numEdge);
+    // make sure duplicated halfedges are in the same partition
+    while (end < numEdge && duplicated(end - 1, end)) end++;
+    ranges.push_back(std::make_pair(start, end));
   }
+  for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
+           [&](const std::pair<int, int>& range) {
+             auto [start, end] = range;
+             for (int i = start; i < end; ++i) body(i, end);
+           });
+#else
+  for (int i = 0; i < numEdge; ++i) body(i, numEdge);
+#endif
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
