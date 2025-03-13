@@ -445,7 +445,6 @@ class Manifold {
 
   struct Impl;
 
-
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
