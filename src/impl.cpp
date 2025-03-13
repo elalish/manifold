@@ -19,6 +19,7 @@
 #include <map>
 #include <optional>
 
+#include "./csg_tree.h"
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
 #include "./parallel.h"
@@ -27,6 +28,7 @@
 #ifdef MANIFOLD_EXPORT
 #include <string.h>
 
+#include <iomanip>
 #include <iostream>
 #endif
 
@@ -594,9 +596,9 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_DEBUG
+#ifdef MANIFOLD_EXPORT
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  stream << std::setprecision(17);  // for double precision
+  stream << std::setprecision(19);  // for double precision
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -615,13 +617,26 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }
-#endif
 
-#ifdef MANIFOLD_EXPORT
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.
+ * Should be used with ImportMeshGL64 for reproducing issues.
+ */
+std::ostream& Manifold::Dump(std::ostream& stream) const {
+  return stream << *GetCsgLeafNode().GetImpl();
+}
+
+/**
+ * Import a mesh from a Wavefront OBJ file that was exported with Dump.
+ * This function is the counterpart to Dump and should be used with it.
+ * This function cannot import OBJ files not written by the Dump function.
+ */
 Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
-  stream.precision(17);
+  stream >> std::setprecision(19);
   while (true) {
     char c = stream.get();
     if (stream.eof()) break;

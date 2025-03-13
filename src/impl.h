@@ -376,8 +376,6 @@ struct Manifold::Impl {
   void Hull(VecView<vec3> vertPos);
 };
 
-#ifdef MANIFOLD_DEBUG
 extern std::mutex dump_lock;
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
-#endif
 }  // namespace manifold
