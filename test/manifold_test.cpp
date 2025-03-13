@@ -600,7 +600,8 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(man.IsEmpty());
+  EXPECT_EQ(man.NumTri(), 4);
+  EXPECT_TRUE(man.Simplify().IsEmpty());
 }
 
 TEST(Manifold, PinchedVert) {
