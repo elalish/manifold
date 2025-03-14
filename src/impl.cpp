@@ -371,15 +371,23 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     // Remove the marked halfedges
     manifold::stable_sort(removedHalfedges.begin(), removedHalfedges.end());
     Vec<Halfedge> newHalfedge;
+    Vec<vec4> newHalfedgeTangent;
     Vec<TriRef> newTriRef;
     Vec<ivec3> newTriProperties;
+    Vec<vec3> newFaceNormal;
     newHalfedge.resize_nofill(halfedge_.size() - removedHalfedges.size());
+    if (!halfedgeTangent_.empty())
+      newHalfedgeTangent.resize_nofill(halfedgeTangent_.size() -
+                                       removedHalfedges.size());
     if (!meshRelation_.triRef.empty())
       newTriRef.resize_nofill(meshRelation_.triRef.size() -
                               removedHalfedges.size() / 3);
     if (!meshRelation_.triProperties.empty())
       newTriProperties.resize_nofill(meshRelation_.triProperties.size() -
                                      removedHalfedges.size() / 3);
+    if (!faceNormal_.empty())
+      newFaceNormal.resize_nofill(faceNormal_.size() -
+                                  removedHalfedges.size() / 3);
 
     // starting valid triangle index
     int prevStart = 0;
@@ -390,6 +398,10 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       manifold::copy(halfedge_.begin() + prevStart * 3,
                      halfedge_.begin() + endTri * 3,
                      newHalfedge.begin() + numTri * 3);
+      if (!newHalfedgeTangent.empty())
+        manifold::copy(halfedgeTangent_.begin() + prevStart * 3,
+                       halfedgeTangent_.begin() + endTri * 3,
+                       newHalfedgeTangent.begin() + numTri * 3);
       if (!newTriRef.empty())
         manifold::copy(meshRelation_.triRef.begin() + prevStart,
                        meshRelation_.triRef.begin() + endTri,
@@ -398,12 +410,22 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
         manifold::copy(meshRelation_.triProperties.begin() + prevStart,
                        meshRelation_.triProperties.begin() + endTri,
                        newTriProperties.begin() + numTri);
+      if (!newFaceNormal.empty())
+        manifold::copy(faceNormal_.begin() + prevStart,
+                       faceNormal_.begin() + endTri,
+                       newFaceNormal.begin() + numTri);
       numTri += endTri - prevStart;
       prevStart = endTri + 1;
     }
     manifold::copy(halfedge_.begin() + prevStart * 3, halfedge_.end(),
                    newHalfedge.begin() + numTri * 3);
     halfedge_ = std::move(newHalfedge);
+    if (!newHalfedgeTangent.empty()) {
+      manifold::copy(halfedgeTangent_.begin() + prevStart * 3,
+                     halfedgeTangent_.end(),
+                     newHalfedgeTangent.begin() + numTri * 3);
+      halfedgeTangent_ = std::move(newHalfedgeTangent);
+    }
     if (!newTriRef.empty()) {
       manifold::copy(meshRelation_.triRef.begin() + prevStart,
                      meshRelation_.triRef.end(), newTriRef.begin() + numTri);
@@ -414,6 +436,11 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
                      meshRelation_.triProperties.end(),
                      newTriProperties.begin() + numTri);
       meshRelation_.triProperties = std::move(newTriProperties);
+    }
+    if (!newFaceNormal.empty()) {
+      manifold::copy(faceNormal_.begin() + prevStart, faceNormal_.end(),
+                     newFaceNormal.begin() + numTri);
+      faceNormal_ = std::move(newFaceNormal);
     }
   }
 
