@@ -306,25 +306,34 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
-  const auto body = [&](int i, int segmentEnd) {
+
+  std::mutex mutex;
+  std::vector<int> removedHalfedges;
+  const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
-    Halfedge h0 = halfedge_[pair0];
-    int k = i + numEdge;
+    Halfedge& h0 = halfedge_[pair0];
+    int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge h1 = halfedge_[pair1];
+      Halfedge& h1 = halfedge_[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0 = {-1, -1, -1};
-        h1 = {-1, -1, -1};
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
+        std::lock_guard<std::mutex> guard(mutex);
+        removedHalfedges.push_back(pair0);
+        removedHalfedges.push_back(pair1);
         break;
       }
       ++k;
       if (k >= segmentEnd + numEdge) break;
     }
+    if (i + 1 == segmentEnd) return consecutiveStart;
+    Halfedge& h1 = halfedge_[ids[i + 1]];
+    if (h0.startVert == h1.startVert && h0.endVert == h1.endVert)
+      return consecutiveStart;
+    return i + 1;
   };
 
 #if MANIFOLD_PAR == 1
@@ -348,23 +357,84 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
            [&](const std::pair<int, int>& range) {
              const auto [start, end] = range;
-             for (int i = start; i < end; ++i) body(i, end);
+             int consecutiveStart = start;
+             for (int i = start; i < end; ++i)
+               consecutiveStart = body(i, consecutiveStart, end);
            });
 #else
-  for (int i = 0; i < numEdge; ++i) body(i, numEdge);
+  int consecutiveStart = 0;
+  for (int i = 0; i < numEdge; ++i)
+    consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
+
+  if (!removedHalfedges.empty()) {
+    // Remove the marked halfedges
+    manifold::stable_sort(removedHalfedges.begin(), removedHalfedges.end());
+    Vec<Halfedge> newHalfedge;
+    Vec<TriRef> newTriRef;
+    Vec<ivec3> newTriProperties;
+    newHalfedge.resize_nofill(halfedge_.size() - removedHalfedges.size());
+    if (!meshRelation_.triRef.empty())
+      newTriRef.resize_nofill(meshRelation_.triRef.size() -
+                              removedHalfedges.size() / 3);
+    if (!meshRelation_.triProperties.empty())
+      newTriProperties.resize_nofill(meshRelation_.triProperties.size() -
+                                     removedHalfedges.size() / 3);
+
+    // starting valid triangle index
+    int prevStart = 0;
+    // end triangle index in the result
+    int numTri = 0;
+    for (int i = 0; i < static_cast<int>(removedHalfedges.size()); i += 3) {
+      int endTri = removedHalfedges[i] / 3;
+      manifold::copy(halfedge_.begin() + prevStart * 3,
+                     halfedge_.begin() + endTri * 3,
+                     newHalfedge.begin() + numTri * 3);
+      if (!newTriRef.empty())
+        manifold::copy(meshRelation_.triRef.begin() + prevStart,
+                       meshRelation_.triRef.begin() + endTri,
+                       newTriRef.begin() + numTri);
+      if (!newTriProperties.empty())
+        manifold::copy(meshRelation_.triProperties.begin() + prevStart,
+                       meshRelation_.triProperties.begin() + endTri,
+                       newTriProperties.begin() + numTri);
+      numTri += endTri - prevStart;
+      prevStart = endTri + 1;
+    }
+    manifold::copy(halfedge_.begin() + prevStart * 3, halfedge_.end(),
+                   newHalfedge.begin() + numTri * 3);
+    halfedge_ = std::move(newHalfedge);
+    if (!newTriRef.empty()) {
+      manifold::copy(meshRelation_.triRef.begin() + prevStart,
+                     meshRelation_.triRef.end(), newTriRef.begin() + numTri);
+      meshRelation_.triRef = std::move(newTriRef);
+    }
+    if (!newTriProperties.empty()) {
+      manifold::copy(meshRelation_.triProperties.begin() + prevStart,
+                     meshRelation_.triProperties.end(),
+                     newTriProperties.begin() + numTri);
+      meshRelation_.triProperties = std::move(newTriProperties);
+    }
+  }
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
-    const int pair0 = ids[i];
-    const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].startVert >= 0) {
-      halfedge_[pair0].pairedHalfedge = pair1;
-      halfedge_[pair1].pairedHalfedge = pair0;
-    }
-  });
+  for_each_n(policy, countAt(0), numEdge,
+             [this, &ids, &removedHalfedges, numEdge](int i) {
+               const int oldpair0 = ids[i];
+               const int oldpair1 = ids[i + numEdge];
+               const auto it0 = std::lower_bound(
+                   removedHalfedges.begin(), removedHalfedges.end(), oldpair0);
+               const auto it1 = std::lower_bound(
+                   removedHalfedges.begin(), removedHalfedges.end(), oldpair1);
+               // only need to check it0, it is removed iff it1 is removed
+               if (it0 != removedHalfedges.end() && oldpair0 == *it0) return;
+               const int pair0 = oldpair0 - (it0 - removedHalfedges.begin());
+               const int pair1 = oldpair1 - (it1 - removedHalfedges.begin());
+               halfedge_[pair0].pairedHalfedge = pair1;
+               halfedge_[pair1].pairedHalfedge = pair0;
+             });
 }
 
 /**
