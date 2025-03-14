@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_priority_queue.h>)
+#if MANIFOLD_PAR == 1
 #include <tbb/tbb.h>
-#define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
-#include <tbb/concurrent_priority_queue.h>
 #endif
 
 #include <algorithm>
@@ -353,50 +351,44 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   if (results.size() == 2)
     return SimpleBoolean(*results[0]->GetImpl(), *results[1]->GetImpl(),
                          operation);
-#if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
-  tbb::task_group group;
-  tbb::concurrent_priority_queue<std::shared_ptr<CsgLeafNode>, MeshCompare>
-      queue(results.size());
-  for (auto result : results) {
-    queue.emplace(result);
-  }
-  results.clear();
-  std::function<void()> process = [&]() {
-    while (queue.size() > 1) {
-      std::shared_ptr<CsgLeafNode> a, b;
-      if (!queue.try_pop(a)) continue;
-      if (!queue.try_pop(b)) {
-        queue.push(a);
-        continue;
-      }
-      group.run([&, a, b]() {
-        queue.emplace(SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation));
-        return group.run(process);
-      });
-    }
-  };
-  group.run_and_wait(process);
-  std::shared_ptr<CsgLeafNode> r;
-  queue.try_pop(r);
-  return r;
-#endif
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
   auto cmpFn = MeshCompare();
   std::make_heap(results.begin(), results.end(), cmpFn);
+  std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+#if MANIFOLD_PAR == 1
+  tbb::task_group group;
+  std::mutex mutex;
+#endif
   while (results.size() > 1) {
-    std::pop_heap(results.begin(), results.end(), cmpFn);
-    auto a = std::move(results.back());
-    results.pop_back();
-    std::pop_heap(results.begin(), results.end(), cmpFn);
-    auto b = std::move(results.back());
-    results.pop_back();
-    // boolean operation
-    auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
-    if (results.size() == 0) return result;
-    results.push_back(result);
-    std::push_heap(results.begin(), results.end(), cmpFn);
+    for (size_t i = 0; i < 4 && results.size() > 1; i++) {
+      std::pop_heap(results.begin(), results.end(), cmpFn);
+      auto a = std::move(results.back());
+      results.pop_back();
+      std::pop_heap(results.begin(), results.end(), cmpFn);
+      auto b = std::move(results.back());
+      results.pop_back();
+#if MANIFOLD_PAR == 1
+      group.run([&, a, b]() {
+        auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
+        mutex.lock();
+        tmp.push_back(result);
+        mutex.unlock();
+      });
+#else
+      auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
+      tmp.push_back(result);
+#endif
+    }
+#if MANIFOLD_PAR == 1
+    group.wait();
+#endif
+    for (auto result : tmp) {
+      results.push_back(result);
+      std::push_heap(results.begin(), results.end(), cmpFn);
+    }
+    tmp.clear();
   }
   return results.front();
 }

@@ -21,6 +21,15 @@ target_link_libraries(perfTest manifold)
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 exportbin(perfTest)
 
+if(MANIFOLD_PAR AND MANIFOLD_EXPORT)
+  add_executable(man_bench ember_tests/man_bench.cpp)
+  target_link_libraries(man_bench PRIVATE manifold TBB::tbb)
+  target_compile_options(
+    man_bench
+    PRIVATE ${MANIFOLD_FLAGS} -DCONTROL_PARALLELISM
+  )
+endif()
+
 if(MANIFOLD_PAR AND NOT MSVC)
   add_executable(stlTest stl_test.cpp)
   target_link_libraries(stlTest PRIVATE manifold TBB::tbb)

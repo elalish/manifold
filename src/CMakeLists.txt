@@ -47,7 +47,6 @@ set(
   parallel.h
   quickhull.h
   shared.h
-  sparse.h
   svd.h
   tree2d.h
   tri_dist.h
