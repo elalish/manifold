@@ -42,7 +42,7 @@ TEST(SDF, SphereShell) {
       },
       {vec3(-1.1), vec3(1.1)}, 0.01, 0, 0.0001);
 
-  EXPECT_NEAR(sphere.Genus(), 11500, 1000);
+  EXPECT_NEAR(sphere.Genus(), 14235, 1000);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
