@@ -313,7 +313,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   const int numEdge = numHalfedge / 2;
 
   constexpr int removedHalfedge = -2;
-  const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
+  const auto body = [&, removedHalfedge](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
     int k = consecutiveStart + numEdge;
@@ -372,7 +372,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge, removedHalfedge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
     if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
