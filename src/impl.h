@@ -49,6 +49,8 @@ struct Manifold::Impl {
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
+  // Note that vertNormal_ is not precise due to the use of an approximated acos
+  // function
   Vec<vec3> vertNormal_;
   Vec<vec3> faceNormal_;
   Vec<vec4> halfedgeTangent_;
