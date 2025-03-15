@@ -19,6 +19,7 @@
 #include <map>
 #include <optional>
 
+#include "./csg_tree.h"
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
 #include "./parallel.h"
@@ -27,6 +28,7 @@
 #ifdef MANIFOLD_EXPORT
 #include <string.h>
 
+#include <iomanip>
 #include <iostream>
 #endif
 
@@ -35,15 +37,20 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-void AtomicAddVec3(vec3& target, const vec3& add) {
-  for (int i : {0, 1, 2}) {
-    std::atomic<double>& tar =
-        reinterpret_cast<std::atomic<double>&>(target[i]);
-    double old_val = tar.load(std::memory_order_relaxed);
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed)) {
-    }
-  }
+// Absolute error <= 6.7e-5
+float acos(float x) {
+  float negate = float(x < 0);
+  x = abs(x);
+  float ret = -0.0187293;
+  ret = ret * x;
+  ret = ret + 0.0742610;
+  ret = ret * x;
+  ret = ret - 0.2121144;
+  ret = ret * x;
+  ret = ret + 1.5707288;
+  ret = ret * sqrt(1.0 - x);
+  ret = ret - 2 * negate * ret;
+  return negate * 3.14159265358979 + ret;
 }
 
 struct Transform4x3 {
@@ -561,7 +568,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : acos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
@@ -589,9 +596,9 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_DEBUG
+#ifdef MANIFOLD_EXPORT
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  stream << std::setprecision(17);  // for double precision
+  stream << std::setprecision(19);  // for double precision
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -610,13 +617,26 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }
-#endif
 
-#ifdef MANIFOLD_EXPORT
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.
+ * Should be used with ImportMeshGL64 for reproducing issues.
+ */
+std::ostream& Manifold::Dump(std::ostream& stream) const {
+  return stream << *GetCsgLeafNode().GetImpl();
+}
+
+/**
+ * Import a mesh from a Wavefront OBJ file that was exported with Dump.
+ * This function is the counterpart to Dump and should be used with it.
+ * This function cannot import OBJ files not written by the Dump function.
+ */
 Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
-  stream.precision(17);
+  stream >> std::setprecision(19);
   while (true) {
     char c = stream.get();
     if (stream.eof()) break;
