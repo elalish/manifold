@@ -174,7 +174,10 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
                meshRelation_.triRef[tri].faceID = -1;
-               if (halfedge_[3 * tri].startVert < 0) return;
+               if (halfedge_[3 * tri].startVert < 0) {
+                 triPriority[tri] = {0, tri};
+                 return;
+               }
                const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
                triPriority[tri] = {
                    length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
