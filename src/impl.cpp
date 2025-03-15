@@ -181,6 +181,10 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
                meshRelation_.triRef[tri].faceID = -1;
+               if (halfedge_[3 * tri].startVert < 0) {
+                 triPriority[tri] = {0, tri};
+                 return;
+               }
                const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
                triPriority[tri] = {
                    length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
@@ -196,6 +200,7 @@ void Manifold::Impl::CreateFaces() {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    if (halfedge_[3 * tp.tri].startVert < 0) continue;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
     interiorHalfedges.resize(3);
@@ -313,18 +318,20 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
-  const auto body = [&](int i, int segmentEnd) {
+
+  constexpr int removedHalfedge = -2;
+  const auto body = [&, removedHalfedge](int i, int consecutiveStart,
+                                         int segmentEnd) {
     const int pair0 = ids[i];
-    Halfedge h0 = halfedge_[pair0];
-    int k = i + numEdge;
+    Halfedge& h0 = halfedge_[pair0];
+    int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge h1 = halfedge_[pair1];
+      Halfedge& h1 = halfedge_[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0 = {-1, -1, -1};
-        h1 = {-1, -1, -1};
+        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -332,6 +339,11 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       ++k;
       if (k >= segmentEnd + numEdge) break;
     }
+    if (i + 1 == segmentEnd) return consecutiveStart;
+    Halfedge& h1 = halfedge_[ids[i + 1]];
+    if (h0.startVert == h1.startVert && h0.endVert == h1.endVert)
+      return consecutiveStart;
+    return i + 1;
   };
 
 #if MANIFOLD_PAR == 1
@@ -355,23 +367,30 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
            [&](const std::pair<int, int>& range) {
              const auto [start, end] = range;
-             for (int i = start; i < end; ++i) body(i, end);
+             int consecutiveStart = start;
+             for (int i = start; i < end; ++i)
+               consecutiveStart = body(i, consecutiveStart, end);
            });
 #else
-  for (int i = 0; i < numEdge; ++i) body(i, numEdge);
+  int consecutiveStart = 0;
+  for (int i = 0; i < numEdge; ++i)
+    consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
-    const int pair0 = ids[i];
-    const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].startVert >= 0) {
-      halfedge_[pair0].pairedHalfedge = pair1;
-      halfedge_[pair1].pairedHalfedge = pair0;
-    }
-  });
+  for_each_n(policy, countAt(0), numEdge,
+             [this, &ids, numEdge, removedHalfedge](int i) {
+               const int pair0 = ids[i];
+               const int pair1 = ids[i + numEdge];
+               if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
+                 halfedge_[pair0].pairedHalfedge = pair1;
+                 halfedge_[pair1].pairedHalfedge = pair0;
+               } else {
+                 halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+               }
+             });
 }
 
 /**
@@ -518,6 +537,7 @@ void Manifold::Impl::CalculateNormals() {
   });
 
   auto atomicMin = [&vertHalfedgeMap](int value, int vert) {
+    if (vert < 0) return;
     int old = std::numeric_limits<int>::max();
     while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
       if (old < value) break;
@@ -527,6 +547,10 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
+      if (halfedge_[3 * face].startVert < 0) {
+        triNormal = vec3(0, 0, 1);
+        return;
+      }
 
       ivec3 triVerts;
       for (int i : {0, 1, 2}) {
