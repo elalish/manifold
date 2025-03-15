@@ -174,6 +174,7 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
                meshRelation_.triRef[tri].faceID = -1;
+               if (halfedge_[3 * tri].startVert < 0) return;
                const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
                triPriority[tri] = {
                    length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
@@ -307,8 +308,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
 
-  std::mutex mutex;
-  std::vector<int> removedHalfedges;
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
@@ -319,11 +318,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
+        h0.pairedHalfedge = h1.pairedHalfedge = -2;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
-        std::lock_guard<std::mutex> guard(mutex);
-        removedHalfedges.push_back(pair0);
-        removedHalfedges.push_back(pair1);
         break;
       }
       ++k;
@@ -367,101 +364,19 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
 
-  if (!removedHalfedges.empty()) {
-    // Remove the marked halfedges
-    manifold::stable_sort(removedHalfedges.begin(), removedHalfedges.end());
-    Vec<Halfedge> newHalfedge;
-    Vec<vec4> newHalfedgeTangent;
-    Vec<TriRef> newTriRef;
-    Vec<ivec3> newTriProperties;
-    Vec<vec3> newFaceNormal;
-    newHalfedge.resize_nofill(halfedge_.size() - removedHalfedges.size());
-    if (!halfedgeTangent_.empty())
-      newHalfedgeTangent.resize_nofill(halfedgeTangent_.size() -
-                                       removedHalfedges.size());
-    if (!meshRelation_.triRef.empty())
-      newTriRef.resize_nofill(meshRelation_.triRef.size() -
-                              removedHalfedges.size() / 3);
-    if (!meshRelation_.triProperties.empty())
-      newTriProperties.resize_nofill(meshRelation_.triProperties.size() -
-                                     removedHalfedges.size() / 3);
-    if (!faceNormal_.empty())
-      newFaceNormal.resize_nofill(faceNormal_.size() -
-                                  removedHalfedges.size() / 3);
-
-    // starting valid triangle index
-    int prevStart = 0;
-    // end triangle index in the result
-    int numTri = 0;
-    for (int i = 0; i < static_cast<int>(removedHalfedges.size()); i += 3) {
-      int endTri = removedHalfedges[i] / 3;
-      manifold::copy(halfedge_.begin() + prevStart * 3,
-                     halfedge_.begin() + endTri * 3,
-                     newHalfedge.begin() + numTri * 3);
-      if (!newHalfedgeTangent.empty())
-        manifold::copy(halfedgeTangent_.begin() + prevStart * 3,
-                       halfedgeTangent_.begin() + endTri * 3,
-                       newHalfedgeTangent.begin() + numTri * 3);
-      if (!newTriRef.empty())
-        manifold::copy(meshRelation_.triRef.begin() + prevStart,
-                       meshRelation_.triRef.begin() + endTri,
-                       newTriRef.begin() + numTri);
-      if (!newTriProperties.empty())
-        manifold::copy(meshRelation_.triProperties.begin() + prevStart,
-                       meshRelation_.triProperties.begin() + endTri,
-                       newTriProperties.begin() + numTri);
-      if (!newFaceNormal.empty())
-        manifold::copy(faceNormal_.begin() + prevStart,
-                       faceNormal_.begin() + endTri,
-                       newFaceNormal.begin() + numTri);
-      numTri += endTri - prevStart;
-      prevStart = endTri + 1;
-    }
-    manifold::copy(halfedge_.begin() + prevStart * 3, halfedge_.end(),
-                   newHalfedge.begin() + numTri * 3);
-    halfedge_ = std::move(newHalfedge);
-    if (!newHalfedgeTangent.empty()) {
-      manifold::copy(halfedgeTangent_.begin() + prevStart * 3,
-                     halfedgeTangent_.end(),
-                     newHalfedgeTangent.begin() + numTri * 3);
-      halfedgeTangent_ = std::move(newHalfedgeTangent);
-    }
-    if (!newTriRef.empty()) {
-      manifold::copy(meshRelation_.triRef.begin() + prevStart,
-                     meshRelation_.triRef.end(), newTriRef.begin() + numTri);
-      meshRelation_.triRef = std::move(newTriRef);
-    }
-    if (!newTriProperties.empty()) {
-      manifold::copy(meshRelation_.triProperties.begin() + prevStart,
-                     meshRelation_.triProperties.end(),
-                     newTriProperties.begin() + numTri);
-      meshRelation_.triProperties = std::move(newTriProperties);
-    }
-    if (!newFaceNormal.empty()) {
-      manifold::copy(faceNormal_.begin() + prevStart, faceNormal_.end(),
-                     newFaceNormal.begin() + numTri);
-      faceNormal_ = std::move(newFaceNormal);
-    }
-  }
-
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge,
-             [this, &ids, &removedHalfedges, numEdge](int i) {
-               const int oldpair0 = ids[i];
-               const int oldpair1 = ids[i + numEdge];
-               const auto it0 = std::lower_bound(
-                   removedHalfedges.begin(), removedHalfedges.end(), oldpair0);
-               const auto it1 = std::lower_bound(
-                   removedHalfedges.begin(), removedHalfedges.end(), oldpair1);
-               // only need to check it0, it is removed iff it1 is removed
-               if (it0 != removedHalfedges.end() && oldpair0 == *it0) return;
-               const int pair0 = oldpair0 - (it0 - removedHalfedges.begin());
-               const int pair1 = oldpair1 - (it1 - removedHalfedges.begin());
-               halfedge_[pair0].pairedHalfedge = pair1;
-               halfedge_[pair1].pairedHalfedge = pair0;
-             });
+  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+    const int pair0 = ids[i];
+    const int pair1 = ids[i + numEdge];
+    if (halfedge_[pair0].pairedHalfedge != -2) {
+      halfedge_[pair0].pairedHalfedge = pair1;
+      halfedge_[pair1].pairedHalfedge = pair0;
+    } else {
+      halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+    }
+  });
 }
 
 /**
@@ -608,6 +523,7 @@ void Manifold::Impl::CalculateNormals() {
   });
 
   auto atomicMin = [&vertHalfedgeMap](int value, int vert) {
+    if (vert < 0) return;
     int old = std::numeric_limits<int>::max();
     while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
       if (old < value) break;
@@ -617,6 +533,10 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
+      if (halfedge_[3 * face].startVert < 0) {
+        triNormal = vec3(0, 0, 1);
+        return;
+      }
 
       ivec3 triVerts;
       for (int i : {0, 1, 2}) {
