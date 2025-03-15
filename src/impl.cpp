@@ -312,6 +312,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
 
+  constexpr int removedHalfedge = -2;
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
@@ -322,7 +323,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = -2;
+        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -374,7 +375,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].pairedHalfedge != -2) {
+    if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
       halfedge_[pair0].pairedHalfedge = pair1;
       halfedge_[pair1].pairedHalfedge = pair0;
     } else {
