@@ -190,6 +190,7 @@ void Manifold::Impl::CreateFaces() {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    if (halfedge_[3 * tp.tri].startVert < 0) continue;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
     interiorHalfedges.resize(3);
