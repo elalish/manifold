@@ -115,9 +115,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const vec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
-      int mapping[3] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert};
       ivec3 tri(halfedge_[firstEdge].startVert,
                 halfedge_[firstEdge + 1].startVert,
                 halfedge_[firstEdge + 2].startVert);
@@ -132,10 +129,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
-      int mapping[4] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert,
-                        halfedge_[firstEdge + 3].startVert};
       const mat2x3 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
@@ -269,6 +262,10 @@ void Manifold::Impl::FlattenFaces() {
                for (const int i : {0, 1, 2}) {
                  const int edge = 3 * tri + i;
                  const int pair = halfedge_[edge].pairedHalfedge;
+                 if (pair < 0) {
+                   edgeFace[edge] = remove;
+                   return;
+                 }
                  const auto& ref = meshRelation_.triRef[tri];
                  if (ref.SameFace(meshRelation_.triRef[pair / 3])) {
                    edgeFace[edge] = remove;

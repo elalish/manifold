@@ -19,6 +19,7 @@
 #include <map>
 #include <optional>
 
+#include "./csg_tree.h"
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
 #include "./parallel.h"
@@ -27,6 +28,7 @@
 #ifdef MANIFOLD_EXPORT
 #include <string.h>
 
+#include <iomanip>
 #include <iostream>
 #endif
 
@@ -35,15 +37,20 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-void AtomicAddVec3(vec3& target, const vec3& add) {
-  for (int i : {0, 1, 2}) {
-    std::atomic<double>& tar =
-        reinterpret_cast<std::atomic<double>&>(target[i]);
-    double old_val = tar.load(std::memory_order_relaxed);
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed)) {
-    }
-  }
+// Absolute error <= 6.7e-5
+float acos(float x) {
+  float negate = float(x < 0);
+  x = abs(x);
+  float ret = -0.0187293;
+  ret = ret * x;
+  ret = ret + 0.0742610;
+  ret = ret * x;
+  ret = ret - 0.2121144;
+  ret = ret * x;
+  ret = ret + 1.5707288;
+  ret = ret * sqrt(1.0 - x);
+  ret = ret - 2 * negate * ret;
+  return negate * 3.14159265358979 + ret;
 }
 
 struct Transform4x3 {
@@ -174,6 +181,10 @@ void Manifold::Impl::CreateFaces() {
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
                meshRelation_.triRef[tri].faceID = -1;
+               if (halfedge_[3 * tri].startVert < 0) {
+                 triPriority[tri] = {0, tri};
+                 return;
+               }
                const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
                triPriority[tri] = {
                    length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
@@ -189,6 +200,7 @@ void Manifold::Impl::CreateFaces() {
     if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    if (halfedge_[3 * tp.tri].startVert < 0) continue;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
     interiorHalfedges.resize(3);
@@ -306,18 +318,20 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
-  const auto body = [&](int i, int segmentEnd) {
+
+  constexpr int removedHalfedge = -2;
+  const auto body = [&, removedHalfedge](int i, int consecutiveStart,
+                                         int segmentEnd) {
     const int pair0 = ids[i];
-    Halfedge h0 = halfedge_[pair0];
-    int k = i + numEdge;
+    Halfedge& h0 = halfedge_[pair0];
+    int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge h1 = halfedge_[pair1];
+      Halfedge& h1 = halfedge_[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0 = {-1, -1, -1};
-        h1 = {-1, -1, -1};
+        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -325,6 +339,11 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       ++k;
       if (k >= segmentEnd + numEdge) break;
     }
+    if (i + 1 == segmentEnd) return consecutiveStart;
+    Halfedge& h1 = halfedge_[ids[i + 1]];
+    if (h0.startVert == h1.startVert && h0.endVert == h1.endVert)
+      return consecutiveStart;
+    return i + 1;
   };
 
 #if MANIFOLD_PAR == 1
@@ -348,23 +367,30 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
            [&](const std::pair<int, int>& range) {
              const auto [start, end] = range;
-             for (int i = start; i < end; ++i) body(i, end);
+             int consecutiveStart = start;
+             for (int i = start; i < end; ++i)
+               consecutiveStart = body(i, consecutiveStart, end);
            });
 #else
-  for (int i = 0; i < numEdge; ++i) body(i, numEdge);
+  int consecutiveStart = 0;
+  for (int i = 0; i < numEdge; ++i)
+    consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
-    const int pair0 = ids[i];
-    const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].startVert >= 0) {
-      halfedge_[pair0].pairedHalfedge = pair1;
-      halfedge_[pair1].pairedHalfedge = pair0;
-    }
-  });
+  for_each_n(policy, countAt(0), numEdge,
+             [this, &ids, numEdge, removedHalfedge](int i) {
+               const int pair0 = ids[i];
+               const int pair1 = ids[i + numEdge];
+               if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
+                 halfedge_[pair0].pairedHalfedge = pair1;
+                 halfedge_[pair1].pairedHalfedge = pair0;
+               } else {
+                 halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+               }
+             });
 }
 
 /**
@@ -511,6 +537,7 @@ void Manifold::Impl::CalculateNormals() {
   });
 
   auto atomicMin = [&vertHalfedgeMap](int value, int vert) {
+    if (vert < 0) return;
     int old = std::numeric_limits<int>::max();
     while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
       if (old < value) break;
@@ -520,6 +547,10 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
+      if (halfedge_[3 * face].startVert < 0) {
+        triNormal = vec3(0, 0, 1);
+        return;
+      }
 
       ivec3 triVerts;
       for (int i : {0, 1, 2}) {
@@ -561,7 +592,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : acos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
@@ -589,9 +620,9 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_DEBUG
+#ifdef MANIFOLD_EXPORT
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  stream << std::setprecision(17);  // for double precision
+  stream << std::setprecision(19);  // for double precision
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -610,13 +641,26 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }
-#endif
 
-#ifdef MANIFOLD_EXPORT
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.
+ * Should be used with ImportMeshGL64 for reproducing issues.
+ */
+std::ostream& Manifold::Dump(std::ostream& stream) const {
+  return stream << *GetCsgLeafNode().GetImpl();
+}
+
+/**
+ * Import a mesh from a Wavefront OBJ file that was exported with Dump.
+ * This function is the counterpart to Dump and should be used with it.
+ * This function cannot import OBJ files not written by the Dump function.
+ */
 Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
-  stream.precision(17);
+  stream >> std::setprecision(19);
   while (true) {
     char c = stream.get();
     if (stream.eof()) break;

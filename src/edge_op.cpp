@@ -770,6 +770,7 @@ void Manifold::Impl::SplitPinchedVerts() {
             if (local[i]) continue;
             local[i] = true;
             const int vert = halfedge_[i].startVert;
+            if (vert == -1) continue;
             size_t largest = i;
             ForVert(i, [&local, &largest](int current) {
               local[current] = true;
@@ -809,6 +810,7 @@ void Manifold::Impl::SplitPinchedVerts() {
     for (size_t i = 0; i < nbEdges; ++i) {
       if (halfedgeProcessed[i]) continue;
       int vert = halfedge_[i].startVert;
+      if (vert == -1) continue;
       if (vertProcessed[vert]) {
         vertPos_.push_back(vertPos_[vert]);
         vert = NumVert() - 1;

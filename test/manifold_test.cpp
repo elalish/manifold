@@ -117,6 +117,55 @@ TEST(Manifold, InvalidInput6) {
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
 }
 
+TEST(Manifold, OppositeFace) {
+  MeshGL gl;
+  gl.vertProperties = {
+      0, 0, 0,  //
+      1, 0, 0,  //
+      0, 1, 0,  //
+      1, 1, 0,  //
+      0, 0, 1,  //
+      1, 0, 1,  //
+      0, 1, 1,  //
+      1, 1, 1,  //
+      //
+      2, 0, 0,  //
+      2, 1, 0,  //
+      2, 0, 1,  //
+      2, 1, 1,  //
+  };
+  gl.triVerts = {
+      0, 1,  4,   //
+      0, 2,  3,   //
+      0, 3,  1,   //
+      0, 4,  2,   //
+      1, 3,  5,   //
+      1, 3,  9,   //
+      1, 5,  3,   //
+      1, 5,  4,   //
+      1, 8,  5,   //
+      1, 9,  8,   //
+      2, 4,  6,   //
+      2, 6,  7,   //
+      2, 7,  3,   //
+      3, 5,  7,   //
+      3, 7,  5,   //
+      3, 7,  11,  //
+      3, 11, 9,   //
+      4, 5,  6,   //
+      5, 7,  6,   //
+      5, 8,  10,  //
+      5, 10, 7,   //
+      7, 10, 11,  //
+      8, 9,  10,  //
+      9, 11, 10,  //
+  };
+  Manifold man(gl);
+  EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(man.NumVert(), 8);
+  EXPECT_FLOAT_EQ(man.Volume(), 2);
+}
+
 /**
  * ExpectMeshes performs a decomposition, so this test ensures that compose and
  * decompose are inverse operations.

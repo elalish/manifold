@@ -437,13 +437,13 @@ class Manifold {
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
+#ifdef MANIFOLD_EXPORT
+  static Manifold ImportMeshGL64(std::istream& stream);
+  std::ostream& Dump(std::ostream& stream) const;
+#endif
   ///@}
 
   struct Impl;
-
-#ifdef MANIFOLD_EXPORT
-  static Manifold ImportMeshGL64(std::istream& stream);
-#endif
 
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);
