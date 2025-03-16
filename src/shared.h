@@ -119,6 +119,7 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
 struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
+  int startProp;
   bool IsForward() const { return startVert < endVert; }
   bool operator<(const Halfedge& other) const {
     return startVert == other.startVert ? endVert < other.endVert

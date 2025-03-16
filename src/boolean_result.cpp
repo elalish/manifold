@@ -200,6 +200,7 @@ struct EdgePos {
   int vert;
   int collisionId;
   bool isStart;
+  int prop;
 };
 
 // thread sanitizer doesn't really know how to check when there are too many
@@ -809,6 +810,40 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   PRINT(n12 << " new verts from edgesP -> facesQ");
   PRINT(n21 << " new verts from facesP -> edgesQ");
 
+  const int numProp = std::max(inP_.NumProp(), inQ_.NumProp());
+  if (numProp > 0) {
+    // Ideally, switch over from triProperties vec to Halfedge.startProp - then
+    // the prop index will be available in the append edges functions below.
+    Vec<std::atomic<int>> prop2VertP(inP_.NumPropVert());
+    for_each_n(autoPolicy(inP_.NumTri()), countAt(0), inP_.NumTri(),
+               [&](size_t tri) {
+                 for (const int i : {0, 1, 2}) {
+                   prop2VertP[inP_.meshRelation_.triProperties[tri][i]].store(
+                       inP_.halfedge_[3 * tri + i].startVert);
+                 }
+               });
+    Vec<std::atomic<int>> prop2VertQ(inQ_.NumPropVert());
+    for_each_n(autoPolicy(inQ_.NumTri()), countAt(0), inQ_.NumTri(),
+               [&](size_t tri) {
+                 for (const int i : {0, 1, 2}) {
+                   prop2VertQ[inQ_.meshRelation_.triProperties[tri][i]].store(
+                       inQ_.halfedge_[3 * tri + i].startVert);
+                 }
+               });
+    // Scan the properties inclusion numbers, e.g. + i03[prop2VertP[prop]].
+    //
+    // New verts create either 2 or 3 new properties: one for the face, plus one
+    // for an edge where start and end verts share properties, or plus two for
+    // an edge that doesn't share both properties.
+    //
+    // Copy included inP and inQ properties to outR, and duplicate for new verts
+    // accoding to the inclusion numbers. Calculate new outR properties using
+    // the Barycentric function from CreateProperties.
+    //
+    // Make equivalents of vP2R through v21R for properties, and use these to
+    // fill in EdgePos.prop indices in the append edge functions below.
+  }
+
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
 
@@ -884,7 +919,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
+  // Since outR.halfedge_ now has .prop, use this as the polygon idx instead of
+  // vert in Face2Tri. Then when it runs CreateHalfedges on the returned
+  // triangles, use a prop2vert vector to map it back.
   outR.Face2Tri(faceEdge, halfedgeRef);
+  // Once Face2Tri is updated, FlattenFaces should start working with properties
+  // (and make BooleanComplex.MeshRelation pass again), since it is also calling
+  // Face2Tri internally.
   halfedgeRef.clear();
   faceEdge.clear();
 
@@ -900,6 +941,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
+  // Remove this function entirely once properties are not longer lost in
+  // Face2Tri.
   CreateProperties(outR, inP_, inQ_);
 
   UpdateReference(outR, inP_, inQ_, invertQ);
