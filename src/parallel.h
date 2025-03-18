@@ -376,6 +376,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -414,6 +415,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
                     typename std::iterator_traits<InputIter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
@@ -492,6 +494,7 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -556,6 +559,8 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
+  (void)identity;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     details::ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f,
@@ -611,6 +616,7 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -657,6 +663,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -716,6 +723,7 @@ void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -741,6 +749,7 @@ void fill(OutputIter first, OutputIter last, T value) {
 template <typename InputIter, typename P>
 size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
                 P pred) {
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     return reduce(policy, TransformIterator(first, pred),
@@ -765,6 +774,7 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
                     typename std::iterator_traits<InputIter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
@@ -814,6 +824,7 @@ OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
           typename std::iterator_traits<OutputIter>::iterator_category,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     auto pred2 = [&](size_t i) { return pred(first[i]); };
@@ -863,6 +874,7 @@ Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
@@ -910,6 +922,7 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     T *tmp = new T[std::distance(first, last)];
@@ -957,6 +970,7 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
   static_assert(std::is_trivially_destructible_v<T>,
                 "Our simple implementation does not support types that are "
                 "not trivially destructable.");
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par && first != last) {
     Iter newSrcStart = first;
@@ -1012,6 +1026,7 @@ Iter unique(Iter first, Iter last) {
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   details::SortFunctor<Iterator, T>()(policy, first, last);
 #else
@@ -1043,6 +1058,7 @@ template <typename Iterator,
           typename Comp = decltype(std::less<T>())>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last,
                  Comp comp) {
+  (void)policy;
 #if (MANIFOLD_PAR == 1)
   details::mergeSort(policy, first, last, comp);
 #else

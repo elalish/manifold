@@ -37,14 +37,12 @@
 
 #include <array>        // For std::array
 #include <cmath>        // For various unary math functions, such as std::sqrt
-#include <cstdint>      // For implementing namespace linalg::aliases
 #include <cstdlib>      // To resolve std::abs ambiguity on clang
 #include <functional>   // For std::hash declaration
 #include <iosfwd>       // For forward definitions of std::ostream
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
 
 #ifdef MANIFOLD_DEBUG
-#include <iomanip>
 #include <iostream>
 #endif
 

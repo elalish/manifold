@@ -273,8 +273,8 @@ void AddNewEdgeVerts(
     return;
   }
 #endif
-  auto processFun = std::bind(
-      process, [](size_t _) {}, [](size_t _) {}, std::placeholders::_1);
+  auto processFun =
+      std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
   for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
