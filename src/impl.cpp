@@ -275,7 +275,7 @@ void Manifold::Impl::DedupePropVerts() {
     for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }
 
-constexpr int removedHalfedge = -2;
+constexpr int kRemovedHalfedge = -2;
 
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
@@ -328,7 +328,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
+        h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -380,7 +380,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
+    if (halfedge_[pair0].pairedHalfedge != kRemovedHalfedge) {
       halfedge_[pair0].pairedHalfedge = pair1;
       halfedge_[pair1].pairedHalfedge = pair0;
     } else {
