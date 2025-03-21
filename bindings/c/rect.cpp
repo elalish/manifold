@@ -80,7 +80,6 @@ ManifoldRect *manifold_rect_transform(void *mem, ManifoldRect *r, double x1,
 
 ManifoldRect *manifold_rect_translate(void *mem, ManifoldRect *r, double x,
                                       double y) {
-  auto rect = *from_c(r);
   auto p = vec2(x, y);
   auto translated = (*from_c(r)) + p;
   return to_c(new (mem) Rect(translated));
@@ -88,7 +87,6 @@ ManifoldRect *manifold_rect_translate(void *mem, ManifoldRect *r, double x,
 
 ManifoldRect *manifold_rect_mul(void *mem, ManifoldRect *r, double x,
                                 double y) {
-  auto rect = *from_c(r);
   auto p = vec2(x, y);
   auto scaled = (*from_c(r)) * p;
   return to_c(new (mem) Rect(scaled));

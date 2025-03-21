@@ -19,7 +19,6 @@
 #include "./shared.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 
 namespace manifold {
 

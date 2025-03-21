@@ -24,6 +24,10 @@
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 
+#ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#endif
+
 namespace {
 using namespace manifold;
 
@@ -841,7 +845,7 @@ class EarClip {
     ZoneScoped;
     std::vector<VertItr> itr;
     Vec<PolyVert> points;
-    Loop(start, [&itr, &points, this](VertItr v) {
+    Loop(start, [&itr, &points](VertItr v) {
       points.push_back({v->pos, static_cast<int>(itr.size())});
       itr.push_back(v);
     });

@@ -82,7 +82,7 @@ struct QR {
   mat3 Q, R;
 };
 // Calculates the squared norm of the vector.
-inline double Dist2(vec3 v) { return la::dot(v, v); }
+inline double Dist2(vec3 v) { return manifold::la::dot(v, v); }
 // For an explanation of the math see
 // http://pages.cs.wisc.edu/~sifakis/papers/SVD_TR1690.pdf Computing the
 // Singular Value Decomposition of 3 x 3 matrices with minimal branching and

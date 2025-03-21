@@ -35,12 +35,10 @@
 namespace {
 using namespace manifold;
 
-constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
-
 // Absolute error <= 6.7e-5
-float acos(float x) {
+float fastacos(float x) {
   float negate = float(x < 0);
-  x = abs(x);
+  x = std::abs(x);
   float ret = -0.0187293;
   ret = ret * x;
   ret = ret + 0.0742610;
@@ -240,7 +238,6 @@ void Manifold::Impl::DedupePropVerts() {
       autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
       [&vert2vert, numProp, this](const int edgeIdx) {
         const Halfedge edge = halfedge_[edgeIdx];
-        const Halfedge pair = halfedge_[edge.pairedHalfedge];
         const int edgeFace = edgeIdx / 3;
         const int pairFace = edge.pairedHalfedge / 3;
 
@@ -277,6 +274,8 @@ void Manifold::Impl::DedupePropVerts() {
   for (auto& prop : meshRelation_.triProperties)
     for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }
+
+constexpr int kRemovedHalfedge = -2;
 
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
@@ -319,9 +318,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
 
-  constexpr int removedHalfedge = -2;
-  const auto body = [&, removedHalfedge](int i, int consecutiveStart,
-                                         int segmentEnd) {
+  const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
     int k = consecutiveStart + numEdge;
@@ -331,7 +328,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
+        h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -380,17 +377,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge,
-             [this, &ids, numEdge, removedHalfedge](int i) {
-               const int pair0 = ids[i];
-               const int pair1 = ids[i + numEdge];
-               if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
-                 halfedge_[pair0].pairedHalfedge = pair1;
-                 halfedge_[pair1].pairedHalfedge = pair0;
-               } else {
-                 halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
-               }
-             });
+  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+    const int pair0 = ids[i];
+    const int pair1 = ids[i + numEdge];
+    if (halfedge_[pair0].pairedHalfedge != kRemovedHalfedge) {
+      halfedge_[pair0].pairedHalfedge = pair1;
+      halfedge_[pair1].pairedHalfedge = pair0;
+    } else {
+      halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+    }
+  });
 }
 
 /**
@@ -529,7 +525,6 @@ void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri());
-  bool calculateTriNormal = false;
 
   std::vector<std::atomic<int>> vertHalfedgeMap(NumVert());
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
@@ -544,7 +539,6 @@ void Manifold::Impl::CalculateNormals() {
   };
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
-    calculateTriNormal = true;
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
       if (halfedge_[3 * face].startVert < 0) {
@@ -592,7 +586,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : acos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : fastacos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
@@ -673,7 +667,7 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
           stream.get(tmp.data(), SIZE, '\n');
           if (strncmp(tmp.data(), "tolerance", SIZE) == 0) {
             // skip 3 letters
-            for (int i : {0, 1, 2}) stream.get();
+            for (int _ : {0, 1, 2}) stream.get();
             stream >> mesh.tolerance;
           } else if (strncmp(tmp.data(), "epsilon =", SIZE) == 0) {
             double tmp;
@@ -694,14 +688,14 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
         break;
       }
       case 'v':
-        for (int i : {0, 1, 2}) {
+        for (int _ : {0, 1, 2}) {
           double x;
           stream >> x;
           mesh.vertProperties.push_back(x);
         }
         break;
       case 'f':
-        for (int i : {0, 1, 2}) {
+        for (int _ : {0, 1, 2}) {
           uint64_t x;
           stream >> x;
           mesh.triVerts.push_back(x - 1);

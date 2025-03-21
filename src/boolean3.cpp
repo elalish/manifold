@@ -402,7 +402,7 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                 a.vertPos_[tmpedges[e].second]);
              });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward};
+  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
 
   b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
                                                        recorder);

@@ -550,7 +550,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
               }
               const int vert = halfedge_[current].endVert;
               vec3 pos = vertPos_[vert];
-              const vec3 edgeVec = centerPos - pos;
               if (vertNumSharp[vert] < 2) {
                 // opposite vert has fixed normal
                 const vec3 normal = vertFlatFace[vert] >= 0
@@ -566,7 +565,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
               return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
-                int current, const FaceEdge& here, FaceEdge& next) {
+                int, const FaceEdge& here, FaceEdge& next) {
               const double dihedral = degrees(std::acos(
                   la::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
