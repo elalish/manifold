@@ -454,7 +454,7 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m) {
   return to_c(new (mem) MeshGL(*from_c(m)));
 }
 
-ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m) { 
+ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m) {
   auto duplicate = new (mem) MeshGL(*from_c(m));
   if (duplicate->Merge()) {
     return to_c(duplicate);
