@@ -459,7 +459,7 @@ ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m) {
   if (duplicate->Merge()) {
     return to_c(duplicate);
   }
-  delete duplicate;
+  duplicate->~MeshGL();
   return m;
 }
 
@@ -477,7 +477,7 @@ ManifoldMeshGL64 *manifold_meshgl64_merge(void *mem, ManifoldMeshGL64 *m) {
   if (duplicate->Merge()) {
     return to_c(duplicate);
   }
-  delete duplicate;
+  duplicate->~MeshGL64();
   return m;
 }
 
