@@ -495,6 +495,11 @@ TEST(Manifold, Slice) {
   EXPECT_EQ(bottom.Area(), 1);
   EXPECT_EQ(top.Area(), 0);
 }
+
+TEST(Manifold, SliceEmptyObject) {
+  Manifold cube;
+  CrossSection bottom = cube.Slice();
+}
 #endif
 
 TEST(Manifold, MeshRelation) {
