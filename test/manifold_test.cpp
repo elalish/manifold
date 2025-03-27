@@ -497,8 +497,9 @@ TEST(Manifold, Slice) {
 }
 
 TEST(Manifold, SliceEmptyObject) {
-  Manifold cube;
-  CrossSection bottom = cube.Slice();
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  CrossSection bottom = empty.Slice();
 }
 #endif
 
