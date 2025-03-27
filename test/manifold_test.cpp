@@ -495,6 +495,12 @@ TEST(Manifold, Slice) {
   EXPECT_EQ(bottom.Area(), 1);
   EXPECT_EQ(top.Area(), 0);
 }
+
+TEST(Manifold, SliceEmptyObject) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  CrossSection bottom = empty.Slice();
+}
 #endif
 
 TEST(Manifold, MeshRelation) {
