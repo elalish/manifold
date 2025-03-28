@@ -35,20 +35,94 @@
 namespace {
 using namespace manifold;
 
-// Absolute error <= 6.7e-5
-float fastacos(float x) {
-  float negate = float(x < 0);
-  x = std::abs(x);
-  float ret = -0.0187293;
-  ret = ret * x;
-  ret = ret + 0.0742610;
-  ret = ret * x;
-  ret = ret - 0.2121144;
-  ret = ret * x;
-  ret = ret + 1.5707288;
-  ret = ret * sqrt(1.0 - x);
-  ret = ret - 2 * negate * ret;
-  return negate * 3.14159265358979 + ret;
+/**
+ * Returns arc cosine of 𝑥.
+ *
+ * @return value in range [0,M_PI]
+ * @return NAN if 𝑥 ∈ {NAN,+INFINITY,-INFINITY}
+ * @return NAN if 𝑥 ∉ [-1,1]
+ */
+double sun_acos(double x) {
+  /*
+   * Origin of acos function: FreeBSD /usr/src/lib/msun/src/e_acos.c
+   * Changed the use of union to memcpy to avoid undefined behavior.
+   * ====================================================
+   * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+   *
+   * Developed at SunSoft, a Sun Microsystems, Inc. business.
+   * Permission to use, copy, modify, and distribute this
+   * software is freely granted, provided that this notice
+   * is preserved.
+   * ====================================================
+   */
+  constexpr double pio2_hi =
+      1.57079632679489655800e+00; /* 0x3FF921FB, 0x54442D18 */
+  constexpr double pio2_lo =
+      6.12323399573676603587e-17; /* 0x3C91A626, 0x33145C07 */
+  constexpr double pS0 =
+      1.66666666666666657415e-01; /* 0x3FC55555, 0x55555555 */
+  constexpr double pS1 =
+      -3.25565818622400915405e-01; /* 0xBFD4D612, 0x03EB6F7D */
+  constexpr double pS2 =
+      2.01212532134862925881e-01; /* 0x3FC9C155, 0x0E884455 */
+  constexpr double pS3 =
+      -4.00555345006794114027e-02; /* 0xBFA48228, 0xB5688F3B */
+  constexpr double pS4 =
+      7.91534994289814532176e-04; /* 0x3F49EFE0, 0x7501B288 */
+  constexpr double pS5 =
+      3.47933107596021167570e-05; /* 0x3F023DE1, 0x0DFDF709 */
+  constexpr double qS1 =
+      -2.40339491173441421878e+00; /* 0xC0033A27, 0x1C8A2D4B */
+  constexpr double qS2 =
+      2.02094576023350569471e+00; /* 0x40002AE5, 0x9C598AC8 */
+  constexpr double qS3 =
+      -6.88283971605453293030e-01; /* 0xBFE6066C, 0x1B8D0159 */
+  constexpr double qS4 =
+      7.70381505559019352791e-02; /* 0x3FB3B8C5, 0xB12E9282 */
+  auto R = [](double z) {
+    double_t p, q;
+    p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
+    q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
+    return p / q;
+  };
+  double z, w, s, c, df;
+  uint64_t xx;
+  uint32_t hx, lx, ix;
+  memcpy(&xx, &x, sizeof(xx));
+  hx = xx >> 32;
+  ix = hx & 0x7fffffff;
+  /* |x| >= 1 or nan */
+  if (ix >= 0x3ff00000) {
+    lx = xx;
+    if (((ix - 0x3ff00000) | lx) == 0) {
+      /* acos(1)=0, acos(-1)=pi */
+      if (hx >> 31) return 2 * pio2_hi + 0x1p-120f;
+      return 0;
+    }
+    return 0 / (x - x);
+  }
+  /* |x| < 0.5 */
+  if (ix < 0x3fe00000) {
+    if (ix <= 0x3c600000) /* |x| < 2**-57 */
+      return pio2_hi + 0x1p-120f;
+    return pio2_hi - (x - (pio2_lo - x * R(x * x)));
+  }
+  /* x < -0.5 */
+  if (hx >> 31) {
+    z = (1.0 + x) * 0.5;
+    s = sqrt(z);
+    w = R(z) * s - pio2_lo;
+    return 2 * (pio2_hi - (s + w));
+  }
+  /* x > 0.5 */
+  z = (1.0 - x) * 0.5;
+  s = sqrt(z);
+  memcpy(&xx, &s, sizeof(xx));
+  xx &= 0xffffffff00000000;
+  memcpy(&df, &xx, sizeof(xx));
+  c = (z - df * df) / (s + df);
+  w = R(z) * s + c;
+  return 2 * (df + w);
 }
 
 struct Transform4x3 {
@@ -586,7 +660,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : fastacos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : sun_acos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
