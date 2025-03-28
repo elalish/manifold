@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <map>
 #include <optional>
 
@@ -26,7 +27,6 @@
 #include "./svd.h"
 
 #ifdef MANIFOLD_EXPORT
-#include <string.h>
 
 #include <iomanip>
 #include <iostream>
@@ -80,7 +80,7 @@ double sun_acos(double x) {
   constexpr double qS4 =
       7.70381505559019352791e-02; /* 0x3FB3B8C5, 0xB12E9282 */
   auto R = [](double z) {
-    double_t p, q;
+    double p, q;
     p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
     q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
     return p / q;
