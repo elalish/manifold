@@ -79,7 +79,7 @@ double sun_acos(double x) {
       -6.88283971605453293030e-01; /* 0xBFE6066C, 0x1B8D0159 */
   constexpr double qS4 =
       7.70381505559019352791e-02; /* 0x3FB3B8C5, 0xB12E9282 */
-  auto R = [](double z) {
+  auto R = [=](double z) {
     double p, q;
     p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
     q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
