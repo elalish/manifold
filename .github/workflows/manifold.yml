@@ -220,6 +220,8 @@ jobs:
       run: brew install tbb
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 3.31.6
     - name: Build
       run: |
         mkdir build
@@ -248,6 +250,8 @@ jobs:
         pip install trimesh pytest
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 3.31.6
     - name: Build
       run: |
         mkdir build
@@ -275,6 +279,8 @@ jobs:
         brew install googletest
         pip install trimesh pytest
     - uses: actions/checkout@v4
+      with:
+        cmake-version: 3.31.6
     - uses: jwlawson/actions-setup-cmake@v2
     - name: test cmake consumer
       run: |
