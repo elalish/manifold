@@ -46,6 +46,42 @@ TEST(CrossSection, MirrorUnion) {
   EXPECT_TRUE(a.Mirror(vec2(0.0)).IsEmpty());
 }
 
+TEST(CrossSection, MirrorCheckAxis) {
+  auto tri = CrossSection({{0., 0.}, {5., 5.}, {0., 10.}});
+
+  auto a = tri.Mirror({1., 1.});
+  auto a_expected = CrossSection({{0., 0.}, {-10., 0.}, {-5., -5.}});
+  auto result_a = Manifold::Extrude(a.ToPolygons(), 5.) -
+                  Manifold::Extrude(a_expected.ToPolygons(), 5.);
+  auto result_a2 = Manifold::Extrude(a_expected.ToPolygons(), 5.) -
+                   Manifold::Extrude(a.ToPolygons(), 5.);
+
+  auto b = tri.Mirror({-1., 1.});
+  auto b_expected = CrossSection({{0., 0.}, {10., 0.}, {5., 5.}});
+  auto result_b = Manifold::Extrude(b.ToPolygons(), 5.) -
+                  Manifold::Extrude(b_expected.ToPolygons(), 5.);
+  auto result_b2 = Manifold::Extrude(b_expected.ToPolygons(), 5.) -
+                   Manifold::Extrude(b.ToPolygons(), 5.);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("cross_section_mirror_check_axis_a.glb", result_a.GetMeshGL(),
+               {});
+    ExportMesh("cross_section_mirror_check_axis_b.glb", result_b.GetMeshGL(),
+               {});
+    ExportMesh("cross_section_mirror_check_axis_a2.glb", result_a2.GetMeshGL(),
+               {});
+    ExportMesh("cross_section_mirror_check_axis_b2.glb", result_b2.GetMeshGL(),
+               {});
+  }
+#endif
+
+  EXPECT_FLOAT_EQ(result_a.Volume(), 0.);
+  EXPECT_FLOAT_EQ(result_a2.Volume(), 0.);
+  EXPECT_FLOAT_EQ(result_b.Volume(), 0.);
+  EXPECT_FLOAT_EQ(result_b2.Volume(), 0.);
+}
+
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
