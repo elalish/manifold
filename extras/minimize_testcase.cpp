@@ -2,7 +2,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #if (MANIFOLD_PAR == 1) && __has_include(<pstl/glue_execution_defs.h>)
@@ -93,17 +92,19 @@ std::pair<int, int> findIndex(const Polygons &polys, size_t i) {
   return std::make_pair(outer, i);
 }
 
-void Dump(const Polygons &polys) {
-  for (const SimplePolygon &poly : polys) {
-    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
-    for (const vec2 v : poly) {
-      std::cout << "    {" << v.x << ", " << v.y << "},  //" << std::endl;
+void Dump(const Polygons &polys, const double epsilon) {
+  std::cout << std::setprecision(19);
+  std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
+  for (auto poly : polys) {
+    std::cout << poly.size() << std::endl;
+    for (auto v : poly) {
+      std::cout << v.x << " " << v.y << std::endl;
     }
-    std::cout << "});" << std::endl;
   }
-  for (const SimplePolygon &poly : polys) {
+  std::cout << "# ... " << std::endl;
+  for (auto poly : polys) {
     std::cout << "show(array([" << std::endl;
-    for (const vec2 v : poly) {
+    for (auto v : poly) {
       std::cout << "  [" << v.x << ", " << v.y << "]," << std::endl;
     }
     std::cout << "]))" << std::endl;
@@ -314,81 +315,36 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: " << argv[0] << " <input file>" << std::endl;
     return 0;
   }
-  std::ifstream fin(argv[1]);
-  std::string line;
-  double precision = -1;
+  std::ifstream f(argv[1]);
+
+  std::string name;
+  double epsilon, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  f >> name >> expectedNumTri >> epsilon >> numPolys;
   Polygons polys;
-  SimplePolygon poly;
-  // search for precision first
-  while (std::getline(fin, line)) {
-    size_t index = line.find("Precision = ");
-    if (index != std::string::npos) {
-      std::istringstream iss(line.substr(index + 12));
-      if (!(iss >> precision)) {
-        std::cerr << "Error parsing precision" << std::endl;
-        return 1;
-      }
-      break;
+  for (int i = 0; i < numPolys; i++) {
+    polys.emplace_back();
+    f >> numPoints;
+    for (int j = 0; j < numPoints; j++) {
+      f >> x >> y;
+      polys.back().emplace_back(x, y);
     }
   }
-  std::cout << "Precision = " << precision << std::endl;
-  // fill polygons
-  while (std::getline(fin, line)) {
-    if (line.length() > 5 && line.substr(0, 5).compare("    {") == 0) {
-      std::istringstream iss(line.substr(5));
-      double x, y;
-      if (!(iss >> x)) {
-        std::cerr << "Error parsing coordinate:" << std::endl;
-        std::cerr << "Line: " << line << std::endl;
-        return 1;
-      }
-      iss.ignore(2);
-      if (!(iss >> y)) {
-        std::cerr << "Error parsing coordinate:" << std::endl;
-        std::cerr << "Line: " << line << std::endl;
-        return 1;
-      }
-      poly.push_back(vec2(x, y));
-    } else if (line.length() >= 3 && line.substr(0, 3).compare("});") == 0) {
-      if (poly.size() < 3) {
-        std::cerr << "Error: empty/invalid polygon" << std::endl;
-        return 1;
-      }
-      polys.push_back(std::move(poly));
-      poly.clear();
-    } else if (line.length() >= 5 && line.substr(0, 5).compare("array") == 0) {
-      break;
-    }
-  }
-
-  if (polys.size() == 0) {
-    std::cerr << "Error: empty polygon" << std::endl;
-    return 1;
-  }
-
-  if (precision == -1) {
-    double bound = 0;
-    for (const SimplePolygon &poly : polys) {
-      for (const vec2 &pt : poly) {
-        bound = la::max(bound, la::abs(pt.x));
-        bound = la::max(bound, la::abs(pt.y));
-      }
-    }
-    precision = bound * kPrecision;
-  }
+  f.close();
 
   std::cout << "------------" << std::endl;
 
-  isValid(polys, precision);
+  isValid(polys, epsilon);
 
-  simplify(polys, precision);
+  simplify(polys, epsilon);
 
   std::cout << "------------" << std::endl;
   std::cout << "Final polygon:" << std::endl;
-  Dump(polys);
+  Dump(polys, epsilon);
 
   std::cout << "------------" << std::endl;
   std::cout << "Erroneous triangulation:" << std::endl;
-  DumpTriangulation(polys, precision);
+  DumpTriangulation(polys, epsilon);
   return 0;
 }
