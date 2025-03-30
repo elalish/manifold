@@ -519,9 +519,9 @@ CrossSection CrossSection::Scale(const vec2 scale) const {
 }
 
 /**
- * Mirror this CrossSection over the arbitrary axis described by the unit form
- * of the given vector. If the length of the vector is zero, an empty
- * CrossSection is returned. This operation can be chained. Transforms are
+ * Mirror this CrossSection over the arbitrary axis whose normal is described by
+ * the unit form of the given vector. If the length of the vector is zero, an
+ * empty CrossSection is returned. This operation can be chained. Transforms are
  * combined and applied lazily.
  *
  * @param ax the axis to be mirrored over

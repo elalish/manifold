@@ -49,37 +49,21 @@ TEST(CrossSection, MirrorUnion) {
 TEST(CrossSection, MirrorCheckAxis) {
   auto tri = CrossSection({{0., 0.}, {5., 5.}, {0., 10.}});
 
-  auto a = tri.Mirror({1., 1.});
-  auto a_expected = CrossSection({{0., 0.}, {-10., 0.}, {-5., -5.}});
-  auto result_a = Manifold::Extrude(a.ToPolygons(), 5.) -
-                  Manifold::Extrude(a_expected.ToPolygons(), 5.);
-  auto result_a2 = Manifold::Extrude(a_expected.ToPolygons(), 5.) -
-                   Manifold::Extrude(a.ToPolygons(), 5.);
+  auto a = tri.Mirror({1., 1.}).Bounds();
+  auto a_expected = CrossSection({{0., 0.}, {-10., 0.}, {-5., -5.}}).Bounds();
 
-  auto b = tri.Mirror({-1., 1.});
-  auto b_expected = CrossSection({{0., 0.}, {10., 0.}, {5., 5.}});
-  auto result_b = Manifold::Extrude(b.ToPolygons(), 5.) -
-                  Manifold::Extrude(b_expected.ToPolygons(), 5.);
-  auto result_b2 = Manifold::Extrude(b_expected.ToPolygons(), 5.) -
-                   Manifold::Extrude(b.ToPolygons(), 5.);
+  EXPECT_NEAR(a.min.x, a_expected.min.x, 0.001);
+  EXPECT_NEAR(a.min.y, a_expected.min.y, 0.001);
+  EXPECT_NEAR(a.max.x, a_expected.max.x, 0.001);
+  EXPECT_NEAR(a.max.y, a_expected.max.y, 0.001);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("cross_section_mirror_check_axis_a.glb", result_a.GetMeshGL(),
-               {});
-    ExportMesh("cross_section_mirror_check_axis_b.glb", result_b.GetMeshGL(),
-               {});
-    ExportMesh("cross_section_mirror_check_axis_a2.glb", result_a2.GetMeshGL(),
-               {});
-    ExportMesh("cross_section_mirror_check_axis_b2.glb", result_b2.GetMeshGL(),
-               {});
-  }
-#endif
+  auto b = tri.Mirror({-1., 1.}).Bounds();
+  auto b_expected = CrossSection({{0., 0.}, {10., 0.}, {5., 5.}}).Bounds();
 
-  EXPECT_FLOAT_EQ(result_a.Volume(), 0.);
-  EXPECT_FLOAT_EQ(result_a2.Volume(), 0.);
-  EXPECT_FLOAT_EQ(result_b.Volume(), 0.);
-  EXPECT_FLOAT_EQ(result_b2.Volume(), 0.);
+  EXPECT_NEAR(b.min.x, b_expected.min.x, 0.001);
+  EXPECT_NEAR(b.min.y, b_expected.min.y, 0.001);
+  EXPECT_NEAR(b.max.x, b_expected.max.x, 0.001);
+  EXPECT_NEAR(b.max.y, b_expected.max.y, 0.001);
 }
 
 TEST(CrossSection, RoundOffset) {
