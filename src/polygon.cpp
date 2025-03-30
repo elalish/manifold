@@ -771,7 +771,8 @@ class EarClip {
           above * CCW(start->pos, vert->pos, connector->pos, epsilon_);
       if (vert->pos.x > start->pos.x - epsilon_ &&
           vert->pos.y * above > start->pos.y * above - epsilon_ &&
-          (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x)) &&
+          (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x &&
+                          vert->pos.y * above < connector->pos.y * above)) &&
           vert->InsideEdge(edge, epsilon_, true) && vert->IsReflex(epsilon_)) {
         connector = vert;
       }
