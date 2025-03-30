@@ -437,7 +437,7 @@ TEST(Boolean, Precision2) {
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
 
-TEST(Boolean, DISABLED_SimpleCubeRegression) {
+TEST(Boolean, SimpleCubeRegression) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold result =

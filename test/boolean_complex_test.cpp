@@ -15,8 +15,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include <fstream>
-#include <iostream>
 
 #include "manifold/manifold.h"
 #include "test.h"
@@ -1020,38 +1018,21 @@ TEST(BooleanComplex, SimpleOffset) {
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
-TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
+TEST(BooleanComplex, OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold a, b;
-  std::ifstream f;
-  f.open(dir + "/models/Offset1.obj");
-  a = Manifold::ImportMeshGL64(f);
-  f.close();
-  f.open(dir + "/models/Offset2.obj");
-  b = Manifold::ImportMeshGL64(f);
-  f.close();
+  Manifold a = ReadMesh64("Offset1.obj");
+  Manifold b = ReadMesh64("Offset2.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
-TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
+TEST(BooleanComplex, OffsetSelfIntersect) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold a, b;
-  std::ifstream f;
-  f.open(dir + "/models/Offset3.obj");
-  a = Manifold::ImportMeshGL64(f);
-  f.close();
-  f.open(dir + "/models/Offset4.obj");
-  b = Manifold::ImportMeshGL64(f);
-  f.close();
-
+  Manifold a = ReadMesh64("Offset3.obj");
+  Manifold b = ReadMesh64("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;

@@ -215,7 +215,8 @@ std::mutex dump_lock;
  * Note that this is not checking for epsilon-validity.
  */
 bool Manifold::Impl::IsSelfIntersecting() const {
-  const double epsilonSq = epsilon_ * epsilon_;
+  const double ep = 2 * epsilon_;
+  const double epsilonSq = ep * ep;
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
@@ -223,38 +224,38 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   const bool verbose = ManifoldParams().verbose > 0;
   std::atomic<bool> intersecting(false);
 
-  auto f = [&](int x, int y) {
-    std::array<vec3, 3> tri_x, tri_y;
+  auto f = [&](int tri0, int tri1) {
+    std::array<vec3, 3> triVerts0, triVerts1;
     for (int i : {0, 1, 2}) {
-      tri_x[i] = vertPos_[halfedge_[3 * x + i].startVert];
-      tri_y[i] = vertPos_[halfedge_[3 * y + i].startVert];
+      triVerts0[i] = vertPos_[halfedge_[3 * tri0 + i].startVert];
+      triVerts1[i] = vertPos_[halfedge_[3 * tri1 + i].startVert];
     }
-    // if triangles x and y share a vertex, return true to skip the
+    // if triangles tri0 and tri1 share a vertex, return true to skip the
     // check. we relax the sharing criteria a bit to allow for at most
     // distance epsilon squared
     for (int i : {0, 1, 2})
       for (int j : {0, 1, 2})
-        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return;
+        if (distance2(triVerts0[i], triVerts1[j]) <= epsilonSq) return;
 
-    if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
+    if (DistanceTriangleTriangleSquared(triVerts0, triVerts1) == 0.0) {
       // try to move the triangles around the normal of the other face
-      std::array<vec3, 3> tmp_x, tmp_y;
-      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
+      std::array<vec3, 3> tmp0, tmp1;
+      for (int i : {0, 1, 2}) tmp0[i] = triVerts0[i] + ep * faceNormal_[tri1];
+      if (DistanceTriangleTriangleSquared(tmp0, triVerts1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp0[i] = triVerts0[i] - ep * faceNormal_[tri1];
+      if (DistanceTriangleTriangleSquared(tmp0, triVerts1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp1[i] = triVerts1[i] + ep * faceNormal_[tri0];
+      if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp1[i] = triVerts1[i] - ep * faceNormal_[tri0];
+      if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
       if (verbose) {
         dump_lock.lock();
         std::cout << "intersecting:" << std::endl;
-        for (int i : {0, 1, 2}) std::cout << tri_x[i] << " ";
+        for (int i : {0, 1, 2}) std::cout << triVerts0[i] << " ";
         std::cout << std::endl;
-        for (int i : {0, 1, 2}) std::cout << tri_y[i] << " ";
+        for (int i : {0, 1, 2}) std::cout << triVerts1[i] << " ";
         std::cout << std::endl;
         dump_lock.unlock();
       }
