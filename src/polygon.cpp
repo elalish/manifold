@@ -235,9 +235,7 @@ std::vector<ivec3> TriangulateConvex(const PolygonsIdx &polys) {
  * Ear-clipping triangulator based on David Eberly's approach from Geometric
  * Tools, but adjusted to handle epsilon-valid polygons, and including a
  * fallback that ensures a manifold triangulation even for overlapping polygons.
- * This is an O(n^2) algorithm, but hopefully this is not a big problem as the
- * number of edges in a given polygon is generally much less than the number of
- * triangles in a mesh, and relatively few faces even need triangulation.
+ * This is reduced from an O(n^2) algorithm by means of our BVH Collider.
  *
  * The main adjustments for robustness involve clipping the sharpest ears first
  * (a known technique to get higher triangle quality), and doing an exhaustive
@@ -411,20 +409,9 @@ class EarClip {
       return true;
     }
 
-    // A major key to robustness is to only clip convex ears, but this is
-    // difficult to determine when an edge is folded back on itself. This
-    // function walks down the kinks in a degenerate portion of a polygon until
-    // it finds a clear geometric result. In the vast majority of cases the loop
-    // will only need one or two iterations.
+    // Returns true for convex or colinear ears.
     bool IsConvex(double epsilon) const {
-      const int convexity = CCW(left->pos, pos, right->pos, epsilon);
-      if (convexity != 0) {
-        return convexity > 0;
-      }
-      if (la::dot(left->pos - pos, right->pos - pos) <= 0) {
-        return true;
-      }
-      return left->InsideEdge(left->right, epsilon, true);
+      return CCW(left->pos, pos, right->pos, epsilon) >= 0;
     }
 
     // Subtly different from !IsConvex because IsConvex will return true for
@@ -609,8 +596,7 @@ class EarClip {
 
   // If an ear will make a degenerate triangle, clip it early to avoid
   // difficulty in key-holing. This function is recursive, as the process of
-  // clipping may cause the neighbors to degenerate. Reflex degenerates *must
-  // not* be clipped, unless they have a short edge.
+  // clipping may cause the neighbors to degenerate.
   void ClipIfDegenerate(VertItr ear) {
     if (Clipped(ear)) {
       return;
@@ -620,8 +606,7 @@ class EarClip {
     }
     if (ear->IsShort(epsilon_) ||
         (CCW(ear->left->pos, ear->pos, ear->right->pos, epsilon_) == 0 &&
-         la::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
-         ear->IsConvex(epsilon_))) {
+         la::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0)) {
       ClipEar(ear);
       ClipIfDegenerate(ear->left);
       ClipIfDegenerate(ear->right);
@@ -786,7 +771,8 @@ class EarClip {
           above * CCW(start->pos, vert->pos, connector->pos, epsilon_);
       if (vert->pos.x > start->pos.x - epsilon_ &&
           vert->pos.y * above > start->pos.y * above - epsilon_ &&
-          (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x)) &&
+          (inside > 0 || (inside == 0 && vert->pos.x < connector->pos.x &&
+                          vert->pos.y * above < connector->pos.y * above)) &&
           vert->InsideEdge(edge, epsilon_, true) && vert->IsReflex(epsilon_)) {
         connector = vert;
       }
