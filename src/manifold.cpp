@@ -332,11 +332,9 @@ MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * only applies to Manifolds newly-created from an input Mesh - once they are
- * combined into a new Manifold via operations, the status reverts to NoError,
- * simply processing the problem mesh as empty. Likewise, empty meshes may still
- * show NoError, for instance if they are small enough relative to their
- * tolerance to be collapsed to nothing.
+ * will carry on through operations like NaN propogation, ensuring an errored
+ * mesh doesn't get mysteriously lost. Empty meshes may still show
+ * NoError, for instance the intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
