@@ -142,6 +142,24 @@ jobs:
         retention-days: 90
         overwrite: true
 
+  build_fuzzer:
+    name: fuzzer
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y update
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y libgtest-dev clang
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMANIFOLD_DEBUG=ON -DMANIFOLD_FUZZ=ON -DMANIFOLD_PYBIND=OFF -DCMAKE_CXX_COMPILER=clang++ ..
+        make
+
   build_windows:
     name: Windows (TBB:${{matrix.parallelization}}, SHARED:${{matrix.shared}})
     timeout-minutes: 30
