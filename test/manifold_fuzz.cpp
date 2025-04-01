@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <pthread.h>
+
 #include <atomic>
 #include <future>
 
@@ -68,11 +70,11 @@ void SimpleCube(const std::vector<CubeOp> &inputs) {
       }
     }
 
-    std::atomic<pid_t> tid;
+    pthread_t tid;
     std::atomic<bool> faulted(true);
     auto asyncFuture = std::async(
         std::launch::async, [&result, &faulted, &tid, &cube, &input]() {
-          tid.store(gettid());
+          tid = pthread_self();
           if (input.isUnion) {
             result += cube;
           } else {
@@ -84,7 +86,7 @@ void SimpleCube(const std::vector<CubeOp> &inputs) {
     if (asyncFuture.wait_for(std::chrono::milliseconds(10000)) ==
         std::future_status::timeout) {
       printf("timeout after %dms...\n", 10000);
-      pthread_cancel(tid.load());
+      pthread_cancel(tid);
     }
 
     EXPECT_FALSE(faulted.load());
