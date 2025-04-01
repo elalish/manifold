@@ -18,6 +18,7 @@
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
+#include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 #include "manifold/polygon.h"
 
@@ -26,7 +27,7 @@ using namespace fuzztest;
 void TriangulationNoCrash(
     std::vector<std::vector<std::pair<float, float>>> input, float precision) {
   if (precision < 0) precision = -1;
-  manifold::PolygonParams().intermediateChecks = true;
+  manifold::ManifoldParams().intermediateChecks = true;
   manifold::Polygons polys;
   size_t size = 0;
   for (const auto &simplePoly : input) {
