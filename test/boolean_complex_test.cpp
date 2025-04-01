@@ -921,14 +921,6 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
-// Note - For the moment, the Status() checks are included in the loops to
-// (more or less) mimic the BRL-CAD behavior of checking the mesh for
-// unexpected output after each iteration.  Doing so is not ideal - it
-// *massively* slows the overall evaluation - but it also seems to be
-// triggering behavior that avoids a triangulation failure.
-//
-// Eventually, once other issues are resolved, the in-loop checks should be
-// removed in favor of the top level checks.
 TEST(BooleanComplex, SimpleOffset) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
@@ -1011,10 +1003,7 @@ TEST(BooleanComplex, SimpleOffset) {
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
     manifold::Manifold right(tri_m);
     c += right;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
 
