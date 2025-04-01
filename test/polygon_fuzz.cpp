@@ -37,11 +37,11 @@ void TriangulationNoCrash(
       size++;
     }
   }
-  std::atomic<pid_t> tid;
+  pthread_t tid;
   std::atomic<bool> faulted(true);
   auto asyncFuture =
       std::async(std::launch::async, [&polys, &faulted, &tid, precision]() {
-        tid.store(gettid());
+        tid = pthread_self();
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
@@ -55,7 +55,7 @@ void TriangulationNoCrash(
   if (asyncFuture.wait_for(std::chrono::milliseconds(
           std::max<size_t>(size, 10000))) == std::future_status::timeout) {
     printf("timeout after %ldms...\n", std::max<size_t>(size, 10000));
-    pthread_cancel(tid.load());
+    pthread_cancel(tid);
   }
 
   EXPECT_FALSE(faulted.load());
