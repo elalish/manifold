@@ -99,9 +99,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Various Compiler Flags
 if(MANIFOLD_FUZZ)
-  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(FATAL_ERROR "fuzztest only supports clang")
-  endif()
   # we should enable debug checks
   set(MANIFOLD_DEBUG ON)
   # enable fuzztest fuzzing mode
