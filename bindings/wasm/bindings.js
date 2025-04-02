@@ -705,7 +705,8 @@ Module.setup = function() {
   Module.triangulate = function(polygons, epsilon = -1, allowConvex = true) {
     const polygonsVec = polygons2vec(polygons);
     const result = fromVec(
-        Module._Triangulate(polygonsVec, epsilon, allowConvex), (x) => [x[0], x[1], x[2]]);
+        Module._Triangulate(polygonsVec, epsilon, allowConvex),
+        (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   };

@@ -26,7 +26,8 @@ import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array,
  * optimization.
  * @return The triangles, referencing the original polygon points in order.
  */
-export function triangulate(polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
+export function triangulate(
+    polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
 /**
  * Sets an angle constraint the default number of circular segments for the
