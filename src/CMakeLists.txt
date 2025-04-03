@@ -36,7 +36,11 @@ set(
 )
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set_property(SOURCE quickhull.cpp APPEND PROPERTY COMPILE_FLAGS "-Wno-array-bounds -Wno-stringop-overflow")
+  set_property(
+    SOURCE quickhull.cpp
+    APPEND
+    PROPERTY COMPILE_FLAGS "-Wno-array-bounds -Wno-stringop-overflow"
+  )
 endif()
 
 set(
