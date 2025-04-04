@@ -693,6 +693,7 @@ void Manifold::Impl::IncrementMeshIDs() {
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
+    stream << std::fixed;           // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;

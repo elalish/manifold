@@ -287,6 +287,7 @@ struct MeshGLP {
 
   std::ostream& Write(std::ostream& stream) const {
     stream << std::setprecision(19);  // for double precision
+    stream << std::fixed;             // for uniformity in output numbers
     stream << "# ======= begin meshGL ======" << std::endl;
     // TODO: vertex normal and face normal
     for (size_t i = 0; i < vertProperties.size()/3; i++)
