@@ -430,6 +430,24 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
+  /** @name Debugging I/O
+   * Self-contained mechanism for reading and writing Manifold data.  Write
+   * functions create OBJ files ONLY intended to be read by Read routines and
+   * are NOT guaranteed to be readable by other programs/libraries.  Likewise,
+   * Read files are intended to read ONLY files created by Write routines and
+   * are not guaranteed to read arbitrary OBJ files. The intent is to support
+   * writing out internal data with as much precision as possible to allow
+   * reproduction of problems.  These routines should also NOT depend on
+   * external libraries - they need to be available regardless of whether
+   * MANIFOLD_EXPORT is enabled.
+   */
+  static Manifold Read(std::istream& stream);
+  static Manifold Read(std::string& filename);
+  static Manifold Read(const char *filename);
+  std::ostream& Write(std::ostream& stream) const;
+  bool Write(std::string& filename) const;
+  bool Write(const char *filename) const;
+
   /** @name Testing Hooks
    *  These are just for internal testing.
    */
@@ -437,10 +455,6 @@ class Manifold {
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
-#ifdef MANIFOLD_EXPORT
-  static Manifold ImportMeshGL64(std::istream& stream);
-  std::ostream& Dump(std::ostream& stream) const;
-#endif
   ///@}
 
   struct Impl;

@@ -16,9 +16,7 @@
 #include "manifold/manifold.h"
 #include "test.h"
 
-#ifdef MANIFOLD_EXPORT
 #include <fstream>
-#endif
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>
@@ -497,14 +495,15 @@ MeshGL ReadMesh(const std::string& filename) {
   std::string dir = file.substr(0, file.rfind('/'));
   return ImportMesh(dir + "/models/" + filename);
 }
+#endif
 
-Manifold ReadMesh64(const std::string& filename) {
+Manifold ReadOBJ(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   std::ifstream f;
   f.open(dir + "/models/" + filename);
-  Manifold a = Manifold::ImportMeshGL64(f);
+  Manifold a = Manifold::Read(f);
   f.close();
   return a;
 }
-#endif
+

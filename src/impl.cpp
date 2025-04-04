@@ -26,11 +26,10 @@
 #include "./parallel.h"
 #include "./svd.h"
 
-#ifdef MANIFOLD_EXPORT
-
+#include <fstream>
 #include <iomanip>
 #include <iostream>
-#endif
+#include <string>
 
 namespace {
 using namespace manifold;
@@ -688,7 +687,10 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_EXPORT
+
+/**
+ * Debugging output using high precision OBJ files with specialized comments
+ */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
   stream << "# ======= begin mesh ======" << std::endl;
@@ -716,16 +718,34 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
  * the tolerance and epsilon. Useful for debugging and testing.
  * Should be used with ImportMeshGL64 for reproducing issues.
  */
-std::ostream& Manifold::Dump(std::ostream& stream) const {
+std::ostream& Manifold::Write(std::ostream& stream) const {
   return stream << *GetCsgLeafNode().GetImpl();
 }
 
+bool Manifold::Write(std::string& filename) const {
+  if (!filename.length())
+     return false;
+
+  std::ofstream ofile;
+  ofile.open(filename);
+  if (!ofile.is_open())
+     return false;
+  Write(ofile);
+  ofile.close();
+  return true;
+}
+
+bool Manifold::Write(const char *filename) const {
+  std::string fname(filename);
+  return Write(fname);
+}
+
 /**
- * Import a mesh from a Wavefront OBJ file that was exported with Dump.
- * This function is the counterpart to Dump and should be used with it.
- * This function cannot import OBJ files not written by the Dump function.
+ * Import a mesh from a Wavefront OBJ file that was exported with Write.
+ * This function is the counterpart to Write and should be used with it.
+ * This function cannot import OBJ files not written by the Write function.
  */
-Manifold Manifold::ImportMeshGL64(std::istream& stream) {
+Manifold Manifold::Read(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
   stream >> std::setprecision(19);
@@ -785,6 +805,24 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
 }
-#endif
+
+Manifold Manifold::Read(std::string& filename) {
+  if (!filename.length())
+     return Manifold();
+
+  std::ifstream ifile;
+  ifile.open(filename);
+  if (!ifile.is_open())
+     return Manifold();
+  Manifold omanifold = Read(ifile);
+  ifile.close();
+  return omanifold;
+}
+
+Manifold Manifold::Read(const char *filename) {
+  std::string fname(filename);
+  return Read(fname);
+}
+
 
 }  // namespace manifold
