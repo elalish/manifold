@@ -292,7 +292,7 @@ struct MeshGLP {
     for (size_t i = 0; i < vertProperties.size()/3; i++)
       stream << "v " << vertProperties[3*i+0] << " " << vertProperties[3*i+1] << " " << vertProperties[3*i+2] << std::endl;
     for (size_t i = 0; i < triVerts.size()/3; i++)
-      stream << "f " << triVerts[3*i+0] << " " << triVerts[3*i+1] << " " << triVerts[3*i+2] << std::endl;
+      stream << "f " << triVerts[3*i+0]+1 << " " << triVerts[3*i+1]+1 << " " << triVerts[3*i+2]+1 << std::endl;
     stream << "# ======== end meshGL =======" << std::endl;
     return stream;
   }
