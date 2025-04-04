@@ -224,15 +224,13 @@ struct MeshGLP {
   }
 
   /** @name Debugging I/O
-   * Self-contained mechanism for reading and writing MeshGL data.  Write
-   * functions create OBJ files ONLY intended to be read by Read routines and
-   * are NOT guaranteed to be readable by other programs/libraries.  Likewise,
-   * Read files are intended to read ONLY files created by Write routines and
-   * are not guaranteed to read arbitrary OBJ files. The intent is to support
-   * writing out internal data with as much precision as possible to allow
-   * reproduction of problems.  These routines should also NOT depend on
-   * external libraries - they need to be available regardless of whether
-   * MANIFOLD_EXPORT is enabled.
+   * Self-contained mechanism for reading and writing high precision MeshGL
+   * data.  Write functions create OBJ files, and Read functions read them.  Be
+   * warned these are not (and not intended to be) full-featured OBJ
+   * importers/exporters.  Their primary use is as "always available"
+   * mechanisms to extract accurate mesh data for debugging purposes.
+   * Consequently, they may store and process additional data in comments that
+   * other OBJ parsing programs won't understand.
    */
   void Read(std::istream& stream) {
     stream >> std::setprecision(19);
@@ -524,15 +522,13 @@ class Manifold {
   ///@}
 
   /** @name Debugging I/O
-   * Self-contained mechanism for reading and writing Manifold data.  Write
-   * functions create OBJ files ONLY intended to be read by Read routines and
-   * are NOT guaranteed to be readable by other programs/libraries.  Likewise,
-   * Read files are intended to read ONLY files created by Write routines and
-   * are not guaranteed to read arbitrary OBJ files. The intent is to support
-   * writing out internal data with as much precision as possible to allow
-   * reproduction of problems.  These routines should also NOT depend on
-   * external libraries - they need to be available regardless of whether
-   * MANIFOLD_EXPORT is enabled.
+   * Self-contained mechanism for reading and writing high precision Manifold
+   * data.  Write functions create special-purpose OBJ files, and Read
+   * functions read them.  Be warned these are not (and not intended to be)
+   * full-featured OBJ importers/exporters.  Their primary use is as "always
+   * available" mechanisms to extract accurate mesh data for debugging
+   * purposes.  Consequently, they may store and process additional data in
+   * comments that other OBJ parsing programs won't understand.
    */
   static Manifold Read(std::istream& stream);
   static Manifold Read(std::string& filename);
