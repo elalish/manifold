@@ -237,84 +237,12 @@ struct MeshGLP {
    * that the ReadOBJ method in a given build/release will read in the output
    * of the WriteOBJ method produced by that release.
    */
-  void ReadOBJ(std::istream& stream) {
-    stream >> std::setprecision(19);
-    while (true) {
-      char c = stream.get();
-      if (stream.eof()) break;
-      switch (c) {
-        case '#': {
-          // skip comment
-          while (c != '\n' && !stream.eof()) {
-            c = stream.get();
-          }
-          break;
-        }
-        case 'v':
-          for (int _ : {0, 1, 2}) {
-            Precision x;
-            stream >> x;
-            vertProperties.push_back(x);
-          }
-          break;
-        case 'f':
-          for (int _ : {0, 1, 2}) {
-            I x;
-            stream >> x;
-            triVerts.push_back(x - 1);
-          }
-          break;
-        case '\r':
-        case '\n':
-          break;
-        default:
-          DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL import");
-      }
-    }
-  }
-  bool ReadOBJ(std::string& filename) {
-    if (!filename.length()) return false;
-    std::ifstream ifile;
-    ifile.open(filename);
-    if (!ifile.is_open()) return false;
-    ReadOBJ(ifile);
-    ifile.close();
-    return true;
-  }
-  bool ReadOBJ(const char* filename) {
-    std::string fname(filename);
-    return ReadOBJ(fname);
-  }
-
-  std::ostream& Write(std::ostream& stream) const {
-    stream << std::setprecision(19);  // for double precision
-    stream << std::fixed;             // for uniformity in output numbers
-    stream << "# ======= begin meshGL ======" << std::endl;
-    // TODO: vertex normal and face normal
-    for (size_t i = 0; i < vertProperties.size() / 3; i++)
-      stream << "v " << vertProperties[3 * i + 0] << " "
-             << vertProperties[3 * i + 1] << " " << vertProperties[3 * i + 2]
-             << std::endl;
-    for (size_t i = 0; i < triVerts.size() / 3; i++)
-      stream << "f " << triVerts[3 * i + 0] + 1 << " "
-             << triVerts[3 * i + 1] + 1 << " " << triVerts[3 * i + 2] + 1
-             << std::endl;
-    stream << "# ======== end meshGL =======" << std::endl;
-    return stream;
-  }
-  bool Write(std::string& filename) const {
-    if (!filename.length()) return false;
-    std::ofstream ofile;
-    ofile.open(filename);
-    if (!ofile.is_open()) return false;
-    Write(ofile);
-    ofile.close();
-    return true;
-  }
-  bool Write(const char* filename) const {
-    std::string fname(filename);
-    return Write(fname);
-  }
+  void ReadOBJ(std::istream& stream);
+  bool ReadOBJ(std::string& filename);
+  bool ReadOBJ(const char* filename);
+  std::ostream& WriteOBJ(std::ostream& stream) const;
+  bool WriteOBJ(std::string& filename) const;
+  bool WriteOBJ(const char* filename) const;
 };
 
 /**
