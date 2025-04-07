@@ -13,12 +13,11 @@
 // limitations under the License.
 
 #pragma once
-#include <functional>
-#include <memory>
-
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "manifold/common.h"
@@ -249,7 +248,7 @@ struct MeshGLP {
           while (c != '\n' && !stream.eof()) {
             c = stream.get();
           }
-        break;
+          break;
         }
         case 'v':
           for (int _ : {0, 1, 2}) {
@@ -265,26 +264,24 @@ struct MeshGLP {
             triVerts.push_back(x - 1);
           }
           break;
-        case '\n':
+	case '\r':
+	case '\n':
           break;
         default:
-	  break;
+	  DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL import");
       }
     }
   }
   bool ReadOBJ(std::string& filename) {
-    if (!filename.length())
-       return false;
-
+    if (!filename.length()) return false;
     std::ifstream ifile;
     ifile.open(filename);
-    if (!ifile.is_open())
-       return false;
+    if (!ifile.is_open()) return false;
     ReadOBJ(ifile);
     ifile.close();
     return true;
   }
-  bool ReadOBJ(const char *filename) {
+  bool ReadOBJ(const char* filename) {
     std::string fname(filename);
     return ReadOBJ(fname);
   }
@@ -295,25 +292,26 @@ struct MeshGLP {
     stream << "# ======= begin meshGL ======" << std::endl;
     // TODO: vertex normal and face normal
     for (size_t i = 0; i < vertProperties.size()/3; i++)
-      stream << "v " << vertProperties[3*i+0] << " " << vertProperties[3*i+1] << " " << vertProperties[3*i+2] << std::endl;
+      stream << "v " << vertProperties[3*i+0] << " "
+	     << vertProperties[3*i+1] << " " << vertProperties[3*i+2]
+	     << std::endl;
     for (size_t i = 0; i < triVerts.size()/3; i++)
-      stream << "f " << triVerts[3*i+0]+1 << " " << triVerts[3*i+1]+1 << " " << triVerts[3*i+2]+1 << std::endl;
+      stream << "f " << triVerts[3*i+0]+1 << " "
+	     << triVerts[3*i+1]+1 << " " << triVerts[3*i+2]+1
+	     << std::endl;
     stream << "# ======== end meshGL =======" << std::endl;
     return stream;
   }
   bool Write(std::string& filename) const {
-    if (!filename.length())
-     return false;
-
+    if (!filename.length()) return false;
     std::ofstream ofile;
     ofile.open(filename);
-    if (!ofile.is_open())
-       return false;
+    if (!ofile.is_open()) return false;
     Write(ofile);
     ofile.close();
     return true;
   }
-  bool Write(const char *filename) const {
+  bool Write(const char* filename) const {
     std::string fname(filename);
     return Write(fname);
   }
@@ -544,10 +542,10 @@ class Manifold {
    */
   static Manifold ReadOBJ(std::istream& stream);
   static Manifold ReadOBJ(std::string& filename);
-  static Manifold ReadOBJ(const char *filename);
+  static Manifold ReadOBJ(const char* filename);
   std::ostream& WriteOBJ(std::ostream& stream) const;
   bool WriteOBJ(std::string& filename) const;
-  bool WriteOBJ(const char *filename) const;
+  bool WriteOBJ(const char* filename) const;
 
   /** @name Testing Hooks
    *  These are just for internal testing.

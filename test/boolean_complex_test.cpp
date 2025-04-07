@@ -1027,4 +1027,3 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
-

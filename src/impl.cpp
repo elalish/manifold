@@ -17,19 +17,18 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <map>
 #include <optional>
+#include <string>
 
 #include "./csg_tree.h"
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
 #include "./parallel.h"
 #include "./svd.h"
-
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <string>
 
 namespace {
 using namespace manifold;
@@ -693,7 +692,7 @@ void Manifold::Impl::IncrementMeshIDs() {
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
-    stream << std::fixed;           // for uniformity in output numbers
+  stream << std::fixed;           // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -724,19 +723,16 @@ std::ostream& Manifold::WriteOBJ(std::ostream& stream) const {
 }
 
 bool Manifold::WriteOBJ(std::string& filename) const {
-  if (!filename.length())
-     return false;
-
+  if (!filename.length()) return false;
   std::ofstream ofile;
   ofile.open(filename);
-  if (!ofile.is_open())
-     return false;
+  if (!ofile.is_open()) return false;
   WriteOBJ(ofile);
   ofile.close();
   return true;
 }
 
-bool Manifold::WriteOBJ(const char *filename) const {
+bool Manifold::WriteOBJ(const char* filename) const {
   std::string fname(filename);
   return WriteOBJ(fname);
 }
@@ -796,10 +792,11 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
           mesh.triVerts.push_back(x - 1);
         }
         break;
+      case '\r':
       case '\n':
         break;
       default:
-        DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL64 import");
+        DEBUG_ASSERT(false, userErr, "unexpected character in Manifold import");
     }
   }
   auto m = std::make_shared<Manifold::Impl>(mesh);
@@ -820,7 +817,7 @@ Manifold Manifold::ReadOBJ(std::string& filename) {
   return omanifold;
 }
 
-Manifold Manifold::ReadOBJ(const char *filename) {
+Manifold Manifold::ReadOBJ(const char* filename) {
   std::string fname(filename);
   return ReadOBJ(fname);
 }
