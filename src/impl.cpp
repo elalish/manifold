@@ -686,13 +686,12 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-
 /**
  * Debugging output using high precision OBJ files with specialized comments
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
-  stream << std::fixed;           // for uniformity in output numbers
+  stream << std::fixed;             // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -805,13 +804,10 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
 }
 
 Manifold Manifold::ReadOBJ(std::string& filename) {
-  if (!filename.length())
-     return Manifold();
-
+  if (!filename.length()) return Manifold();
   std::ifstream ifile;
   ifile.open(filename);
-  if (!ifile.is_open())
-     return Manifold();
+  if (!ifile.is_open()) return Manifold();
   Manifold omanifold = ReadOBJ(ifile);
   ifile.close();
   return omanifold;
@@ -821,6 +817,5 @@ Manifold Manifold::ReadOBJ(const char* filename) {
   std::string fname(filename);
   return ReadOBJ(fname);
 }
-
 
 }  // namespace manifold

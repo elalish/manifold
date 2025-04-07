@@ -264,11 +264,11 @@ struct MeshGLP {
             triVerts.push_back(x - 1);
           }
           break;
-	case '\r':
-	case '\n':
+        case '\r':
+        case '\n':
           break;
         default:
-	  DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL import");
+          DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL import");
       }
     }
   }
@@ -291,14 +291,14 @@ struct MeshGLP {
     stream << std::fixed;             // for uniformity in output numbers
     stream << "# ======= begin meshGL ======" << std::endl;
     // TODO: vertex normal and face normal
-    for (size_t i = 0; i < vertProperties.size()/3; i++)
-      stream << "v " << vertProperties[3*i+0] << " "
-	     << vertProperties[3*i+1] << " " << vertProperties[3*i+2]
-	     << std::endl;
-    for (size_t i = 0; i < triVerts.size()/3; i++)
-      stream << "f " << triVerts[3*i+0]+1 << " "
-	     << triVerts[3*i+1]+1 << " " << triVerts[3*i+2]+1
-	     << std::endl;
+    for (size_t i = 0; i < vertProperties.size() / 3; i++)
+      stream << "v " << vertProperties[3 * i + 0] << " "
+             << vertProperties[3 * i + 1] << " " << vertProperties[3 * i + 2]
+             << std::endl;
+    for (size_t i = 0; i < triVerts.size() / 3; i++)
+      stream << "f " << triVerts[3 * i + 0] + 1 << " "
+             << triVerts[3 * i + 1] + 1 << " " << triVerts[3 * i + 2] + 1
+             << std::endl;
     stream << "# ======== end meshGL =======" << std::endl;
     return stream;
   }
@@ -315,7 +315,6 @@ struct MeshGLP {
     std::string fname(filename);
     return Write(fname);
   }
-
 };
 
 /**

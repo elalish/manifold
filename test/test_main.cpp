@@ -17,7 +17,6 @@
 #include "manifold/manifold.h"
 #include "test.h"
 
-
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>
 #endif
@@ -506,4 +505,3 @@ Manifold ReadTestOBJ(const std::string& filename) {
   f.close();
   return a;
 }
-
