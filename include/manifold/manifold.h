@@ -231,8 +231,14 @@ struct MeshGLP {
    * mechanisms to extract accurate mesh data for debugging purposes.
    * Consequently, they may store and process additional data in comments that
    * other OBJ parsing programs won't understand.
+   *
+   * The "format" read and written by these functions is not guaranteed to be
+   * stable from release to release - it will be modified as needed to ensure
+   * it captures information needed for debugging.  The only API guarantee is
+   * that the ReadOBJ method in a given build/release will read in the output
+   * of the WriteOBJ method produced by that release.
    */
-  void Read(std::istream& stream) {
+  void ReadOBJ(std::istream& stream) {
     stream >> std::setprecision(19);
     while (true) {
       char c = stream.get();
@@ -266,7 +272,7 @@ struct MeshGLP {
       }
     }
   }
-  bool Read(std::string& filename) {
+  bool ReadOBJ(std::string& filename) {
     if (!filename.length())
        return false;
 
@@ -274,13 +280,13 @@ struct MeshGLP {
     ifile.open(filename);
     if (!ifile.is_open())
        return false;
-    Read(ifile);
+    ReadOBJ(ifile);
     ifile.close();
     return true;
   }
-  bool Read(const char *filename) {
+  bool ReadOBJ(const char *filename) {
     std::string fname(filename);
-    return Read(fname);
+    return ReadOBJ(fname);
   }
 
   std::ostream& Write(std::ostream& stream) const {
@@ -529,13 +535,19 @@ class Manifold {
    * available" mechanisms to extract accurate mesh data for debugging
    * purposes.  Consequently, they may store and process additional data in
    * comments that other OBJ parsing programs won't understand.
+   *
+   * The "format" read and written by these functions is not guaranteed to be
+   * stable from release to release - it will be modified as needed to ensure
+   * it captures information needed for debugging.  The only API guarantee is
+   * that the ReadOBJ method in a given build/release will read in the output
+   * of the WriteOBJ method produced by that release.
    */
-  static Manifold Read(std::istream& stream);
-  static Manifold Read(std::string& filename);
-  static Manifold Read(const char *filename);
-  std::ostream& Write(std::ostream& stream) const;
-  bool Write(std::string& filename) const;
-  bool Write(const char *filename) const;
+  static Manifold ReadOBJ(std::istream& stream);
+  static Manifold ReadOBJ(std::string& filename);
+  static Manifold ReadOBJ(const char *filename);
+  std::ostream& WriteOBJ(std::ostream& stream) const;
+  bool WriteOBJ(std::string& filename) const;
+  bool WriteOBJ(const char *filename) const;
 
   /** @name Testing Hooks
    *  These are just for internal testing.

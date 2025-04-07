@@ -1011,8 +1011,8 @@ TEST(BooleanComplex, SimpleOffset) {
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  Manifold a = ReadOBJ("Offset1.obj");
-  Manifold b = ReadOBJ("Offset2.obj");
+  Manifold a = ReadTestOBJ("Offset1.obj");
+  Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
@@ -1021,8 +1021,8 @@ TEST(BooleanComplex, OffsetTriangulationFailure) {
 TEST(BooleanComplex, OffsetSelfIntersect) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  Manifold a = ReadOBJ("Offset3.obj");
-  Manifold b = ReadOBJ("Offset4.obj");
+  Manifold a = ReadTestOBJ("Offset3.obj");
+  Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;

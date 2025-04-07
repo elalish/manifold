@@ -497,12 +497,12 @@ MeshGL ReadMesh(const std::string& filename) {
 }
 #endif
 
-Manifold ReadOBJ(const std::string& filename) {
+Manifold ReadTestOBJ(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   std::ifstream f;
   f.open(dir + "/models/" + filename);
-  Manifold a = Manifold::Read(f);
+  Manifold a = Manifold::ReadOBJ(f);
   f.close();
   return a;
 }

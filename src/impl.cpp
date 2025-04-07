@@ -719,11 +719,11 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
  * the tolerance and epsilon. Useful for debugging and testing.
  * Should be used with ImportMeshGL64 for reproducing issues.
  */
-std::ostream& Manifold::Write(std::ostream& stream) const {
+std::ostream& Manifold::WriteOBJ(std::ostream& stream) const {
   return stream << *GetCsgLeafNode().GetImpl();
 }
 
-bool Manifold::Write(std::string& filename) const {
+bool Manifold::WriteOBJ(std::string& filename) const {
   if (!filename.length())
      return false;
 
@@ -731,14 +731,14 @@ bool Manifold::Write(std::string& filename) const {
   ofile.open(filename);
   if (!ofile.is_open())
      return false;
-  Write(ofile);
+  WriteOBJ(ofile);
   ofile.close();
   return true;
 }
 
-bool Manifold::Write(const char *filename) const {
+bool Manifold::WriteOBJ(const char *filename) const {
   std::string fname(filename);
-  return Write(fname);
+  return WriteOBJ(fname);
 }
 
 /**
@@ -746,7 +746,7 @@ bool Manifold::Write(const char *filename) const {
  * This function is the counterpart to Write and should be used with it.
  * This function cannot import OBJ files not written by the Write function.
  */
-Manifold Manifold::Read(std::istream& stream) {
+Manifold Manifold::ReadOBJ(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
   stream >> std::setprecision(19);
@@ -807,7 +807,7 @@ Manifold Manifold::Read(std::istream& stream) {
   return Manifold(m);
 }
 
-Manifold Manifold::Read(std::string& filename) {
+Manifold Manifold::ReadOBJ(std::string& filename) {
   if (!filename.length())
      return Manifold();
 
@@ -815,14 +815,14 @@ Manifold Manifold::Read(std::string& filename) {
   ifile.open(filename);
   if (!ifile.is_open())
      return Manifold();
-  Manifold omanifold = Read(ifile);
+  Manifold omanifold = ReadOBJ(ifile);
   ifile.close();
   return omanifold;
 }
 
-Manifold Manifold::Read(const char *filename) {
+Manifold Manifold::ReadOBJ(const char *filename) {
   std::string fname(filename);
-  return Read(fname);
+  return ReadOBJ(fname);
 }
 
 

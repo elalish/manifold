@@ -58,5 +58,5 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2);
 #ifdef MANIFOLD_EXPORT
 MeshGL ReadMesh(const std::string& filename);
 #endif
-Manifold ReadOBJ(const std::string& filename);
+Manifold ReadTestOBJ(const std::string& filename);
 void RegisterPolygonTests();
