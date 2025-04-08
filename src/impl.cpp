@@ -686,6 +686,7 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
+#ifdef MANIFOLD_IO
 /**
  * Debugging output using high precision OBJ files with specialized comments
  */
@@ -817,5 +818,6 @@ Manifold Manifold::ReadOBJ(const char* filename) {
   std::string fname(filename);
   return ReadOBJ(fname);
 }
+#endif
 
 }  // namespace manifold

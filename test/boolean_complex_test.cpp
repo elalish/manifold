@@ -1008,6 +1008,7 @@ TEST(BooleanComplex, SimpleOffset) {
 }
 #endif
 
+#ifdef MANIFOLD_IO
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
@@ -1027,3 +1028,4 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
+#endif

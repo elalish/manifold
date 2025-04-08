@@ -13,12 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#include <fstream>
 #include <functional>
-#include <iomanip>
 #include <iostream>
+
+#if defined(MANIFOLD_EXPORT) || defined (MANIFOLD_IO)
+#include <fstream>
+#include <iomanip>
 #include <memory>
 #include <string>
+#endif
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -221,28 +224,6 @@ struct MeshGLP {
         halfedgeTangent[offset], halfedgeTangent[offset + 1],
         halfedgeTangent[offset + 2], halfedgeTangent[offset + 3]);
   }
-
-  /** @name Debugging I/O
-   * Self-contained mechanism for reading and writing high precision MeshGL
-   * data.  Write functions create OBJ files, and Read functions read them.  Be
-   * warned these are not (and not intended to be) full-featured OBJ
-   * importers/exporters.  Their primary use is as "always available"
-   * mechanisms to extract accurate mesh data for debugging purposes.
-   * Consequently, they may store and process additional data in comments that
-   * other OBJ parsing programs won't understand.
-   *
-   * The "format" read and written by these functions is not guaranteed to be
-   * stable from release to release - it will be modified as needed to ensure
-   * it captures information needed for debugging.  The only API guarantee is
-   * that the ReadOBJ method in a given build/release will read in the output
-   * of the WriteOBJ method produced by that release.
-   */
-  void ReadOBJ(std::istream& stream);
-  bool ReadOBJ(std::string& filename);
-  bool ReadOBJ(const char* filename);
-  std::ostream& WriteOBJ(std::ostream& stream) const;
-  bool WriteOBJ(std::string& filename) const;
-  bool WriteOBJ(const char* filename) const;
 };
 
 /**
@@ -452,14 +433,16 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
+#ifdef MANIFOLD_IO
   /** @name Debugging I/O
    * Self-contained mechanism for reading and writing high precision Manifold
    * data.  Write functions create special-purpose OBJ files, and Read
    * functions read them.  Be warned these are not (and not intended to be)
-   * full-featured OBJ importers/exporters.  Their primary use is as "always
-   * available" mechanisms to extract accurate mesh data for debugging
-   * purposes.  Consequently, they may store and process additional data in
-   * comments that other OBJ parsing programs won't understand.
+   * full-featured OBJ importers/exporters.  Their primary use is to extract
+   * accurate Manifold data for debugging purposes - writing out any info
+   * needed to accurately reproduce a problem case's state.  Consequently, they
+   * may store and process additional data in comments that other OBJ parsing
+   * programs won't understand.
    *
    * The "format" read and written by these functions is not guaranteed to be
    * stable from release to release - it will be modified as needed to ensure
@@ -473,6 +456,7 @@ class Manifold {
   std::ostream& WriteOBJ(std::ostream& stream) const;
   bool WriteOBJ(std::string& filename) const;
   bool WriteOBJ(const char* filename) const;
+#endif
 
   /** @name Testing Hooks
    *  These are just for internal testing.
