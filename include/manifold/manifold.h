@@ -451,11 +451,9 @@ class Manifold {
    * of the WriteOBJ method produced by that release.
    */
   static Manifold ReadOBJ(std::istream& stream);
-  static Manifold ReadOBJ(std::string& filename);
-  static Manifold ReadOBJ(const char* filename);
+  static Manifold ReadOBJ(const std::string& filename);
   std::ostream& WriteOBJ(std::ostream& stream) const;
-  bool WriteOBJ(std::string& filename) const;
-  bool WriteOBJ(const char* filename) const;
+  bool WriteOBJ(const std::string& filename) const;
 #endif
 
   /** @name Testing Hooks

@@ -17,12 +17,15 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <map>
 #include <optional>
+
+#if defined(MANIFOLD_EXPORT) || defined (MANIFOLD_IO)
+#include <fstream>
+#include <iomanip>
 #include <string>
+#endif
 
 #include "./csg_tree.h"
 #include "./hashtable.h"
@@ -722,7 +725,7 @@ std::ostream& Manifold::WriteOBJ(std::ostream& stream) const {
   return stream << *GetCsgLeafNode().GetImpl();
 }
 
-bool Manifold::WriteOBJ(std::string& filename) const {
+bool Manifold::WriteOBJ(const std::string& filename) const {
   if (!filename.length()) return false;
   std::ofstream ofile;
   ofile.open(filename);
@@ -730,11 +733,6 @@ bool Manifold::WriteOBJ(std::string& filename) const {
   WriteOBJ(ofile);
   ofile.close();
   return true;
-}
-
-bool Manifold::WriteOBJ(const char* filename) const {
-  std::string fname(filename);
-  return WriteOBJ(fname);
 }
 
 /**
@@ -804,7 +802,7 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   return Manifold(m);
 }
 
-Manifold Manifold::ReadOBJ(std::string& filename) {
+Manifold Manifold::ReadOBJ(const std::string& filename) {
   if (!filename.length()) return Manifold();
   std::ifstream ifile;
   ifile.open(filename);
@@ -812,11 +810,6 @@ Manifold Manifold::ReadOBJ(std::string& filename) {
   Manifold omanifold = ReadOBJ(ifile);
   ifile.close();
   return omanifold;
-}
-
-Manifold Manifold::ReadOBJ(const char* filename) {
-  std::string fname(filename);
-  return ReadOBJ(fname);
 }
 #endif
 
