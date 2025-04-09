@@ -17,7 +17,7 @@
 #include <iostream>
 #include <memory>  // needed for shared_ptr
 
-#if defined(MANIFOLD_EXPORT) || defined (MANIFOLD_IO)
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_IO)
 #include <fstream>
 #include <iomanip>
 #include <string>
