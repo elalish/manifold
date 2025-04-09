@@ -723,8 +723,7 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
 #ifdef MANIFOLD_DEBUG
-  if (!stream.good())
-     return Invalid();
+  if (!stream.good()) return Invalid();
 
   MeshGL64 mesh;
   std::optional<double> epsilon;
@@ -798,8 +797,7 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
 #ifdef MANIFOLD_DEBUG
-  if (!stream.good())
-     return false;
+  if (!stream.good()) return false;
   stream << *this->GetCsgLeafNode().GetImpl();
   return true;
 #else
