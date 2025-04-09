@@ -13,10 +13,13 @@
 // limitations under the License.
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
 
 #include "manifold/manifold.h"
 #include "test.h"
+
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
+#include <fstream>
+#endif
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>

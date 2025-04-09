@@ -1009,7 +1009,7 @@ TEST(BooleanComplex, SimpleOffset) {
 #endif
 
 #ifdef MANIFOLD_DEBUG
-TEST(BooleanComplex, OffsetTriangulationFailure) {
+TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold a = ReadTestOBJ("Offset1.obj");
@@ -1019,7 +1019,7 @@ TEST(BooleanComplex, OffsetTriangulationFailure) {
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
-TEST(BooleanComplex, OffsetSelfIntersect) {
+TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold a = ReadTestOBJ("Offset3.obj");

@@ -17,13 +17,13 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
-#include <iostream>
 #include <map>
 #include <optional>
 
 #if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <string>
 #endif
 
