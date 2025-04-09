@@ -20,18 +20,16 @@
 #include <map>
 #include <optional>
 
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <string>
-#endif
-
 #include "./csg_tree.h"
 #include "./hashtable.h"
 #include "./mesh_fixes.h"
 #include "./parallel.h"
 #include "./svd.h"
+
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
+#include <iomanip>
+#include <iostream>
+#endif
 
 namespace {
 using namespace manifold;
