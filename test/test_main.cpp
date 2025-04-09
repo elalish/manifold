@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 
 #include "manifold/manifold.h"
@@ -498,10 +499,12 @@ MeshGL ReadMesh(const std::string& filename) {
 
 #ifdef MANIFOLD_DEBUG
 Manifold ReadTestOBJ(const std::string& filename) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
+  std::filesystem::path file(__FILE__);
+  std::filesystem::path obj = file.parent_path();
+  obj.append("models");
+  obj.append(filename);
   std::ifstream f;
-  f.open(dir + "/models/" + filename);
+  f.open(obj);
   Manifold a = Manifold::ReadOBJ(f);
   f.close();
   return a;
