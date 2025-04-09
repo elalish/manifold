@@ -496,7 +496,7 @@ MeshGL ReadMesh(const std::string& filename) {
 }
 #endif
 
-#ifdef MANIFOLD_IO
+#ifdef MANIFOLD_DEBUG
 Manifold ReadTestOBJ(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));

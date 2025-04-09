@@ -42,7 +42,6 @@ option(
   "Allow Manifold build to download missing dependencies"
   ON
 )
-option(MANIFOLD_IO "Enable basic OBJ reading and writing of Manifolds" OFF)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(

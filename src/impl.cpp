@@ -21,7 +21,7 @@
 #include <map>
 #include <optional>
 
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_IO)
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <fstream>
 #include <iomanip>
 #include <string>
@@ -689,7 +689,7 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_IO
+#ifdef MANIFOLD_DEBUG
 /**
  * Debugging output using high precision OBJ files with specialized comments
  */
@@ -716,31 +716,16 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
 }
 
 /**
- * Export the mesh to a Wavefront OBJ file in a way that preserves the full
- * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon. Useful for debugging and testing.
- * Should be used with ImportMeshGL64 for reproducing issues.
- */
-std::ostream& Manifold::WriteOBJ(std::ostream& stream) const {
-  return stream << *GetCsgLeafNode().GetImpl();
-}
-
-bool Manifold::WriteOBJ(const std::string& filename) const {
-  if (!filename.length()) return false;
-  std::ofstream ofile;
-  ofile.open(filename);
-  if (!ofile.is_open()) return false;
-  WriteOBJ(ofile);
-  ofile.close();
-  return true;
-}
-
-/**
- * Import a mesh from a Wavefront OBJ file that was exported with Write.
- * This function is the counterpart to Write and should be used with it.
- * This function cannot import OBJ files not written by the Write function.
+ * Import a mesh from a Wavefront OBJ file that was exported with Write.  This
+ * function is the counterpart to Write and should be used with it.  This
+ * function is not guaranteed to be able to import OBJ files not written by the
+ * Write function.
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
+#ifdef MANIFOLD_DEBUG
+  if (!stream.good())
+     return Invalid();
+
   MeshGL64 mesh;
   std::optional<double> epsilon;
   stream >> std::setprecision(19);
@@ -800,17 +785,28 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   auto m = std::make_shared<Manifold::Impl>(mesh);
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
+#else
+  return Invalid();
+#endif
 }
 
-Manifold Manifold::ReadOBJ(const std::string& filename) {
-  if (!filename.length()) return Manifold();
-  std::ifstream ifile;
-  ifile.open(filename);
-  if (!ifile.is_open()) return Manifold();
-  Manifold omanifold = ReadOBJ(ifile);
-  ifile.close();
-  return omanifold;
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.  Files written
+ * by WriteOBJ should be read back in with ReadOBJ.
+ */
+bool Manifold::WriteOBJ(std::ostream& stream) const {
+#ifdef MANIFOLD_DEBUG
+  if (!stream.good())
+     return false;
+  stream << *this->GetCsgLeafNode().GetImpl();
+  return true;
+#else
+  return false;
+#endif
 }
+
 #endif
 
 }  // namespace manifold

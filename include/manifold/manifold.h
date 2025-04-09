@@ -17,7 +17,7 @@
 #include <iostream>
 #include <memory>  // needed for shared_ptr
 
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_IO)
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <fstream>
 #include <iomanip>
 #include <string>
@@ -433,7 +433,6 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
-#ifdef MANIFOLD_IO
   /** @name Debugging I/O
    * Self-contained mechanism for reading and writing high precision Manifold
    * data.  Write functions create special-purpose OBJ files, and Read
@@ -449,12 +448,41 @@ class Manifold {
    * it captures information needed for debugging.  The only API guarantee is
    * that the ReadOBJ method in a given build/release will read in the output
    * of the WriteOBJ method produced by that release.
+   *
+   * If Manifold is compiled without MANIFOLD_DEBUG set, ReadOBJ will return
+   * an invalid Manifold and WriteOBJ will be a no-op returning false;
+   *
+   * To work with a file, the caller should prepare the ifstream/ostream
+   * themselves, as follows:
+   *
+   * Reading:
+   * @code
+   * std::ifstream ifile;
+   * ifile.open(filename);
+   * if (ifile.is_open()) {
+   *   Manifold obj_m = Manifold::ReadOBJ(ifile);
+   *   ifile.close();
+   *   if (obj_m.Status() != Manifold::Error::NoError) {
+   *      std::cerr << "Failed reading " << filename << ": " << Manifold::ToString(ob_m.Status()) << "\n";
+   *   }
+   *   ifile.close();
+   * }
+   * @endcode
+   *
+   * Writing:
+   * @code
+   * std::ofstream ofile;
+   * ofile.open(filename);
+   * if (ofile.is_open()) {
+   *    if (!m.WriteOBJ(ofile)) {
+   *       std::cerr << "Failed writing to " << filename << "\n";
+   *    }
+   * }
+   * ofile.close();
+   * @endcode
    */
   static Manifold ReadOBJ(std::istream& stream);
-  static Manifold ReadOBJ(const std::string& filename);
-  std::ostream& WriteOBJ(std::ostream& stream) const;
-  bool WriteOBJ(const std::string& filename) const;
-#endif
+  bool WriteOBJ(std::ostream& stream) const;
 
   /** @name Testing Hooks
    *  These are just for internal testing.

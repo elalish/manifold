@@ -1008,7 +1008,7 @@ TEST(BooleanComplex, SimpleOffset) {
 }
 #endif
 
-#ifdef MANIFOLD_IO
+#ifdef MANIFOLD_DEBUG
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
