@@ -26,8 +26,7 @@
 #include "./parallel.h"
 #include "./svd.h"
 
-#ifdef MANIFOLD_EXPORT
-
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <iomanip>
 #include <iostream>
 #endif
@@ -688,9 +687,13 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_EXPORT
+#ifdef MANIFOLD_DEBUG
+/**
+ * Debugging output using high precision OBJ files with specialized comments
+ */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
+  stream << std::fixed;             // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -711,21 +714,15 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
 }
 
 /**
- * Export the mesh to a Wavefront OBJ file in a way that preserves the full
- * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon. Useful for debugging and testing.
- * Should be used with ImportMeshGL64 for reproducing issues.
+ * Import a mesh from a Wavefront OBJ file that was exported with Write.  This
+ * function is the counterpart to Write and should be used with it.  This
+ * function is not guaranteed to be able to import OBJ files not written by the
+ * Write function.
  */
-std::ostream& Manifold::Dump(std::ostream& stream) const {
-  return stream << *GetCsgLeafNode().GetImpl();
-}
+Manifold Manifold::ReadOBJ(std::istream& stream) {
+#ifdef MANIFOLD_DEBUG
+  if (!stream.good()) return Invalid();
 
-/**
- * Import a mesh from a Wavefront OBJ file that was exported with Dump.
- * This function is the counterpart to Dump and should be used with it.
- * This function cannot import OBJ files not written by the Dump function.
- */
-Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
   stream >> std::setprecision(19);
@@ -775,16 +772,37 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
           mesh.triVerts.push_back(x - 1);
         }
         break;
+      case '\r':
       case '\n':
         break;
       default:
-        DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL64 import");
+        DEBUG_ASSERT(false, userErr, "unexpected character in Manifold import");
     }
   }
   auto m = std::make_shared<Manifold::Impl>(mesh);
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
+#else
+  return Invalid();
+#endif
 }
+
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.  Files written
+ * by WriteOBJ should be read back in with ReadOBJ.
+ */
+bool Manifold::WriteOBJ(std::ostream& stream) const {
+#ifdef MANIFOLD_DEBUG
+  if (!stream.good()) return false;
+  stream << *this->GetCsgLeafNode().GetImpl();
+  return true;
+#else
+  return false;
+#endif
+}
+
 #endif
 
 }  // namespace manifold
