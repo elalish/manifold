@@ -166,8 +166,8 @@ else()
   elseif(PROJECT_IS_TOP_LEVEL)
     # only do -Werror if we are the top level project and
     # MANIFOLD_STRICT is on
-    if (MANIFOLD_STRICT)
-       list(APPEND WARNING_FLAGS -Werror)
+    if(MANIFOLD_STRICT)
+      list(APPEND WARNING_FLAGS -Werror)
     endif()
   endif()
   list(APPEND MANIFOLD_FLAGS ${WARNING_FLAGS})
