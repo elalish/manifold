@@ -360,15 +360,27 @@ TEST(Boolean, ConvexConvexMinkowski) {
   Manifold sum = cube.MinkowskiSum(sphere);
   EXPECT_NEAR(sum.Volume(), 10.589364051818848f, 1e-5);
   EXPECT_EQ(sum.Genus(), 0);
-  Manifold difference = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth})
-                            .MinkowskiDifference(sphere);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("minkowski-convex-convex.glb", sum.GetMeshGL(), {});
+#endif
+}
+
+TEST(Boolean, ConvexConvexMinkowskiD) {
+  float offsetRadius = 0.1f;
+  float cubeWidth = 2.0f;
+  Manifold sphere = Manifold::Sphere(offsetRadius, 20);
+  Manifold cube = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth});
+  Manifold difference = cube.MinkowskiDifference(sphere);
   EXPECT_NEAR(difference.Volume(), 5.8319993019104004f, 1e-5);
   EXPECT_NEAR(difference.SurfaceArea(), 19.439998626708984, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-convex-convex.glb", sum.GetMeshGL(), {});
+    ExportMesh("minkowski-convex-convex-difference.glb", 
+      difference.GetMeshGL(), {});
 #endif
 }
 
