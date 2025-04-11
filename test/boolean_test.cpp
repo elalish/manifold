@@ -386,8 +386,8 @@ TEST(Boolean, ConvexConvexMinkowskiD) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-convex-convex-difference.glb", 
-      difference.GetMeshGL(), {});
+    ExportMesh("minkowski-convex-convex-difference.glb", difference.GetMeshGL(),
+               {});
 #endif
 }
 
