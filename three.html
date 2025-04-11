@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Manifold - three.js Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vw;
+      max-width: 600px;
+      max-height: 600px;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/three.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill.js">
+  <link rel="modulepreload" crossorigin href="/assets/manifold.js">
+</head>
+
+<body>
+  <p>This example demonstrates interop between Manifold and Three.js with minimal code - please open dev tools to
+    inspect the source. Here we generate two multi-material Three.js meshes and convert them to Manifolds while building
+    a mapping from material to Manifold ID. Then Boolean operations are performed on the Manifolds and the result is
+    converted back to a Three.js mesh using the material mapping. The input cube has half red faces and half
+    normal-shaded, while the icosahedron has half blue faces and half normal-shaded. The resulting mesh has three
+    materials, since one (normal-shaded) was common between the input models.</p>
+  <p>A slightly more complex example involving our library for GLTF import/export and &lt;model-viewer&gt; can be found
+    <a href="model-viewer.html">here</a>. </p>
+  <select>
+    <option value="union" selected>Union</option>
+    <option value="difference">Difference</option>
+    <option value="intersection">Intersection</option>
+  </select><br />
+  <canvas id="output"></canvas>
+</body>
+
+
+</html>
