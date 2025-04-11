@@ -239,31 +239,33 @@ void Manifold::Impl::Finish() {
                "Not an even number of faces after sorting faces!");
 
 #ifdef MANIFOLD_DEBUG
-  auto MaxOrMinus = [](int a, int b) {
-    return std::min(a, b) < 0 ? -1 : std::max(a, b);
-  };
-  int face = 0;
-  Halfedge extrema = {0, 0, 0};
-  for (size_t i = 0; i < halfedge_.size(); i++) {
-    Halfedge e = halfedge_[i];
-    if (!e.IsForward()) std::swap(e.startVert, e.endVert);
-    extrema.startVert = std::min(extrema.startVert, e.startVert);
-    extrema.endVert = std::min(extrema.endVert, e.endVert);
-    extrema.pairedHalfedge =
-        MaxOrMinus(extrema.pairedHalfedge, e.pairedHalfedge);
-    face = MaxOrMinus(face, i / 3);
+  if (ManifoldParams().intermediateChecks) {
+    auto MaxOrMinus = [](int a, int b) {
+      return std::min(a, b) < 0 ? -1 : std::max(a, b);
+    };
+    int face = 0;
+    Halfedge extrema = {0, 0, 0};
+    for (size_t i = 0; i < halfedge_.size(); i++) {
+      Halfedge e = halfedge_[i];
+      if (!e.IsForward()) std::swap(e.startVert, e.endVert);
+      extrema.startVert = std::min(extrema.startVert, e.startVert);
+      extrema.endVert = std::min(extrema.endVert, e.endVert);
+      extrema.pairedHalfedge =
+          MaxOrMinus(extrema.pairedHalfedge, e.pairedHalfedge);
+      face = MaxOrMinus(face, i / 3);
+    }
+    DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
+                 "Vertex index is negative!");
+    DEBUG_ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
+                 "Vertex index exceeds number of verts!");
+    DEBUG_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
+                 "Halfedge index is negative!");
+    DEBUG_ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()),
+                 topologyErr, "Halfedge index exceeds number of halfedges!");
+    DEBUG_ASSERT(face >= 0, topologyErr, "Face index is negative!");
+    DEBUG_ASSERT(face < static_cast<int>(NumTri()), topologyErr,
+                 "Face index exceeds number of faces!");
   }
-  DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
-               "Vertex index is negative!");
-  DEBUG_ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
-               "Vertex index exceeds number of verts!");
-  DEBUG_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
-               "Halfedge index is negative!");
-  DEBUG_ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()),
-               topologyErr, "Halfedge index exceeds number of halfedges!");
-  DEBUG_ASSERT(face >= 0, topologyErr, "Face index is negative!");
-  DEBUG_ASSERT(face < static_cast<int>(NumTri()), topologyErr,
-               "Face index exceeds number of faces!");
 #endif
 
   DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||

@@ -39,12 +39,7 @@
 #include <cmath>        // For various unary math functions, such as std::sqrt
 #include <cstdlib>      // To resolve std::abs ambiguity on clang
 #include <functional>   // For std::hash declaration
-#include <iosfwd>       // For forward definitions of std::ostream
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
-
-#ifdef MANIFOLD_DEBUG
-#include <iostream>
-#endif
 
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
@@ -2363,42 +2358,6 @@ struct converter<std::array<T, 4>, vec<T, 4>> {
   }
 };
 /** @} */
-
-#ifdef MANIFOLD_DEBUG
-template <class T>
-std::ostream &operator<<(std::ostream &out, const vec<T, 1> &v) {
-  return out << '{' << v[0] << '}';
-}
-template <class T>
-std::ostream &operator<<(std::ostream &out, const vec<T, 2> &v) {
-  return out << '{' << v[0] << ',' << v[1] << '}';
-}
-template <class T>
-std::ostream &operator<<(std::ostream &out, const vec<T, 3> &v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << '}';
-}
-template <class T>
-std::ostream &operator<<(std::ostream &out, const vec<T, 4> &v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << ',' << v[3] << '}';
-}
-
-template <class T, int M>
-std::ostream &operator<<(std::ostream &out, const mat<T, M, 1> &m) {
-  return out << '{' << m[0] << '}';
-}
-template <class T, int M>
-std::ostream &operator<<(std::ostream &out, const mat<T, M, 2> &m) {
-  return out << '{' << m[0] << ',' << m[1] << '}';
-}
-template <class T, int M>
-std::ostream &operator<<(std::ostream &out, const mat<T, M, 3> &m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << '}';
-}
-template <class T, int M>
-std::ostream &operator<<(std::ostream &out, const mat<T, M, 4> &m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << ',' << m[3] << '}';
-}
-#endif
 }  // namespace linalg
 
 namespace std {
