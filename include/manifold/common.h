@@ -20,7 +20,7 @@
 #include <chrono>
 #endif
 
-#include "manifold/linalg.h"
+#include "linalg.h"
 
 namespace manifold {
 /** @addtogroup Math

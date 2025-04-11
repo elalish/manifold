@@ -19,8 +19,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/tri_dist.h"
-#include "samples.h"
 #include "test.h"
 
 namespace {
@@ -115,6 +113,55 @@ TEST(Manifold, InvalidInput6) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
+}
+
+TEST(Manifold, OppositeFace) {
+  MeshGL gl;
+  gl.vertProperties = {
+      0, 0, 0,  //
+      1, 0, 0,  //
+      0, 1, 0,  //
+      1, 1, 0,  //
+      0, 0, 1,  //
+      1, 0, 1,  //
+      0, 1, 1,  //
+      1, 1, 1,  //
+      //
+      2, 0, 0,  //
+      2, 1, 0,  //
+      2, 0, 1,  //
+      2, 1, 1,  //
+  };
+  gl.triVerts = {
+      0, 1,  4,   //
+      0, 2,  3,   //
+      0, 3,  1,   //
+      0, 4,  2,   //
+      1, 3,  5,   //
+      1, 3,  9,   //
+      1, 5,  3,   //
+      1, 5,  4,   //
+      1, 8,  5,   //
+      1, 9,  8,   //
+      2, 4,  6,   //
+      2, 6,  7,   //
+      2, 7,  3,   //
+      3, 5,  7,   //
+      3, 7,  5,   //
+      3, 7,  11,  //
+      3, 11, 9,   //
+      4, 5,  6,   //
+      5, 7,  6,   //
+      5, 8,  10,  //
+      5, 10, 7,   //
+      7, 10, 11,  //
+      8, 9,  10,  //
+      9, 11, 10,  //
+  };
+  Manifold man(gl);
+  EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(man.NumVert(), 8);
+  EXPECT_FLOAT_EQ(man.Volume(), 2);
 }
 
 /**
@@ -232,6 +279,16 @@ TEST(Manifold, Revolve3) {
   EXPECT_NEAR(sphere.SurfaceArea(), 4 * kPi, 0.15);
 }
 #endif
+
+TEST(Manifold, RevolveClip) {
+  Polygons polys = {{{-5, -10}, {5, 0}, {-5, 10}}};
+  Polygons clipped = {{{0, -5}, {5, 0}, {0, 5}}};
+  Manifold first = Manifold::Revolve(polys, 48);
+  Manifold second = Manifold::Revolve(clipped, 48);
+  EXPECT_EQ(first.Genus(), second.Genus());
+  EXPECT_EQ(first.Volume(), second.Volume());
+  EXPECT_EQ(first.SurfaceArea(), second.SurfaceArea());
+}
 
 TEST(Manifold, PartialRevolveOnYAxis) {
   Polygons polys = SquareHole(2.0);
@@ -445,6 +502,12 @@ TEST(Manifold, Slice) {
   CrossSection top = cube.Slice(1);
   EXPECT_EQ(bottom.Area(), 1);
   EXPECT_EQ(top.Area(), 0);
+}
+
+TEST(Manifold, SliceEmptyObject) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  CrossSection bottom = empty.Slice();
 }
 #endif
 

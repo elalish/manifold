@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#include <filesystem>
 
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 #include "test.h"
+
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
+#include <fstream>
+#endif
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>
@@ -493,5 +497,19 @@ MeshGL ReadMesh(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   return ImportMesh(dir + "/models/" + filename);
+}
+#endif
+
+#ifdef MANIFOLD_DEBUG
+Manifold ReadTestOBJ(const std::string& filename) {
+  std::filesystem::path file(__FILE__);
+  std::filesystem::path obj = file.parent_path();
+  obj.append("models");
+  obj.append(filename);
+  std::ifstream f;
+  f.open(obj);
+  Manifold a = Manifold::ReadOBJ(f);
+  f.close();
+  return a;
 }
 #endif

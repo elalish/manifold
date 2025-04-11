@@ -42,8 +42,8 @@ vec2 Interpolate(vec3 pL, vec3 pR, double x) {
   if (!std::isfinite(lambda) || !std::isfinite(dLR.y) || !std::isfinite(dLR.z))
     return vec2(pL.y, pL.z);
   vec2 yz;
-  yz[0] = fma(lambda, dLR.y, useL ? pL.y : pR.y);
-  yz[1] = fma(lambda, dLR.z, useL ? pL.z : pR.z);
+  yz[0] = lambda * dLR.y + (useL ? pL.y : pR.y);
+  yz[1] = lambda * dLR.z + (useL ? pL.z : pR.z);
   return yz;
 }
 
@@ -57,14 +57,14 @@ vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
   double lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!std::isfinite(lambda)) lambda = 0.0;
   vec4 xyzz;
-  xyzz.x = fma(lambda, dx, useL ? pL.x : pR.x);
+  xyzz.x = lambda * dx + (useL ? pL.x : pR.x);
   const double pDy = pR.y - pL.y;
   const double qDy = qR.y - qL.y;
   const bool useP = fabs(pDy) < fabs(qDy);
-  xyzz.y = fma(lambda, useP ? pDy : qDy,
-               useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y));
-  xyzz.z = fma(lambda, pR.z - pL.z, useL ? pL.z : pR.z);
-  xyzz.w = fma(lambda, qR.z - qL.z, useL ? qL.z : qR.z);
+  xyzz.y = lambda * (useP ? pDy : qDy) +
+           (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y));
+  xyzz.z = lambda * (pR.z - pL.z) + (useL ? pL.z : pR.z);
+  xyzz.w = lambda * (qR.z - qL.z) + (useL ? qL.z : qR.z);
   return xyzz;
 }
 
@@ -402,7 +402,7 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                 a.vertPos_[tmpedges[e].second]);
              });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward};
+  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
 
   b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
                                                        recorder);

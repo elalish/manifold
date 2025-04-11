@@ -19,10 +19,15 @@ import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array,
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param epsilon The value of epsilon, bounding the uncertainty of the input
+ * @param epsilon The value of epsilon, bounding the uncertainty of the input.
+ * @param allowConvex If true (default), the triangulator will use a fast
+ * triangulation if the input is convex, falling back to ear-clipping if not.
+ * The triangle quality may be lower, so set to false to disable this
+ * optimization.
  * @return The triangles, referencing the original polygon points in order.
  */
-export function triangulate(polygons: Polygons, epsilon?: number): Vec3[];
+export function triangulate(
+    polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
 /**
  * Sets an angle constraint the default number of circular segments for the

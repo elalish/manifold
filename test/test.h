@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include <ostream>
 
 #include "gtest/gtest.h"
 #include "manifold/common.h"
@@ -58,5 +57,8 @@ void CheckGL(const Manifold& manifold, bool noMerge = true);
 void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2);
 #ifdef MANIFOLD_EXPORT
 MeshGL ReadMesh(const std::string& filename);
+#endif
+#ifdef MANIFOLD_DEBUG
+Manifold ReadTestOBJ(const std::string& filename);
 #endif
 void RegisterPolygonTests();

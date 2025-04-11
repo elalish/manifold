@@ -323,6 +323,7 @@ class Collider {
                   bool parallel = true) const {
     ZoneScoped;
     using collider_internal::FindCollision;
+    if (internalChildren_.empty()) return;
     for_each_n(parallel ? autoPolicy(queriesIn.size(),
                                      collider_internal::kSequentialThreshold)
                         : ExecutionPolicy::Seq,

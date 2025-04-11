@@ -15,6 +15,7 @@
 #include "./csg_tree.h"
 #include "./impl.h"
 #include "./parallel.h"
+#include "manifold/manifold.h"
 #include "manifold/polygon.h"
 
 namespace manifold {
@@ -173,8 +174,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
-  pImpl_->Subdivide(
-      [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
+  pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
                v = la::cos(kHalfPi * (1.0 - v));
@@ -316,7 +316,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
       }
       const size_t next = i + 1 == poly.size() ? 0 : i + 1;
       if ((poly[next].x < 0) != (poly[i].x < 0)) {
-        const double y = poly[next].y + poly[next].x *
+        const double y = poly[next].y - poly[next].x *
                                             (poly[i].y - poly[next].y) /
                                             (poly[i].x - poly[next].x);
         polygons.back().push_back({0, y});
@@ -352,8 +352,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {
-    std::size_t nPosVerts = 0;
-    std::size_t nRevolveAxisVerts = 0;
+    size_t nPosVerts = 0;
+    size_t nRevolveAxisVerts = 0;
     for (auto& pt : poly) {
       if (pt.x > 0) {
         nPosVerts++;

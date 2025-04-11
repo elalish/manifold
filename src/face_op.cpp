@@ -115,9 +115,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const vec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
-      int mapping[3] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert};
       ivec3 tri(halfedge_[firstEdge].startVert,
                 halfedge_[firstEdge + 1].startVert,
                 halfedge_[firstEdge + 2].startVert);
@@ -132,10 +129,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
-      int mapping[4] = {halfedge_[firstEdge].startVert,
-                        halfedge_[firstEdge + 1].startVert,
-                        halfedge_[firstEdge + 2].startVert,
-                        halfedge_[firstEdge + 3].startVert};
       const mat2x3 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
@@ -239,7 +232,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triRef.reserve(faceEdge.size());
   auto processFace2 = std::bind(
       processFace, generalTriangulation,
-      [&](size_t _face, ivec3 tri, vec3 normal, TriRef r) {
+      [&](size_t, ivec3 tri, vec3 normal, TriRef r) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triRef.push_back(r);
@@ -254,9 +247,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   CreateHalfedges(triVerts);
 }
 
+constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
+
 void Manifold::Impl::FlattenFaces() {
   Vec<uint64_t> edgeFace(halfedge_.size());
-  constexpr uint64_t remove = std::numeric_limits<uint64_t>::max();
   const size_t numTri = NumTri();
   const auto policy = autoPolicy(numTri);
 
@@ -265,13 +259,17 @@ void Manifold::Impl::FlattenFaces() {
            [](auto& v) { v.store(0); });
 
   for_each_n(policy, countAt(0_uz), numTri,
-             [&edgeFace, &vertDegree, remove, this](size_t tri) {
+             [&edgeFace, &vertDegree, this](size_t tri) {
                for (const int i : {0, 1, 2}) {
                  const int edge = 3 * tri + i;
                  const int pair = halfedge_[edge].pairedHalfedge;
+                 if (pair < 0) {
+                   edgeFace[edge] = kRemove;
+                   return;
+                 }
                  const auto& ref = meshRelation_.triRef[tri];
                  if (ref.SameFace(meshRelation_.triRef[pair / 3])) {
-                   edgeFace[edge] = remove;
+                   edgeFace[edge] = kRemove;
                  } else {
                    edgeFace[edge] = (static_cast<uint64_t>(ref.meshID) << 32) +
                                     static_cast<uint64_t>(ref.faceID);
@@ -287,7 +285,7 @@ void Manifold::Impl::FlattenFaces() {
       [&edgeFace](size_t a, size_t b) { return edgeFace[a] < edgeFace[b]; });
   newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
                                   [&](const size_t i) {
-                                    return edgeFace[newHalf2Old[i]] == remove;
+                                    return edgeFace[newHalf2Old[i]] == kRemove;
                                   }) -
                      countAt(0_uz));
 
