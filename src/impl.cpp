@@ -25,6 +25,8 @@
 #include "./mesh_fixes.h"
 #include "./parallel.h"
 #include "./svd.h"
+#include "manifold/optional_assert.h"
+#include "shared.h"
 
 #ifdef MANIFOLD_EXPORT
 
@@ -302,6 +304,10 @@ void Manifold::Impl::CreateFaces() {
   }
 }
 
+/**
+ * Derefernce duplicate property vertices if they are exactly floating-point
+ * equal. These unreferenced properties are then removed by CompactProps.
+ */
 void Manifold::Impl::DedupePropVerts() {
   ZoneScoped;
   const size_t numProp = NumProp();
@@ -323,9 +329,13 @@ void Manifold::Impl::DedupePropVerts() {
         const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
         const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
+        DEBUG_ASSERT(edge.propVert == prop0, logicErr, "error");
         const int prop1 =
             meshRelation_
                 .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
+        DEBUG_ASSERT(
+            halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert == prop1,
+            logicErr, "error");
         bool propEqual = true;
         for (size_t p = 0; p < numProp; ++p) {
           if (meshRelation_.properties[numProp * prop0 + p] !=
@@ -347,16 +357,23 @@ void Manifold::Impl::DedupePropVerts() {
   for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
   for (auto& prop : meshRelation_.triProperties)
     for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
+  for (Halfedge& edge : halfedge_)
+    edge.propVert = label2vert[vertLabels[edge.propVert]];
 }
 
 constexpr int kRemovedHalfedge = -2;
 
 /**
- * Create the halfedge_ data structure from an input triVerts array like Mesh.
+ * Create the halfedge_ data structure from a list of triangles. If the optional
+ * prop2vert array is missing, it's assumed these traiangles are are pointing to
+ * both vert and propVert indices. If prop2vert is present, the triangles are
+ * assumed to be pointing to propVert indices only. The prop2vert array is used
+ * to map the propVert indices to vert indices.
  */
-void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
+void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
+                                     const Vec<ivec3>& triVert) {
   ZoneScoped;
-  const size_t numTri = triVerts.size();
+  const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
   halfedge_.clear(true);
@@ -366,17 +383,19 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   auto policy = autoPolicy(numTri, 1e5);
   sequence(ids.begin(), ids.end());
   for_each_n(policy, countAt(0), numTri,
-             [this, &edge, &triVerts](const int tri) {
-               const ivec3& verts = triVerts[tri];
+             [this, &edge, &triProp, &triVert](const int tri) {
+               const ivec3& props = triProp[tri];
                for (const int i : {0, 1, 2}) {
                  const int j = (i + 1) % 3;
                  const int e = 3 * tri + i;
-                 halfedge_[e] = {verts[i], verts[j], -1};
+                 const int v0 = triVert.empty() ? props[i] : triVert[tri][i];
+                 const int v1 = triVert.empty() ? props[j] : triVert[tri][j];
+                 halfedge_[e] = {v0, v1, -1, props[i]};
                  // Sort the forward halfedges in front of the backward ones
                  // by setting the highest-order bit.
-                 edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
-                           ((uint64_t)std::min(verts[i], verts[j])) << 32 |
-                           std::max(verts[i], verts[j]);
+                 edge[e] = uint64_t(v0 < v1 ? 1 : 0) << 63 |
+                           ((uint64_t)std::min(v0, v1)) << 32 |
+                           std::max(v0, v1);
                }
              });
   // Stable sort is required here so that halfedges from the same face are

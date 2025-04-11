@@ -690,6 +690,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     const int numPropVert = NumPropVert();
     const int addedVerts = NumVert() - numVert;
     const int propOffset = numPropVert - numVert;
+    // duplicate the prop verts along all new edges even though this is
+    // unnecessary for edges that share the same prop verts. The duplicates will
+    // be removed by CompactProps.
     Vec<double> prop(meshRelation_.numProp *
                      (numPropVert + addedVerts + totalEdgeAdded));
 
@@ -729,7 +732,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           }
         });
 
-    // copy backward edge prop verts
+    // copy backward edge prop verts, some of which will be unreferenced
+    // duplicates.
     for_each_n(policy, countAt(0), numEdge,
                [this, &prop, &edges, &edgeAdded, &edgeOffset, propOffset,
                 addedVerts](const int i) {
@@ -783,6 +787,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                              rel.triProperties[thisTri][Next3(j)] ||
                          rel.triProperties[pairTri][Next3(k)] !=
                              rel.triProperties[thisTri][j]) {
+                       // if the edge doesn't match, point to the backward edge
+                       // propverts.
                        edgeOffsets[i] += addedVerts;
                      } else {
                        edgeFwd[i] = false;
@@ -799,9 +805,10 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
     meshRelation_.properties = prop;
     meshRelation_.triProperties = triProp;
+    CreateHalfedges(triProp, triVerts);
+  } else {
+    CreateHalfedges(triVerts);
   }
-
-  CreateHalfedges(triVerts);
 
   return vertBary;
 }

@@ -18,6 +18,7 @@
 #include "./collider.h"
 #include "./shared.h"
 #include "./vec.h"
+#include "manifold/common.h"
 #include "manifold/manifold.h"
 
 namespace manifold {
@@ -117,16 +118,19 @@ struct Manifold::Impl {
       return;
     }
 
-    std::vector<int> prop2vert(numVert);
-    std::iota(prop2vert.begin(), prop2vert.end(), 0);
-    for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const uint32_t from = meshGL.mergeFromVert[i];
-      const uint32_t to = meshGL.mergeToVert[i];
-      if (from >= numVert || to >= numVert) {
-        MakeEmpty(Error::MergeIndexOutOfBounds);
-        return;
+    std::vector<int> prop2vert;
+    if (!meshGL.mergeFromVert.empty()) {
+      prop2vert.resize(numVert);
+      std::iota(prop2vert.begin(), prop2vert.end(), 0);
+      for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+        const uint32_t from = meshGL.mergeFromVert[i];
+        const uint32_t to = meshGL.mergeToVert[i];
+        if (from >= numVert || to >= numVert) {
+          MakeEmpty(Error::MergeIndexOutOfBounds);
+          return;
+        }
+        prop2vert[from] = to;
       }
-      prop2vert[from] = to;
     }
 
     const auto numProp = meshGL.numProp - 3;
@@ -186,8 +190,10 @@ struct Manifold::Impl {
       }
     }
 
-    Vec<ivec3> triVerts;
-    triVerts.reserve(numTri);
+    Vec<ivec3> triProp;
+    triProp.reserve(numTri);
+    Vec<ivec3> triVert;
+    if (!prop2vert.empty()) triVert.reserve(numTri);
     if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
     if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
@@ -198,10 +204,14 @@ struct Manifold::Impl {
           MakeEmpty(Error::VertexOutOfBounds);
           return;
         }
-        tri[j] = prop2vert[vert];
+        tri[j] = vert;
       }
       if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
-        triVerts.push_back(tri);
+        triProp.push_back(tri);
+        if (!prop2vert.empty()) {
+          triVert.push_back(
+              {prop2vert[tri[0]], prop2vert[tri[1]], prop2vert[tri[2]]});
+        }
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
         }
@@ -214,7 +224,7 @@ struct Manifold::Impl {
       }
     }
 
-    CreateHalfedges(triVerts);
+    CreateHalfedges(triProp, triVert);
     if (!IsManifold()) {
       MakeEmpty(Error::NotManifold);
       return;
@@ -277,7 +287,8 @@ struct Manifold::Impl {
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
-  void CreateHalfedges(const Vec<ivec3>& triVerts);
+  void CreateHalfedges(const Vec<ivec3>& triProp,
+                       const Vec<ivec3>& triVert = {});
   void CalculateNormals();
   void IncrementMeshIDs();
 
