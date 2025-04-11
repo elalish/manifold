@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <optional>
-#include <string>
 
 #include "autogen_docstrings.inl"  // generated in build folder
 #include "manifold/cross_section.h"

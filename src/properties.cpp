@@ -142,33 +142,8 @@ struct CheckCCW {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
-    int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
-    bool check = tol > 0 ? ccw >= 0 : ccw == 0;
-
-#ifdef MANIFOLD_DEBUG
-    if (tol > 0 && !check) {
-      vec2 v1 = v[1] - v[0];
-      vec2 v2 = v[2] - v[0];
-      double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
-      double base = std::sqrt(base2);
-      vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = la::cross(V1 - V0, V2 - V0);
-      printf(
-          "Tri %ld does not match normal, approx height = %g, base = %g\n"
-          "tol = %g, area2 = %g, base2*tol2 = %g\n"
-          "normal = %g, %g, %g\n"
-          "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          static_cast<long>(face), area / base, base, tol, area * area,
-          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
-          triNormal[face].z, norm.x, norm.y, norm.z,
-          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
-          halfedges[3 * face + 2].startVert);
-    }
-#endif
-    return check;
+    const int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
+    return tol > 0 ? ccw >= 0 : ccw == 0;
   }
 };
 }  // namespace

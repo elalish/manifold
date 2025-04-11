@@ -16,11 +16,6 @@
 #include <functional>
 #include <memory>  // needed for shared_ptr
 
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
-#include <iostream>
-#include <string>
-#endif
-
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
 
