@@ -125,7 +125,7 @@ void CheckGeometry(const std::vector<ivec3> &triangles,
 }
 
 void Dump(const PolygonsIdx &polys, double epsilon) {
-  std::cout << std::setprecision(16);
+  std::cout << std::setprecision(19);
   std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
     std::cout << poly.size() << std::endl;
@@ -149,7 +149,7 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
                   std::vector<ivec3> &triangles, double epsilon) {
   // only print the first triangulation failure
   if (numFailures.fetch_add(1) != 0) return;
-  std::cout << std::setprecision(16);
+  std::cout << std::setprecision(19);
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << epsilon << std::endl;
   std::cout << e.what() << std::endl;

@@ -438,7 +438,6 @@ class Manifold {
   ///@{
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
-  size_t NumOverlaps(const Manifold& second) const;
   double GetEpsilon() const;
   ///@}
 

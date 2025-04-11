@@ -17,7 +17,6 @@
 
 #include "./collider.h"
 #include "./shared.h"
-#include "./sparse.h"
 #include "./vec.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
@@ -223,6 +222,9 @@ struct Manifold::Impl {
     CalculateBBox();
     SetEpsilon(-1, std::is_same<Precision, float>::value);
 
+    // we need to split pinched verts before calculating vertex normals, because
+    // the algorithm doesn't work with pinched verts
+    CleanupTopology();
     CalculateNormals();
 
     if (meshGL.runOriginalID.empty()) {
@@ -283,9 +285,6 @@ struct Manifold::Impl {
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
   Impl Transform(const mat3x4& transform) const;
-  SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
-  SparseIndices VertexCollisionsZ(VecView<const vec3> vertsIn,
-                                  bool inverted = false) const;
 
   bool IsEmpty() const { return NumTri() == 0; }
   size_t NumVert() const { return vertPos_.size(); }

@@ -381,12 +381,9 @@ Polygons Manifold::Impl::Slice(double height) const {
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
   query.push_back(plane);
-  const SparseIndices collisions =
-      collider_.Collisions<false, false>(query.cview());
 
   std::unordered_set<int> tris;
-  for (size_t i = 0; i < collisions.size(); ++i) {
-    const int tri = collisions.Get(i, 1);
+  auto recordCollision = [&](int, int tri) {
     double min = std::numeric_limits<double>::infinity();
     double max = -std::numeric_limits<double>::infinity();
     for (const int j : {0, 1, 2}) {
@@ -398,7 +395,10 @@ Polygons Manifold::Impl::Slice(double height) const {
     if (min <= height && max > height) {
       tris.insert(tri);
     }
-  }
+  };
+
+  auto recorder = MakeSimpleRecorder(recordCollision);
+  collider_.Collisions<false>(query.cview(), recorder, false);
 
   Polygons polys;
   while (!tris.empty()) {

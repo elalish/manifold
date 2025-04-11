@@ -14,6 +14,10 @@
 
 #include <limits>
 
+#if MANIFOLD_PAR == 1
+#include <tbb/combinable.h>
+#endif
+
 #include "./impl.h"
 #include "./parallel.h"
 #include "./tri_dist.h"
@@ -215,12 +219,11 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
-  SparseIndices collisions = collider_.Collisions<true>(faceBox.cview());
 
   const bool verbose = ManifoldParams().verbose > 0;
-  return !all_of(countAt(0), countAt(collisions.size()), [&](size_t i) {
-    size_t x = collisions.Get(i, false);
-    size_t y = collisions.Get(i, true);
+  std::atomic<bool> intersecting(false);
+
+  auto f = [&](int x, int y) {
     std::array<vec3, 3> tri_x, tri_y;
     for (int i : {0, 1, 2}) {
       tri_x[i] = vertPos_[halfedge_[3 * x + i].startVert];
@@ -231,19 +234,19 @@ bool Manifold::Impl::IsSelfIntersecting() const {
     // distance epsilon squared
     for (int i : {0, 1, 2})
       for (int j : {0, 1, 2})
-        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return true;
+        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return;
 
     if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
       // try to move the triangles around the normal of the other face
       std::array<vec3, 3> tmp_x, tmp_y;
       for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
       for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return true;
+      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
       for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
       for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return true;
+      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
       if (verbose) {
@@ -256,10 +259,14 @@ bool Manifold::Impl::IsSelfIntersecting() const {
         dump_lock.unlock();
       }
 #endif
-      return false;
+      intersecting.store(true);
     }
-    return true;
-  });
+  };
+
+  auto recorder = MakeSimpleRecorder(f);
+  collider_.Collisions<true>(faceBox.cview(), recorder);
+
+  return intersecting.load();
 }
 
 /**
@@ -404,6 +411,36 @@ bool Manifold::Impl::IsIndexInBounds(VecView<const ivec3> triVerts) const {
   return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());
 }
 
+struct MinDistanceRecorder {
+  using Local = double;
+  const Manifold::Impl &self, &other;
+#if MANIFOLD_PAR == 1
+  tbb::combinable<double> store = tbb::combinable<double>(
+      []() { return std::numeric_limits<double>::infinity(); });
+  Local& local() { return store.local(); }
+  double get() {
+    double result = std::numeric_limits<double>::infinity();
+    store.combine_each([&](double& val) { result = std::min(result, val); });
+    return result;
+  }
+#else
+  double result = std::numeric_limits<double>::infinity();
+  Local& local() { return result; }
+  double get() { return result; }
+#endif
+
+  void record(int triOther, int tri, double& minDistance) {
+    std::array<vec3, 3> p;
+    std::array<vec3, 3> q;
+
+    for (const int j : {0, 1, 2}) {
+      p[j] = self.vertPos_[self.halfedge_[3 * tri + j].startVert];
+      q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+    }
+    minDistance = std::min(minDistance, DistanceTriangleTriangleSquared(p, q));
+  }
+};
+
 /*
  * Returns the minimum gap between two manifolds. Returns a double between
  * 0 and searchLength.
@@ -422,26 +459,11 @@ double Manifold::Impl::MinGap(const Manifold::Impl& other,
                          box.max + vec3(searchLength));
             });
 
-  SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
-
-  double minDistanceSquared = transform_reduce(
-      countAt(0_uz), countAt(collisions.size()), searchLength * searchLength,
-      [](double a, double b) { return std::min(a, b); },
-      [&collisions, this, &other](int i) {
-        const int tri = collisions.Get(i, 1);
-        const int triOther = collisions.Get(i, 0);
-
-        std::array<vec3, 3> p;
-        std::array<vec3, 3> q;
-
-        for (const int j : {0, 1, 2}) {
-          p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
-          q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
-        }
-
-        return DistanceTriangleTriangleSquared(p, q);
-      });
-
+  MinDistanceRecorder recorder{*this, other};
+  collider_.Collisions<false, Box, MinDistanceRecorder>(faceBoxOther.cview(),
+                                                        recorder, false);
+  double minDistanceSquared =
+      std::min(recorder.get(), searchLength * searchLength);
   return sqrt(minDistanceSquared);
 };
 

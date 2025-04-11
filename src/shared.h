@@ -15,7 +15,6 @@
 #pragma once
 
 #include "./parallel.h"
-#include "./sparse.h"
 #include "./utils.h"
 #include "./vec.h"
 
@@ -187,17 +186,6 @@ Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
   edges.resize(numEdge);
   return edges;
 }
-
-template <const bool inverted>
-struct ReindexEdge {
-  VecView<const TmpEdge> edges;
-  SparseIndices& indices;
-
-  void operator()(size_t i) {
-    int& edge = indices.Get(i, inverted);
-    edge = edges[edge].halfedgeIdx;
-  }
-};
 
 #ifdef MANIFOLD_DEBUG
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {

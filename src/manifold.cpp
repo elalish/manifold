@@ -515,22 +515,6 @@ size_t Manifold::NumDegenerateTris() const {
 }
 
 /**
- * This is a checksum-style verification of the collider, simply returning the
- * total number of edge-face bounding box overlaps between this and other.
- *
- * @param other A Manifold to overlap with.
- */
-size_t Manifold::NumOverlaps(const Manifold& other) const {
-  SparseIndices overlaps = GetCsgLeafNode().GetImpl()->EdgeCollisions(
-      *other.GetCsgLeafNode().GetImpl());
-  int num_overlaps = overlaps.size();
-
-  overlaps = other.GetCsgLeafNode().GetImpl()->EdgeCollisions(
-      *GetCsgLeafNode().GetImpl());
-  return num_overlaps + overlaps.size();
-}
-
-/**
  * Move this Manifold in space. This operation can be chained. Transforms are
  * combined and applied lazily.
  *

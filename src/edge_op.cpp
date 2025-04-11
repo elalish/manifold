@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unordered_set>
+#include <unordered_map>
 
 #include "./impl.h"
 #include "./parallel.h"
@@ -160,32 +160,21 @@ struct FlagStore {
                       });
 
     std::vector<std::vector<size_t>> stores;
-    // first index: index within the vector
-    // second index: vector index within stores
-    using P = std::pair<size_t, size_t>;
-    auto cmp = [&stores](P a, P b) {
-      return stores[a.second][a.first] < stores[b.second][b.first];
-    };
-    std::vector<P> s;
-
-    store.combine_each([&stores, &s, &cmp](std::vector<size_t>& local) {
-      if (local.empty()) return;
-      stores.emplace_back(std::move(local));
-      s.push_back(std::make_pair(0, stores.size() - 1));
-      std::push_heap(s.begin(), s.end(), cmp);
-    });
-    while (!s.empty()) {
-      std::pop_heap(s.begin(), s.end());
-      auto [a, b] = s.back();
-      auto i = stores[b][a];
-      if (a + 1 == stores[b].size()) {
-        s.pop_back();
-      } else {
-        s.back().first++;
-        std::push_heap(s.begin(), s.end(), cmp);
-      }
-      f(i);
+    std::vector<size_t> result;
+    store.combine_each(
+        [&](auto& data) { stores.emplace_back(std::move(data)); });
+    std::vector<size_t> sizes;
+    size_t total_size = 0;
+    for (const auto& tmp : stores) {
+      sizes.push_back(total_size);
+      total_size += tmp.size();
     }
+    result.resize(total_size);
+    for_each_n(ExecutionPolicy::Seq, countAt(0), stores.size(), [&](size_t i) {
+      std::copy(stores[i].begin(), stores[i].end(), result.begin() + sizes[i]);
+    });
+    stable_sort(autoPolicy(result.size()), result.begin(), result.end());
+    for (size_t x : result) f(x);
   }
 #endif
 
@@ -782,6 +771,7 @@ void Manifold::Impl::SplitPinchedVerts() {
           }
         });
 
+    manifold::stable_sort(pinched.begin(), pinched.end());
     std::vector<bool> halfedgeProcessed(nbEdges, false);
     for (size_t i : pinched) {
       if (halfedgeProcessed[i]) continue;
@@ -830,46 +820,75 @@ void Manifold::Impl::DedupeEdges() {
       // small because unordered_set requires allocations and is expensive.
       // We switch to unordered_set when the number of neighbor is
       // larger to avoid making things quadratic.
+      // We do it in two pass, the first pass to find the minimal halfedges with
+      // the target start and end verts, the second pass flag all the duplicated
+      // halfedges that are not having the minimal index as duplicates.
+      // This ensures deterministic result.
       //
       // The local store is to store the processed halfedges, so to avoid
       // repetitive processing. Note that it only approximates the processed
-      // halfedges because it is thread local. This is why we need a vector to
-      // deduplicate the probematic halfedges we found.
-      Vec<int> endVerts;
-      std::unordered_set<int> endVertSet;
+      // halfedges because it is thread local.
+      Vec<std::pair<int, int>> endVerts;
+      std::unordered_map<int, int> endVertSet;
       for (auto i = start; i < end; ++i) {
         if (local[i] || halfedge_[i].startVert == -1 ||
             halfedge_[i].endVert == -1)
           continue;
-        local[i] = true;
         // we want to keep the allocation
         endVerts.clear(false);
         endVertSet.clear();
-        ForVert(
-            i, [&local, &endVerts, &endVertSet, &results, this](int current) {
-              local[current] = true;
-              if (halfedge_[current].startVert == -1 ||
-                  halfedge_[current].endVert == -1) {
-                return;
+
+        // first iteration, populate entries
+        // this makes sure we always report the same set of entries
+        ForVert(i, [&local, &endVerts, &endVertSet, &results,
+                    this](int current) {
+          local[current] = true;
+          if (halfedge_[current].startVert == -1 ||
+              halfedge_[current].endVert == -1) {
+            return;
+          }
+          int endV = halfedge_[current].endVert;
+          if (endVertSet.empty()) {
+            auto iter = std::find_if(endVerts.begin(), endVerts.end(),
+                                     [endV](const std::pair<int, int>& pair) {
+                                       return pair.first == endV;
+                                     });
+            if (iter != endVerts.end()) {
+              iter->second = std::min(iter->second, current);
+            } else {
+              endVerts.push_back({endV, current});
+              if (endVerts.size() > 32) {
+                endVertSet.insert(endVerts.begin(), endVerts.end());
+                endVerts.clear(false);
               }
-              if (endVertSet.empty()) {
-                if (std::find(endVerts.begin(), endVerts.end(),
-                              halfedge_[current].endVert) != endVerts.end()) {
-                  results.push_back(current);
-                } else {
-                  endVerts.push_back(halfedge_[current].endVert);
-                  // switch to hashset for vertices with many neighbors
-                  if (endVerts.size() > 32) {
-                    endVertSet.insert(endVerts.begin(), endVerts.end());
-                    endVerts.clear(false);
-                  }
-                }
-              } else {
-                if (!endVertSet.insert(halfedge_[current].endVert).second) {
-                  results.push_back(current);
-                }
-              }
-            });
+            }
+          } else {
+            auto pair = endVertSet.insert({endV, current});
+            if (!pair.second)
+              pair.first->second = std::min(pair.first->second, current);
+          }
+        });
+        // second iteration, actually check for duplicates
+        // we always report the same set of duplicates, excluding the smallest
+        // halfedge in the set of duplicates
+        ForVert(i, [&local, &endVerts, &endVertSet, &results,
+                    this](int current) {
+          if (halfedge_[current].startVert == -1 ||
+              halfedge_[current].endVert == -1) {
+            return;
+          }
+          int endV = halfedge_[current].endVert;
+          if (endVertSet.empty()) {
+            auto iter = std::find_if(endVerts.begin(), endVerts.end(),
+                                     [endV](const std::pair<int, int>& pair) {
+                                       return pair.first == endV;
+                                     });
+            if (iter->second != current) results.push_back(current);
+          } else {
+            auto iter = endVertSet.find(endV);
+            if (iter->second != current) results.push_back(current);
+          }
+        });
       }
     };
 #if MANIFOLD_PAR == 1
@@ -889,6 +908,10 @@ void Manifold::Impl::DedupeEdges() {
                                 duplicatesLocal.end());
             }
           });
+      manifold::stable_sort(duplicates.begin(), duplicates.end());
+      duplicates.resize(
+          std::distance(duplicates.begin(),
+                        std::unique(duplicates.begin(), duplicates.end())));
     } else
 #endif
     {
@@ -897,13 +920,9 @@ void Manifold::Impl::DedupeEdges() {
     }
 
     size_t numFlagged = 0;
-    // there may be duplicates
-    std::vector<bool> handled(nbEdges, false);
     for (size_t i : duplicates) {
-      if (handled[i]) continue;
       DedupeEdge(i);
       numFlagged++;
-      handled[i] = true;
     }
 
     if (numFlagged == 0) break;

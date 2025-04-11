@@ -52,45 +52,6 @@ struct Transform4x3 {
   vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
 };
 
-template <bool calculateTriNormal>
-struct AssignNormals {
-  VecView<vec3> faceNormal;
-  VecView<vec3> vertNormal;
-  VecView<const vec3> vertPos;
-  VecView<const Halfedge> halfedges;
-
-  void operator()(const int face) {
-    vec3& triNormal = faceNormal[face];
-
-    ivec3 triVerts;
-    for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
-
-    vec3 edge[3];
-    for (int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      edge[i] = la::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
-    }
-
-    if (calculateTriNormal) {
-      triNormal = la::normalize(la::cross(edge[0], edge[1]));
-      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
-    }
-
-    // corner angles
-    vec3 phi;
-    double dot = -la::dot(edge[2], edge[0]);
-    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
-    dot = -la::dot(edge[0], edge[1]);
-    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
-    phi[2] = kPi - phi[0] - phi[1];
-
-    // assign weighted sum
-    for (int i : {0, 1, 2}) {
-      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
-    }
-  }
-};
-
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
@@ -345,7 +306,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
-  for (int i = 0; i < numEdge; ++i) {
+  const auto body = [&](int i, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge h0 = halfedge_[pair0];
     int k = i + numEdge;
@@ -362,9 +323,36 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
         break;
       }
       ++k;
-      if (k >= numHalfedge) break;
+      if (k >= segmentEnd + numEdge) break;
     }
+  };
+
+#if MANIFOLD_PAR == 1
+  Vec<std::pair<int, int>> ranges;
+  const int increment = std::min(
+      std::max(numEdge / tbb::this_task_arena::max_concurrency() / 2, 1024),
+      numEdge);
+  const auto duplicated = [&](int a, int b) {
+    const Halfedge& h0 = halfedge_[ids[a]];
+    const Halfedge& h1 = halfedge_[ids[b]];
+    return h0.startVert == h1.startVert && h0.endVert == h1.endVert;
+  };
+  int end = 0;
+  while (end < numEdge) {
+    const int start = end;
+    end = std::min(end + increment, numEdge);
+    // make sure duplicated halfedges are in the same partition
+    while (end < numEdge && duplicated(end - 1, end)) end++;
+    ranges.push_back(std::make_pair(start, end));
   }
+  for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
+           [&](const std::pair<int, int>& range) {
+             const auto [start, end] = range;
+             for (int i = start; i < end; ++i) body(i, end);
+           });
+#else
+  for (int i = 0; i < numEdge; ++i) body(i, numEdge);
+#endif
 
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
@@ -417,7 +405,6 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   }
   Update();
   faceNormal_.clear();  // force recalculation of triNormal
-  CalculateNormals();
   SetEpsilon();
   Finish();
   CreateFaces();
@@ -515,23 +502,70 @@ void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
 void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
-  auto policy = autoPolicy(NumTri(), 1e4);
-  fill(vertNormal_.begin(), vertNormal_.end(), vec3(0.0));
+  auto policy = autoPolicy(NumTri());
   bool calculateTriNormal = false;
+
+  std::vector<std::atomic<int>> vertHalfedgeMap(NumVert());
+  for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
+    vertHalfedgeMap[vert] = std::numeric_limits<int>::max();
+  });
+
+  auto atomicMin = [&vertHalfedgeMap](int value, int vert) {
+    int old = std::numeric_limits<int>::max();
+    while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
+      if (old < value) break;
+  };
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
+    for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
+      vec3& triNormal = faceNormal_[face];
+
+      ivec3 triVerts;
+      for (int i : {0, 1, 2}) {
+        int v = halfedge_[3 * face + i].startVert;
+        triVerts[i] = v;
+        atomicMin(3 * face + i, v);
+      }
+
+      vec3 edge[3];
+      for (int i : {0, 1, 2}) {
+        const int j = (i + 1) % 3;
+        edge[i] = la::normalize(vertPos_[triVerts[j]] - vertPos_[triVerts[i]]);
+      }
+      triNormal = la::normalize(la::cross(edge[0], edge[1]));
+      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
+    });
+  } else {
+    for_each_n(policy, countAt(0), halfedge_.size(),
+               [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
   }
-  if (calculateTriNormal)
-    for_each_n(
-        policy, countAt(0), NumTri(),
-        AssignNormals<true>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
-  else
-    for_each_n(
-        policy, countAt(0), NumTri(),
-        AssignNormals<false>({faceNormal_, vertNormal_, vertPos_, halfedge_}));
-  for_each(policy, vertNormal_.begin(), vertNormal_.end(),
-           [](vec3& v) { v = SafeNormalize(v); });
+
+  for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
+    int firstEdge = vertHalfedgeMap[vert].load();
+    // not referenced
+    if (firstEdge == std::numeric_limits<int>::max()) {
+      vertNormal_[vert] = vec3(0.0);
+      return;
+    }
+    vec3 normal = vec3(0.0);
+    ForVert(firstEdge, [&](int edge) {
+      ivec3 triVerts = {halfedge_[edge].startVert, halfedge_[edge].endVert,
+                        halfedge_[NextHalfedge(edge)].endVert};
+      vec3 currEdge =
+          la::normalize(vertPos_[triVerts[1]] - vertPos_[triVerts[0]]);
+      vec3 prevEdge =
+          la::normalize(vertPos_[triVerts[0]] - vertPos_[triVerts[2]]);
+
+      // if it is not finite, this means that the triangle is degenerate, and we
+      // should just exclude it from the normal calculation...
+      if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
+      double dot = -la::dot(prevEdge, currEdge);
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+      normal += phi * faceNormal_[edge / 3];
+    });
+    vertNormal_[vert] = SafeNormalize(normal);
+  });
 }
 
 /**
@@ -553,52 +587,6 @@ void Manifold::Impl::IncrementMeshIDs() {
   const size_t numTri = NumTri();
   for_each_n(autoPolicy(numTri, 1e5), meshRelation_.triRef.begin(), numTri,
              UpdateMeshID({meshIDold2new.D()}));
-}
-
-/**
- * Returns a sparse array of the bounding box overlaps between the edges of
- * the input manifold, Q and the faces of this manifold. Returned indices only
- * point to forward halfedges.
- */
-SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
-                                             bool inverted) const {
-  ZoneScoped;
-  Vec<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
-  const size_t numEdge = edges.size();
-  Vec<Box> QedgeBB(numEdge);
-  const auto& vertPos = Q.vertPos_;
-  auto policy = autoPolicy(numEdge, 1e5);
-  for_each_n(
-      policy, countAt(0), numEdge, [&QedgeBB, &edges, &vertPos](const int e) {
-        QedgeBB[e] = Box(vertPos[edges[e].first], vertPos[edges[e].second]);
-      });
-
-  SparseIndices q1p2(0);
-  if (inverted)
-    q1p2 = collider_.Collisions<false, true>(QedgeBB.cview());
-  else
-    q1p2 = collider_.Collisions<false, false>(QedgeBB.cview());
-
-  if (inverted)
-    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
-             ReindexEdge<true>({edges, q1p2}));
-  else
-    for_each(policy, countAt(0_uz), countAt(q1p2.size()),
-             ReindexEdge<false>({edges, q1p2}));
-  return q1p2;
-}
-
-/**
- * Returns a sparse array of the input vertices that project inside the XY
- * bounding boxes of the faces of this manifold.
- */
-SparseIndices Manifold::Impl::VertexCollisionsZ(VecView<const vec3> vertsIn,
-                                                bool inverted) const {
-  ZoneScoped;
-  if (inverted)
-    return collider_.Collisions<false, true>(vertsIn);
-  else
-    return collider_.Collisions<false, false>(vertsIn);
 }
 
 #ifdef MANIFOLD_DEBUG
