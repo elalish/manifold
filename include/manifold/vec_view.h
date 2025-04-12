@@ -31,22 +31,22 @@ namespace manifold {
 template <typename T>
 class VecView {
  public:
-  using Iter = T *;
-  using IterC = const T *;
+  using Iter = T*;
+  using IterC = const T*;
 
   VecView() : ptr_(nullptr), size_(0) {}
 
-  VecView(T *ptr, size_t size) : ptr_(ptr), size_(size) {}
+  VecView(T* ptr, size_t size) : ptr_(ptr), size_(size) {}
 
-  VecView(const std::vector<std::remove_cv_t<T>> &v)
+  VecView(const std::vector<std::remove_cv_t<T>>& v)
       : ptr_(v.data()), size_(v.size()) {}
 
-  VecView(const VecView &other) {
+  VecView(const VecView& other) {
     ptr_ = other.ptr_;
     size_ = other.size_;
   }
 
-  VecView &operator=(const VecView &other) {
+  VecView& operator=(const VecView& other) {
     ptr_ = other.ptr_;
     size_ = other.size_;
     return *this;
@@ -55,12 +55,12 @@ class VecView {
   // allows conversion to a const VecView
   operator VecView<const T>() const { return {ptr_, size_}; }
 
-  inline const T &operator[](size_t i) const {
+  inline const T& operator[](size_t i) const {
     ASSERT(i < size_, std::out_of_range("Vec out of range"));
     return ptr_[i];
   }
 
-  inline T &operator[](size_t i) {
+  inline T& operator[](size_t i) {
     ASSERT(i < size_, std::out_of_range("Vec out of range"));
     return ptr_[i];
   }
@@ -74,25 +74,25 @@ class VecView {
   Iter begin() { return ptr_; }
   Iter end() { return ptr_ + size_; }
 
-  const T &front() const {
+  const T& front() const {
     ASSERT(size_ != 0,
            std::out_of_range("Attempt to take the front of an empty vector"));
     return ptr_[0];
   }
 
-  const T &back() const {
+  const T& back() const {
     ASSERT(size_ != 0,
            std::out_of_range("Attempt to take the back of an empty vector"));
     return ptr_[size_ - 1];
   }
 
-  T &front() {
+  T& front() {
     ASSERT(size_ != 0,
            std::out_of_range("Attempt to take the front of an empty vector"));
     return ptr_[0];
   }
 
-  T &back() {
+  T& back() {
     ASSERT(size_ != 0,
            std::out_of_range("Attempt to take the back of an empty vector"));
     return ptr_[size_ - 1];
@@ -127,9 +127,9 @@ class VecView {
     return cview(offset, length);
   }
 
-  T *data() { return this->ptr_; }
+  T* data() { return this->ptr_; }
 
-  const T *data() const { return this->ptr_; }
+  const T* data() const { return this->ptr_; }
 
 #ifdef MANIFOLD_DEBUG
   void Dump() const {
@@ -142,7 +142,7 @@ class VecView {
 #endif
 
  protected:
-  T *ptr_ = nullptr;
+  T* ptr_ = nullptr;
   size_t size_ = 0;
 };
 

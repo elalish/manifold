@@ -19,7 +19,7 @@
 
 using namespace manifold;
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
     Manifold sphere2 = sphere.Translate(vec3(0.5));

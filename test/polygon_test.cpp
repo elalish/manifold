@@ -25,8 +25,8 @@ namespace {
 using namespace manifold;
 
 Polygons Turn180(Polygons polys) {
-  for (SimplePolygon &poly : polys) {
-    for (vec2 &vert : poly) {
+  for (SimplePolygon& poly : polys) {
+    for (vec2& vert : poly) {
       vert *= -1.0;
     }
   }
@@ -36,8 +36,8 @@ Polygons Turn180(Polygons polys) {
 Polygons Duplicate(Polygons polys) {
   double xMin = std::numeric_limits<double>::infinity();
   double xMax = -std::numeric_limits<double>::infinity();
-  for (SimplePolygon &poly : polys) {
-    for (vec2 &vert : poly) {
+  for (SimplePolygon& poly : polys) {
+    for (vec2& vert : poly) {
       xMin = std::min(xMin, vert.x);
       xMax = std::max(xMax, vert.x);
     }
@@ -47,7 +47,7 @@ Polygons Duplicate(Polygons polys) {
   const int nPolys = polys.size();
   for (int i = 0; i < nPolys; ++i) {
     SimplePolygon poly = polys[i];
-    for (vec2 &vert : poly) {
+    for (vec2& vert : poly) {
       vert.x += shift;
     }
     polys.push_back(poly);
@@ -55,7 +55,7 @@ Polygons Duplicate(Polygons polys) {
   return polys;
 }
 
-void TestPoly(const Polygons &polys, int expectedNumTri,
+void TestPoly(const Polygons& polys, int expectedNumTri,
               double epsilon = -1.0) {
   std::vector<ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys, epsilon));
@@ -79,7 +79,7 @@ class PolygonTestFixture : public testing::Test {
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-void RegisterPolygonTestsFile(const std::string &filename) {
+void RegisterPolygonTestsFile(const std::string& filename) {
   auto f = std::ifstream(filename);
   EXPECT_TRUE(f.is_open());
 
@@ -111,7 +111,7 @@ void RegisterPolygonTestsFile(const std::string &filename) {
     }
     testing::RegisterTest(
         "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture * {
+        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
           return new PolygonTestFixture(polys, epsilon, expectedNumTri);
         });
   }
