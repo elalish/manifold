@@ -29,9 +29,9 @@ void TriangulationNoCrash(
   manifold::PolygonParams().intermediateChecks = true;
   manifold::Polygons polys;
   size_t size = 0;
-  for (const auto &simplePoly : input) {
+  for (const auto& simplePoly : input) {
     polys.emplace_back();
-    for (const auto &p : simplePoly) {
+    for (const auto& p : simplePoly) {
       polys.back().emplace_back(p.first, p.second);
       size++;
     }
@@ -85,8 +85,8 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrash)
 FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
     .WithDomains(ReversibleMap(
                      [](auto input) {
-                       for (auto &poly : input) {
-                         for (auto &pair : poly) {
+                       for (auto& poly : input) {
+                         for (auto& pair : poly) {
                            pair.first = std::round(pair.first);
                            pair.second = std::round(pair.second);
                          }

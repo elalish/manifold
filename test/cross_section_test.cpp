@@ -131,7 +131,7 @@ TEST(CrossSection, Transform) {
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](vec2 &v) {
+  auto b = sq.Warp([](vec2& v) {
     v.x = v.x * 2 + 4;
     v.y = v.y * 3 + 5;
   });

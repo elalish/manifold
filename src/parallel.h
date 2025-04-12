@@ -114,20 +114,20 @@ template <typename T, typename InputIter, typename OutputIter, typename BinOp>
 struct ScanBody {
   T sum;
   T identity;
-  BinOp &f;
+  BinOp& f;
   InputIter input;
   OutputIter output;
 
-  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
+  ScanBody(T sum, T identity, BinOp& f, InputIter input, OutputIter output)
       : sum(sum), identity(identity), f(f), input(input), output(output) {}
-  ScanBody(ScanBody &b, tbb::split)
+  ScanBody(ScanBody& b, tbb::split)
       : sum(b.identity),
         identity(b.identity),
         f(b.f),
         input(b.input),
         output(b.output) {}
   template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+  void operator()(const tbb::blocked_range<size_t>& r, Tag) {
     T temp = sum;
     for (size_t i = r.begin(); i < r.end(); ++i) {
       T inputTmp = input[i];
@@ -137,23 +137,23 @@ struct ScanBody {
     sum = temp;
   }
   T get_sum() const { return sum; }
-  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
-  void assign(ScanBody &b) { sum = b.sum; }
+  void reverse_join(ScanBody& a) { sum = f(a.sum, sum); }
+  void assign(ScanBody& b) { sum = b.sum; }
 };
 
 template <typename InputIter, typename OutputIter, typename P>
 struct CopyIfScanBody {
   size_t sum;
-  P &pred;
+  P& pred;
   InputIter input;
   OutputIter output;
 
-  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
+  CopyIfScanBody(P& pred, InputIter input, OutputIter output)
       : sum(0), pred(pred), input(input), output(output) {}
-  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
+  CopyIfScanBody(CopyIfScanBody& b, tbb::split)
       : sum(0), pred(b.pred), input(b.input), output(b.output) {}
   template <typename Tag>
-  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+  void operator()(const tbb::blocked_range<size_t>& r, Tag) {
     size_t temp = sum;
     for (size_t i = r.begin(); i < r.end(); ++i) {
       if (pred(i)) {
@@ -164,8 +164,8 @@ struct CopyIfScanBody {
     sum = temp;
   }
   size_t get_sum() const { return sum; }
-  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
-  void assign(CopyIfScanBody &b) { sum = b.sum; }
+  void reverse_join(CopyIfScanBody& a) { sum = a.sum + sum; }
+  void assign(CopyIfScanBody& b) { sum = b.sum; }
 };
 
 template <typename N, const int K>
@@ -173,11 +173,11 @@ struct Hist {
   using SizeType = N;
   static constexpr int k = K;
   N hist[k][256] = {{0}};
-  void merge(const Hist<N, K> &other) {
+  void merge(const Hist<N, K>& other) {
     for (int i = 0; i < k; ++i)
       for (int j = 0; j < 256; ++j) hist[i][j] += other.hist[i][j];
   }
-  void prefixSum(N total, bool *canSkip) {
+  void prefixSum(N total, bool* canSkip) {
     for (int i = 0; i < k; ++i) {
       size_t count = 0;
       for (int j = 0; j < 256; ++j) {
@@ -191,8 +191,8 @@ struct Hist {
 };
 
 template <typename T, typename H>
-void histogram(T *ptr, typename H::SizeType n, H &hist) {
-  auto worker = [](T *ptr, typename H::SizeType n, H &hist) {
+void histogram(T* ptr, typename H::SizeType n, H& hist) {
+  auto worker = [](T* ptr, typename H::SizeType n, H& hist) {
     for (typename H::SizeType i = 0; i < n; ++i)
       for (int k = 0; k < hist.k; ++k)
         ++hist.hist[k][(ptr[i] >> (8 * k)) & 0xFF];
@@ -203,21 +203,21 @@ void histogram(T *ptr, typename H::SizeType n, H &hist) {
     tbb::combinable<H> store;
     tbb::parallel_for(
         tbb::blocked_range<typename H::SizeType>(0, n, kSeqThreshold),
-        [&worker, &store, ptr](const auto &r) {
+        [&worker, &store, ptr](const auto& r) {
           worker(ptr + r.begin(), r.end() - r.begin(), store.local());
         });
-    store.combine_each([&hist](const H &h) { hist.merge(h); });
+    store.combine_each([&hist](const H& h) { hist.merge(h); });
   }
 }
 
 template <typename T, typename H>
-void shuffle(T *src, T *target, typename H::SizeType n, H &hist, int k) {
+void shuffle(T* src, T* target, typename H::SizeType n, H& hist, int k) {
   for (typename H::SizeType i = 0; i < n; ++i)
     target[hist.hist[k][(src[i] >> (8 * k)) & 0xFF]++] = src[i];
 }
 
 template <typename T, typename SizeType>
-bool LSB_radix_sort(T *input, T *tmp, SizeType n) {
+bool LSB_radix_sort(T* input, T* tmp, SizeType n) {
   Hist<SizeType, sizeof(T) / sizeof(char)> hist;
   if (std::is_sorted(input, input + n)) return false;
   histogram(input, n, hist);
@@ -240,9 +240,9 @@ struct SortedRange {
   SizeType offset = 0, length = 0;
   bool inTmp = false;
 
-  SortedRange(T *input, T *tmp, SizeType offset = 0, SizeType length = 0)
+  SortedRange(T* input, T* tmp, SizeType offset = 0, SizeType length = 0)
       : input(input), tmp(tmp), offset(offset), length(length) {}
-  SortedRange(SortedRange<T, SizeType> &r, tbb::split)
+  SortedRange(SortedRange<T, SizeType>& r, tbb::split)
       : input(r.input), tmp(r.tmp) {}
   // FIXME: no idea why thread sanitizer reports data race here
 #if defined(__has_feature)
@@ -251,7 +251,7 @@ struct SortedRange {
 #endif
 #endif
   void
-  operator()(const tbb::blocked_range<SizeType> &range) {
+  operator()(const tbb::blocked_range<SizeType>& range) {
     SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
                                  range.end() - range.begin());
     rhs.inTmp =
@@ -267,7 +267,7 @@ struct SortedRange {
     copy(src + offset, src + offset + length, target + offset);
     return !inTmp;
   }
-  void join(const SortedRange<T, SizeType> &rhs) {
+  void join(const SortedRange<T, SizeType>& rhs) {
     if (inTmp != rhs.inTmp) {
       if (length < rhs.length)
         inTmp = swapBuffer();
@@ -286,8 +286,8 @@ struct SortedRange {
 };
 
 template <typename T, typename SizeTy>
-void radix_sort(T *input, SizeTy n) {
-  T *aux = new T[n];
+void radix_sort(T* input, SizeTy n) {
+  T* aux = new T[n];
   SizeTy blockSize = std::max(n / tbb::this_task_arena::max_concurrency() / 4,
                               static_cast<SizeTy>(kSeqThreshold / sizeof(T)));
   SortedRange<T, SizeTy> result(input, aux);
@@ -306,7 +306,7 @@ void mergeSort(ExecutionPolicy policy, Iterator first, Iterator last,
     // apparently this prioritizes threads inside here?
     tbb::this_task_arena::isolate([&] {
       size_t length = std::distance(first, last);
-      T *tmp = new T[length];
+      T* tmp = new T[length];
       copy(policy, first, last, tmp);
       details::mergeSortRec(tmp, first, 0, length, comp);
       delete[] tmp;
@@ -381,7 +381,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
-                        [&f](const tbb::blocked_range<Iter> &range) {
+                        [&f](const tbb::blocked_range<Iter>& range) {
                           for (Iter i = range.begin(); i != range.end(); i++)
                             f(*i);
                         });
@@ -423,7 +423,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
       return tbb::parallel_reduce(
           tbb::blocked_range<InputIter>(first, last, details::kSeqThreshold),
           init,
-          [&f](const tbb::blocked_range<InputIter> &range, T value) {
+          [&f](const tbb::blocked_range<InputIter>& range, T value) {
             return std::reduce(range.begin(), range.end(), value, f);
           },
           f);
@@ -501,7 +501,7 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
       tbb::parallel_scan(
           tbb::blocked_range<size_t>(0, std::distance(first, last)),
           static_cast<T>(0),
-          [&](const tbb::blocked_range<size_t> &range, T sum,
+          [&](const tbb::blocked_range<size_t>& range, T sum,
               bool is_final_scan) {
             T temp = sum;
             for (size_t i = range.begin(); i < range.end(); ++i) {
@@ -622,7 +622,7 @@ void transform(ExecutionPolicy policy, InputIter first, InputIter last,
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<size_t>(
                             0, static_cast<size_t>(std::distance(first, last))),
-                        [&](const tbb::blocked_range<size_t> &range) {
+                        [&](const tbb::blocked_range<size_t>& range) {
                           std::transform(first + range.begin(),
                                          first + range.end(),
                                          d_first + range.begin(), f);
@@ -670,7 +670,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
       tbb::parallel_for(tbb::blocked_range<size_t>(
                             0, static_cast<size_t>(std::distance(first, last)),
                             details::kSeqThreshold),
-                        [&](const tbb::blocked_range<size_t> &range) {
+                        [&](const tbb::blocked_range<size_t>& range) {
                           std::copy(first + range.begin(), first + range.end(),
                                     d_first + range.begin());
                         });
@@ -728,7 +728,7 @@ void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<OutputIter>(first, last),
-                        [&](const tbb::blocked_range<OutputIter> &range) {
+                        [&](const tbb::blocked_range<OutputIter>& range) {
                           std::fill(range.begin(), range.end(), value);
                         });
     });
@@ -781,7 +781,7 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
     return tbb::this_task_arena::isolate([&]() {
       return tbb::parallel_reduce(
           tbb::blocked_range<InputIter>(first, last), true,
-          [&](const tbb::blocked_range<InputIter> &range, bool value) {
+          [&](const tbb::blocked_range<InputIter>& range, bool value) {
             if (!value) return false;
             for (InputIter i = range.begin(); i != range.end(); i++)
               if (!pred(*i)) return false;
@@ -877,7 +877,7 @@ Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
   (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
-    T *tmp = new T[std::distance(first, last)];
+    T* tmp = new T[std::distance(first, last)];
     auto back =
         copy_if(policy, first, last, tmp, [&](T v) { return !pred(v); });
     copy(policy, tmp, back, first);
@@ -925,7 +925,7 @@ Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
   (void)policy;
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
-    T *tmp = new T[std::distance(first, last)];
+    T* tmp = new T[std::distance(first, last)];
     auto back =
         copy_if(policy, first, last, tmp, [&](T v) { return v != value; });
     copy(policy, tmp, back, first);
@@ -977,7 +977,7 @@ Iter unique(ExecutionPolicy policy, Iter first, Iter last) {
     // cap the maximum buffer size, proved to be beneficial for unique with huge
     // array size
     constexpr size_t MAX_BUFFER_SIZE = 1 << 16;
-    T *tmp = new T[std::min(MAX_BUFFER_SIZE,
+    T* tmp = new T[std::min(MAX_BUFFER_SIZE,
                             static_cast<size_t>(std::distance(first, last)))];
     auto pred = [&](size_t i) { return tmp[i] != tmp[i + 1]; };
     do {

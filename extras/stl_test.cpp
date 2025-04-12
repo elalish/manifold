@@ -18,12 +18,12 @@ static constexpr size_t g_Sizes[] = {1'000, 10'000, 100'000, 1'000'000,
                                      10'000'000};
 
 template <class Tp>
-inline void noopt(Tp const &value) {
+inline void noopt(Tp const& value) {
   asm volatile("" : : "r,m"(value) : "memory");
 }
 
 template <class Tp>
-inline void noopt(Tp &value) {
+inline void noopt(Tp& value) {
   asm volatile("" : "+r,m"(value) : : "memory");
 }
 
@@ -70,7 +70,7 @@ struct for_each {  // 25.6.4
     return measure([&] { v = std::vector<double>(size, 42.); },
                    [&] {
                      manifold::for_each(Policy, v.begin(), v.end(),
-                                        [](auto &e) { e += 1.; });
+                                        [](auto& e) { e += 1.; });
                      noopt(v);
                    });
   }
@@ -517,7 +517,7 @@ struct exclusive_scan {  // 25.10.8
 
 template <class T>
 static std::string demangle() {
-  const char *name = typeid(T).name();
+  const char* name = typeid(T).name();
   char s[1024];
   size_t len = sizeof(s);
   int status;
@@ -583,7 +583,7 @@ int main() {
   results.emplace_back(record<benchmarks::exclusive_scan>());
 
   const auto max_name_len =
-      std::max_element(results.begin(), results.end(), [](auto &a, auto &b) {
+      std::max_element(results.begin(), results.end(), [](auto& a, auto& b) {
         return a.name.length() < b.name.length();
       })->name.length();
 
@@ -596,7 +596,7 @@ int main() {
   }
   printf("\n");
 
-  for (auto &r : results) {
+  for (auto& r : results) {
     printf("%-*s ", int(max_name_len), r.name.c_str());
     for (auto v : r.speedups) printf("%5.2f ", v);
     printf("\n");

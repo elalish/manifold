@@ -63,7 +63,7 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
 // check if removing point j in polygon i will introduce self-intersection
 // this checks if the new edge j-1 <-> j+1 intersects with any other edges,
 // assuming the original polygon does not contain self-intersection
-bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
+bool safeToRemove(const Polygons& polys, size_t i, size_t j, double precision) {
   if (polys[i].size() == 3) return false;
   vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
   vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
@@ -71,7 +71,7 @@ bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
     auto ll = [&](size_t l) {
       return l == (polys[k].size() - 1) ? 0 : (l + 1);
     };
-    const vec2 *polysk = polys[k].data();
+    const vec2* polysk = polys[k].data();
     if (!std::all_of(
 #if (MANIFOLD_PAR == 1) && __has_include(<pstl/glue_execution_defs.h>)
             std::execution::par,
@@ -86,13 +86,13 @@ bool safeToRemove(const Polygons &polys, size_t i, size_t j, double precision) {
   return true;
 }
 
-std::pair<int, int> findIndex(const Polygons &polys, size_t i) {
+std::pair<int, int> findIndex(const Polygons& polys, size_t i) {
   size_t outer = 0;
   while (i >= polys[outer].size()) i -= polys[outer++].size();
   return std::make_pair(outer, i);
 }
 
-void Dump(const Polygons &polys, const double epsilon) {
+void Dump(const Polygons& polys, const double epsilon) {
   std::cout << std::setprecision(19);
   std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
@@ -111,12 +111,12 @@ void Dump(const Polygons &polys, const double epsilon) {
   }
 }
 
-void DumpTriangulation(const Polygons &polys, double precision) {
+void DumpTriangulation(const Polygons& polys, double precision) {
   ExecutionParams oldParams = ManifoldParams();
   manifold::ManifoldParams().processOverlaps = true;
   std::vector<ivec3> result = Triangulate(polys);
   ManifoldParams() = oldParams;
-  for (const ivec3 &tri : result) {
+  for (const ivec3& tri : result) {
     std::pair<int, int> xid = findIndex(polys, tri.x);
     std::pair<int, int> yid = findIndex(polys, tri.y);
     std::pair<int, int> zid = findIndex(polys, tri.z);
@@ -143,7 +143,7 @@ bool rayHit(vec2 point, vec2 q0, vec2 q1) {
 // this enumerates over the first point in all other polygons,
 // and check if they are inside the current polygon
 // this algorithm assumes that polygons are non-intersecting
-std::vector<int> getChildren(const Polygons &polys, size_t i) {
+std::vector<int> getChildren(const Polygons& polys, size_t i) {
   std::vector<int> results;
   for (size_t j = 0; j < polys.size(); j++) {
     if (i == j) continue;
@@ -167,12 +167,12 @@ std::vector<int> getChildren(const Polygons &polys, size_t i) {
 // 1. the updated polys is still valid (no overlapping edges, correct winding
 // direction)
 // 2. same error in triangulation (either geometryErr or overlapping triangles)
-void simplify(Polygons &polys, double precision = -1) {
+void simplify(Polygons& polys, double precision = -1) {
   bool removedSomething = true;
   std::string msg;
   while (removedSomething) {
     int points = 0;
-    for (const SimplePolygon &poly : polys) points += poly.size();
+    for (const SimplePolygon& poly : polys) points += poly.size();
     std::cout << "trying to simplify " << points << " points" << std::endl;
 
     removedSomething = false;
@@ -187,14 +187,14 @@ void simplify(Polygons &polys, double precision = -1) {
       try {
         std::vector<ivec3> result = Triangulate(polys, precision);
         polys.insert(polys.begin() + i, std::move(poly));
-      } catch (geometryErr &e) {
+      } catch (geometryErr& e) {
         if (msg.size() > 0 && msg.compare(e.what()) != 0) {
           polys.insert(polys.begin() + i, std::move(poly));
         } else {
           removedSomething = true;
           msg = e.what();
         }
-      } catch (topologyErr &e) {
+      } catch (topologyErr& e) {
         polys.insert(polys.begin() + i, std::move(poly));
       }
     }
@@ -225,14 +225,14 @@ void simplify(Polygons &polys, double precision = -1) {
         try {
           std::vector<ivec3> result = Triangulate(polys, precision);
           polys[i].insert(polys[i].begin() + j, removed);
-        } catch (geometryErr &e) {
+        } catch (geometryErr& e) {
           if (msg.size() > 0 && msg.compare(e.what()) != 0) {
             polys[i].insert(polys[i].begin() + j, removed);
           } else {
             removedSomething = true;
             msg = e.what();
           }
-        } catch (topologyErr &e) {
+        } catch (topologyErr& e) {
           polys[i].insert(polys[i].begin() + j, removed);
         }
       }
@@ -246,11 +246,11 @@ struct Edge {
   vec2 west;    // -x side vertex
   vec2 east;    // +x side vertex
   size_t i, j;  // indices of origin vertex
-  bool operator<(const Edge &other) const {
+  bool operator<(const Edge& other) const {
     return west.x < other.west.x ||
            (west.x == other.west.x && east.x < other.east.x);
   }
-  Edge(const Polygons &polys, size_t i, size_t j) : i(i), j(j) {
+  Edge(const Polygons& polys, size_t i, size_t j) : i(i), j(j) {
     size_t j1 = j == polys[i].size() - 1 ? 0 : j + 1;
     east = polys[i][j];
     west = polys[i][j1];
@@ -258,9 +258,9 @@ struct Edge {
   }
 };
 
-int isValid(const Polygons &polys, double precision = -1) {
+int isValid(const Polygons& polys, double precision = -1) {
   size_t numEdge = 0;
-  for (const SimplePolygon &poly : polys) numEdge += poly.size();
+  for (const SimplePolygon& poly : polys) numEdge += poly.size();
   std::vector<Edge> edges;
   edges.reserve(numEdge);
   for (size_t i = 0; i < polys.size(); i++)
@@ -291,7 +291,7 @@ int isValid(const Polygons &polys, double precision = -1) {
   if (!overlappingPairs.empty()) {
     std::cout << "found " << overlappingPairs.size() << " self-intersection"
               << std::endl;
-    for (const std::pair<Edge, Edge> &pairs : overlappingPairs) {
+    for (const std::pair<Edge, Edge>& pairs : overlappingPairs) {
       std::cout << pairs.first.i << " " << pairs.first.j << "<->"  //
                 << pairs.second.i << " " << pairs.second.j << std::endl;
       printf("array([[%.7f, %.7f], [%.7f, %.7f]])\n", pairs.first.west.x,
@@ -306,7 +306,7 @@ int isValid(const Polygons &polys, double precision = -1) {
   return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ManifoldParams().intermediateChecks = true;
   ManifoldParams().processOverlaps = false;
   ManifoldParams().suppressErrors = true;
