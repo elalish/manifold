@@ -27,7 +27,7 @@ using namespace manifold;
     make -j && \
     time ./extras/largeSceneTest 50 )
 */
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   int n = 20;
   if (argc == 2) n = atoi(argv[1]);
 

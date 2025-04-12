@@ -5,27 +5,27 @@
 #include "gtest/gtest.h"
 #include "manifold/types.h"
 
-void *alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
+void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
 
-void *alloc_box_buffer() { return malloc(manifold_box_size()); }
+void* alloc_box_buffer() { return malloc(manifold_box_size()); }
 
-void *alloc_meshgl_buffer() { return malloc(manifold_meshgl_size()); }
+void* alloc_meshgl_buffer() { return malloc(manifold_meshgl_size()); }
 
-void *alloc_meshgl64_buffer() { return malloc(manifold_meshgl64_size()); }
+void* alloc_meshgl64_buffer() { return malloc(manifold_meshgl64_size()); }
 
-void *alloc_simple_polygon_buffer() {
+void* alloc_simple_polygon_buffer() {
   return malloc(manifold_simple_polygon_size());
 }
 
-void *alloc_polygons_buffer() { return malloc(manifold_polygons_size()); }
+void* alloc_polygons_buffer() { return malloc(manifold_polygons_size()); }
 
-void *alloc_manifold_vec_buffer() {
+void* alloc_manifold_vec_buffer() {
   return malloc(manifold_manifold_vec_size());
 }
 
 TEST(CBIND, sphere) {
   int n = 25;
-  ManifoldManifold *sphere =
+  ManifoldManifold* sphere =
       manifold_sphere(alloc_manifold_buffer(), 1.0, 4 * n);
 
   EXPECT_EQ(manifold_status(sphere), MANIFOLD_NO_ERROR);
@@ -36,39 +36,39 @@ TEST(CBIND, sphere) {
 }
 
 TEST(CBIND, warp_translation) {
-  ManifoldVec3 (*warp)(double, double, double, void *) = [](double x, double y,
-                                                            double z, void *) {
+  ManifoldVec3 (*warp)(double, double, double, void*) = [](double x, double y,
+                                                           double z, void*) {
     ManifoldVec3 v = {x + 15.0, y, z};
     return v;
   };
-  double *context = (double *)malloc(1 * sizeof(double));
+  double* context = (double*)malloc(1 * sizeof(double));
   context[0] = 15.0;
-  ManifoldVec3 (*warpcontext)(double, double, double, void *) =
-      [](double x, double y, double z, void *ctx) {
-        ManifoldVec3 v = {x + ((double *)ctx)[0], y, z};
+  ManifoldVec3 (*warpcontext)(double, double, double, void*) =
+      [](double x, double y, double z, void* ctx) {
+        ManifoldVec3 v = {x + ((double*)ctx)[0], y, z};
         return v;
       };
-  ManifoldManifold *sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
-  ManifoldManifold *trans =
+  ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
+  ManifoldManifold* trans =
       manifold_translate(alloc_manifold_buffer(), sphere, 15., 0., 0.);
-  ManifoldManifold *warped =
+  ManifoldManifold* warped =
       manifold_warp(alloc_manifold_buffer(), sphere, warp, NULL);
-  ManifoldManifold *diff =
+  ManifoldManifold* diff =
       manifold_difference(alloc_manifold_buffer(), trans, warped);
-  ManifoldManifold *warpedcontext =
+  ManifoldManifold* warpedcontext =
       manifold_warp(alloc_manifold_buffer(), sphere, warpcontext, context);
-  ManifoldManifold *diffcontext =
+  ManifoldManifold* diffcontext =
       manifold_difference(alloc_manifold_buffer(), trans, warped);
 
   EXPECT_NEAR(manifold_volume(diff), 0, 0.0001);
   EXPECT_NEAR(manifold_volume(diffcontext), 0, 0.0001);
 
-  ManifoldBox *sphere_bounds =
+  ManifoldBox* sphere_bounds =
       manifold_bounding_box(alloc_box_buffer(), sphere);
-  ManifoldBox *trans_bounds = manifold_bounding_box(alloc_box_buffer(), trans);
-  ManifoldBox *warped_bounds =
+  ManifoldBox* trans_bounds = manifold_bounding_box(alloc_box_buffer(), trans);
+  ManifoldBox* warped_bounds =
       manifold_bounding_box(alloc_box_buffer(), warped);
-  ManifoldBox *warped_context_bounds =
+  ManifoldBox* warped_context_bounds =
       manifold_bounding_box(alloc_box_buffer(), warpedcontext);
 
   ManifoldVec3 sphere_dims = manifold_box_dimensions(sphere_bounds);
@@ -113,8 +113,8 @@ TEST(CBIND, warp_translation) {
 
 TEST(CBIND, level_set) {
   // can't convert lambda with captures to funptr
-  double (*sdf)(double, double, double, void *) = [](double x, double y,
-                                                     double z, void *ctx) {
+  double (*sdf)(double, double, double, void*) = [](double x, double y,
+                                                    double z, void* ctx) {
     const double radius = 15;
     const double xscale = 3;
     const double yscale = 1;
@@ -124,14 +124,14 @@ TEST(CBIND, level_set) {
     double zs = z / zscale;
     return radius - sqrtf(xs * xs + ys * ys + zs * zs);
   };
-  double *context = (double *)malloc(4 * sizeof(double));
+  double* context = (double*)malloc(4 * sizeof(double));
   context[0] = 15.0;
   context[1] = 3.0;
   context[2] = 1.0;
   context[3] = 1.0;
   double (*sdfcontext)(double, double, double,
-                       void *) = [](double x, double y, double z, void *ctx) {
-    double *context = (double *)ctx;
+                       void*) = [](double x, double y, double z, void* ctx) {
+    double* context = (double*)ctx;
     const double radius = context[0];
     const double xscale = context[1];
     const double yscale = context[2];
@@ -144,19 +144,19 @@ TEST(CBIND, level_set) {
 
   const double bb = 30;  // (radius * 2)
   // bounding box scaled according to factors used in *sdf
-  ManifoldBox *bounds = manifold_box(alloc_box_buffer(), -bb * 3, -bb * 1,
+  ManifoldBox* bounds = manifold_box(alloc_box_buffer(), -bb * 3, -bb * 1,
                                      -bb * 1, bb * 3, bb * 1, bb * 1);
-  ManifoldManifold *sdf_man = manifold_level_set(alloc_manifold_buffer(), sdf,
+  ManifoldManifold* sdf_man = manifold_level_set(alloc_manifold_buffer(), sdf,
                                                  bounds, 0.5, 0, -1, NULL);
-  ManifoldManifold *sdf_man_context = manifold_level_set(
+  ManifoldManifold* sdf_man_context = manifold_level_set(
       alloc_manifold_buffer(), sdfcontext, bounds, 0.5, 0, -1, context);
-  ManifoldMeshGL *sdf_mesh =
+  ManifoldMeshGL* sdf_mesh =
       manifold_get_meshgl(alloc_meshgl_buffer(), sdf_man);
 
 #ifdef MANIFOLD_EXPORT
-  ManifoldExportOptions *options =
+  ManifoldExportOptions* options =
       manifold_export_options(malloc(manifold_export_options_size()));
-  const char *name = "cbind_sdf_test.glb";
+  const char* name = "cbind_sdf_test.glb";
   manifold_export_meshgl(name, sdf_mesh, options);
   manifold_destruct_export_options(options);
   free(options);
@@ -198,8 +198,8 @@ TEST(CBIND, level_set) {
 
 TEST(CBIND, level_set_64) {
   // can't convert lambda with captures to funptr
-  double (*sdf)(double, double, double, void *) = [](double x, double y,
-                                                     double z, void *ctx) {
+  double (*sdf)(double, double, double, void*) = [](double x, double y,
+                                                    double z, void* ctx) {
     const double radius = 15;
     const double xscale = 3;
     const double yscale = 1;
@@ -209,14 +209,14 @@ TEST(CBIND, level_set_64) {
     double zs = z / zscale;
     return radius - sqrtf(xs * xs + ys * ys + zs * zs);
   };
-  double *context = (double *)malloc(4 * sizeof(double));
+  double* context = (double*)malloc(4 * sizeof(double));
   context[0] = 15.0;
   context[1] = 3.0;
   context[2] = 1.0;
   context[3] = 1.0;
   double (*sdfcontext)(double, double, double,
-                       void *) = [](double x, double y, double z, void *ctx) {
-    double *context = (double *)ctx;
+                       void*) = [](double x, double y, double z, void* ctx) {
+    double* context = (double*)ctx;
     const double radius = context[0];
     const double xscale = context[1];
     const double yscale = context[2];
@@ -229,13 +229,13 @@ TEST(CBIND, level_set_64) {
 
   const double bb = 30;  // (radius * 2)
   // bounding box scaled according to factors used in *sdf
-  ManifoldBox *bounds = manifold_box(alloc_box_buffer(), -bb * 3, -bb * 1,
+  ManifoldBox* bounds = manifold_box(alloc_box_buffer(), -bb * 3, -bb * 1,
                                      -bb * 1, bb * 3, bb * 1, bb * 1);
-  ManifoldManifold *sdf_man = manifold_level_set(alloc_manifold_buffer(), sdf,
+  ManifoldManifold* sdf_man = manifold_level_set(alloc_manifold_buffer(), sdf,
                                                  bounds, 0.5, 0, -1, NULL);
-  ManifoldManifold *sdf_man_context = manifold_level_set(
+  ManifoldManifold* sdf_man_context = manifold_level_set(
       alloc_manifold_buffer(), sdfcontext, bounds, 0.5, 0, -1, context);
-  ManifoldMeshGL64 *sdf_mesh =
+  ManifoldMeshGL64* sdf_mesh =
       manifold_get_meshgl64(alloc_meshgl64_buffer(), sdf_man);
 
   EXPECT_EQ(manifold_status(sdf_man), MANIFOLD_NO_ERROR);
@@ -273,34 +273,34 @@ TEST(CBIND, level_set_64) {
 }
 
 TEST(CBIND, properties) {
-  void (*props)(double *, ManifoldVec3, const double *,
-                void *) = [](double *new_prop, ManifoldVec3 position,
-                             const double *old_prop, void *ctx) {
+  void (*props)(double*, ManifoldVec3, const double*,
+                void*) = [](double* new_prop, ManifoldVec3 position,
+                            const double* old_prop, void* ctx) {
     new_prop[0] =
         std::sqrt(std::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
         5.0;
   };
-  double *context = (double *)malloc(1 * sizeof(double));
+  double* context = (double*)malloc(1 * sizeof(double));
   context[0] = 5.0;
-  void (*propscontext)(double *, ManifoldVec3, const double *,
-                       void *) = [](double *new_prop, ManifoldVec3 position,
-                                    const double *old_prop, void *ctx) {
+  void (*propscontext)(double*, ManifoldVec3, const double*,
+                       void*) = [](double* new_prop, ManifoldVec3 position,
+                                   const double* old_prop, void* ctx) {
     new_prop[0] =
         std::sqrt(std::sqrt(position.x * position.x + position.y * position.y) +
                   position.z * position.z) *
-        ((double *)ctx)[0];
+        ((double*)ctx)[0];
   };
 
-  ManifoldManifold *cube =
+  ManifoldManifold* cube =
       manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
   EXPECT_EQ(manifold_num_prop(cube), 0);
 
-  ManifoldManifold *cube_props =
+  ManifoldManifold* cube_props =
       manifold_set_properties(alloc_manifold_buffer(), cube, 1, props, NULL);
   EXPECT_EQ(manifold_num_prop(cube_props), 1);
 
-  ManifoldManifold *cube_props_context = manifold_set_properties(
+  ManifoldManifold* cube_props_context = manifold_set_properties(
       alloc_manifold_buffer(), cube, 1, propscontext, context);
   EXPECT_EQ(manifold_num_prop(cube_props_context), 1);
 
@@ -315,16 +315,16 @@ TEST(CBIND, properties) {
 
 TEST(CBIND, extrude) {
   ManifoldVec2 pts[] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-  ManifoldSimplePolygon *sq[] = {
+  ManifoldSimplePolygon* sq[] = {
       manifold_simple_polygon(alloc_simple_polygon_buffer(), &pts[0], 4)};
-  ManifoldPolygons *polys = manifold_polygons(alloc_polygons_buffer(), sq, 1);
+  ManifoldPolygons* polys = manifold_polygons(alloc_polygons_buffer(), sq, 1);
 
-  ManifoldManifold *cube =
+  ManifoldManifold* cube =
       manifold_cube(alloc_manifold_buffer(), 1., 1., 1., 0);
-  ManifoldManifold *extrusion =
+  ManifoldManifold* extrusion =
       manifold_extrude(alloc_manifold_buffer(), polys, 1, 0, 0, 1, 1);
 
-  ManifoldManifold *diff =
+  ManifoldManifold* diff =
       manifold_difference(alloc_manifold_buffer(), cube, extrusion);
 
   EXPECT_TRUE(manifold_volume(diff) < 0.0001);
@@ -343,16 +343,16 @@ TEST(CBIND, extrude) {
 }
 
 TEST(CBIND, compose_decompose) {
-  ManifoldManifold *s1 = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
-  ManifoldManifold *s2 =
+  ManifoldManifold* s1 = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
+  ManifoldManifold* s2 =
       manifold_translate(alloc_manifold_buffer(), s1, 2., 2., 2.);
-  ManifoldManifoldVec *ss =
+  ManifoldManifoldVec* ss =
       manifold_manifold_vec(alloc_manifold_vec_buffer(), 2);
   manifold_manifold_vec_set(ss, 0, s1);
   manifold_manifold_vec_set(ss, 1, s2);
-  ManifoldManifold *composed = manifold_compose(alloc_manifold_buffer(), ss);
+  ManifoldManifold* composed = manifold_compose(alloc_manifold_buffer(), ss);
 
-  ManifoldManifoldVec *decomposed =
+  ManifoldManifoldVec* decomposed =
       manifold_decompose(alloc_manifold_vec_buffer(), composed);
 
   EXPECT_EQ(manifold_manifold_vec_length(decomposed), 2);
@@ -371,10 +371,10 @@ TEST(CBIND, compose_decompose) {
 
 TEST(CBIND, polygons) {
   ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {2, 2}};
-  ManifoldSimplePolygon *sp =
+  ManifoldSimplePolygon* sp =
       manifold_simple_polygon(alloc_simple_polygon_buffer(), vs, 3);
-  ManifoldSimplePolygon *sps[] = {sp};
-  ManifoldPolygons *ps = manifold_polygons(alloc_polygons_buffer(), sps, 1);
+  ManifoldSimplePolygon* sps[] = {sp};
+  ManifoldPolygons* ps = manifold_polygons(alloc_polygons_buffer(), sps, 1);
 
   EXPECT_EQ(vs[0].x, manifold_simple_polygon_get_point(sp, 0).x);
   EXPECT_EQ(vs[1].x, manifold_simple_polygon_get_point(sp, 1).x);
@@ -391,18 +391,18 @@ TEST(CBIND, polygons) {
 
 TEST(CBIND, triangulation) {
   ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {1, 2}};
-  ManifoldSimplePolygon *sp =
+  ManifoldSimplePolygon* sp =
       manifold_simple_polygon(manifold_alloc_simple_polygon(), vs, 3);
-  ManifoldSimplePolygon *sps[] = {sp};
-  ManifoldPolygons *ps = manifold_polygons(manifold_alloc_polygons(), sps, 1);
-  ManifoldTriangulation *triangulation =
+  ManifoldSimplePolygon* sps[] = {sp};
+  ManifoldPolygons* ps = manifold_polygons(manifold_alloc_polygons(), sps, 1);
+  ManifoldTriangulation* triangulation =
       manifold_triangulate(manifold_alloc_triangulation(), ps, 1e-6);
 
   manifold_delete_simple_polygon(sp);
   manifold_delete_polygons(ps);
 
   size_t num_tri = manifold_triangulation_num_tri(triangulation);
-  int *tri_verts = (int *)manifold_triangulation_tri_verts(
+  int* tri_verts = (int*)manifold_triangulation_tri_verts(
       malloc(num_tri * 3 * sizeof(int)), triangulation);
 
   EXPECT_EQ(num_tri, 1);
