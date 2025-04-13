@@ -197,20 +197,20 @@ struct Manifold::Impl {
     if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
     if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
-      ivec3 tri;
+      ivec3 triP, triV;
       for (const size_t j : {0, 1, 2}) {
         uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
         if (vert >= numVert) {
           MakeEmpty(Error::VertexOutOfBounds);
           return;
         }
-        tri[j] = vert;
+        triP[j] = vert;
+        triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
       }
-      if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
-        triProp.push_back(tri);
+      if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
+        triProp.push_back(triP);
         if (!prop2vert.empty()) {
-          triVert.push_back(
-              {prop2vert[tri[0]], prop2vert[tri[1]], prop2vert[tri[2]]});
+          triVert.push_back(triV);
         }
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
