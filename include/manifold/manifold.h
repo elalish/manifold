@@ -422,6 +422,18 @@ class Manifold {
                          const std::vector<Smoothness>& sharpenedEdges = {});
   ///@}
 
+  /** @name Fillet
+   * Create a rounding corner
+   */
+  ///@{
+  static Manifold Fillet(const MeshGL&, double radius,
+                         const std::vector<size_t>& selectedEdges = {});
+
+  static Manifold Fillet(const MeshGL64&, double radius,
+                         const std::vector<size_t>& selectedEdges = {});
+
+  ///@}
+
   /** @name Convex Hull
    */
   ///@{
