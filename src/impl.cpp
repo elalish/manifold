@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <map>
 #include <optional>
 
@@ -25,32 +26,97 @@
 #include "./parallel.h"
 #include "./svd.h"
 
-#ifdef MANIFOLD_EXPORT
-#include <string.h>
-
-#include <iomanip>
-#include <iostream>
-#endif
-
 namespace {
 using namespace manifold;
 
-constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
-
-// Absolute error <= 6.7e-5
-float acos(float x) {
-  float negate = float(x < 0);
-  x = abs(x);
-  float ret = -0.0187293;
-  ret = ret * x;
-  ret = ret + 0.0742610;
-  ret = ret * x;
-  ret = ret - 0.2121144;
-  ret = ret * x;
-  ret = ret + 1.5707288;
-  ret = ret * sqrt(1.0 - x);
-  ret = ret - 2 * negate * ret;
-  return negate * 3.14159265358979 + ret;
+/**
+ * Returns arc cosine of 𝑥.
+ *
+ * @return value in range [0,M_PI]
+ * @return NAN if 𝑥 ∈ {NAN,+INFINITY,-INFINITY}
+ * @return NAN if 𝑥 ∉ [-1,1]
+ */
+double sun_acos(double x) {
+  /*
+   * Origin of acos function: FreeBSD /usr/src/lib/msun/src/e_acos.c
+   * Changed the use of union to memcpy to avoid undefined behavior.
+   * ====================================================
+   * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+   *
+   * Developed at SunSoft, a Sun Microsystems, Inc. business.
+   * Permission to use, copy, modify, and distribute this
+   * software is freely granted, provided that this notice
+   * is preserved.
+   * ====================================================
+   */
+  constexpr double pio2_hi =
+      1.57079632679489655800e+00; /* 0x3FF921FB, 0x54442D18 */
+  constexpr double pio2_lo =
+      6.12323399573676603587e-17; /* 0x3C91A626, 0x33145C07 */
+  constexpr double pS0 =
+      1.66666666666666657415e-01; /* 0x3FC55555, 0x55555555 */
+  constexpr double pS1 =
+      -3.25565818622400915405e-01; /* 0xBFD4D612, 0x03EB6F7D */
+  constexpr double pS2 =
+      2.01212532134862925881e-01; /* 0x3FC9C155, 0x0E884455 */
+  constexpr double pS3 =
+      -4.00555345006794114027e-02; /* 0xBFA48228, 0xB5688F3B */
+  constexpr double pS4 =
+      7.91534994289814532176e-04; /* 0x3F49EFE0, 0x7501B288 */
+  constexpr double pS5 =
+      3.47933107596021167570e-05; /* 0x3F023DE1, 0x0DFDF709 */
+  constexpr double qS1 =
+      -2.40339491173441421878e+00; /* 0xC0033A27, 0x1C8A2D4B */
+  constexpr double qS2 =
+      2.02094576023350569471e+00; /* 0x40002AE5, 0x9C598AC8 */
+  constexpr double qS3 =
+      -6.88283971605453293030e-01; /* 0xBFE6066C, 0x1B8D0159 */
+  constexpr double qS4 =
+      7.70381505559019352791e-02; /* 0x3FB3B8C5, 0xB12E9282 */
+  auto R = [=](double z) {
+    double p, q;
+    p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
+    q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
+    return p / q;
+  };
+  double z, w, s, c, df;
+  uint64_t xx;
+  uint32_t hx, lx, ix;
+  memcpy(&xx, &x, sizeof(xx));
+  hx = xx >> 32;
+  ix = hx & 0x7fffffff;
+  /* |x| >= 1 or nan */
+  if (ix >= 0x3ff00000) {
+    lx = xx;
+    if (((ix - 0x3ff00000) | lx) == 0) {
+      /* acos(1)=0, acos(-1)=pi */
+      if (hx >> 31) return 2 * pio2_hi + 0x1p-120f;
+      return 0;
+    }
+    return 0 / (x - x);
+  }
+  /* |x| < 0.5 */
+  if (ix < 0x3fe00000) {
+    if (ix <= 0x3c600000) /* |x| < 2**-57 */
+      return pio2_hi + 0x1p-120f;
+    return pio2_hi - (x - (pio2_lo - x * R(x * x)));
+  }
+  /* x < -0.5 */
+  if (hx >> 31) {
+    z = (1.0 + x) * 0.5;
+    s = sqrt(z);
+    w = R(z) * s - pio2_lo;
+    return 2 * (pio2_hi - (s + w));
+  }
+  /* x > 0.5 */
+  z = (1.0 - x) * 0.5;
+  s = sqrt(z);
+  memcpy(&xx, &s, sizeof(xx));
+  xx &= 0xffffffff00000000;
+  memcpy(&df, &xx, sizeof(xx));
+  c = (z - df * df) / (s + df);
+  w = R(z) * s + c;
+  return 2 * (df + w);
 }
 
 struct Transform4x3 {
@@ -240,7 +306,6 @@ void Manifold::Impl::DedupePropVerts() {
       autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
       [&vert2vert, numProp, this](const int edgeIdx) {
         const Halfedge edge = halfedge_[edgeIdx];
-        const Halfedge pair = halfedge_[edge.pairedHalfedge];
         const int edgeFace = edgeIdx / 3;
         const int pairFace = edge.pairedHalfedge / 3;
 
@@ -277,6 +342,8 @@ void Manifold::Impl::DedupePropVerts() {
   for (auto& prop : meshRelation_.triProperties)
     for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }
+
+constexpr int kRemovedHalfedge = -2;
 
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
@@ -319,9 +386,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
 
-  constexpr int removedHalfedge = -2;
-  const auto body = [&, removedHalfedge](int i, int consecutiveStart,
-                                         int segmentEnd) {
+  const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
     int k = consecutiveStart + numEdge;
@@ -331,7 +396,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = removedHalfedge;
+        h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
@@ -380,17 +445,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge,
-             [this, &ids, numEdge, removedHalfedge](int i) {
-               const int pair0 = ids[i];
-               const int pair1 = ids[i + numEdge];
-               if (halfedge_[pair0].pairedHalfedge != removedHalfedge) {
-                 halfedge_[pair0].pairedHalfedge = pair1;
-                 halfedge_[pair1].pairedHalfedge = pair0;
-               } else {
-                 halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
-               }
-             });
+  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+    const int pair0 = ids[i];
+    const int pair1 = ids[i + numEdge];
+    if (halfedge_[pair0].pairedHalfedge != kRemovedHalfedge) {
+      halfedge_[pair0].pairedHalfedge = pair1;
+      halfedge_[pair1].pairedHalfedge = pair0;
+    } else {
+      halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+    }
+  });
 }
 
 /**
@@ -529,7 +593,6 @@ void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri());
-  bool calculateTriNormal = false;
 
   std::vector<std::atomic<int>> vertHalfedgeMap(NumVert());
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
@@ -544,7 +607,6 @@ void Manifold::Impl::CalculateNormals() {
   };
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
-    calculateTriNormal = true;
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
       if (halfedge_[3 * face].startVert < 0) {
@@ -592,7 +654,7 @@ void Manifold::Impl::CalculateNormals() {
       // should just exclude it from the normal calculation...
       if (!la::isfinite(currEdge[0]) || !la::isfinite(prevEdge[0])) return;
       double dot = -la::dot(prevEdge, currEdge);
-      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : acos(dot));
+      double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : sun_acos(dot));
       normal += phi * faceNormal_[edge / 3];
     });
     vertNormal_[vert] = SafeNormalize(normal);
@@ -620,9 +682,13 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_EXPORT
+#ifdef MANIFOLD_DEBUG
+/**
+ * Debugging output using high precision OBJ files with specialized comments
+ */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   stream << std::setprecision(19);  // for double precision
+  stream << std::fixed;             // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# tolerance = " << impl.tolerance_ << std::endl;
   stream << "# epsilon = " << impl.epsilon_ << std::endl;
@@ -643,21 +709,14 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
 }
 
 /**
- * Export the mesh to a Wavefront OBJ file in a way that preserves the full
- * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon. Useful for debugging and testing.
- * Should be used with ImportMeshGL64 for reproducing issues.
+ * Import a mesh from a Wavefront OBJ file that was exported with Write.  This
+ * function is the counterpart to Write and should be used with it.  This
+ * function is not guaranteed to be able to import OBJ files not written by the
+ * Write function.
  */
-std::ostream& Manifold::Dump(std::ostream& stream) const {
-  return stream << *GetCsgLeafNode().GetImpl();
-}
+Manifold Manifold::ReadOBJ(std::istream& stream) {
+  if (!stream.good()) return Invalid();
 
-/**
- * Import a mesh from a Wavefront OBJ file that was exported with Dump.
- * This function is the counterpart to Dump and should be used with it.
- * This function cannot import OBJ files not written by the Dump function.
- */
-Manifold Manifold::ImportMeshGL64(std::istream& stream) {
   MeshGL64 mesh;
   std::optional<double> epsilon;
   stream >> std::setprecision(19);
@@ -673,7 +732,7 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
           stream.get(tmp.data(), SIZE, '\n');
           if (strncmp(tmp.data(), "tolerance", SIZE) == 0) {
             // skip 3 letters
-            for (int i : {0, 1, 2}) stream.get();
+            for (int _ : {0, 1, 2}) stream.get();
             stream >> mesh.tolerance;
           } else if (strncmp(tmp.data(), "epsilon =", SIZE) == 0) {
             double tmp;
@@ -694,28 +753,41 @@ Manifold Manifold::ImportMeshGL64(std::istream& stream) {
         break;
       }
       case 'v':
-        for (int i : {0, 1, 2}) {
+        for (int _ : {0, 1, 2}) {
           double x;
           stream >> x;
           mesh.vertProperties.push_back(x);
         }
         break;
       case 'f':
-        for (int i : {0, 1, 2}) {
+        for (int _ : {0, 1, 2}) {
           uint64_t x;
           stream >> x;
           mesh.triVerts.push_back(x - 1);
         }
         break;
+      case '\r':
       case '\n':
         break;
       default:
-        DEBUG_ASSERT(false, userErr, "unexpected character in MeshGL64 import");
+        DEBUG_ASSERT(false, userErr, "unexpected character in Manifold import");
     }
   }
   auto m = std::make_shared<Manifold::Impl>(mesh);
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
+}
+
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions, as well as storing metadata such as
+ * the tolerance and epsilon. Useful for debugging and testing.  Files written
+ * by WriteOBJ should be read back in with ReadOBJ.
+ */
+bool Manifold::WriteOBJ(std::ostream& stream) const {
+  if (!stream.good()) return false;
+  stream << *this->GetCsgLeafNode().GetImpl();
+  return true;
 }
 #endif
 

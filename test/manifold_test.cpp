@@ -19,8 +19,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "../src/tri_dist.h"
-#include "samples.h"
 #include "test.h"
 
 namespace {
@@ -282,6 +280,16 @@ TEST(Manifold, Revolve3) {
 }
 #endif
 
+TEST(Manifold, RevolveClip) {
+  Polygons polys = {{{-5, -10}, {5, 0}, {-5, 10}}};
+  Polygons clipped = {{{0, -5}, {5, 0}, {0, 5}}};
+  Manifold first = Manifold::Revolve(polys, 48);
+  Manifold second = Manifold::Revolve(clipped, 48);
+  EXPECT_EQ(first.Genus(), second.Genus());
+  EXPECT_EQ(first.Volume(), second.Volume());
+  EXPECT_EQ(first.SurfaceArea(), second.SurfaceArea());
+}
+
 TEST(Manifold, PartialRevolveOnYAxis) {
   Polygons polys = SquareHole(2.0);
   Polygons offsetPolys = SquareHole(10.0);
@@ -494,6 +502,12 @@ TEST(Manifold, Slice) {
   CrossSection top = cube.Slice(1);
   EXPECT_EQ(bottom.Area(), 1);
   EXPECT_EQ(top.Area(), 0);
+}
+
+TEST(Manifold, SliceEmptyObject) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  CrossSection bottom = empty.Slice();
 }
 #endif
 

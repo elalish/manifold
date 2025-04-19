@@ -142,33 +142,8 @@ struct CheckCCW {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
-    int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
-    bool check = tol > 0 ? ccw >= 0 : ccw == 0;
-
-#ifdef MANIFOLD_DEBUG
-    if (tol > 0 && !check) {
-      vec2 v1 = v[1] - v[0];
-      vec2 v2 = v[2] - v[0];
-      double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
-      double base = std::sqrt(base2);
-      vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = la::cross(V1 - V0, V2 - V0);
-      printf(
-          "Tri %ld does not match normal, approx height = %g, base = %g\n"
-          "tol = %g, area2 = %g, base2*tol2 = %g\n"
-          "normal = %g, %g, %g\n"
-          "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          static_cast<long>(face), area / base, base, tol, area * area,
-          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
-          triNormal[face].z, norm.x, norm.y, norm.z,
-          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
-          halfedges[3 * face + 2].startVert);
-    }
-#endif
-    return check;
+    const int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
+    return tol > 0 ? ccw >= 0 : ccw == 0;
   }
 };
 }  // namespace
@@ -215,7 +190,8 @@ std::mutex dump_lock;
  * Note that this is not checking for epsilon-validity.
  */
 bool Manifold::Impl::IsSelfIntersecting() const {
-  const double epsilonSq = epsilon_ * epsilon_;
+  const double ep = 2 * epsilon_;
+  const double epsilonSq = ep * ep;
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
@@ -223,38 +199,38 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   const bool verbose = ManifoldParams().verbose > 0;
   std::atomic<bool> intersecting(false);
 
-  auto f = [&](int x, int y) {
-    std::array<vec3, 3> tri_x, tri_y;
+  auto f = [&](int tri0, int tri1) {
+    std::array<vec3, 3> triVerts0, triVerts1;
     for (int i : {0, 1, 2}) {
-      tri_x[i] = vertPos_[halfedge_[3 * x + i].startVert];
-      tri_y[i] = vertPos_[halfedge_[3 * y + i].startVert];
+      triVerts0[i] = vertPos_[halfedge_[3 * tri0 + i].startVert];
+      triVerts1[i] = vertPos_[halfedge_[3 * tri1 + i].startVert];
     }
-    // if triangles x and y share a vertex, return true to skip the
+    // if triangles tri0 and tri1 share a vertex, return true to skip the
     // check. we relax the sharing criteria a bit to allow for at most
     // distance epsilon squared
     for (int i : {0, 1, 2})
       for (int j : {0, 1, 2})
-        if (distance2(tri_x[i], tri_y[j]) <= epsilonSq) return;
+        if (distance2(triVerts0[i], triVerts1[j]) <= epsilonSq) return;
 
-    if (DistanceTriangleTriangleSquared(tri_x, tri_y) == 0.0) {
+    if (DistanceTriangleTriangleSquared(triVerts0, triVerts1) == 0.0) {
       // try to move the triangles around the normal of the other face
-      std::array<vec3, 3> tmp_x, tmp_y;
-      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] + epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_x[i] = tri_x[i] - epsilon_ * faceNormal_[y];
-      if (DistanceTriangleTriangleSquared(tmp_x, tri_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] + epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
-      for (int i : {0, 1, 2}) tmp_y[i] = tri_y[i] - epsilon_ * faceNormal_[x];
-      if (DistanceTriangleTriangleSquared(tri_x, tmp_y) > 0.0) return;
+      std::array<vec3, 3> tmp0, tmp1;
+      for (int i : {0, 1, 2}) tmp0[i] = triVerts0[i] + ep * faceNormal_[tri1];
+      if (DistanceTriangleTriangleSquared(tmp0, triVerts1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp0[i] = triVerts0[i] - ep * faceNormal_[tri1];
+      if (DistanceTriangleTriangleSquared(tmp0, triVerts1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp1[i] = triVerts1[i] + ep * faceNormal_[tri0];
+      if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
+      for (int i : {0, 1, 2}) tmp1[i] = triVerts1[i] - ep * faceNormal_[tri0];
+      if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
       if (verbose) {
         dump_lock.lock();
         std::cout << "intersecting:" << std::endl;
-        for (int i : {0, 1, 2}) std::cout << tri_x[i] << " ";
+        for (int i : {0, 1, 2}) std::cout << triVerts0[i] << " ";
         std::cout << std::endl;
-        for (int i : {0, 1, 2}) std::cout << tri_y[i] << " ";
+        for (int i : {0, 1, 2}) std::cout << triVerts1[i] << " ";
         std::cout << std::endl;
         dump_lock.unlock();
       }

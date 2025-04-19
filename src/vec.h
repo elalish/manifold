@@ -52,33 +52,33 @@ class Vec : public VecView<T> {
 
   Vec(size_t size, T val) : VecView<T>() { resize(size, val); }
 
-  Vec(const Vec<T> &vec) : VecView<T>() { *this = Vec(vec.view()); }
+  Vec(const Vec<T>& vec) : VecView<T>() { *this = Vec(vec.view()); }
 
-  Vec(const VecView<const T> &vec) : VecView<T>() {
+  Vec(const VecView<const T>& vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
-  Vec(const std::vector<T> &vec) : VecView<T>() {
+  Vec(const std::vector<T>& vec) : VecView<T>() {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
-  Vec(Vec<T> &&vec) : VecView<T>() {
+  Vec(Vec<T>&& vec) : VecView<T>() {
     this->ptr_ = vec.ptr_;
     this->size_ = vec.size_;
     capacity_ = vec.capacity_;
@@ -100,7 +100,7 @@ class Vec : public VecView<T> {
     capacity_ = 0;
   }
 
-  Vec<T> &operator=(const Vec<T> &other) {
+  Vec<T>& operator=(const Vec<T>& other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
       TracyFreeS(this->ptr_, 3);
@@ -109,7 +109,7 @@ class Vec : public VecView<T> {
     this->size_ = other.size_;
     capacity_ = other.size_;
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
       ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
@@ -117,7 +117,7 @@ class Vec : public VecView<T> {
     return *this;
   }
 
-  Vec<T> &operator=(Vec<T> &&other) {
+  Vec<T>& operator=(Vec<T>&& other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
       TracyFreeS(this->ptr_, 3);
@@ -134,13 +134,13 @@ class Vec : public VecView<T> {
 
   operator VecView<T>() const { return {this->ptr_, this->size_}; }
 
-  void swap(Vec<T> &other) {
+  void swap(Vec<T>& other) {
     std::swap(this->ptr_, other.ptr_);
     std::swap(this->size_, other.size_);
     std::swap(capacity_, other.capacity_);
   }
 
-  inline void push_back(const T &val) {
+  inline void push_back(const T& val) {
     if (this->size_ >= capacity_) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
@@ -159,7 +159,7 @@ class Vec : public VecView<T> {
 
   void reserve(size_t n) {
     if (n > capacity_) {
-      T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
+      T* newBuffer = reinterpret_cast<T*>(malloc(n * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
@@ -200,9 +200,9 @@ class Vec : public VecView<T> {
   }
 
   void shrink_to_fit() {
-    T *newBuffer = nullptr;
+    T* newBuffer = nullptr;
     if (this->size_ > 0) {
-      newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      newBuffer = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
       ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);

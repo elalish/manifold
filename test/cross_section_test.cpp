@@ -46,6 +46,26 @@ TEST(CrossSection, MirrorUnion) {
   EXPECT_TRUE(a.Mirror(vec2(0.0)).IsEmpty());
 }
 
+TEST(CrossSection, MirrorCheckAxis) {
+  auto tri = CrossSection({{0., 0.}, {5., 5.}, {0., 10.}});
+
+  auto a = tri.Mirror({1., 1.}).Bounds();
+  auto a_expected = CrossSection({{0., 0.}, {-10., 0.}, {-5., -5.}}).Bounds();
+
+  EXPECT_NEAR(a.min.x, a_expected.min.x, 0.001);
+  EXPECT_NEAR(a.min.y, a_expected.min.y, 0.001);
+  EXPECT_NEAR(a.max.x, a_expected.max.x, 0.001);
+  EXPECT_NEAR(a.max.y, a_expected.max.y, 0.001);
+
+  auto b = tri.Mirror({-1., 1.}).Bounds();
+  auto b_expected = CrossSection({{0., 0.}, {10., 0.}, {5., 5.}}).Bounds();
+
+  EXPECT_NEAR(b.min.x, b_expected.min.x, 0.001);
+  EXPECT_NEAR(b.min.y, b_expected.min.y, 0.001);
+  EXPECT_NEAR(b.max.x, b_expected.max.x, 0.001);
+  EXPECT_NEAR(b.max.y, b_expected.max.y, 0.001);
+}
+
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
@@ -111,7 +131,7 @@ TEST(CrossSection, Transform) {
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](vec2 &v) {
+  auto b = sq.Warp([](vec2& v) {
     v.x = v.x * 2 + 4;
     v.y = v.y * 3 + 5;
   });

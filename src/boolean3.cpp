@@ -47,7 +47,7 @@ vec2 Interpolate(vec3 pL, vec3 pR, double x) {
   return yz;
 }
 
-vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
+vec4 Intersect(const vec3& pL, const vec3& pR, const vec3& qL, const vec3& qR) {
   const double dyL = qL.y - pL.y;
   const double dyR = qR.y - pR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
@@ -325,19 +325,19 @@ struct Kernel12Tmp {
 
 struct Kernel12Recorder {
   using Local = Kernel12Tmp;
-  Kernel12 &k12;
+  Kernel12& k12;
   VecView<const TmpEdge> tmpedges;
   bool forward;
 
 #if MANIFOLD_PAR == 1
   tbb::combinable<Kernel12Tmp> store;
-  Local &local() { return store.local(); }
+  Local& local() { return store.local(); }
 #else
   Kernel12Tmp localStore;
-  Local &local() { return localStore; }
+  Local& local() { return localStore; }
 #endif
 
-  void record(int queryIdx, int leafIdx, Local &tmp) {
+  void record(int queryIdx, int leafIdx, Local& tmp) {
     queryIdx = tmpedges[queryIdx].halfedgeIdx;
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
@@ -355,10 +355,10 @@ struct Kernel12Recorder {
     Kernel12Tmp result;
     std::vector<Kernel12Tmp> tmps;
     store.combine_each(
-        [&](Kernel12Tmp &data) { tmps.emplace_back(std::move(data)); });
+        [&](Kernel12Tmp& data) { tmps.emplace_back(std::move(data)); });
     std::vector<size_t> sizes;
     size_t total_size = 0;
-    for (const auto &tmp : tmps) {
+    for (const auto& tmp : tmps) {
       sizes.push_back(total_size);
       total_size += tmp.x12_.size();
     }
@@ -380,14 +380,14 @@ struct Kernel12Recorder {
   }
 };
 
-std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
-                                            const Manifold::Impl &inQ,
-                                            Vec<std::array<int, 2>> &p1q2,
+std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
+                                            const Manifold::Impl& inQ,
+                                            Vec<std::array<int, 2>>& p1q2,
                                             double expandP, bool forward) {
   ZoneScoped;
   // a: 1 (edge), b: 2 (face)
-  const Manifold::Impl &a = forward ? inP : inQ;
-  const Manifold::Impl &b = forward ? inQ : inP;
+  const Manifold::Impl& a = forward ? inP : inQ;
+  const Manifold::Impl& b = forward ? inQ : inP;
 
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
@@ -402,7 +402,7 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
                                 a.vertPos_[tmpedges[e].second]);
              });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward};
+  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
 
   b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
                                                        recorder);
@@ -424,13 +424,13 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
   return std::make_tuple(x12, v12);
 };
 
-Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
+Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    double expandP, bool forward) {
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   // a: 0 (vertex), b: 2 (face)
-  const Manifold::Impl &a = forward ? inP : inQ;
-  const Manifold::Impl &b = forward ? inQ : inP;
+  const Manifold::Impl& a = forward ? inP : inQ;
+  const Manifold::Impl& b = forward ? inQ : inP;
   Vec<int> w03(a.NumVert(), 0);
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
@@ -445,7 +445,7 @@ Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 }  // namespace
 
 namespace manifold {
-Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
+Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add ? 1.0 : -1.0) {
   // Symbolic perturbation:

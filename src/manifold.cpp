@@ -332,11 +332,9 @@ MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * only applies to Manifolds newly-created from an input Mesh - once they are
- * combined into a new Manifold via operations, the status reverts to NoError,
- * simply processing the problem mesh as empty. Likewise, empty meshes may still
- * show NoError, for instance if they are small enough relative to their
- * tolerance to be collapsed to nothing.
+ * will carry on through operations like NaN propogation, ensuring an errored
+ * mesh doesn't get mysteriously lost. Empty meshes may still show
+ * NoError, for instance the intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
@@ -661,9 +659,9 @@ Manifold Manifold::SetProperties(
             {pImpl->meshRelation_.properties.data(), numProp,
              oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
              triProperties.data(), pImpl->halfedge_.data(),
-             propFunc == nullptr ? [](double* newProp, vec3 position,
-                                      const double* oldProp) { *newProp = 0; }
-                                 : propFunc}));
+             propFunc == nullptr
+                 ? [](double* newProp, vec3, const double*) { *newProp = 0; }
+                 : propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;
@@ -783,8 +781,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
 Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (n > 1) {
-    pImpl->Refine(
-        [n](vec3 edge, vec4 tangentStart, vec4 tangentEnd) { return n - 1; });
+    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -802,7 +799,7 @@ Manifold Manifold::Refine(int n) const {
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine([length](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
+  pImpl->Refine([length](vec3 edge, vec4, vec4) {
     return static_cast<int>(la::length(edge) / length);
   });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));

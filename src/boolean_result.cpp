@@ -37,7 +37,7 @@ using namespace manifold;
 
 template <>
 struct std::hash<std::pair<int, int>> {
-  size_t operator()(const std::pair<int, int> &p) const {
+  size_t operator()(const std::pair<int, int>& p) const {
     return std::hash<int>()(p.first) ^ std::hash<int>()(p.second);
   }
 };
@@ -83,7 +83,7 @@ struct CountNewVerts {
   VecView<int> countP;
   VecView<int> countQ;
   VecView<const int> i12;
-  const Vec<std::array<int, 2>> &pq;
+  const Vec<std::array<int, 2>>& pq;
   VecView<const Halfedge> halfedges;
 
   void operator()(const int idx) {
@@ -106,10 +106,10 @@ struct CountNewVerts {
 };
 
 std::tuple<Vec<int>, Vec<int>> SizeOutput(
-    Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
-    const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
-    const Vec<int> &i21, const Vec<std::array<int, 2>> &p1q2,
-    const Vec<std::array<int, 2>> &p2q1, bool invertQ) {
+    Manifold::Impl& outR, const Manifold::Impl& inP, const Manifold::Impl& inQ,
+    const Vec<int>& i03, const Vec<int>& i30, const Vec<int>& i12,
+    const Vec<int>& i21, const Vec<std::array<int, 2>>& p1q2,
+    const Vec<std::array<int, 2>>& p2q1, bool invertQ) {
   ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
@@ -237,13 +237,13 @@ void AddNewEdgeVerts(
 
     bool direction = inclusion < 0;
     std::hash<std::pair<int, int>> pairHasher;
-    std::array<std::tuple<bool, size_t, std::vector<EdgePos> *>, 3> edges = {
+    std::array<std::tuple<bool, size_t, std::vector<EdgePos>*>, 3> edges = {
         std::make_tuple(direction, std::hash<int>{}(edgeP), &edgesP[edgeP]),
         std::make_tuple(direction ^ !forward,  // revert if not forward
                         pairHasher(keyRight), &edgesNew[keyRight]),
         std::make_tuple(direction ^ forward,  // revert if forward
                         pairHasher(keyLeft), &edgesNew[keyLeft])};
-    for (const auto &tuple : edges) {
+    for (const auto& tuple : edges) {
       lock(std::get<1>(tuple));
       for (int j = 0; j < std::abs(inclusion); ++j)
         std::get<2>(tuple)->push_back(
@@ -266,19 +266,19 @@ void AddNewEdgeVerts(
         std::placeholders::_1);
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
-        [&](const tbb::blocked_range<size_t> &range) {
+        [&](const tbb::blocked_range<size_t>& range) {
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },
         ap);
     return;
   }
 #endif
-  auto processFun = std::bind(
-      process, [](size_t _) {}, [](size_t _) {}, std::placeholders::_1);
+  auto processFun =
+      std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
   for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
-std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
+std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -304,11 +304,11 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   return edges;
 }
 
-void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
-                        Vec<int> &facePtrR,
-                        concurrent_map<int, std::vector<EdgePos>> &edgesP,
-                        Vec<TriRef> &halfedgeRef, const Manifold::Impl &inP,
-                        const Vec<int> &i03, const Vec<int> &vP2R,
+void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
+                        Vec<int>& facePtrR,
+                        concurrent_map<int, std::vector<EdgePos>>& edgesP,
+                        Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
+                        const Vec<int>& i03, const Vec<int>& vP2R,
                         const Vec<int>::IterC faceP2R, bool forward) {
   ZoneScoped;
   // Each edge in the map is partially retained; for each of these, look up
@@ -316,15 +316,15 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  Vec<Halfedge> &halfedgeR = outR.halfedge_;
-  const Vec<vec3> &vertPosP = inP.vertPos_;
-  const Vec<Halfedge> &halfedgeP = inP.halfedge_;
+  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  const Vec<vec3>& vertPosP = inP.vertPos_;
+  const Vec<Halfedge>& halfedgeP = inP.halfedge_;
 
-  for (auto &value : edgesP) {
+  for (auto& value : edgesP) {
     const int edgeP = value.first;
-    std::vector<EdgePos> &edgePosP = value.second;
+    std::vector<EdgePos>& edgePosP = value.second;
 
-    const Halfedge &halfedge = halfedgeP[edgeP];
+    const Halfedge& halfedge = halfedgeP[edgeP];
     wholeHalfedgeP[edgeP] = false;
     wholeHalfedgeP[halfedge.pairedHalfedge] = false;
 
@@ -332,7 +332,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     const int vEnd = halfedge.endVert;
     const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
-    for (EdgePos &edge : edgePosP) {
+    for (EdgePos& edge : edgePosP) {
       edge.edgePos = la::dot(outR.vertPos_[edge.vert], edgeVec);
     }
 
@@ -385,18 +385,18 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
 }
 
 void AppendNewEdges(
-    Manifold::Impl &outR, Vec<int> &facePtrR,
-    concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    Vec<TriRef> &halfedgeRef, const Vec<int> &facePQ2R, const int numFaceP) {
+    Manifold::Impl& outR, Vec<int>& facePtrR,
+    concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
+    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  Vec<Halfedge> &halfedgeR = outR.halfedge_;
-  Vec<vec3> &vertPosR = outR.vertPos_;
+  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  Vec<vec3>& vertPosR = outR.vertPos_;
 
-  for (auto &value : edgesNew) {
+  for (auto& value : edgesNew) {
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
-    std::vector<EdgePos> &edgePos = value.second;
+    std::vector<EdgePos>& edgePos = value.second;
 
     Box bbox;
     for (auto edge : edgePos) {
@@ -407,7 +407,7 @@ void AppendNewEdges(
     const int i = (size.x > size.y && size.x > size.z) ? 0
                   : size.y > size.z                    ? 1
                                                        : 2;
-    for (auto &edge : edgePos) {
+    for (auto& edge : edgePos) {
       edge.edgePos = vertPosR[edge.vert][i];
     }
 
@@ -485,10 +485,10 @@ struct DuplicateHalfedges {
   }
 };
 
-void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
-                      Vec<TriRef> &halfedgeRef, const Manifold::Impl &inP,
-                      const Vec<char> wholeHalfedgeP, const Vec<int> &i03,
-                      const Vec<int> &vP2R, VecView<const int> faceP2R,
+void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
+                      Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
+                      const Vec<char> wholeHalfedgeP, const Vec<int>& i03,
+                      const Vec<int>& vP2R, VecView<const int> faceP2R,
                       bool forward) {
   ZoneScoped;
   for_each_n(
@@ -502,7 +502,7 @@ struct MapTriRef {
   VecView<const TriRef> triRefQ;
   const int offsetQ;
 
-  void operator()(TriRef &triRef) {
+  void operator()(TriRef& triRef) {
     const int tri = triRef.tri;
     const bool PQ = triRef.meshID == 0;
     triRef = PQ ? triRefP[tri] : triRefQ[tri];
@@ -510,18 +510,18 @@ struct MapTriRef {
   }
 };
 
-void UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
-                     const Manifold::Impl &inQ, bool invertQ) {
+void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
+                     const Manifold::Impl& inQ, bool invertQ) {
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(
       autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
       outR.NumTri(),
       MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
 
-  for (const auto &pair : inP.meshRelation_.meshIDtransform) {
+  for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
-  for (const auto &pair : inQ.meshRelation_.meshIDtransform) {
+  for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
     outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
         invertQ;
@@ -545,8 +545,8 @@ struct Barycentric {
 
     const int triPQ = refPQ.tri;
     const bool PQ = refPQ.meshID == 0;
-    const auto &vertPos = PQ ? vertPosP : vertPosQ;
-    const auto &halfedge = PQ ? halfedgeP : halfedgeQ;
+    const auto& vertPos = PQ ? vertPosP : vertPosQ;
+    const auto& halfedge = PQ ? halfedgeP : halfedgeQ;
 
     mat3 triPos;
     for (const int j : {0, 1, 2})
@@ -559,8 +559,8 @@ struct Barycentric {
   }
 };
 
-void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
-                      const Manifold::Impl &inQ) {
+void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
+                      const Manifold::Impl& inQ) {
   ZoneScoped;
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
@@ -594,15 +594,15 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
     const int oldNumProp = PQ ? numPropP : numPropQ;
-    const auto &properties =
+    const auto& properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const ivec3 &triProp = oldNumProp == 0 ? ivec3(-1)
+    const ivec3& triProp = oldNumProp == 0 ? ivec3(-1)
                            : PQ ? inP.meshRelation_.triProperties[ref.tri]
                                 : inQ.meshRelation_.triProperties[ref.tri];
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
-      const vec3 &uvw = bary[3 * tri + i];
+      const vec3& uvw = bary[3 * tri + i];
 
       ivec4 key(PQ, idMissProp, -1, -1);
       if (oldNumProp > 0) {
@@ -630,16 +630,16 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
 
       if (key.y == idMissProp && key.z >= 0) {
         // only key.x/key.z matters
-        auto &entry = propMissIdx[key.x][key.z];
+        auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
           outR.meshRelation_.triProperties[tri][i] = entry;
           continue;
         }
         entry = idx;
       } else {
-        auto &bin = propIdx[key.y];
+        auto& bin = propIdx[key.y];
         bool bFound = false;
-        for (const auto &b : bin) {
+        for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
             outR.meshRelation_.triProperties[tri][i] = b.second;
@@ -665,7 +665,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   }
 }
 
-void ReorderHalfedges(VecView<Halfedge> &halfedges) {
+void ReorderHalfedges(VecView<Halfedge>& halfedges) {
   // halfedges in the same face are added in non-deterministic order, so we have
   // to reorder them for determinism
 
@@ -686,7 +686,7 @@ void ReorderHalfedges(VecView<Halfedge> &halfedges) {
   for_each(autoPolicy(halfedges.size() / 3), countAt(0),
            countAt(halfedges.size() / 3), [&halfedges](size_t tri) {
              for (int i : {0, 1, 2}) {
-               Halfedge &curr = halfedges[tri * 3 + i];
+               Halfedge& curr = halfedges[tri * 3 + i];
                int oppositeFace = curr.pairedHalfedge / 3;
                int index = -1;
                for (int j : {0, 1, 2})

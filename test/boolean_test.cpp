@@ -275,6 +275,13 @@ TEST(Boolean, MultiCoplanar) {
   EXPECT_NEAR(out.SurfaceArea(), 2.76, 1e-5);
 }
 
+TEST(Boolean, AlmostCoplanar) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold result =
+      tet + tet.Rotate(0.001, -0.08472872823860228, 0.055910459615905288) + tet;
+  ExpectMeshes(result, {{20, 36}});
+}
+
 TEST(Boolean, FaceUnion) {
   Manifold cubes = Manifold::Cube();
   cubes += cubes.Translate({1, 0, 0});
@@ -430,7 +437,7 @@ TEST(Boolean, Precision2) {
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
 
-TEST(Boolean, DISABLED_SimpleCubeRegression) {
+TEST(Boolean, SimpleCubeRegression) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold result =

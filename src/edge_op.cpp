@@ -252,7 +252,7 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   FlagStore s;
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges, 1e5);
+
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
   // Short edges get to skip several checks and hence remove more classes of
@@ -277,7 +277,6 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
   FlagStore s;
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges, 1e5);
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
   while (1) {
@@ -310,7 +309,6 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   FlagStore s;
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
-  auto policy = autoPolicy(nbEdges, 1e5);
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
@@ -330,9 +328,9 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   });
 
 #ifdef MANIFOLD_DEBUG
-   if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-     std::cout << "swapped " << numFlagged << " edges" << std::endl;
-   }
+  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    std::cout << "swapped " << numFlagged << " edges" << std::endl;
+  }
 #endif
 }
 
@@ -356,7 +354,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       UpdateVert(newVert, current, opposite);
 
       int newHalfedge = halfedge_.size();
-      int newFace = newHalfedge / 3;
       int oldFace = current / 3;
       int outsideVert = halfedge_[current].startVert;
       halfedge_.push_back({endVert, newVert, -1});
@@ -372,7 +369,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
-      ++newFace;
       oldFace = opposite / 3;
       outsideVert = halfedge_[opposite].startVert;
       halfedge_.push_back({newVert, endVert, -1});
@@ -860,8 +856,7 @@ void Manifold::Impl::DedupeEdges() {
 
         // first iteration, populate entries
         // this makes sure we always report the same set of entries
-        ForVert(i, [&local, &endVerts, &endVertSet, &results,
-                    this](int current) {
+        ForVert(i, [&local, &endVerts, &endVertSet, this](int current) {
           local[current] = true;
           if (halfedge_[current].startVert == -1 ||
               halfedge_[current].endVert == -1) {
@@ -891,8 +886,7 @@ void Manifold::Impl::DedupeEdges() {
         // second iteration, actually check for duplicates
         // we always report the same set of duplicates, excluding the smallest
         // halfedge in the set of duplicates
-        ForVert(i, [&local, &endVerts, &endVertSet, &results,
-                    this](int current) {
+        ForVert(i, [&endVerts, &endVertSet, &results, this](int current) {
           if (halfedge_[current].startVert == -1 ||
               halfedge_[current].endVert == -1) {
             return;

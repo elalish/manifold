@@ -15,8 +15,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include <fstream>
-#include <iostream>
 
 #include "manifold/manifold.h"
 #include "test.h"
@@ -923,14 +921,6 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
-// Note - For the moment, the Status() checks are included in the loops to
-// (more or less) mimic the BRL-CAD behavior of checking the mesh for
-// unexpected output after each iteration.  Doing so is not ideal - it
-// *massively* slows the overall evaluation - but it also seems to be
-// triggering behavior that avoids a triangulation failure.
-//
-// Eventually, once other issues are resolved, the in-loop checks should be
-// removed in favor of the top level checks.
 TEST(BooleanComplex, SimpleOffset) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
@@ -1013,26 +1003,17 @@ TEST(BooleanComplex, SimpleOffset) {
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
     manifold::Manifold right(tri_m);
     c += right;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
+#endif
 
+#ifdef MANIFOLD_DEBUG
 TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold a, b;
-  std::ifstream f;
-  f.open(dir + "/models/Offset1.obj");
-  a = Manifold::ImportMeshGL64(f);
-  f.close();
-  f.open(dir + "/models/Offset2.obj");
-  b = Manifold::ImportMeshGL64(f);
-  f.close();
+  Manifold a = ReadTestOBJ("Offset1.obj");
+  Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
@@ -1041,20 +1022,10 @@ TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
 TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold a, b;
-  std::ifstream f;
-  f.open(dir + "/models/Offset3.obj");
-  a = Manifold::ImportMeshGL64(f);
-  f.close();
-  f.open(dir + "/models/Offset4.obj");
-  b = Manifold::ImportMeshGL64(f);
-  f.close();
-
+  Manifold a = ReadTestOBJ("Offset3.obj");
+  Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
-
 #endif

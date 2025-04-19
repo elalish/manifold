@@ -24,13 +24,11 @@
 #include "./mesh_fixes.h"
 #include "./parallel.h"
 
-constexpr int kParallelThreshold = 4096;
-
 namespace {
 using namespace manifold;
 struct MeshCompare {
-  bool operator()(const std::shared_ptr<CsgLeafNode> &a,
-                  const std::shared_ptr<CsgLeafNode> &b) {
+  bool operator()(const std::shared_ptr<CsgLeafNode>& a,
+                  const std::shared_ptr<CsgLeafNode>& b) {
     return a->GetImpl()->NumVert() < b->GetImpl()->NumVert();
   }
 };
@@ -39,7 +37,7 @@ struct MeshCompare {
 namespace manifold {
 
 std::shared_ptr<CsgNode> CsgNode::Boolean(
-    const std::shared_ptr<CsgNode> &second, OpType op) {
+    const std::shared_ptr<CsgNode>& second, OpType op) {
   if (second->GetNodeType() != CsgNodeType::Leaf) {
     // "this" is not a CsgOpNode (which overrides Boolean), but if "second" is
     // and the operation is commutative, we let it built the tree.
@@ -52,13 +50,13 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(
   return std::make_shared<CsgOpNode>(children, op);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Translate(const vec3 &t) const {
+std::shared_ptr<CsgNode> CsgNode::Translate(const vec3& t) const {
   mat3x4 transform = la::identity;
   transform[3] += t;
   return Transform(transform);
 }
 
-std::shared_ptr<CsgNode> CsgNode::Scale(const vec3 &v) const {
+std::shared_ptr<CsgNode> CsgNode::Scale(const vec3& v) const {
   mat3x4 transform;
   for (int i : {0, 1, 2}) transform[i][i] = v[i];
   return Transform(transform);
@@ -100,18 +98,18 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
   return std::make_shared<CsgLeafNode>(*this);
 }
 
-std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4 &m) const {
+std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
   return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_));
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
-std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl &&impl) {
+std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
   return std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(impl));
 }
 
-std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
-                                           const Manifold::Impl &b, OpType op) {
+std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
+                                           const Manifold::Impl& b, OpType op) {
 #ifdef MANIFOLD_DEBUG
   auto dump = [&]() {
     dump_lock.lock();
@@ -144,10 +142,10 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
       throw logicErr("self intersection detected");
     }
     return ImplToLeaf(std::move(impl));
-  } catch (logicErr &err) {
+  } catch (logicErr& err) {
     dump();
     throw err;
-  } catch (geometryErr &err) {
+  } catch (geometryErr& err) {
     dump();
     throw err;
   }
@@ -160,7 +158,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl &a,
  * Efficient union of a set of pairwise disjoint meshes.
  */
 std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
-    const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
+    const std::vector<std::shared_ptr<CsgLeafNode>>& nodes) {
   ZoneScoped;
   double epsilon = -1;
   double tolerance = -1;
@@ -173,7 +171,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   std::vector<int> triIndices;
   std::vector<int> propVertIndices;
   int numPropOut = 0;
-  for (auto &node : nodes) {
+  for (auto& node : nodes) {
     if (node->pImpl_->status_ != Manifold::Error::NoError) {
       Manifold::Impl impl;
       impl.status_ = node->pImpl_->status_;
@@ -228,17 +226,16 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       countAt(0), nodes.size(),
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &propVertIndices,
        numPropOut, &combined, policy](int i) {
-        auto &node = nodes[i];
+        auto& node = nodes[i];
         copy(node->pImpl_->halfedgeTangent_.begin(),
              node->pImpl_->halfedgeTangent_.end(),
              combined.halfedgeTangent_.begin() + edgeIndices[i]);
         const int nextVert = vertIndices[i];
         const int nextEdge = edgeIndices[i];
-        const int nextFace = triIndices[i];
         transform(node->pImpl_->halfedge_.begin(),
                   node->pImpl_->halfedge_.end(),
                   combined.halfedge_.begin() + edgeIndices[i],
-                  [nextVert, nextEdge, nextFace](Halfedge edge) {
+                  [nextVert, nextEdge](Halfedge edge) {
                     edge.startVert += nextVert;
                     edge.endVert += nextVert;
                     edge.pairedHalfedge += nextEdge;
@@ -249,7 +246,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
           auto start =
               combined.meshRelation_.triProperties.begin() + triIndices[i];
           if (node->pImpl_->NumProp() > 0) {
-            auto &triProp = node->pImpl_->meshRelation_.triProperties;
+            auto& triProp = node->pImpl_->meshRelation_.triProperties;
             const int nextProp = propVertIndices[i];
             transform(triProp.begin(), triProp.end(), start,
                       [nextProp](ivec3 tri) {
@@ -258,8 +255,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
                       });
 
             const int numProp = node->pImpl_->NumProp();
-            auto &oldProp = node->pImpl_->meshRelation_.properties;
-            auto &newProp = combined.meshRelation_.properties;
+            auto& oldProp = node->pImpl_->meshRelation_.properties;
+            auto& newProp = combined.meshRelation_.properties;
             for (int p = 0; p < numProp; ++p) {
               auto oldRange =
                   StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
@@ -323,10 +320,10 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       });
 
   for (size_t i = 0; i < nodes.size(); i++) {
-    auto &node = nodes[i];
+    auto& node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
-    for (const auto &pair : node->pImpl_->meshRelation_.meshIDtransform) {
+    for (const auto& pair : node->pImpl_->meshRelation_.meshIDtransform) {
       combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
     }
   }
@@ -343,7 +340,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
  * operation. Only supports union and intersection.
  */
 std::shared_ptr<CsgLeafNode> BatchBoolean(
-    OpType operation, std::vector<std::shared_ptr<CsgLeafNode>> &results) {
+    OpType operation, std::vector<std::shared_ptr<CsgLeafNode>>& results) {
   ZoneScoped;
   DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
                "BatchBoolean doesn't support Difference.");
@@ -400,7 +397,7 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
  * possible.
  */
 std::shared_ptr<CsgLeafNode> BatchUnion(
-    std::vector<std::shared_ptr<CsgLeafNode>> &children) {
+    std::vector<std::shared_ptr<CsgLeafNode>>& children) {
   ZoneScoped;
   // INVARIANT: children_ is a vector of leaf nodes
   // this kMaxUnionSize is a heuristic to avoid the pairwise disjoint check
@@ -423,7 +420,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     // each set contains a set of children that are pairwise disjoint
     std::vector<Vec<size_t>> disjointSets;
     for (size_t i = 0; i < boxes.size(); i++) {
-      auto lambda = [&boxes, i](const Vec<size_t> &set) {
+      auto lambda = [&boxes, i](const Vec<size_t>& set) {
         return std::find_if(set.begin(), set.end(), [&boxes, i](size_t j) {
                  return boxes[i].DoesOverlap(boxes[j]);
                }) == set.end();
@@ -437,7 +434,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     }
     // compose each set of disjoint children
     std::vector<std::shared_ptr<CsgLeafNode>> impls;
-    for (auto &set : disjointSets) {
+    for (auto& set : disjointSets) {
       if (set.size() == 1) {
         impls.push_back(children[start + set[0]]);
       } else {
@@ -460,7 +457,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
 
 CsgOpNode::CsgOpNode() {}
 
-CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
+CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>>& children,
                      OpType op)
     : impl_(children), op_(op) {}
 
@@ -469,7 +466,7 @@ CsgOpNode::~CsgOpNode() {
     auto impl = impl_.GetGuard();
     std::vector<std::shared_ptr<CsgOpNode>> toProcess;
     auto handleChildren =
-        [&toProcess](std::vector<std::shared_ptr<CsgNode>> &children) {
+        [&toProcess](std::vector<std::shared_ptr<CsgNode>>& children) {
           while (!children.empty()) {
             // move out so shrinking the vector will not trigger recursive drop
             auto movedChild = std::move(children.back());
@@ -492,7 +489,7 @@ CsgOpNode::~CsgOpNode() {
 }
 
 std::shared_ptr<CsgNode> CsgOpNode::Boolean(
-    const std::shared_ptr<CsgNode> &second, OpType op) {
+    const std::shared_ptr<CsgNode>& second, OpType op) {
   std::vector<std::shared_ptr<CsgNode>> children;
   children.push_back(shared_from_this());
   children.push_back(second);
@@ -500,7 +497,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   return std::make_shared<CsgOpNode>(children, op);
 }
 
-std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat3x4 &m) const {
+std::shared_ptr<CsgNode> CsgOpNode::Transform(const mat3x4& m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
   node->transform_ = m * Mat4(transform_);
@@ -514,14 +511,14 @@ struct CsgStackFrame {
   bool finalize;
   OpType parent_op;
   mat3x4 transform;
-  Nodes *positive_dest;
-  Nodes *negative_dest;
+  Nodes* positive_dest;
+  Nodes* negative_dest;
   std::shared_ptr<const CsgOpNode> op_node;
   Nodes positive_children;
   Nodes negative_children;
 
   CsgStackFrame(bool finalize, OpType parent_op, mat3x4 transform,
-                Nodes *positive_dest, Nodes *negative_dest,
+                Nodes* positive_dest, Nodes* negative_dest,
                 std::shared_ptr<const CsgOpNode> op_node)
       : finalize(finalize),
         parent_op(parent_op),
@@ -669,8 +666,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
       stack.pop_back();
     } else {
       auto add_children =
-          [&stack](std::shared_ptr<CsgNode> &node, OpType op, mat3x4 transform,
-                   CsgStackFrame::Nodes *dest1, CsgStackFrame::Nodes *dest2) {
+          [&stack](std::shared_ptr<CsgNode>& node, OpType op, mat3x4 transform,
+                   CsgStackFrame::Nodes* dest1, CsgStackFrame::Nodes* dest2) {
             if (node->GetNodeType() == CsgNodeType::Leaf)
               dest1->push_back(std::static_pointer_cast<CsgLeafNode>(
                   node->Transform(transform)));
@@ -696,14 +693,14 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
       const mat3x4 transform =
           canCollapse ? (frame->transform * Mat4(frame->op_node->transform_))
                       : la::identity;
-      CsgStackFrame::Nodes *pos_dest =
+      CsgStackFrame::Nodes* pos_dest =
           canCollapse ? frame->positive_dest : &frame->positive_children;
-      CsgStackFrame::Nodes *neg_dest =
+      CsgStackFrame::Nodes* neg_dest =
           canCollapse ? frame->negative_dest : &frame->negative_children;
       for (size_t i = 0; i < impl->size(); i++) {
         const bool negative = op == OpType::Subtract && i != 0;
-        CsgStackFrame::Nodes *dest1 = negative ? neg_dest : pos_dest;
-        CsgStackFrame::Nodes *dest2 =
+        CsgStackFrame::Nodes* dest1 = negative ? neg_dest : pos_dest;
+        CsgStackFrame::Nodes* dest2 =
             (op == OpType::Subtract && i == 0) ? neg_dest : nullptr;
         add_children((*impl)[i], negative ? OpType::Add : op, transform, dest1,
                      dest2);
