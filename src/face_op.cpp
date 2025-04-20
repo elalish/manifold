@@ -107,7 +107,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                               const Vec<TriRef>& halfedgeRef,
                               bool allowConvex) {
   ZoneScoped;
-
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
   Vec<ivec3> triProp;
@@ -138,7 +137,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
                    topologyErr, "These 3 edges do not form a triangle!");
 
-      addTri(face, tri, normal, halfedgeRef[firstEdge]);
+      addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
       // } else if (numEdge == 4) {  // Pair of triangles
       //   const mat2x3 projection = GetAxisAlignedProjection(normal);
       //   auto triCCW = [&projection, this](const ivec3 tri) {
@@ -349,15 +348,19 @@ void Manifold::Impl::FlattenFaces() {
       int last = -1;
       for (const int edge : poly) {
         // only keep vert touching 3 or more faces
-        if (vertDegree[halfedge_[edge].startVert] < 3) continue;
+        if (vertDegree[newHalfedge[edge].startVert] < 3) continue;
         if (start == -1) {
           start = edge;
         } else if (last != -1) {
-          polys2.push_back({last, edge, -1, halfedge_[last].propVert});
+          polys2.push_back({newHalfedge[last].startVert,
+                            newHalfedge[edge].startVert, -1,
+                            newHalfedge[last].propVert});
         }
         last = edge;
       }
-      polys2.push_back({last, start, -1, halfedge_[last].propVert});
+      polys2.push_back({newHalfedge[last].startVert,
+                        newHalfedge[start].startVert, -1,
+                        newHalfedge[last].propVert});
     }
 
     const int numEdge = polys2.size();

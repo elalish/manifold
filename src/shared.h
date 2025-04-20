@@ -192,7 +192,8 @@ Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
   return stream << "startVert = " << edge.startVert
                 << ", endVert = " << edge.endVert
-                << ", pairedHalfedge = " << edge.pairedHalfedge;
+                << ", pairedHalfedge = " << edge.pairedHalfedge
+                << ", propVert = " << edge.propVert;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
