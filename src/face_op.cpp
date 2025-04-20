@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold/common.h"
+#include "shared.h"
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -29,10 +31,13 @@ using namespace manifold;
 /**
  * Returns an assembled set of vertex index loops of the input list of
  * Halfedges, where each vert must be referenced the same number of times as a
- * startVert and endVert.
+ * startVert and endVert. If startHalfedgeIdx is given, instead of putting
+ * vertex indices into the returned polygons structure, it will use the halfedge
+ * indices instead.
  */
 std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
-                                                VecView<Halfedge>::IterC end) {
+                                                VecView<Halfedge>::IterC end,
+                                                const int startHalfedgeIdx) {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
     vert_edge.emplace(
@@ -49,8 +54,7 @@ std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
       thisEdge = startEdge;
       polys.push_back({});
     }
-    int vert = (start + thisEdge)->startVert;
-    polys.back().push_back(vert);
+    polys.back().push_back(startHalfedgeIdx + thisEdge);
     const auto result = vert_edge.find((start + thisEdge)->endVert);
     DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
     thisEdge = result->second;
@@ -63,12 +67,14 @@ std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
  * Add the vertex position projection to the indexed polygons.
  */
 PolygonsIdx ProjectPolygons(const std::vector<std::vector<int>>& polys,
+                            const Vec<Halfedge>& halfedge,
                             const Vec<vec3>& vertPos, mat2x3 projection) {
   PolygonsIdx polygons;
   for (const auto& poly : polys) {
     polygons.push_back({});
-    for (const auto& vert : poly) {
-      polygons.back().push_back({projection * vertPos[vert], vert});
+    for (const auto& edge : poly) {
+      polygons.back().push_back(
+          {projection * vertPos[halfedge[edge].startVert], edge});
     }  // for vert
   }  // for poly
   return polygons;
@@ -101,8 +107,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                               const Vec<TriRef>& halfedgeRef,
                               bool allowConvex) {
   ZoneScoped;
+
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
+  Vec<ivec3> triProp;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
@@ -115,63 +123,67 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const vec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
+      ivec3 triEdge(firstEdge, firstEdge + 1, firstEdge + 2);
       ivec3 tri(halfedge_[firstEdge].startVert,
                 halfedge_[firstEdge + 1].startVert,
                 halfedge_[firstEdge + 2].startVert);
       ivec3 ends(halfedge_[firstEdge].endVert, halfedge_[firstEdge + 1].endVert,
                  halfedge_[firstEdge + 2].endVert);
       if (ends[0] == tri[2]) {
+        std::swap(triEdge[1], triEdge[2]);
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
+
       }
       DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
                    topologyErr, "These 3 edges do not form a triangle!");
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
-    } else if (numEdge == 4) {  // Pair of triangles
-      const mat2x3 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, this](const ivec3 tri) {
-        return CCW(projection * this->vertPos_[tri[0]],
-                   projection * this->vertPos_[tri[1]],
-                   projection * this->vertPos_[tri[2]], epsilon_) >= 0;
-      };
+      // } else if (numEdge == 4) {  // Pair of triangles
+      //   const mat2x3 projection = GetAxisAlignedProjection(normal);
+      //   auto triCCW = [&projection, this](const ivec3 tri) {
+      //     return CCW(projection * this->vertPos_[tri[0]],
+      //                projection * this->vertPos_[tri[1]],
+      //                projection * this->vertPos_[tri[2]], epsilon_) >= 0;
+      //   };
 
-      ivec3 tri0(halfedge_[firstEdge].startVert, halfedge_[firstEdge].endVert,
-                 -1);
-      ivec3 tri1(-1, -1, tri0[0]);
-      for (const int i : {1, 2, 3}) {
-        if (halfedge_[firstEdge + i].startVert == tri0[1]) {
-          tri0[2] = halfedge_[firstEdge + i].endVert;
-          tri1[0] = tri0[2];
-        }
-        if (halfedge_[firstEdge + i].endVert == tri0[0]) {
-          tri1[1] = halfedge_[firstEdge + i].startVert;
-        }
-      }
-      DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
-                       la::all(la::gequal(tri1, ivec3(0))),
-                   topologyErr, "non-manifold quad!");
-      bool firstValid = triCCW(tri0) && triCCW(tri1);
-      tri0[2] = tri1[1];
-      tri1[2] = tri0[1];
-      bool secondValid = triCCW(tri0) && triCCW(tri1);
+      //   ivec3 tri0(halfedge_[firstEdge].startVert,
+      //   halfedge_[firstEdge].endVert,
+      //              -1);
+      //   ivec3 tri1(-1, -1, tri0[0]);
+      //   for (const int i : {1, 2, 3}) {
+      //     if (halfedge_[firstEdge + i].startVert == tri0[1]) {
+      //       tri0[2] = halfedge_[firstEdge + i].endVert;
+      //       tri1[0] = tri0[2];
+      //     }
+      //     if (halfedge_[firstEdge + i].endVert == tri0[0]) {
+      //       tri1[1] = halfedge_[firstEdge + i].startVert;
+      //     }
+      //   }
+      //   DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
+      //                    la::all(la::gequal(tri1, ivec3(0))),
+      //                topologyErr, "non-manifold quad!");
+      //   bool firstValid = triCCW(tri0) && triCCW(tri1);
+      //   tri0[2] = tri1[1];
+      //   tri1[2] = tri0[1];
+      //   bool secondValid = triCCW(tri0) && triCCW(tri1);
 
-      if (!secondValid) {
-        tri0[2] = tri1[0];
-        tri1[2] = tri0[0];
-      } else if (firstValid) {
-        vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
-        vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
-        if (la::dot(firstCross, firstCross) <
-            la::dot(secondCross, secondCross)) {
-          tri0[2] = tri1[0];
-          tri1[2] = tri0[0];
-        }
-      }
+      //   if (!secondValid) {
+      //     tri0[2] = tri1[0];
+      //     tri1[2] = tri0[0];
+      //   } else if (firstValid) {
+      //     vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
+      //     vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
+      //     if (la::dot(firstCross, firstCross) <
+      //         la::dot(secondCross, secondCross)) {
+      //       tri0[2] = tri1[0];
+      //       tri1[2] = tri0[0];
+      //     }
+      //   }
 
-      for (const auto& tri : {tri0, tri1}) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      }
+      //   for (const auto& tri : {tri0, tri1}) {
+      //     addTri(face, tri, normal, halfedgeRef[firstEdge]);
+      //   }
     } else {  // General triangulation
       for (const auto& tri : general(face)) {
         addTri(face, tri, normal, halfedgeRef[firstEdge]);
@@ -183,8 +195,9 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const mat2x3 projection = GetAxisAlignedProjection(normal);
     const PolygonsIdx polys = ProjectPolygons(
         AssembleHalfedges(halfedge_.cbegin() + faceEdge[face],
-                          halfedge_.cbegin() + faceEdge[face + 1]),
-        vertPos_, projection);
+                          halfedge_.cbegin() + faceEdge[face + 1],
+                          faceEdge[face]),
+        halfedge_, vertPos_, projection);
     return TriangulateIdx(polys, epsilon_, allowConvex);
   };
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
@@ -211,13 +224,17 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(triCount.begin(), triCount.end(), triCount.begin(), 0_uz);
   triVerts.resize(triCount.back());
+  triProp.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
 
   auto processFace2 = std::bind(
       processFace, [&](size_t face) { return std::move(results[face]); },
       [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
-        triVerts[triCount[face]] = tri;
+        for (const int i : {0, 1, 2}) {
+          triVerts[triCount[face]][i] = halfedge_[tri[i]].startVert;
+          triProp[triCount[face]][i] = halfedge_[tri[i]].propVert;
+        }
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
         triCount[face]++;
@@ -233,7 +250,14 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   auto processFace2 = std::bind(
       processFace, generalTriangulation,
       [&](size_t, ivec3 tri, vec3 normal, TriRef r) {
-        triVerts.push_back(tri);
+        ivec3 verts;
+        ivec3 props;
+        for (const int i : {0, 1, 2}) {
+          verts[i] = halfedge_[tri[i]].startVert;
+          props[i] = halfedge_[tri[i]].propVert;
+        }
+        triVerts.push_back(verts);
+        triProp.push_back(props);
         triNormal.push_back(normal);
         triRef.push_back(r);
       },
@@ -244,7 +268,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 #endif
 
   faceNormal_ = std::move(triNormal);
-  CreateHalfedges(triVerts);
+  CreateHalfedges(triProp, triVerts);
 }
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
@@ -316,24 +340,24 @@ void Manifold::Impl::FlattenFaces() {
   faceEdge2[0] = 0;
   Vec<Halfedge> newHalfedge2(newHalfedge.size());
   for_each_n(policy, countAt(0_uz), numFace, [&](size_t inFace) {
-    std::vector<std::vector<int>> polys =
-        AssembleHalfedges(newHalfedge.cbegin() + faceEdge[inFace],
-                          newHalfedge.cbegin() + faceEdge[inFace + 1]);
+    std::vector<std::vector<int>> polys = AssembleHalfedges(
+        newHalfedge.cbegin() + faceEdge[inFace],
+        newHalfedge.cbegin() + faceEdge[inFace + 1], faceEdge[inFace]);
     Vec<Halfedge> polys2;
     for (const auto& poly : polys) {
       int start = -1;
       int last = -1;
-      for (const int vert : poly) {
+      for (const int edge : poly) {
         // only keep vert touching 3 or more faces
-        if (vertDegree[vert] < 3) continue;
+        if (vertDegree[halfedge_[edge].startVert] < 3) continue;
         if (start == -1) {
-          start = vert;
+          start = edge;
         } else if (last != -1) {
-          polys2.push_back({last, vert});
+          polys2.push_back({last, edge, -1, halfedge_[last].propVert});
         }
-        last = vert;
+        last = edge;
       }
-      polys2.push_back({last, start});
+      polys2.push_back({last, start, -1, halfedge_[last].propVert});
     }
 
     const int numEdge = polys2.size();
@@ -450,8 +474,9 @@ Polygons Manifold::Impl::Project() const {
           }) -
       cusps.begin());
 
-  PolygonsIdx polysIndexed = ProjectPolygons(
-      AssembleHalfedges(cusps.cbegin(), cusps.cend()), vertPos_, projection);
+  PolygonsIdx polysIndexed =
+      ProjectPolygons(AssembleHalfedges(cusps.cbegin(), cusps.cend(), 0), cusps,
+                      vertPos_, projection);
 
   Polygons polys;
   for (const auto& poly : polysIndexed) {
