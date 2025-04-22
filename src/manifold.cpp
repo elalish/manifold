@@ -94,11 +94,12 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
   // Don't sort originals - keep them in order
   if (!isOriginal) {
-    std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
-      return triRef[a].originalID == triRef[b].originalID
-                 ? triRef[a].meshID < triRef[b].meshID
-                 : triRef[a].originalID < triRef[b].originalID;
-    });
+    std::stable_sort(triNew2Old.begin(), triNew2Old.end(),
+                     [triRef](int a, int b) {
+                       return triRef[a].originalID == triRef[b].originalID
+                                  ? triRef[a].meshID < triRef[b].meshID
+                                  : triRef[a].originalID < triRef[b].originalID;
+                     });
   }
 
   std::vector<mat3> runNormalTransform;
