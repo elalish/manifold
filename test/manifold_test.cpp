@@ -48,6 +48,46 @@ TEST(Manifold, GetMeshGL) {
   Identical(mesh_out, mesh_out2);
 }
 
+TEST(Manifold, MeshDeterminism) {
+  Manifold cube1 = Manifold::Cube(vec3(2.0, 2.0, 2.0), true);
+  Manifold cube2 = Manifold::Cube(vec3(2.0, 2.0, 2.0), true)
+                       .Translate(vec3(-1.1091, 0.88509, 1.3099));
+
+  Manifold result = cube1 - cube2;
+  MeshGL out = result.GetMeshGL();
+
+  uint32_t triVerts[]{0,  2,  7,  0,  10, 1,  0,  6,  10, 0, 1,  2,  1, 3,  2,
+                      1,  5,  3,  1,  11, 5,  0,  7,  6,  6, 7,  8,  6, 8,  13,
+                      10, 12, 11, 1,  10, 11, 11, 13, 5,  6, 12, 10, 6, 13, 12,
+                      13, 9,  5,  13, 8,  9,  11, 12, 13, 4, 2,  3,  4, 3,  5,
+                      4,  7,  2,  4,  5,  8,  4,  8,  7,  9, 8,  5};
+
+  float vertProperties[]{-1,      -1,       -1,     -1,      -1,       1,
+                         -1,      -0.11491, 0.3099, -1,      -0.11491, 1,
+                         -0.1091, -0.11491, 0.3099, -0.1091, -0.11491, 1,
+                         -1,      1,        -1,     -1,      1,        0.3099,
+                         -0.1091, 1,        0.3099, -0.1091, 1,        1,
+                         1,       -1,       -1,     1,       -1,       1,
+                         1,       1,        -1,     1,       1,        1};
+
+  bool flag = true;
+  for (size_t i = 0; i != out.triVerts.size(); i++) {
+    if (out.triVerts[i] != triVerts[i]) {
+      flag = false;
+      break;
+    }
+  }
+
+  for (size_t i = 0; flag && i != out.vertProperties.size(); i++) {
+    if (out.vertProperties[i] != vertProperties[i]) {
+      flag = false;
+      break;
+    }
+  }
+
+  EXPECT_TRUE(flag);
+}
+
 TEST(Manifold, Empty) {
   MeshGL emptyMesh;
   Manifold empty(emptyMesh);
