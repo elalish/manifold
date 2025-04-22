@@ -247,6 +247,11 @@ void Manifold::Impl::Finish() {
     Halfedge extrema = {0, 0, 0};
     for (size_t i = 0; i < halfedge_.size(); i++) {
       Halfedge e = halfedge_[i];
+      const int propVert = NumProp() > 0
+                               ? meshRelation_.triProperties[i / 3][i % 3]
+                               : e.startVert;
+      // std::cout << i << ", " << e.propVert << ", " << propVert << std::endl;
+      DEBUG_ASSERT(e.propVert == propVert, logicErr, "error");
       if (!e.IsForward()) std::swap(e.startVert, e.endVert);
       extrema.startVert = std::min(extrema.startVert, e.startVert);
       extrema.endVert = std::min(extrema.endVert, e.endVert);
