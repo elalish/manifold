@@ -384,6 +384,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
                  const int e = 3 * tri + i;
                  const int v0 = triVert.empty() ? props[i] : triVert[tri][i];
                  const int v1 = triVert.empty() ? props[j] : triVert[tri][j];
+                 DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
                  halfedge_[e] = {v0, v1, -1, props[i]};
                  // Sort the forward halfedges in front of the backward ones
                  // by setting the highest-order bit.

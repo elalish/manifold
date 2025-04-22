@@ -132,7 +132,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         std::swap(triEdge[1], triEdge[2]);
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
-
       }
       DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
                    topologyErr, "These 3 edges do not form a triangle!");
@@ -212,7 +211,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
                           "face has less than three edges.");
-             if (triCount[face] > 2)
+             if (triCount[face] > 1)
                group.run([&, face] {
                  std::vector<ivec3> newTris = generalTriangulation(face);
                  triCount[face] = newTris.size();
