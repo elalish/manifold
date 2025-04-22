@@ -31,16 +31,6 @@ uint32_t MortonCode(vec3 position, Box bBox) {
   return Collider::MortonCode(position, bBox);
 }
 
-struct Reindex {
-  VecView<const int> indexInv;
-
-  void operator()(Halfedge& edge) {
-    if (edge.startVert < 0) return;
-    edge.startVert = indexInv[edge.startVert];
-    edge.endVert = indexInv[edge.endVert];
-  }
-};
-
 struct MarkProp {
   VecView<int> keep;
 
@@ -335,8 +325,16 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
+  const bool hasProp = NumProp() > 0;
   for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(),
-           Reindex({vertOld2New}));
+           [&vertOld2New, hasProp](Halfedge& edge) {
+             if (edge.startVert < 0) return;
+             edge.startVert = vertOld2New[edge.startVert];
+             edge.endVert = vertOld2New[edge.endVert];
+             if (!hasProp) {
+               edge.propVert = edge.startVert;
+             }
+           });
 }
 
 /**

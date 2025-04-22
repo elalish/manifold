@@ -41,7 +41,7 @@ int NumUnique(const std::vector<T>& in) {
  * produces a consistent result.
  */
 TEST(Manifold, GetMeshGL) {
-  Manifold manifold = Manifold::Sphere(1);
+  Manifold manifold = Manifold::Sphere(0.01);
   auto mesh_out = manifold.GetMeshGL();
   Manifold manifold2(mesh_out);
   auto mesh_out2 = manifold2.GetMeshGL();
