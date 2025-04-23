@@ -17,6 +17,7 @@
 
 #include "./impl.h"
 #include "./parallel.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
@@ -38,16 +39,6 @@ struct MarkProp {
     for (const int i : {0, 1, 2}) {
       reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
           ->store(1, std::memory_order_relaxed);
-    }
-  }
-};
-
-struct ReindexProps {
-  VecView<const int> old2new;
-
-  void operator()(ivec3& triProp) {
-    for (const int i : {0, 1, 2}) {
-      triProp[i] = old2new[triProp[i]];
     }
   }
 };
@@ -368,7 +359,15 @@ void Manifold::Impl::CompactProps() {
         }
       });
   for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
-             ReindexProps({propOld2New}));
+             [&propOld2New, this](ivec3& triProp) {
+               for (const int i : {0, 1, 2}) {
+                 triProp[i] = propOld2New[triProp[i]];
+               }
+             });
+  for_each(policy, halfedge_.begin(), halfedge_.end(),
+           [&propOld2New, this](Halfedge& edge) {
+             edge.propVert = propOld2New[edge.propVert];
+           });
 }
 
 /**

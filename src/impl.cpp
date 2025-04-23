@@ -299,7 +299,7 @@ void Manifold::Impl::CreateFaces() {
 }
 
 /**
- * Derefernce duplicate property vertices if they are exactly floating-point
+ * Dereference duplicate property vertices if they are exactly floating-point
  * equal. These unreferenced properties are then removed by CompactProps.
  */
 void Manifold::Impl::DedupePropVerts() {
@@ -355,7 +355,7 @@ constexpr int kRemovedHalfedge = -2;
 
 /**
  * Create the halfedge_ data structure from a list of triangles. If the optional
- * prop2vert array is missing, it's assumed these traiangles are are pointing to
+ * prop2vert array is missing, it's assumed these triangles are are pointing to
  * both vert and propVert indices. If prop2vert is present, the triangles are
  * assumed to be pointing to propVert indices only. The prop2vert array is used
  * to map the propVert indices to vert indices.

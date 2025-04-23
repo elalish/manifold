@@ -193,7 +193,8 @@ struct Manifold::Impl {
     Vec<ivec3> triProp;
     triProp.reserve(numTri);
     Vec<ivec3> triVert;
-    if (!prop2vert.empty()) triVert.reserve(numTri);
+    const bool needsPropMap = numProp > 0 && !prop2vert.empty();
+    if (needsPropMap) triVert.reserve(numTri);
     if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
     if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
@@ -208,9 +209,11 @@ struct Manifold::Impl {
         triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
       }
       if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
-        triProp.push_back(triP);
-        if (!prop2vert.empty()) {
+        if (needsPropMap) {
+          triProp.push_back(triP);
           triVert.push_back(triV);
+        } else {
+          triProp.push_back(triV);
         }
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
