@@ -15,13 +15,13 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 
 | | | |
 | --- | --- | --- |
-| [OpenSCAD](https://openscad.org/) | [IFCjs](https://ifcjs.github.io/info/) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
+| [OpenSCAD](https://openscad.org/) | [Blender](https://www.blender.org/) | [IFCjs](https://ifcjs.github.io/info/) |
 | [Nomad Sculpt](https://apps.apple.com/us/app/id1519508653?mt=8&platform=ipad) | [Grid.Space](https://grid.space/) | [badcad](https://github.com/wrongbad/badcad) |
 | [Godot Engine](https://godotengine.org/) | [OCADml](https://github.com/OCADml/OManifold) | [Flitter](https://flitter.readthedocs.io/en/latest/) |
 | [BRL-CAD](https://brlcad.org/) | [PolygonJS](https://polygonjs.com/) | [Spherene](https://spherene.ch/) |
 | [Babylon.js](https://doc.babylonjs.com/features/featuresDeepDive/mesh/mergeMeshes#merging-meshes-with-constructive-solid-geometry) | [trimesh](https://trimesh.org/) | [Gypsum](https://github.com/playkostudios/gypsum) |
 | [Valence 3D](https://apps.apple.com/us/app/valence-3d/id6450967410?mt=8&platform=ipad) | [bitbybit.dev](https://bitbybit.dev) | [PythonOpenSCAD](https://github.com/owebeeone/pythonopenscad) |
-| [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | | |
+| [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 
 ### Bindings & Packages
 
