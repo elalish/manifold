@@ -821,7 +821,7 @@ export class Manifold {
    *
    * @param cutter
    */
-  split(cutter: Manifold): Manifold[];
+  split(cutter: Manifold): [Manifold,Manifold];
 
   /**
    * Convenient version of Split() for a half-space.
@@ -833,7 +833,7 @@ export class Manifold {
    * @param originOffset The distance of the plane from the origin in the
    * direction of the normal vector.
    */
-  splitByPlane(normal: Readonly<Vec3>, originOffset: number): Manifold[];
+  splitByPlane(normal: Readonly<Vec3>, originOffset: number): [Manifold,Manifold];
 
   /**
    * Removes everything behind the given half-space plane.
