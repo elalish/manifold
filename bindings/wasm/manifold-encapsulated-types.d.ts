@@ -288,17 +288,18 @@ export class CrossSection {
   /**
    * Boolean union of a list of cross-sections
    */
-  static union(polygons: readonly (CrossSection|Polygons)[]): CrossSection;
+  static union(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean difference of the tail of a list of cross-sections from its head
    */
-  static difference(polygons: readonly (CrossSection|Polygons)[]): CrossSection;
+  static difference(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean intersection of a list of cross-sections
    */
-  static intersection(polygons: readonly (CrossSection|Polygons)[]): CrossSection;
+  static intersection(polygons: readonly(CrossSection|Polygons)[]):
+      CrossSection;
 
   // Convex Hulls
 
@@ -310,7 +311,7 @@ export class CrossSection {
   /**
    * Compute the convex hull of all points in a list of polygons/cross-sections.
    */
-  static hull(polygons: readonly (CrossSection|Polygons)[]): CrossSection;
+  static hull(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   // Topological Operations
 
@@ -318,7 +319,7 @@ export class CrossSection {
    * Construct a CrossSection from a vector of other Polygons (batch
    * boolean union).
    */
-  static compose(polygons: readonly (CrossSection|Polygons)[]): CrossSection;
+  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * This operation returns a vector of CrossSections that are topologically
@@ -821,7 +822,7 @@ export class Manifold {
    *
    * @param cutter
    */
-  split(cutter: Manifold): [Manifold,Manifold];
+  split(cutter: Manifold): [Manifold, Manifold];
 
   /**
    * Convenient version of Split() for a half-space.
@@ -833,7 +834,8 @@ export class Manifold {
    * @param originOffset The distance of the plane from the origin in the
    * direction of the normal vector.
    */
-  splitByPlane(normal: Readonly<Vec3>, originOffset: number): [Manifold,Manifold];
+  splitByPlane(normal: Readonly<Vec3>, originOffset: number):
+      [Manifold, Manifold];
 
   /**
    * Removes everything behind the given half-space plane.
@@ -873,7 +875,7 @@ export class Manifold {
    * Compute the convex hull of all points contained within a set of Manifolds
    * and point vectors.
    */
-  static hull(points: readonly (Manifold|Vec3)[]): Manifold;
+  static hull(points: readonly(Manifold|Vec3)[]): Manifold;
 
   // Topological Operations
 
