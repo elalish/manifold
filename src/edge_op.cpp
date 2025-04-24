@@ -462,7 +462,7 @@ void Manifold::Impl::CollapseTri(const ivec3& triEdge) {
   halfedge_[pair1].pairedHalfedge = pair2;
   halfedge_[pair2].pairedHalfedge = pair1;
   for (int i : {0, 1, 2}) {
-    halfedge_[triEdge[i]] = {-1, -1, -1};
+    halfedge_[triEdge[i]] = {-1, -1, -1, halfedge_[triEdge[i]].propVert};
   }
 }
 
