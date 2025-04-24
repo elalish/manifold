@@ -324,7 +324,7 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   // Orbit endVert
   const int startVert = halfedge_[edge].startVert;
   const int endVert = halfedge_[edge].endVert;
-  // const int endProp = halfedge_[NextHalfedge(edge)].propVert;
+  const int endProp = halfedge_[NextHalfedge(edge)].propVert;
   int current = halfedge_[NextHalfedge(edge)].pairedHalfedge;
   while (current != edge) {
     const int vert = halfedge_[current].startVert;
@@ -341,16 +341,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       int newHalfedge = halfedge_.size();
       int oldFace = current / 3;
       int outsideVert = halfedge_[current].startVert;
+      halfedge_.push_back({endVert, newVert, -1, endProp});
+      halfedge_.push_back({newVert, outsideVert, -1, endProp});
       halfedge_.push_back(
-          {endVert, newVert, -1,
-           meshRelation_.triProperties[oldFace][0]});  // endProp
-      halfedge_.push_back(
-          {newVert, outsideVert, -1,
-           meshRelation_.triProperties[oldFace][1]});  // endProp
-      halfedge_.push_back(
-          {outsideVert, endVert, -1,
-           meshRelation_
-               .triProperties[oldFace][2]});  // halfedge_[current].propVert
+          {outsideVert, endVert, -1, halfedge_[current].propVert});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
@@ -363,14 +357,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       newHalfedge += 3;
       oldFace = opposite / 3;
       outsideVert = halfedge_[opposite].startVert;
+      halfedge_.push_back({newVert, endVert, -1, endProp});  // fix prop
+      halfedge_.push_back({endVert, outsideVert, -1, endProp});
       halfedge_.push_back(
-          {newVert, endVert, -1, meshRelation_.triProperties[oldFace][0]});
-      halfedge_.push_back(
-          {endVert, outsideVert, -1, meshRelation_.triProperties[oldFace][1]});
-      halfedge_.push_back(
-          {outsideVert, newVert, -1,
-           meshRelation_
-               .triProperties[oldFace][2]});  // halfedge_[opposite].propVert
+          {outsideVert, newVert, -1, halfedge_[opposite].propVert});
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);

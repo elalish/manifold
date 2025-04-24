@@ -232,7 +232,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
              combined.halfedgeTangent_.begin() + edgeIndices[i]);
         const int nextVert = vertIndices[i];
         const int nextEdge = edgeIndices[i];
-        const int nextProp = triIndices[i];
+        const int nextProp = propVertIndices[i];
         transform(node->pImpl_->halfedge_.begin(),
                   node->pImpl_->halfedge_.end(),
                   combined.halfedge_.begin() + edgeIndices[i],
