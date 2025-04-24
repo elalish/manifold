@@ -638,14 +638,10 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
   auto SwapEdge = [&]() {
     // The 0-verts are swapped to the opposite 2-verts.
     const int v0 = halfedge_[tri0edge[2]].startVert;
-    const int p0 = halfedge_[tri0edge[2]].propVert;
     const int v1 = halfedge_[tri1edge[2]].startVert;
-    const int p1 = halfedge_[tri1edge[2]].propVert;
     halfedge_[tri0edge[0]].startVert = v1;
-    halfedge_[tri0edge[0]].propVert = p1;
     halfedge_[tri0edge[2]].endVert = v1;
     halfedge_[tri1edge[0]].startVert = v0;
-    halfedge_[tri1edge[0]].propVert = p0;
     halfedge_[tri1edge[2]].endVert = v0;
     PairUp(tri0edge[0], halfedge_[tri1edge[2]].pairedHalfedge);
     PairUp(tri1edge[0], halfedge_[tri0edge[2]].pairedHalfedge);
@@ -665,6 +661,9 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
       triProp[tri0] = triProp[tri1];
       triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
       triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
+      halfedge_[tri0edge[1]].propVert = halfedge_[tri1edge[0]].propVert;
+      halfedge_[tri0edge[0]].propVert = halfedge_[tri1edge[2]].propVert;
+      halfedge_[tri0edge[2]].propVert = halfedge_[tri1edge[2]].propVert;
       const int numProp = NumProp();
       const int newProp = prop.size() / numProp;
       const int propIdx0 = triProp[tri1][perm1[0]];
@@ -675,6 +674,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
       }
       triProp[tri1][perm1[0]] = newProp;
       triProp[tri0][perm0[2]] = newProp;
+      halfedge_[tri1edge[0]].propVert = newProp;
+      halfedge_[tri0edge[2]].propVert = newProp;
     }
 
     // if the new edge already exists, duplicate the verts and split the mesh.
