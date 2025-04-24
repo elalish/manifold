@@ -32,17 +32,6 @@ uint32_t MortonCode(vec3 position, Box bBox) {
   return Collider::MortonCode(position, bBox);
 }
 
-struct MarkProp {
-  VecView<int> keep;
-
-  void operator()(ivec3 triProp) {
-    for (const int i : {0, 1, 2}) {
-      reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
-          ->store(1, std::memory_order_relaxed);
-    }
-  }
-};
-
 struct ReindexFace {
   VecView<Halfedge> halfedge;
   VecView<vec4> halfedgeTangent;
@@ -340,7 +329,12 @@ void Manifold::Impl::CompactProps() {
   auto policy = autoPolicy(numVerts, 1e5);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), MarkProp({keep}));
+           meshRelation_.triProperties.cend(), [&keep](ivec3 triProp) {
+             for (const int i : {0, 1, 2}) {
+               reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
+                   ->store(1, std::memory_order_relaxed);
+             }
+           });
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 

@@ -644,7 +644,7 @@ Manifold Manifold::SetProperties(
             const int propVert = triProperties[tri][i];
             if (propFunc == nullptr) {
               for (int p = 0; p < numProp; ++p) {
-                pImpl->meshRelation_.properties[numProp * propVert] = 0;
+                pImpl->meshRelation_.properties[numProp * propVert + p] = 0;
               }
             } else {
               propFunc(&pImpl->meshRelation_.properties[numProp * propVert],
