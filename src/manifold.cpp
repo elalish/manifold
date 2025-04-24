@@ -20,31 +20,12 @@
 #include "./csg_tree.h"
 #include "./impl.h"
 #include "./parallel.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
 
 ExecutionParams manifoldParams;
-
-struct UpdateProperties {
-  double* properties;
-  const int numProp;
-  const double* oldProperties;
-  const int numOldProp;
-  const vec3* vertPos;
-  const ivec3* triProperties;
-  const Halfedge* halfedges;
-  std::function<void(double*, vec3, const double*)> propFunc;
-
-  void operator()(int tri) {
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedges[3 * tri + i].startVert;
-      const int propVert = triProperties[tri][i];
-      propFunc(properties + numProp * propVert, vertPos[vert],
-               oldProperties + numOldProp * propVert);
-    }
-  }
-};
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   normal = la::normalize(normal);
@@ -647,6 +628,8 @@ Manifold Manifold::SetProperties(
       for (int i = 0; i < numTri; ++i) {
         for (const int j : {0, 1, 2}) {
           triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;
+          pImpl->halfedge_[3 * i + j].propVert =
+              pImpl->halfedge_[3 * i + j].startVert;
         }
       }
       pImpl->meshRelation_.properties = Vec<double>(numProp * NumVert(), 0);
@@ -655,14 +638,21 @@ Manifold Manifold::SetProperties(
     }
     for_each_n(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), NumTri(),
-        UpdateProperties(
-            {pImpl->meshRelation_.properties.data(), numProp,
-             oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
-             triProperties.data(), pImpl->halfedge_.data(),
-             propFunc == nullptr
-                 ? [](double* newProp, vec3, const double*) { *newProp = 0; }
-                 : propFunc}));
+        countAt(0), NumTri(), [&](int tri) {
+          for (int i : {0, 1, 2}) {
+            const int vert = pImpl->halfedge_[3 * tri + i].startVert;
+            const int propVert = triProperties[tri][i];
+            if (propFunc == nullptr) {
+              for (int p = 0; p < numProp; ++p) {
+                pImpl->meshRelation_.properties[numProp * propVert] = 0;
+              }
+            } else {
+              propFunc(&pImpl->meshRelation_.properties[numProp * propVert],
+                       pImpl->vertPos_[vert],
+                       oldProperties.data() + oldNumProp * propVert);
+            }
+          }
+        });
   }
 
   pImpl->meshRelation_.numProp = numProp;
@@ -756,11 +746,14 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
       const int numProp = pImpl->meshRelation_.numProp;
       Vec<double> properties = pImpl->meshRelation_.properties;
       Vec<ivec3> triProperties = pImpl->meshRelation_.triProperties;
+      Vec<Halfedge> halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
+      // Reset the properties to the original values, removing temporary normals
       pImpl->meshRelation_.numProp = numProp;
       pImpl->meshRelation_.properties.swap(properties);
       pImpl->meshRelation_.triProperties.swap(triProperties);
+      pImpl->halfedge_.swap(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }

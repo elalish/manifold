@@ -498,6 +498,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           const int j = current - 3 * thisTri;
           const int prop = oldTriProp[thisTri][j];
           meshRelation_.triProperties[thisTri][j] = prop;
+          halfedge_[current].propVert = prop;
           if (prop == lastProp) return;
           lastProp = prop;
           // update property vertex
@@ -624,6 +625,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
           // point to updated property vertex
           meshRelation_.triProperties[thisTri][j] = newProp;
+          halfedge_[current1].propVert = newProp;
           ++idx;
         });
       }
