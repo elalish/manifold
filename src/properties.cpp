@@ -286,11 +286,12 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<uint8_t> counters(NumPropVert(), 0);
   for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
     for (const int i : {0, 1, 2}) {
-      const int vert = halfedge_[3 * tri + i].startVert;
+      const Halfedge& edge = halfedge_[3 * tri + i];
+      const int vert = edge.startVert;
+      const int propVert = edge.propVert;
       if (oldNumProp == 0) {
         meshRelation_.triProperties[tri][i] = vert;
       }
-      const int propVert = meshRelation_.triProperties[tri][i];
 
       auto old = std::atomic_exchange(
           reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),

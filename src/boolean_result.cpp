@@ -596,9 +596,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto& properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const ivec3& triProp = oldNumProp == 0 ? ivec3(-1)
-                           : PQ ? inP.meshRelation_.triProperties[ref.tri]
-                                : inQ.meshRelation_.triProperties[ref.tri];
+    const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
@@ -610,7 +608,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            key[2] = triProp[j];
+            key[2] = halfedge[3 * ref.tri + j].propVert;
             edge = -1;
             break;
           }
@@ -618,8 +616,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         }
         if (edge >= 0) {
           // On an edge, both propVerts must match
-          const int p0 = triProp[Next3(edge)];
-          const int p1 = triProp[Prev3(edge)];
+          const int p0 = halfedge[3 * ref.tri + Next3(edge)].propVert;
+          const int p1 = halfedge[3 * ref.tri + Prev3(edge)].propVert;
           key[1] = vert;
           key[2] = std::min(p0, p1);
           key[3] = std::max(p0, p1);
@@ -658,7 +656,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         if (p < oldNumProp) {
           vec3 oldProps;
           for (const int j : {0, 1, 2})
-            oldProps[j] = properties[oldNumProp * triProp[j] + p];
+            oldProps[j] =
+                properties[oldNumProp * halfedge[3 * ref.tri + j].propVert + p];
           outR.meshRelation_.properties.push_back(la::dot(uvw, oldProps));
         } else {
           outR.meshRelation_.properties.push_back(0);

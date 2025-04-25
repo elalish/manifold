@@ -714,18 +714,18 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
             if (halfedges[3] < 0) {
               vec3 triProp;
               for (const int i : {0, 1, 2}) {
-                triProp[i] = rel.properties[rel.triProperties[bary.tri][i] *
-                                                rel.numProp +
-                                            p];
+                triProp[i] =
+                    rel.properties[halfedge_[3 * bary.tri + i].propVert *
+                                       rel.numProp +
+                                   p];
               }
               prop[vert * rel.numProp + p] = la::dot(triProp, vec3(bary.uvw));
             } else {
               vec4 quadProp;
               for (const int i : {0, 1, 2, 3}) {
-                const int tri = halfedges[i] / 3;
-                const int j = halfedges[i] % 3;
-                quadProp[i] =
-                    rel.properties[rel.triProperties[tri][j] * rel.numProp + p];
+                quadProp[i] = rel.properties[halfedge_[halfedges[i]].propVert *
+                                                 rel.numProp +
+                                             p];
               }
               prop[vert * rel.numProp + p] = la::dot(quadProp, bary.uvw);
             }
@@ -746,8 +746,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                      halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
                  const int v0 = halfedgeIdx % 3;
                  const int tri = halfedgeIdx / 3;
-                 const int prop0 = rel.triProperties[tri][v0];
-                 const int prop1 = rel.triProperties[tri][Next3(v0)];
+                 const int prop0 = halfedge_[halfedgeIdx].propVert;
+                 const int prop1 =
+                     halfedge_[NextHalfedge(halfedgeIdx)].propVert;
                  for (int i = 0; i < n; ++i) {
                    for (int p = 0; p < rel.numProp; ++p) {
                      prop[(offset + i) * rel.numProp + p] =
@@ -775,18 +776,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                      tri3[i] = -1;
                      continue;
                    }
-                   const int thisTri = halfedges[i] / 3;
-                   const int j = halfedges[i] % 3;
                    const Halfedge& halfedge = halfedge_[halfedges[i]];
-                   tri3[i] = rel.triProperties[thisTri][j];
+                   tri3[i] = halfedge.propVert;
                    edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
                    if (!halfedge.IsForward()) {
-                     const int pairTri = halfedge.pairedHalfedge / 3;
-                     const int k = halfedge.pairedHalfedge % 3;
-                     if (rel.triProperties[pairTri][k] !=
-                             rel.triProperties[thisTri][Next3(j)] ||
-                         rel.triProperties[pairTri][Next3(k)] !=
-                             rel.triProperties[thisTri][j]) {
+                     if (halfedge_[halfedge.pairedHalfedge].propVert !=
+                             halfedge_[NextHalfedge(halfedges[i])].propVert ||
+                         halfedge_[NextHalfedge(halfedge.pairedHalfedge)]
+                                 .propVert != halfedge.propVert) {
                        // if the edge doesn't match, point to the backward edge
                        // propverts.
                        edgeOffsets[i] += addedVerts;

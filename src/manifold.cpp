@@ -147,9 +147,8 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
     for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
-      const ivec3 triProp = impl.meshRelation_.triProperties[triNew2Old[tri]];
       for (const int i : {0, 1, 2}) {
-        const int prop = triProp[i];
+        const int prop = impl.halfedge_[3 * triNew2Old[tri] + i].propVert;
         const int vert = out.triVerts[3 * tri + i];
 
         auto& bin = vertPropPair[vert];
@@ -640,8 +639,9 @@ Manifold Manifold::SetProperties(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), NumTri(), [&](int tri) {
           for (int i : {0, 1, 2}) {
-            const int vert = pImpl->halfedge_[3 * tri + i].startVert;
-            const int propVert = triProperties[tri][i];
+            const Halfedge& edge = pImpl->halfedge_[3 * tri + i];
+            const int vert = edge.startVert;
+            const int propVert = edge.propVert;
             if (propFunc == nullptr) {
               for (int p = 0; p < numProp; ++p) {
                 pImpl->meshRelation_.properties[numProp * propVert + p] = 0;

@@ -254,9 +254,7 @@ namespace manifold {
  * normalIdx shows the beginning of where normals are stored in the properties.
  */
 vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
-  const int tri = halfedge / 3;
-  const int j = halfedge % 3;
-  const int prop = meshRelation_.triProperties[tri][j];
+  const int prop = halfedge_[halfedge].propVert;
   vec3 normal;
   for (const int i : {0, 1, 2}) {
     normal[i] =

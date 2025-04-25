@@ -322,10 +322,8 @@ void Manifold::Impl::DedupePropVerts() {
         const int baseNum = edgeIdx - 3 * edgeFace;
         const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
-        const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
-        const int prop1 =
-            meshRelation_
-                .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
+        const int prop0 = halfedge_[edgeIdx].propVert;
+        const int prop1 = halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
         bool propEqual = true;
         for (size_t p = 0; p < numProp; ++p) {
           if (meshRelation_.properties[numProp * prop0 + p] !=

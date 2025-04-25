@@ -328,13 +328,10 @@ void Manifold::Impl::CompactProps() {
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), [&keep](ivec3 triProp) {
-             for (const int i : {0, 1, 2}) {
-               reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
-                   ->store(1, std::memory_order_relaxed);
-             }
-           });
+  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
+    reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
+        ->store(1, std::memory_order_relaxed);
+  });
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
