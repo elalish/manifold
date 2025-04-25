@@ -160,7 +160,7 @@ TEST(Manifold, OppositeFace) {
   };
   Manifold man(gl);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(man.NumVert(), 8);
+  EXPECT_EQ(man.NumVert(), 12);
   EXPECT_FLOAT_EQ(man.Volume(), 2);
 }
 

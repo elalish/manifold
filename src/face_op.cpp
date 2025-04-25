@@ -299,7 +299,7 @@ void Manifold::Impl::FlattenFaces() {
       faceEdge.push_back(i);
     }
   }
-  const int numFace = faceEdge.size();
+  const size_t numFace = faceEdge.size();
   faceEdge.push_back(newHalf2Old.size());
 
   if (numFace < 4) {
