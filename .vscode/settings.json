@@ -158,4 +158,7 @@
   },
   "python.formatting.provider": "none",
   "clang-format.executable": "clang-format",
+  "clangd.arguments": [
+    "--header-insertion=never"
+  ],
 }

@@ -50,7 +50,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
-  ExpectMeshes(result2, {{16, 28}});
+  ExpectMeshes(result2, {{18, 32}});
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();

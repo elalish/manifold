@@ -49,7 +49,7 @@ struct DuplicateEdge {
 struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
-  const double tolerance;
+  const double epsilon;
   const int firstNewVert;
 
   bool operator()(int edge) const {
@@ -59,7 +59,7 @@ struct ShortEdge {
       return false;
     // Flag short edges
     const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
-    return la::dot(delta, delta) < tolerance * tolerance;
+    return la::dot(delta, delta) < epsilon * epsilon;
   }
 };
 
@@ -234,43 +234,56 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   if (!halfedge_.size()) return;
 
   CleanupTopology();
+  CollapseShortEdges(firstNewVert);
+  CollapseColinearEdges(firstNewVert);
+  SwapDegenerates(firstNewVert);
+}
 
-  if (!ManifoldParams().cleanupTriangles) {
-    return;
-  }
+void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
+  if (!halfedge_.size()) return;
 
-  const size_t nbEdges = halfedge_.size();
+  CleanupTopology();
+  CollapseShortEdges(firstNewVert);
+  SwapDegenerates(firstNewVert);
+}
+
+void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
+  ZoneScopedN("CollapseShortEdge");
+  FlagStore s;
   size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
 
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
-
-  FlagStore s;
-  {
-    ZoneScopedN("CollapseShortEdge");
-    numFlagged = 0;
-    // Short edges get to skip several checks and hence remove more classes of
-    // degenerate triangles than flagged edges do, but this could in theory lead
-    // to error stacking where a vertex moves too far. For this reason this is
-    // restricted to epsilon, rather than tolerance.
-    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
-    s.run(nbEdges, se, [&](size_t i) {
-      const bool didCollapse = CollapseEdge(i, scratchBuffer);
-      if (didCollapse) numFlagged++;
-      scratchBuffer.resize(0);
-    });
+  // Short edges get to skip several checks and hence remove more classes of
+  // degenerate triangles than flagged edges do, but this could in theory lead
+  // to error stacking where a vertex moves too far. For this reason this is
+  // restricted to epsilon, rather than tolerance.
+  ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
+  s.run(nbEdges, se, [&](size_t i) {
+    const bool didCollapse = CollapseEdge(i, scratchBuffer);
+    if (didCollapse) numFlagged++;
+    scratchBuffer.resize(0);
+  });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-      std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
-    }
-#endif
+  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
   }
+#endif
+}
 
+void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
+  FlagStore s;
+  size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
+  std::vector<int> scratchBuffer;
+  scratchBuffer.reserve(10);
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
-    // Collapse colinear edges, but only remove new verts, i.e. verts with index
+    // Collapse colinear edges, but only remove new verts, i.e. verts with
+    // index
     // >= firstNewVert. This is used to keep the Boolean from changing the
     // non-intersecting parts of the input meshes. Colinear is defined not by a
     // local check, but by the global CreateFaces function, which keeps this
@@ -289,32 +302,36 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
     }
 #endif
   }
+}
 
-  {
-    ZoneScopedN("RecursiveEdgeSwap");
-    numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_,
-                     firstNewVert};
-    std::vector<int> edgeSwapStack;
-    std::vector<int> visited(halfedge_.size(), -1);
-    int tag = 0;
-    s.run(nbEdges, se, [&](size_t i) {
-      numFlagged++;
-      tag++;
-      RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
-      while (!edgeSwapStack.empty()) {
-        int last = edgeSwapStack.back();
-        edgeSwapStack.pop_back();
-        RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
-      }
-    });
+void Manifold::Impl::SwapDegenerates(int firstNewVert) {
+  ZoneScopedN("RecursiveEdgeSwap");
+  FlagStore s;
+  size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
+  std::vector<int> scratchBuffer;
+  scratchBuffer.reserve(10);
+
+  SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_, firstNewVert};
+  std::vector<int> edgeSwapStack;
+  std::vector<int> visited(halfedge_.size(), -1);
+  int tag = 0;
+  s.run(nbEdges, se, [&](size_t i) {
+    numFlagged++;
+    tag++;
+    RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
+    while (!edgeSwapStack.empty()) {
+      int last = edgeSwapStack.back();
+      edgeSwapStack.pop_back();
+      RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
+    }
+  });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-      std::cout << "swapped " << numFlagged << " edges" << std::endl;
-    }
-#endif
+  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    std::cout << "swapped " << numFlagged << " edges" << std::endl;
   }
+#endif
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the

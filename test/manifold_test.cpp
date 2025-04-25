@@ -200,7 +200,7 @@ TEST(Manifold, OppositeFace) {
   };
   Manifold man(gl);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(man.NumVert(), 8);
+  EXPECT_EQ(man.NumVert(), 12);
   EXPECT_FLOAT_EQ(man.Volume(), 2);
 }
 
@@ -703,7 +703,8 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(man.IsEmpty());
+  EXPECT_EQ(man.NumTri(), 4);
+  EXPECT_TRUE(man.Simplify().IsEmpty());
 }
 
 TEST(Manifold, PinchedVert) {

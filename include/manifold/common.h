@@ -587,7 +587,8 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Perform optional but recommended triangle cleanups in SimplifyTopology()
+  /// Deprecated! This value no longer has any effect, as cleanup now only
+  /// occurs on intersected triangles.
   bool cleanupTriangles = true;
   /// Verbose level:
   /// - 0 for no verbose output

@@ -299,12 +299,14 @@ void Manifold::Impl::FlattenFaces() {
       faceEdge.push_back(i);
     }
   }
-  const int numFace = faceEdge.size();
+  const size_t numFace = faceEdge.size();
   faceEdge.push_back(newHalf2Old.size());
 
   if (numFace < 4) {
     MakeEmpty(Error::NoError);
     return;  // empty
+  } else if (numFace == numTri) {
+    return;  // already flat
   }
 
   Vec<TriRef> halfedgeRef(halfedge_.size());

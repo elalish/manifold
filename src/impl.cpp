@@ -377,7 +377,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
-  // fixed by duplicating verts in SimplifyTopology.
+  // fixed by duplicating verts in CleanupTopology.
   stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
     return edge[a] < edge[b];
   });
