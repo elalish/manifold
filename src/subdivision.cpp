@@ -535,7 +535,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           auto Added = [&edgeAdded, &half2Edge, thisAdded, this](int hIdx) {
             int longest = 0;
             int total = 0;
-            for (int _ : {0, 1, 2}) {
+            for ([[maybe_unused]] int _ : {0, 1, 2}) {
               const int added = edgeAdded[half2Edge[hIdx]];
               longest = la::max(longest, added);
               total += added;

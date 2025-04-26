@@ -44,7 +44,7 @@ struct std::hash<std::pair<int, int>> {
 
 namespace {
 
-constexpr int kParallelThreshold = 128;
+[[maybe_unused]] constexpr int kParallelThreshold = 128;
 
 struct AbsSum {
   int operator()(int a, int b) const { return abs(a) + abs(b); }
@@ -777,7 +777,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     exclusive_scan(i21.begin(), i21.end(), v21R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
-  const int n21 = numVertR - nPv - nQv - n12;
+  [[maybe_unused]] const int n21 = numVertR - nPv - nQv - n12;
 
   // Create the output Manifold
   Manifold::Impl outR;

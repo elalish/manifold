@@ -743,7 +743,7 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
           stream.get(tmp.data(), SIZE, '\n');
           if (strncmp(tmp.data(), "tolerance", SIZE) == 0) {
             // skip 3 letters
-            for (int _ : {0, 1, 2}) stream.get();
+            for ([[maybe_unused]] int _ : {0, 1, 2}) stream.get();
             stream >> mesh.tolerance;
           } else if (strncmp(tmp.data(), "epsilon =", SIZE) == 0) {
             double tmp;
@@ -764,14 +764,14 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
         break;
       }
       case 'v':
-        for (int _ : {0, 1, 2}) {
+        for ([[maybe_unused]] int _ : {0, 1, 2}) {
           double x;
           stream >> x;
           mesh.vertProperties.push_back(x);
         }
         break;
       case 'f':
-        for (int _ : {0, 1, 2}) {
+        for ([[maybe_unused]] int _ : {0, 1, 2}) {
           uint64_t x;
           stream >> x;
           mesh.triVerts.push_back(x - 1);
