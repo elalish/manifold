@@ -343,8 +343,6 @@ void Manifold::Impl::DedupePropVerts() {
 
   std::vector<int> label2vert(numLabels);
   for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
-  for (auto& prop : meshRelation_.triProperties)
-    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
   for (Halfedge& edge : halfedge_)
     edge.propVert = label2vert[vertLabels[edge.propVert]];
 }

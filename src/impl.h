@@ -37,7 +37,6 @@ struct Manifold::Impl {
     Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
-    Vec<ivec3> triProperties;
   };
   struct BaryIndices {
     int tri, start4, end4;
@@ -196,7 +195,6 @@ struct Manifold::Impl {
     const bool needsPropMap = numProp > 0 && !prop2vert.empty();
     if (needsPropMap) triVert.reserve(numTri);
     if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
-    if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
       ivec3 triP, triV;
       for (const size_t j : {0, 1, 2}) {
@@ -217,12 +215,6 @@ struct Manifold::Impl {
         }
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
-        }
-        if (numProp > 0) {
-          meshRelation_.triProperties.push_back(
-              ivec3(static_cast<uint32_t>(meshGL.triVerts[3 * i]),
-                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 1]),
-                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 2])));
         }
       }
     }

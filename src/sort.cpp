@@ -217,11 +217,6 @@ void Manifold::Impl::Finish() {
     Halfedge extrema = {0, 0, 0};
     for (size_t i = 0; i < halfedge_.size(); i++) {
       Halfedge e = halfedge_[i];
-      const int propVert = NumProp() > 0
-                               ? meshRelation_.triProperties[i / 3][i % 3]
-                               : e.startVert;
-      // std::cout << i << ", " << e.propVert << ", " << propVert << std::endl;
-      DEBUG_ASSERT(e.propVert == propVert, logicErr, "error");
       if (!e.IsForward()) std::swap(e.startVert, e.endVert);
       extrema.startVert = std::min(extrema.startVert, e.startVert);
       extrema.endVert = std::min(extrema.endVert, e.endVert);
@@ -318,7 +313,7 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
 }
 
 /**
- * Removes unreferenced property verts and reindexes triProperties.
+ * Removes unreferenced property verts and reindexes propVerts.
  */
 void Manifold::Impl::CompactProps() {
   ZoneScoped;
@@ -349,12 +344,6 @@ void Manifold::Impl::CompactProps() {
               oldProp[oldIdx * numProp + p];
         }
       });
-  for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
-             [&propOld2New, this](ivec3& triProp) {
-               for (const int i : {0, 1, 2}) {
-                 triProp[i] = propOld2New[triProp[i]];
-               }
-             });
   for_each(policy, halfedge_.begin(), halfedge_.end(),
            [&propOld2New, this](Halfedge& edge) {
              edge.propVert = propOld2New[edge.propVert];
@@ -433,8 +422,6 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
-  if (meshRelation_.triProperties.size() == NumTri())
-    Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
@@ -464,11 +451,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
     meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
 
-  if (old.meshRelation_.triProperties.size() > 0) {
-    meshRelation_.triProperties.resize_nofill(numTri);
-    gather(faceNew2Old.begin(), faceNew2Old.end(),
-           old.meshRelation_.triProperties.begin(),
-           meshRelation_.triProperties.begin());
+  if (old.NumProp() > 0) {
     meshRelation_.numProp = old.meshRelation_.numProp;
     meshRelation_.properties = old.meshRelation_.properties;
   }

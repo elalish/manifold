@@ -801,7 +801,6 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                });
 
     meshRelation_.properties = prop;
-    meshRelation_.triProperties = triProp;
     CreateHalfedges(triProp, triVerts);
   } else {
     CreateHalfedges(triVerts);

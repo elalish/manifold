@@ -470,15 +470,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   Vec<double> oldProperties(numProp * NumPropVert(), 0);
   meshRelation_.properties.swap(oldProperties);
   meshRelation_.numProp = numProp;
-  if (meshRelation_.triProperties.size() == 0) {
-    meshRelation_.triProperties.resize(numTri);
-    for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri, [this](int tri) {
-      for (const int j : {0, 1, 2})
-        meshRelation_.triProperties[tri][j] = halfedge_[3 * tri + j].startVert;
-    });
-  }
-  Vec<ivec3> oldTriProp(numTri, {-1, -1, -1});
-  meshRelation_.triProperties.swap(oldTriProp);
 
   Vec<int> oldHalfedgeProp(halfedge_.size());
   for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),

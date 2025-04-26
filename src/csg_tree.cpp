@@ -212,7 +212,6 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   if (numPropOut > 0) {
     combined.meshRelation_.numProp = numPropOut;
     combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
-    combined.meshRelation_.triProperties.resize_nofill(numTri);
   }
   auto policy = autoPolicy(numTri);
 
@@ -244,33 +243,17 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
                     return edge;
                   });
 
-        if (numPropOut > 0) {
-          auto start =
-              combined.meshRelation_.triProperties.begin() + triIndices[i];
-          if (node->pImpl_->NumProp() > 0) {
-            auto& triProp = node->pImpl_->meshRelation_.triProperties;
-            const int nextProp = propVertIndices[i];
-            transform(triProp.begin(), triProp.end(), start,
-                      [nextProp](ivec3 tri) {
-                        tri += nextProp;
-                        return tri;
-                      });
-
-            const int numProp = node->pImpl_->NumProp();
-            auto& oldProp = node->pImpl_->meshRelation_.properties;
-            auto& newProp = combined.meshRelation_.properties;
-            for (int p = 0; p < numProp; ++p) {
-              auto oldRange =
-                  StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
-              auto newRange = StridedRange(
-                  newProp.begin() + numPropOut * propVertIndices[i] + p,
-                  newProp.end(), numPropOut);
-              copy(oldRange.begin(), oldRange.end(), newRange.begin());
-            }
-          } else {
-            // point all triangles at single new property of zeros.
-            fill(start, start + node->pImpl_->NumTri(),
-                 ivec3(propVertIndices[i]));
+        if (node->pImpl_->NumProp() > 0) {
+          const int numProp = node->pImpl_->NumProp();
+          auto& oldProp = node->pImpl_->meshRelation_.properties;
+          auto& newProp = combined.meshRelation_.properties;
+          for (int p = 0; p < numProp; ++p) {
+            auto oldRange =
+                StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
+            auto newRange = StridedRange(
+                newProp.begin() + numPropOut * propVertIndices[i] + p,
+                newProp.end(), numPropOut);
+            copy(oldRange.begin(), oldRange.end(), newRange.begin());
           }
         }
 

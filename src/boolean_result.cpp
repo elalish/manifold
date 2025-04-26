@@ -569,8 +569,6 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
-  outR.meshRelation_.triProperties.resize_nofill(numTri);
-
   Vec<vec3> bary(outR.halfedge_.size());
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
@@ -630,7 +628,6 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         // only key.x/key.z matters
         auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
-          outR.meshRelation_.triProperties[tri][i] = entry;
           outR.halfedge_[3 * tri + i].propVert = entry;
           continue;
         }
@@ -641,7 +638,6 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.meshRelation_.triProperties[tri][i] = b.second;
             outR.halfedge_[3 * tri + i].propVert = b.second;
             break;
           }
@@ -650,8 +646,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
-      outR.halfedge_[3 * tri + i].propVert = idx;
-      outR.meshRelation_.triProperties[tri][i] = idx++;
+      outR.halfedge_[3 * tri + i].propVert = idx++;
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           vec3 oldProps;

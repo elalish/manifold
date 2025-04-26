@@ -616,25 +616,10 @@ Manifold Manifold::SetProperties(
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->meshRelation_.properties;
 
-  auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
-    triProperties.clear();
     pImpl->meshRelation_.properties.clear();
   } else {
-    if (triProperties.size() == 0) {
-      const int numTri = NumTri();
-      triProperties.resize_nofill(numTri);
-      for (int i = 0; i < numTri; ++i) {
-        for (const int j : {0, 1, 2}) {
-          triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;
-          pImpl->halfedge_[3 * i + j].propVert =
-              pImpl->halfedge_[3 * i + j].startVert;
-        }
-      }
-      pImpl->meshRelation_.properties = Vec<double>(numProp * NumVert(), 0);
-    } else {
-      pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
-    }
+    pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     for_each_n(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), NumTri(), [&](int tri) {
@@ -745,14 +730,12 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
     if (minSmoothness == 0) {
       const int numProp = pImpl->meshRelation_.numProp;
       Vec<double> properties = pImpl->meshRelation_.properties;
-      Vec<ivec3> triProperties = pImpl->meshRelation_.triProperties;
       Vec<Halfedge> halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
       pImpl->meshRelation_.numProp = numProp;
       pImpl->meshRelation_.properties.swap(properties);
-      pImpl->meshRelation_.triProperties.swap(triProperties);
       pImpl->halfedge_.swap(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));

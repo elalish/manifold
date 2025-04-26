@@ -366,9 +366,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
         meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
-      if (meshRelation_.triProperties.size() > 0)
-        meshRelation_.triProperties.push_back(
-            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
@@ -383,9 +380,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge, newHalfedge - 3);
       if (meshRelation_.triRef.size() > 0)
         meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
-      if (meshRelation_.triProperties.size() > 0)
-        meshRelation_.triProperties.push_back(
-            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       break;
@@ -518,7 +512,6 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // pointing to it.
 bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
-  Vec<ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return false;
@@ -587,17 +580,15 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
-    if (triProp.size() > 0) {
+    if (NumProp() > 0) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
       if (triRef[tri].SameFace(triRef[tri0])) {
         halfedge_[current].propVert = halfedge_[NextHalfedge(edge)].propVert;
-        triProp[tri][vIdx] = triProp[tri0][triVert0];
       } else if (triRef[tri].SameFace(triRef[tri1])) {
         halfedge_[current].propVert =
             halfedge_[toRemove.pairedHalfedge].propVert;
-        triProp[tri][vIdx] = triProp[tri1][triVert1];
       }
     }
 
@@ -673,24 +664,18 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const double a = std::max(0.0, std::min(1.0, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
-      Vec<ivec3>& triProp = meshRelation_.triProperties;
       Vec<double>& prop = meshRelation_.properties;
-      triProp[tri0] = triProp[tri1];
-      triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
-      triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
       halfedge_[tri0edge[1]].propVert = halfedge_[tri1edge[0]].propVert;
       halfedge_[tri0edge[0]].propVert = halfedge_[tri1edge[2]].propVert;
       halfedge_[tri0edge[2]].propVert = halfedge_[tri1edge[2]].propVert;
       const int numProp = NumProp();
       const int newProp = prop.size() / numProp;
-      const int propIdx0 = triProp[tri1][perm1[0]];
-      const int propIdx1 = triProp[tri1][perm1[1]];
+      const int propIdx0 = halfedge_[tri1edge[0]].propVert;
+      const int propIdx1 = halfedge_[tri1edge[1]].propVert;
       for (int p = 0; p < numProp; ++p) {
         prop.push_back(a * prop[numProp * propIdx0 + p] +
                        (1 - a) * prop[numProp * propIdx1 + p]);
       }
-      triProp[tri1][perm1[0]] = newProp;
-      triProp[tri0][perm0[2]] = newProp;
       halfedge_[tri1edge[0]].propVert = newProp;
       halfedge_[tri0edge[2]].propVert = newProp;
     }
