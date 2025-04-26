@@ -696,8 +696,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     Vec<double> prop(numProp_ * (numPropVert + addedVerts + totalEdgeAdded));
 
     // copy retained prop verts
-    copy(meshRelation_.properties.begin(), meshRelation_.properties.end(),
-         prop.begin());
+    copy(properties_.begin(), properties_.end(), prop.begin());
 
     // copy interior prop verts and forward edge prop verts
     for_each_n(
@@ -707,7 +706,6 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const int vert = numPropVert + i;
           const Barycentric bary = vertBary[numVert + i];
           const ivec4 halfedges = faceHalfedges[bary.tri];
-          auto& rel = meshRelation_;
           const int numProp = NumProp();
 
           for (int p = 0; p < numProp; ++p) {
@@ -715,17 +713,15 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
               vec3 triProp;
               for (const int i : {0, 1, 2}) {
                 triProp[i] =
-                    rel.properties[halfedge_[3 * bary.tri + i].propVert *
-                                       numProp +
-                                   p];
+                    properties_[halfedge_[3 * bary.tri + i].propVert * numProp +
+                                p];
               }
               prop[vert * numProp + p] = la::dot(triProp, vec3(bary.uvw));
             } else {
               vec4 quadProp;
               for (const int i : {0, 1, 2, 3}) {
                 quadProp[i] =
-                    rel.properties[halfedge_[halfedges[i]].propVert * numProp +
-                                   p];
+                    properties_[halfedge_[halfedges[i]].propVert * numProp + p];
               }
               prop[vert * numProp + p] = la::dot(quadProp, bary.uvw);
             }
@@ -739,22 +735,19 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                 addedVerts](const int i) {
                  const int n = edgeAdded[i];
                  const int offset = edgeOffset[i] + propOffset + addedVerts;
-                 auto& rel = meshRelation_;
                  const int numProp = NumProp();
 
                  const double frac = 1.0 / (n + 1);
                  const int halfedgeIdx =
                      halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
-                 const int v0 = halfedgeIdx % 3;
-                 const int tri = halfedgeIdx / 3;
                  const int prop0 = halfedge_[halfedgeIdx].propVert;
                  const int prop1 =
                      halfedge_[NextHalfedge(halfedgeIdx)].propVert;
                  for (int i = 0; i < n; ++i) {
                    for (int p = 0; p < numProp; ++p) {
                      prop[(offset + i) * numProp + p] = la::lerp(
-                         rel.properties[prop0 * numProp + p],
-                         rel.properties[prop1 * numProp + p], (i + 1) * frac);
+                         properties_[prop0 * numProp + p],
+                         properties_[prop1 * numProp + p], (i + 1) * frac);
                    }
                  }
                });
@@ -768,7 +761,6 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const ivec4 halfedges = faceHalfedges[tri];
           if (halfedges[0] < 0) return;
 
-          auto& rel = meshRelation_;
           ivec4 tri3;
           ivec4 edgeOffsets;
           bvec4 edgeFwd(true);
@@ -801,7 +793,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                triProp.begin() + triOffset[tri]);
         });
 
-    meshRelation_.properties = prop;
+    properties_ = prop;
     CreateHalfedges(triProp, triVerts);
   } else {
     CreateHalfedges(triVerts);

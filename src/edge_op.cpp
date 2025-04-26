@@ -663,8 +663,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const double l02 = la::length(v[2] - v[0]);
     const double a = std::max(0.0, std::min(1.0, l02 / l01));
     // Update properties if applicable
-    if (meshRelation_.properties.size() > 0) {
-      Vec<double>& prop = meshRelation_.properties;
+    if (properties_.size() > 0) {
+      Vec<double>& prop = properties_;
       halfedge_[tri0edge[1]].propVert = halfedge_[tri1edge[0]].propVert;
       halfedge_[tri0edge[0]].propVert = halfedge_[tri1edge[2]].propVert;
       halfedge_[tri0edge[2]].propVert = halfedge_[tri1edge[2]].propVert;

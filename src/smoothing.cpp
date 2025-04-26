@@ -257,7 +257,7 @@ vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
   const int prop = halfedge_[halfedge].propVert;
   vec3 normal;
   for (const int i : {0, 1, 2}) {
-    normal[i] = meshRelation_.properties[prop * numProp_ + normalIdx + i];
+    normal[i] = properties_[prop * numProp_ + normalIdx + i];
   }
   return normal;
 }
@@ -467,7 +467,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
   const int numProp = std::max(oldNumProp, normalIdx + 3);
   Vec<double> oldProperties(numProp * NumPropVert(), 0);
-  meshRelation_.properties.swap(oldProperties);
+  properties_.swap(oldProperties);
   numProp_ = numProp;
 
   Vec<int> oldHalfedgeProp(halfedge_.size());
@@ -495,9 +495,9 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         // update property vertex
         auto start = oldProperties.begin() + prop * oldNumProp;
         std::copy(start, start + oldNumProp,
-                  meshRelation_.properties.begin() + prop * numProp);
+                  properties_.begin() + prop * numProp);
         for (const int i : {0, 1, 2})
-          meshRelation_.properties[prop * numProp + normalIdx + i] = normal[i];
+          properties_[prop * numProp + normalIdx + i] = normal[i];
       });
     } else {  // vertex has multiple normals
       const vec3 centerPos = vertPos_[vert];
@@ -592,12 +592,11 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           // split property vertex, duplicating but with an updated normal
           lastGroup = group[idx];
           newProp = NumPropVert();
-          meshRelation_.properties.resize(meshRelation_.properties.size() +
-                                          numProp);
+          properties_.resize(properties_.size() + numProp);
           std::copy(start, start + oldNumProp,
-                    meshRelation_.properties.begin() + newProp * numProp);
+                    properties_.begin() + newProp * numProp);
           for (const int i : {0, 1, 2}) {
-            meshRelation_.properties[newProp * numProp + normalIdx + i] =
+            properties_[newProp * numProp + normalIdx + i] =
                 normals[group[idx]][i];
           }
         } else if (prop != lastProp) {
@@ -605,9 +604,9 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           lastProp = prop;
           newProp = prop;
           std::copy(start, start + oldNumProp,
-                    meshRelation_.properties.begin() + prop * numProp);
+                    properties_.begin() + prop * numProp);
           for (const int i : {0, 1, 2})
-            meshRelation_.properties[prop * numProp + normalIdx + i] =
+            properties_[prop * numProp + normalIdx + i] =
                 normals[group[idx]][i];
         }
 

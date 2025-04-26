@@ -582,7 +582,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
 
-  outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
+  outR.properties_.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
@@ -592,8 +592,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
     const int oldNumProp = PQ ? numPropP : numPropQ;
-    const auto& properties =
-        PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
+    const auto& properties = PQ ? inP.properties_ : inQ.properties_;
     const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
 
     for (const int i : {0, 1, 2}) {
@@ -653,9 +652,9 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
           for (const int j : {0, 1, 2})
             oldProps[j] =
                 properties[oldNumProp * halfedge[3 * ref.tri + j].propVert + p];
-          outR.meshRelation_.properties.push_back(la::dot(uvw, oldProps));
+          outR.properties_.push_back(la::dot(uvw, oldProps));
         } else {
-          outR.meshRelation_.properties.push_back(0);
+          outR.properties_.push_back(0);
         }
       }
     }

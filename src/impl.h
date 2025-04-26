@@ -33,7 +33,6 @@ struct Manifold::Impl {
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
-    Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
   };
@@ -48,6 +47,7 @@ struct Manifold::Impl {
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
+  Vec<double> properties_;
   // Note that vertNormal_ is not precise due to the use of an approximated acos
   // function
   Vec<vec3> vertNormal_;
@@ -134,7 +134,7 @@ struct Manifold::Impl {
 
     const auto numProp = meshGL.numProp - 3;
     numProp_ = numProp;
-    meshRelation_.properties.resize_nofill(meshGL.NumVert() * numProp);
+    properties_.resize_nofill(meshGL.NumVert() * numProp);
     tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
@@ -144,7 +144,7 @@ struct Manifold::Impl {
       for (const int j : {0, 1, 2})
         vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
       for (size_t j = 0; j < numProp; ++j)
-        meshRelation_.properties[i * numProp + j] =
+        properties_[i * numProp + j] =
             meshGL.vertProperties[meshGL.numProp * i + 3 + j];
     }
 
@@ -299,8 +299,7 @@ struct Manifold::Impl {
   size_t NumTri() const { return halfedge_.size() / 3; }
   size_t NumProp() const { return numProp_; }
   size_t NumPropVert() const {
-    return NumProp() == 0 ? NumVert()
-                          : meshRelation_.properties.size() / NumProp();
+    return NumProp() == 0 ? NumVert() : properties_.size() / NumProp();
   }
 
   // properties.cpp

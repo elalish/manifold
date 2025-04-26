@@ -170,8 +170,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           out.vertProperties.push_back(impl.vertPos_[vert][p]);
         }
         for (int p = 0; p < numProp; ++p) {
-          out.vertProperties.push_back(
-              impl.meshRelation_.properties[prop * numProp + p]);
+          out.vertProperties.push_back(impl.properties_[prop * numProp + p]);
         }
 
         if (updateNormals) {
@@ -614,12 +613,12 @@ Manifold Manifold::SetProperties(
         propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const Vec<double> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<double> oldProperties = pImpl->properties_;
 
   if (numProp == 0) {
-    pImpl->meshRelation_.properties.clear();
+    pImpl->properties_.clear();
   } else {
-    pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
+    pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
     for_each_n(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), NumTri(), [&](int tri) {
@@ -629,10 +628,10 @@ Manifold Manifold::SetProperties(
             const int propVert = edge.propVert;
             if (propFunc == nullptr) {
               for (int p = 0; p < numProp; ++p) {
-                pImpl->meshRelation_.properties[numProp * propVert + p] = 0;
+                pImpl->properties_[numProp * propVert + p] = 0;
               }
             } else {
-              propFunc(&pImpl->meshRelation_.properties[numProp * propVert],
+              propFunc(&pImpl->properties_[numProp * propVert],
                        pImpl->vertPos_[vert],
                        oldProperties.data() + oldNumProp * propVert);
             }
@@ -729,13 +728,13 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
       const int numProp = pImpl->numProp_;
-      Vec<double> properties = pImpl->meshRelation_.properties;
+      Vec<double> properties = pImpl->properties_;
       Vec<Halfedge> halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
       pImpl->numProp_ = numProp;
-      pImpl->meshRelation_.properties.swap(properties);
+      pImpl->properties_.swap(properties);
       pImpl->halfedge_.swap(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));

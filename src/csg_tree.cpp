@@ -197,8 +197,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     const int numProp = node->pImpl_->NumProp();
     numPropOut = std::max(numPropOut, numProp);
     numPropVert +=
-        numProp == 0 ? 1
-                     : node->pImpl_->meshRelation_.properties.size() / numProp;
+        numProp == 0 ? 1 : node->pImpl_->properties_.size() / numProp;
   }
 
   Manifold::Impl combined;
@@ -211,7 +210,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.meshRelation_.triRef.resize_nofill(numTri);
   if (numPropOut > 0) {
     combined.numProp_ = numPropOut;
-    combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
+    combined.properties_.resize(numPropOut * numPropVert, 0);
   }
   auto policy = autoPolicy(numTri);
 
@@ -245,8 +244,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
         if (node->pImpl_->NumProp() > 0) {
           const int numProp = node->pImpl_->NumProp();
-          auto& oldProp = node->pImpl_->meshRelation_.properties;
-          auto& newProp = combined.meshRelation_.properties;
+          auto& oldProp = node->pImpl_->properties_;
+          auto& newProp = combined.properties_;
           for (int p = 0; p < numProp; ++p) {
             auto oldRange =
                 StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);

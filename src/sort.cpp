@@ -320,7 +320,7 @@ void Manifold::Impl::CompactProps() {
   if (numProp_ == 0) return;
 
   const int numProp = NumProp();
-  const auto numVerts = meshRelation_.properties.size() / numProp;
+  const auto numVerts = properties_.size() / numProp;
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
@@ -331,9 +331,9 @@ void Manifold::Impl::CompactProps() {
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  Vec<double> oldProp = meshRelation_.properties;
+  Vec<double> oldProp = properties_;
   const int numVertsNew = propOld2New[numVerts];
-  auto& properties = meshRelation_.properties;
+  auto& properties = properties_;
   properties.resize_nofill(numProp * numVertsNew);
   for_each_n(
       policy, countAt(0), numVerts,
@@ -453,7 +453,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   if (old.NumProp() > 0) {
     numProp_ = old.numProp_;
-    meshRelation_.properties = old.meshRelation_.properties;
+    properties_ = old.properties_;
   }
 
   if (old.faceNormal_.size() == old.NumTri()) {

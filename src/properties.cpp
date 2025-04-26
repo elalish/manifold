@@ -276,8 +276,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
-  const Vec<double> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
+  const Vec<double> oldProperties = properties_;
+  properties_ = Vec<double>(numProp * NumPropVert(), 0);
   numProp_ = numProp;
 
   Vec<uint8_t> counters(NumPropVert(), 0);
@@ -293,17 +293,16 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
       if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
-        meshRelation_.properties[numProp * propVert + p] =
+        properties_[numProp * propVert + p] =
             oldProperties[oldNumProp * propVert + p];
       }
 
       if (gaussianIdx >= 0) {
-        meshRelation_.properties[numProp * propVert + gaussianIdx] =
+        properties_[numProp * propVert + gaussianIdx] =
             vertGaussianCurvature[vert];
       }
       if (meanIdx >= 0) {
-        meshRelation_.properties[numProp * propVert + meanIdx] =
-            vertMeanCurvature[vert];
+        properties_[numProp * propVert + meanIdx] = vertMeanCurvature[vert];
       }
     }
   });

@@ -326,8 +326,8 @@ void Manifold::Impl::DedupePropVerts() {
                    halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
                bool propEqual = true;
                for (size_t p = 0; p < numProp; ++p) {
-                 if (meshRelation_.properties[numProp * prop0 + p] !=
-                     meshRelation_.properties[numProp * prop1 + p]) {
+                 if (properties_[numProp * prop0 + p] !=
+                     properties_[numProp * prop1 + p]) {
                    propEqual = false;
                    break;
                  }
@@ -531,6 +531,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
+  result.properties_ = properties_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
