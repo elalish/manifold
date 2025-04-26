@@ -18,9 +18,9 @@
 #include <tbb/combinable.h>
 #endif
 
-#include "./impl.h"
-#include "./parallel.h"
-#include "./tri_dist.h"
+#include "impl.h"
+#include "parallel.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;

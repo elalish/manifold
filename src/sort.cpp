@@ -15,8 +15,8 @@
 #include <atomic>
 #include <set>
 
-#include "./impl.h"
-#include "./parallel.h"
+#include "impl.h"
+#include "parallel.h"
 #include "shared.h"
 
 namespace {

@@ -14,9 +14,9 @@
 
 #pragma once
 
-#include "./parallel.h"
-#include "./utils.h"
-#include "./vec.h"
+#include "parallel.h"
+#include "utils.h"
+#include "vec.h"
 
 namespace manifold {
 

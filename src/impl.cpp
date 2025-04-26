@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./impl.h"
+#include "impl.h"
 
 #include <algorithm>
 #include <atomic>
@@ -20,13 +20,13 @@
 #include <map>
 #include <optional>
 
-#include "./csg_tree.h"
-#include "./hashtable.h"
-#include "./mesh_fixes.h"
-#include "./parallel.h"
-#include "./svd.h"
+#include "csg_tree.h"
+#include "hashtable.h"
 #include "manifold/optional_assert.h"
+#include "mesh_fixes.h"
+#include "parallel.h"
 #include "shared.h"
+#include "svd.h"
 
 namespace {
 using namespace manifold;

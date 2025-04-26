@@ -18,11 +18,11 @@
 
 #include <algorithm>
 
-#include "./boolean3.h"
-#include "./csg_tree.h"
-#include "./impl.h"
-#include "./mesh_fixes.h"
-#include "./parallel.h"
+#include "boolean3.h"
+#include "csg_tree.h"
+#include "impl.h"
+#include "mesh_fixes.h"
+#include "parallel.h"
 
 namespace {
 using namespace manifold;

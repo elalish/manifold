@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <limits>
 
-#include "./impl.h"
+#include "impl.h"
 
 namespace manifold {
 

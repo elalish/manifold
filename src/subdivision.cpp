@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./impl.h"
-#include "./parallel.h"
+#include "impl.h"
+#include "parallel.h"
 
 template <>
 struct std::hash<manifold::ivec4> {

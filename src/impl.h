@@ -15,11 +15,11 @@
 #pragma once
 #include <map>
 
-#include "./collider.h"
-#include "./shared.h"
-#include "./vec.h"
+#include "collider.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
+#include "shared.h"
+#include "vec.h"
 
 namespace manifold {
 

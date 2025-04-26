@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unordered_set>
+
+#include "impl.h"
 #include "manifold/common.h"
+#include "manifold/polygon.h"
+#include "parallel.h"
 #include "shared.h"
+
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
 #endif
-#include <unordered_set>
-
-#include "./impl.h"
-#include "./parallel.h"
-#include "manifold/polygon.h"
 
 namespace {
 using namespace manifold;

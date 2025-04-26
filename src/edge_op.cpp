@@ -14,8 +14,8 @@
 
 #include <unordered_map>
 
-#include "./impl.h"
-#include "./parallel.h"
+#include "impl.h"
+#include "parallel.h"
 #include "shared.h"
 
 namespace {

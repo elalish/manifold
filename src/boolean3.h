@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "./impl.h"
+#include "impl.h"
 
 #ifdef MANIFOLD_DEBUG
 #define PRINT(msg) \

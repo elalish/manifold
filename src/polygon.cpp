@@ -18,11 +18,11 @@
 #include <map>
 #include <set>
 
-#include "./parallel.h"
-#include "./tree2d.h"
-#include "./utils.h"
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
+#include "parallel.h"
+#include "tree2d.h"
+#include "utils.h"
 
 #ifdef MANIFOLD_DEBUG
 #include <iomanip>

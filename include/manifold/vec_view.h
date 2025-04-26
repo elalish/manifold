@@ -19,7 +19,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "manifold/common.h"
 #include "manifold/optional_assert.h"
 
 namespace manifold {

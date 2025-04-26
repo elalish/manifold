@@ -19,8 +19,8 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "./vec.h"
 #include "manifold/common.h"
+#include "vec.h"
 
 #ifndef MANIFOLD_PAR
 #error "MANIFOLD_PAR must be defined to either 1 (parallel) or -1 (series)"
@@ -33,7 +33,7 @@
 #endif
 #endif
 
-#include "./parallel.h"
+#include "parallel.h"
 
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>
