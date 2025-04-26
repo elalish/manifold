@@ -686,15 +686,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
   faceNormal_.clear();
 
-  if (meshRelation_.numProp > 0) {
+  if (numProp_ > 0) {
     const int numPropVert = NumPropVert();
     const int addedVerts = NumVert() - numVert;
     const int propOffset = numPropVert - numVert;
     // duplicate the prop verts along all new edges even though this is
     // unnecessary for edges that share the same prop verts. The duplicates will
     // be removed by CompactProps.
-    Vec<double> prop(meshRelation_.numProp *
-                     (numPropVert + addedVerts + totalEdgeAdded));
+    Vec<double> prop(numProp_ * (numPropVert + addedVerts + totalEdgeAdded));
 
     // copy retained prop verts
     copy(meshRelation_.properties.begin(), meshRelation_.properties.end(),
@@ -709,54 +708,56 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const Barycentric bary = vertBary[numVert + i];
           const ivec4 halfedges = faceHalfedges[bary.tri];
           auto& rel = meshRelation_;
+          const int numProp = NumProp();
 
-          for (int p = 0; p < rel.numProp; ++p) {
+          for (int p = 0; p < numProp; ++p) {
             if (halfedges[3] < 0) {
               vec3 triProp;
               for (const int i : {0, 1, 2}) {
                 triProp[i] =
                     rel.properties[halfedge_[3 * bary.tri + i].propVert *
-                                       rel.numProp +
+                                       numProp +
                                    p];
               }
-              prop[vert * rel.numProp + p] = la::dot(triProp, vec3(bary.uvw));
+              prop[vert * numProp + p] = la::dot(triProp, vec3(bary.uvw));
             } else {
               vec4 quadProp;
               for (const int i : {0, 1, 2, 3}) {
-                quadProp[i] = rel.properties[halfedge_[halfedges[i]].propVert *
-                                                 rel.numProp +
-                                             p];
+                quadProp[i] =
+                    rel.properties[halfedge_[halfedges[i]].propVert * numProp +
+                                   p];
               }
-              prop[vert * rel.numProp + p] = la::dot(quadProp, bary.uvw);
+              prop[vert * numProp + p] = la::dot(quadProp, bary.uvw);
             }
           }
         });
 
     // copy backward edge prop verts, some of which will be unreferenced
     // duplicates.
-    for_each_n(
-        policy, countAt(0), numEdge,
-        [this, &prop, &edges, &edgeAdded, &edgeOffset, propOffset,
-         addedVerts](const int i) {
-          const int n = edgeAdded[i];
-          const int offset = edgeOffset[i] + propOffset + addedVerts;
-          auto& rel = meshRelation_;
+    for_each_n(policy, countAt(0), numEdge,
+               [this, &prop, &edges, &edgeAdded, &edgeOffset, propOffset,
+                addedVerts](const int i) {
+                 const int n = edgeAdded[i];
+                 const int offset = edgeOffset[i] + propOffset + addedVerts;
+                 auto& rel = meshRelation_;
+                 const int numProp = NumProp();
 
-          const double frac = 1.0 / (n + 1);
-          const int halfedgeIdx =
-              halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
-          const int v0 = halfedgeIdx % 3;
-          const int tri = halfedgeIdx / 3;
-          const int prop0 = halfedge_[halfedgeIdx].propVert;
-          const int prop1 = halfedge_[NextHalfedge(halfedgeIdx)].propVert;
-          for (int i = 0; i < n; ++i) {
-            for (int p = 0; p < rel.numProp; ++p) {
-              prop[(offset + i) * rel.numProp + p] = la::lerp(
-                  rel.properties[prop0 * rel.numProp + p],
-                  rel.properties[prop1 * rel.numProp + p], (i + 1) * frac);
-            }
-          }
-        });
+                 const double frac = 1.0 / (n + 1);
+                 const int halfedgeIdx =
+                     halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
+                 const int v0 = halfedgeIdx % 3;
+                 const int tri = halfedgeIdx / 3;
+                 const int prop0 = halfedge_[halfedgeIdx].propVert;
+                 const int prop1 =
+                     halfedge_[NextHalfedge(halfedgeIdx)].propVert;
+                 for (int i = 0; i < n; ++i) {
+                   for (int p = 0; p < numProp; ++p) {
+                     prop[(offset + i) * numProp + p] = la::lerp(
+                         rel.properties[prop0 * numProp + p],
+                         rel.properties[prop1 * numProp + p], (i + 1) * frac);
+                   }
+                 }
+               });
 
     Vec<ivec3> triProp(triVerts.size());
     for_each_n(

@@ -210,7 +210,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.halfedgeTangent_.resize(2 * numEdge);
   combined.meshRelation_.triRef.resize_nofill(numTri);
   if (numPropOut > 0) {
-    combined.meshRelation_.numProp = numPropOut;
+    combined.numProp_ = numPropOut;
     combined.meshRelation_.properties.resize(numPropOut * numPropVert, 0);
   }
   auto policy = autoPolicy(numTri);

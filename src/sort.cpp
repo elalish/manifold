@@ -317,9 +317,10 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
  */
 void Manifold::Impl::CompactProps() {
   ZoneScoped;
-  if (meshRelation_.numProp == 0) return;
+  if (numProp_ == 0) return;
 
-  const auto numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  const int numProp = NumProp();
+  const auto numVerts = meshRelation_.properties.size() / numProp;
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
@@ -332,7 +333,6 @@ void Manifold::Impl::CompactProps() {
 
   Vec<double> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
-  const int numProp = meshRelation_.numProp;
   auto& properties = meshRelation_.properties;
   properties.resize_nofill(numProp * numVertsNew);
   for_each_n(
@@ -452,7 +452,7 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   }
 
   if (old.NumProp() > 0) {
-    meshRelation_.numProp = old.meshRelation_.numProp;
+    numProp_ = old.numProp_;
     meshRelation_.properties = old.meshRelation_.properties;
   }
 

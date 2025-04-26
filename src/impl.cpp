@@ -530,6 +530,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
+  result.numProp_ = numProp_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());

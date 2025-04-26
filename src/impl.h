@@ -33,7 +33,6 @@ struct Manifold::Impl {
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
-    int numProp = 0;
     Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
@@ -45,6 +44,7 @@ struct Manifold::Impl {
   Box bBox_;
   double epsilon_ = -1;
   double tolerance_ = -1;
+  int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
@@ -133,7 +133,7 @@ struct Manifold::Impl {
     }
 
     const auto numProp = meshGL.numProp - 3;
-    meshRelation_.numProp = numProp;
+    numProp_ = numProp;
     meshRelation_.properties.resize_nofill(meshGL.NumVert() * numProp);
     tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
@@ -297,7 +297,7 @@ struct Manifold::Impl {
   size_t NumVert() const { return vertPos_.size(); }
   size_t NumEdge() const { return halfedge_.size() / 2; }
   size_t NumTri() const { return halfedge_.size() / 3; }
-  size_t NumProp() const { return meshRelation_.numProp; }
+  size_t NumProp() const { return numProp_; }
   size_t NumPropVert() const {
     return NumProp() == 0 ? NumVert()
                           : meshRelation_.properties.size() / NumProp();

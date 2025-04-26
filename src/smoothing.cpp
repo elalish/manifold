@@ -257,8 +257,7 @@ vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
   const int prop = halfedge_[halfedge].propVert;
   vec3 normal;
   for (const int i : {0, 1, 2}) {
-    normal[i] =
-        meshRelation_.properties[prop * meshRelation_.numProp + normalIdx + i];
+    normal[i] = meshRelation_.properties[prop * numProp_ + normalIdx + i];
   }
   return normal;
 }
@@ -469,7 +468,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   const int numProp = std::max(oldNumProp, normalIdx + 3);
   Vec<double> oldProperties(numProp * NumPropVert(), 0);
   meshRelation_.properties.swap(oldProperties);
-  meshRelation_.numProp = numProp;
+  numProp_ = numProp;
 
   Vec<int> oldHalfedgeProp(halfedge_.size());
   for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),

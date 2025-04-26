@@ -640,7 +640,7 @@ Manifold Manifold::SetProperties(
         });
   }
 
-  pImpl->meshRelation_.numProp = numProp;
+  pImpl->numProp_ = numProp;
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -728,13 +728,13 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
-      const int numProp = pImpl->meshRelation_.numProp;
+      const int numProp = pImpl->numProp_;
       Vec<double> properties = pImpl->meshRelation_.properties;
       Vec<Halfedge> halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
-      pImpl->meshRelation_.numProp = numProp;
+      pImpl->numProp_ = numProp;
       pImpl->meshRelation_.properties.swap(properties);
       pImpl->halfedge_.swap(halfedge);
     } else {

@@ -565,7 +565,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = std::max(numPropP, numPropQ);
-  outR.meshRelation_.numProp = numProp;
+  outR.numProp_ = numProp;
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
