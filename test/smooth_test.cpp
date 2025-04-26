@@ -103,7 +103,8 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
-  Manifold smooth = cone.AsOriginal().SmoothOut(180).RefineToLength(0.1);
+  Manifold smooth =
+      cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   EXPECT_NEAR(smooth.Volume(), 4604, 1);
   EXPECT_NEAR(smooth.SurfaceArea(), 1356, 1);
@@ -351,7 +352,7 @@ TEST(Smooth, SineSurface) {
             return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0 : -1.0;
           },
           {vec3(-2 * kPi + 0.2), vec3(0 * kPi - 0.2)}, 1)
-          .AsOriginal();
+          .Simplify();
 
   Manifold smoothed =
       surface.CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);

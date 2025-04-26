@@ -53,15 +53,15 @@ TEST(Properties, Tolerance) {
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
   Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  EXPECT_EQ(imperfect.NumTri(), 28);
 
-  Manifold imperfect2 = imperfect.SetTolerance(tol);
+  Manifold imperfect2 = imperfect.Simplify(tol);
+  EXPECT_EQ(imperfect2.NumTri(), 12);
+
   MeshGL mesh = imperfect.GetMeshGL();
   mesh.tolerance = tol;
   Manifold imperfect3(mesh);
-
-  EXPECT_EQ(imperfect.NumTri(), 28);
-  EXPECT_EQ(imperfect2.NumTri(), 12);
-  EXPECT_EQ(imperfect3.NumTri(), 12);
+  EXPECT_EQ(imperfect3.NumTri(), 28);  // Don't automatically simplify
 
   EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
   EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);

@@ -391,7 +391,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
-  // fixed by duplicating verts in SimplifyTopology.
+  // fixed by duplicating verts in CleanupTopology.
   stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
     return edge[a] < edge[b];
   });
@@ -729,7 +729,6 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
  * Write function.
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
-#ifdef MANIFOLD_DEBUG
   if (!stream.good()) return Invalid();
 
   MeshGL64 mesh;
@@ -791,9 +790,6 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   auto m = std::make_shared<Manifold::Impl>(mesh);
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
-#else
-  return Invalid();
-#endif
 }
 
 /**
@@ -803,15 +799,10 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
  * by WriteOBJ should be read back in with ReadOBJ.
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
-#ifdef MANIFOLD_DEBUG
   if (!stream.good()) return false;
   stream << *this->GetCsgLeafNode().GetImpl();
   return true;
-#else
-  return false;
-#endif
 }
-
 #endif
 
 }  // namespace manifold

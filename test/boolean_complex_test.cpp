@@ -910,7 +910,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(res.IsEmpty());
-  res = res.Simplify();
+  res = res.AsOriginal().Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 

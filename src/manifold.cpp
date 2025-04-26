@@ -75,11 +75,12 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
   // Don't sort originals - keep them in order
   if (!isOriginal) {
-    std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
-      return triRef[a].originalID == triRef[b].originalID
-                 ? triRef[a].meshID < triRef[b].meshID
-                 : triRef[a].originalID < triRef[b].originalID;
-    });
+    std::stable_sort(triNew2Old.begin(), triNew2Old.end(),
+                     [triRef](int a, int b) {
+                       return triRef[a].originalID == triRef[b].originalID
+                                  ? triRef[a].meshID < triRef[b].meshID
+                                  : triRef[a].originalID < triRef[b].originalID;
+                     });
   }
 
   std::vector<mat3> runNormalTransform;
@@ -394,18 +395,18 @@ Manifold Manifold::SetTolerance(double tolerance) const {
 
 /**
  * Return a copy of the manifold simplified to the given tolerance, but with its
- * actual tolerance value unchanged. If no tolerance is given, the current
- * tolerance is used for simplification.
+ * actual tolerance value unchanged. If the tolerance is not given or is less
+ * than the current tolerance, the current tolerance is used for simplification.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const double oldTolerance = impl->tolerance_;
   if (tolerance == 0) tolerance = oldTolerance;
-  if (tolerance >= oldTolerance) {
+  if (tolerance > oldTolerance) {
     impl->tolerance_ = tolerance;
     impl->CreateFaces();
-    impl->FlattenFaces();
   }
+  impl->FlattenFaces();
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);
 }
@@ -445,9 +446,10 @@ int Manifold::OriginalID() const {
 
 /**
  * This removes all relations (originalID, faceID, transform) to ancestor meshes
- * and this new Manifold is marked an original. It also collapses colinear edges
- * - these don't get collapsed at boundaries where originalID changes, so the
- * reset may allow flat faces to be further simplified.
+ * and this new Manifold is marked an original. It also recreates faces
+ * - these don't get joined at boundaries where originalID changes, so the
+ * reset may allow triangles of flat faces to be further collapsed with
+ * Simplify().
  */
 Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
@@ -459,8 +461,6 @@ Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->CreateFaces();
-  newImpl->SimplifyTopology();
-  newImpl->Finish();
   newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
