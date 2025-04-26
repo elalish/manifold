@@ -480,153 +480,151 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   Vec<ivec3> oldTriProp(numTri, {-1, -1, -1});
   meshRelation_.triProperties.swap(oldTriProp);
 
-  for (int tri = 0; tri < numTri; ++tri) {
-    for (const int i : {0, 1, 2}) {
-      if (meshRelation_.triProperties[tri][i] >= 0) continue;
-      int startEdge = 3 * tri + i;
-      const int vert = halfedge_[startEdge].startVert;
+  Vec<int> oldHalfedgeProp(halfedge_.size());
+  for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
+             [this, &oldHalfedgeProp](int i) {
+               oldHalfedgeProp[i] = halfedge_[i].propVert;
+               halfedge_[i].propVert = -1;
+             });
 
-      if (vertNumSharp[vert] < 2) {  // vertex has single normal
-        const vec3 normal = vertFlatFace[vert] >= 0
-                                ? faceNormal_[vertFlatFace[vert]]
-                                : vertNormal_[vert];
-        int lastProp = -1;
-        ForVert(startEdge, [&](int current) {
-          const int thisTri = current / 3;
-          const int j = current - 3 * thisTri;
-          const int prop = oldTriProp[thisTri][j];
-          meshRelation_.triProperties[thisTri][j] = prop;
-          halfedge_[current].propVert = prop;
-          if (prop == lastProp) return;
-          lastProp = prop;
+  const int numEdge = halfedge_.size();
+  for (int startEdge = 0; startEdge < numEdge; ++startEdge) {
+    if (halfedge_[startEdge].propVert >= 0) continue;
+    const int vert = halfedge_[startEdge].startVert;
+
+    if (vertNumSharp[vert] < 2) {  // vertex has single normal
+      const vec3 normal = vertFlatFace[vert] >= 0
+                              ? faceNormal_[vertFlatFace[vert]]
+                              : vertNormal_[vert];
+      int lastProp = -1;
+      ForVert(startEdge, [&](int current) {
+        const int prop = oldHalfedgeProp[current];
+        halfedge_[current].propVert = prop;
+        if (prop == lastProp) return;
+        lastProp = prop;
+        // update property vertex
+        auto start = oldProperties.begin() + prop * oldNumProp;
+        std::copy(start, start + oldNumProp,
+                  meshRelation_.properties.begin() + prop * numProp);
+        for (const int i : {0, 1, 2})
+          meshRelation_.properties[prop * numProp + normalIdx + i] = normal[i];
+      });
+    } else {  // vertex has multiple normals
+      const vec3 centerPos = vertPos_[vert];
+      // Length degree
+      std::vector<int> group;
+      // Length number of normals
+      std::vector<vec3> normals;
+      int current = startEdge;
+      int prevFace = current / 3;
+
+      do {  // find a sharp edge to start on
+        int next = NextHalfedge(halfedge_[current].pairedHalfedge);
+        const int face = next / 3;
+
+        const double dihedral = degrees(
+            std::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
+        if (dihedral > minSharpAngle ||
+            triIsFlatFace[face] != triIsFlatFace[prevFace] ||
+            (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
+             !meshRelation_.triRef[face].SameFace(
+                 meshRelation_.triRef[prevFace]))) {
+          break;
+        }
+        current = next;
+        prevFace = face;
+      } while (current != startEdge);
+
+      const int endEdge = current;
+
+      struct FaceEdge {
+        int face;
+        vec3 edgeVec;
+      };
+
+      // calculate pseudo-normals between each sharp edge
+      ForVert<FaceEdge>(
+          endEdge,
+          [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
+            if (IsInsideQuad(current)) {
+              return FaceEdge({current / 3, vec3(NAN)});
+            }
+            const int vert = halfedge_[current].endVert;
+            vec3 pos = vertPos_[vert];
+            if (vertNumSharp[vert] < 2) {
+              // opposite vert has fixed normal
+              const vec3 normal = vertFlatFace[vert] >= 0
+                                      ? faceNormal_[vertFlatFace[vert]]
+                                      : vertNormal_[vert];
+              // Flair out the normal we're calculating to give the edge a
+              // more constant curvature to meet the opposite normal. Achieve
+              // this by pointing the tangent toward the opposite bezier
+              // control point instead of the vert itself.
+              pos += vec3(
+                  TangentFromNormal(normal, halfedge_[current].pairedHalfedge));
+            }
+            return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
+          },
+          [this, &triIsFlatFace, &normals, &group, minSharpAngle](
+              int, const FaceEdge& here, FaceEdge& next) {
+            const double dihedral = degrees(std::acos(
+                la::dot(faceNormal_[here.face], faceNormal_[next.face])));
+            if (dihedral > minSharpAngle ||
+                triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
+                (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
+                 !meshRelation_.triRef[here.face].SameFace(
+                     meshRelation_.triRef[next.face]))) {
+              normals.push_back(vec3(0.0));
+            }
+            group.push_back(normals.size() - 1);
+            if (std::isfinite(next.edgeVec.x)) {
+              normals.back() +=
+                  SafeNormalize(la::cross(next.edgeVec, here.edgeVec)) *
+                  AngleBetween(here.edgeVec, next.edgeVec);
+            } else {
+              next.edgeVec = here.edgeVec;
+            }
+          });
+
+      for (auto& normal : normals) {
+        normal = SafeNormalize(normal);
+      }
+
+      int lastGroup = 0;
+      int lastProp = -1;
+      int newProp = -1;
+      int idx = 0;
+      ForVert(endEdge, [&](int current1) {
+        const int prop = oldHalfedgeProp[current1];
+        auto start = oldProperties.begin() + prop * oldNumProp;
+
+        if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
+          // split property vertex, duplicating but with an updated normal
+          lastGroup = group[idx];
+          newProp = NumPropVert();
+          meshRelation_.properties.resize(meshRelation_.properties.size() +
+                                          numProp);
+          std::copy(start, start + oldNumProp,
+                    meshRelation_.properties.begin() + newProp * numProp);
+          for (const int i : {0, 1, 2}) {
+            meshRelation_.properties[newProp * numProp + normalIdx + i] =
+                normals[group[idx]][i];
+          }
+        } else if (prop != lastProp) {
           // update property vertex
-          auto start = oldProperties.begin() + prop * oldNumProp;
+          lastProp = prop;
+          newProp = prop;
           std::copy(start, start + oldNumProp,
                     meshRelation_.properties.begin() + prop * numProp);
           for (const int i : {0, 1, 2})
             meshRelation_.properties[prop * numProp + normalIdx + i] =
-                normal[i];
-        });
-      } else {  // vertex has multiple normals
-        const vec3 centerPos = vertPos_[vert];
-        // Length degree
-        std::vector<int> group;
-        // Length number of normals
-        std::vector<vec3> normals;
-        int current = startEdge;
-        int prevFace = current / 3;
-
-        do {  // find a sharp edge to start on
-          int next = NextHalfedge(halfedge_[current].pairedHalfedge);
-          const int face = next / 3;
-
-          const double dihedral = degrees(
-              std::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
-          if (dihedral > minSharpAngle ||
-              triIsFlatFace[face] != triIsFlatFace[prevFace] ||
-              (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
-               !meshRelation_.triRef[face].SameFace(
-                   meshRelation_.triRef[prevFace]))) {
-            break;
-          }
-          current = next;
-          prevFace = face;
-        } while (current != startEdge);
-
-        const int endEdge = current;
-
-        struct FaceEdge {
-          int face;
-          vec3 edgeVec;
-        };
-
-        // calculate pseudo-normals between each sharp edge
-        ForVert<FaceEdge>(
-            endEdge,
-            [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
-              if (IsInsideQuad(current)) {
-                return FaceEdge({current / 3, vec3(NAN)});
-              }
-              const int vert = halfedge_[current].endVert;
-              vec3 pos = vertPos_[vert];
-              if (vertNumSharp[vert] < 2) {
-                // opposite vert has fixed normal
-                const vec3 normal = vertFlatFace[vert] >= 0
-                                        ? faceNormal_[vertFlatFace[vert]]
-                                        : vertNormal_[vert];
-                // Flair out the normal we're calculating to give the edge a
-                // more constant curvature to meet the opposite normal. Achieve
-                // this by pointing the tangent toward the opposite bezier
-                // control point instead of the vert itself.
-                pos += vec3(TangentFromNormal(
-                    normal, halfedge_[current].pairedHalfedge));
-              }
-              return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
-            },
-            [this, &triIsFlatFace, &normals, &group, minSharpAngle](
-                int, const FaceEdge& here, FaceEdge& next) {
-              const double dihedral = degrees(std::acos(
-                  la::dot(faceNormal_[here.face], faceNormal_[next.face])));
-              if (dihedral > minSharpAngle ||
-                  triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
-                  (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
-                   !meshRelation_.triRef[here.face].SameFace(
-                       meshRelation_.triRef[next.face]))) {
-                normals.push_back(vec3(0.0));
-              }
-              group.push_back(normals.size() - 1);
-              if (std::isfinite(next.edgeVec.x)) {
-                normals.back() +=
-                    SafeNormalize(la::cross(next.edgeVec, here.edgeVec)) *
-                    AngleBetween(here.edgeVec, next.edgeVec);
-              } else {
-                next.edgeVec = here.edgeVec;
-              }
-            });
-
-        for (auto& normal : normals) {
-          normal = SafeNormalize(normal);
+                normals[group[idx]][i];
         }
 
-        int lastGroup = 0;
-        int lastProp = -1;
-        int newProp = -1;
-        int idx = 0;
-        ForVert(endEdge, [&](int current1) {
-          const int thisTri = current1 / 3;
-          const int j = current1 - 3 * thisTri;
-          const int prop = oldTriProp[thisTri][j];
-          auto start = oldProperties.begin() + prop * oldNumProp;
-
-          if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
-            // split property vertex, duplicating but with an updated normal
-            lastGroup = group[idx];
-            newProp = NumPropVert();
-            meshRelation_.properties.resize(meshRelation_.properties.size() +
-                                            numProp);
-            std::copy(start, start + oldNumProp,
-                      meshRelation_.properties.begin() + newProp * numProp);
-            for (const int i : {0, 1, 2}) {
-              meshRelation_.properties[newProp * numProp + normalIdx + i] =
-                  normals[group[idx]][i];
-            }
-          } else if (prop != lastProp) {
-            // update property vertex
-            lastProp = prop;
-            newProp = prop;
-            std::copy(start, start + oldNumProp,
-                      meshRelation_.properties.begin() + prop * numProp);
-            for (const int i : {0, 1, 2})
-              meshRelation_.properties[prop * numProp + normalIdx + i] =
-                  normals[group[idx]][i];
-          }
-
-          // point to updated property vertex
-          meshRelation_.triProperties[thisTri][j] = newProp;
-          halfedge_[current1].propVert = newProp;
-          ++idx;
-        });
-      }
+        // point to updated property vertex
+        halfedge_[current1].propVert = newProp;
+        ++idx;
+      });
     }
   }
 }
