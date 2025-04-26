@@ -154,7 +154,6 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
 
-  const bool verbose = ManifoldParams().verbose > 0;
   std::atomic<bool> intersecting(false);
 
   auto f = [&](int tri0, int tri1) {
@@ -183,7 +182,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
       if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
-      if (verbose) {
+      if (ManifoldParams().verbose > 0) {
         dump_lock.lock();
         std::cout << "intersecting:" << std::endl;
         for (int i : {0, 1, 2}) std::cout << triVerts0[i] << " ";
