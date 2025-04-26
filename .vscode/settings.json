@@ -161,4 +161,5 @@
   "clangd.arguments": [
     "--header-insertion=never"
   ],
+  "editor.defaultFormatter": "xaver.clang-format",
 }

@@ -734,71 +734,71 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
     // copy backward edge prop verts, some of which will be unreferenced
     // duplicates.
-    for_each_n(policy, countAt(0), numEdge,
-               [this, &prop, &edges, &edgeAdded, &edgeOffset, propOffset,
-                addedVerts](const int i) {
-                 const int n = edgeAdded[i];
-                 const int offset = edgeOffset[i] + propOffset + addedVerts;
-                 auto& rel = meshRelation_;
+    for_each_n(
+        policy, countAt(0), numEdge,
+        [this, &prop, &edges, &edgeAdded, &edgeOffset, propOffset,
+         addedVerts](const int i) {
+          const int n = edgeAdded[i];
+          const int offset = edgeOffset[i] + propOffset + addedVerts;
+          auto& rel = meshRelation_;
 
-                 const double frac = 1.0 / (n + 1);
-                 const int halfedgeIdx =
-                     halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
-                 const int v0 = halfedgeIdx % 3;
-                 const int tri = halfedgeIdx / 3;
-                 const int prop0 = halfedge_[halfedgeIdx].propVert;
-                 const int prop1 =
-                     halfedge_[NextHalfedge(halfedgeIdx)].propVert;
-                 for (int i = 0; i < n; ++i) {
-                   for (int p = 0; p < rel.numProp; ++p) {
-                     prop[(offset + i) * rel.numProp + p] =
-                         la::lerp(rel.properties[prop0 * rel.numProp + p],
-                                  rel.properties[prop1 * rel.numProp + p],
-                                  (i + 1) * frac);
-                   }
-                 }
-               });
+          const double frac = 1.0 / (n + 1);
+          const int halfedgeIdx =
+              halfedge_[edges[i].halfedgeIdx].pairedHalfedge;
+          const int v0 = halfedgeIdx % 3;
+          const int tri = halfedgeIdx / 3;
+          const int prop0 = halfedge_[halfedgeIdx].propVert;
+          const int prop1 = halfedge_[NextHalfedge(halfedgeIdx)].propVert;
+          for (int i = 0; i < n; ++i) {
+            for (int p = 0; p < rel.numProp; ++p) {
+              prop[(offset + i) * rel.numProp + p] = la::lerp(
+                  rel.properties[prop0 * rel.numProp + p],
+                  rel.properties[prop1 * rel.numProp + p], (i + 1) * frac);
+            }
+          }
+        });
 
     Vec<ivec3> triProp(triVerts.size());
-    for_each_n(policy, countAt(0), numTri,
-               [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
-                &interiorOffset, &faceHalfedges, propOffset,
-                addedVerts](const int tri) {
-                 const ivec4 halfedges = faceHalfedges[tri];
-                 if (halfedges[0] < 0) return;
+    for_each_n(
+        policy, countAt(0), numTri,
+        [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
+         &interiorOffset, &faceHalfedges, propOffset,
+         addedVerts](const int tri) {
+          const ivec4 halfedges = faceHalfedges[tri];
+          if (halfedges[0] < 0) return;
 
-                 auto& rel = meshRelation_;
-                 ivec4 tri3;
-                 ivec4 edgeOffsets;
-                 bvec4 edgeFwd(true);
-                 for (const int i : {0, 1, 2, 3}) {
-                   if (halfedges[i] < 0) {
-                     tri3[i] = -1;
-                     continue;
-                   }
-                   const Halfedge& halfedge = halfedge_[halfedges[i]];
-                   tri3[i] = halfedge.propVert;
-                   edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
-                   if (!halfedge.IsForward()) {
-                     if (halfedge_[halfedge.pairedHalfedge].propVert !=
-                             halfedge_[NextHalfedge(halfedges[i])].propVert ||
-                         halfedge_[NextHalfedge(halfedge.pairedHalfedge)]
-                                 .propVert != halfedge.propVert) {
-                       // if the edge doesn't match, point to the backward edge
-                       // propverts.
-                       edgeOffsets[i] += addedVerts;
-                     } else {
-                       edgeFwd[i] = false;
-                     }
-                   }
-                 }
+          auto& rel = meshRelation_;
+          ivec4 tri3;
+          ivec4 edgeOffsets;
+          bvec4 edgeFwd(true);
+          for (const int i : {0, 1, 2, 3}) {
+            if (halfedges[i] < 0) {
+              tri3[i] = -1;
+              continue;
+            }
+            const Halfedge& halfedge = halfedge_[halfedges[i]];
+            tri3[i] = halfedge.propVert;
+            edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
+            if (!halfedge.IsForward()) {
+              if (halfedge_[halfedge.pairedHalfedge].propVert !=
+                      halfedge_[NextHalfedge(halfedges[i])].propVert ||
+                  halfedge_[NextHalfedge(halfedge.pairedHalfedge)].propVert !=
+                      halfedge.propVert) {
+                // if the edge doesn't match, point to the backward edge
+                // propverts.
+                edgeOffsets[i] += addedVerts;
+              } else {
+                edgeFwd[i] = false;
+              }
+            }
+          }
 
-                 Vec<ivec3> newTris = subTris[tri].Reindex(
-                     tri3, edgeOffsets + propOffset, edgeFwd,
-                     interiorOffset[tri] + propOffset);
-                 copy(newTris.begin(), newTris.end(),
-                      triProp.begin() + triOffset[tri]);
-               });
+          Vec<ivec3> newTris =
+              subTris[tri].Reindex(tri3, edgeOffsets + propOffset, edgeFwd,
+                                   interiorOffset[tri] + propOffset);
+          copy(newTris.begin(), newTris.end(),
+               triProp.begin() + triOffset[tri]);
+        });
 
     meshRelation_.properties = prop;
     CreateHalfedges(triProp, triVerts);

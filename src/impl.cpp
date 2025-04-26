@@ -308,34 +308,34 @@ void Manifold::Impl::DedupePropVerts() {
   if (numProp == 0) return;
 
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
-  for_each_n(
-      autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-      [&vert2vert, numProp, this](const int edgeIdx) {
-        const Halfedge edge = halfedge_[edgeIdx];
-        const int edgeFace = edgeIdx / 3;
-        const int pairFace = edge.pairedHalfedge / 3;
+  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
+             [&vert2vert, numProp, this](const int edgeIdx) {
+               const Halfedge edge = halfedge_[edgeIdx];
+               const int edgeFace = edgeIdx / 3;
+               const int pairFace = edge.pairedHalfedge / 3;
 
-        if (meshRelation_.triRef[edgeFace].meshID !=
-            meshRelation_.triRef[pairFace].meshID)
-          return;
+               if (meshRelation_.triRef[edgeFace].meshID !=
+                   meshRelation_.triRef[pairFace].meshID)
+                 return;
 
-        const int baseNum = edgeIdx - 3 * edgeFace;
-        const int jointNum = edge.pairedHalfedge - 3 * pairFace;
+               const int baseNum = edgeIdx - 3 * edgeFace;
+               const int jointNum = edge.pairedHalfedge - 3 * pairFace;
 
-        const int prop0 = halfedge_[edgeIdx].propVert;
-        const int prop1 = halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
-        bool propEqual = true;
-        for (size_t p = 0; p < numProp; ++p) {
-          if (meshRelation_.properties[numProp * prop0 + p] !=
-              meshRelation_.properties[numProp * prop1 + p]) {
-            propEqual = false;
-            break;
-          }
-        }
-        if (propEqual) {
-          vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
-        }
-      });
+               const int prop0 = halfedge_[edgeIdx].propVert;
+               const int prop1 =
+                   halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
+               bool propEqual = true;
+               for (size_t p = 0; p < numProp; ++p) {
+                 if (meshRelation_.properties[numProp * prop0 + p] !=
+                     meshRelation_.properties[numProp * prop1 + p]) {
+                   propEqual = false;
+                   break;
+                 }
+               }
+               if (propEqual) {
+                 vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
+               }
+             });
 
   std::vector<int> vertLabels;
   const size_t numPropVert = NumPropVert();
