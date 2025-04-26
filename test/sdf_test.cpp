@@ -168,7 +168,6 @@ TEST(SDF, Resize) {
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
   EXPECT_EQ(layers.Genus(), -8);
-  const double outerBound = size / 2;
   const double epsilon = layers.GetEpsilon();
   Box bounds = layers.BoundingBox();
   EXPECT_NEAR(bounds.min.x, 0, epsilon);

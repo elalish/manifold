@@ -318,9 +318,6 @@ void Manifold::Impl::DedupePropVerts() {
                    meshRelation_.triRef[pairFace].meshID)
                  return;
 
-               const int baseNum = edgeIdx - 3 * edgeFace;
-               const int jointNum = edge.pairedHalfedge - 3 * pairFace;
-
                const int prop0 = halfedge_[edgeIdx].propVert;
                const int prop1 =
                    halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;

@@ -436,7 +436,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   if (normalIdx < 0) return;
 
   const int oldNumProp = NumProp();
-  const int numTri = NumTri();
 
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);

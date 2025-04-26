@@ -54,7 +54,7 @@ void print_usage() {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
-  const char* name = "test setup";
+  [[maybe_unused]] const char* name = "test setup";
   FrameMarkStart(name);
 
   // warmup tbb for emscripten, according to
@@ -464,7 +464,6 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
 }
 
 void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
-  bool verbose = true;
   EXPECT_EQ(mgl1.NumVert(), mgl2.NumVert());
   EXPECT_EQ(mgl1.NumTri(), mgl2.NumTri());
   EXPECT_EQ(mgl1.numProp, mgl2.numProp);

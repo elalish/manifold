@@ -153,7 +153,7 @@ struct FlagStore {
     // ascending order by using a heap in a single thread
     auto& store = this->store;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
-                      [&store, &pred, f](const auto& r) {
+                      [&store, &pred](const auto& r) {
                         auto& local = store.local();
                         for (auto i = r.begin(); i < r.end(); ++i) {
                           if (pred(i)) local.push_back(i);
@@ -574,8 +574,6 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   // Orbit startVert
   const int tri0 = edge / 3;
   const int tri1 = toRemove.pairedHalfedge / 3;
-  const int triVert0 = (edge + 1) % 3;
-  const int triVert1 = toRemove.pairedHalfedge % 3;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
@@ -583,7 +581,6 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     if (NumProp() > 0) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
-      const int vIdx = current - 3 * tri;
       if (triRef[tri].SameFace(triRef[tri0])) {
         halfedge_[current].propVert = halfedge_[NextHalfedge(edge)].propVert;
       } else if (triRef[tri].SameFace(triRef[tri1])) {
@@ -626,8 +623,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
 
   const ivec3 tri0edge = TriOf(edge);
   const ivec3 tri1edge = TriOf(pair);
-  const ivec3 perm0 = TriOf(edge % 3);
-  const ivec3 perm1 = TriOf(pair % 3);
 
   mat2x3 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
   vec2 v[4];
@@ -909,7 +904,7 @@ void Manifold::Impl::DedupeEdges() {
           [nbEdges]() { return std::vector<bool>(nbEdges, false); });
       tbb::parallel_for(
           tbb::blocked_range<size_t>(0, nbEdges),
-          [&store, &mutex, &duplicates, this, &localLoop](const auto& r) {
+          [&store, &mutex, &duplicates, &localLoop](const auto& r) {
             auto& local = store.local();
             std::vector<size_t> duplicatesLocal;
             localLoop(r.begin(), r.end(), local, duplicatesLocal);

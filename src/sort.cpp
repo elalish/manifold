@@ -345,7 +345,7 @@ void Manifold::Impl::CompactProps() {
         }
       });
   for_each(policy, halfedge_.begin(), halfedge_.end(),
-           [&propOld2New, this](Halfedge& edge) {
+           [&propOld2New](Halfedge& edge) {
              edge.propVert = propOld2New[edge.propVert];
            });
 }
