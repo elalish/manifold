@@ -157,6 +157,7 @@ else()
     WARNING_FLAGS
     -Wall
     -Wno-unknown-warning-option
+    -Wno-unused
     -Wno-shorten-64-to-32
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

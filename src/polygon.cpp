@@ -940,7 +940,7 @@ namespace manifold {
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx& polys, double epsilon,
                                   bool allowConvex) {
   std::vector<ivec3> triangles;
-  [[maybe_unused]] double updatedEpsilon = epsilon;
+  double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_DEBUG
   try {
 #endif
