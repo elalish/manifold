@@ -202,7 +202,7 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeOriginal();
-  CreateFaces();
+  MarkCoplanar();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -232,13 +232,13 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, keepFaceID, &triRef](const int tri) {
                triRef[tri] = {meshID, meshID, tri,
-                              keepFaceID ? triRef[tri].faceID : tri};
+                              keepFaceID ? triRef[tri].coplanarID : tri};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::CreateFaces() {
+void Manifold::Impl::MarkCoplanar() {
   ZoneScoped;
   const int numTri = NumTri();
   struct TriPriority {
@@ -248,7 +248,7 @@ void Manifold::Impl::CreateFaces() {
   Vec<TriPriority> triPriority(numTri);
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
-               meshRelation_.triRef[tri].faceID = -1;
+               meshRelation_.triRef[tri].coplanarID = -1;
                if (halfedge_[3 * tri].startVert < 0) {
                  triPriority[tri] = {0, tri};
                  return;
@@ -265,9 +265,9 @@ void Manifold::Impl::CreateFaces() {
 
   Vec<int> interiorHalfedges;
   for (const auto tp : triPriority) {
-    if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
+    if (meshRelation_.triRef[tp.tri].coplanarID >= 0) continue;
 
-    meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    meshRelation_.triRef[tp.tri].coplanarID = tp.tri;
     if (halfedge_[3 * tp.tri].startVert < 0) continue;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
@@ -279,11 +279,11 @@ void Manifold::Impl::CreateFaces() {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
       interiorHalfedges.pop_back();
-      if (meshRelation_.triRef[h / 3].faceID >= 0) continue;
+      if (meshRelation_.triRef[h / 3].coplanarID >= 0) continue;
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (std::abs(dot(v - base, normal)) < tolerance_) {
-        meshRelation_.triRef[h / 3].faceID = tp.tri;
+        meshRelation_.triRef[h / 3].coplanarID = tp.tri;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
@@ -506,7 +506,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
   Finish();
-  CreateFaces();
+  MarkCoplanar();
   meshRelation_.originalID = -1;
 }
 

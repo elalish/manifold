@@ -58,6 +58,7 @@ TEST(BooleanComplex, MeshRelation) {
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
+
   Manifold result = gyroid + gyroid2;
   result = result.RefineToLength(0.1);
 

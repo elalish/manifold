@@ -503,7 +503,7 @@ struct MapTriRef {
   const int offsetQ;
 
   void operator()(TriRef& triRef) {
-    const int tri = triRef.tri;
+    const int tri = triRef.faceID;
     const bool PQ = triRef.meshID == 0;
     triRef = PQ ? triRefP[tri] : triRefQ[tri];
     if (!PQ) triRef.meshID += offsetQ;
@@ -543,7 +543,7 @@ struct Barycentric {
     const TriRef refPQ = ref[tri];
     if (halfedgeR[3 * tri].startVert < 0) return;
 
-    const int triPQ = refPQ.tri;
+    const int triPQ = refPQ.faceID;
     const bool PQ = refPQ.meshID == 0;
     const auto& vertPos = PQ ? vertPosP : vertPosQ;
     const auto& halfedge = PQ ? halfedgeP : halfedgeQ;
@@ -605,7 +605,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            key[2] = halfedge[3 * ref.tri + j].propVert;
+            key[2] = halfedge[3 * ref.faceID + j].propVert;
             edge = -1;
             break;
           }
@@ -613,8 +613,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         }
         if (edge >= 0) {
           // On an edge, both propVerts must match
-          const int p0 = halfedge[3 * ref.tri + Next3(edge)].propVert;
-          const int p1 = halfedge[3 * ref.tri + Prev3(edge)].propVert;
+          const int p0 = halfedge[3 * ref.faceID + Next3(edge)].propVert;
+          const int p1 = halfedge[3 * ref.faceID + Prev3(edge)].propVert;
           key[1] = vert;
           key[2] = std::min(p0, p1);
           key[3] = std::max(p0, p1);
@@ -651,7 +651,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
           vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] =
-                properties[oldNumProp * halfedge[3 * ref.tri + j].propVert + p];
+                properties[oldNumProp * halfedge[3 * ref.faceID + j].propVert +
+                           p];
           outR.properties_.push_back(la::dot(uvw, oldProps));
         } else {
           outR.properties_.push_back(0);

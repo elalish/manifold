@@ -530,7 +530,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->RemoveUnreferencedVerts();
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 }  // namespace manifold

@@ -110,7 +110,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = ref.tri;
+    out.faceID[tri] = ref.faceID;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
@@ -382,7 +382,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
-    impl->CreateFaces();
+    impl->MarkCoplanar();
     impl->FlattenFaces();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
@@ -403,7 +403,7 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (tolerance == 0) tolerance = oldTolerance;
   if (tolerance > oldTolerance) {
     impl->tolerance_ = tolerance;
-    impl->CreateFaces();
+    impl->MarkCoplanar();
   }
   impl->FlattenFaces();
   impl->tolerance_ = oldTolerance;
@@ -459,7 +459,7 @@ Manifold Manifold::AsOriginal() const {
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces();
+  newImpl->MarkCoplanar();
   newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }

@@ -277,7 +277,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -420,7 +420,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 

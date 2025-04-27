@@ -322,7 +322,7 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
   std::unordered_map<int, int> oldHalfedge2New;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
-    int oldTri = meshRelation_.triRef[tri].tri;
+    int oldTri = meshRelation_.triRef[tri].faceID;
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
   }
   std::vector<Smoothness> newSharp = sharpenedEdges;
@@ -981,7 +981,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
 
   halfedgeTangent_.clear();
   Finish();
-  CreateFaces();
+  MarkCoplanar();
   meshRelation_.originalID = -1;
 }
 

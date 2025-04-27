@@ -142,12 +142,12 @@ struct TriRef {
   int originalID;
   /// Probably the triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri], but it's an input, so just pass it along unchanged.
-  int tri;
-  /// Triangles with the same face ID are coplanar.
   int faceID;
+  /// Triangles with the same face ID are coplanar.
+  int coplanarID;
 
   bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && faceID == other.faceID;
+    return meshID == other.meshID && coplanarID == other.coplanarID;
   }
 };
 
@@ -202,8 +202,9 @@ inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
 
 inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
-                << ", originalID: " << ref.originalID << ", tri: " << ref.tri
-                << ", faceID: " << ref.faceID;
+                << ", originalID: " << ref.originalID
+                << ", faceID: " << ref.faceID
+                << ", coplanarID: " << ref.coplanarID;
 }
 #endif
 }  // namespace manifold

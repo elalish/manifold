@@ -287,7 +287,7 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     // index
     // >= firstNewVert. This is used to keep the Boolean from changing the
     // non-intersecting parts of the input meshes. Colinear is defined not by a
-    // local check, but by the global CreateFaces function, which keeps this
+    // local check, but by the global MarkCoplanar function, which keeps this
     // from being vulnerable to error stacking.
     FlagEdge se{halfedge_, meshRelation_.triRef, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {

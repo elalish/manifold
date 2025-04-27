@@ -853,7 +853,7 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   SetEpsilon();
   InitializeOriginal();
   Finish();
-  CreateFaces();
+  MarkCoplanar();
 }
 
 }  // namespace manifold

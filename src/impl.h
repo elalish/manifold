@@ -172,8 +172,8 @@ struct Manifold::Impl {
           TriRef& ref = triRef[tri];
           ref.meshID = meshID;
           ref.originalID = originalID;
-          ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
-          ref.faceID = tri;
+          ref.faceID = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+          ref.coplanarID = tri;
         }
 
         if (meshGL.runTransform.empty()) {
@@ -238,7 +238,7 @@ struct Manifold::Impl {
     }
 
     DedupePropVerts();
-    CreateFaces();
+    MarkCoplanar();
 
     RemoveDegenerates();
     RemoveUnreferencedVerts();
@@ -278,7 +278,7 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces();
+  void MarkCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);

@@ -295,7 +295,7 @@ void Manifold::Impl::FlattenFaces() {
                    edgeFace[edge] = kRemove;
                  } else {
                    edgeFace[edge] = (static_cast<uint64_t>(ref.meshID) << 32) +
-                                    static_cast<uint64_t>(ref.faceID);
+                                    static_cast<uint64_t>(ref.coplanarID);
                    ++vertDegree[halfedge_[edge].startVert];
                  }
                }
