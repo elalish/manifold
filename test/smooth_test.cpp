@@ -283,7 +283,6 @@ TEST(Smooth, Torus) {
           CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
           .GetMeshGL64();
   const int numTri = torusMesh.NumTri();
-  const int numProp = torusMesh.numProp;
 
   // Create correct toroidal halfedge tangents - SmoothOut() is too generic to
   // do this perfectly.

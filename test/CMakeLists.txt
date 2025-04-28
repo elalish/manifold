@@ -51,7 +51,6 @@ if(EMSCRIPTEN)
     manifold_test
     PRIVATE
       -sASSERTIONS=1
-      -sDEMANGLE_SUPPORT=1
       --bind
       --preload-file
       ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons

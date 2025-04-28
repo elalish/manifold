@@ -28,7 +28,6 @@ bool isMeshConvex(Manifold hullManifold, double epsilon = 0.0000001) {
 
   const auto numTri = mesh.NumTri();
   const auto numVert = mesh.NumVert();
-  const auto numProp = mesh.numProp;
 
   // Iterate over each triangle
   for (size_t t = 0; t < numTri; ++t) {

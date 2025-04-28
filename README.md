@@ -167,7 +167,8 @@ cd manifold
 mkdir buildWASM
 cd buildWASM
 emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make
-node test/manifold_test.js
+cd test
+node ./manifold_test.js
 ```
 
 ### Python

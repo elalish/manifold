@@ -15,10 +15,11 @@
 #pragma once
 #include <map>
 
-#include "./collider.h"
-#include "./shared.h"
-#include "./vec.h"
+#include "collider.h"
+#include "manifold/common.h"
 #include "manifold/manifold.h"
+#include "shared.h"
+#include "vec.h"
 
 namespace manifold {
 
@@ -32,11 +33,8 @@ struct Manifold::Impl {
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
-    int numProp = 0;
-    Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
-    Vec<ivec3> triProperties;
   };
   struct BaryIndices {
     int tri, start4, end4;
@@ -45,9 +43,11 @@ struct Manifold::Impl {
   Box bBox_;
   double epsilon_ = -1;
   double tolerance_ = -1;
+  int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Vec<Halfedge> halfedge_;
+  Vec<double> properties_;
   // Note that vertNormal_ is not precise due to the use of an approximated acos
   // function
   Vec<vec3> vertNormal_;
@@ -117,21 +117,24 @@ struct Manifold::Impl {
       return;
     }
 
-    std::vector<int> prop2vert(numVert);
-    std::iota(prop2vert.begin(), prop2vert.end(), 0);
-    for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const uint32_t from = meshGL.mergeFromVert[i];
-      const uint32_t to = meshGL.mergeToVert[i];
-      if (from >= numVert || to >= numVert) {
-        MakeEmpty(Error::MergeIndexOutOfBounds);
-        return;
+    std::vector<int> prop2vert;
+    if (!meshGL.mergeFromVert.empty()) {
+      prop2vert.resize(numVert);
+      std::iota(prop2vert.begin(), prop2vert.end(), 0);
+      for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+        const uint32_t from = meshGL.mergeFromVert[i];
+        const uint32_t to = meshGL.mergeToVert[i];
+        if (from >= numVert || to >= numVert) {
+          MakeEmpty(Error::MergeIndexOutOfBounds);
+          return;
+        }
+        prop2vert[from] = to;
       }
-      prop2vert[from] = to;
     }
 
     const auto numProp = meshGL.numProp - 3;
-    meshRelation_.numProp = numProp;
-    meshRelation_.properties.resize_nofill(meshGL.NumVert() * numProp);
+    numProp_ = numProp;
+    properties_.resize_nofill(meshGL.NumVert() * numProp);
     tolerance_ = meshGL.tolerance;
     // This will have unreferenced duplicate positions that will be removed by
     // Impl::RemoveUnreferencedVerts().
@@ -141,7 +144,7 @@ struct Manifold::Impl {
       for (const int j : {0, 1, 2})
         vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
       for (size_t j = 0; j < numProp; ++j)
-        meshRelation_.properties[i * numProp + j] =
+        properties_[i * numProp + j] =
             meshGL.vertProperties[meshGL.numProp * i + 3 + j];
     }
 
@@ -169,8 +172,8 @@ struct Manifold::Impl {
           TriRef& ref = triRef[tri];
           ref.meshID = meshID;
           ref.originalID = originalID;
-          ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
-          ref.faceID = tri;
+          ref.faceID = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+          ref.coplanarID = tri;
         }
 
         if (meshGL.runTransform.empty()) {
@@ -186,35 +189,37 @@ struct Manifold::Impl {
       }
     }
 
-    Vec<ivec3> triVerts;
-    triVerts.reserve(numTri);
+    Vec<ivec3> triProp;
+    triProp.reserve(numTri);
+    Vec<ivec3> triVert;
+    const bool needsPropMap = numProp > 0 && !prop2vert.empty();
+    if (needsPropMap) triVert.reserve(numTri);
     if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
-    if (numProp > 0) meshRelation_.triProperties.reserve(numTri);
     for (size_t i = 0; i < numTri; ++i) {
-      ivec3 tri;
+      ivec3 triP, triV;
       for (const size_t j : {0, 1, 2}) {
         uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
         if (vert >= numVert) {
           MakeEmpty(Error::VertexOutOfBounds);
           return;
         }
-        tri[j] = prop2vert[vert];
+        triP[j] = vert;
+        triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
       }
-      if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
-        triVerts.push_back(tri);
+      if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
+        if (needsPropMap) {
+          triProp.push_back(triP);
+          triVert.push_back(triV);
+        } else {
+          triProp.push_back(triV);
+        }
         if (triRef.size() > 0) {
           meshRelation_.triRef.push_back(triRef[i]);
-        }
-        if (numProp > 0) {
-          meshRelation_.triProperties.push_back(
-              ivec3(static_cast<uint32_t>(meshGL.triVerts[3 * i]),
-                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 1]),
-                    static_cast<uint32_t>(meshGL.triVerts[3 * i + 2])));
         }
       }
     }
 
-    CreateHalfedges(triVerts);
+    CreateHalfedges(triProp, triVert);
     if (!IsManifold()) {
       MakeEmpty(Error::NotManifold);
       return;
@@ -233,7 +238,7 @@ struct Manifold::Impl {
     }
 
     DedupePropVerts();
-    CreateFaces();
+    MarkCoplanar();
 
     RemoveDegenerates();
     RemoveUnreferencedVerts();
@@ -273,11 +278,12 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void CreateFaces();
+  void MarkCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(bool keepFaceID = false);
-  void CreateHalfedges(const Vec<ivec3>& triVerts);
+  void CreateHalfedges(const Vec<ivec3>& triProp,
+                       const Vec<ivec3>& triVert = {});
   void CalculateNormals();
   void IncrementMeshIDs();
 
@@ -291,10 +297,9 @@ struct Manifold::Impl {
   size_t NumVert() const { return vertPos_.size(); }
   size_t NumEdge() const { return halfedge_.size() / 2; }
   size_t NumTri() const { return halfedge_.size() / 3; }
-  size_t NumProp() const { return meshRelation_.numProp; }
+  size_t NumProp() const { return numProp_; }
   size_t NumPropVert() const {
-    return NumProp() == 0 ? NumVert()
-                          : meshRelation_.properties.size() / NumProp();
+    return NumProp() == 0 ? NumVert() : properties_.size() / NumProp();
   }
 
   // properties.cpp

@@ -16,8 +16,8 @@
 
 #include <atomic>
 
-#include "./utils.h"
-#include "./vec.h"
+#include "utils.h"
+#include "vec.h"
 
 namespace {
 using hash_fun_t = uint64_t(uint64_t);

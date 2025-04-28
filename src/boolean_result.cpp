@@ -16,9 +16,9 @@
 #include <array>
 #include <map>
 
-#include "./boolean3.h"
-#include "./parallel.h"
-#include "./utils.h"
+#include "boolean3.h"
+#include "parallel.h"
+#include "utils.h"
 
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -503,7 +503,7 @@ struct MapTriRef {
   const int offsetQ;
 
   void operator()(TriRef& triRef) {
-    const int tri = triRef.tri;
+    const int tri = triRef.faceID;
     const bool PQ = triRef.meshID == 0;
     triRef = PQ ? triRefP[tri] : triRefQ[tri];
     if (!PQ) triRef.meshID += offsetQ;
@@ -543,7 +543,7 @@ struct Barycentric {
     const TriRef refPQ = ref[tri];
     if (halfedgeR[3 * tri].startVert < 0) return;
 
-    const int triPQ = refPQ.tri;
+    const int triPQ = refPQ.faceID;
     const bool PQ = refPQ.meshID == 0;
     const auto& vertPos = PQ ? vertPosP : vertPosQ;
     const auto& halfedge = PQ ? halfedgeP : halfedgeQ;
@@ -565,12 +565,10 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = std::max(numPropP, numPropQ);
-  outR.meshRelation_.numProp = numProp;
+  outR.numProp_ = numProp;
   if (numProp == 0) return;
 
   const int numTri = outR.NumTri();
-  outR.meshRelation_.triProperties.resize_nofill(numTri);
-
   Vec<vec3> bary(outR.halfedge_.size());
   for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
@@ -584,7 +582,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
 
-  outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
+  outR.properties_.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
@@ -594,11 +592,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
     const int oldNumProp = PQ ? numPropP : numPropQ;
-    const auto& properties =
-        PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const ivec3& triProp = oldNumProp == 0 ? ivec3(-1)
-                           : PQ ? inP.meshRelation_.triProperties[ref.tri]
-                                : inQ.meshRelation_.triProperties[ref.tri];
+    const auto& properties = PQ ? inP.properties_ : inQ.properties_;
+    const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
@@ -610,7 +605,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            key[2] = triProp[j];
+            key[2] = halfedge[3 * ref.faceID + j].propVert;
             edge = -1;
             break;
           }
@@ -618,8 +613,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         }
         if (edge >= 0) {
           // On an edge, both propVerts must match
-          const int p0 = triProp[Next3(edge)];
-          const int p1 = triProp[Prev3(edge)];
+          const int p0 = halfedge[3 * ref.faceID + Next3(edge)].propVert;
+          const int p1 = halfedge[3 * ref.faceID + Prev3(edge)].propVert;
           key[1] = vert;
           key[2] = std::min(p0, p1);
           key[3] = std::max(p0, p1);
@@ -632,7 +627,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         // only key.x/key.z matters
         auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
-          outR.meshRelation_.triProperties[tri][i] = entry;
+          outR.halfedge_[3 * tri + i].propVert = entry;
           continue;
         }
         entry = idx;
@@ -642,7 +637,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.meshRelation_.triProperties[tri][i] = b.second;
+            outR.halfedge_[3 * tri + i].propVert = b.second;
             break;
           }
         }
@@ -650,15 +645,17 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
-      outR.meshRelation_.triProperties[tri][i] = idx++;
+      outR.halfedge_[3 * tri + i].propVert = idx++;
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           vec3 oldProps;
           for (const int j : {0, 1, 2})
-            oldProps[j] = properties[oldNumProp * triProp[j] + p];
-          outR.meshRelation_.properties.push_back(la::dot(uvw, oldProps));
+            oldProps[j] =
+                properties[oldNumProp * halfedge[3 * ref.faceID + j].propVert +
+                           p];
+          outR.properties_.push_back(la::dot(uvw, oldProps));
         } else {
-          outR.meshRelation_.properties.push_back(0);
+          outR.properties_.push_back(0);
         }
       }
     }

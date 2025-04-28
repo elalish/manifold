@@ -549,7 +549,7 @@ class Quality {
     int nSegL = 2.0 * radius * kPi / circularEdgeLength_;
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
-    return std::max(nSeg, 3);
+    return std::max(nSeg, 4);
   }
 
   /**

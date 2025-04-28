@@ -14,7 +14,7 @@
 
 #include "tree2d.h"
 
-#include "./parallel.h"
+#include "parallel.h"
 
 #ifndef ZoneScoped
 #if __has_include(<tracy/Tracy.hpp>)

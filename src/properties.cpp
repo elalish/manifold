@@ -18,9 +18,9 @@
 #include <tbb/combinable.h>
 #endif
 
-#include "./impl.h"
-#include "./parallel.h"
-#include "./tri_dist.h"
+#include "impl.h"
+#include "parallel.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -64,48 +64,6 @@ struct CurvatureAngles {
       const int vert = halfedge[3 * tri + i].startVert;
       AtomicAdd(gaussianCurvature[vert], -phi[i]);
       AtomicAdd(area[vert], area3);
-    }
-  }
-};
-
-struct UpdateProperties {
-  VecView<ivec3> triProp;
-  VecView<double> properties;
-  VecView<uint8_t> counters;
-
-  VecView<const double> oldProperties;
-  VecView<const Halfedge> halfedge;
-  VecView<const double> meanCurvature;
-  VecView<const double> gaussianCurvature;
-  const int oldNumProp;
-  const int numProp;
-  const int gaussianIdx;
-  const int meanIdx;
-
-  void operator()(const size_t tri) {
-    for (const int i : {0, 1, 2}) {
-      const int vert = halfedge[3 * tri + i].startVert;
-      if (oldNumProp == 0) {
-        triProp[tri][i] = vert;
-      }
-      const int propVert = triProp[tri][i];
-
-      auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
-          static_cast<uint8_t>(1));
-      if (old == 1) continue;
-
-      for (int p = 0; p < oldNumProp; ++p) {
-        properties[numProp * propVert + p] =
-            oldProperties[oldNumProp * propVert + p];
-      }
-
-      if (gaussianIdx >= 0) {
-        properties[numProp * propVert + gaussianIdx] = gaussianCurvature[vert];
-      }
-      if (meanIdx >= 0) {
-        properties[numProp * propVert + meanIdx] = meanCurvature[vert];
-      }
     }
   }
 };
@@ -196,7 +154,6 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
 
-  const bool verbose = ManifoldParams().verbose > 0;
   std::atomic<bool> intersecting(false);
 
   auto f = [&](int tri0, int tri1) {
@@ -225,7 +182,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
       if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
-      if (verbose) {
+      if (ManifoldParams().verbose > 0) {
         dump_lock.lock();
         std::cout << "intersecting:" << std::endl;
         for (int i : {0, 1, 2}) std::cout << triVerts0[i] << " ";
@@ -318,20 +275,36 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
-  const Vec<double> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
-  meshRelation_.numProp = numProp;
-  if (meshRelation_.triProperties.size() == 0) {
-    meshRelation_.triProperties.resize(NumTri());
-  }
+  const Vec<double> oldProperties = properties_;
+  properties_ = Vec<double>(numProp * NumPropVert(), 0);
+  numProp_ = numProp;
 
-  const Vec<uint8_t> counters(NumPropVert(), 0);
-  for_each_n(
-      policy, countAt(0_uz), NumTri(),
-      UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
-                        counters, oldProperties, halfedge_, vertMeanCurvature,
-                        vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
-                        meanIdx}));
+  Vec<uint8_t> counters(NumPropVert(), 0);
+  for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
+    for (const int i : {0, 1, 2}) {
+      const Halfedge& edge = halfedge_[3 * tri + i];
+      const int vert = edge.startVert;
+      const int propVert = edge.propVert;
+
+      auto old = std::atomic_exchange(
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
+      if (old == 1) continue;
+
+      for (int p = 0; p < oldNumProp; ++p) {
+        properties_[numProp * propVert + p] =
+            oldProperties[oldNumProp * propVert + p];
+      }
+
+      if (gaussianIdx >= 0) {
+        properties_[numProp * propVert + gaussianIdx] =
+            vertGaussianCurvature[vert];
+      }
+      if (meanIdx >= 0) {
+        properties_[numProp * propVert + meanIdx] = vertMeanCurvature[vert];
+      }
+    }
+  });
 }
 
 /**

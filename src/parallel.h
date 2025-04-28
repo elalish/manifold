@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "./iters.h"
+#include "iters.h"
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
 #include <tbb/parallel_for.h>

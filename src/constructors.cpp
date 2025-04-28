@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./csg_tree.h"
-#include "./impl.h"
-#include "./parallel.h"
+#include "csg_tree.h"
+#include "impl.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
+#include "parallel.h"
 
 namespace manifold {
 /**
@@ -277,7 +277,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -420,7 +420,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 

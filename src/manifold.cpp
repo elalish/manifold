@@ -16,35 +16,16 @@
 #include <map>
 #include <numeric>
 
-#include "./boolean3.h"
-#include "./csg_tree.h"
-#include "./impl.h"
-#include "./parallel.h"
+#include "boolean3.h"
+#include "csg_tree.h"
+#include "impl.h"
+#include "parallel.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
 
 ExecutionParams manifoldParams;
-
-struct UpdateProperties {
-  double* properties;
-  const int numProp;
-  const double* oldProperties;
-  const int numOldProp;
-  const vec3* vertPos;
-  const ivec3* triProperties;
-  const Halfedge* halfedges;
-  std::function<void(double*, vec3, const double*)> propFunc;
-
-  void operator()(int tri) {
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedges[3 * tri + i].startVert;
-      const int propVert = triProperties[tri][i];
-      propFunc(properties + numProp * propVert, vertPos[vert],
-               oldProperties + numOldProp * propVert);
-    }
-  }
-};
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   normal = la::normalize(normal);
@@ -129,7 +110,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = ref.tri;
+    out.faceID[tri] = ref.faceID;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
@@ -167,9 +148,8 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
     for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
-      const ivec3 triProp = impl.meshRelation_.triProperties[triNew2Old[tri]];
       for (const int i : {0, 1, 2}) {
-        const int prop = triProp[i];
+        const int prop = impl.halfedge_[3 * triNew2Old[tri] + i].propVert;
         const int vert = out.triVerts[3 * tri + i];
 
         auto& bin = vertPropPair[vert];
@@ -190,8 +170,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           out.vertProperties.push_back(impl.vertPos_[vert][p]);
         }
         for (int p = 0; p < numProp; ++p) {
-          out.vertProperties.push_back(
-              impl.meshRelation_.properties[prop * numProp + p]);
+          out.vertProperties.push_back(impl.properties_[prop * numProp + p]);
         }
 
         if (updateNormals) {
@@ -403,7 +382,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
-    impl->CreateFaces();
+    impl->MarkCoplanar();
     impl->FlattenFaces();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
@@ -424,7 +403,7 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (tolerance == 0) tolerance = oldTolerance;
   if (tolerance > oldTolerance) {
     impl->tolerance_ = tolerance;
-    impl->CreateFaces();
+    impl->MarkCoplanar();
   }
   impl->FlattenFaces();
   impl->tolerance_ = oldTolerance;
@@ -480,7 +459,7 @@ Manifold Manifold::AsOriginal() const {
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->CreateFaces();
+  newImpl->MarkCoplanar();
   newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
@@ -634,38 +613,33 @@ Manifold Manifold::SetProperties(
         propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const Vec<double> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<double> oldProperties = pImpl->properties_;
 
-  auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
-    triProperties.clear();
-    pImpl->meshRelation_.properties.clear();
+    pImpl->properties_.clear();
   } else {
-    if (triProperties.size() == 0) {
-      const int numTri = NumTri();
-      triProperties.resize_nofill(numTri);
-      for (int i = 0; i < numTri; ++i) {
-        for (const int j : {0, 1, 2}) {
-          triProperties[i][j] = pImpl->halfedge_[3 * i + j].startVert;
-        }
-      }
-      pImpl->meshRelation_.properties = Vec<double>(numProp * NumVert(), 0);
-    } else {
-      pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
-    }
+    pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
     for_each_n(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), NumTri(),
-        UpdateProperties(
-            {pImpl->meshRelation_.properties.data(), numProp,
-             oldProperties.data(), oldNumProp, pImpl->vertPos_.data(),
-             triProperties.data(), pImpl->halfedge_.data(),
-             propFunc == nullptr
-                 ? [](double* newProp, vec3, const double*) { *newProp = 0; }
-                 : propFunc}));
+        countAt(0), NumTri(), [&](int tri) {
+          for (int i : {0, 1, 2}) {
+            const Halfedge& edge = pImpl->halfedge_[3 * tri + i];
+            const int vert = edge.startVert;
+            const int propVert = edge.propVert;
+            if (propFunc == nullptr) {
+              for (int p = 0; p < numProp; ++p) {
+                pImpl->properties_[numProp * propVert + p] = 0;
+              }
+            } else {
+              propFunc(&pImpl->properties_[numProp * propVert],
+                       pImpl->vertPos_[vert],
+                       oldProperties.data() + oldNumProp * propVert);
+            }
+          }
+        });
   }
 
-  pImpl->meshRelation_.numProp = numProp;
+  pImpl->numProp_ = numProp;
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -753,14 +727,15 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
-      const int numProp = pImpl->meshRelation_.numProp;
-      Vec<double> properties = pImpl->meshRelation_.properties;
-      Vec<ivec3> triProperties = pImpl->meshRelation_.triProperties;
+      const int numProp = pImpl->numProp_;
+      Vec<double> properties = pImpl->properties_;
+      Vec<Halfedge> halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
-      pImpl->meshRelation_.numProp = numProp;
-      pImpl->meshRelation_.properties.swap(properties);
-      pImpl->meshRelation_.triProperties.swap(triProperties);
+      // Reset the properties to the original values, removing temporary normals
+      pImpl->numProp_ = numProp;
+      pImpl->properties_.swap(properties);
+      pImpl->halfedge_.swap(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }

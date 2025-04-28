@@ -15,8 +15,9 @@
 #include <atomic>
 #include <set>
 
-#include "./impl.h"
-#include "./parallel.h"
+#include "impl.h"
+#include "parallel.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
@@ -30,37 +31,6 @@ uint32_t MortonCode(vec3 position, Box bBox) {
 
   return Collider::MortonCode(position, bBox);
 }
-
-struct Reindex {
-  VecView<const int> indexInv;
-
-  void operator()(Halfedge& edge) {
-    if (edge.startVert < 0) return;
-    edge.startVert = indexInv[edge.startVert];
-    edge.endVert = indexInv[edge.endVert];
-  }
-};
-
-struct MarkProp {
-  VecView<int> keep;
-
-  void operator()(ivec3 triProp) {
-    for (const int i : {0, 1, 2}) {
-      reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
-          ->store(1, std::memory_order_relaxed);
-    }
-  }
-};
-
-struct ReindexProps {
-  VecView<const int> old2new;
-
-  void operator()(ivec3& triProp) {
-    for (const int i : {0, 1, 2}) {
-      triProp[i] = old2new[triProp[i]];
-    }
-  }
-};
 
 struct ReindexFace {
   VecView<Halfedge> halfedge;
@@ -330,30 +300,40 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
+  const bool hasProp = NumProp() > 0;
   for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(),
-           Reindex({vertOld2New}));
+           [&vertOld2New, hasProp](Halfedge& edge) {
+             if (edge.startVert < 0) return;
+             edge.startVert = vertOld2New[edge.startVert];
+             edge.endVert = vertOld2New[edge.endVert];
+             if (!hasProp) {
+               edge.propVert = edge.startVert;
+             }
+           });
 }
 
 /**
- * Removes unreferenced property verts and reindexes triProperties.
+ * Removes unreferenced property verts and reindexes propVerts.
  */
 void Manifold::Impl::CompactProps() {
   ZoneScoped;
-  if (meshRelation_.numProp == 0) return;
+  if (numProp_ == 0) return;
 
-  const auto numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  const int numProp = NumProp();
+  const auto numVerts = properties_.size() / numProp;
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), MarkProp({keep}));
+  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
+    reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
+        ->store(1, std::memory_order_relaxed);
+  });
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  Vec<double> oldProp = meshRelation_.properties;
+  Vec<double> oldProp = properties_;
   const int numVertsNew = propOld2New[numVerts];
-  const int numProp = meshRelation_.numProp;
-  auto& properties = meshRelation_.properties;
+  auto& properties = properties_;
   properties.resize_nofill(numProp * numVertsNew);
   for_each_n(
       policy, countAt(0), numVerts,
@@ -364,8 +344,10 @@ void Manifold::Impl::CompactProps() {
               oldProp[oldIdx * numProp + p];
         }
       });
-  for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
-             ReindexProps({propOld2New}));
+  for_each(policy, halfedge_.begin(), halfedge_.end(),
+           [&propOld2New](Halfedge& edge) {
+             edge.propVert = propOld2New[edge.propVert];
+           });
 }
 
 /**
@@ -440,8 +422,6 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
-  if (meshRelation_.triProperties.size() == NumTri())
-    Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
@@ -471,13 +451,9 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
     meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
 
-  if (old.meshRelation_.triProperties.size() > 0) {
-    meshRelation_.triProperties.resize_nofill(numTri);
-    gather(faceNew2Old.begin(), faceNew2Old.end(),
-           old.meshRelation_.triProperties.begin(),
-           meshRelation_.triProperties.begin());
-    meshRelation_.numProp = old.meshRelation_.numProp;
-    meshRelation_.properties = old.meshRelation_.properties;
+  if (old.NumProp() > 0) {
+    numProp_ = old.numProp_;
+    properties_ = old.properties_;
   }
 
   if (old.faceNormal_.size() == old.NumTri()) {

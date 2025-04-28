@@ -21,8 +21,8 @@
 #endif
 #include <vector>
 
-#include "./parallel.h"
 #include "manifold/vec_view.h"
+#include "parallel.h"
 
 namespace manifold {
 
