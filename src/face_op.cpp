@@ -391,6 +391,7 @@ void Manifold::Impl::FlattenFaces() {
   }
 
   newHalfedge2.resize(startFace);
+  halfedgeRef.resize(startFace);
   faceEdge2.resize(outFace + 1);
   halfedge_ = std::move(newHalfedge2);
 

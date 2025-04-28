@@ -322,7 +322,8 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
   std::unordered_map<int, int> oldHalfedge2New;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
-    int oldTri = meshRelation_.triRef[tri].faceID;
+    int oldTri =
+        meshRelation_.triRef[tri].faceID;  // TODO: should not use faceID
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
   }
   std::vector<Smoothness> newSharp = sharpenedEdges;

@@ -552,8 +552,9 @@ TEST(Manifold, SliceEmptyObject) {
 #endif
 
 TEST(Manifold, MeshRelation) {
-  MeshGL gyroidMeshGL = WithPositionColors(Gyroid()).AsOriginal().GetMeshGL();
-  Manifold gyroid(gyroidMeshGL);
+  Manifold gyroid = WithPositionColors(Gyroid());
+  MeshGL gyroidMeshGL = gyroid.GetMeshGL();
+  gyroid = gyroid.Simplify();
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
