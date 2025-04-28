@@ -138,51 +138,40 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                    topologyErr, "These 3 edges do not form a triangle!");
 
       addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
-      // } else if (numEdge == 4) {  // Pair of triangles
-      //   const mat2x3 projection = GetAxisAlignedProjection(normal);
-      //   auto triCCW = [&projection, this](const ivec3 tri) {
-      //     return CCW(projection * this->vertPos_[tri[0]],
-      //                projection * this->vertPos_[tri[1]],
-      //                projection * this->vertPos_[tri[2]], epsilon_) >= 0;
-      //   };
+    } else if (numEdge == 4) {  // Pair of triangles
+      const mat2x3 projection = GetAxisAlignedProjection(normal);
+      auto triCCW = [&projection, this](const ivec3 tri) {
+        return CCW(projection * this->vertPos_[halfedge_[tri[0]].startVert],
+                   projection * this->vertPos_[halfedge_[tri[1]].startVert],
+                   projection * this->vertPos_[halfedge_[tri[2]].startVert],
+                   epsilon_) >= 0;
+      };
 
-      //   ivec3 tri0(halfedge_[firstEdge].startVert,
-      //   halfedge_[firstEdge].endVert,
-      //              -1);
-      //   ivec3 tri1(-1, -1, tri0[0]);
-      //   for (const int i : {1, 2, 3}) {
-      //     if (halfedge_[firstEdge + i].startVert == tri0[1]) {
-      //       tri0[2] = halfedge_[firstEdge + i].endVert;
-      //       tri1[0] = tri0[2];
-      //     }
-      //     if (halfedge_[firstEdge + i].endVert == tri0[0]) {
-      //       tri1[1] = halfedge_[firstEdge + i].startVert;
-      //     }
-      //   }
-      //   DEBUG_ASSERT(la::all(la::gequal(tri0, ivec3(0))) &&
-      //                    la::all(la::gequal(tri1, ivec3(0))),
-      //                topologyErr, "non-manifold quad!");
-      //   bool firstValid = triCCW(tri0) && triCCW(tri1);
-      //   tri0[2] = tri1[1];
-      //   tri1[2] = tri0[1];
-      //   bool secondValid = triCCW(tri0) && triCCW(tri1);
+      std::vector<int> quad = AssembleHalfedges(
+          halfedge_.cbegin() + faceEdge[face],
+          halfedge_.cbegin() + faceEdge[face + 1], faceEdge[face])[0];
 
-      //   if (!secondValid) {
-      //     tri0[2] = tri1[0];
-      //     tri1[2] = tri0[0];
-      //   } else if (firstValid) {
-      //     vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
-      //     vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
-      //     if (la::dot(firstCross, firstCross) <
-      //         la::dot(secondCross, secondCross)) {
-      //       tri0[2] = tri1[0];
-      //       tri1[2] = tri0[0];
-      //     }
-      //   }
+      const la::mat<int, 3, 2> tris[2] = {
+          {{quad[0], quad[1], quad[2]}, {quad[0], quad[2], quad[3]}},
+          {{quad[1], quad[2], quad[3]}, {quad[0], quad[1], quad[3]}}};
 
-      //   for (const auto& tri : {tri0, tri1}) {
-      //     addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      //   }
+      int choice = 0;
+
+      if (!(triCCW(tris[0][0]) && triCCW(tris[0][1]))) {
+        choice = 1;
+      } else if (triCCW(tris[1][0]) && triCCW(tris[1][1])) {
+        vec3 diag0 = vertPos_[halfedge_[quad[0]].startVert] -
+                     vertPos_[halfedge_[quad[2]].startVert];
+        vec3 diag1 = vertPos_[halfedge_[quad[1]].startVert] -
+                     vertPos_[halfedge_[quad[3]].startVert];
+        if (la::length2(diag0) > la::length2(diag1)) {
+          choice = 1;
+        }
+      }
+
+      for (const auto& tri : tris[choice]) {
+        addTri(face, tri, normal, halfedgeRef[firstEdge]);
+      }
     } else {  // General triangulation
       for (const auto& tri : general(face)) {
         addTri(face, tri, normal, halfedgeRef[firstEdge]);
@@ -212,7 +201,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
                           "face has less than three edges.");
-             if (triCount[face] > 1)
+             if (triCount[face] > 2)
                group.run([&, face] {
                  std::vector<ivec3> newTris = generalTriangulation(face);
                  triCount[face] = newTris.size();

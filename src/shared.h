@@ -143,7 +143,7 @@ struct TriRef {
   /// Probably the triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri], but it's an input, so just pass it along unchanged.
   int faceID;
-  /// Triangles with the same face ID are coplanar.
+  /// Triangles with the same coplanar ID are coplanar.
   int coplanarID;
 
   bool SameFace(const TriRef& other) const {
