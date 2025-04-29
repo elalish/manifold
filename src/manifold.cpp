@@ -110,7 +110,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = ref.faceID;
+    out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.coplanarID;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 

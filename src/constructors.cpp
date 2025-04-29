@@ -47,14 +47,28 @@ namespace manifold {
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-Manifold Manifold::Smooth(const MeshGL& meshGL,
+Manifold Manifold::Smooth(MeshGL meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
   DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
+  const std::vector<uint32_t> faceIDin = meshGL.faceID;
+  meshGL.faceID.resize(meshGL.NumTri());
+  std::iota(meshGL.faceID.begin(), meshGL.faceID.end(), 0);
+
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  // Restore the original faceID
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (faceIDin.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          faceIDin[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
   return Manifold(impl);
 }
 
@@ -86,14 +100,28 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-Manifold Manifold::Smooth(const MeshGL64& meshGL64,
+Manifold Manifold::Smooth(MeshGL64 meshGL64,
                           const std::vector<Smoothness>& sharpenedEdges) {
   DEBUG_ASSERT(meshGL64.halfedgeTangent.empty(), std::runtime_error,
                "when supplying tangents, the normal constructor should be used "
                "rather than Smooth().");
 
+  const std::vector<uint64_t> faceIDin = meshGL64.faceID;
+  meshGL64.faceID.resize(meshGL64.NumTri());
+  std::iota(meshGL64.faceID.begin(), meshGL64.faceID.end(), 0);
+
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  // Restore the original faceID
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (faceIDin.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          faceIDin[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
   return Manifold(impl);
 }
 

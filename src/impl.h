@@ -155,37 +155,41 @@ struct Manifold::Impl {
     }
 
     Vec<TriRef> triRef;
-    if (!meshGL.runOriginalID.empty()) {
-      auto runIndex = meshGL.runIndex;
-      const auto runEnd = meshGL.triVerts.size();
-      if (runIndex.empty()) {
-        runIndex = {0, static_cast<I>(runEnd)};
-      } else if (runIndex.size() == meshGL.runOriginalID.size()) {
-        runIndex.push_back(runEnd);
-      }
-      triRef.resize_nofill(meshGL.NumTri());
-      const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
-      for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
-        const int meshID = startID + i;
-        const int originalID = meshGL.runOriginalID[i];
-        for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
-          TriRef& ref = triRef[tri];
-          ref.meshID = meshID;
-          ref.originalID = originalID;
-          ref.faceID = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
-          ref.coplanarID = tri;
-        }
+    triRef.resize_nofill(meshGL.NumTri());
 
-        if (meshGL.runTransform.empty()) {
-          meshRelation_.meshIDtransform[meshID] = {originalID};
-        } else {
-          const Precision* m = meshGL.runTransform.data() + 12 * i;
-          meshRelation_.meshIDtransform[meshID] = {originalID,
-                                                   {{m[0], m[1], m[2]},
-                                                    {m[3], m[4], m[5]},
-                                                    {m[6], m[7], m[8]},
-                                                    {m[9], m[10], m[11]}}};
-        }
+    auto runIndex = meshGL.runIndex;
+    const auto runEnd = meshGL.triVerts.size();
+    if (runIndex.empty()) {
+      runIndex = {0, static_cast<I>(runEnd)};
+    } else if (runIndex.size() == meshGL.runOriginalID.size()) {
+      runIndex.push_back(runEnd);
+    }
+
+    const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
+    auto runOriginalID = meshGL.runOriginalID;
+    if (runOriginalID.empty()) {
+      runOriginalID.push_back(startID);
+    }
+    for (size_t i = 0; i < runOriginalID.size(); ++i) {
+      const int meshID = startID + i;
+      const int originalID = runOriginalID[i];
+      for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
+        TriRef& ref = triRef[tri];
+        ref.meshID = meshID;
+        ref.originalID = originalID;
+        ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
+        ref.coplanarID = tri;
+      }
+
+      if (meshGL.runTransform.empty()) {
+        meshRelation_.meshIDtransform[meshID] = {originalID};
+      } else {
+        const Precision* m = meshGL.runTransform.data() + 12 * i;
+        meshRelation_.meshIDtransform[meshID] = {originalID,
+                                                 {{m[0], m[1], m[2]},
+                                                  {m[3], m[4], m[5]},
+                                                  {m[6], m[7], m[8]},
+                                                  {m[9], m[10], m[11]}}};
       }
     }
 
@@ -232,10 +236,6 @@ struct Manifold::Impl {
     // the algorithm doesn't work with pinched verts
     CleanupTopology();
     CalculateNormals();
-
-    if (meshGL.runOriginalID.empty()) {
-      InitializeOriginal();
-    }
 
     DedupePropVerts();
     MarkCoplanar();

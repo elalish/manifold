@@ -644,6 +644,11 @@ inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
                 << "max: " << box.max;
 }
 
+inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
+  return stream << "halfedge: " << s.halfedge << ", "
+                << "smoothness: " << s.smoothness;
+}
+
 /**
  * Print the contents of this vector to standard output. Only exists if compiled
  * with MANIFOLD_DEBUG flag.
