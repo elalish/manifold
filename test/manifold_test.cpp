@@ -549,6 +549,19 @@ TEST(Manifold, SliceEmptyObject) {
   EXPECT_TRUE(empty.IsEmpty());
   CrossSection bottom = empty.Slice();
 }
+
+TEST(Manifold, Simplify) {
+  Polygons polyCircle =
+      CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
+  Manifold torus = Manifold::Revolve(polyCircle, 100);
+  Manifold simplified = torus.Simplify(0.4);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 20);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("torus.glb", simplified.GetMeshGL(), {});
+#endif
+}
 #endif
 
 TEST(Manifold, MeshRelation) {
