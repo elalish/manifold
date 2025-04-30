@@ -413,9 +413,9 @@ class Manifold {
   Manifold RefineToTolerance(double) const;
   Manifold SmoothByNormals(int normalIdx) const;
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
-  static Manifold Smooth(MeshGL,
+  static Manifold Smooth(const MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
-  static Manifold Smooth(MeshGL64,
+  static Manifold Smooth(const MeshGL64&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   ///@}
 

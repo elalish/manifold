@@ -295,19 +295,18 @@ void Manifold::Impl::FlattenFaces() {
     if (edgeTri[b] == kRemove) return true;
     const TriRef& refA = meshRelation_.triRef[edgeTri[a]];
     const TriRef& refB = meshRelation_.triRef[edgeTri[b]];
-    return refA.meshID < refB.meshID || (refA.meshID == refB.meshID &&
-                                         (refA.coplanarID < refB.coplanarID ||
-                                          (refA.coplanarID == refB.coplanarID &&
-                                           refA.faceID < refB.faceID)));
+    return std::tie(refA.meshID, refA.coplanarID, refA.faceID) <
+           std::tie(refB.meshID, refB.coplanarID, refB.faceID);
   };
 
   Vec<size_t> newHalf2Old(halfedge_.size());
   sequence(newHalf2Old.begin(), newHalf2Old.end());
   stable_sort(newHalf2Old.begin(), newHalf2Old.end(), comp);
-  newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
-                                  [&](const size_t i) {
-                                    return edgeTri[newHalf2Old[i]] == kRemove;
-                                  }) -
+  newHalf2Old.resize(std::lower_bound(countAt(0_uz), countAt(halfedge_.size()),
+                                      kRemove,
+                                      [&](const size_t i, const size_t val) {
+                                        return edgeTri[newHalf2Old[i]] < val;
+                                      }) -
                      countAt(0_uz));
 
   Vec<Halfedge> newHalfedge(newHalf2Old.size());
