@@ -22,6 +22,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
+include(CTest)
+enable_testing()
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 
