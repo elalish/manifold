@@ -139,11 +139,26 @@ TEST(Boolean, Cubes) {
 }
 
 TEST(Boolean, Simplify) {
-  Manifold cube = Manifold::Cube().Refine(10);
+  const int n = 10;
+  MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
+  size_t tri = 0;
+  for (auto& id : cubeGL.faceID) {
+    id = tri++;
+  }
+  Manifold cube(cubeGL);
+
+  const int nExpected = 20 * n * n;
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), 1928);
+  EXPECT_EQ(result.NumTri(), nExpected);
   result = result.Simplify();
-  EXPECT_EQ(result.NumTri(), 20);
+  EXPECT_EQ(result.NumTri(), nExpected);
+
+  MeshGL resultGL = result.GetMeshGL();
+  resultGL.faceID.clear();
+  Manifold result2(resultGL);
+  EXPECT_EQ(result2.NumTri(), nExpected);
+  result2 = result2.Simplify();
+  EXPECT_EQ(result2.NumTri(), 20);
 }
 
 TEST(Boolean, NoRetainedVerts) {

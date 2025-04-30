@@ -147,7 +147,8 @@ struct TriRef {
   int coplanarID;
 
   bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && coplanarID == other.coplanarID;
+    return meshID == other.meshID && coplanarID == other.coplanarID &&
+           faceID == other.faceID;
   }
 };
 

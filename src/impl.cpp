@@ -231,7 +231,7 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, keepFaceID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, tri,
+               triRef[tri] = {meshID, meshID, -1,
                               keepFaceID ? triRef[tri].coplanarID : tri};
              });
   meshRelation_.meshIDtransform.clear();

@@ -18,6 +18,38 @@
 #include "manifold/polygon.h"
 #include "parallel.h"
 
+namespace {
+using namespace manifold;
+
+template <typename P, typename I>
+std::shared_ptr<Manifold::Impl> SmoothImpl(
+    const MeshGLP<P, I>& meshGL,
+    const std::vector<Smoothness>& sharpenedEdges) {
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
+
+  MeshGLP<P, I> meshTmp = meshGL;
+  meshTmp.faceID.resize(meshGL.NumTri());
+  std::iota(meshTmp.faceID.begin(), meshTmp.faceID.end(), 0);
+
+  std::shared_ptr<Manifold::Impl> impl =
+      std::make_shared<Manifold::Impl>(meshTmp);
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  // Restore the original faceID
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (meshGL.faceID.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          meshGL.faceID[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
+  return impl;
+}
+}  // namespace
+
 namespace manifold {
 /**
  * Constructs a smooth version of the input mesh by creating tangents; this
@@ -49,13 +81,7 @@ namespace manifold {
  */
 Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
-               "when supplying tangents, the normal constructor should be used "
-               "rather than Smooth().");
-
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
-  return Manifold(impl);
+  return Manifold(SmoothImpl(meshGL, sharpenedEdges));
 }
 
 /**
@@ -88,13 +114,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  */
 Manifold Manifold::Smooth(const MeshGL64& meshGL64,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(meshGL64.halfedgeTangent.empty(), std::runtime_error,
-               "when supplying tangents, the normal constructor should be used "
-               "rather than Smooth().");
-
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
-  return Manifold(impl);
+  return Manifold(SmoothImpl(meshGL64, sharpenedEdges));
 }
 
 /**

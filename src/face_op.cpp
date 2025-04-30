@@ -259,10 +259,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   CreateHalfedges(triProp, triVerts);
 }
 
-constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
+constexpr size_t kRemove = std::numeric_limits<size_t>::max();
 
 void Manifold::Impl::FlattenFaces() {
-  Vec<uint64_t> edgeFace(halfedge_.size());
+  Vec<size_t> edgeTri(halfedge_.size());
   const size_t numTri = NumTri();
   const auto policy = autoPolicy(numTri);
 
@@ -271,34 +271,42 @@ void Manifold::Impl::FlattenFaces() {
            [](auto& v) { v.store(0); });
 
   for_each_n(policy, countAt(0_uz), numTri,
-             [&edgeFace, &vertDegree, this](size_t tri) {
+             [&edgeTri, &vertDegree, this](size_t tri) {
+               const auto& ref = meshRelation_.triRef[tri];
                for (const int i : {0, 1, 2}) {
                  const int edge = 3 * tri + i;
                  const int pair = halfedge_[edge].pairedHalfedge;
                  if (pair < 0) {
-                   edgeFace[edge] = kRemove;
+                   edgeTri[edge] = kRemove;
                    return;
                  }
-                 const auto& ref = meshRelation_.triRef[tri];
                  if (ref.SameFace(meshRelation_.triRef[pair / 3])) {
-                   edgeFace[edge] = kRemove;
+                   edgeTri[edge] = kRemove;
                  } else {
-                   edgeFace[edge] = (static_cast<uint64_t>(ref.meshID) << 32) +
-                                    static_cast<uint64_t>(ref.coplanarID);
+                   edgeTri[edge] = tri;
                    ++vertDegree[halfedge_[edge].startVert];
                  }
                }
              });
 
+  auto comp = [&edgeTri, this](size_t a, size_t b) {
+    if (edgeTri[a] == edgeTri[b]) return false;
+    if (edgeTri[a] == kRemove) return false;
+    if (edgeTri[b] == kRemove) return true;
+    const TriRef& refA = meshRelation_.triRef[edgeTri[a]];
+    const TriRef& refB = meshRelation_.triRef[edgeTri[b]];
+    return std::tie(refA.meshID, refA.coplanarID, refA.faceID) <
+           std::tie(refB.meshID, refB.coplanarID, refB.faceID);
+  };
+
   Vec<size_t> newHalf2Old(halfedge_.size());
   sequence(newHalf2Old.begin(), newHalf2Old.end());
-  stable_sort(
-      newHalf2Old.begin(), newHalf2Old.end(),
-      [&edgeFace](size_t a, size_t b) { return edgeFace[a] < edgeFace[b]; });
-  newHalf2Old.resize(std::find_if(countAt(0_uz), countAt(halfedge_.size()),
-                                  [&](const size_t i) {
-                                    return edgeFace[newHalf2Old[i]] == kRemove;
-                                  }) -
+  stable_sort(newHalf2Old.begin(), newHalf2Old.end(), comp);
+  newHalf2Old.resize(std::lower_bound(countAt(0_uz), countAt(halfedge_.size()),
+                                      kRemove,
+                                      [&](const size_t i, const size_t val) {
+                                        return edgeTri[newHalf2Old[i]] < val;
+                                      }) -
                      countAt(0_uz));
 
   Vec<Halfedge> newHalfedge(newHalf2Old.size());
@@ -307,7 +315,7 @@ void Manifold::Impl::FlattenFaces() {
 
   Vec<int> faceEdge(1, 0);
   for (size_t i = 1; i < newHalf2Old.size(); ++i) {
-    if (edgeFace[newHalf2Old[i]] != edgeFace[newHalf2Old[i - 1]]) {
+    if (comp(newHalf2Old[i - 1], newHalf2Old[i])) {
       faceEdge.push_back(i);
     }
   }

@@ -317,13 +317,12 @@ bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
 
 // sharpenedEdges are referenced to the input Mesh, but the triangles have
 // been sorted in creating the Manifold, so the indices are converted using
-// meshRelation_.
+// meshRelation_.faceID, which temporarily holds the mapping.
 std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
   std::unordered_map<int, int> oldHalfedge2New;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
-    int oldTri =
-        meshRelation_.triRef[tri].faceID;  // TODO: should not use faceID
+    int oldTri = meshRelation_.triRef[tri].faceID;
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
   }
   std::vector<Smoothness> newSharp = sharpenedEdges;
@@ -982,7 +981,9 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
 
   halfedgeTangent_.clear();
   Finish();
-  MarkCoplanar();
+  if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
+    MarkCoplanar();
+  }
   meshRelation_.originalID = -1;
 }
 

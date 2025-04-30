@@ -743,7 +743,7 @@ TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
   ASSERT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  ASSERT_EQ(NumUnique(inGL.faceID), 12);
+  ASSERT_EQ(NumUnique(inGL.faceID), 6);
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);

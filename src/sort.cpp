@@ -275,11 +275,12 @@ void Manifold::Impl::SortVerts() {
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const auto newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
-                                       [&vertMorton](const int vert) {
-                                         return vertMorton[vert] == kNoCode;
-                                       }) -
-                          vertNew2Old.begin();
+  const auto newNumVert =
+      std::lower_bound(vertNew2Old.begin(), vertNew2Old.end(), kNoCode,
+                       [&vertMorton](const int vert, const uint32_t val) {
+                         return vertMorton[vert] < val;
+                       }) -
+      vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
   Permute(vertPos_, vertNew2Old);
@@ -400,11 +401,12 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
-  const int newNumTri = std::find_if(faceNew2Old.begin(), faceNew2Old.end(),
-                                     [&faceMorton](const int face) {
-                                       return faceMorton[face] == kNoCode;
-                                     }) -
-                        faceNew2Old.begin();
+  const int newNumTri =
+      std::lower_bound(faceNew2Old.begin(), faceNew2Old.end(), kNoCode,
+                       [&faceMorton](const int face, const uint32_t val) {
+                         return faceMorton[face] < val;
+                       }) -
+      faceNew2Old.begin();
   faceNew2Old.resize(newNumTri);
 
   Permute(faceMorton, faceNew2Old);
