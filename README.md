@@ -97,7 +97,7 @@ cd manifold
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make
-test/manifold_test
+make test
 ```
 
 CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
