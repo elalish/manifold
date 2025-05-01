@@ -397,6 +397,8 @@ Manifold Manifold::SetTolerance(double tolerance) const {
  * Return a copy of the manifold simplified to the given tolerance, but with its
  * actual tolerance value unchanged. If the tolerance is not given or is less
  * than the current tolerance, the current tolerance is used for simplification.
+ * The result will contain a subset of the original verts and all surfaces will
+ * have moved by less than tolerance.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
