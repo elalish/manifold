@@ -952,6 +952,17 @@ export class Manifold {
   setTolerance(tolerance: number): Manifold;
 
   /**
+   * Return a copy of the manifold simplified to the given tolerance, but with
+   * its actual tolerance value unchanged. The result will contain a subset of
+   * the original verts and all surfaces will have moved by less than tolerance.
+   *
+   * @param tolerance The maximum distance between the original and simplified
+   *     meshes. If not given or is less than the current tolerance, the current
+   *     tolerance is used.
+   */
+  simplify(tolerance?: number): Manifold;
+
+  /**
    * The genus is a topological property of the manifold, representing the
    * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
    * a single mesh, so it is best to call Decompose() first.
