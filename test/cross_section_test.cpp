@@ -231,8 +231,6 @@ TEST(CrossSection, BatchBoolean) {
   CrossSection intersect = CrossSection::BatchBoolean(
       {square, circle1, circle2, circle3}, OpType::Intersect);
 
-  std::cout << intersect.Area() << std::endl;
-
   EXPECT_FLOAT_EQ(intersect.Area(), 0);
   EXPECT_FLOAT_EQ(intersect.NumVert(), 0);
 
