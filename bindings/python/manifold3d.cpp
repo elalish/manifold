@@ -363,7 +363,8 @@ NB_MODULE(manifold3d, m) {
       .def("set_tolerance", &Manifold::SetTolerance,
            manifold__set_tolerance__tolerance)
       .def("simplify", &Manifold::Simplify, manifold__simplify__tolerance)
-      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
+      .def("as_original", &Manifold::AsOriginal, nb::arg("id"),
+           manifold__as_original__id)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),

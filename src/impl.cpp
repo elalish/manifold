@@ -193,8 +193,15 @@ void Manifold::Impl::EagerTransformPropNormals(
   }
 }
 
-void Manifold::Impl::InitializeOriginal() {
-  const int meshID = ReserveIDs(1);
+/**
+ * Initialize the mesh IDs and face IDs of this manifold.
+ *
+ * @param id The original ID to assign to this manifold. If -1, a new ID is
+ *          generated.
+ * @param keepFaceID If true, the coplanar IDs are not changed.
+ */
+void Manifold::Impl::InitializeOriginal(int id, bool keepFaceID) {
+  const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize_nofill(NumTri());

@@ -791,8 +791,8 @@ int manifold_meshgl64_has_normals(ManifoldMeshGL64* m, size_t run) {
   return from_c(m)->HasNormals(run) ? 1 : 0;
 }
 
-ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {
-  auto orig = from_c(m)->AsOriginal();
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m, int id) {
+  auto orig = from_c(m)->AsOriginal(id);
   return to_c(new (mem) Manifold(orig));
 }
 
