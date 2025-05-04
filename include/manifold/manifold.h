@@ -353,7 +353,7 @@ class Manifold {
    */
   ///@{
   int OriginalID() const;
-  Manifold AsOriginal() const;
+  Manifold AsOriginal(int id = -1) const;
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 

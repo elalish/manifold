@@ -210,9 +210,9 @@ TEST(Manifold, OppositeFace) {
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
-  manifoldList.emplace_back(Manifold::Tetrahedron());
-  manifoldList.emplace_back(Manifold::Cube());
-  manifoldList.emplace_back(Manifold::Sphere(1, 4));
+  manifoldList.emplace_back(Manifold::Tetrahedron().AsOriginal());
+  manifoldList.emplace_back(Manifold::Cube().AsOriginal());
+  manifoldList.emplace_back(Manifold::Sphere(1, 4).AsOriginal());
   Manifold manifolds = Manifold::Compose(manifoldList);
 
   ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});

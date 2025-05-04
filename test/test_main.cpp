@@ -236,7 +236,7 @@ Manifold WithPositionColors(const Manifold& in) {
   const Box bbox = in.BoundingBox();
   const vec3 size = bbox.Size();
 
-  return in.SetProperties(
+  return in.AsOriginal().SetProperties(
       3, [bbox, size](double* prop, vec3 pos, const double* oldProp) {
         for (int i : {0, 1, 2}) {
           prop[i] = (pos[i] - bbox.min[i]) / size[i];
