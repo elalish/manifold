@@ -121,18 +121,6 @@ double sun_acos(double x) {
   return 2 * (df + w);
 }
 
-struct Transform4x3 {
-  const mat3x4 transform;
-
-  vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
-};
-
-struct UpdateMeshID {
-  const HashTableD<uint32_t> meshIDold2new;
-
-  void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
-};
-
 int GetLabels(std::vector<int>& components,
               const Vec<std::pair<int, int>>& edges, int numNodes) {
   UnionFind<> uf(numNodes);
@@ -549,7 +537,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.faceNormal_.resize(faceNormal_.size());
   result.vertNormal_.resize(vertNormal_.size());
   transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
-            Transform4x3({transform_}));
+            [&transform_](const vec3& v) { return transform_ * vec4(v, 1.0); });
 
   mat3 normalTransform = NormalTransform(transform_);
   transform(faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
@@ -697,7 +685,9 @@ void Manifold::Impl::IncrementMeshIDs() {
 
   const size_t numTri = NumTri();
   for_each_n(autoPolicy(numTri, 1e5), meshRelation_.triRef.begin(), numTri,
-             UpdateMeshID({meshIDold2new.D()}));
+             [&meshIDold2new](TriRef& tri) {
+               tri.meshID = meshIDold2new.D()[tri.meshID];
+             });
 }
 
 #ifdef MANIFOLD_DEBUG

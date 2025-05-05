@@ -138,13 +138,19 @@ TEST(Boolean, Cubes) {
 #endif
 }
 
+TEST(Boolean, CubeUnion) {
+  Manifold cube = Manifold::Cube();
+  Manifold result = cube + cube.Translate({1, 0, 0});
+  EXPECT_EQ(result.NumTri(), 14);
+  result = result.Simplify();
+  EXPECT_EQ(result.NumTri(), 12);
+}
+
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
-  size_t tri = 0;
-  for (auto& id : cubeGL.faceID) {
-    id = tri++;
-  }
+  // Give unique face IDs to stop edge removal
+  std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
   const int nExpected = 20 * n * n;

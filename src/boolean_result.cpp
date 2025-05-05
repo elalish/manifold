@@ -497,34 +497,32 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
 
-struct MapTriRef {
-  VecView<const TriRef> triRefP;
-  VecView<const TriRef> triRefQ;
-  const int offsetQ;
-
-  void operator()(TriRef& triRef) {
-    const int tri = triRef.faceID;
-    const bool PQ = triRef.meshID == 0;
-    triRef = PQ ? triRefP[tri] : triRefQ[tri];
-    if (!PQ) triRef.meshID += offsetQ;
-  }
-};
-
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
                      const Manifold::Impl& inQ, bool invertQ) {
   const int offsetQ = Manifold::Impl::meshIDCounter_;
-  for_each_n(
-      autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-      outR.NumTri(),
-      MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
+  for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
+             outR.NumTri(), [&inP, &inQ, offsetQ](TriRef& triRef) {
+               const int tri = triRef.faceID;
+               const bool PQ = triRef.meshID == 0;
+               triRef = PQ ? inP.meshRelation_.triRef[tri]
+                           : inQ.meshRelation_.triRef[tri];
+               if (!PQ && triRef.meshID != 0) triRef.meshID += offsetQ;
+             });
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
   for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
-        invertQ;
+    if (pair.first != 0) {
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
+          invertQ;
+    }
+  }
+  if (outR.meshRelation_.meshIDtransform.find(0) !=
+      outR.meshRelation_.meshIDtransform.end()) {
+    // recalculate since multiple ID 0 meshes may incorrectly share a faceID
+    outR.MarkCoplanar();
   }
 }
 

@@ -640,7 +640,6 @@ TEST(Manifold, MeshGLRoundTrip) {
 
 void CheckCube(const MeshGL& cubeSTL) {
   Manifold cube(cubeSTL);
-  cube = cube.AsOriginal();
   EXPECT_EQ(cube.NumTri(), 12);
   EXPECT_EQ(cube.NumVert(), 8);
   EXPECT_EQ(cube.NumPropVert(), 24);
