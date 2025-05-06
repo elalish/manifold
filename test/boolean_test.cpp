@@ -67,7 +67,9 @@ TEST(Boolean, Tetra) {
 
 TEST(Boolean, MeshGLRoundTrip) {
   Manifold cube = Manifold::Cube(vec3(2));
-  ASSERT_GE(cube.OriginalID(), 0);
+  ASSERT_EQ(cube.OriginalID(), 0);
+  cube = cube.AsOriginal();
+  ASSERT_GT(cube.OriginalID(), 0);
   const MeshGL original = cube.GetMeshGL();
 
   Manifold result = cube + cube.Translate({1, 1, 0});
@@ -92,7 +94,7 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0);
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -124,8 +126,8 @@ TEST(Boolean, MissingNormals) {
 }
 
 TEST(Boolean, EmptyOriginal) {
-  const Manifold cube = Manifold::Cube();
-  const Manifold tet = Manifold::Tetrahedron();
+  const Manifold cube = Manifold::Cube().AsOriginal();
+  const Manifold tet = Manifold::Tetrahedron().AsOriginal();
   const Manifold result = tet - cube.Translate({3, 4, 5});
   const MeshGL mesh = result.GetMeshGL();
   ASSERT_EQ(mesh.runIndex.size(), 3);
@@ -292,7 +294,7 @@ TEST(Boolean, PropertiesNoIntersection) {
 TEST(Boolean, MixedProperties) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result = m0 + m1.Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
@@ -301,7 +303,7 @@ TEST(Boolean, MixedProperties) {
 TEST(Boolean, MixedNumProp) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result =
       m0 + m1.SetProperties(1, [](double* prop, vec3 p, const double* n) {
                prop[0] = 1;
@@ -568,7 +570,7 @@ TEST(Boolean, AlmostCoplanar) {
 }
 
 TEST(Boolean, FaceUnion) {
-  Manifold cubes = Manifold::Cube();
+  Manifold cubes = Manifold::Cube().AsOriginal();
   cubes += cubes.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
   ExpectMeshes(cubes, {{12, 20}});
