@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <cstdint>  // uint32_t, uint64_t
 #include <functional>
 #include <memory>  // needed for shared_ptr
 
