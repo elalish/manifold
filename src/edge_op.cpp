@@ -532,7 +532,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
-    while (current != tri0edge[2]) {
+    while (current != tri1edge[0]) {
       current = NextHalfedge(current);
       vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
@@ -541,9 +541,20 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
+        const TriRef oldRef = refCheck;
         refCheck = triRef[edge / 3];
         if (!ref.SameFace(refCheck)) {
           return false;
+        }
+        if (ref.meshID != oldRef.meshID || ref.faceID != oldRef.faceID ||
+            la::dot(faceNormal_[toRemove.pairedHalfedge / 3],
+                    faceNormal_[tri]) < -0.5) {
+          // Restrict collapse to colinear edges when the edge separates faces
+          // or the edge is sharp. This ensures large shifts are not introduced
+          // parallel to the tangent plane.
+          if (CCW(projection * pLast, projection * pOld, projection * pNew,
+                  epsilon_) != 0)
+            return false;
         }
       }
 
