@@ -127,6 +127,7 @@ TEST(Properties, CalculateCurvature) {
 
 TEST(Properties, Coplanar) {
   Manifold peg = Manifold::Cube({1, 1, 2}).Translate({1, 1, 0}).AsOriginal();
+  const size_t pegID = peg.OriginalID();
   Manifold hole = Manifold::Cube({3, 3, 1}) - peg;
   hole = hole.AsOriginal();
   std::vector<MeshGL> input = {hole.GetMeshGL(), peg.GetMeshGL()};
@@ -140,7 +141,7 @@ TEST(Properties, Coplanar) {
   MeshGL resultGL = result.GetMeshGL();
   float minPegZ = std::numeric_limits<float>::max();
   for (size_t run = 0; run < resultGL.runOriginalID.size(); run++) {
-    if (resultGL.runOriginalID[run] == peg.OriginalID()) {
+    if (resultGL.runOriginalID[run] == pegID) {
       for (size_t t3 = resultGL.runIndex[run]; t3 < resultGL.runIndex[run + 1];
            t3++) {
         const size_t v = resultGL.triVerts[t3];
