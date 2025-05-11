@@ -139,11 +139,11 @@ TEST(Properties, Coplanar) {
 
   MeshGL resultGL = result.GetMeshGL();
   float minPegZ = std::numeric_limits<float>::max();
-  for (int run = 0; run < resultGL.runOriginalID.size(); run++) {
+  for (size_t run = 0; run < resultGL.runOriginalID.size(); run++) {
     if (resultGL.runOriginalID[run] == peg.OriginalID()) {
-      for (int t3 = resultGL.runIndex[run]; t3 < resultGL.runIndex[run + 1];
+      for (size_t t3 = resultGL.runIndex[run]; t3 < resultGL.runIndex[run + 1];
            t3++) {
-        const int v = resultGL.triVerts[t3];
+        const size_t v = resultGL.triVerts[t3];
         minPegZ = std::min(minPegZ,
                            resultGL.vertProperties[v * resultGL.numProp + 2]);
       }
