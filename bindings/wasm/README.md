@@ -26,7 +26,7 @@ Also included are a novel and powerful suite of refining functions for smooth me
 
 ## Note on memory management
 
-Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each manifold object constructed by your scripts, see [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
+Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each object constructed by your scripts (both `Manifold` and `CrossSection`), see [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
 
 ## Examples
 
