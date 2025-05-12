@@ -171,7 +171,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Decompose", select_overload<std::vector<Manifold>() const>(
                                   &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)
-      .function("status", &Manifold::Status)
+      .function("status", &man_js::Status)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)

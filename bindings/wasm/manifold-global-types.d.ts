@@ -69,3 +69,8 @@ export type Smoothness = {
 };
 export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
 export type JoinType = 'Square'|'Round'|'Miter'
+export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
+    'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
+    'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
+    'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
+    'InvalidConstruction'
