@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -984,6 +984,14 @@ export class Manifold {
    * 0 and searchLength.
    */
   minGap(other: Manifold, searchLength: number): number;
+
+  /**
+   * Returns the reason for an input Mesh producing an empty Manifold. This
+   * Status will carry on through operations like NaN propogation, ensuring an
+   * errored mesh doesn't get mysteriously lost. Empty meshes may still show
+   * NoError, for instance the intersection of non-overlapping meshes.
+   */
+  status(): ErrorStatus;
 
   // Export
 
