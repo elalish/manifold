@@ -40,7 +40,7 @@ def all_cross_section():
     c = c.mirror((0, 1))
     n = c.num_contour()
     n = c.num_vert()
-    c = c.offset(1, JoinType.Round)
+    c = c.offset(1)
     m = c.revolve()
     c = c.rotate(90)
     c = c.scale((2, 2))

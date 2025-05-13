@@ -216,7 +216,7 @@ export class CrossSection {
    * to expand, and retraction of inner (hole) contours. Negative deltas will
    * have the opposite effect.
    * @param joinType The join type specifying the treatment of contour joins
-   * (corners).
+   * (corners). Defaults to Round
    * @param miterLimit The maximum distance in multiples of delta that vertices
    * can be offset from their original positions with before squaring is
    * applied, **when the join type is Miter** (default is 2, which is the
