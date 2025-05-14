@@ -159,7 +159,7 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.offset = function(
-      delta, joinType = 'Square', miterLimit = 2.0, circularSegments = 0) {
+      delta, joinType = 'Round', miterLimit = 2.0, circularSegments = 0) {
     return this._Offset(
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };

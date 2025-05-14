@@ -817,8 +817,8 @@ NB_MODULE(manifold3d, m) {
            cross_section__simplify__epsilon)
       .def(
           "offset", &CrossSection::Offset, nb::arg("delta"),
-          nb::arg("join_type"), nb::arg("miter_limit") = 2.0,
-          nb::arg("circular_segments") = 0,
+          nb::arg("join_type") = CrossSection::JoinType::Round,
+          nb::arg("miter_limit") = 2.0, nb::arg("circular_segments") = 0,
           cross_section__offset__delta__jointype__miter_limit__circular_segments)
       .def(nb::self + nb::self, cross_section__operator_plus__q)
       .def(nb::self - nb::self, cross_section__operator_minus__q)

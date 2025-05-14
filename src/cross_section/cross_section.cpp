@@ -652,7 +652,7 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * to expand, and retraction of inner (hole) contours. Negative deltas will
  * have the opposite effect.
  * @param jointype The join type specifying the treatment of contour joins
- * (corners).
+ * (corners). Defaults to Round.
  * @param miter_limit The maximum distance in multiples of delta that vertices
  * can be offset from their original positions with before squaring is
  * applied, <B>when the join type is Miter</B> (default is 2, which is the
