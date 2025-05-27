@@ -331,12 +331,12 @@ TEST(Samples, CurvedWallSimplify) {
   Manifold cylinder =
       Manifold::Cylinder(2, 50, 50, 180)
           .Rotate(
-              -89.999999999999) // Rotating by -90 makes the result too perfect
+              -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
   Manifold cube = Manifold::Cube(vec3(100, 2, 50));
   Manifold refined = (cylinder + cube).RefineToLength(0.13071895424836602);
   Manifold deformed =
-      refined.Warp([](vec3 &p) { p.y += p.x - (p.x * p.x) / 100.0; });
+      refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
   Manifold simplified = deformed.Simplify(0.005);
 
   // If Simplify adds cracks, volume decreases and surface area increases
