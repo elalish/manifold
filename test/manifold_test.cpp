@@ -103,6 +103,14 @@ TEST(Manifold, ValidInput) {
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
 }
 
+TEST(Manifold, ValidInputOneRunIndex) {
+  MeshGL emptyMesh;
+  emptyMesh.runIndex = {0};
+  Manifold empty(emptyMesh);
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+}
+
 TEST(Manifold, InvalidInput1) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -153,6 +161,14 @@ TEST(Manifold, InvalidInput6) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
+}
+
+TEST(Manifold, InvalidInput7) {
+  MeshGL cube = CubeUV();
+  cube.runIndex = {0, 1, static_cast<uint32_t>(cube.triVerts.size())};
+  Manifold tet(cube);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
 TEST(Manifold, OppositeFace) {
