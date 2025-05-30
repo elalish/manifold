@@ -414,9 +414,9 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   // sort p1q2
   Vec<size_t> i12(p1q2.size());
   sequence(i12.begin(), i12.end());
-  stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
-    return p1q2[a][0] < p1q2[b][0] ||
-           (p1q2[a][0] == p1q2[b][0] && p1q2[a][1] < p1q2[b][1]);
+  radix_sort_with_key(i12.begin(), i12.end(), [&](size_t i) {
+    return (static_cast<uint64_t>(p1q2[i][0]) << 32) |
+           static_cast<uint64_t>(p1q2[i][1]);
   });
   Permute(p1q2, i12);
   Permute(x12, i12);

@@ -361,12 +361,13 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   // drop the old value first to avoid copy
   halfedge_.clear(true);
   halfedge_.resize_nofill(numHalfedge);
-  Vec<uint64_t> edge(numHalfedge);
-  Vec<int> ids(numHalfedge);
+  Vec<uint64_t> edge;
+  edge.resize_nofill(numHalfedge);
+  Vec<int> ids;
+  ids.resize_nofill(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
-  sequence(ids.begin(), ids.end());
   for_each_n(policy, countAt(0), numTri,
-             [this, &edge, &triProp, &triVert](const int tri) {
+             [this, &triProp, &triVert, &edge, &ids](const int tri) {
                const ivec3& props = triProp[tri];
                for (const int i : {0, 1, 2}) {
                  const int j = (i + 1) % 3;
@@ -375,6 +376,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
                  const int v1 = triVert.empty() ? props[j] : triVert[tri][j];
                  DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
                  halfedge_[e] = {v0, v1, -1, props[i]};
+                 ids[e] = e;
                  // Sort the forward halfedges in front of the backward ones
                  // by setting the highest-order bit.
                  edge[e] = uint64_t(v0 < v1 ? 1 : 0) << 63 |
@@ -382,15 +384,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
                            std::max(v0, v1);
                }
              });
-  // Stable sort is required here so that halfedges from the same face are
-  // paired together (the triangles were created in face order). In some
-  // degenerate situations the triangulator can add the same internal edge in
-  // two different faces, causing this edge to not be 2-manifold. These are
-  // fixed by duplicating verts in CleanupTopology.
-  stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
-    return edge[a] < edge[b];
-  });
 
+  radix_sort_with_key(ids.begin(), ids.end(),
+                      [&edge](const int ind) { return edge[ind]; });
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;

@@ -174,7 +174,8 @@ struct FlagStore {
     for_each_n(ExecutionPolicy::Seq, countAt(0), stores.size(), [&](size_t i) {
       std::copy(stores[i].begin(), stores[i].end(), result.begin() + sizes[i]);
     });
-    stable_sort(autoPolicy(result.size()), result.begin(), result.end());
+    radix_sort_with_key(result.begin(), result.end(),
+                        [](size_t i) { return i; });
     for (size_t x : result) f(x);
   }
 #endif
@@ -789,7 +790,8 @@ void Manifold::Impl::SplitPinchedVerts() {
           }
         });
 
-    manifold::stable_sort(pinched.begin(), pinched.end());
+    radix_sort_with_key(pinched.begin(), pinched.end(),
+                        [](size_t i) { return i; });
     std::vector<bool> halfedgeProcessed(nbEdges, false);
     for (size_t i : pinched) {
       if (halfedgeProcessed[i]) continue;
@@ -925,7 +927,8 @@ void Manifold::Impl::DedupeEdges() {
                                 duplicatesLocal.end());
             }
           });
-      manifold::stable_sort(duplicates.begin(), duplicates.end());
+      radix_sort_with_key(duplicates.begin(), duplicates.end(),
+                          [](size_t i) { return i; });
       duplicates.resize(
           std::distance(duplicates.begin(),
                         std::unique(duplicates.begin(), duplicates.end())));
