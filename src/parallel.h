@@ -26,7 +26,16 @@
 #include <tbb/parallel_scan.h>
 #endif
 #include <algorithm>
+#include <cmath>
 #include <numeric>
+
+#if __cplusplus >= 202002L
+#define LIKELY [[likely]]
+#define UNLIKELY [[unlikely]]
+#else
+#define LIKELY
+#define UNLIKELY
+#endif
 
 namespace manifold {
 
@@ -64,8 +73,364 @@ template <typename InputIter, typename OutputIter>
 void copy(InputIter first, InputIter last, OutputIter d_first);
 
 #if (MANIFOLD_PAR == 1)
+using TaskGroup = tbb::task_group;
+#elif (MANIFOLD_PAR == -1)
+// dummy task group
+struct TaskGroup {
+  template <typename F>
+  void run(F&& f) {
+    f();
+  }
+
+  void wait() {}
+};
+#else
+#error "MANIFOLD_PAR must be set to 1 or -1"
+#endif
+
 namespace details {
-using manifold::kSeqThreshold;
+template <typename KeyFn>
+struct ByteGetter {
+  KeyFn& keyfn;
+  ByteGetter(KeyFn& keyfn) : keyfn(keyfn) {}
+  template <typename I>
+  size_t operator()(I curr, int i) const {
+    return static_cast<size_t>((keyfn(*curr) >> (8 * i)) & 0xFF);
+  }
+};
+
+template <typename U>
+struct RadixBlockMetadata {
+  U localMin;
+  U localMax;
+  U prefixMax;
+  U suffixMin;
+  bool sorted;
+  bool canSkip;
+};
+
+template <typename I, typename KeyFn, typename H>
+struct RadixSortLsbHelper {
+  I start;
+  I end;
+  ByteGetter<KeyFn>& getByte;
+  H& hists;
+
+  template <size_t k>
+  void count(size_t x) {
+    if (x != k) return;
+    for (I curr = start; curr != end; ++curr)
+      // basically to make k constant for unrolling
+      for (size_t i = 0; i < k; ++i) hists[i][getByte(curr, i)]++;
+  }
+
+  template <size_t... Is>
+  void counts(std::integer_sequence<size_t, Is...>, size_t x) {
+    (count<Is>(x), ...);
+  }
+};
+
+template <typename I, typename J, typename KeyFn>
+void radix_sort_shuffle(I start, J dest, size_t n, size_t k,
+                        ByteGetter<KeyFn>& getByte,
+                        std::array<size_t, 256>& hist,
+                        std::array<size_t, 256>& buffer) {
+  size_t i = 0;
+  int bufferEnd = 0;
+  while (i < n) {
+    constexpr int maxK = 2;
+    std::array<size_t, maxK> bytes = {0};
+    std::array<int, maxK> counts = {0};
+
+    size_t failed = 0;
+    while (i < n) {
+      size_t byte = getByte(start + i, k);
+      dest[hist[byte]++] = start[i++];
+
+      bool present = false;
+      int j = 0;
+      for (; j < maxK && counts[j] > 1; ++j) {
+        if (bytes[j] != byte) LIKELY {
+            counts[j] -= 1;
+          }
+        else {
+          counts[j] += 2;
+          int jj = j;
+          while (jj > 0 && counts[jj - 1] < counts[jj]) UNLIKELY {
+              std::swap(bytes[jj - 1], bytes[jj]);
+              std::swap(counts[jj - 1], counts[jj]);
+              jj -= 1;
+            }
+          present = true;
+        }
+      }
+
+      if (!present && j < maxK) {
+        counts[j] = 2;
+        bytes[j] = byte;
+      } else if (present && counts[0] >= 32) {
+        break;
+      }
+
+      failed++;
+      if (failed > 256) UNLIKELY {
+          for (int j = 0; j < 2048 && i + j < n; ++j)
+            dest[hist[getByte(start + i + j, k)]++] = start[i + j];
+          i += 2048;
+          failed = 0;
+        }
+    }
+
+    int lastFlush = i;
+    size_t lastByte = bytes[0];
+    size_t& count = hist[lastByte];
+    while (i < n) {
+      size_t byte = getByte(start + i, k);
+      if (byte == lastByte) LIKELY {
+          dest[count++] = start[i++];
+        }
+      else {
+        buffer[bufferEnd++] = i++;
+
+        if (bufferEnd == 256) {
+          // flush buffer
+          for (int j : buffer) dest[hist[getByte(start + j, k)]++] = start[j];
+          bufferEnd = 0;
+
+          // if frequent flush: exit combo mode
+          if (i - lastFlush < 512) break;
+          lastFlush = i;
+        }
+      }
+    }
+  }
+  // cleanup buffer
+  for (int j = 0; j < bufferEnd; ++j)
+    dest[hist[getByte(start + buffer[j], k)]++] = start[buffer[j]];
+}
+
+template <typename I, typename J, typename KeyFn>
+void radix_sort_lsb(I start, I end, J dest, int bytes, KeyFn& keyfn,
+                    bool writeback) {
+  // LSB radix sort, better for single thread
+  size_t n = std::distance(start, end);
+
+  // simple stl stable sort is faster for small arrays
+  if (n <= 1024) {
+    std::stable_sort(start, end,
+                     [&keyfn](auto a, auto b) { return keyfn(a) < keyfn(b); });
+    if (!writeback) std::copy(start, end, dest);
+    return;
+  }
+
+  constexpr size_t maxBytes = sizeof(
+      std::invoke_result_t<KeyFn, std::remove_reference_t<decltype(*start)>>);
+  auto getByte = ByteGetter(keyfn);
+
+  std::array<std::array<size_t, 256>, maxBytes> hists;
+  for (int i = 0; i < bytes + 1; ++i)
+    std::fill(hists[i].begin(), hists[i].end(), 0);
+
+  // compute all histograms at once
+  RadixSortLsbHelper<I, KeyFn, decltype(hists)> helper{start, end, getByte,
+                                                       hists};
+  helper.counts(std::make_integer_sequence<size_t, maxBytes + 1>(), bytes + 1);
+
+  bool inStart = true;
+  std::array<size_t, 256> buffer;
+
+  for (int i = 0; i < bytes + 1; ++i) {
+    size_t count = 0;
+    // prefix sum for histogram
+    bool canSkip = false;
+    for (int j = 0; j < 256; ++j) {
+      size_t tmp = hists[i][j];
+      hists[i][j] = count;
+      count += tmp;
+      if (tmp == n) {
+        canSkip = true;
+        break;
+      }
+    }
+    if (canSkip) continue;
+    if (inStart) {
+      radix_sort_shuffle(start, dest, n, i, getByte, hists[i], buffer);
+    } else {
+      radix_sort_shuffle(dest, start, n, i, getByte, hists[i], buffer);
+    }
+    inStart = !inStart;
+  }
+  // writeback = should be in start
+  if (inStart && !writeback) {
+    std::copy(start, end, dest);
+  } else if (!inStart && writeback) {
+    std::copy(dest, dest + n, start);
+  }
+}
+
+// combine subarray histograms into offsets
+// 0 - (k-1): offset for each block (k blocks in total)
+// k: full histogram for the array
+inline bool sumBlockCounts(std::vector<std::array<size_t, 256>>& hists,
+                           size_t n) {
+  // prefix sum to compute offsets for each byte pattern
+  // we use the final block to store the total, because we need exclusive sum,
+  // e.g. (1, 2, 3) => (0, 1, 3, 6)
+  auto& total = hists.back();
+  std::fill(total.begin(), total.end(), 0);
+
+  for (size_t i = 0; i < hists.size() - 1; ++i) {
+    for (size_t j = 0; j < 256; ++j) {
+      size_t old = total[j];
+      total[j] += hists[i][j];
+      hists[i][j] = old;
+    }
+  }
+
+  // prefix sum on total count
+  for (size_t j = 0; j < 256; ++j) {
+    if (total[j] == n) return true;
+    if (j != 0) total[j] += total[j - 1];
+  }
+
+  // add final total to each offset for each byte pattern
+  for (size_t i = 0; i < hists.size() - 1; ++i)
+    for (size_t j = 1; j < 256; ++j) hists[i][j] += total[j - 1];
+
+  return false;
+}
+
+template <typename I, typename J, typename KeyFn>
+void radix_sort_with_key_rec(I start, I end, J dest, int bytes, KeyFn& keyfn,
+                             size_t blockSize, bool writeback,
+                             TaskGroup& group) {
+  using T = std::remove_reference_t<decltype(*start)>;
+  using U = std::invoke_result_t<KeyFn, T>;
+  size_t n = std::distance(start, end);
+  auto getByte = ByteGetter(keyfn);
+  size_t blocks = n / blockSize;
+
+#if MANIFOLD_PAR == 1
+  if (blocks > 1) {
+    std::vector<std::array<size_t, 256>> hists(blocks + 1);
+    std::vector<RadixBlockMetadata<U>> metadata(blocks);
+
+    for_each(ExecutionPolicy::Par, countAt(0), countAt(blocks), [&](size_t i) {
+      std::fill(hists[i].begin(), hists[i].end(), 0);
+      I localStart = start + blockSize * i;
+      I localEnd = start + (i == blocks - 1 ? n : blockSize * (i + 1));
+
+      U localMin = keyfn(*localStart);
+      U localMax = keyfn(*localStart);
+      U prev = keyfn(*localStart);
+      bool sorted = true;
+
+      for (I curr = localStart; curr != localEnd; ++curr) {
+        U x = keyfn(*curr);
+        localMin = std::min(localMin, x);
+        localMax = std::max(localMax, x);
+        if (prev > x) sorted = false;
+        prev = x;
+        hists[i][getByte(curr, bytes)]++;
+      }
+      metadata[i] = {localMin, localMax, localMax, localMin, sorted, false};
+    });
+
+    // compute prefix max
+    for (size_t i = 1; i < blocks; ++i) {
+      metadata[i].prefixMax =
+          std::max(metadata[i].prefixMax, metadata[i - 1].prefixMax);
+
+      metadata[blocks - i - 1].suffixMin = std::min(
+          metadata[blocks - i - 1].suffixMin, metadata[blocks - i].suffixMin);
+    }
+    int prefixSkips = 0;
+    int suffixSkips = 0;
+    // check if the prefix can be skipped
+    for (size_t i = 0; i < blocks; ++i) {
+      auto& m = metadata[i];
+      if (m.sorted &&
+          (i == blocks - 1 || m.localMax <= metadata[i + 1].suffixMin))
+        m.canSkip = true;
+      else
+        break;
+      prefixSkips++;
+    }
+    // check if the suffix can be skipped
+    for (size_t i = 0; i < blocks; ++i) {
+      // starting from the last block
+      auto& m = metadata[blocks - i - 1];
+      if (m.canSkip) {
+        // early return, the whole thing is sorted
+        if (!writeback) manifold::copy(start, end, dest);
+        return;
+      }
+      // if prefix max <= localMin
+      if (m.sorted &&
+          (i == blocks - 1 || metadata[blocks - i - 2].prefixMax <= m.localMin))
+        m.canSkip = true;
+      else
+        break;
+      suffixSkips++;
+    }
+
+    size_t unsortedStart = prefixSkips * blockSize;
+    size_t unsortedEnd =
+        suffixSkips == 0 ? n : (blocks - suffixSkips) * blockSize;
+    // fast path: no need to shuffle, all have the same byte pattern
+    if (sumBlockCounts(hists, n)) {
+      if (bytes > 0) {
+        if (!writeback) {
+          manifold::copy(start, start + unsortedStart, dest);
+          manifold::copy(start + unsortedEnd, end, dest + unsortedEnd);
+        }
+        radix_sort_with_key_rec(start + unsortedStart, start + unsortedEnd,
+                                dest + unsortedStart, bytes - 1, keyfn,
+                                blockSize, writeback, group);
+      } else if (!writeback) {
+        manifold::copy(start, end, dest);
+      }
+      return;
+    }
+
+    for_each(ExecutionPolicy::Par, countAt(0), countAt(blocks), [&](size_t i) {
+      I localStart = start + blockSize * i;
+      I localEnd = start + (i == blocks - 1 ? n : blockSize * (i + 1));
+      if (metadata[i].canSkip) {
+        std::copy(localStart, localEnd, dest + blockSize * i);
+      } else {
+        std::array<size_t, 256> buffer;
+        radix_sort_shuffle(localStart, dest,
+                           std::distance(localStart, localEnd), bytes, getByte,
+                           hists[i], buffer);
+      }
+    });
+
+    if (bytes > 0) {
+      for (size_t i = 0; i < 256; ++i) {
+        size_t lower = i == 0 ? 0 : hists.back()[i - 1];
+        size_t upper = hists.back()[i];
+        if (lower == upper) continue;
+        // we can skip sorted regions because they are the same in both
+        // start-end and dest
+        if (upper <= unsortedStart || lower >= unsortedEnd) continue;
+        group.run([=, &group]() {
+          radix_sort_with_key_rec(dest + lower, dest + upper, start + lower,
+                                  bytes - 1, keyfn, blockSize, !writeback,
+                                  group);
+        });
+      }
+    } else if (writeback) {
+      manifold::copy(dest, dest + n, start);
+    }
+  } else
+#endif
+  {
+    radix_sort_lsb(start, end, dest, bytes, keyfn, writeback);
+  }
+}
+
+#if (MANIFOLD_PAR == 1)
 // implementation from
 // https://duvanenko.tech.blog/2018/01/14/parallel-merge/
 // https://github.com/DragonSpit/ParallelAlgorithms
@@ -168,134 +533,6 @@ struct CopyIfScanBody {
   void assign(CopyIfScanBody& b) { sum = b.sum; }
 };
 
-template <typename N, const int K>
-struct Hist {
-  using SizeType = N;
-  static constexpr int k = K;
-  N hist[k][256] = {{0}};
-  void merge(const Hist<N, K>& other) {
-    for (int i = 0; i < k; ++i)
-      for (int j = 0; j < 256; ++j) hist[i][j] += other.hist[i][j];
-  }
-  void prefixSum(N total, bool* canSkip) {
-    for (int i = 0; i < k; ++i) {
-      size_t count = 0;
-      for (int j = 0; j < 256; ++j) {
-        N tmp = hist[i][j];
-        hist[i][j] = count;
-        count += tmp;
-        if (tmp == total) canSkip[i] = true;
-      }
-    }
-  }
-};
-
-template <typename T, typename H>
-void histogram(T* ptr, typename H::SizeType n, H& hist) {
-  auto worker = [](T* ptr, typename H::SizeType n, H& hist) {
-    for (typename H::SizeType i = 0; i < n; ++i)
-      for (int k = 0; k < hist.k; ++k)
-        ++hist.hist[k][(ptr[i] >> (8 * k)) & 0xFF];
-  };
-  if (n < kSeqThreshold) {
-    worker(ptr, n, hist);
-  } else {
-    tbb::combinable<H> store;
-    tbb::parallel_for(
-        tbb::blocked_range<typename H::SizeType>(0, n, kSeqThreshold),
-        [&worker, &store, ptr](const auto& r) {
-          worker(ptr + r.begin(), r.end() - r.begin(), store.local());
-        });
-    store.combine_each([&hist](const H& h) { hist.merge(h); });
-  }
-}
-
-template <typename T, typename H>
-void shuffle(T* src, T* target, typename H::SizeType n, H& hist, int k) {
-  for (typename H::SizeType i = 0; i < n; ++i)
-    target[hist.hist[k][(src[i] >> (8 * k)) & 0xFF]++] = src[i];
-}
-
-template <typename T, typename SizeType>
-bool LSB_radix_sort(T* input, T* tmp, SizeType n) {
-  Hist<SizeType, sizeof(T) / sizeof(char)> hist;
-  if (std::is_sorted(input, input + n)) return false;
-  histogram(input, n, hist);
-  bool canSkip[hist.k] = {0};
-  hist.prefixSum(n, canSkip);
-  T *a = input, *b = tmp;
-  for (int k = 0; k < hist.k; ++k) {
-    if (!canSkip[k]) {
-      shuffle(a, b, n, hist, k);
-      std::swap(a, b);
-    }
-  }
-  return a == tmp;
-}
-
-// LSB radix sort with merge
-template <typename T, typename SizeType>
-struct SortedRange {
-  T *input, *tmp;
-  SizeType offset = 0, length = 0;
-  bool inTmp = false;
-
-  SortedRange(T* input, T* tmp, SizeType offset = 0, SizeType length = 0)
-      : input(input), tmp(tmp), offset(offset), length(length) {}
-  SortedRange(SortedRange<T, SizeType>& r, tbb::split)
-      : input(r.input), tmp(r.tmp) {}
-  // FIXME: no idea why thread sanitizer reports data race here
-#if defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-  __attribute__((no_sanitize("thread")))
-#endif
-#endif
-  void
-  operator()(const tbb::blocked_range<SizeType>& range) {
-    SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
-                                 range.end() - range.begin());
-    rhs.inTmp =
-        LSB_radix_sort(input + rhs.offset, tmp + rhs.offset, rhs.length);
-    if (length == 0)
-      *this = rhs;
-    else
-      join(rhs);
-  }
-  bool swapBuffer() const {
-    T *src = input, *target = tmp;
-    if (inTmp) std::swap(src, target);
-    copy(src + offset, src + offset + length, target + offset);
-    return !inTmp;
-  }
-  void join(const SortedRange<T, SizeType>& rhs) {
-    if (inTmp != rhs.inTmp) {
-      if (length < rhs.length)
-        inTmp = swapBuffer();
-      else
-        rhs.swapBuffer();
-    }
-    T *src = input, *target = tmp;
-    if (inTmp) std::swap(src, target);
-    if (src[offset + length - 1] > src[rhs.offset]) {
-      mergeRec(src, target, offset, offset + length, rhs.offset,
-               rhs.offset + rhs.length, offset, std::less<T>());
-      inTmp = !inTmp;
-    }
-    length += rhs.length;
-  }
-};
-
-template <typename T, typename SizeTy>
-void radix_sort(T* input, SizeTy n) {
-  T* aux = new T[n];
-  SizeTy blockSize = std::max(n / tbb::this_task_arena::max_concurrency() / 4,
-                              static_cast<SizeTy>(kSeqThreshold / sizeof(T)));
-  SortedRange<T, SizeTy> result(input, aux);
-  tbb::parallel_reduce(tbb::blocked_range<SizeTy>(0, n, blockSize), result);
-  if (result.inTmp) copy(aux, aux + n, input);
-  delete[] aux;
-}
-
 template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type,
           typename Comp = decltype(std::less<T>())>
@@ -337,37 +574,8 @@ struct SortFunctor {
     return mergeSort(policy, first, last, std::less<T>());
   }
 };
-
-// stable_sort specialized with radix sort for integral types.
-// Typically faster than merge sort.
-template <typename Iterator, typename T>
-struct SortFunctor<
-    Iterator, T,
-    std::enable_if_t<
-        std::is_integral_v<T> &&
-        std::is_pointer_v<typename std::iterator_traits<Iterator>::pointer>>> {
-  void operator()(ExecutionPolicy policy, Iterator first, Iterator last) {
-    static_assert(
-        std::is_convertible_v<
-            typename std::iterator_traits<Iterator>::iterator_category,
-            std::random_access_iterator_tag>,
-        "You can only parallelize RandomAccessIterator.");
-    static_assert(std::is_trivially_destructible_v<T>,
-                  "Our simple implementation does not support types that are "
-                  "not trivially destructable.");
-#if (MANIFOLD_PAR == 1)
-    if (policy == ExecutionPolicy::Par) {
-      radix_sort(&*first, static_cast<size_t>(std::distance(first, last)));
-      return;
-    }
 #endif
-    stable_sort(policy, first, last, std::less<T>());
-  }
-};
-
 }  // namespace details
-
-#endif
 
 // Applies the function `f` to each element in the range `[first, last)`
 template <typename Iter, typename F>
@@ -421,8 +629,7 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
     // should we use deterministic reduce here?
     return tbb::this_task_arena::isolate([&]() {
       return tbb::parallel_reduce(
-          tbb::blocked_range<InputIter>(first, last, details::kSeqThreshold),
-          init,
+          tbb::blocked_range<InputIter>(first, last, kSeqThreshold), init,
           [&f](const tbb::blocked_range<InputIter>& range, T value) {
             return std::reduce(range.begin(), range.end(), value, f);
           },
@@ -669,7 +876,7 @@ void copy(ExecutionPolicy policy, InputIter first, InputIter last,
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<size_t>(
                             0, static_cast<size_t>(std::distance(first, last)),
-                            details::kSeqThreshold),
+                            kSeqThreshold),
                         [&](const tbb::blocked_range<size_t>& range) {
                           std::copy(first + range.begin(), first + range.end(),
                                     d_first + range.begin());
@@ -1158,4 +1365,34 @@ void sequence(Iterator first, Iterator last) {
   sequence(autoPolicy(first, last, 1e5), first, last);
 }
 
+template <typename I, typename KeyFn>
+void radix_sort_with_key(I start, I end, KeyFn keyfn) {
+  constexpr size_t MIN_BLOCK_SIZE = 2'000;
+  size_t n = std::distance(start, end);
+
+  if (n <= 5e4) {
+    manifold::stable_sort(
+        start, end, [&keyfn](auto a, auto b) { return keyfn(a) < keyfn(b); });
+    return;
+  }
+
+  unsigned int hardware_concurrency = 1;
+#if (MANIFOLD_PAR == 1)
+  hardware_concurrency = std::thread::hardware_concurrency();
+#endif
+  size_t blocks =
+      std::max(std::min(hardware_concurrency * 2,
+                        static_cast<unsigned int>(n / MIN_BLOCK_SIZE)),
+               1u);
+  size_t blockSize = std::ceil(static_cast<double>(n) / blocks);
+
+  using T = std::remove_reference_t<decltype(*start)>;
+  T* tmp = new T[std::distance(start, end)];
+  TaskGroup group;
+  details::radix_sort_with_key_rec(start, end, tmp,
+                                   sizeof(std::invoke_result_t<KeyFn, T>) - 1,
+                                   keyfn, blockSize, true, group);
+  group.wait();
+  delete[] tmp;
+}
 }  // namespace manifold

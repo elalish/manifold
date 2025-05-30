@@ -14,16 +14,16 @@
 
 static constexpr size_t g_Iterations = 5;
 static constexpr size_t g_IterationsDiscard = 1;
-static constexpr size_t g_Sizes[] = {1'000, 10'000, 100'000, 1'000'000,
-                                     10'000'000};
+static constexpr size_t g_Sizes[] = {1'000,   5'000,     10'000,    50'000,
+                                     100'000, 200'000, 500'000, 1'000'000 /*, 10'000'000*/};
 
 template <class Tp>
-inline void noopt(Tp const& value) {
+inline void noopt(Tp const &value) {
   asm volatile("" : : "r,m"(value) : "memory");
 }
 
 template <class Tp>
-inline void noopt(Tp& value) {
+inline void noopt(Tp &value) {
   asm volatile("" : "+r,m"(value) : : "memory");
 }
 
@@ -70,7 +70,7 @@ struct for_each {  // 25.6.4
     return measure([&] { v = std::vector<double>(size, 42.); },
                    [&] {
                      manifold::for_each(Policy, v.begin(), v.end(),
-                                        [](auto& e) { e += 1.; });
+                                        [](auto &e) { e += 1.; });
                      noopt(v);
                    });
   }
@@ -238,7 +238,11 @@ struct sort_Rnd_size {  // 25.8.2.1, semi-random input
                         [&dist, &mt] { return dist(mt); });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }
@@ -258,8 +262,7 @@ struct sort_Rnd_size_merge {  // 25.8.2.1, semi-random input
                         [&dist, &mt] { return dist(mt); });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end(),
-                                std::less<size_t>());
+          manifold::stable_sort(Policy, v.begin(), v.end());
           noopt(v);
         });
   }
@@ -283,7 +286,11 @@ struct sort_Eq_size {  // 25.8.2.1, equal input
     std::vector<size_t> v;
     return measure([&] { v = std::vector<size_t>(size, 42); },
                    [&] {
-                     manifold::stable_sort(Policy, v.begin(), v.end());
+                     if (Policy == manifold::ExecutionPolicy::Par)
+                       manifold::radix_sort_with_key(v.begin(), v.end(),
+                                                     [](auto x) { return x; });
+                     else
+                       std::stable_sort(v.begin(), v.end());
                      noopt(v);
                    });
   }
@@ -328,7 +335,11 @@ struct sort_Asc_size {  // 25.8.2.1, ascending
           std::iota(v.begin(), v.end(), 0);
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
           noopt(v);
         });
   }
@@ -358,7 +369,7 @@ struct sort_roughly_Asc {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<double>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -379,7 +390,7 @@ struct sort_roughly_Asc_size {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<size_t>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -387,7 +398,13 @@ struct sort_roughly_Asc_size {  // 25.8.2.1, ascending + random swaps
           }
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
+          if (!std::is_sorted(v.begin(), v.end()))
+            printf("wtf?\n");
           noopt(v);
         });
   }
@@ -400,7 +417,7 @@ struct sort_roughly_Asc_size_merge {  // 25.8.2.1, ascending + random swaps
     return measure(
         [&] {
           std::mt19937 mt{42};
-          std::uniform_int_distribution<size_t> dist{0, size - 1};
+          std::uniform_int_distribution<size_t> dist{size / 2, size - 1};
           v = std::vector<size_t>(size);
           std::iota(v.begin(), v.end(), 0.);
           for (int i = 0; i < std::sqrt(size); i++) {
@@ -408,8 +425,7 @@ struct sort_roughly_Asc_size_merge {  // 25.8.2.1, ascending + random swaps
           }
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end(),
-                                std::less<size_t>());
+          manifold::stable_sort(Policy, v.begin(), v.end());
           noopt(v);
         });
   }
@@ -447,7 +463,13 @@ struct sort_Des_size {  // 25.8.2.1, descending
                         });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end());
+          if (Policy == manifold::ExecutionPolicy::Par)
+            manifold::radix_sort_with_key(v.begin(), v.end(),
+                                          [](auto x) { return x; });
+          else
+            std::stable_sort(v.begin(), v.end());
+          if (!std::is_sorted(v.begin(), v.end()))
+            printf("wtf?\n");
           noopt(v);
         });
   }
@@ -466,8 +488,7 @@ struct sort_Des_size_merge {  // 25.8.2.1, descending
                         });
         },
         [&] {
-          manifold::stable_sort(Policy, v.begin(), v.end(),
-                                std::less<size_t>());
+          manifold::stable_sort(Policy, v.begin(), v.end());
           noopt(v);
         });
   }
@@ -517,7 +538,7 @@ struct exclusive_scan {  // 25.10.8
 
 template <class T>
 static std::string demangle() {
-  const char* name = typeid(T).name();
+  const char *name = typeid(T).name();
   char s[1024];
   size_t len = sizeof(s);
   int status;
@@ -545,45 +566,59 @@ Result record() {
   using Par = Benchmark<manifold::ExecutionPolicy::Par>;
   Result r;
   r.name = benchmarks::demangle<Seq>();
-  for (size_t i = 0; i != std::size(g_Sizes); ++i)
-    r.speedups[i] = micro(Seq{}(g_Sizes[i])) / micro(Par{}(g_Sizes[i]));
+  for (size_t i = 0; i != std::size(g_Sizes); ++i) {
+    double seq = 0;
+    double par = 0;
+    for (size_t j = 0; j < g_Iterations; j++) {
+      seq += micro(Seq{}(g_Sizes[i]));
+      if (j < g_IterationsDiscard)
+        seq = 0;
+    }
+    for (size_t j = 0; j < g_Iterations; j++) {
+      par += micro(Par{}(g_Sizes[i]));
+      if (j < g_IterationsDiscard)
+        par = 0;
+    }
+
+    r.speedups[i] = seq / par;
+  }
   return r;
 }
 
 int main() {
   std::vector<Result> results;
-  results.emplace_back(record<benchmarks::all_of>());
-  results.emplace_back(record<benchmarks::for_each>());
-  results.emplace_back(record<benchmarks::count>());
-  results.emplace_back(record<benchmarks::copy>());
-  results.emplace_back(record<benchmarks::copy_if_28>());
-  results.emplace_back(record<benchmarks::copy_if_55>());
-  results.emplace_back(record<benchmarks::copy_if_82>());
-  results.emplace_back(record<benchmarks::copy_if_1001>());
-  results.emplace_back(record<benchmarks::fill>());
-  results.emplace_back(record<benchmarks::sort_Rnd>());
+  // results.emplace_back(record<benchmarks::all_of>());
+  // results.emplace_back(record<benchmarks::for_each>());
+  // results.emplace_back(record<benchmarks::count>());
+  // results.emplace_back(record<benchmarks::copy>());
+  // results.emplace_back(record<benchmarks::copy_if_28>());
+  // results.emplace_back(record<benchmarks::copy_if_55>());
+  // results.emplace_back(record<benchmarks::copy_if_82>());
+  // results.emplace_back(record<benchmarks::copy_if_1001>());
+  // results.emplace_back(record<benchmarks::fill>());
+  // results.emplace_back(record<benchmarks::sort_Rnd>());
   results.emplace_back(record<benchmarks::sort_Rnd_size>());
-  results.emplace_back(record<benchmarks::sort_Rnd_size_merge>());
-  results.emplace_back(record<benchmarks::sort_Eq>());
+  // results.emplace_back(record<benchmarks::sort_Rnd_size_merge>());
+  // results.emplace_back(record<benchmarks::sort_Eq>());
   // we optimized it to a copy...
   // results.emplace_back(record<benchmarks::sort_Eq_size>());
-  results.emplace_back(record<benchmarks::sort_Eq_size_merge>());
-  results.emplace_back(record<benchmarks::sort_Asc>());
+  // results.emplace_back(record<benchmarks::sort_Eq_size_merge>());
+  // results.emplace_back(record<benchmarks::sort_Asc>());
   // optimized to a copy as well
   // results.emplace_back(record<benchmarks::sort_Asc_size>());
-  results.emplace_back(record<benchmarks::sort_Asc_size_merge>());
-  results.emplace_back(record<benchmarks::sort_roughly_Asc>());
+  // results.emplace_back(record<benchmarks::sort_Asc_size_merge>());
+  // results.emplace_back(record<benchmarks::sort_roughly_Asc>());
   results.emplace_back(record<benchmarks::sort_roughly_Asc_size>());
-  results.emplace_back(record<benchmarks::sort_roughly_Asc_size_merge>());
-  results.emplace_back(record<benchmarks::sort_Des>());
+  // results.emplace_back(record<benchmarks::sort_roughly_Asc_size_merge>());
+  // results.emplace_back(record<benchmarks::sort_Des>());
   results.emplace_back(record<benchmarks::sort_Des_size>());
-  results.emplace_back(record<benchmarks::sort_Des_size_merge>());
-  results.emplace_back(record<benchmarks::reduce>());
-  results.emplace_back(record<benchmarks::transform_reduce>());
-  results.emplace_back(record<benchmarks::exclusive_scan>());
+  // results.emplace_back(record<benchmarks::sort_Des_size_merge>());
+  // results.emplace_back(record<benchmarks::reduce>());
+  // results.emplace_back(record<benchmarks::transform_reduce>());
+  // results.emplace_back(record<benchmarks::exclusive_scan>());
 
   const auto max_name_len =
-      std::max_element(results.begin(), results.end(), [](auto& a, auto& b) {
+      std::max_element(results.begin(), results.end(), [](auto &a, auto &b) {
         return a.name.length() < b.name.length();
       })->name.length();
 
@@ -596,9 +631,10 @@ int main() {
   }
   printf("\n");
 
-  for (auto& r : results) {
+  for (auto &r : results) {
     printf("%-*s ", int(max_name_len), r.name.c_str());
     for (auto v : r.speedups) printf("%5.2f ", v);
     printf("\n");
   }
 }
+
