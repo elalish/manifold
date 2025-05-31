@@ -43,6 +43,19 @@
  */
 
 namespace manifold {
+struct UnionFindKeyValue {
+  uint32_t key;
+  int value;
+  bool operator==(const UnionFindKeyValue& other) const {
+    return key == other.key;
+  }
+  bool operator!=(const UnionFindKeyValue& other) const {
+    return key != other.key;
+  }
+  bool operator<(const UnionFindKeyValue& other) const {
+    return key < other.key;
+  }
+};
 
 /** @ingroup Private */
 class Boolean3 {
@@ -54,8 +67,10 @@ class Boolean3 {
   const Manifold::Impl &inP_, &inQ_;
   const double expandP_;
   Vec<std::array<int, 2>> p1q2_, p2q1_;
-  Vec<int> x12_, x21_, w03_, w30_;
+  Vec<int> x12_, x21_;
+  Vec<UnionFindKeyValue> w03_, w30_;
   Vec<vec3> v12_, v21_;
+  DisjointSets uP, uQ;
   bool valid = true;
 };
 }  // namespace manifold

@@ -15,6 +15,7 @@
 #include "boolean3.h"
 
 #include <limits>
+#include <set>
 
 #include "parallel.h"
 
@@ -407,12 +408,15 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   p1q2 = std::move(result.p1q2_);
   auto x12 = std::move(result.x12_);
   auto v12 = std::move(result.v12_);
-  // sort p1q2
+  // sort p1q2 according to edges
   Vec<size_t> i12(p1q2.size());
   sequence(i12.begin(), i12.end());
+
+  int index = forward ? 0 : 1;
   stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
-    return p1q2[a][0] < p1q2[b][0] ||
-           (p1q2[a][0] == p1q2[b][0] && p1q2[a][1] < p1q2[b][1]);
+    return p1q2[a][index] < p1q2[b][index] ||
+           (p1q2[a][index] == p1q2[b][index] &&
+            p1q2[a][1 - index] < p1q2[b][1 - index]);
   });
   Permute(p1q2, i12);
   Permute(x12, i12);
@@ -420,30 +424,82 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   return std::make_tuple(x12, v12);
 };
 
-Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   double expandP, bool forward) {
-  ZoneScoped;
-  // verts that are not shadowed (not in p0q2) have winding number zero.
-  // a: 0 (vertex), b: 2 (face)
+// TODO: maybe use std::unordered_map?
+Vec<UnionFindKeyValue> Winding03(const Manifold::Impl& inP,
+                                 const Manifold::Impl& inQ,
+                                 const VecView<std::array<int, 2>> p1q2,
+                                 DisjointSets& uF, double expandP,
+                                 bool forward) {
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
-  Vec<int> w03(a.NumVert(), 0);
+  Vec<int> brokenHalfedges;
+  int index = forward ? 0 : 1;
+
+  for_each(autoPolicy(a.halfedge_.size()), countAt(0),
+           countAt(a.halfedge_.size()), [&](size_t edge) {
+             const Halfedge& he = a.halfedge_[edge];
+             if (!he.IsForward()) return;
+             // check if the edge is broken
+             auto it = std::lower_bound(
+                 p1q2.begin(), p1q2.end(), edge,
+                 [index](const std::array<int, 2>& a, size_t e) {
+                   return a[index] < static_cast<int>(e);
+                 });
+             if (it == p1q2.end() || (*it)[index] != static_cast<int>(edge))
+               uF.unite(he.startVert, he.endVert);
+           });
+
+  // find components, the hope is the number of components should be small
+  std::set<UnionFindKeyValue> components;
+#if (MANIFOLD_PAR == 1)
+  if (a.vertPos_.size() > 1e5) {
+    tbb::combinable<std::set<UnionFindKeyValue>> componentsShared;
+    for_each(
+        autoPolicy(a.vertPos_.size()), countAt(0), countAt(a.vertPos_.size()),
+        [&](int v) {
+          componentsShared.local().insert(UnionFindKeyValue{uF.find(v), v});
+        });
+    componentsShared.combine_each([&](const std::set<UnionFindKeyValue>& data) {
+      components.insert(data.begin(), data.end());
+    });
+  } else
+#endif
+  {
+    for (int v = 0; v < static_cast<int>(a.vertPos_.size()); v++)
+      components.insert(UnionFindKeyValue{uF.cfind(v), v});
+  }
+  Vec<UnionFindKeyValue> w03;
+  w03.reserve(components.size());
+  for (const auto& component : components) w03.push_back(component);
+
+  Vec<int> verts(w03.size());
+  for (size_t i = 0; i < w03.size(); ++i) {
+    verts[i] = w03[i].value;
+    w03[i].value = 0;
+  }
+
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
-  auto f = [&](int a, int b) {
-    const auto [s02, z02] = k02(a, b);
-    if (std::isfinite(z02)) AtomicAdd(w03[a], s02 * (!forward ? -1 : 1));
+  auto recorderf = [&](int i, int b) {
+    const auto [s02, z02] = k02(verts[i], b);
+    if (std::isfinite(z02)) w03[i].value += s02 * (!forward ? -1 : 1);
   };
-  auto recorder = MakeSimpleRecorder(f);
-  b.collider_.Collisions<false>(a.vertPos_.cview(), recorder);
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&](int i) { return a.vertPos_[verts[i]]; };
+  b.collider_.Collisions<false, decltype(f), decltype(recorder)>(f, w03.size(),
+                                                                 recorder);
   return w03;
-};
+}
 }  // namespace
 
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    OpType op)
-    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add ? 1.0 : -1.0) {
+    : inP_(inP),
+      inQ_(inQ),
+      expandP_(op == OpType::Add ? 1.0 : -1.0),
+      uP(inP.NumVert()),
+      uQ(inQ.NumVert()) {
   // Symbolic perturbation:
   // Union -> expand inP
   // Difference, Intersection -> contract inP
@@ -452,8 +508,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
-    w03_.resize(inP.NumVert(), 0);
-    w30_.resize(inQ.NumVert(), 0);
+    w03_.resize(0);
+    w30_.resize(0);
     return;
   }
 
@@ -477,9 +533,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return;
   }
 
-  // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, inQ, expandP_, true);
-  w30_ = Winding03(inP, inQ, expandP_, false);
+  w03_ = Winding03(inP, inQ, p1q2_, uP, expandP_, true);
+  w30_ = Winding03(inP, inQ, p2q1_, uQ, expandP_, false);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
