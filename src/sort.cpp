@@ -254,15 +254,24 @@ void Manifold::Impl::Finish() {
 void Manifold::Impl::SortVerts() {
   ZoneScoped;
   const auto numVert = NumVert();
-  Vec<uint32_t> vertMorton(numVert);
+  Vec<uint32_t> vertMorton;
+  Vec<int> vertNew2Old;
   auto policy = autoPolicy(numVert, 1e5);
-  for_each_n(policy, countAt(0), numVert, [this, &vertMorton](const int vert) {
-    vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
+
+  TaskGroup group;
+  group.run([&] {
+    vertMorton.resize(numVert);
+    for_each_n(policy, countAt(0), numVert,
+               [this, &vertMorton](const int vert) {
+                 vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
+               });
+  });
+  group.run([&] {
+    vertNew2Old.resize(numVert);
+    sequence(vertNew2Old.begin(), vertNew2Old.end());
   });
 
-  Vec<int> vertNew2Old(numVert);
-  sequence(vertNew2Old.begin(), vertNew2Old.end());
-
+  group.wait();
   radix_sort_with_key(vertNew2Old.begin(), vertNew2Old.end(),
                       [&vertMorton](const int i) { return vertMorton[i]; });
   ReindexVerts(vertNew2Old, numVert);
@@ -277,11 +286,12 @@ void Manifold::Impl::SortVerts() {
       vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
-  Permute(vertPos_, vertNew2Old);
 
-  if (vertNormal_.size() == numVert) {
-    Permute(vertNormal_, vertNew2Old);
-  }
+  group.run([&] { Permute(vertPos_, vertNew2Old); });
+
+  if (vertNormal_.size() == numVert)
+    group.run([&] { Permute(vertNormal_, vertNew2Old); });
+  group.wait();
 }
 
 /**
@@ -401,9 +411,11 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
       faceNew2Old.begin();
   faceNew2Old.resize(newNumTri);
 
-  Permute(faceMorton, faceNew2Old);
-  Permute(faceBox, faceNew2Old);
-  GatherFaces(faceNew2Old);
+  TaskGroup group;
+  group.run([&]() { Permute(faceMorton, faceNew2Old); });
+  group.run([&]() { Permute(faceBox, faceNew2Old); });
+  group.run([&]() { GatherFaces(faceNew2Old, group); });
+  group.wait();
 }
 
 /**
@@ -411,23 +423,34 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
+                                 TaskGroup& group) {
   ZoneScoped;
   const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
-    Permute(meshRelation_.triRef, faceNew2Old);
-  if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
+    group.run([&]() { Permute(meshRelation_.triRef, faceNew2Old); });
+  if (faceNormal_.size() == NumTri())
+    group.run([&]() { Permute(faceNormal_, faceNew2Old); });
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
   Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
-  Vec<int> faceOld2New(oldHalfedge.size() / 3);
-  auto policy = autoPolicy(numTri, 1e5);
-  scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
-          faceOld2New.begin());
 
-  halfedge_.resize_nofill(3 * numTri);
-  if (oldHalfedgeTangent.size() != 0)
-    halfedgeTangent_.resize_nofill(3 * numTri);
+  TaskGroup subgroup;
+  auto policy = autoPolicy(numTri, 1e5);
+
+  Vec<int> faceOld2New;
+  subgroup.run([&]() {
+    faceOld2New.resize_nofill(oldHalfedge.size() / 3);
+    scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),
+            faceOld2New.begin());
+  });
+  subgroup.run([&]() { halfedge_.resize_nofill(3 * numTri); });
+  subgroup.run([&]() {
+    if (oldHalfedgeTangent.size() != 0)
+      halfedgeTangent_.resize_nofill(3 * numTri);
+  });
+
+  subgroup.wait();
   for_each_n(policy, countAt(0), numTri,
              ReindexFace({halfedge_, halfedgeTangent_, oldHalfedge,
                           oldHalfedgeTangent, faceNew2Old, faceOld2New}));

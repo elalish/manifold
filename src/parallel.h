@@ -135,6 +135,8 @@ void radix_sort_shuffle(I start, J dest, size_t n, size_t k,
                         ByteGetter<KeyFn>& getByte,
                         std::array<size_t, 256>& hist,
                         std::array<size_t, 256>& buffer) {
+  // for (size_t i = 0; i < n; ++i)
+  //   dest[hist[getByte(start + i, k)]++] = start[i];
   size_t i = 0;
   int bufferEnd = 0;
   while (i < n) {

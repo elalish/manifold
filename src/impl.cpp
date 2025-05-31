@@ -147,6 +147,10 @@ int GetLabels(std::vector<int>& components,
 
 namespace manifold {
 
+#if (MANIFOLD_PAR == 1)
+tbb::task_arena gc_arena(1, 1, tbb::task_arena::priority::low);
+#endif
+
 std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
 uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
@@ -359,12 +363,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
-  halfedge_.clear(true);
-  halfedge_.resize_nofill(numHalfedge);
   Vec<uint64_t> edge;
-  edge.resize_nofill(numHalfedge);
   Vec<int> ids;
-  ids.resize_nofill(numHalfedge);
+  TaskGroup group;
+  group.run([&]() {
+    halfedge_.clear(true);
+    halfedge_.resize_nofill(numHalfedge);
+  });
+  group.run([&]() { edge.resize_nofill(numHalfedge); });
+  group.run([&]() { ids.resize_nofill(numHalfedge); });
+  group.wait();
   auto policy = autoPolicy(numTri, 1e5);
   for_each_n(policy, countAt(0), numTri,
              [this, &triProp, &triVert, &edge, &ids](const int tri) {
@@ -519,55 +527,69 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.MakeEmpty(Error::NonFiniteVertex);
     return result;
   }
-  result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
-  result.properties_ = properties_;
   result.bBox_ = bBox_;
-  result.halfedge_ = halfedge_;
-  result.halfedgeTangent_.resize(halfedgeTangent_.size());
 
   result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
     m.second.transform = transform_ * Mat4(m.second.transform);
   }
 
-  result.vertPos_.resize(NumVert());
-  result.faceNormal_.resize(faceNormal_.size());
-  result.vertNormal_.resize(vertNormal_.size());
-  transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
-            Transform4x3({transform_}));
-
-  mat3 normalTransform = NormalTransform(transform_);
-  transform(faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
-            TransformNormals({normalTransform}));
-  transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
-            TransformNormals({normalTransform}));
-
   const bool invert = la::determinant(mat3(transform_)) < 0;
+  mat3 normalTransform = NormalTransform(transform_);
 
-  if (halfedgeTangent_.size() > 0) {
-    for_each_n(policy, countAt(0), halfedgeTangent_.size(),
-               TransformTangents({result.halfedgeTangent_, 0, mat3(transform_),
-                                  invert, halfedgeTangent_, halfedge_}));
+  TaskGroup group;
+  group.run([&]() { result.properties_ = properties_; });
+  group.run([&]() { result.collider_ = collider_; });
+  group.run([&]() {
+    result.halfedge_ = halfedge_;
+    if (invert) {
+      for_each_n(policy, countAt(0), result.NumTri(),
+                 FlipTris({result.halfedge_}));
+    }
+  });
+  group.run([&]() {
+    result.vertPos_.resize_nofill(NumVert());
+    transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
+              Transform4x3({transform_}));
+  });
+  group.run([&]() {
+    result.faceNormal_.resize_nofill(faceNormal_.size());
+    transform(faceNormal_.begin(), faceNormal_.end(),
+              result.faceNormal_.begin(), TransformNormals({normalTransform}));
+  });
+  group.run([&]() {
+    result.vertNormal_.resize_nofill(vertNormal_.size());
+    transform(vertNormal_.begin(), vertNormal_.end(),
+              result.vertNormal_.begin(), TransformNormals({normalTransform}));
+  });
+
+  if (halfedgeTangent_.size() > 0)
+    group.run([&]() {
+      result.halfedgeTangent_.resize_nofill(halfedgeTangent_.size());
+      for_each_n(
+          policy, countAt(0), halfedgeTangent_.size(),
+          TransformTangents({result.halfedgeTangent_, 0, mat3(transform_),
+                             invert, halfedgeTangent_, halfedge_}));
+    });
+  group.wait();
+
+  {
+    ZoneScopedN("UpdateCollider");
+    // This optimization does a cheap collider update if the transform is
+    // axis-aligned.
+    // if (!result.collider_.Transform(transform_))
+    result.Update();
+
+    result.CalculateBBox();
+    // Scale epsilon by the norm of the 3x3 portion of the transform.
+    result.epsilon_ *= SpectralNorm(mat3(transform_));
+    // Maximum of inherited epsilon loss and translational epsilon loss.
+    result.SetEpsilon(result.epsilon_);
   }
-
-  if (invert) {
-    for_each_n(policy, countAt(0), result.NumTri(),
-               FlipTris({result.halfedge_}));
-  }
-
-  // This optimization does a cheap collider update if the transform is
-  // axis-aligned.
-  if (!result.collider_.Transform(transform_)) result.Update();
-
-  result.CalculateBBox();
-  // Scale epsilon by the norm of the 3x3 portion of the transform.
-  result.epsilon_ *= SpectralNorm(mat3(transform_));
-  // Maximum of inherited epsilon loss and translational epsilon loss.
-  result.SetEpsilon(result.epsilon_);
   return result;
 }
 
@@ -598,10 +620,14 @@ void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
  */
 void Manifold::Impl::CalculateNormals() {
   ZoneScoped;
-  vertNormal_.resize(NumVert());
+  TaskGroup group;
+  group.run([&]() {
+    vertNormal_.resize_nofill(NumVert());
+  });
   auto policy = autoPolicy(NumTri());
 
-  std::vector<std::atomic<int>> vertHalfedgeMap(NumVert());
+  Vec<std::atomic<int>> vertHalfedgeMap;
+  vertHalfedgeMap.init_nofill(NumVert());
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
     vertHalfedgeMap[vert] = std::numeric_limits<int>::max();
   });
@@ -613,7 +639,7 @@ void Manifold::Impl::CalculateNormals() {
       if (old < value) break;
   };
   if (faceNormal_.size() != NumTri()) {
-    faceNormal_.resize(NumTri());
+    faceNormal_.resize_nofill(NumTri());
     for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
       vec3& triNormal = faceNormal_[face];
       if (halfedge_[3 * face].startVert < 0) {
@@ -641,6 +667,7 @@ void Manifold::Impl::CalculateNormals() {
                [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
   }
 
+  group.wait();
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
     int firstEdge = vertHalfedgeMap[vert].load();
     // not referenced

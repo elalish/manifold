@@ -326,7 +326,6 @@ struct Kernel12Tmp {
 struct Kernel12Recorder {
   using Local = Kernel12Tmp;
   Kernel12& k12;
-  VecView<const TmpEdge> tmpedges;
   bool forward;
 
 #if MANIFOLD_PAR == 1
@@ -338,7 +337,6 @@ struct Kernel12Recorder {
 #endif
 
   void record(int queryIdx, int leafIdx, Local& tmp) {
-    queryIdx = tmpedges[queryIdx].halfedgeIdx;
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
@@ -394,15 +392,15 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   Kernel11 k11{inP.vertPos_,  inQ.vertPos_, inP.halfedge_,
                inQ.halfedge_, expandP,      inP.vertNormal_};
 
-  Vec<TmpEdge> tmpedges = CreateTmpEdges(a.halfedge_);
-  Vec<Box> AEdgeBB(tmpedges.size());
-  for_each_n(autoPolicy(tmpedges.size(), 1e5), countAt(0), tmpedges.size(),
+  Vec<Box> AEdgeBB(a.halfedge_.size());
+  for_each_n(autoPolicy(a.halfedge_.size(), 1e5), countAt(0), a.halfedge_.size(),
              [&](const int e) {
-               AEdgeBB[e] = Box(a.vertPos_[tmpedges[e].first],
-                                a.vertPos_[tmpedges[e].second]);
+               int start = a.halfedge_[e].startVert;
+               int end = a.halfedge_[e].endVert;
+               AEdgeBB[e] = start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
              });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
+  Kernel12Recorder recorder{k12, forward, {}};
 
   b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
                                                        recorder);
@@ -412,7 +410,8 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   auto x12 = std::move(result.x12_);
   auto v12 = std::move(result.v12_);
   // sort p1q2
-  Vec<size_t> i12(p1q2.size());
+  Vec<size_t> i12;
+  i12.resize_nofill(p1q2.size());
   sequence(i12.begin(), i12.end());
   radix_sort_with_key(i12.begin(), i12.end(), [&](size_t i) {
     return (static_cast<uint64_t>(p1q2[i][0]) << 32) |

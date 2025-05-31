@@ -326,7 +326,7 @@ struct Manifold::Impl {
   void CompactProps();
   void GetFaceBoxMorton(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) const;
   void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
-  void GatherFaces(const Vec<int>& faceNew2Old);
+  void GatherFaces(const Vec<int>& faceNew2Old, TaskGroup &group);
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
 
   // face_op.cpp

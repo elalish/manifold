@@ -26,6 +26,10 @@
 
 namespace manifold {
 
+#if (MANIFOLD_PAR == 1)
+extern tbb::task_arena gc_arena;
+#endif
+
 template <typename T>
 class Vec;
 
@@ -92,8 +96,7 @@ class Vec : public VecView<T> {
 
   ~Vec() {
     if (this->ptr_ != nullptr) {
-      TracyFreeS(this->ptr_, 3);
-      free(this->ptr_);
+      free_async(this->ptr_);
     }
     this->ptr_ = nullptr;
     this->size_ = 0;
@@ -103,8 +106,7 @@ class Vec : public VecView<T> {
   Vec<T>& operator=(const Vec<T>& other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
-      TracyFreeS(this->ptr_, 3);
-      free(this->ptr_);
+      free_async(this->ptr_);
     }
     this->size_ = other.size_;
     capacity_ = other.size_;
@@ -120,8 +122,7 @@ class Vec : public VecView<T> {
   Vec<T>& operator=(Vec<T>&& other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
-      TracyFreeS(this->ptr_, 3);
-      free(this->ptr_);
+      free_async(this->ptr_);
     }
     this->size_ = other.size_;
     capacity_ = other.capacity_;
@@ -166,8 +167,7 @@ class Vec : public VecView<T> {
         manifold::copy(autoPolicy(this->size_), this->ptr_,
                        this->ptr_ + this->size_, newBuffer);
       if (this->ptr_ != nullptr) {
-        TracyFreeS(this->ptr_, 3);
-        free(this->ptr_);
+        free_async(this->ptr_);
       }
       this->ptr_ = newBuffer;
       capacity_ = n;
@@ -183,6 +183,14 @@ class Vec : public VecView<T> {
     }
     this->size_ = newSize;
     if (shrink) shrink_to_fit();
+  }
+
+  void init_nofill(size_t size) {
+    this->ptr_ = reinterpret_cast<T*>(malloc(size * sizeof(T)));
+    ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+    TracyAllocS(this->ptr_, size * sizeof(T), 3);
+    this->size_ = size;
+    this->capacity_ = size;
   }
 
   void resize_nofill(size_t newSize) {
@@ -208,8 +216,7 @@ class Vec : public VecView<T> {
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }
     if (this->ptr_ != nullptr) {
-      TracyFreeS(this->ptr_, 3);
-      free(this->ptr_);
+      free_async(this->ptr_);
     }
     this->ptr_ = newBuffer;
     capacity_ = this->size_;
@@ -221,5 +228,14 @@ class Vec : public VecView<T> {
   size_t capacity_ = 0;
 
   static_assert(std::is_trivially_destructible<T>::value);
+
+  static void free_async(T* ptr) {
+    TracyFreeS(ptr, 3);
+#if (MANIFOLD_PAR == 1)
+    gc_arena.enqueue([ptr]() { free(ptr); });
+#else
+    free(ptr);
+#endif
+  }
 };
 }  // namespace manifold
