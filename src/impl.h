@@ -167,8 +167,10 @@ struct Manifold::Impl {
       runIndex.push_back(runEnd);
     }
 
-    const auto startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
     auto runOriginalID = meshGL.runOriginalID;
+    const auto startID = runOriginalID.empty()
+                             ? 0
+                             : Impl::ReserveIDs(meshGL.runOriginalID.size());
     if (runOriginalID.empty()) {
       runOriginalID.push_back(startID);
     }
@@ -283,7 +285,7 @@ struct Manifold::Impl {
   void MarkCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(bool keepFaceID = false);
+  void InitializeOriginal(int id = 0, bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateNormals();
