@@ -326,7 +326,6 @@ struct Kernel12Tmp {
 struct Kernel12Recorder {
   using Local = Kernel12Tmp;
   Kernel12& k12;
-  VecView<const TmpEdge> tmpedges;
   bool forward;
 
 #if MANIFOLD_PAR == 1
@@ -338,7 +337,6 @@ struct Kernel12Recorder {
 #endif
 
   void record(int queryIdx, int leafIdx, Local& tmp) {
-    queryIdx = tmpedges[queryIdx].halfedgeIdx;
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
@@ -394,18 +392,16 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   Kernel11 k11{inP.vertPos_,  inQ.vertPos_, inP.halfedge_,
                inQ.halfedge_, expandP,      inP.vertNormal_};
 
-  Vec<TmpEdge> tmpedges = CreateTmpEdges(a.halfedge_);
-  Vec<Box> AEdgeBB(tmpedges.size());
-  for_each_n(autoPolicy(tmpedges.size(), 1e5), countAt(0), tmpedges.size(),
-             [&](const int e) {
-               AEdgeBB[e] = Box(a.vertPos_[tmpedges[e].first],
-                                a.vertPos_[tmpedges[e].second]);
-             });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
-
-  b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
-                                                       recorder);
+  Kernel12Recorder recorder{k12, forward, {}};
+  auto f = [&a](int i) {
+    return a.halfedge_[i].IsForward()
+               ? Box(a.vertPos_[a.halfedge_[i].startVert],
+                     a.vertPos_[a.halfedge_[i].endVert])
+               : Box();
+  };
+  b.collider_.Collisions<false, decltype(f), Kernel12Recorder>(
+      f, a.halfedge_.size(), recorder);
 
   Kernel12Tmp result = recorder.get();
   p1q2 = std::move(result.p1q2_);
