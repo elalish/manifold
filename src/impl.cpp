@@ -135,10 +135,10 @@ struct UpdateMeshID {
 
 int GetLabels(std::vector<int>& components,
               const Vec<std::pair<int, int>>& edges, int numNodes) {
-  UnionFind<> uf(numNodes);
+  DisjointSets uf(numNodes);
   for (auto edge : edges) {
     if (edge.first == -1 || edge.second == -1) continue;
-    uf.unionXY(edge.first, edge.second);
+    uf.unite(edge.first, edge.second);
   }
 
   return uf.connectedComponents(components);
