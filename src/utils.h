@@ -156,15 +156,6 @@ class DisjointSets {
     return id;
   }
 
-  uint32_t cfind(uint32_t id) const {
-    while (id != parent(id)) {
-      uint64_t value = mData[id];
-      uint32_t new_parent = parent((uint32_t)value);
-      id = new_parent;
-    }
-    return id;
-  }
-
   bool same(uint32_t id1, uint32_t id2) const {
     for (;;) {
       id1 = find(id1);
@@ -221,7 +212,7 @@ class DisjointSets {
     for (size_t i = 0; i < mData.size(); ++i) {
       // we optimize for connected component of size 1
       // no need to put them into the hashmap
-      auto iParent = cfind(i);
+      auto iParent = find(i);
       if (rank(iParent) == 0) {
         components[i] = static_cast<int>(toLabel.size()) + lonelyNodes++;
         continue;

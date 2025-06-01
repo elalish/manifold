@@ -463,7 +463,7 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #endif
   {
     for (size_t v = 0; v < a.vertPos_.size(); v++)
-      components.insert(uA.cfind(v));
+      components.insert(uA.find(v));
   }
   Vec<int> verts;
   verts.reserve(components.size());
@@ -483,7 +483,7 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
            [&](size_t i) {
-             size_t root = uA.cfind(i);
+             size_t root = uA.find(i);
              if (root == i) return;
              w03[i] = w03[root];
            });
