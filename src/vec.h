@@ -222,13 +222,14 @@ class Vec : public VecView<T> {
   static_assert(std::is_trivially_destructible<T>::value);
 
   static void free_async(T* ptr, size_t size) {
-    TracyFreeS(ptr, 3);
-    // only do async free if the size is large, because otherwise we may be able
+    // Only do async free if the size is large, because otherwise we may be able
     // to reuse the allocation, and the deallocation probably won't trigger
     // munmap.
-    // Currently it is set to 64 pages.
+    // Currently it is set to 64 pages (4kB page).
+    constexpr size_t ASYNC_FREE_THRESHOLD = 1 << 18;
+    TracyFreeS(ptr, 3);
 #if (MANIFOLD_PAR == 1)
-    if (size * sizeof(T) > 1 << 18)
+    if (size * sizeof(T) > ASYNC_FREE_THRESHOLD)
       gc_arena.enqueue([ptr]() { free(ptr); });
     else
 #endif
