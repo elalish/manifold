@@ -663,6 +663,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
 }
 
 void ReorderHalfedges(VecView<Halfedge>& halfedges) {
+  ZoneScoped;
   // halfedges in the same face are added in non-deterministic order, so we have
   // to reorder them for determinism
 
@@ -744,33 +745,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Convert winding numbers to inclusion values based on operation type.
   Vec<int> i12(x12_.size());
   Vec<int> i21(x21_.size());
-  Vec<int> i03(inP_.NumVert());
-  Vec<int> i30(inQ_.NumVert());
+  Vec<int> i03(w03_.size());
+  Vec<int> i30(w30_.size());
 
   transform(x12_.begin(), x12_.end(), i12.begin(),
             [c3](int v) { return c3 * v; });
   transform(x21_.begin(), x21_.end(), i21.begin(),
             [c3](int v) { return c3 * v; });
-
-  if (w03_.empty())
-    fill(i03.begin(), i03.end(), c1);
-  else
-    transform(
-        countAt(0), countAt(i03.size()), i03.begin(), [c1, c3, this](int v) {
-          return c1 + c3 * std::lower_bound(w03_.begin(), w03_.end(),
-                                            UnionFindKeyValue{uP.cfind(v), 0})
-                               ->value;
-        });
-
-  if (w30_.empty())
-    fill(i30.begin(), i30.end(), c2);
-  else
-    transform(
-        countAt(0), countAt(i30.size()), i30.begin(), [c2, c3, this](int v) {
-          return c2 + c3 * std::lower_bound(w30_.begin(), w30_.end(),
-                                            UnionFindKeyValue{uQ.cfind(v), 0})
-                               ->value;
-        });
+  transform(w03_.begin(), w03_.end(), i03.begin(),
+            [c1, c3](int v) { return c1 + c3 * v; });
+  transform(w30_.begin(), w30_.end(), i30.begin(),
+            [c2, c3](int v) { return c2 + c3 * v; });
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
