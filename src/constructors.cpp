@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "csg_tree.h"
+#include "disjoint_sets.h"
 #include "impl.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"

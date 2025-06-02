@@ -21,6 +21,7 @@
 #include <optional>
 
 #include "csg_tree.h"
+#include "disjoint_sets.h"
 #include "hashtable.h"
 #include "manifold/optional_assert.h"
 #include "mesh_fixes.h"

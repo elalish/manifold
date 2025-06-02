@@ -17,6 +17,7 @@
 #include <limits>
 #include <unordered_set>
 
+#include "disjoint_sets.h"
 #include "parallel.h"
 
 #if (MANIFOLD_PAR == 1)

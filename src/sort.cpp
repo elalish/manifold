@@ -15,6 +15,7 @@
 #include <atomic>
 #include <set>
 
+#include "disjoint_sets.h"
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
