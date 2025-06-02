@@ -436,16 +436,16 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
-           countAt(a.halfedge_.size()), [&](size_t edge) {
+           countAt(a.halfedge_.size()), [&](int edge) {
              const Halfedge& he = a.halfedge_[edge];
              if (!he.IsForward()) return;
              // check if the edge is broken
              auto it = std::lower_bound(
                  p1q2.begin(), p1q2.end(), edge,
-                 [index](const std::array<int, 2>& a, size_t e) {
-                   return a[index] < static_cast<int>(e);
+                 [index](const std::array<int, 2>& collisionPair, int e) {
+                   return collisionPair[index] < e;
                  });
-             if (it == p1q2.end() || (*it)[index] != static_cast<int>(edge))
+             if (it == p1q2.end() || (*it)[index] != edge)
                uA.unite(he.startVert, he.endVert);
            });
 
