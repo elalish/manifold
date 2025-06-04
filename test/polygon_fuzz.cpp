@@ -101,11 +101,6 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
                  InRange<float>(-1.0, 0.1))
     .WithSeeds(SeedProvider);
 
-static std::vector<TestCase> TestCases;
-void TestPoly(Polygons polys, int _unused, float precision = -1.0) {
-  TestCases.push_back({polys, precision});
-}
-
 std::vector<TestCase> SeedProvider() {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
