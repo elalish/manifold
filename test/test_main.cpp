@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#include <filesystem>
 
 #include "manifold/manifold.h"
 #include "test.h"
 
-#ifdef MANIFOLD_EXPORT
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <fstream>
 #endif
 
@@ -53,7 +54,7 @@ void print_usage() {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
-  const char* name = "test setup";
+  [[maybe_unused]] const char* name = "test setup";
   FrameMarkStart(name);
 
   // warmup tbb for emscripten, according to
@@ -463,7 +464,6 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
 }
 
 void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
-  bool verbose = true;
   EXPECT_EQ(mgl1.NumVert(), mgl2.NumVert());
   EXPECT_EQ(mgl1.NumTri(), mgl2.NumTri());
   EXPECT_EQ(mgl1.numProp, mgl2.numProp);
@@ -497,13 +497,17 @@ MeshGL ReadMesh(const std::string& filename) {
   std::string dir = file.substr(0, file.rfind('/'));
   return ImportMesh(dir + "/models/" + filename);
 }
+#endif
 
-Manifold ReadMesh64(const std::string& filename) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
+#ifdef MANIFOLD_DEBUG
+Manifold ReadTestOBJ(const std::string& filename) {
+  std::filesystem::path file(__FILE__);
+  std::filesystem::path obj = file.parent_path();
+  obj.append("models");
+  obj.append(filename);
   std::ifstream f;
-  f.open(dir + "/models/" + filename);
-  Manifold a = Manifold::ImportMeshGL64(f);
+  f.open(obj);
+  Manifold a = Manifold::ReadOBJ(f);
   f.close();
   return a;
 }

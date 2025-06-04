@@ -131,7 +131,7 @@ TEST(CrossSection, Transform) {
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](vec2 &v) {
+  auto b = sq.Warp([](vec2& v) {
     v.x = v.x * 2 + 4;
     v.y = v.y * 3 + 5;
   });
@@ -220,4 +220,29 @@ TEST(CrossSection, HullError) {
   auto rr_verts = rr.NumVert();
   EXPECT_FLOAT_EQ(rr_area, 1765.1790375559026);
   EXPECT_FLOAT_EQ(rr_verts, 40);
+}
+
+TEST(CrossSection, BatchBoolean) {
+  CrossSection square = CrossSection::Square({100, 100});
+  CrossSection circle1 = CrossSection::Circle(30, 30).Translate({-10, 30});
+  CrossSection circle2 = CrossSection::Circle(20, 30).Translate({110, 20});
+  CrossSection circle3 = CrossSection::Circle(40, 30).Translate({50, 110});
+
+  CrossSection intersect = CrossSection::BatchBoolean(
+      {square, circle1, circle2, circle3}, OpType::Intersect);
+
+  EXPECT_FLOAT_EQ(intersect.Area(), 0);
+  EXPECT_FLOAT_EQ(intersect.NumVert(), 0);
+
+  CrossSection add = CrossSection::BatchBoolean(
+      {square, circle1, circle2, circle3}, OpType::Add);
+
+  CrossSection subtract = CrossSection::BatchBoolean(
+      {square, circle1, circle2, circle3}, OpType::Subtract);
+
+  EXPECT_FLOAT_EQ(add.Area(), 16278.637002);
+  EXPECT_FLOAT_EQ(add.NumVert(), 66);
+
+  EXPECT_FLOAT_EQ(subtract.Area(), 7234.478452);
+  EXPECT_FLOAT_EQ(subtract.NumVert(), 42);
 }

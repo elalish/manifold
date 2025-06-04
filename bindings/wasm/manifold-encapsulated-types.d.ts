@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param epsilon The value of epsilon, bounding the uncertainty of the input
+ * @param epsilon The value of epsilon, bounding the uncertainty of the input.
+ * @param allowConvex If true (default), the triangulator will use a fast
+ * triangulation if the input is convex, falling back to ear-clipping if not.
+ * The triangle quality may be lower, so set to false to disable this
+ * optimization.
  * @return The triangles, referencing the original polygon points in order.
  */
-export function triangulate(polygons: Polygons, epsilon?: number): Vec3[];
+export function triangulate(
+    polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -102,7 +107,7 @@ export class CrossSection {
    * @param size The X, and Y dimensions of the square.
    * @param center Set to true to shift the center to the origin.
    */
-  static square(size?: Vec2|number, center?: boolean): CrossSection;
+  static square(size?: Readonly<Vec2>|number, center?: boolean): CrossSection;
 
   /**
    * Constructs a circle of a given radius.
@@ -133,7 +138,7 @@ export class CrossSection {
    */
   extrude(
       height: number, nDivisions?: number, twistDegrees?: number,
-      scaleTop?: Vec2|number, center?: boolean): Manifold;
+      scaleTop?: Readonly<Vec2>|number, center?: boolean): Manifold;
 
   /**
    * Constructs a manifold by revolving this cross-section around its Y-axis and
@@ -163,7 +168,7 @@ export class CrossSection {
    *
    * @param v The vector to add to every vertex.
    */
-  translate(v: Vec2): CrossSection;
+  translate(v: Readonly<Vec2>): CrossSection;
   translate(x: number, y?: number): CrossSection;
 
   /**
@@ -180,7 +185,7 @@ export class CrossSection {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec2|number): CrossSection;
+  scale(v: Readonly<Vec2>|number): CrossSection;
 
 
   /**
@@ -191,7 +196,7 @@ export class CrossSection {
    *
    * @param ax the axis to be mirrored over
    */
-  mirror(ax: Vec2): CrossSection;
+  mirror(ax: Readonly<Vec2>): CrossSection;
 
   /**
    * Move the vertices of this CrossSection (creating a new one) according to
@@ -211,7 +216,7 @@ export class CrossSection {
    * to expand, and retraction of inner (hole) contours. Negative deltas will
    * have the opposite effect.
    * @param joinType The join type specifying the treatment of contour joins
-   * (corners).
+   * (corners). Defaults to Round
    * @param miterLimit The maximum distance in multiples of delta that vertices
    * can be offset from their original positions with before squaring is
    * applied, **when the join type is Miter** (default is 2, which is the
@@ -283,17 +288,18 @@ export class CrossSection {
   /**
    * Boolean union of a list of cross-sections
    */
-  static union(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static union(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean difference of the tail of a list of cross-sections from its head
    */
-  static difference(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static difference(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean intersection of a list of cross-sections
    */
-  static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static intersection(polygons: readonly(CrossSection|Polygons)[]):
+      CrossSection;
 
   // Convex Hulls
 
@@ -305,7 +311,7 @@ export class CrossSection {
   /**
    * Compute the convex hull of all points in a list of polygons/cross-sections.
    */
-  static hull(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static hull(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   // Topological Operations
 
@@ -313,7 +319,7 @@ export class CrossSection {
    * Construct a CrossSection from a vector of other Polygons (batch
    * boolean union).
    */
-  static compose(polygons: (CrossSection|Polygons)[]): CrossSection;
+  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * This operation returns a vector of CrossSections that are topologically
@@ -433,7 +439,7 @@ export class Manifold {
    * @param size The X, Y, and Z dimensions of the box.
    * @param center Set to true to shift the center to the origin.
    */
-  static cube(size?: Vec3|number, center?: boolean): Manifold;
+  static cube(size?: Readonly<Vec3>|number, center?: boolean): Manifold;
 
   /**
    * A convenience constructor for the common case of extruding a circle. Can
@@ -486,7 +492,7 @@ export class Manifold {
    */
   static extrude(
       polygons: CrossSection|Polygons, height: number, nDivisions?: number,
-      twistDegrees?: number, scaleTop?: Vec2|number,
+      twistDegrees?: number, scaleTop?: Readonly<Vec2>|number,
       center?: boolean): Manifold;
 
   /**
@@ -548,7 +554,7 @@ export class Manifold {
    * can be sharpened by sharping all edges that are incident on it, allowing
    * cones to be formed.
    */
-  static smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
+  static smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
 
   // Signed Distance Functions
 
@@ -595,7 +601,7 @@ export class Manifold {
    *
    * @param v The vector to add to every vertex.
    */
-  translate(v: Vec3): Manifold;
+  translate(v: Readonly<Vec3>): Manifold;
   translate(x: number, y?: number, z?: number): Manifold;
 
   /**
@@ -608,7 +614,7 @@ export class Manifold {
    *
    * @param v [X, Y, Z] rotation in degrees.
    */
-  rotate(v: Vec3): Manifold;
+  rotate(v: Readonly<Vec3>): Manifold;
   rotate(x: number, y?: number, z?: number): Manifold;
 
   /**
@@ -617,7 +623,7 @@ export class Manifold {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec3|number): Manifold;
+  scale(v: Readonly<Vec3>|number): Manifold;
 
   /**
    * Mirror this Manifold over the plane described by the unit form of the given
@@ -627,7 +633,7 @@ export class Manifold {
    *
    * @param normal The normal vector of the plane to be mirrored over
    */
-  mirror(normal: Vec3): Manifold;
+  mirror(normal: Readonly<Vec3>): Manifold;
 
   /**
    * This function does not change the topology, but allows the vertices to be
@@ -797,17 +803,17 @@ export class Manifold {
   /**
    * Boolean union of a list of manifolds
    */
-  static union(manifolds: Manifold[]): Manifold;
+  static union(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * Boolean difference of the tail of a list of manifolds from its head
    */
-  static difference(manifolds: Manifold[]): Manifold;
+  static difference(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * Boolean intersection of a list of manifolds
    */
-  static intersection(manifolds: Manifold[]): Manifold;
+  static intersection(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * Split cuts this manifold in two using the cutter manifold. The first result
@@ -816,7 +822,7 @@ export class Manifold {
    *
    * @param cutter
    */
-  split(cutter: Manifold): Manifold[];
+  split(cutter: Manifold): [Manifold, Manifold];
 
   /**
    * Convenient version of Split() for a half-space.
@@ -828,7 +834,8 @@ export class Manifold {
    * @param originOffset The distance of the plane from the origin in the
    * direction of the normal vector.
    */
-  splitByPlane(normal: Vec3, originOffset: number): Manifold[];
+  splitByPlane(normal: Readonly<Vec3>, originOffset: number):
+      [Manifold, Manifold];
 
   /**
    * Removes everything behind the given half-space plane.
@@ -839,7 +846,7 @@ export class Manifold {
    * @param originOffset The distance of the plane from the origin in the
    *     direction of the normal vector.
    */
-  trimByPlane(normal: Vec3, originOffset: number): Manifold;
+  trimByPlane(normal: Readonly<Vec3>, originOffset: number): Manifold;
 
   /**
    * Returns the cross section of this object parallel to the X-Y plane at the
@@ -868,7 +875,7 @@ export class Manifold {
    * Compute the convex hull of all points contained within a set of Manifolds
    * and point vectors.
    */
-  static hull(points: (Manifold|Vec3)[]): Manifold;
+  static hull(points: readonly(Manifold|Vec3)[]): Manifold;
 
   // Topological Operations
 
@@ -879,7 +886,7 @@ export class Manifold {
    *
    * @param manifolds A list of Manifolds to lazy-union together.
    */
-  static compose(manifolds: Manifold[]): Manifold;
+  static compose(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * This operation returns a vector of Manifolds that are topologically
@@ -945,6 +952,17 @@ export class Manifold {
   setTolerance(tolerance: number): Manifold;
 
   /**
+   * Return a copy of the manifold simplified to the given tolerance, but with
+   * its actual tolerance value unchanged. The result will contain a subset of
+   * the original verts and all surfaces will have moved by less than tolerance.
+   *
+   * @param tolerance The maximum distance between the original and simplified
+   *     meshes. If not given or is less than the current tolerance, the current
+   *     tolerance is used.
+   */
+  simplify(tolerance?: number): Manifold;
+
+  /**
    * The genus is a topological property of the manifold, representing the
    * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
    * a single mesh, so it is best to call Decompose() first.
@@ -966,6 +984,14 @@ export class Manifold {
    * 0 and searchLength.
    */
   minGap(other: Manifold, searchLength: number): number;
+
+  /**
+   * Returns the reason for an input Mesh producing an empty Manifold. This
+   * Status will carry on through operations like NaN propogation, ensuring an
+   * errored mesh doesn't get mysteriously lost. Empty meshes may still show
+   * NoError, for instance the intersection of non-overlapping meshes.
+   */
+  status(): ErrorStatus;
 
   // Export
 

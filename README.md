@@ -15,12 +15,13 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 
 | | | |
 | --- | --- | --- |
-| [OpenSCAD](https://openscad.org/) | [IFCjs](https://ifcjs.github.io/info/) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
+| [OpenSCAD](https://openscad.org/) | [Blender](https://www.blender.org/) | [IFCjs](https://ifcjs.github.io/info/) |
 | [Nomad Sculpt](https://apps.apple.com/us/app/id1519508653?mt=8&platform=ipad) | [Grid.Space](https://grid.space/) | [badcad](https://github.com/wrongbad/badcad) |
 | [Godot Engine](https://godotengine.org/) | [OCADml](https://github.com/OCADml/OManifold) | [Flitter](https://flitter.readthedocs.io/en/latest/) |
 | [BRL-CAD](https://brlcad.org/) | [PolygonJS](https://polygonjs.com/) | [Spherene](https://spherene.ch/) |
 | [Babylon.js](https://doc.babylonjs.com/features/featuresDeepDive/mesh/mergeMeshes#merging-meshes-with-constructive-solid-geometry) | [trimesh](https://trimesh.org/) | [Gypsum](https://github.com/playkostudios/gypsum) |
-| [Valence 3D](https://apps.apple.com/us/app/valence-3d/id6450967410?mt=8&platform=ipad) | | [bitbybit.dev](https://bitbybit.dev) |
+| [Valence 3D](https://apps.apple.com/us/app/valence-3d/id6450967410?mt=8&platform=ipad) | [bitbybit.dev](https://bitbybit.dev) | [PythonOpenSCAD](https://github.com/owebeeone/pythonopenscad) |
+| [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 
 ### Bindings & Packages
 
@@ -96,7 +97,7 @@ cd manifold
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make
-test/manifold_test
+make test
 ```
 
 CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
@@ -106,7 +107,8 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_PAR=[<OFF>, ON]`: Enables multi-thread parallelization, requires `tbb`.
 - `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings), requires `Clipper2`.
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables `MeshIO` and GLB export of 3D models from the tests, requires `assimp`.
-- `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions. This incurs around 20% runtime overhead.
+- `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.
+- `MANIFOLD_ASSERT=[<OFF>, ON]`: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
@@ -165,7 +167,8 @@ cd manifold
 mkdir buildWASM
 cd buildWASM
 emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make
-node test/manifold_test.js
+cd test
+node ./manifold_test.js
 ```
 
 ### Python

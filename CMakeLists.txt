@@ -22,12 +22,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
+include(CTest)
+enable_testing()
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 
 # Define Manifold version
 set(MANIFOLD_VERSION_MAJOR 3)
-set(MANIFOLD_VERSION_MINOR 0)
+set(MANIFOLD_VERSION_MINOR 1)
 set(MANIFOLD_VERSION_PATCH 1)
 set(
   MANIFOLD_VERSION
@@ -37,6 +39,8 @@ set(
 # Primary user facing options
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
+option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
+option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" ON)
 option(
   MANIFOLD_DOWNLOADS
   "Allow Manifold build to download missing dependencies"
@@ -160,8 +164,11 @@ else()
       list(APPEND WARNING_FLAGS -Wno-format)
     endif()
   elseif(PROJECT_IS_TOP_LEVEL)
-    # only do -Werror if we are the top level project
-    list(APPEND WARNING_FLAGS -Werror)
+    # only do -Werror if we are the top level project and
+    # MANIFOLD_STRICT is on
+    if(MANIFOLD_STRICT)
+      list(APPEND WARNING_FLAGS -Werror)
+    endif()
   endif()
   list(APPEND MANIFOLD_FLAGS ${WARNING_FLAGS})
   if(

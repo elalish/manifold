@@ -13,12 +13,9 @@
 // limitations under the License.
 
 #pragma once
+#include <cstdint>  // uint32_t, uint64_t
 #include <functional>
-#include <memory>
-
-#ifdef MANIFOLD_EXPORT
-#include <iostream>
-#endif
+#include <memory>  // needed for shared_ptr
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -153,10 +150,11 @@ struct MeshGLP {
   /// This matrix is stored in column-major order and the length of the overall
   /// vector is 12 * runOriginalID.size().
   std::vector<Precision> runTransform;
-  /// Optional: Length NumTri, contains the source face ID this
-  /// triangle comes from. When auto-generated, this ID will be a triangle index
-  /// into the original mesh. This index/ID is purely for external use (e.g.
-  /// recreating polygonal faces) and will not affect Manifold's algorithms.
+  /// Optional: Length NumTri, contains the source face ID this triangle comes
+  /// from. Simplification will maintain all edges between triangles with
+  /// different faceIDs. Input faceIDs will be maintained to the outputs, but if
+  /// none are given, they will be filled in with Manifold's coplanar face
+  /// calculation based on mesh tolerance.
   std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
@@ -430,6 +428,57 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
+  /** @name Debugging I/O
+   * Self-contained mechanism for reading and writing high precision Manifold
+   * data.  Write function creates special-purpose OBJ files, and Read function
+   * reads them in.  Be warned these are not (and not intended to be)
+   * full-featured OBJ importers/exporters.  Their primary use is to extract
+   * accurate Manifold data for debugging purposes - writing out any info
+   * needed to accurately reproduce a problem case's state.  Consequently, they
+   * may store and process additional data in comments that other OBJ parsing
+   * programs won't understand.
+   *
+   * The "format" read and written by these functions is not guaranteed to be
+   * stable from release to release - it will be modified as needed to ensure
+   * it captures information needed for debugging.  The only API guarantee is
+   * that the ReadOBJ method in a given build/release will read in the output
+   * of the WriteOBJ method produced by that release.
+   *
+   * To work with a file, the caller should prepare the ifstream/ostream
+   * themselves, as follows:
+   *
+   * Reading:
+   * @code
+   * std::ifstream ifile;
+   * ifile.open(filename);
+   * if (ifile.is_open()) {
+   *   Manifold obj_m = Manifold::ReadOBJ(ifile);
+   *   ifile.close();
+   *   if (obj_m.Status() != Manifold::Error::NoError) {
+   *      std::cerr << "Failed reading " << filename << ":\n";
+   *      std::cerr << Manifold::ToString(ob_m.Status()) << "\n";
+   *   }
+   *   ifile.close();
+   * }
+   * @endcode
+   *
+   * Writing:
+   * @code
+   * std::ofstream ofile;
+   * ofile.open(filename);
+   * if (ofile.is_open()) {
+   *    if (!m.WriteOBJ(ofile)) {
+   *       std::cerr << "Failed writing to " << filename << "\n";
+   *    }
+   * }
+   * ofile.close();
+   * @endcode
+   */
+#ifdef MANIFOLD_DEBUG
+  static Manifold ReadOBJ(std::istream& stream);
+  bool WriteOBJ(std::ostream& stream) const;
+#endif
+
   /** @name Testing Hooks
    *  These are just for internal testing.
    */
@@ -437,10 +486,6 @@ class Manifold {
   bool MatchesTriNormals() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
-#ifdef MANIFOLD_EXPORT
-  static Manifold ImportMeshGL64(std::istream& stream);
-  std::ostream& Dump(std::ostream& stream) const;
-#endif
   ///@}
 
   struct Impl;

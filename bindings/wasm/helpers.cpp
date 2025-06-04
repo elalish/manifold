@@ -211,6 +211,37 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
   return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
+std::string Status(Manifold& manifold) {
+  switch (manifold.Status()) {
+    case Manifold::Error::NoError:
+      return "NoError";
+    case Manifold::Error::NonFiniteVertex:
+      return "NonFiniteVertex";
+    case Manifold::Error::NotManifold:
+      return "NotManifold";
+    case Manifold::Error::VertexOutOfBounds:
+      return "VertexOutOfBounds";
+    case Manifold::Error::PropertiesWrongLength:
+      return "PropertiesWrongLength";
+    case Manifold::Error::MissingPositionProperties:
+      return "MissingPositionProperties";
+    case Manifold::Error::MergeVectorsDifferentLengths:
+      return "MergeVectorsDifferentLengths";
+    case Manifold::Error::MergeIndexOutOfBounds:
+      return "MergeIndexOutOfBounds";
+    case Manifold::Error::TransformWrongLength:
+      return "TransformWrongLength";
+    case Manifold::Error::RunIndexWrongLength:
+      return "RunIndexWrongLength";
+    case Manifold::Error::FaceIDWrongLength:
+      return "FaceIDWrongLength";
+    case Manifold::Error::InvalidConstruction:
+      return "InvalidConstruction";
+    default:
+      return "UnknownError";
+  }
+}
+
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   auto [r1, r2] = a.Split(b);
   return {r1, r2};

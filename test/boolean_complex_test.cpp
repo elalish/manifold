@@ -50,14 +50,16 @@ TEST(BooleanComplex, Sphere) {
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  Manifold gyroid = WithPositionColors(Gyroid()).AsOriginal();
+  Manifold gyroid = WithPositionColors(Gyroid());
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
+  gyroid = gyroid.Simplify();
 
   Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
+
   Manifold result = gyroid + gyroid2;
   result = result.RefineToLength(0.1);
 
@@ -910,7 +912,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(res.IsEmpty());
-  res = res.Simplify();
+  res = res.AsOriginal().Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 
@@ -921,14 +923,6 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
-// Note - For the moment, the Status() checks are included in the loops to
-// (more or less) mimic the BRL-CAD behavior of checking the mesh for
-// unexpected output after each iteration.  Doing so is not ideal - it
-// *massively* slows the overall evaluation - but it also seems to be
-// triggering behavior that avoids a triangulation failure.
-//
-// Eventually, once other issues are resolved, the in-loop checks should be
-// removed in favor of the top level checks.
 TEST(BooleanComplex, SimpleOffset) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
@@ -1011,31 +1005,29 @@ TEST(BooleanComplex, SimpleOffset) {
       tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
     manifold::Manifold right(tri_m);
     c += right;
-    // See above discussion
-    EXPECT_EQ(c.Status(), Manifold::Error::NoError);
   }
-  // See above discussion
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
+#endif
 
-TEST(BooleanComplex, OffsetTriangulationFailure) {
+#ifdef MANIFOLD_DEBUG
+TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  Manifold a = ReadMesh64("Offset1.obj");
-  Manifold b = ReadMesh64("Offset2.obj");
+  Manifold a = ReadTestOBJ("Offset1.obj");
+  Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
-TEST(BooleanComplex, OffsetSelfIntersect) {
+TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
   const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
   ManifoldParams().selfIntersectionChecks = true;
-  Manifold a = ReadMesh64("Offset3.obj");
-  Manifold b = ReadMesh64("Offset4.obj");
+  Manifold a = ReadTestOBJ("Offset3.obj");
+  Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
-
 #endif

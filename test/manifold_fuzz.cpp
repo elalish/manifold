@@ -44,11 +44,11 @@ auto CsgDomain =
                               ElementOf({false, true})))
         .WithMaxSize(100);
 
-void SimpleCube(const std::vector<CubeOp> &inputs) {
+void SimpleCube(const std::vector<CubeOp>& inputs) {
   ManifoldParams().intermediateChecks = true;
   ManifoldParams().processOverlaps = false;
   Manifold result;
-  for (const auto &input : inputs) {
+  for (const auto& input : inputs) {
     auto cube = Manifold::Cube();
     for (const auto &transform : input.transforms) {
       switch (transform.ty) {

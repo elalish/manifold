@@ -168,7 +168,6 @@ TEST(SDF, Resize) {
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
   EXPECT_EQ(layers.Genus(), -8);
-  const double outerBound = size / 2;
   const double epsilon = layers.GetEpsilon();
   Box bounds = layers.BoundingBox();
   EXPECT_NEAR(bounds.min.x, 0, epsilon);
@@ -187,7 +186,7 @@ TEST(SDF, SineSurface) {
             return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
           },
           {vec3(-1.75 * kPi), vec3(1.75 * kPi)}, 1)
-          .AsOriginal();
+          .Simplify();
   Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);

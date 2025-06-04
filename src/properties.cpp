@@ -18,9 +18,9 @@
 #include <tbb/combinable.h>
 #endif
 
-#include "./impl.h"
-#include "./parallel.h"
-#include "./tri_dist.h"
+#include "impl.h"
+#include "parallel.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -68,48 +68,6 @@ struct CurvatureAngles {
   }
 };
 
-struct UpdateProperties {
-  VecView<ivec3> triProp;
-  VecView<double> properties;
-  VecView<uint8_t> counters;
-
-  VecView<const double> oldProperties;
-  VecView<const Halfedge> halfedge;
-  VecView<const double> meanCurvature;
-  VecView<const double> gaussianCurvature;
-  const int oldNumProp;
-  const int numProp;
-  const int gaussianIdx;
-  const int meanIdx;
-
-  void operator()(const size_t tri) {
-    for (const int i : {0, 1, 2}) {
-      const int vert = halfedge[3 * tri + i].startVert;
-      if (oldNumProp == 0) {
-        triProp[tri][i] = vert;
-      }
-      const int propVert = triProp[tri][i];
-
-      auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
-          static_cast<uint8_t>(1));
-      if (old == 1) continue;
-
-      for (int p = 0; p < oldNumProp; ++p) {
-        properties[numProp * propVert + p] =
-            oldProperties[oldNumProp * propVert + p];
-      }
-
-      if (gaussianIdx >= 0) {
-        properties[numProp * propVert + gaussianIdx] = gaussianCurvature[vert];
-      }
-      if (meanIdx >= 0) {
-        properties[numProp * propVert + meanIdx] = meanCurvature[vert];
-      }
-    }
-  }
-};
-
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
 
@@ -142,33 +100,8 @@ struct CheckCCW {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
-    int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
-    bool check = tol > 0 ? ccw >= 0 : ccw == 0;
-
-#ifdef MANIFOLD_DEBUG
-    if (tol > 0 && !check) {
-      vec2 v1 = v[1] - v[0];
-      vec2 v2 = v[2] - v[0];
-      double area = v1.x * v2.y - v1.y * v2.x;
-      double base2 = std::max(la::dot(v1, v1), la::dot(v2, v2));
-      double base = std::sqrt(base2);
-      vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      vec3 norm = la::cross(V1 - V0, V2 - V0);
-      printf(
-          "Tri %ld does not match normal, approx height = %g, base = %g\n"
-          "tol = %g, area2 = %g, base2*tol2 = %g\n"
-          "normal = %g, %g, %g\n"
-          "norm = %g, %g, %g\nverts: %d, %d, %d\n",
-          static_cast<long>(face), area / base, base, tol, area * area,
-          base2 * tol * tol, triNormal[face].x, triNormal[face].y,
-          triNormal[face].z, norm.x, norm.y, norm.z,
-          halfedges[3 * face].startVert, halfedges[3 * face + 1].startVert,
-          halfedges[3 * face + 2].startVert);
-    }
-#endif
-    return check;
+    const int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
+    return tol > 0 ? ccw >= 0 : ccw == 0;
   }
 };
 }  // namespace
@@ -221,7 +154,6 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
 
-  const bool verbose = ManifoldParams().verbose > 0;
   std::atomic<bool> intersecting(false);
 
   auto f = [&](int tri0, int tri1) {
@@ -250,7 +182,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
       if (DistanceTriangleTriangleSquared(triVerts0, tmp1) > 0.0) return;
 
 #ifdef MANIFOLD_DEBUG
-      if (verbose) {
+      if (ManifoldParams().verbose > 0) {
         dump_lock.lock();
         std::cout << "intersecting:" << std::endl;
         for (int i : {0, 1, 2}) std::cout << triVerts0[i] << " ";
@@ -343,20 +275,36 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
-  const Vec<double> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
-  meshRelation_.numProp = numProp;
-  if (meshRelation_.triProperties.size() == 0) {
-    meshRelation_.triProperties.resize(NumTri());
-  }
+  const Vec<double> oldProperties = properties_;
+  properties_ = Vec<double>(numProp * NumPropVert(), 0);
+  numProp_ = numProp;
 
-  const Vec<uint8_t> counters(NumPropVert(), 0);
-  for_each_n(
-      policy, countAt(0_uz), NumTri(),
-      UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
-                        counters, oldProperties, halfedge_, vertMeanCurvature,
-                        vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
-                        meanIdx}));
+  Vec<uint8_t> counters(NumPropVert(), 0);
+  for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
+    for (const int i : {0, 1, 2}) {
+      const Halfedge& edge = halfedge_[3 * tri + i];
+      const int vert = edge.startVert;
+      const int propVert = edge.propVert;
+
+      auto old = std::atomic_exchange(
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
+      if (old == 1) continue;
+
+      for (int p = 0; p < oldNumProp; ++p) {
+        properties_[numProp * propVert + p] =
+            oldProperties[oldNumProp * propVert + p];
+      }
+
+      if (gaussianIdx >= 0) {
+        properties_[numProp * propVert + gaussianIdx] =
+            vertGaussianCurvature[vert];
+      }
+      if (meanIdx >= 0) {
+        properties_[numProp * propVert + meanIdx] = vertMeanCurvature[vert];
+      }
+    }
+  });
 }
 
 /**

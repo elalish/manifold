@@ -159,7 +159,7 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.offset = function(
-      delta, joinType = 'Square', miterLimit = 2.0, circularSegments = 0) {
+      delta, joinType = 'Round', miterLimit = 2.0, circularSegments = 0) {
     return this._Offset(
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
@@ -224,8 +224,8 @@ Module.setup = function() {
     removeFunction(wasmFuncPtr);
 
     const status = out.status();
-    if (status.value !== 0) {
-      throw new Module.ManifoldError(status.value);
+    if (status !== 'NoError') {
+      throw new Module.ManifoldError(status);
     }
     return out;
   };
@@ -415,36 +415,36 @@ Module.setup = function() {
   Module.ManifoldError = function ManifoldError(code, ...args) {
     let message = 'Unknown error';
     switch (code) {
-      case Module.status.NonFiniteVertex.value:
+      case 'NonFiniteVertex':
         message = 'Non-finite vertex';
         break;
-      case Module.status.NotManifold.value:
+      case 'NotManifold':
         message = 'Not manifold';
         break;
-      case Module.status.VertexOutOfBounds.value:
+      case 'VertexOutOfBounds':
         message = 'Vertex index out of bounds';
         break;
-      case Module.status.PropertiesWrongLength.value:
+      case 'PropertiesWrongLength':
         message = 'Properties have wrong length';
         break;
-      case Module.status.MissingPositionProperties.value:
+      case 'MissingPositionProperties':
         message = 'Less than three properties';
         break;
-      case Module.status.MergeVectorsDifferentLengths.value:
+      case 'MergeVectorsDifferentLengths':
         message = 'Merge vectors have different lengths';
         break;
-      case Module.status.MergeIndexOutOfBounds.value:
+      case 'MergeIndexOutOfBounds':
         message = 'Merge index out of bounds';
         break;
-      case Module.status.TransformWrongLength.value:
+      case 'TransformWrongLength':
         message = 'Transform vector has wrong length';
         break;
-      case Module.status.RunIndexWrongLength.value:
+      case 'RunIndexWrongLength':
         message = 'Run index vector has wrong length';
         break;
-      case Module.status.FaceIDWrongLength.value:
+      case 'FaceIDWrongLength':
         message = 'Face ID vector has wrong length';
-      case Module.status.InvalidConstruction.value:
+      case 'InvalidConstruction':
         message = 'Manifold constructed with invalid parameters';
     }
 
@@ -554,8 +554,8 @@ Module.setup = function() {
     const manifold = new ManifoldCtor(mesh);
 
     const status = manifold.status();
-    if (status.value !== 0) {
-      throw new Module.ManifoldError(status.value);
+    if (status !== 'NoError') {
+      throw new Module.ManifoldError(status);
     }
 
     return manifold;
@@ -702,10 +702,11 @@ Module.setup = function() {
 
   // Top-level functions
 
-  Module.triangulate = function(polygons, epsilon = -1) {
+  Module.triangulate = function(polygons, epsilon = -1, allowConvex = true) {
     const polygonsVec = polygons2vec(polygons);
     const result = fromVec(
-        Module._Triangulate(polygonsVec, epsilon), (x) => [x[0], x[1], x[2]]);
+        Module._Triangulate(polygonsVec, epsilon, allowConvex),
+        (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   };

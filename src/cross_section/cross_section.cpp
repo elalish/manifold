@@ -376,6 +376,16 @@ CrossSection CrossSection::BatchBoolean(
     return crossSections[0];
 
   auto subjs = crossSections[0].GetPaths();
+
+  if (op == OpType::Intersect) {
+    auto res = subjs->paths_;
+    for (size_t i = 1; i < crossSections.size(); ++i) {
+      res = C2::BooleanOp(C2::ClipType::Intersection, C2::FillRule::Positive,
+                          res, crossSections[i].GetPaths()->paths_, precision_);
+    }
+    return CrossSection(shared_paths(res));
+  }
+
   int n_clips = 0;
   for (size_t i = 1; i < crossSections.size(); ++i) {
     n_clips += crossSections[i].GetPaths()->paths_.size();
@@ -642,7 +652,7 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * to expand, and retraction of inner (hole) contours. Negative deltas will
  * have the opposite effect.
  * @param jointype The join type specifying the treatment of contour joins
- * (corners).
+ * (corners). Defaults to Round.
  * @param miter_limit The maximum distance in multiples of delta that vertices
  * can be offset from their original positions with before squaring is
  * applied, <B>when the join type is Miter</B> (default is 2, which is the

@@ -14,8 +14,9 @@
 
 #include <unordered_map>
 
-#include "./impl.h"
-#include "./parallel.h"
+#include "impl.h"
+#include "parallel.h"
+#include "shared.h"
 
 namespace {
 using namespace manifold;
@@ -49,7 +50,7 @@ struct DuplicateEdge {
 struct ShortEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
-  const double tolerance;
+  const double epsilon;
   const int firstNewVert;
 
   bool operator()(int edge) const {
@@ -59,7 +60,7 @@ struct ShortEdge {
       return false;
     // Flag short edges
     const vec3 delta = vertPos[half.endVert] - vertPos[half.startVert];
-    return la::dot(delta, delta) < tolerance * tolerance;
+    return la::dot(delta, delta) < epsilon * epsilon;
   }
 };
 
@@ -152,7 +153,7 @@ struct FlagStore {
     // ascending order by using a heap in a single thread
     auto& store = this->store;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
-                      [&store, &pred, f](const auto& r) {
+                      [&store, &pred](const auto& r) {
                         auto& local = store.local();
                         for (auto i = r.begin(); i < r.end(); ++i) {
                           if (pred(i)) local.push_back(i);
@@ -234,46 +235,59 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   if (!halfedge_.size()) return;
 
   CleanupTopology();
+  CollapseShortEdges(firstNewVert);
+  CollapseColinearEdges(firstNewVert);
+  SwapDegenerates(firstNewVert);
+}
 
-  if (!ManifoldParams().cleanupTriangles) {
-    return;
-  }
+void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
+  if (!halfedge_.size()) return;
 
-  const size_t nbEdges = halfedge_.size();
+  CleanupTopology();
+  CollapseShortEdges(firstNewVert);
+  SwapDegenerates(firstNewVert);
+}
+
+void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
+  ZoneScopedN("CollapseShortEdge");
+  FlagStore s;
   size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
 
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
-
-  FlagStore s;
-  {
-    ZoneScopedN("CollapseShortEdge");
-    numFlagged = 0;
-    // Short edges get to skip several checks and hence remove more classes of
-    // degenerate triangles than flagged edges do, but this could in theory lead
-    // to error stacking where a vertex moves too far. For this reason this is
-    // restricted to epsilon, rather than tolerance.
-    ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
-    s.run(nbEdges, se, [&](size_t i) {
-      const bool didCollapse = CollapseEdge(i, scratchBuffer);
-      if (didCollapse) numFlagged++;
-      scratchBuffer.resize(0);
-    });
+  // Short edges get to skip several checks and hence remove more classes of
+  // degenerate triangles than flagged edges do, but this could in theory lead
+  // to error stacking where a vertex moves too far. For this reason this is
+  // restricted to epsilon, rather than tolerance.
+  ShortEdge se{halfedge_, vertPos_, epsilon_, firstNewVert};
+  s.run(nbEdges, se, [&](size_t i) {
+    const bool didCollapse = CollapseEdge(i, scratchBuffer);
+    if (didCollapse) numFlagged++;
+    scratchBuffer.resize(0);
+  });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-      std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
-    }
-#endif
+  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
   }
+#endif
+}
 
+void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
+  FlagStore s;
+  size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
+  std::vector<int> scratchBuffer;
+  scratchBuffer.reserve(10);
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
-    // Collapse colinear edges, but only remove new verts, i.e. verts with index
+    // Collapse colinear edges, but only remove new verts, i.e. verts with
+    // index
     // >= firstNewVert. This is used to keep the Boolean from changing the
     // non-intersecting parts of the input meshes. Colinear is defined not by a
-    // local check, but by the global CreateFaces function, which keeps this
+    // local check, but by the global MarkCoplanar function, which keeps this
     // from being vulnerable to error stacking.
     FlagEdge se{halfedge_, meshRelation_.triRef, firstNewVert};
     s.run(nbEdges, se, [&](size_t i) {
@@ -289,32 +303,36 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
     }
 #endif
   }
+}
 
-  {
-    ZoneScopedN("RecursiveEdgeSwap");
-    numFlagged = 0;
-    SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_,
-                     firstNewVert};
-    std::vector<int> edgeSwapStack;
-    std::vector<int> visited(halfedge_.size(), -1);
-    int tag = 0;
-    s.run(nbEdges, se, [&](size_t i) {
-      numFlagged++;
-      tag++;
-      RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
-      while (!edgeSwapStack.empty()) {
-        int last = edgeSwapStack.back();
-        edgeSwapStack.pop_back();
-        RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
-      }
-    });
+void Manifold::Impl::SwapDegenerates(int firstNewVert) {
+  ZoneScopedN("RecursiveEdgeSwap");
+  FlagStore s;
+  size_t numFlagged = 0;
+  const size_t nbEdges = halfedge_.size();
+  std::vector<int> scratchBuffer;
+  scratchBuffer.reserve(10);
+
+  SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_, firstNewVert};
+  std::vector<int> edgeSwapStack;
+  std::vector<int> visited(halfedge_.size(), -1);
+  int tag = 0;
+  s.run(nbEdges, se, [&](size_t i) {
+    numFlagged++;
+    tag++;
+    RecursiveEdgeSwap(i, tag, visited, edgeSwapStack, scratchBuffer);
+    while (!edgeSwapStack.empty()) {
+      int last = edgeSwapStack.back();
+      edgeSwapStack.pop_back();
+      RecursiveEdgeSwap(last, tag, visited, edgeSwapStack, scratchBuffer);
+    }
+  });
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-      std::cout << "swapped " << numFlagged << " edges" << std::endl;
-    }
-#endif
+  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    std::cout << "swapped " << numFlagged << " edges" << std::endl;
   }
+#endif
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
@@ -323,6 +341,7 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   // Orbit endVert
   const int startVert = halfedge_[edge].startVert;
   const int endVert = halfedge_[edge].endVert;
+  const int endProp = halfedge_[NextHalfedge(edge)].propVert;
   int current = halfedge_[NextHalfedge(edge)].pairedHalfedge;
   while (current != edge) {
     const int vert = halfedge_[current].startVert;
@@ -339,32 +358,28 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       int newHalfedge = halfedge_.size();
       int oldFace = current / 3;
       int outsideVert = halfedge_[current].startVert;
-      halfedge_.push_back({endVert, newVert, -1});
-      halfedge_.push_back({newVert, outsideVert, -1});
-      halfedge_.push_back({outsideVert, endVert, -1});
+      halfedge_.push_back({endVert, newVert, -1, endProp});
+      halfedge_.push_back({newVert, outsideVert, -1, endProp});
+      halfedge_.push_back(
+          {outsideVert, endVert, -1, halfedge_[current].propVert});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
         meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
-      if (meshRelation_.triProperties.size() > 0)
-        meshRelation_.triProperties.push_back(
-            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
       oldFace = opposite / 3;
       outsideVert = halfedge_[opposite].startVert;
-      halfedge_.push_back({newVert, endVert, -1});
-      halfedge_.push_back({endVert, outsideVert, -1});
-      halfedge_.push_back({outsideVert, newVert, -1});
+      halfedge_.push_back({newVert, endVert, -1, endProp});  // fix prop
+      halfedge_.push_back({endVert, outsideVert, -1, endProp});
+      halfedge_.push_back(
+          {outsideVert, newVert, -1, halfedge_[opposite].propVert});
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
       if (meshRelation_.triRef.size() > 0)
         meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
-      if (meshRelation_.triProperties.size() > 0)
-        meshRelation_.triProperties.push_back(
-            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       break;
@@ -458,7 +473,7 @@ void Manifold::Impl::CollapseTri(const ivec3& triEdge) {
   halfedge_[pair1].pairedHalfedge = pair2;
   halfedge_[pair2].pairedHalfedge = pair1;
   for (int i : {0, 1, 2}) {
-    halfedge_[triEdge[i]] = {-1, -1, -1};
+    halfedge_[triEdge[i]] = {-1, -1, -1, halfedge_[triEdge[i]].propVert};
   }
 }
 
@@ -497,7 +512,6 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // pointing to it.
 bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
-  Vec<ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return false;
@@ -518,7 +532,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
-    while (current != tri0edge[2]) {
+    while (current != tri1edge[0]) {
       current = NextHalfedge(current);
       vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
@@ -527,9 +541,20 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
+        const TriRef oldRef = refCheck;
         refCheck = triRef[edge / 3];
         if (!ref.SameFace(refCheck)) {
           return false;
+        }
+        if (ref.meshID != oldRef.meshID || ref.faceID != oldRef.faceID ||
+            la::dot(faceNormal_[toRemove.pairedHalfedge / 3],
+                    faceNormal_[tri]) < -0.5) {
+          // Restrict collapse to colinear edges when the edge separates faces
+          // or the edge is sharp. This ensures large shifts are not introduced
+          // parallel to the tangent plane.
+          if (CCW(projection * pLast, projection * pOld, projection * pNew,
+                  epsilon_) != 0)
+            return false;
         }
       }
 
@@ -560,20 +585,18 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   // Orbit startVert
   const int tri0 = edge / 3;
   const int tri1 = toRemove.pairedHalfedge / 3;
-  const int triVert0 = (edge + 1) % 3;
-  const int triVert1 = toRemove.pairedHalfedge % 3;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
-    if (triProp.size() > 0) {
+    if (NumProp() > 0) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
-      const int vIdx = current - 3 * tri;
       if (triRef[tri].SameFace(triRef[tri0])) {
-        triProp[tri][vIdx] = triProp[tri0][triVert0];
+        halfedge_[current].propVert = halfedge_[NextHalfedge(edge)].propVert;
       } else if (triRef[tri].SameFace(triRef[tri1])) {
-        triProp[tri][vIdx] = triProp[tri1][triVert1];
+        halfedge_[current].propVert =
+            halfedge_[toRemove.pairedHalfedge].propVert;
       }
     }
 
@@ -611,8 +634,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
 
   const ivec3 tri0edge = TriOf(edge);
   const ivec3 tri1edge = TriOf(pair);
-  const ivec3 perm0 = TriOf(edge % 3);
-  const ivec3 perm1 = TriOf(pair % 3);
 
   mat2x3 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
   vec2 v[4];
@@ -648,22 +669,21 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const double l02 = la::length(v[2] - v[0]);
     const double a = std::max(0.0, std::min(1.0, l02 / l01));
     // Update properties if applicable
-    if (meshRelation_.properties.size() > 0) {
-      Vec<ivec3>& triProp = meshRelation_.triProperties;
-      Vec<double>& prop = meshRelation_.properties;
-      triProp[tri0] = triProp[tri1];
-      triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
-      triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
+    if (properties_.size() > 0) {
+      Vec<double>& prop = properties_;
+      halfedge_[tri0edge[1]].propVert = halfedge_[tri1edge[0]].propVert;
+      halfedge_[tri0edge[0]].propVert = halfedge_[tri1edge[2]].propVert;
+      halfedge_[tri0edge[2]].propVert = halfedge_[tri1edge[2]].propVert;
       const int numProp = NumProp();
       const int newProp = prop.size() / numProp;
-      const int propIdx0 = triProp[tri1][perm1[0]];
-      const int propIdx1 = triProp[tri1][perm1[1]];
+      const int propIdx0 = halfedge_[tri1edge[0]].propVert;
+      const int propIdx1 = halfedge_[tri1edge[1]].propVert;
       for (int p = 0; p < numProp; ++p) {
         prop.push_back(a * prop[numProp * propIdx0 + p] +
                        (1 - a) * prop[numProp * propIdx1 + p]);
       }
-      triProp[tri1][perm1[0]] = newProp;
-      triProp[tri0][perm0[2]] = newProp;
+      halfedge_[tri1edge[0]].propVert = newProp;
+      halfedge_[tri0edge[2]].propVert = newProp;
     }
 
     // if the new edge already exists, duplicate the verts and split the mesh.
@@ -895,7 +915,7 @@ void Manifold::Impl::DedupeEdges() {
           [nbEdges]() { return std::vector<bool>(nbEdges, false); });
       tbb::parallel_for(
           tbb::blocked_range<size_t>(0, nbEdges),
-          [&store, &mutex, &duplicates, this, &localLoop](const auto& r) {
+          [&store, &mutex, &duplicates, &localLoop](const auto& r) {
             auto& local = store.local();
             std::vector<size_t> duplicatesLocal;
             localLoop(r.begin(), r.end(), local, duplicatesLocal);

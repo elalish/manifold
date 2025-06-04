@@ -50,7 +50,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
-  ExpectMeshes(result2, {{16, 28}});
+  ExpectMeshes(result2, {{18, 32}});
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();
@@ -139,11 +139,43 @@ TEST(Boolean, Cubes) {
 }
 
 TEST(Boolean, Simplify) {
-  Manifold cube = Manifold::Cube().Refine(10);
+  const int n = 10;
+  MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
+  size_t tri = 0;
+  for (auto& id : cubeGL.faceID) {
+    id = tri++;
+  }
+  Manifold cube(cubeGL);
+
+  const int nExpected = 20 * n * n;
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), 1926);
+  EXPECT_EQ(result.NumTri(), nExpected);
   result = result.Simplify();
-  EXPECT_EQ(result.NumTri(), 20);
+  EXPECT_EQ(result.NumTri(), nExpected);
+
+  MeshGL resultGL = result.GetMeshGL();
+  resultGL.faceID.clear();
+  Manifold result2(resultGL);
+  EXPECT_EQ(result2.NumTri(), nExpected);
+  result2 = result2.Simplify();
+  EXPECT_EQ(result2.NumTri(), 20);
+}
+
+TEST(Boolean, DISABLED_SimplifyCracks) {
+  Manifold cylinder =
+      Manifold::Cylinder(2, 50, 50, 180)
+          .Rotate(
+              -89.999999999999)  // Rotating by -90 makes the result too perfect
+          .Translate(vec3(50, 0, 50));
+  Manifold cube = Manifold::Cube(vec3(100, 2, 50));
+  Manifold refined = (cylinder + cube).RefineToLength(0.13071895424836602);
+  Manifold deformed =
+      refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
+  Manifold simplified = deformed.Simplify(0.005);
+
+  // If Simplify adds cracks, volume decreases and surface area increases
+  EXPECT_NEAR(simplified.Volume(), 17848, 1);
+  EXPECT_NEAR(simplified.SurfaceArea(), 20930, 1);
 }
 
 TEST(Boolean, NoRetainedVerts) {
@@ -446,4 +478,30 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
+}
+
+TEST(Boolean, BatchBoolean) {
+  Manifold cube = Manifold::Cube({100, 100, 1});
+  Manifold cylinder1 = Manifold::Cylinder(1, 30).Translate({-10, 30, 0});
+  Manifold cylinder2 = Manifold::Cylinder(1, 20).Translate({110, 20, 0});
+  Manifold cylinder3 = Manifold::Cylinder(1, 40).Translate({50, 110, 0});
+
+  Manifold intersect = Manifold::BatchBoolean(
+      {cube, cylinder1, cylinder2, cylinder3}, OpType::Intersect);
+
+  EXPECT_TRUE(intersect.IsEmpty());
+
+  Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
+                                        OpType::Add);
+
+  ExpectMeshes(add, {{150, 296}});
+  EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
+  EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
+
+  Manifold subtract = Manifold::BatchBoolean(
+      {cube, cylinder1, cylinder2, cylinder3}, OpType::Subtract);
+
+  ExpectMeshes(subtract, {{102, 200}});
+  EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
+  EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
