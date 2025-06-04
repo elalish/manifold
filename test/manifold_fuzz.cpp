@@ -50,7 +50,7 @@ void SimpleCube(const std::vector<CubeOp>& inputs) {
   Manifold result;
   for (const auto& input : inputs) {
     auto cube = Manifold::Cube();
-    for (const auto &transform : input.transforms) {
+    for (const auto& transform : input.transforms) {
       switch (transform.ty) {
         case TransformType::Translate:
           cube = cube.Translate({std::get<0>(transform.vector),
