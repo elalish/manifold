@@ -224,7 +224,7 @@ if(MANIFOLD_FUZZ)
   FetchContent_Declare(
     fuzztest
     GIT_REPOSITORY https://github.com/google/fuzztest.git
-    GIT_TAG 7b107216fa6cd62659234366aee493d6f8832d46
+    GIT_TAG f1e26613f66997aa09d3026762e275de22b2daae
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(fuzztest)
