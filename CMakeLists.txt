@@ -184,6 +184,12 @@ else()
   if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     list(APPEND MANIFOLD_FLAGS -fno-omit-frame-pointer)
   endif()
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # disable fp math optimizations, e.g. FMA for supported architectures, as
+    # this changes floating-point results
+    # clang defaults to -ffp-contract=off so we don't have to set that
+    list(APPEND MANIFOLD_FLAGS -ffp-contract=off -fexcess-precision=standard)
+  endif()
   if(CODE_COVERAGE)
     list(
       APPEND
