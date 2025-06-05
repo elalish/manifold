@@ -27,6 +27,7 @@ set(
   quickhull.cpp
   sdf.cpp
   smoothing.cpp
+  fillet.cpp
   sort.cpp
   subdivision.cpp
   tree2d.cpp
