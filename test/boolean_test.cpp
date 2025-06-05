@@ -36,7 +36,9 @@ TEST(Boolean, Tetra) {
 
 TEST(Boolean, MeshGLRoundTrip) {
   Manifold cube = Manifold::Cube(vec3(2));
-  ASSERT_GE(cube.OriginalID(), 0);
+  ASSERT_EQ(cube.OriginalID(), 0);
+  cube = cube.AsOriginal();
+  ASSERT_GT(cube.OriginalID(), 0);
   const MeshGL original = cube.GetMeshGL();
 
   Manifold result = cube + cube.Translate({1, 1, 0});
@@ -61,7 +63,7 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0);
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -90,8 +92,8 @@ TEST(Boolean, Normals) {
 }
 
 TEST(Boolean, EmptyOriginal) {
-  const Manifold cube = Manifold::Cube();
-  const Manifold tet = Manifold::Tetrahedron();
+  const Manifold cube = Manifold::Cube().AsOriginal();
+  const Manifold tet = Manifold::Tetrahedron().AsOriginal();
   const Manifold result = tet - cube.Translate({3, 4, 5});
   const MeshGL mesh = result.GetMeshGL();
   ASSERT_EQ(mesh.runIndex.size(), 3);
@@ -138,13 +140,19 @@ TEST(Boolean, Cubes) {
 #endif
 }
 
+TEST(Boolean, CubeUnion) {
+  Manifold cube = Manifold::Cube();
+  Manifold result = cube + cube.Translate({1, 0, 0});
+  EXPECT_EQ(result.NumTri(), 14);
+  result = result.Simplify();
+  EXPECT_EQ(result.NumTri(), 12);
+}
+
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
-  size_t tri = 0;
-  for (auto& id : cubeGL.faceID) {
-    id = tri++;
-  }
+  // Give unique face IDs to stop edge removal
+  std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
   const int nExpected = 20 * n * n;
@@ -198,7 +206,7 @@ TEST(Boolean, PropertiesNoIntersection) {
 TEST(Boolean, MixedProperties) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result = m0 + m1.Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
@@ -207,7 +215,7 @@ TEST(Boolean, MixedProperties) {
 TEST(Boolean, MixedNumProp) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result =
       m0 + m1.SetProperties(1, [](double* prop, vec3 p, const double* n) {
                prop[0] = 1;
@@ -315,7 +323,7 @@ TEST(Boolean, AlmostCoplanar) {
 }
 
 TEST(Boolean, FaceUnion) {
-  Manifold cubes = Manifold::Cube();
+  Manifold cubes = Manifold::Cube().AsOriginal();
   cubes += cubes.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
   ExpectMeshes(cubes, {{12, 20}});

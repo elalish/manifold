@@ -614,8 +614,8 @@ double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m) {
   return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
-ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {
-  auto orig = from_c(m)->AsOriginal();
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m, int id) {
+  auto orig = from_c(m)->AsOriginal(id);
   return to_c(new (mem) Manifold(orig));
 }
 

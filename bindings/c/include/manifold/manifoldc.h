@@ -186,7 +186,8 @@ ManifoldManifold* manifold_revolve(void* mem, ManifoldPolygons* cs,
 ManifoldManifold* manifold_compose(void* mem, ManifoldManifoldVec* ms);
 ManifoldManifoldVec* manifold_decompose(void* mem, ManifoldManifold* m);
 
-ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m,
+                                       int id = -1);
 
 // Manifold Info
 
