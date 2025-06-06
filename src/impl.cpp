@@ -351,6 +351,39 @@ void Manifold::Impl::DedupePropVerts() {
 
 constexpr int kRemovedHalfedge = -2;
 
+struct HalfedgePairData {
+  int largeVert;
+  int tri;
+  int edgeIndex;
+
+  bool operator<(const HalfedgePairData& other) const {
+    return largeVert < other.largeVert ||
+           (largeVert == other.largeVert && tri < other.tri);
+  }
+};
+
+template <bool useProp, typename F>
+struct PrepHalfedges {
+  VecView<Halfedge> halfedges;
+  const VecView<ivec3> triProp;
+  const VecView<ivec3> triVert;
+  F& f;
+
+  void operator()(const int tri) {
+    const ivec3& props = triProp[tri];
+    for (const int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      const int k = (i + 2) % 3;
+      const int e = 3 * tri + i;
+      const int v0 = useProp ? props[i] : triVert[tri][i];
+      const int v1 = useProp ? props[j] : triVert[tri][j];
+      DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
+      halfedges[e] = {v0, v1, -1, props[i]};
+      f(e, v0, v1);
+    }
+  }
+};
+
 /**
  * Create the halfedge_ data structure from a list of triangles. If the optional
  * prop2vert array is missing, it's assumed these triangles are are pointing to
@@ -366,35 +399,74 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   // drop the old value first to avoid copy
   halfedge_.clear(true);
   halfedge_.resize_nofill(numHalfedge);
-  Vec<uint64_t> edge(numHalfedge);
-  Vec<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
-  sequence(ids.begin(), ids.end());
-  for_each_n(policy, countAt(0), numTri,
-             [this, &edge, &triProp, &triVert](const int tri) {
-               const ivec3& props = triProp[tri];
-               for (const int i : {0, 1, 2}) {
-                 const int j = (i + 1) % 3;
-                 const int e = 3 * tri + i;
-                 const int v0 = triVert.empty() ? props[i] : triVert[tri][i];
-                 const int v1 = triVert.empty() ? props[j] : triVert[tri][j];
-                 DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
-                 halfedge_[e] = {v0, v1, -1, props[i]};
-                 // Sort the forward halfedges in front of the backward ones
-                 // by setting the highest-order bit.
-                 edge[e] = uint64_t(v0 < v1 ? 1 : 0) << 63 |
-                           ((uint64_t)std::min(v0, v1)) << 32 |
-                           std::max(v0, v1);
-               }
-             });
-  // Stable sort is required here so that halfedges from the same face are
-  // paired together (the triangles were created in face order). In some
-  // degenerate situations the triangulator can add the same internal edge in
-  // two different faces, causing this edge to not be 2-manifold. These are
-  // fixed by duplicating verts in CleanupTopology.
-  stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
-    return edge[a] < edge[b];
-  });
+
+  int vertCount = static_cast<int>(vertPos_.size());
+  Vec<int> ids(numHalfedge);
+  {
+    ZoneScopedN("PrepHalfedges");
+    if (vertCount < (1 << 18)) {
+      // For small vertex count, it is faster to just do sorting
+      Vec<uint64_t> edge(numHalfedge);
+      auto setEdge = [&edge](int e, int v0, int v1) {
+        edge[e] = uint64_t(v0 < v1 ? 1 : 0) << 63 |
+                  ((uint64_t)std::min(v0, v1)) << 32 | std::max(v0, v1);
+      };
+      if (triVert.empty())
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<true, decltype(setEdge)>{halfedge_, triProp,
+                                                          triVert, setEdge});
+      else
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<false, decltype(setEdge)>{halfedge_, triProp,
+                                                           triVert, setEdge});
+      sequence(ids.begin(), ids.end());
+      stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
+        return edge[a] < edge[b];
+      });
+    } else {
+      // For larger vertex count, we separate the ids into slices for halfedges
+      // with the same smaller vertex.
+      // We first copy them there (as HalfedgePairData), and then do sorting
+      // locally for each slice.
+      // This helps with memory locality, and is faster for larger meshes.
+      Vec<HalfedgePairData> entries(numHalfedge);
+      Vec<int> offsets(vertCount * 2, 0);
+      auto setOffset = [&offsets, vertCount](int _e, int v0, int v1) {
+        const int offset = v0 > v1 ? 0 : vertCount;
+        AtomicAdd(offsets[std::min(v0, v1) + offset], 1);
+      };
+      if (triVert.empty())
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<true, decltype(setOffset)>{
+                       halfedge_, triProp, triVert, setOffset});
+      else
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<false, decltype(setOffset)>{
+                       halfedge_, triProp, triVert, setOffset});
+      exclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
+      for_each_n(policy, countAt(0), numTri,
+                 [this, &offsets, &entries, vertCount](const int tri) {
+                   for (const int i : {0, 1, 2}) {
+                     const int e = 3 * tri + i;
+                     const int v0 = halfedge_[e].startVert;
+                     const int v1 = halfedge_[e].endVert;
+                     const int offset = v0 > v1 ? 0 : vertCount;
+                     const int start = std::min(v0, v1);
+                     const int index = AtomicAdd(offsets[start + offset], 1);
+                     entries[index] = {std::max(v0, v1), tri, e};
+                   }
+                 });
+      for_each_n(policy, countAt(0), offsets.size(), [&](const int v) {
+        int start = v == 0 ? 0 : offsets[v - 1];
+        int end = offsets[v];
+        for (int i = start; i < end; ++i) ids[i] = i;
+        std::sort(ids.begin() + start, ids.begin() + end,
+                  [&entries](int a, int b) { return entries[a] < entries[b]; });
+        for (int i = start; i < end; ++i) ids[i] = entries[ids[i]].edgeIndex;
+      });
+    }
+  }
 
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
@@ -403,6 +475,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
+    const int startVert = h0.startVert;
+    const int endVert = h0.endVert;
     int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
@@ -420,7 +494,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
     }
     if (i + 1 == segmentEnd) return consecutiveStart;
     Halfedge& h1 = halfedge_[ids[i + 1]];
-    if (h0.startVert == h1.startVert && h0.endVert == h1.endVert)
+    if (h1.startVert == startVert && h1.endVert == endVert)
       return consecutiveStart;
     return i + 1;
   };
@@ -455,10 +529,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   for (int i = 0; i < numEdge; ++i)
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
-
-  // Once sorted, the first half of the range is the forward halfedges, which
-  // correspond to their backward pair at the same offset in the second half
-  // of the range.
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
