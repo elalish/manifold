@@ -372,8 +372,8 @@ struct PrepHalfedges {
   void operator()(const int tri) {
     const ivec3& props = triProp[tri];
     for (const int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      const int k = (i + 2) % 3;
+      const int j = NextHalfedge(i);
+      const int k = NextHalfedge(j);
       const int e = 3 * tri + i;
       const int v0 = useProp ? props[i] : triVert[tri][i];
       const int v1 = useProp ? props[j] : triVert[tri][j];
@@ -409,17 +409,19 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       // For small vertex count, it is faster to just do sorting
       Vec<uint64_t> edge(numHalfedge);
       auto setEdge = [&edge](int e, int v0, int v1) {
-        edge[e] = uint64_t(v0 < v1 ? 1 : 0) << 63 |
-                  ((uint64_t)std::min(v0, v1)) << 32 | std::max(v0, v1);
+        edge[e] = static_cast<uint64_t>(v0 < v1 ? 1 : 0) << 63 |
+                  (static_cast<uint64_t>(std::min(v0, v1))) << 32 |
+                  static_cast<uint64_t>(std::max(v0, v1));
       };
-      if (triVert.empty())
+      if (triVert.empty()) {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<true, decltype(setEdge)>{halfedge_, triProp,
                                                           triVert, setEdge});
-      else
+      } else {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<false, decltype(setEdge)>{halfedge_, triProp,
                                                            triVert, setEdge});
+      }
       sequence(ids.begin(), ids.end());
       stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
         return edge[a] < edge[b];
@@ -436,14 +438,15 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
         const int offset = v0 > v1 ? 0 : vertCount;
         AtomicAdd(offsets[std::min(v0, v1) + offset], 1);
       };
-      if (triVert.empty())
+      if (triVert.empty()) {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<true, decltype(setOffset)>{
                        halfedge_, triProp, triVert, setOffset});
-      else
+      } else {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<false, decltype(setOffset)>{
                        halfedge_, triProp, triVert, setOffset});
+      }
       exclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
       for_each_n(policy, countAt(0), numTri,
                  [this, &offsets, &entries, vertCount](const int tri) {
@@ -475,8 +478,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
     Halfedge& h0 = halfedge_[pair0];
-    const int startVert = h0.startVert;
-    const int endVert = h0.endVert;
     int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
@@ -494,7 +495,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
     }
     if (i + 1 == segmentEnd) return consecutiveStart;
     Halfedge& h1 = halfedge_[ids[i + 1]];
-    if (h1.startVert == startVert && h1.endVert == endVert)
+    if (h1.startVert == h0.startVert && h1.endVert == h0.endVert)
       return consecutiveStart;
     return i + 1;
   };
