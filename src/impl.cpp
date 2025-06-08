@@ -372,8 +372,8 @@ struct PrepHalfedges {
   void operator()(const int tri) {
     const ivec3& props = triProp[tri];
     for (const int i : {0, 1, 2}) {
-      const int j = NextHalfedge(i);
-      const int k = NextHalfedge(j);
+      const int j = Next3(i);
+      const int k = Next3(j);
       const int e = 3 * tri + i;
       const int v0 = useProp ? props[i] : triVert[tri][i];
       const int v1 = useProp ? props[j] : triVert[tri][j];
