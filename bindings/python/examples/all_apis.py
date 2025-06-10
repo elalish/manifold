@@ -92,6 +92,7 @@ def all_manifold():
     i = m.original_id()
     p = m.get_tolerance()
     pp = m.set_tolerance(0.0001)
+    m = m.simplify(0.001)
     c = m.project()
     m = m.refine(2)
     m = m.refine_to_length(0.1)
