@@ -580,6 +580,17 @@ TEST(Manifold, Simplify) {
 }
 #endif
 
+TEST(Manifold, MeshID) {
+  const Manifold cube = Manifold::Cube();
+  MeshGL cubeGL = cube.GetMeshGL();
+  cubeGL.runIndex.clear();
+  cubeGL.runOriginalID.clear();
+  Manifold cube1 = Manifold(cubeGL);
+  Manifold cube2 = Manifold(cubeGL);
+  EXPECT_NE(cube1.GetMeshGL().runOriginalID[0],
+            cube2.GetMeshGL().runOriginalID[0]);
+}
+
 TEST(Manifold, MeshRelation) {
   Manifold gyroid = WithPositionColors(Gyroid());
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
