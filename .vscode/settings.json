@@ -130,6 +130,7 @@
     "-DMANIFOLD_DEBUG=ON",
     "-DMANIFOLD_ASSERT=ON",
     "-DMANIFOLD_PAR=ON",
+    "-DMANIFOLD_FUZZ=OFF",
     "-DCODE_COVERAGE=OFF",
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
   ],
