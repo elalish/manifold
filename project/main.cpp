@@ -10,6 +10,32 @@ using namespace manifold;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+void VertexByVertex(float radius) {
+  manifold::Polygons poly{{vec2{0, 0}, vec2{1, 1}, vec2{0, 1}}};
+
+  for (size_t i = 0; i != poly[0].size(); i++) {
+    const vec2 preP = poly[0][(i - 1 + poly[0].size()) % poly[0].size()],
+               curP = poly[0][i], nextP = poly[0][(i + 1) % poly[0].size()];
+
+    vec2 norm1 = la::normalize(preP - curP),
+         norm2 = la::normalize(nextP - curP);
+    double theta = std::acos(la::dot(norm1, norm2));
+
+    double convexity = la::cross((curP - preP), (nextP - curP));
+
+    double dist = radius / std::tan(theta / 2.0);
+
+    vec2 t1 = curP + norm1 * dist, t2 = curP + norm2 * dist;
+
+    vec2 circleCenter = t1 + vec2(-norm1.y, norm1.x) * radius;
+
+    double start = std::atan2(t1.y - circleCenter.y, t1.x - circleCenter.x),
+           end = std::atan2(t2.y - circleCenter.y, t2.x - circleCenter.x);
+
+    // Discrete, Merge
+  }
+}
+
 void RollingBall(float radius) {
   manifold::Polygons poly{{vec2{0, 0}, vec2{1, 1}, vec2{0, 1}}};
 
