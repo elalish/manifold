@@ -106,7 +106,7 @@ Manifold Manifold::Smooth(const MeshGL64& meshGL64,
  */
 
 Manifold Manifold::Fillet(const MeshGL& meshGL, double radius,
-                          const std::vector<size_t>& selectedEdges = {}) {
+                          const std::vector<size_t>& selectedEdges) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
 
   if (selectedEdges.size() != 0 && radius > impl->epsilon_)
@@ -125,7 +125,7 @@ Manifold Manifold::Fillet(const MeshGL& meshGL, double radius,
  */
 
 Manifold Manifold::Fillet(const MeshGL64& meshGL64, double radius,
-                          const std::vector<size_t>& selectedEdges = {}) {
+                          const std::vector<size_t>& selectedEdges) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
 
   if (selectedEdges.size() != 0 && radius > impl->epsilon_)

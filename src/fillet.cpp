@@ -25,7 +25,7 @@ std::vector<int> getNeighbour(const size_t& halfedge,
   int idx = halfedge % 3;
 
   while (true) {
-    const int next = vec[tri * 3 + (idx + 1) % 3].pairedHalfedge;
+    const size_t next = vec[tri * 3 + (idx + 1) % 3].pairedHalfedge;
     if (next == halfedge) break;
 
     r.push_back(vec[next].startVert);
@@ -43,6 +43,7 @@ namespace manifold {
 
 void Manifold::Impl::Fillet(double radius,
                             const std::vector<size_t>& selectedEdges) {
+#if true
   // Map to sorted idx
   std::unordered_map<int, int> oldHalfedge2New;
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -59,11 +60,11 @@ void Manifold::Impl::Fillet(double radius,
     auto r2 = getNeighbour(halfedge_[halfedge].pairedHalfedge, halfedge_);
 
     std::vector<ivec3> f;
-    for (int i = 0; i != r1.size() - 1; i++) {
+    for (size_t i = 0; i != r1.size() - 1; i++) {
       f.emplace_back(r1[0], r1[1], halfedge_[halfedge].endVert);
     }
 
-    for (int i = 0; i != r2.size() - 1; i++) {
+    for (size_t i = 0; i != r2.size() - 1; i++) {
       f.emplace_back(r2[0], r2[1], halfedge_[halfedge].endVert);
     }
 
@@ -75,15 +76,15 @@ void Manifold::Impl::Fillet(double radius,
     float len = la::length(target) * 2;
 
     /*
-            v4
-           / \
-          /   \    <- f2
-         /  n2 \
-        v1 --- v2  <- Half edge
-         \  n1 /
-          \   /    <- f1
-           \ /
-            v3
+    v4
+    / \
+    /   \    <- f2
+    /  n2 \
+    v1 --- v2  <- Half edge
+    \  n1 /
+    \   /    <- f1
+    \ /
+    v3
     */
 
     vec3 v1 = vertPos_[edge.startVert], v2 = vertPos_[edge.endVert],
@@ -97,15 +98,15 @@ void Manifold::Impl::Fillet(double radius,
 
     // Cross line
     vec3 n3 = la::normalize(v1v2);
-    float A1 = n1.x, B1 = n1.y, C1 = n1.z,
-          D1 = A1 * -v3.x + B1 * -v3.y + C1 * -v3.z -
-               radius * std::sqrt(A1 * A1 + B1 * B1 * +C1 * C1),
-          D3 = A1 * -v3.x + B1 * -v3.y + C1 * -v3.z;
+    double A1 = n1.x, B1 = n1.y, C1 = n1.z,
+           D1 = A1 * -v3.x + B1 * -v3.y + C1 * -v3.z -
+                radius * std::sqrt(A1 * A1 + B1 * B1 * +C1 * C1),
+           D3 = A1 * -v3.x + B1 * -v3.y + C1 * -v3.z;
 
-    float A2 = n2.x, B2 = n2.y, C2 = n2.z,
-          D2 = A2 * -v4.x + B2 * -v4.y + C2 * -v4.z -
-               radius * std::sqrt(A2 * A2 + B2 * B2 * +C2 * C2),
-          D4 = A2 * -v4.x + B2 * -v4.y + C2 * -v4.z;
+    double A2 = n2.x, B2 = n2.y, C2 = n2.z,
+           D2 = A2 * -v4.x + B2 * -v4.y + C2 * -v4.z -
+                radius * std::sqrt(A2 * A2 + B2 * B2 * +C2 * C2),
+           D4 = A2 * -v4.x + B2 * -v4.y + C2 * -v4.z;
 
     vec3 p;
     if ((A1 * B2 - A2 * B1) > epsilon_) {
@@ -151,7 +152,7 @@ void Manifold::Impl::Fillet(double radius,
 
       // Offset origin by len
 
-      origin -= len / 4 * n3;
+      origin -= len / 4.0 * n3;
 
       cylinder.Translate(origin);
 
@@ -175,6 +176,7 @@ void Manifold::Impl::Fillet(double radius,
       throw std::exception();
     }
   }
+#endif
 }
 
 }  // namespace manifold
