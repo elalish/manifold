@@ -11,6 +11,19 @@ using namespace manifold;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+void Print(const manifold::Polygons& poly) {
+  std::cout << "Poly = [" << std::endl;
+
+  auto& loop = poly[0];
+  for (size_t i = 0; i != loop.size(); i++) {
+    std::cout << "[" << loop[i].x << ", " << loop[i].y << "]";
+
+    if (i != loop.size() - 1) std::cout << " ,";
+  }
+
+  std::cout << std::endl << "]" << std::endl;
+}
+
 void VertexByVertex(double radius) {
   auto generateArc = [](const vec2& preP, const vec2& curP, const vec2& nextP,
                         double radius) -> std::vector<vec2> {
@@ -59,7 +72,7 @@ void VertexByVertex(double radius) {
     return arcPoints;
   };
 
-  manifold::Polygons poly{{vec2{0, 0}, vec2{1, 1}, vec2{0, 1}}};
+  manifold::Polygons poly{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}}};
   manifold::Polygons newPoly{{}};
 
   for (size_t i = 0; i != poly[0].size(); i++) {
@@ -77,6 +90,8 @@ void VertexByVertex(double radius) {
       newLoop.push_back(curP);
     }
   }
+
+  Print(newPoly);
 }
 
 void RollingBall(double radius) {
@@ -128,9 +143,7 @@ int main() {
     Manifold::Fillet(mesh, 5, {});
   }
 
-  vec2 v{0, 0};
-
-  vec2 r = v * 3.0;
+  VertexByVertex(0.5);
 
   // RollingBall(0.5);
   // manifold::Collider co(poly);
