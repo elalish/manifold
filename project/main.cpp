@@ -1,9 +1,11 @@
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <iomanip>
 #include <iostream>
 
 #include "../src/collider.h"
+#include "../src/impl.h"
 #include "manifold/linalg.h"
 #include "manifold/manifold.h"
 
@@ -95,28 +97,52 @@ void VertexByVertex(double radius) {
 }
 
 void RollingBall(double radius) {
-  manifold::Polygons poly{{vec2{0, 0}, vec2{1, 1}, vec2{0, 1}}};
+  manifold::Polygons poly{{vec2{0, 0}, vec2{5, 0}, vec2{5, 5}, vec2{0, 5}}};
 
-  std::vector<manifold::Box> boxVec;
-  std::vector<uint32_t> mortonVec;
+  Vec<manifold::Box> boxVec;
+  Vec<uint32_t> mortonVec;
 
-  for (size_t i = 0; i != poly[0].size(); i++) {
-    const vec2 p1 = poly[0][i], p2 = poly[0][(i + 1) % poly[0].size()];
+  auto& loop = poly[0];
 
-    vec3 center = toVec3(p1) + toVec3(p2);
-    center /= 2;
+  {
+    struct pair {
+      manifold::Box box;
+      uint32_t morton;
+    };
 
-    manifold::Box bbox(toVec3(p1), toVec3(p2));
+    std::vector<pair> pairs;
 
-    mortonVec.push_back(manifold::Collider::MortonCode(center, bbox));
+    for (size_t i = 0; i != loop.size(); i++) {
+      const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
 
-    boxVec.push_back(bbox);
+      vec3 center = toVec3(p1) + toVec3(p2);
+      center /= 2;
+
+      std::cout << center.x << " " << center.y << std::endl;
+
+      manifold::Box bbox(toVec3(p1), toVec3(p2));
+
+      pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox)});
+    }
+
+    std::stable_sort(pairs.begin(), pairs.end(),
+                     [](const pair& lhs, const pair& rhs) -> bool {
+                       return rhs.morton > lhs.morton;
+                     });
+
+    for (auto it = pairs.begin(); it != pairs.end(); it++) {
+      boxVec.push_back(it->box);
+      mortonVec.push_back(it->morton);
+    }
+
+    boxVec.Dump();
+    mortonVec.Dump();
   }
 
   manifold::Collider collider(boxVec, mortonVec);
 
-  for (size_t i = 0; i != poly[0].size(); i++) {
-    const vec2 p1 = poly[0][i], p2 = poly[0][(i + 1) % poly[0].size()];
+  for (size_t i = 0; i != loop.size(); i++) {
+    const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
     vec2 e = p2 - p1;
     vec2 perp = la::normalize(vec2(-e.y, e.x));
 
@@ -132,6 +158,9 @@ void RollingBall(double radius) {
     box.Union(toVec3(offsetP2));
 
     auto r = collider.Collisions(manifold::Vec<manifold::Box>({box}).cview());
+    r.Dump();
+
+    r.Sort();
   }
 }
 
@@ -143,9 +172,8 @@ int main() {
     Manifold::Fillet(mesh, 5, {});
   }
 
-  VertexByVertex(0.5);
+  RollingBall(0.5);
 
-  // RollingBall(0.5);
   // manifold::Collider co(poly);
 
   // co.Collisions(poly,);
