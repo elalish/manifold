@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 
@@ -98,21 +99,23 @@ void VertexByVertex(const double radius) {
 
 void RollingBall(const double radius) {
   manifold::Polygons poly{{vec2{0, 0}, vec2{5, 0}, vec2{5, 5}, vec2{0, 5}}};
+  auto& loop = poly[0];
+
+  manifold::Polygons newPoly = poly;
+  auto& newLoop = newPoly[0];
 
   Vec<manifold::Box> boxVec;
   Vec<uint32_t> mortonVec;
 
-  auto& loop = poly[0];
+  struct pair {
+    manifold::Box box;
+    uint32_t morton;
+    size_t p1Ref;
+    size_t p2Ref;
+  };
 
+  std::vector<pair> pairs;
   {
-    struct pair {
-      manifold::Box box;
-      uint32_t morton;
-      size_t index;
-    };
-
-    std::vector<pair> pairs;
-
     for (size_t i = 0; i != loop.size(); i++) {
       const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
 
@@ -123,7 +126,8 @@ void RollingBall(const double radius) {
 
       manifold::Box bbox(toVec3(p1), toVec3(p2));
 
-      pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i});
+      pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i,
+                       (i + 1) % loop.size()});
     }
 
     std::stable_sort(pairs.begin(), pairs.end(),
@@ -211,7 +215,7 @@ void RollingBall(const double radius) {
       if (la::length(d) < EPSILON)
         return la::dot(p1 - center, p1 - center) <= radius * radius;
 
-      // Project p1, circle to line segement
+      // Project vec p1 -> circle to line segement
       double t = la::dot(center - p1, d) / la::dot(d, d);
 
       vec2 closestPoint;
@@ -231,10 +235,40 @@ void RollingBall(const double radius) {
       return distanceSquared <= radius * radius;
     };
 
-    for (size_t i = 0; i != r.size(); i++) {
-    }
-
     // Result
+    for (size_t j = 0; j != r.size(); j++) {
+      auto ele = pairs[r.Get(j, true)];
+
+      vec2 t;
+      if (intersectLine(p1, p2, loop[ele.p1Ref], loop[ele.p2Ref], t) ||
+          intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
+                                   extendP1 + perp * radius) ||
+          intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
+                                   extendP2 + perp * radius)) {
+        // Intersect
+
+        {
+          vec2 norm1 = la::normalize(p1 - p2),
+               norm2 = la::normalize(loop[ele.p1Ref] - loop[ele.p2Ref]);
+          double theta = std::acos(la::dot(norm1, norm2));
+
+          double convexity =
+              la::cross((p2 - p1), (loop[ele.p1Ref] - loop[ele.p2Ref]));
+
+          double dist = radius / std::tan(theta / 2.0);
+
+          vec2 t1 = p2 + norm1 * dist, t2 = loop[ele.p2Ref] + norm2 * dist;
+
+          vec2 circleCenter = t1 + vec2(-norm1.y, norm1.x) * radius;
+
+          for (size_t k = 0; k != 100; k++) {
+            newLoop.push_back(circleCenter +
+                              vec2{radius * cos(M_PI * 2 / 100 * k),
+                                   radius * sin(M_PI * 2 / 100 * k)});
+          }
+        }
+      }
+    }
   }
 }
 
