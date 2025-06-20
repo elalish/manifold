@@ -26,7 +26,7 @@ void Print(const manifold::Polygons& poly) {
   std::cout << std::endl << "]" << std::endl;
 }
 
-void VertexByVertex(double radius) {
+void VertexByVertex(const double radius) {
   auto generateArc = [](const vec2& preP, const vec2& curP, const vec2& nextP,
                         double radius) -> std::vector<vec2> {
     vec2 norm1 = la::normalize(preP - curP),
@@ -96,7 +96,7 @@ void VertexByVertex(double radius) {
   Print(newPoly);
 }
 
-void RollingBall(double radius) {
+void RollingBall(const double radius) {
   manifold::Polygons poly{{vec2{0, 0}, vec2{5, 0}, vec2{5, 5}, vec2{0, 5}}};
 
   Vec<manifold::Box> boxVec;
@@ -108,6 +108,7 @@ void RollingBall(double radius) {
     struct pair {
       manifold::Box box;
       uint32_t morton;
+      size_t index;
     };
 
     std::vector<pair> pairs;
@@ -122,7 +123,7 @@ void RollingBall(double radius) {
 
       manifold::Box bbox(toVec3(p1), toVec3(p2));
 
-      pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox)});
+      pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i});
     }
 
     std::stable_sort(pairs.begin(), pairs.end(),
@@ -138,6 +139,8 @@ void RollingBall(double radius) {
     boxVec.Dump();
     mortonVec.Dump();
   }
+
+  const double EPSILON = 1E-7;
 
   manifold::Collider collider(boxVec, mortonVec);
 
@@ -161,6 +164,77 @@ void RollingBall(double radius) {
     r.Dump();
 
     r.Sort();
+
+    // In Out Classify
+    // AABB is too wide for collision test, this part can accelerate
+
+    // Line intersect
+    auto intersectLine = [&EPSILON](const vec2& p1, const vec2& p2,
+                                    const vec2& p3, const vec2& p4,
+                                    vec2& intersectionPoint) -> bool {
+      double det = la::cross(p2 - p1, p4 - p3);
+
+      if (std::abs(det) < EPSILON) {
+        // Parallel
+        return false;
+      }
+
+      double num_t = la::cross(p3 - p1, p4 - p3);
+      double num_u = la::cross(p3 - p1, p2 - p1);
+
+      double t = num_t / det;
+      double u = num_u / det;
+
+      // Check if the intersection point inside line segement
+      if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
+          (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
+        // Inside
+        double intersect_x = p1.x + t * (p2.x - p1.x);
+        double intersect_y = p1.y + t * (p2.y - p1.y);
+
+        intersectionPoint = {intersect_x, intersect_y};
+        return true;
+      } else {
+        // Outside -> No intersection
+
+        intersectionPoint = {};
+        return false;
+      }
+    };
+
+    // Cirle intersection
+    auto intersectCircleDetermine = [&radius, &EPSILON](
+                                        const vec2& p1, const vec2& p2,
+                                        const vec2& center) -> bool {
+      vec2 d = p2 - p1;
+
+      if (la::length(d) < EPSILON)
+        return la::dot(p1 - center, p1 - center) <= radius * radius;
+
+      // Project p1, circle to line segement
+      double t = la::dot(center - p1, d) / la::dot(d, d);
+
+      vec2 closestPoint;
+
+      if (t < 0) {
+        closestPoint = p1;
+      } else if (t > 1) {
+        closestPoint = p2;
+      } else {
+        closestPoint = p1 + t * d;
+      }
+
+      // Calculate the distance from the closest point to the circle's center
+      double distanceSquared =
+          la::dot(closestPoint - center, closestPoint - center);
+
+      return distanceSquared <= radius * radius;
+    };
+
+    for (size_t i = 0; i != r.size(); i++) {
+    }
+
+    // Result
   }
 }
 
