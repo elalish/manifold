@@ -2,6 +2,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 
@@ -27,7 +28,50 @@ void Print(const manifold::Polygons& poly) {
   std::cout << std::endl << "]" << std::endl;
 }
 
-void VertexByVertex(const double radius) {
+struct PolygonTest {
+  PolygonTest(const manifold::Polygons& polygons)
+      : polygons(polygons), name("Result"){};
+  std::string name;
+  int expectedNumTri = -1;
+  double epsilon = -1;
+
+  manifold::Polygons polygons;
+};
+
+void Save(const std::string& filename, const std::vector<PolygonTest>& result) {
+  // Open a file stream for writing.
+  std::ofstream outFile(filename);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Could not open file " << filename << " for writing."
+              << std::endl;
+    return;
+  }
+
+  // Write each test case to the file.
+  for (const auto& test : result) {
+    // Write the header for the test.
+    outFile << test.name << " " << test.expectedNumTri << " " << test.epsilon
+            << " " << test.polygons.size() << "\n";
+
+    // Write each polygon within the test.
+    for (const auto& poly : test.polygons) {
+      // Write the number of points for the current polygon.
+      outFile << poly.size() << "\n";
+      // Write the coordinates for each point in the polygon.
+      for (const auto& point : poly) {
+        outFile << point.x << " " << point.y << "\n";
+      }
+    }
+  }
+
+  outFile.close();
+  std::cout << "Successfully saved " << result.size() << " tests to "
+            << filename << std::endl;
+}
+
+manifold::Polygons VertexByVertex(const double radius,
+                                  const manifold::Polygons& poly) {
   auto generateArc = [](const vec2& preP, const vec2& curP, const vec2& nextP,
                         double radius) -> std::vector<vec2> {
     vec2 norm1 = la::normalize(preP - curP),
@@ -75,7 +119,6 @@ void VertexByVertex(const double radius) {
     return arcPoints;
   };
 
-  manifold::Polygons poly{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}}};
   manifold::Polygons newPoly{{}};
 
   for (size_t i = 0; i != poly[0].size(); i++) {
@@ -94,11 +137,11 @@ void VertexByVertex(const double radius) {
     }
   }
 
-  Print(newPoly);
+  return newPoly;
 }
 
-void RollingBall(const double radius) {
-  manifold::Polygons poly{{vec2{0, 0}, vec2{5, 0}, vec2{5, 5}, vec2{0, 5}}};
+manifold::Polygons RollingBall(const double radius,
+                               const manifold::Polygons& poly) {
   auto& loop = poly[0];
 
   manifold::Polygons newPoly = poly;
@@ -239,6 +282,10 @@ void RollingBall(const double radius) {
     for (size_t j = 0; j != r.size(); j++) {
       auto ele = pairs[r.Get(j, true)];
 
+      // if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
+      //     ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
+      //   continue;
+
       vec2 t;
       if (intersectLine(p1, p2, loop[ele.p1Ref], loop[ele.p2Ref], t) ||
           intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
@@ -246,14 +293,15 @@ void RollingBall(const double radius) {
           intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
                                    extendP2 + perp * radius)) {
         // Intersect
+        std::cout << "Intersect\n";
 
         {
           vec2 norm1 = la::normalize(p1 - p2),
-               norm2 = la::normalize(loop[ele.p1Ref] - loop[ele.p2Ref]);
+               norm2 = la::normalize(loop[ele.p2Ref] - loop[ele.p1Ref]);
           double theta = std::acos(la::dot(norm1, norm2));
 
           double convexity =
-              la::cross((p2 - p1), (loop[ele.p1Ref] - loop[ele.p2Ref]));
+              la::cross((p2 - p1), (loop[ele.p2Ref] - loop[ele.p1Ref]));
 
           double dist = radius / std::tan(theta / 2.0);
 
@@ -261,15 +309,18 @@ void RollingBall(const double radius) {
 
           vec2 circleCenter = t1 + vec2(-norm1.y, norm1.x) * radius;
 
-          for (size_t k = 0; k != 100; k++) {
+          const uint32_t seg = 20;
+          for (size_t k = 0; k != seg; k++) {
             newLoop.push_back(circleCenter +
-                              vec2{radius * cos(M_PI * 2 / 100 * k),
-                                   radius * sin(M_PI * 2 / 100 * k)});
+                              vec2{radius * cos(M_PI * 2 / seg * k),
+                                   radius * sin(M_PI * 2 / seg * k)});
           }
         }
       }
     }
   }
+
+  return newPoly;
 }
 
 int main() {
@@ -280,11 +331,17 @@ int main() {
     Manifold::Fillet(mesh, 5, {});
   }
 
-  RollingBall(0.5);
+  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}};
+  manifold::Polygons Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}};
+  manifold::Polygons UShape{
+      {vec2{0, 0}, vec2{-1, 5}, vec2{3, 2}, vec2{7, 5}, vec2{6, 0}}};
 
-  // manifold::Collider co(poly);
+  const manifold::Polygons poly = UShape;
 
-  // co.Collisions(poly,);
+  std::vector<PolygonTest> result{PolygonTest(VertexByVertex(0.5, poly)),
+                                  PolygonTest(RollingBall(0.5, poly))};
+
+  Save("../project/result.txt", result);
 
   return 0;
 }
