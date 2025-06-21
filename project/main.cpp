@@ -104,7 +104,7 @@ manifold::Polygons VertexByVertex(const double radius,
       sweep_angle_total_rad -= 2 * M_PI;
     }
 
-    int num_arc_segments = 100;
+    int num_arc_segments = 10;
 
     std::vector<vec2> arcPoints;
     arcPoints.push_back(t1);
@@ -147,8 +147,11 @@ manifold::Polygons RollingBall(const double radius,
                                const manifold::Polygons& poly) {
   auto& loop = poly[0];
 
+  std::vector<std::optional<vec2>> adjustCircleCenter;
+
   manifold::Polygons newPoly = poly;
   auto& newLoop = newPoly[0];
+  newLoop.push_back(loop[0]);
 
   Vec<manifold::Box> boxVec;
   Vec<uint32_t> mortonVec;
@@ -205,12 +208,15 @@ manifold::Polygons RollingBall(const double radius,
 
     vec2 extendP1 = p1 - e * radius, extendP2 = p2 + e * radius;
 
-    vec2 offsetP1 = extendP1 + perp * 2.0 * radius,
-         offsetP2 = extendP2 + perp * 2.0 * radius;
+    vec2 offsetExtendP1 = extendP1 + perp * 2.0 * radius,
+         offsetExtendP2 = extendP2 + perp * 2.0 * radius;
+
+    vec2 offsetP1 = p1 + perp * 2.0 * radius,
+         offsetP2 = p2 + perp * 2.0 * radius;
 
     manifold::Box box(toVec3(extendP1), toVec3(extendP2));
-    box.Union(toVec3(offsetP1));
-    box.Union(toVec3(offsetP2));
+    box.Union(toVec3(offsetExtendP1));
+    box.Union(toVec3(offsetExtendP2));
 
     auto r = collider.Collisions(manifold::Vec<manifold::Box>({box}).cview());
     // r.Dump();
@@ -284,7 +290,15 @@ manifold::Polygons RollingBall(const double radius,
       return distanceSquared <= radius * radius;
     };
 
-    // Result
+    // Projection
+    auto isProjectionOnSegment = [](const vec2& c, const vec2& p1,
+                                    const vec2& p2) -> bool {
+      double t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
+
+      return t >= 0 && t <= 1;
+    };
+
+    // Intersection
     std::cout << "Now " << i << "->" << (i + 1) % loop.size() << std::endl;
     // std::cout << "BBox " << box << std::endl;
     // r.Dump();
@@ -292,24 +306,34 @@ manifold::Polygons RollingBall(const double radius,
       auto ele = pairs[r.Get(j, true)];
 
       // Skip neighbour because handled before
-      if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
-          ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
-        continue;
+      // if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
+      //     ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
+      //   continue;
 
       vec2 p3 = loop[ele.p1Ref], p4 = loop[ele.p2Ref];
       vec2 t;
 
       std::cout << "Testing " << ele.p1Ref << "->" << ele.p2Ref << "\t";
-      if (intersectLine(offsetP1, offsetP2, p3, p4, t) ||
-          intersectCircleDetermine(p3, p4, extendP1 + perp * radius) ||
-          intersectCircleDetermine(p3, p4, extendP2 + perp * radius)) {
+
+      bool flag1 = intersectLine(offsetP1, offsetP2, p3, p4, t),
+           flag2 = intersectCircleDetermine(p3, p4, p1 + perp * radius),
+           flag3 = intersectCircleDetermine(p3, p4, p2 + perp * radius);
+
+      std::cout << (flag1 ? "True" : "False") << " "
+                << (flag2 ? "True" : "False") << " "
+                << (flag3 ? "True" : "False") << " ";
+
+      if (flag1 || flag2 || flag3) {
         // Intersect logical
 
-        std::cout << "Intersect " << std::endl;
+        std::cout << "Intersect ";
 
         // Skip processed line
         mark[i * loop.size() + ele.p1Ref] = 1;
-        if (mark[ele.p1Ref * loop.size() + i] != 0) continue;
+        if (mark[ele.p1Ref * loop.size() + i] != 0) {
+          std::cout << "processed" << std::endl;
+          continue;
+        }
 
         {
           vec2 e1 = p2 - p1;
@@ -322,7 +346,7 @@ manifold::Polygons RollingBall(const double radius,
 
           if (la::length(e1) < EPSILON || la::length(e2) < EPSILON) {
             // FIXME: Degenerate
-
+            std::cout << "Degenerate" << std::endl;
             continue;
           }
 
@@ -332,9 +356,20 @@ manifold::Polygons RollingBall(const double radius,
 
           if (std::abs(la::determinant(A)) < EPSILON) {
             // Parallel line
+            std::cout << "Parallel" << std::endl;
             continue;
           } else {
             vec2 circleCenter = la::mul(la::inverse(A), b);
+
+            if (isProjectionOnSegment(circleCenter, p1, p2) &&
+                isProjectionOnSegment(circleCenter, p3, p4)) {
+            } else {
+              std::cout << "Circle center not on line segment" << std::endl;
+              continue;
+            }
+
+            std::cout << "Center" << circleCenter << " Start " << newLoop.size()
+                      << "~" << newLoop.size() + 20 << std::endl;
 
             const uint32_t seg = 20;
             for (size_t k = 0; k != seg; k++) {
@@ -350,6 +385,8 @@ manifold::Polygons RollingBall(const double radius,
     }
   }
 
+  // Construct Reuslt
+
   return newPoly;
 }
 
@@ -361,14 +398,24 @@ int main() {
     Manifold::Fillet(mesh, 5, {});
   }
 
-  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}};
-  manifold::Polygons Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}};
-  manifold::Polygons UShape{
-      {vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}};
+  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
+      Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
+      UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
+      ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
+              vec2{6, 0}}},
+      WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
+              vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
+      TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
+              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}};
 
-  const manifold::Polygons poly = UShape;
+  const manifold::Polygons poly = TShape;
+  const double radius = 2.3;
 
-  std::vector<PolygonTest> result{UShape, PolygonTest(RollingBall(0.6, poly))};
+  std::vector<PolygonTest> result{poly,
+                                  PolygonTest(VertexByVertex(radius, poly)),
+                                  PolygonTest(RollingBall(radius, poly))};
+
+  // UnionFind
 
   Save("../project/result.txt", result);
 
