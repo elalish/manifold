@@ -2,9 +2,11 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 
 #include "../src/collider.h"
 #include "../src/impl.h"
@@ -194,6 +196,8 @@ manifold::Polygons RollingBall(const double radius,
 
   manifold::Collider collider(boxVec, mortonVec);
 
+  std::vector<uint8_t> mark(loop.size() * loop.size(), 0);
+
   for (size_t i = 0; i != loop.size(); i++) {
     const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
     vec2 e = p2 - p1;
@@ -282,11 +286,12 @@ manifold::Polygons RollingBall(const double radius,
 
     // Result
     std::cout << "Now " << i << "->" << (i + 1) % loop.size() << std::endl;
-    std::cout << "BBox " << box << std::endl;
-    r.Dump();
+    // std::cout << "BBox " << box << std::endl;
+    // r.Dump();
     for (size_t j = 0; j != r.size(); j++) {
       auto ele = pairs[r.Get(j, true)];
 
+      // Skip neighbour because handled before
       if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
           ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
         continue;
@@ -298,9 +303,14 @@ manifold::Polygons RollingBall(const double radius,
       if (intersectLine(offsetP1, offsetP2, p3, p4, t) ||
           intersectCircleDetermine(p3, p4, extendP1 + perp * radius) ||
           intersectCircleDetermine(p3, p4, extendP2 + perp * radius)) {
-        // Intersect
+        // Intersect logical
 
         std::cout << "Intersect " << std::endl;
+
+        // Skip processed line
+        mark[i * loop.size() + ele.p1Ref] = 1;
+        if (mark[ele.p1Ref * loop.size() + i] != 0) continue;
+
         {
           vec2 e1 = p2 - p1;
           vec2 normal1 = {e1.y, -e1.x};
@@ -318,7 +328,7 @@ manifold::Polygons RollingBall(const double radius,
 
           mat2 A = {{normal1.x, normal2.x}, {normal1.y, normal2.y}};
           vec2 b = {radius * la::length(normal1) - c1,
-                    radius * la::length(normal1) - c2};
+                    radius * la::length(normal2) - c2};
 
           if (std::abs(la::determinant(A)) < EPSILON) {
             // Parallel line
@@ -335,7 +345,7 @@ manifold::Polygons RollingBall(const double radius,
           }
         }
       } else {
-        std::cout << "\n";
+        std::cout << std::endl;
       }
     }
   }
