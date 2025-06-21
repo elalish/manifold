@@ -96,7 +96,8 @@ manifold::Polygons VertexByVertex(const double radius,
     const double EPSILON = 1E-7;
 
     if (convexity > 0 && sweep_angle_total_rad < EPSILON) {
-      sweep_angle_total_rad += 2 * M_PI;
+      // Concave, ignore
+      return std::vector<vec2>();
     } else if (convexity < 0 && sweep_angle_total_rad > EPSILON) {
       sweep_angle_total_rad -= 2 * M_PI;
     }
@@ -165,9 +166,11 @@ manifold::Polygons RollingBall(const double radius,
       vec3 center = toVec3(p1) + toVec3(p2);
       center /= 2;
 
-      std::cout << center.x << " " << center.y << std::endl;
+      // std::cout << center.x << " " << center.y << std::endl;
 
       manifold::Box bbox(toVec3(p1), toVec3(p2));
+
+      std::cout << i << "\t" << bbox.min << " " << bbox.max << std::endl;
 
       pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i,
                        (i + 1) % loop.size()});
@@ -194,9 +197,7 @@ manifold::Polygons RollingBall(const double radius,
   for (size_t i = 0; i != loop.size(); i++) {
     const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
     vec2 e = p2 - p1;
-    vec2 perp = la::normalize(vec2(-e.y, e.x));
-
-    // auto box = boxVec[i];
+    vec2 perp = la::normalize(vec2(e.y, -e.x));
 
     vec2 extendP1 = p1 - e * radius, extendP2 = p2 + e * radius;
 
@@ -208,12 +209,13 @@ manifold::Polygons RollingBall(const double radius,
     box.Union(toVec3(offsetP2));
 
     auto r = collider.Collisions(manifold::Vec<manifold::Box>({box}).cview());
-    r.Dump();
+    // r.Dump();
 
     r.Sort();
 
     // In Out Classify
-    // AABB is too wide for collision test, this part can accelerate
+    // TODO: AABB is too wide for collision test, this part can accelerate with
+    // OBB
 
     // Line intersect
     auto intersectLine = [&EPSILON](const vec2& p1, const vec2& p2,
@@ -279,43 +281,61 @@ manifold::Polygons RollingBall(const double radius,
     };
 
     // Result
+    std::cout << "Now " << i << "->" << (i + 1) % loop.size() << std::endl;
+    std::cout << "BBox " << box << std::endl;
+    r.Dump();
     for (size_t j = 0; j != r.size(); j++) {
       auto ele = pairs[r.Get(j, true)];
 
-      // if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
-      //     ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
-      //   continue;
+      if (ele.p1Ref == i || ele.p1Ref == (i + 1) % loop.size() ||
+          ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
+        continue;
 
+      vec2 p3 = loop[ele.p1Ref], p4 = loop[ele.p2Ref];
       vec2 t;
-      if (intersectLine(p1, p2, loop[ele.p1Ref], loop[ele.p2Ref], t) ||
-          intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
-                                   extendP1 + perp * radius) ||
-          intersectCircleDetermine(loop[ele.p1Ref], loop[ele.p2Ref],
-                                   extendP2 + perp * radius)) {
+
+      std::cout << "Testing " << ele.p1Ref << "->" << ele.p2Ref << "\t";
+      if (intersectLine(offsetP1, offsetP2, p3, p4, t) ||
+          intersectCircleDetermine(p3, p4, extendP1 + perp * radius) ||
+          intersectCircleDetermine(p3, p4, extendP2 + perp * radius)) {
         // Intersect
-        std::cout << "Intersect\n";
 
+        std::cout << "Intersect " << std::endl;
         {
-          vec2 norm1 = la::normalize(p1 - p2),
-               norm2 = la::normalize(loop[ele.p2Ref] - loop[ele.p1Ref]);
-          double theta = std::acos(la::dot(norm1, norm2));
+          vec2 e1 = p2 - p1;
+          vec2 normal1 = {e1.y, -e1.x};
+          double c1 = -la::dot(normal1, p1);
 
-          double convexity =
-              la::cross((p2 - p1), (loop[ele.p2Ref] - loop[ele.p1Ref]));
+          vec2 e2 = p4 - p3;
+          vec2 normal2 = {e2.y, -e2.x};
+          double c2 = -la::dot(normal2, p3);
 
-          double dist = radius / std::tan(theta / 2.0);
+          if (la::length(e1) < EPSILON || la::length(e2) < EPSILON) {
+            // FIXME: Degenerate
 
-          vec2 t1 = p2 + norm1 * dist, t2 = loop[ele.p2Ref] + norm2 * dist;
+            continue;
+          }
 
-          vec2 circleCenter = t1 + vec2(-norm1.y, norm1.x) * radius;
+          mat2 A = {{normal1.x, normal2.x}, {normal1.y, normal2.y}};
+          vec2 b = {radius * la::length(normal1) - c1,
+                    radius * la::length(normal1) - c2};
 
-          const uint32_t seg = 20;
-          for (size_t k = 0; k != seg; k++) {
-            newLoop.push_back(circleCenter +
-                              vec2{radius * cos(M_PI * 2 / seg * k),
-                                   radius * sin(M_PI * 2 / seg * k)});
+          if (std::abs(la::determinant(A)) < EPSILON) {
+            // Parallel line
+            continue;
+          } else {
+            vec2 circleCenter = la::mul(la::inverse(A), b);
+
+            const uint32_t seg = 20;
+            for (size_t k = 0; k != seg; k++) {
+              newLoop.push_back(circleCenter +
+                                vec2{radius * cos(M_PI * 2 / seg * k),
+                                     radius * sin(M_PI * 2 / seg * k)});
+            }
           }
         }
+      } else {
+        std::cout << "\n";
       }
     }
   }
@@ -334,12 +354,11 @@ int main() {
   manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}};
   manifold::Polygons Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}};
   manifold::Polygons UShape{
-      {vec2{0, 0}, vec2{-1, 5}, vec2{3, 2}, vec2{7, 5}, vec2{6, 0}}};
+      {vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}};
 
   const manifold::Polygons poly = UShape;
 
-  std::vector<PolygonTest> result{PolygonTest(VertexByVertex(0.5, poly)),
-                                  PolygonTest(RollingBall(0.5, poly))};
+  std::vector<PolygonTest> result{UShape, PolygonTest(RollingBall(0.6, poly))};
 
   Save("../project/result.txt", result);
 
