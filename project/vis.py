@@ -132,7 +132,7 @@ def read_polygon_tests_file(filename: str) -> List[Dict[str, Any]]:
     return all_tests
 
 if __name__ == "__main__":
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(15, 20))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 20))
 
     result = read_polygon_tests_file("result.txt")
     
@@ -147,15 +147,21 @@ if __name__ == "__main__":
     ax1.grid(True); 
     ax1.set_aspect('equal', adjustable='box')
 
-    plot_polygon(ax2, result[1]["polygons"][0], "", "blue", show_indices=True)
+    plot_polygon(ax2, result[0]["polygons"][1], "", "blue", show_indices=True)
     # ax2.legend(); 
     ax2.grid(True); 
     ax2.set_aspect('equal', adjustable='box')
 
-    plot_polygon(ax3, result[2]["polygons"][0], "", "blue", show_indices=True)
-    # ax2.legend(); 
-    ax3.grid(True); 
-    ax3.set_aspect('equal', adjustable='box')
+    # plot_polygon(ax3, result[2]["polygons"][0], "", "blue", show_indices=True)
+    # # ax2.legend(); 
+    # ax3.grid(True); 
+    # ax3.set_aspect('equal', adjustable='box')
+
+    # plot_polygon(ax3, result[3]["polygons"][0], "", "blue", show_indices=True)
+    # # ax2.legend(); 
+    # ax3.grid(True); 
+    # ax3.set_aspect('equal', adjustable='box')
+
 
     # plt.tight_layout(rect=[0, 1, 0, 0.96])
     plt.savefig("r.png")
