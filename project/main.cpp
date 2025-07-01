@@ -514,12 +514,12 @@ manifold::Polygons RollingBall(const double radius,
                     << newLoop.size() + 20 << std::endl;
 
           // NOTE: inter result shown in upper figure
-          const uint32_t seg = 20;
-          for (size_t k = 0; k != seg; k++) {
-            newLoop.push_back(circleCenter +
-                              vec2{radius * cos(M_PI * 2 / seg * k),
-                                   radius * sin(M_PI * 2 / seg * k)});
-          }
+          // const uint32_t seg = 20;
+          // for (size_t k = 0; k != seg; k++) {
+          //   newLoop.push_back(circleCenter +
+          //                     vec2{radius * cos(M_PI * 2 / seg * k),
+          //                          radius * sin(M_PI * 2 / seg * k)});
+          // }
         }
       } else {
         std::cout << std::endl;
