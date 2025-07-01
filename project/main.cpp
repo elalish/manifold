@@ -208,7 +208,6 @@ manifold::Polygons RollingBall(const double radius,
     vec2 center;
 
     double t1, t2;
-    vec2 p1E1, p2E2;
     size_t e1, e2;
     double startRad, endRad;
   };
@@ -220,7 +219,7 @@ manifold::Polygons RollingBall(const double radius,
 
   // create BBox for every line to find Collision
   for (size_t i = 0; i != loop.size(); i++) {
-    // CCW, p1 p2 -> current edge start end
+    // CW, p1 p2 -> current edge start end
     const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
     vec2 e = p2 - p1;
     vec2 perp = la::normalize(vec2(e.y, -e.x));
@@ -312,13 +311,12 @@ manifold::Polygons RollingBall(const double radius,
     // Handle if projection not on linesegment
     auto intersectEndpoint = [&](const vec2& line_normal, double line_c,
                                  const vec2& vertex_p1, const vec2& vertex_p2,
-                                 const vec2& oldCenter, double filletRadius,
-                                 vec2& newCenter) -> bool {
+                                 double filletRadius, vec2& center) -> bool {
       // Closer endpoint
-      vec2 endpoint = (la::length2(oldCenter - vertex_p1) <
-                       la::length2(oldCenter - vertex_p2))
-                          ? vertex_p1
-                          : vertex_p2;
+      vec2 endpoint =
+          (la::length2(center - vertex_p1) < la::length2(center - vertex_p2))
+              ? vertex_p1
+              : vertex_p2;
 
       double c_offset = line_c - filletRadius * la::length(line_normal);
 
@@ -341,10 +339,8 @@ manifold::Polygons RollingBall(const double radius,
       vec2 sol1 = proj_point + line_dir * chord_half_length;
       vec2 sol2 = proj_point - line_dir * chord_half_length;
 
-      newCenter =
-          (la::length2(sol1 - oldCenter) < la::length2(sol2 - oldCenter))
-              ? sol1
-              : sol2;
+      center = (la::length2(sol1 - center) < la::length2(sol2 - center)) ? sol1
+                                                                         : sol2;
       return true;
     };
 
@@ -372,7 +368,7 @@ manifold::Polygons RollingBall(const double radius,
       //     ele.p2Ref == i || ele.p2Ref == (i + 1) % loop.size())
       //   continue;
 
-      // CCW, p3 p4 -> bbox hit edge start end
+      // CW, p3 p4 -> bbox hit edge start end
       vec2 p3 = loop[ele.p1Ref], p4 = loop[ele.p2Ref];
       vec2 t;
 
@@ -398,50 +394,27 @@ manifold::Polygons RollingBall(const double radius,
           continue;
         }
 
+        // Calc circle center
         {
           vec2 e1 = p2 - p1;
+          vec2 normal1 = {e1.y, -e1.x};
+          double c1 = -la::dot(normal1, p1);
           vec2 e2 = p4 - p3;
-
+          vec2 normal2 = {e2.y, -e2.x};
+          double c2 = -la::dot(normal2, p3);
           if (la::length(e1) < EPSILON || la::length(e2) < EPSILON) {
             // FIXME: Degenerate
             std::cout << "Degenerate" << std::endl;
-            throw std::exception();
+            continue;
           }
-
-          double angle =
-              std::atan2(std::abs(la::cross(e1, e2)), la::dot(e1, e2));
-
-          if (angle > M_PI - EPSILON) {
-            std::cout << "Arc too long (>π)" << std::endl;
-            throw std::exception();
-          }
-
-          vec2 normal1, normal2;
-
-          if (la::cross(e1, e2) > 0) {
-            // Concave
-            normal1 = {e1.y, -e1.x};
-            normal2 = {e2.y, -e2.x};
-          } else {
-            // Convex
-            normal1 = {-e1.y, e1.x};
-            normal2 = {-e2.y, e2.x};
-          }
-
-          normal1 = la::normalize(normal1);
-          normal2 = la::normalize(normal2);
-
-          double c1 = -la::dot(normal1, p1);
-          double c2 = -la::dot(normal2, p3);
-
           mat2 A = {{normal1.x, normal2.x}, {normal1.y, normal2.y}};
-          vec2 b = {radius - c1, radius - c2};
-
+          vec2 b = {radius * la::length(normal1) - c1,
+                    radius * la::length(normal2) - c2};
           if (std::abs(la::determinant(A)) < EPSILON) {
+            // FIXME: Parallel line
             std::cout << "Parallel" << std::endl;
-            throw std::exception();
+            continue;
           }
-
           vec2 circleCenter = la::mul(la::inverse(A), b);
 
           double e1T = 0, e2T = 0;
@@ -450,10 +423,10 @@ manifold::Polygons RollingBall(const double radius,
 
           // Check is on line segment
           if (onE1 && onE2) {
+            // On both e1 and e2
           } else if (onE1) {
-            // e2 endpoint
-            if (!intersectEndpoint(normal1, c1, p3, p4, circleCenter, radius,
-                                   circleCenter)) {
+            // On e2 endpoint
+            if (!intersectEndpoint(normal1, c1, p3, p4, radius, circleCenter)) {
               continue;
             }
             if (e2T < 0) {
@@ -461,49 +434,57 @@ manifold::Polygons RollingBall(const double radius,
               if (markEV[i * loop.size() + ele.p1Ref]) continue;
 
               markEV[i * loop.size() + ele.p1Ref] = 1;
+
+              e2T = 0;
             } else {
               // p4
               if (markEV[i * loop.size() + ele.p2Ref]) continue;
 
               markEV[i * loop.size() + ele.p2Ref] = 1;
+
+              e2T = 1;
             }
 
-            std::cout << "Center (line-vertex on e2): " << circleCenter
-                      << std::endl;
+            isProjectionOnSegment(circleCenter, p1, p2, e1T);
+            if (e1T < EPSILON || e1T > (1 + EPSILON)) continue;
+
+            std::cout << "Center (line-vertex on e2): ";
 
           } else if (onE2) {
             // e1 endpoint
-            if (!intersectEndpoint(normal2, c2, p1, p2, circleCenter, radius,
-                                   circleCenter)) {
+            if (!intersectEndpoint(normal2, c2, p1, p2, radius, circleCenter)) {
               continue;
             }
+
             if (e1T < 0) {
               // p1
-              if (markEV[i * loop.size() + i]) continue;
+              if (markEV[ele.p1Ref * loop.size() + i]) continue;
 
-              markEV[i * loop.size() + i] = 1;
+              markEV[ele.p1Ref * loop.size() + i] = 1;
+
+              e1T = 0;
             } else {
               // p2
-              if (markEV[i * loop.size() + (i + 1) % loop.size()]) continue;
+              if (markEV[ele.p1Ref * loop.size() + (i + 1) % loop.size()])
+                continue;
 
-              markEV[(i + 1) % loop.size()] = 1;
+              markEV[ele.p1Ref * loop.size() + (i + 1) % loop.size()] = 1;
+
+              e1T = 1;
             }
 
-            std::cout << "Center (line-vertex on e1): " << circleCenter
-                      << std::endl;
+            isProjectionOnSegment(circleCenter, p3, p4, e2T);
+
+            if (e2T < EPSILON || e2T > (1 + EPSILON)) continue;
+            std::cout << "Center (line-vertex on e1): ";
           } else {
-            // Not on line segemnt skip
+            // Not on line segemnt, skip
             continue;
           }
 
           {
-            vec2 tangent1 =
-                circleCenter - (la::dot(normal1, circleCenter) + c1) /
-                                   la::dot(normal1, normal1) * normal1;
-
-            vec2 tangent2 =
-                circleCenter - (la::dot(normal2, circleCenter) + c2) /
-                                   la::dot(normal2, normal2) * normal2;
+            vec2 tangent1 = p1 + e1T * e1;
+            vec2 tangent2 = p3 + e2T * e2;
 
             vec2 v_start = tangent1 - circleCenter;
             vec2 v_end = tangent2 - circleCenter;
@@ -515,24 +496,22 @@ manifold::Polygons RollingBall(const double radius,
             if (start_rad < 0) start_rad += 2 * M_PI;
             if (end_rad < 0) end_rad += 2 * M_PI;
 
-            // Sort result by CCW
+            // Sort result by CW
             double arcAngle = end_rad - start_rad;
             if (arcAngle < 0) arcAngle += 2 * M_PI;
 
             if (arcAngle <= M_PI) {
-              circleConnection[i].emplace_back(
-                  Info{circleCenter, e1T, e2T, tangent1, tangent2, i, ele.p1Ref,
-                       start_rad, end_rad});
+              circleConnection[ele.p1Ref].emplace_back(Info{
+                  circleCenter, e2T, e1T, ele.p1Ref, i, end_rad, start_rad});
             } else {
-              circleConnection[ele.p1Ref].emplace_back(
-                  Info{circleCenter, e2T, e1T, tangent2, tangent1, ele.p1Ref, i,
-                       end_rad, start_rad});
+              circleConnection[i].emplace_back(Info{
+                  circleCenter, e1T, e2T, i, ele.p1Ref, start_rad, end_rad});
             }
           }
 
-          std::cout << "Circle center " << circleCenter << " Vetex index "
-                    << newLoop.size() << "~" << newLoop.size() + 20
-                    << std::endl;
+          std::cout << "Circle center " << circleCenter << " " << i << " "
+                    << ele.p1Ref << " Vetex index " << newLoop.size() << "~"
+                    << newLoop.size() + 20 << std::endl;
 
           // NOTE: inter result shown in upper figure
           const uint32_t seg = 20;
@@ -551,20 +530,26 @@ manifold::Polygons RollingBall(const double radius,
   // Construct Reuslt
 
   for (size_t i = 0; i != circleConnection.size(); i++) {
-    std::cout << circleConnection[i].size();
+    std::cout << i << " " << circleConnection[i].size();
     for (size_t j = 0; j != circleConnection[i].size(); j++) {
       std::cout << "\t" << circleConnection[i][j].e1 << " "
                 << circleConnection[i][j].e2 << " " << circleConnection[i][j].t1
-                << " " << circleConnection[i][j].t2 << std::endl;
+                << " " << circleConnection[i][j].t2 << " "
+                << circleConnection[i][j].startRad << " "
+                << circleConnection[i][j].endRad << std::endl;
     }
 
     std::cout << std::endl;
   }
 
   // Do tracing
-  SimplePolygon rLoop{};
 
   while (true) {
+    SimplePolygon rLoop{};
+
+    std::vector<size_t> tracingEList;
+    std::vector<size_t> mapVV;
+
     // Tracing to construct result
     size_t currentEdgeIndex = 0, endEdgeIndex = 0;
 
@@ -576,6 +561,11 @@ manifold::Polygons RollingBall(const double radius,
         Info& info = *it->begin();
 
         double total_arc_angle = info.endRad - info.startRad;
+
+        if (total_arc_angle > 0) {
+          total_arc_angle -= 2.0 * M_PI;
+        }
+
         const uint32_t seg = 10;
 
         for (uint32_t seg_i = 0; seg_i < seg; ++seg_i) {
@@ -588,55 +578,94 @@ manifold::Polygons RollingBall(const double radius,
           rLoop.push_back(point_on_arc);
         }
 
-        it->erase(it->begin());
-
         currentEdgeIndex = info.e2;
         endEdgeIndex = info.e1;
         currentEdgeT = info.t2;
 
+        it->erase(it->begin());
         break;
       }
     }
 
     if (it == circleConnection.end()) break;
 
+    // For detecting inner loop
+    tracingEList.push_back(currentEdgeIndex);
+    mapVV.push_back(rLoop.size());
+
     while (currentEdgeIndex != endEdgeIndex) {
       auto it = std::find_if(circleConnection[currentEdgeIndex].begin(),
                              circleConnection[currentEdgeIndex].end(),
-                             [&currentEdgeT](const Info& ele) -> bool {
-                               return ele.t1 > currentEdgeT;
+                             [currentEdgeT, EPSILON](const Info& ele) -> bool {
+                               return ele.t1 + EPSILON > currentEdgeT;
                              });
 
       if (it != circleConnection[currentEdgeIndex].end()) {
         // Found next circle fillet
 
-        double total_arc_angle = it->endRad - it->startRad;
+        Info t = *it;
+        circleConnection[currentEdgeIndex].erase(it);
+
+        double total_arc_angle = t.endRad - t.startRad;
+        if (total_arc_angle > 0) {
+          total_arc_angle -= 2.0 * M_PI;
+        }
+
         const uint32_t seg = 10;
 
         for (uint32_t seg_i = 0; seg_i < seg; ++seg_i) {
           double fraction = static_cast<double>(seg_i) / (seg - 1);
-          double current_angle = it->startRad + fraction * total_arc_angle;
+          double current_angle = t.startRad + fraction * total_arc_angle;
 
-          vec2 point_on_arc = {it->center.x + radius * cos(current_angle),
-                               it->center.y + radius * sin(current_angle)};
+          vec2 point_on_arc = {t.center.x + radius * cos(current_angle),
+                               t.center.y + radius * sin(current_angle)};
 
           rLoop.push_back(point_on_arc);
         }
 
-        currentEdgeIndex = it->e2;
-        endEdgeIndex = it->e1;
-        currentEdgeT = it->t1;
+        // Check if current result contain inner loop
 
-        circleConnection[currentEdgeIndex].erase(it);
+        auto itt = std::find(tracingEList.rbegin(), tracingEList.rend(), t.e2);
+
+        if (itt != tracingEList.rend()) {
+          size_t pos = tracingEList.size() -
+                       std::distance(tracingEList.rbegin(), itt) - 1;
+          mapVV[pos];
+
+          SimplePolygon innerLoop{};
+          innerLoop.insert(innerLoop.end(), rLoop.begin() + mapVV[pos],
+                           rLoop.end());
+
+          newPoly.push_back(innerLoop);
+
+          rLoop.erase(rLoop.begin() + mapVV[pos], rLoop.end());
+
+          currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
+          currentEdgeT = 0;
+
+          continue;
+        }
+
+        currentEdgeIndex = t.e2;
+        currentEdgeT = t.t2;
+
+        tracingEList.push_back(currentEdgeIndex);
+        mapVV.push_back(rLoop.size());
       } else {
         // Not found, just add vertex
 
         rLoop.push_back(loop[(currentEdgeIndex + 1) % loop.size()]);
         currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
+        currentEdgeT = 0;
+
+        tracingEList.push_back(currentEdgeIndex);
+        mapVV.push_back(rLoop.size());
       }
     }
+    newPoly.push_back(rLoop);
   }
-  newPoly.push_back(rLoop);
+
+  std::cout << "Result loop count:" << newPoly.size() << std::endl;
 
   return newPoly;
 }
@@ -652,6 +681,7 @@ int main() {
   manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
       Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
       UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
+      // Corner testcase
       ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
               vec2{6, 0}}},
       WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
@@ -659,7 +689,7 @@ int main() {
       TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
               vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}};
 
-  const manifold::Polygons poly = Rect;
+  const manifold::Polygons poly = TShape;
   const double radius = 0.7;
 
   std::vector<PolygonTest> result{

@@ -147,10 +147,23 @@ if __name__ == "__main__":
     ax1.grid(True); 
     ax1.set_aspect('equal', adjustable='box')
 
-    plot_polygon(ax2, result[0]["polygons"][1], "", "blue", show_indices=True)
-    # ax2.legend(); 
-    ax2.grid(True); 
-    ax2.set_aspect('equal', adjustable='box')
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    
+    for i in range(1,len(result[0]["polygons"])):
+      plot_polygon(ax2, result[0]["polygons"][i], "", colors[i], show_indices=True)
+      # ax2.legend(); 
+      ax2.grid(True); 
+      ax2.set_aspect('equal', adjustable='box')
+
+    # plot_polygon(ax2, result[0]["polygons"][2], "", "blue", show_indices=True)
+    # # ax2.legend(); 
+    # ax2.grid(True); 
+    # ax2.set_aspect('equal', adjustable='box')
+
+    # plot_polygon(ax2, result[0]["polygons"][4], "", "blue", show_indices=True)
+    # # ax2.legend(); 
+    # ax2.grid(True); 
+    # ax2.set_aspect('equal', adjustable='box')
 
     # plot_polygon(ax3, result[2]["polygons"][0], "", "blue", show_indices=True)
     # # ax2.legend(); 
