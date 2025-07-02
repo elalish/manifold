@@ -30,7 +30,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     TARGET manifold3d_stub
     POST_BUILD
     COMMAND
-      python "${CMAKE_CURRENT_SOURCE_DIR}/stub_postprocess.py"
+      python "${PROJECT_SOURCE_DIR}/stub_postprocess.py"
       "$<TARGET_FILE_DIR:manifold3d>/manifold3d.pyi"
     VERBATIM
   )

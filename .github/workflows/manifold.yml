@@ -151,7 +151,7 @@ jobs:
       matrix:
         parallelization: [OFF, ON]
         shared: [OFF, ON]
-    runs-on: windows-2019
+    runs-on: windows-2025
     steps:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
