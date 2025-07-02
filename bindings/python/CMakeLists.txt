@@ -25,6 +25,13 @@ if(MANIFOLD_PYBIND_STUBGEN)
     DEPENDS manifold3d
     PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
   )
+
+  add_custom_command(
+    TARGET manifold3d_stub POST_BUILD
+    COMMAND
+    python "${CMAKE_CURRENT_SOURCE_DIR}/stub_postprocess.py" "$<TARGET_FILE_DIR:manifold3d>/manifold3d.pyi"
+    VERBATIM
+  )
 endif()
 
 target_link_libraries(manifold3d PRIVATE manifold)

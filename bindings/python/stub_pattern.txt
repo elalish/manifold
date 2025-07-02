@@ -1,6 +1,6 @@
 manifold3d.__prefix__:
   import numpy as np
-  from typing import Literal, TypeVar, Union
+  from typing import Literal, TypeVar, Union, Any
 
   N = TypeVar('N', bound=int)
   DoubleNx2 = np.ndarray[tuple[N, Literal[2]], np.dtype[np.double]]
@@ -11,11 +11,3 @@ manifold3d.__prefix__:
   DoubleNx3 = np.ndarray[tuple[N, Literal[3]], np.dtype[np.double]]
   Intx3 = Union[np.ndarray[tuple[Literal[3]], np.dtype[np.integer]], tuple[int, int, int], list[int]]
   IntNx3 = np.ndarray[tuple[N, Literal[3]], np.dtype[np.integer]]
-
-manifold3d.Mesh.vert_properties:
-  @property
-  def vert_properties(self) -> np.typing.NDArray[np.float32]: ...
-
-manifold3d.Mesh64.vert_properties:
-  @property
-  def vert_properties(self) -> np.typing.NDArray[np.float64]: ...
