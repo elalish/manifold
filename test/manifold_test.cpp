@@ -714,6 +714,13 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
 
+TEST(Manifold, Fillet3D) {
+  auto obj = manifold::Manifold::Cube();
+
+  auto mesh = obj.GetMeshGL();
+  Manifold::Fillet(mesh, 5, {});
+}
+
 #ifdef MANIFOLD_EXPORT
 TEST(Manifold, MergeRefine) {
   MeshGL mesh;
