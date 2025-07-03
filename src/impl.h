@@ -373,9 +373,6 @@ struct Manifold::Impl {
   void CreateTangents(std::vector<Smoothness>);
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false);
 
-  // fillet.cpp
-  void Fillet(double radius, const std::vector<size_t>& selectedEdges);
-
   // quickhull.cpp
   void Hull(VecView<vec3> vertPos);
 };

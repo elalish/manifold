@@ -1,14 +1,6 @@
 # Created by https://www.gitignore.io/api/osx,c++,cuda,linux,cmake
 # Edit at https://www.gitignore.io/?templates=osx,c++,cuda,linux,cmake
 
-data
-cmake
-include
-
-manifold.pc
-manifoldConfig.cmake
-DartConfiguration.tcl
-
 ### C++ ###
 # Prerequisites
 *.d
@@ -142,4 +134,3 @@ CMakeSettings.json
 
 # Benchmark stl files
 extras/ember_tests/testfiles/raw_meshes
-

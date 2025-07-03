@@ -97,44 +97,6 @@ Manifold Manifold::Smooth(const MeshGL64& meshGL64,
 }
 
 /**
- * Create a rounding corner with specified radius at given edges. If radius
- * can't fit, tri won't be change.
- *
- * @param meshGL input MeshGL.
- * @param radius radius of fillet
- * @param selectedEdges Selected edges to apply fillet operation
- */
-
-Manifold Manifold::Fillet(const MeshGL& meshGL, double radius,
-                          const std::vector<size_t>& selectedEdges) {
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
-
-  if (selectedEdges.size() != 0 && radius > impl->epsilon_)
-    impl->Fillet(radius, selectedEdges);
-
-  return Manifold(impl);
-}
-
-/**
- * Create a rounding corner with specified radius at given edges. If radius
- * can't fit, tri won't be change.
- *
- * @param meshGL input MeshGL.
- * @param radius radius of fillet
- * @param selectedEdges Selected edges to apply fillet operation
- */
-
-Manifold Manifold::Fillet(const MeshGL64& meshGL64, double radius,
-                          const std::vector<size_t>& selectedEdges) {
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
-
-  if (selectedEdges.size() != 0 && radius > impl->epsilon_)
-    impl->Fillet(radius, selectedEdges);
-
-  return Manifold(impl);
-}
-
-/**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
  */

@@ -18,6 +18,7 @@
 #include <fstream>
 #include <limits>
 
+#include "manifold/manifold.h"
 #include "test.h"
 
 namespace {
@@ -131,4 +132,73 @@ void RegisterPolygonTests() {
   std::string dir = file.substr(0, end);
   for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
 #endif
+}
+
+struct PolygonTest {
+  PolygonTest(const manifold::Polygons &polygons)
+      : name("Result"), polygons(polygons){};
+
+  std::string name;
+  int expectedNumTri = -1;
+  double epsilon = -1;
+
+  manifold::Polygons polygons;
+};
+
+void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
+  // Open a file stream for writing.
+  std::ofstream outFile(filename);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Could not open file " << filename << " for writing."
+              << std::endl;
+    return;
+  }
+
+  // Write each test case to the file.
+  for (const auto &test : result) {
+    // Write the header for the test.
+    outFile << test.name << " " << test.expectedNumTri << " " << test.epsilon
+            << " " << test.polygons.size() << "\n";
+
+    // Write each polygon within the test.
+    for (const auto &poly : test.polygons) {
+      // Write the number of points for the current polygon.
+      outFile << poly.size() << "\n";
+      // Write the coordinates for each point in the polygon.
+      for (const auto &point : poly) {
+        outFile << point.x << " " << point.y << "\n";
+      }
+    }
+  }
+
+  outFile.close();
+  std::cout << "Successfully saved " << result.size() << " tests to "
+            << filename << std::endl;
+}
+
+TEST(Polygons, Fillet) {
+  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
+      Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
+      UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
+      // Corner testcase
+      ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
+              vec2{6, 0}}},
+      WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
+              vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
+      TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
+              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}};
+
+  const manifold::Polygons polygon = TShape;
+  const double radius = 0.7;
+
+  std::vector<PolygonTest> result{
+      // poly,
+      // PolygonTest(VertexByVertex(radius, poly)),
+      manifold::Manifold::Fillet2D(polygon, radius),
+  };
+
+  // UnionFind
+
+  Save("result.txt", result);
 }

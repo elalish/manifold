@@ -1,19 +1,25 @@
-#include <algorithm>
-#include <array>
-#include <cassert>
-#include <cmath>
-#include <cstring>
-#include <fstream>
-#include <iomanip>
+// Copyright 2021 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <iostream>
-#include <memory>
 
-#include "../src/collider.h"
-#include "../src/impl.h"
-#include "manifold/linalg.h"
-#include "manifold/manifold.h"
+#include "./impl.h"
 
+namespace {
 using namespace manifold;
+
+const double EPSILON = 1e-9;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
@@ -30,126 +36,119 @@ void Print(const manifold::Polygons& poly) {
   std::cout << std::endl << "]" << std::endl;
 }
 
-struct PolygonTest {
-  PolygonTest(const manifold::Polygons& polygons)
-      : polygons(polygons), name("Result"){};
-  std::string name;
-  int expectedNumTri = -1;
-  double epsilon = -1;
+bool intersectLine(const vec2& p1, const vec2& p2, const vec2& p3,
+                   const vec2& p4, vec2& intersectionPoint) {
+  double det = la::cross(p2 - p1, p4 - p3);
 
-  manifold::Polygons polygons;
+  if (std::abs(det) < EPSILON) {
+    // Parallel
+    return false;
+  }
+
+  double num_t = la::cross(p3 - p1, p4 - p3);
+  double num_u = la::cross(p3 - p1, p2 - p1);
+
+  double t = num_t / det;
+  double u = num_u / det;
+
+  // Check if the intersection point inside line segement
+  if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
+      (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
+    // Inside
+    double intersect_x = p1.x + t * (p2.x - p1.x);
+    double intersect_y = p1.y + t * (p2.y - p1.y);
+
+    intersectionPoint = {intersect_x, intersect_y};
+    return true;
+  } else {
+    // Outside -> No intersection
+
+    intersectionPoint = {};
+    return false;
+  }
 };
 
-void Save(const std::string& filename, const std::vector<PolygonTest>& result) {
-  // Open a file stream for writing.
-  std::ofstream outFile(filename);
+// Cirle intersection
+bool intersectCircleDetermine(const vec2& p1, const vec2& p2,
+                              const vec2& center, double radius) {
+  vec2 d = p2 - p1;
 
-  if (!outFile.is_open()) {
-    std::cerr << "Error: Could not open file " << filename << " for writing."
-              << std::endl;
-    return;
+  if (la::length(d) < EPSILON)
+    return la::dot(p1 - center, p1 - center) <= radius * radius;
+
+  // Project vec p1 -> circle to line segement
+  double t = la::dot(center - p1, d) / la::dot(d, d);
+
+  vec2 closestPoint;
+
+  if (t < 0) {
+    closestPoint = p1;
+  } else if (t > 1) {
+    closestPoint = p2;
+  } else {
+    closestPoint = p1 + t * d;
   }
 
-  // Write each test case to the file.
-  for (const auto& test : result) {
-    // Write the header for the test.
-    outFile << test.name << " " << test.expectedNumTri << " " << test.epsilon
-            << " " << test.polygons.size() << "\n";
+  // Calculate the distance from the closest point to the circle's center
+  double distanceSquared =
+      la::dot(closestPoint - center, closestPoint - center);
 
-    // Write each polygon within the test.
-    for (const auto& poly : test.polygons) {
-      // Write the number of points for the current polygon.
-      outFile << poly.size() << "\n";
-      // Write the coordinates for each point in the polygon.
-      for (const auto& point : poly) {
-        outFile << point.x << " " << point.y << "\n";
-      }
-    }
+  return distanceSquared <= radius * radius;
+};
+
+// Handle if projection not on linesegment
+bool intersectEndpoint(const vec2& line_normal, double line_c,
+                       const vec2& vertex_p1, const vec2& vertex_p2,
+                       double filletRadius, vec2& center) {
+  // Closer endpoint
+  vec2 endpoint =
+      (la::length2(center - vertex_p1) < la::length2(center - vertex_p2))
+          ? vertex_p1
+          : vertex_p2;
+
+  double c_offset = line_c - filletRadius * la::length(line_normal);
+
+  double signed_dist_to_offset_line =
+      (la::dot(line_normal, endpoint) + c_offset) / la::length(line_normal);
+
+  // No solution
+  if (std::abs(signed_dist_to_offset_line) > filletRadius + EPSILON) {
+    return false;
   }
 
-  outFile.close();
-  std::cout << "Successfully saved " << result.size() << " tests to "
-            << filename << std::endl;
-}
+  vec2 proj_point =
+      endpoint -
+      (signed_dist_to_offset_line / la::length(line_normal)) * line_normal;
+  double chord_half_length = std::sqrt(std::max(
+      0.0, filletRadius * filletRadius -
+               signed_dist_to_offset_line * signed_dist_to_offset_line));
+  vec2 line_dir = la::normalize(vec2{-line_normal.y, line_normal.x});
 
-manifold::Polygons VertexByVertex(const double radius,
-                                  const manifold::Polygons& poly) {
-  auto generateArc = [](const vec2& preP, const vec2& curP, const vec2& nextP,
-                        double radius) -> std::vector<vec2> {
-    vec2 norm1 = la::normalize(preP - curP),
-         norm2 = la::normalize(nextP - curP);
-    double theta = std::acos(la::dot(norm1, norm2));
+  vec2 sol1 = proj_point + line_dir * chord_half_length;
+  vec2 sol2 = proj_point - line_dir * chord_half_length;
 
-    double convexity = la::cross((curP - preP), (nextP - curP));
+  center =
+      (la::length2(sol1 - center) < la::length2(sol2 - center)) ? sol1 : sol2;
+  return true;
+};
 
-    double dist = radius / std::tan(theta / 2.0);
+// Projection
+bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
+                           double& t) {
+  t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
 
-    vec2 t1 = curP + norm1 * dist, t2 = curP + norm2 * dist;
+  return t >= 0 && t <= 1;
+};
+}  // namespace
 
-    vec2 circleCenter = t1 + vec2(-norm1.y, norm1.x) * radius;
+namespace manifold {
 
-    double start = std::atan2(t1.y - circleCenter.y, t1.x - circleCenter.x),
-           end = std::atan2(t2.y - circleCenter.y, t2.x - circleCenter.x);
-
-    // Discrete, Merge
-
-    double sweep_angle_total_rad = end - start;
-
-    const double EPSILON = 1E-7;
-
-    if (convexity > 0 && sweep_angle_total_rad < EPSILON) {
-      // Concave, ignore
-      return std::vector<vec2>();
-    } else if (convexity < 0 && sweep_angle_total_rad > EPSILON) {
-      sweep_angle_total_rad -= 2 * M_PI;
-    }
-
-    int num_arc_segments = 10;
-
-    std::vector<vec2> arcPoints;
-    arcPoints.push_back(t1);
-
-    for (int i = 1; i < num_arc_segments; ++i) {
-      double fraction = static_cast<double>(i) / num_arc_segments;
-      double current_angle = start + sweep_angle_total_rad * fraction;
-      double px = circleCenter.x + radius * std::cos(current_angle);
-      double py = circleCenter.y + radius * std::sin(current_angle);
-      arcPoints.push_back({px, py});
-    }
-
-    arcPoints.push_back(t2);
-
-    return arcPoints;
-  };
-
-  manifold::Polygons newPoly{{}};
-
-  for (size_t i = 0; i != poly[0].size(); i++) {
-    auto& loop = poly[0];
-    auto& newLoop = newPoly[0];
-
-    const vec2 preP = loop[(i - 1 + loop.size()) % loop.size()], curP = loop[i],
-               nextP = loop[(i + 1) % loop.size()];
-
-    auto r = generateArc(preP, curP, nextP, radius);
-
-    if (!r.empty()) {
-      newLoop.insert(newLoop.end(), r.begin(), r.end());
-    } else {
-      newLoop.push_back(curP);
-    }
-  }
-
-  return newPoly;
-}
-
-manifold::Polygons RollingBall(const double radius,
-                               const manifold::Polygons& poly) {
-  auto& loop = poly[0];
+Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
+  auto& loop = polygons[0];
 
   std::vector<std::optional<vec2>> adjustCircleCenter;
 
-  manifold::Polygons newPoly = poly;
+  manifold::Polygons newPoly = polygons;
   auto& newLoop = newPoly[0];
   newLoop.push_back(loop[0]);
 
@@ -244,116 +243,6 @@ manifold::Polygons RollingBall(const double radius,
     // TODO: AABB is too wide for collision test, this part can accelerate with
     // OBB
 
-#pragma region Utility
-    // Line intersect
-    auto intersectLine = [&EPSILON](const vec2& p1, const vec2& p2,
-                                    const vec2& p3, const vec2& p4,
-                                    vec2& intersectionPoint) -> bool {
-      double det = la::cross(p2 - p1, p4 - p3);
-
-      if (std::abs(det) < EPSILON) {
-        // Parallel
-        return false;
-      }
-
-      double num_t = la::cross(p3 - p1, p4 - p3);
-      double num_u = la::cross(p3 - p1, p2 - p1);
-
-      double t = num_t / det;
-      double u = num_u / det;
-
-      // Check if the intersection point inside line segement
-      if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
-          (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
-        // Inside
-        double intersect_x = p1.x + t * (p2.x - p1.x);
-        double intersect_y = p1.y + t * (p2.y - p1.y);
-
-        intersectionPoint = {intersect_x, intersect_y};
-        return true;
-      } else {
-        // Outside -> No intersection
-
-        intersectionPoint = {};
-        return false;
-      }
-    };
-
-    // Cirle intersection
-    auto intersectCircleDetermine = [&radius, &EPSILON](
-                                        const vec2& p1, const vec2& p2,
-                                        const vec2& center) -> bool {
-      vec2 d = p2 - p1;
-
-      if (la::length(d) < EPSILON)
-        return la::dot(p1 - center, p1 - center) <= radius * radius;
-
-      // Project vec p1 -> circle to line segement
-      double t = la::dot(center - p1, d) / la::dot(d, d);
-
-      vec2 closestPoint;
-
-      if (t < 0) {
-        closestPoint = p1;
-      } else if (t > 1) {
-        closestPoint = p2;
-      } else {
-        closestPoint = p1 + t * d;
-      }
-
-      // Calculate the distance from the closest point to the circle's center
-      double distanceSquared =
-          la::dot(closestPoint - center, closestPoint - center);
-
-      return distanceSquared <= radius * radius;
-    };
-
-    // Handle if projection not on linesegment
-    auto intersectEndpoint = [&](const vec2& line_normal, double line_c,
-                                 const vec2& vertex_p1, const vec2& vertex_p2,
-                                 double filletRadius, vec2& center) -> bool {
-      // Closer endpoint
-      vec2 endpoint =
-          (la::length2(center - vertex_p1) < la::length2(center - vertex_p2))
-              ? vertex_p1
-              : vertex_p2;
-
-      double c_offset = line_c - filletRadius * la::length(line_normal);
-
-      double signed_dist_to_offset_line =
-          (la::dot(line_normal, endpoint) + c_offset) / la::length(line_normal);
-
-      // No solution
-      if (std::abs(signed_dist_to_offset_line) > filletRadius + EPSILON) {
-        return false;
-      }
-
-      vec2 proj_point =
-          endpoint -
-          (signed_dist_to_offset_line / la::length(line_normal)) * line_normal;
-      double chord_half_length = std::sqrt(std::max(
-          0.0, filletRadius * filletRadius -
-                   signed_dist_to_offset_line * signed_dist_to_offset_line));
-      vec2 line_dir = la::normalize(vec2{-line_normal.y, line_normal.x});
-
-      vec2 sol1 = proj_point + line_dir * chord_half_length;
-      vec2 sol2 = proj_point - line_dir * chord_half_length;
-
-      center = (la::length2(sol1 - center) < la::length2(sol2 - center)) ? sol1
-                                                                         : sol2;
-      return true;
-    };
-
-    // Projection
-    auto isProjectionOnSegment = [](const vec2& c, const vec2& p1,
-                                    const vec2& p2, double& t) -> bool {
-      t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
-
-      return t >= 0 && t <= 1;
-    };
-
-#pragma endregion
-
     // Intersection
     std::cout << "Now " << i << "->" << (i + 1) % loop.size() << std::endl;
     // std::cout << "BBox " << box << std::endl;
@@ -375,8 +264,8 @@ manifold::Polygons RollingBall(const double radius,
       std::cout << "Testing " << ele.p1Ref << "->" << ele.p2Ref << "\t";
 
       bool flag1 = intersectLine(offsetP1, offsetP2, p3, p4, t),
-           flag2 = intersectCircleDetermine(p3, p4, p1 + perp * radius),
-           flag3 = intersectCircleDetermine(p3, p4, p2 + perp * radius);
+           flag2 = intersectCircleDetermine(p3, p4, p1 + perp * radius, radius),
+           flag3 = intersectCircleDetermine(p3, p4, p2 + perp * radius, radius);
 
       std::cout << (flag1 ? "True" : "False") << " "
                 << (flag2 ? "True" : "False") << " "
@@ -670,37 +559,4 @@ manifold::Polygons RollingBall(const double radius,
   return newPoly;
 }
 
-int main() {
-  if (false) {
-    auto obj = manifold::Manifold::Cube();
-
-    auto mesh = obj.GetMeshGL();
-    Manifold::Fillet(mesh, 5, {});
-  }
-
-  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
-      Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
-      UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
-      // Corner testcase
-      ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
-              vec2{6, 0}}},
-      WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
-              vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
-      TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
-              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}};
-
-  const manifold::Polygons poly = TShape;
-  const double radius = 0.7;
-
-  std::vector<PolygonTest> result{
-      // poly,
-      // PolygonTest(VertexByVertex(radius, poly)),
-      PolygonTest(RollingBall(radius, poly)),
-  };
-
-  // UnionFind
-
-  Save("../project/result.txt", result);
-
-  return 0;
-}
+}  // namespace manifold

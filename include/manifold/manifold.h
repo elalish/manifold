@@ -308,6 +308,8 @@ class Manifold {
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
                           double revolveDegrees = 360.0f);
+
+  static Polygons Fillet2D(const Polygons&, double radius);
   ///@}
 
   enum class Error {
@@ -420,18 +422,6 @@ class Manifold {
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Smooth(const MeshGL64&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
-  ///@}
-
-  /** @name Fillet
-   * Create a rounding corner
-   */
-  ///@{
-  static Manifold Fillet(const MeshGL&, double radius,
-                         const std::vector<size_t>& selectedEdges = {});
-
-  static Manifold Fillet(const MeshGL64&, double radius,
-                         const std::vector<size_t>& selectedEdges = {});
-
   ///@}
 
   /** @name Convex Hull
