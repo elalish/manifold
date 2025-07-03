@@ -6,13 +6,13 @@
   "configurations": [
     {
       "name": "manifold test",
-      "type": "lldb-dap",
+      "type": "cppdbg",
       "MIMode": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_catch_exceptions=0",
-        "--gtest_filter=Manifold.Simplify"
+        "--gtest_filter=Properties.ToleranceSphere"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",
