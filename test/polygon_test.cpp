@@ -136,7 +136,7 @@ void RegisterPolygonTests() {
 
 struct PolygonTest {
   PolygonTest(const manifold::Polygons &polygons)
-      : name("Result"), polygons(polygons){};
+      : name("Result"), polygons(polygons) {};
 
   std::string name;
   int expectedNumTri = -1;
