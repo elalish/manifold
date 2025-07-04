@@ -18,7 +18,7 @@
 #include <fstream>
 #include <limits>
 
-#include "manifold/manifold.h"
+#include "manifold/cross_section.h"
 #include "test.h"
 
 namespace {
@@ -136,7 +136,7 @@ void RegisterPolygonTests() {
 
 struct PolygonTest {
   PolygonTest(const manifold::Polygons &polygons)
-      : name("Result"), polygons(polygons) {};
+      : name("Result"), polygons(polygons){};
 
   std::string name;
   int expectedNumTri = -1;
@@ -195,7 +195,7 @@ TEST(Polygons, Fillet) {
   std::vector<PolygonTest> result{
       // poly,
       // PolygonTest(VertexByVertex(radius, poly)),
-      manifold::Manifold::Fillet2D(polygon, radius),
+      manifold::CrossSection::Fillet(polygon, radius, 20),
   };
 
   // UnionFind

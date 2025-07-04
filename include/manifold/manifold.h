@@ -308,8 +308,6 @@ class Manifold {
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
                           double revolveDegrees = 360.0f);
-
-  static Polygons Fillet2D(const Polygons&, double radius);
   ///@}
 
   enum class Error {
