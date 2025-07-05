@@ -190,10 +190,14 @@ TEST(Polygons, Fillet) {
               vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}},
       // Spike case
       Spike1{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{4, -6}, vec2{2, 0}}};
+              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}},
+      Spike2{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
+              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}};
 
-  const manifold::Polygons polygon = UShape;
+  const manifold::Polygons polygon = Spike2;
   const double radius = 0.7;
+
+  manifold::ManifoldParams().verbose = true;
 
   std::vector<PolygonTest> result{
       // poly,

@@ -462,7 +462,7 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
         }
 
         for (int i = 0; i < circularSegments; ++i) {
-          double fraction = static_cast<double>(circularSegments) / (i - 1);
+          double fraction = static_cast<double>(i) / (circularSegments - 1);
           double current_angle = info.startRad + fraction * total_arc_angle;
 
           vec2 point_on_arc = {info.center.x + radius * cos(current_angle),
