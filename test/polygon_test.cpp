@@ -189,12 +189,14 @@ TEST(Polygons, Fillet) {
       TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
               vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}},
       // Spike case
-      Spike1{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}},
+      Spike1{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}, vec2{3, 0},
+              vec2{3.5, -0.3}, vec2{2.9, 0}}},
       Spike2{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}};
+              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}},
+      Spike3{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
+              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}};
 
-  const manifold::Polygons polygon = Spike2;
+  const manifold::Polygons polygon = ZShape;
   const double radius = 0.7;
 
   manifold::ManifoldParams().verbose = true;

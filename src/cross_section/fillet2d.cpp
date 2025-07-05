@@ -198,16 +198,16 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
   std::vector<uint8_t> markEE(loop.size() * loop.size(), 0);
   std::vector<uint8_t> markEV(loop.size() * loop.size(), 0);
 
-  struct Info {
+  struct ArcConnectionInfo {
     vec2 center;
 
-    double t1, t2;
-    size_t e1, e2;
+    double t1, t2;  // Parameter value of arc tangent points of edges
+    size_t e1, e2;  // Index of tangent points' edge
     double startRad, endRad;
   };
 
-  std::vector<std::vector<Info>> circleConnection(loop.size(),
-                                                  std::vector<Info>());
+  std::vector<std::vector<ArcConnectionInfo>> arcConnection(
+      loop.size(), std::vector<ArcConnectionInfo>());
 
   std::cout << "Collider BBox Testing" << std::endl;
 
@@ -388,10 +388,10 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
             if (arcAngle < 0) arcAngle += 2 * M_PI;
 
             if (arcAngle <= M_PI) {
-              circleConnection[ele.p1Ref].emplace_back(Info{
+              arcConnection[ele.p1Ref].emplace_back(ArcConnectionInfo{
                   circleCenter, e2T, e1T, ele.p1Ref, i, end_rad, start_rad});
             } else {
-              circleConnection[i].emplace_back(Info{
+              arcConnection[i].emplace_back(ArcConnectionInfo{
                   circleCenter, e1T, e2T, i, ele.p1Ref, start_rad, end_rad});
             }
           }
@@ -422,15 +422,14 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
-    for (size_t i = 0; i != circleConnection.size(); i++) {
-      std::cout << i << " " << circleConnection[i].size();
-      for (size_t j = 0; j != circleConnection[i].size(); j++) {
-        std::cout << "\t" << circleConnection[i][j].e1 << " "
-                  << circleConnection[i][j].e2 << " "
-                  << circleConnection[i][j].t1 << " "
-                  << circleConnection[i][j].t2 << " "
-                  << circleConnection[i][j].startRad << " "
-                  << circleConnection[i][j].endRad << std::endl;
+    for (size_t i = 0; i != arcConnection.size(); i++) {
+      std::cout << i << " " << arcConnection[i].size();
+      for (size_t j = 0; j != arcConnection[i].size(); j++) {
+        std::cout << "\t" << arcConnection[i][j].e1 << " "
+                  << arcConnection[i][j].e2 << " " << arcConnection[i][j].t1
+                  << " " << arcConnection[i][j].t2 << " "
+                  << arcConnection[i][j].startRad << " "
+                  << arcConnection[i][j].endRad << std::endl;
       }
 
       std::cout << std::endl;
@@ -450,12 +449,13 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
 
     double currentEdgeT = 0;
 
-    auto it = circleConnection.begin();
-    for (; it != circleConnection.end(); it++) {
+    auto it = arcConnection.begin();
+    for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
-        Info& info = *it->begin();
+        ArcConnectionInfo& ArcConnectionInfo = *it->begin();
 
-        double total_arc_angle = info.endRad - info.startRad;
+        double total_arc_angle =
+            ArcConnectionInfo.endRad - ArcConnectionInfo.startRad;
 
         if (total_arc_angle > 0) {
           total_arc_angle -= 2.0 * M_PI;
@@ -463,37 +463,40 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
 
         for (int i = 0; i < circularSegments; ++i) {
           double fraction = static_cast<double>(i) / (circularSegments - 1);
-          double current_angle = info.startRad + fraction * total_arc_angle;
+          double current_angle =
+              ArcConnectionInfo.startRad + fraction * total_arc_angle;
 
-          vec2 point_on_arc = {info.center.x + radius * cos(current_angle),
-                               info.center.y + radius * sin(current_angle)};
+          vec2 point_on_arc = {
+              ArcConnectionInfo.center.x + radius * cos(current_angle),
+              ArcConnectionInfo.center.y + radius * sin(current_angle)};
 
           rLoop.push_back(point_on_arc);
         }
 
-        currentEdgeIndex = info.e2;
-        endEdgeIndex = info.e1;
-        currentEdgeT = info.t2;
+        currentEdgeIndex = ArcConnectionInfo.e2;
+        endEdgeIndex = ArcConnectionInfo.e1;
+        currentEdgeT = ArcConnectionInfo.t2;
 
         it->erase(it->begin());
         break;
       }
     }
 
-    if (it == circleConnection.end()) break;
+    if (it == arcConnection.end()) break;
 
     // For detecting inner loop
     tracingEList.push_back(currentEdgeIndex);
     mapVV.push_back(rLoop.size());
 
     while (currentEdgeIndex != endEdgeIndex) {
-      auto it = std::find_if(circleConnection[currentEdgeIndex].begin(),
-                             circleConnection[currentEdgeIndex].end(),
-                             [currentEdgeT, EPSILON](const Info& ele) -> bool {
-                               return ele.t1 + EPSILON > currentEdgeT;
-                             });
+      auto it = std::find_if(
+          arcConnection[currentEdgeIndex].begin(),
+          arcConnection[currentEdgeIndex].end(),
+          [currentEdgeT, EPSILON](const ArcConnectionInfo& ele) -> bool {
+            return ele.t1 + EPSILON > currentEdgeT;
+          });
 
-      if (it == circleConnection[currentEdgeIndex].end()) {
+      if (it == arcConnection[currentEdgeIndex].end()) {
         // Not found, just add vertex
         // FIXME: shouldn't add vertex directly, should search for next edge
         // with fillet arc
@@ -506,8 +509,8 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
       } else {
         // Found next circle fillet
 
-        Info t = *it;
-        circleConnection[currentEdgeIndex].erase(it);
+        ArcConnectionInfo t = *it;
+        arcConnection[currentEdgeIndex].erase(it);
 
         double total_arc_angle = t.endRad - t.startRad;
         if (total_arc_angle > 0) {
