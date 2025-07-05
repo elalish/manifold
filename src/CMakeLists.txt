@@ -27,12 +27,12 @@ set(
   quickhull.cpp
   sdf.cpp
   smoothing.cpp
-  fillet2d.cpp
   sort.cpp
   subdivision.cpp
   tree2d.cpp
   # optional source files
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
+  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/fillet2d.cpp>
   $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO/meshIO.cpp>
 )
 

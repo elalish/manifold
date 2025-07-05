@@ -19,6 +19,7 @@
 #include "../collider.h"
 #include "../vec.h"
 #include "manifold/cross_section.h"
+#include "manifold/manifold.h"
 
 namespace {
 using namespace manifold;
@@ -460,7 +461,7 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
           total_arc_angle -= 2.0 * M_PI;
         }
 
-        for (uint32_t i = 0; i < circularSegments; ++i) {
+        for (int i = 0; i < circularSegments; ++i) {
           double fraction = static_cast<double>(circularSegments) / (i - 1);
           double current_angle = info.startRad + fraction * total_arc_angle;
 
@@ -494,7 +495,8 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
 
       if (it == circleConnection[currentEdgeIndex].end()) {
         // Not found, just add vertex
-
+        // FIXME: shouldn't add vertex directly, should search for next edge
+        // with fillet arc
         rLoop.push_back(loop[(currentEdgeIndex + 1) % loop.size()]);
         currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
         currentEdgeT = 0;
@@ -531,7 +533,6 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
         if (itt != tracingEList.rend()) {
           size_t pos = tracingEList.size() -
                        std::distance(tracingEList.rbegin(), itt) - 1;
-          mapVV[pos];
 
           SimplePolygon innerLoop{};
           innerLoop.insert(innerLoop.end(), rLoop.begin() + mapVV[pos],
