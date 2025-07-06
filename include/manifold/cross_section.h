@@ -164,6 +164,13 @@ class CrossSection {
   static CrossSection Hull(const Polygons polys);
   ///@}
 
+  /** @name Fillet
+   */
+  ///@{
+  static Polygons Fillet(const Polygons&, double radius,
+                         int circularSegments = 0);
+  ///@}
+
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
