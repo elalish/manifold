@@ -18,7 +18,7 @@
 #include <fstream>
 #include <limits>
 
-#include "manifold/manifold.h"
+#include "manifold/cross_section.h"
 #include "test.h"
 
 namespace {
@@ -136,7 +136,7 @@ void RegisterPolygonTests() {
 
 struct PolygonTest {
   PolygonTest(const manifold::Polygons &polygons)
-      : name("Result"), polygons(polygons){};
+      : name("Result"), polygons(polygons) {};
 
   std::string name;
   int expectedNumTri = -1;
@@ -187,15 +187,24 @@ TEST(Polygons, Fillet) {
       WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
               vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
       TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
-              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}};
+              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}},
+      // Spike case
+      Spike1{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}, vec2{3, 0},
+              vec2{3.5, -0.3}, vec2{2.9, 0}}},
+      Spike2{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
+              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}},
+      Spike3{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
+              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}};
 
-  const manifold::Polygons polygon = TShape;
+  const manifold::Polygons polygon = ZShape;
   const double radius = 0.7;
+
+  manifold::ManifoldParams().verbose = true;
 
   std::vector<PolygonTest> result{
       // poly,
       // PolygonTest(VertexByVertex(radius, poly)),
-      manifold::Manifold::Fillet2D(polygon, radius),
+      manifold::CrossSection::Fillet(polygon, radius, 20),
   };
 
   // UnionFind

@@ -13,8 +13,13 @@
 // limitations under the License.
 
 #include <iostream>
+#include <optional>
+#include <vector>
 
-#include "./impl.h"
+#include "../collider.h"
+#include "../vec.h"
+#include "manifold/cross_section.h"
+#include "manifold/manifold.h"
 
 namespace {
 using namespace manifold;
@@ -22,19 +27,6 @@ using namespace manifold;
 const double EPSILON = 1e-9;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
-
-void Print(const manifold::Polygons& poly) {
-  std::cout << "Poly = [" << std::endl;
-
-  auto& loop = poly[0];
-  for (size_t i = 0; i != loop.size(); i++) {
-    std::cout << "[" << loop[i].x << ", " << loop[i].y << "]";
-
-    if (i != loop.size() - 1) std::cout << " ,";
-  }
-
-  std::cout << std::endl << "]" << std::endl;
-}
 
 bool intersectLine(const vec2& p1, const vec2& p2, const vec2& p3,
                    const vec2& p4, vec2& intersectionPoint) {
@@ -143,7 +135,10 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
 
 namespace manifold {
 
-Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
+Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
+                              int circularSegments) {
+  using namespace manifold;
+
   auto& loop = polygons[0];
 
   std::vector<std::optional<vec2>> adjustCircleCenter;
@@ -172,11 +167,7 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
       vec3 center = toVec3(p1) + toVec3(p2);
       center /= 2;
 
-      // std::cout << center.x << " " << center.y << std::endl;
-
       manifold::Box bbox(toVec3(p1), toVec3(p2));
-
-      std::cout << i << "\t" << bbox.min << " " << bbox.max << std::endl;
 
       pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i,
                        (i + 1) % loop.size()});
@@ -192,8 +183,12 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
       mortonVec.push_back(it->morton);
     }
 
-    boxVec.Dump();
-    mortonVec.Dump();
+#ifdef MANIFOLD_DEBUG
+    if (ManifoldParams().verbose) {
+      boxVec.Dump();
+      mortonVec.Dump();
+    }
+#endif
   }
 
   const double EPSILON = 1E-7;
@@ -203,16 +198,16 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
   std::vector<uint8_t> markEE(loop.size() * loop.size(), 0);
   std::vector<uint8_t> markEV(loop.size() * loop.size(), 0);
 
-  struct Info {
+  struct ArcConnectionInfo {
     vec2 center;
 
-    double t1, t2;
-    size_t e1, e2;
+    double t1, t2;  // Parameter value of arc tangent points of edges
+    size_t e1, e2;  // Index of tangent points' edge
     double startRad, endRad;
   };
 
-  std::vector<std::vector<Info>> circleConnection(loop.size(),
-                                                  std::vector<Info>());
+  std::vector<std::vector<ArcConnectionInfo>> arcConnection(
+      loop.size(), std::vector<ArcConnectionInfo>());
 
   std::cout << "Collider BBox Testing" << std::endl;
 
@@ -310,11 +305,15 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
           bool onE1 = isProjectionOnSegment(circleCenter, p1, p2, e1T),
                onE2 = isProjectionOnSegment(circleCenter, p3, p4, e2T);
 
-          // Check is on line segment
+          // Check Circle center projection for tangent point status
           if (onE1 && onE2) {
-            // On both e1 and e2
+            // Tangent point on both edge
+          } else if ((!onE1) && (!onE2)) {
+            // Not on both line, invalid result
+            continue;
           } else if (onE1) {
-            // On e2 endpoint
+            // Only on e1, tangent point might be e2 endpoint
+            // Calc new circle center
             if (!intersectEndpoint(normal1, c1, p3, p4, radius, circleCenter)) {
               continue;
             }
@@ -334,13 +333,15 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
               e2T = 1;
             }
 
+            // Calc new tangent point's parameter value, and check is valid
             isProjectionOnSegment(circleCenter, p1, p2, e1T);
             if (e1T < EPSILON || e1T > (1 + EPSILON)) continue;
 
             std::cout << "Center (line-vertex on e2): ";
 
           } else if (onE2) {
-            // e1 endpoint
+            // tangent point might be e1 endpoint
+
             if (!intersectEndpoint(normal2, c2, p1, p2, radius, circleCenter)) {
               continue;
             }
@@ -366,9 +367,6 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
 
             if (e2T < EPSILON || e2T > (1 + EPSILON)) continue;
             std::cout << "Center (line-vertex on e1): ";
-          } else {
-            // Not on line segemnt, skip
-            continue;
           }
 
           {
@@ -390,17 +388,21 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
             if (arcAngle < 0) arcAngle += 2 * M_PI;
 
             if (arcAngle <= M_PI) {
-              circleConnection[ele.p1Ref].emplace_back(Info{
+              arcConnection[ele.p1Ref].emplace_back(ArcConnectionInfo{
                   circleCenter, e2T, e1T, ele.p1Ref, i, end_rad, start_rad});
             } else {
-              circleConnection[i].emplace_back(Info{
+              arcConnection[i].emplace_back(ArcConnectionInfo{
                   circleCenter, e1T, e2T, i, ele.p1Ref, start_rad, end_rad});
             }
           }
 
-          std::cout << "Circle center " << circleCenter << " " << i << " "
-                    << ele.p1Ref << " Vetex index " << newLoop.size() << "~"
-                    << newLoop.size() + 20 << std::endl;
+#ifdef MANIFOLD_DEBUG
+          if (ManifoldParams().verbose) {
+            std::cout << "Circle center " << circleCenter << " " << i << " "
+                      << ele.p1Ref << " Vetex index " << newLoop.size() << "~"
+                      << newLoop.size() + 20 << std::endl;
+          }
+#endif
 
           // NOTE: inter result shown in upper figure
           // const uint32_t seg = 20;
@@ -418,19 +420,22 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
 
   // Construct Reuslt
 
-  for (size_t i = 0; i != circleConnection.size(); i++) {
-    std::cout << i << " " << circleConnection[i].size();
-    for (size_t j = 0; j != circleConnection[i].size(); j++) {
-      std::cout << "\t" << circleConnection[i][j].e1 << " "
-                << circleConnection[i][j].e2 << " " << circleConnection[i][j].t1
-                << " " << circleConnection[i][j].t2 << " "
-                << circleConnection[i][j].startRad << " "
-                << circleConnection[i][j].endRad << std::endl;
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    for (size_t i = 0; i != arcConnection.size(); i++) {
+      std::cout << i << " " << arcConnection[i].size();
+      for (size_t j = 0; j != arcConnection[i].size(); j++) {
+        std::cout << "\t" << arcConnection[i][j].e1 << " "
+                  << arcConnection[i][j].e2 << " " << arcConnection[i][j].t1
+                  << " " << arcConnection[i][j].t2 << " "
+                  << arcConnection[i][j].startRad << " "
+                  << arcConnection[i][j].endRad << std::endl;
+      }
+
+      std::cout << std::endl;
     }
-
-    std::cout << std::endl;
   }
-
+#endif
   // Do tracing
 
   while (true) {
@@ -444,56 +449,68 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
 
     double currentEdgeT = 0;
 
-    auto it = circleConnection.begin();
-    for (; it != circleConnection.end(); it++) {
+    auto it = arcConnection.begin();
+    for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
-        Info& info = *it->begin();
+        ArcConnectionInfo& ArcConnectionInfo = *it->begin();
 
-        double total_arc_angle = info.endRad - info.startRad;
+        double total_arc_angle =
+            ArcConnectionInfo.endRad - ArcConnectionInfo.startRad;
 
         if (total_arc_angle > 0) {
           total_arc_angle -= 2.0 * M_PI;
         }
 
-        const uint32_t seg = 10;
+        for (int i = 0; i < circularSegments; ++i) {
+          double fraction = static_cast<double>(i) / (circularSegments - 1);
+          double current_angle =
+              ArcConnectionInfo.startRad + fraction * total_arc_angle;
 
-        for (uint32_t seg_i = 0; seg_i < seg; ++seg_i) {
-          double fraction = static_cast<double>(seg_i) / (seg - 1);
-          double current_angle = info.startRad + fraction * total_arc_angle;
-
-          vec2 point_on_arc = {info.center.x + radius * cos(current_angle),
-                               info.center.y + radius * sin(current_angle)};
+          vec2 point_on_arc = {
+              ArcConnectionInfo.center.x + radius * cos(current_angle),
+              ArcConnectionInfo.center.y + radius * sin(current_angle)};
 
           rLoop.push_back(point_on_arc);
         }
 
-        currentEdgeIndex = info.e2;
-        endEdgeIndex = info.e1;
-        currentEdgeT = info.t2;
+        currentEdgeIndex = ArcConnectionInfo.e2;
+        endEdgeIndex = ArcConnectionInfo.e1;
+        currentEdgeT = ArcConnectionInfo.t2;
 
         it->erase(it->begin());
         break;
       }
     }
 
-    if (it == circleConnection.end()) break;
+    if (it == arcConnection.end()) break;
 
     // For detecting inner loop
     tracingEList.push_back(currentEdgeIndex);
     mapVV.push_back(rLoop.size());
 
     while (currentEdgeIndex != endEdgeIndex) {
-      auto it = std::find_if(circleConnection[currentEdgeIndex].begin(),
-                             circleConnection[currentEdgeIndex].end(),
-                             [currentEdgeT, EPSILON](const Info& ele) -> bool {
-                               return ele.t1 + EPSILON > currentEdgeT;
-                             });
+      auto it = std::find_if(
+          arcConnection[currentEdgeIndex].begin(),
+          arcConnection[currentEdgeIndex].end(),
+          [currentEdgeT, EPSILON](const ArcConnectionInfo& ele) -> bool {
+            return ele.t1 + EPSILON > currentEdgeT;
+          });
 
-      if (it != circleConnection[currentEdgeIndex].end()) {
+      if (it == arcConnection[currentEdgeIndex].end()) {
+        // Not found, just add vertex
+        // FIXME: shouldn't add vertex directly, should search for next edge
+        // with fillet arc
+        rLoop.push_back(loop[(currentEdgeIndex + 1) % loop.size()]);
+        currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
+        currentEdgeT = 0;
+
+        tracingEList.push_back(currentEdgeIndex);
+        mapVV.push_back(rLoop.size());
+      } else {
         // Found next circle fillet
 
-        Info t = *it;
-        circleConnection[currentEdgeIndex].erase(it);
+        ArcConnectionInfo t = *it;
+        arcConnection[currentEdgeIndex].erase(it);
 
         double total_arc_angle = t.endRad - t.startRad;
         if (total_arc_angle > 0) {
@@ -519,7 +536,6 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
         if (itt != tracingEList.rend()) {
           size_t pos = tracingEList.size() -
                        std::distance(tracingEList.rbegin(), itt) - 1;
-          mapVV[pos];
 
           SimplePolygon innerLoop{};
           innerLoop.insert(innerLoop.end(), rLoop.begin() + mapVV[pos],
@@ -540,21 +556,16 @@ Polygons Manifold::Fillet2D(const Polygons& polygons, double radius) {
 
         tracingEList.push_back(currentEdgeIndex);
         mapVV.push_back(rLoop.size());
-      } else {
-        // Not found, just add vertex
-
-        rLoop.push_back(loop[(currentEdgeIndex + 1) % loop.size()]);
-        currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
-        currentEdgeT = 0;
-
-        tracingEList.push_back(currentEdgeIndex);
-        mapVV.push_back(rLoop.size());
       }
     }
     newPoly.push_back(rLoop);
   }
 
-  std::cout << "Result loop count:" << newPoly.size() << std::endl;
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    std::cout << "Result loop count:" << newPoly.size() << std::endl;
+  }
+#endif
 
   return newPoly;
 }

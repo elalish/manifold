@@ -145,7 +145,6 @@ if __name__ == "__main__":
     # ax1.legend(); 
     ax1.grid(True); 
     ax1.set_aspect('equal', adjustable='box')
-
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     
     for i in range(1,len(result[0]["polygons"])):
@@ -153,6 +152,10 @@ if __name__ == "__main__":
       # ax2.legend(); 
       ax2.grid(True); 
       ax2.set_aspect('equal', adjustable='box')
+    
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_ylim(ax1.get_ylim())
+    
 
     # plot_polygon(ax2, result[0]["polygons"][2], "", "blue", show_indices=True)
     # # ax2.legend(); 
