@@ -177,26 +177,54 @@ void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
             << filename << std::endl;
 }
 
-TEST(Polygons, Fillet) {
-  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
-      Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
-      UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
-      // Corner testcase
-      ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
-              vec2{6, 0}}},
-      WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
-              vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
-      TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
-              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}},
-      // Spike case
-      Spike1{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}, vec2{3, 0},
-              vec2{3.5, -0.3}, vec2{2.9, 0}}},
-      Spike2{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}},
-      Spike3{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}};
+std::map<std::string, Polygons> Read(const std::string &filename) {
+  std::map<std::string, Polygons> r;
 
-  const manifold::Polygons polygon = ZShape;
+  auto f = std::ifstream(filename);
+  EXPECT_TRUE(f.is_open());
+
+  // for each test:
+  //   test name, expectedNumTri, epsilon, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double epsilon, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> epsilon >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
+
+    r.emplace(name, polys);
+  }
+  f.close();
+
+  return r;
+}
+
+TEST(Polygons, Fillet) {
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+
+  auto dataset = Read(dir + "/polygons/" + "fillet.txt");
+
+  const manifold::Polygons polygon = dataset["TShape"];
   const double radius = 0.7;
 
   manifold::ManifoldParams().verbose = true;
@@ -206,8 +234,6 @@ TEST(Polygons, Fillet) {
       // PolygonTest(VertexByVertex(radius, poly)),
       manifold::CrossSection::Fillet(polygon, radius, 20),
   };
-
-  // UnionFind
 
   Save("result.txt", result);
 }
