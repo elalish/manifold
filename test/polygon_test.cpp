@@ -136,7 +136,7 @@ void RegisterPolygonTests() {
 
 struct PolygonTest {
   PolygonTest(const manifold::Polygons &polygons)
-      : name("Result"), polygons(polygons) {};
+      : name("Result"), polygons(polygons){};
 
   std::string name;
   int expectedNumTri = -1;
@@ -224,6 +224,7 @@ TEST(Polygons, Fillet) {
 
   auto dataset = Read(dir + "/polygons/" + "fillet.txt");
 
+  // CCW
   const manifold::Polygons polygon = dataset["TShape"];
   const double radius = 0.7;
 

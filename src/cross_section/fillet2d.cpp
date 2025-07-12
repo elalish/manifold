@@ -29,8 +29,8 @@ using namespace manifold;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
-bool intersectLine(const vec2& p1, const vec2& p2, const vec2& p3,
-                   const vec2& p4, vec2& intersectionPoint) {
+bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
+                             const vec2& p4, vec2& intersectionPoint) {
   double det = la::cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
@@ -62,8 +62,8 @@ bool intersectLine(const vec2& p1, const vec2& p2, const vec2& p3,
 };
 
 // Cirle intersection
-bool intersectCircleDetermine(const vec2& p1, const vec2& p2,
-                              const vec2& center, double radius) {
+bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
+                            double radius) {
   vec2 d = p2 - p1;
 
   if (la::length(d) < EPSILON)
@@ -87,6 +87,14 @@ bool intersectCircleDetermine(const vec2& p1, const vec2& p2,
       la::dot(closestPoint - center, closestPoint - center);
 
   return distanceSquared <= radius * radius;
+};
+
+// Projection
+bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
+                           double& t) {
+  t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
+
+  return t >= 0 && t <= 1;
 };
 
 // Handle if projection not on linesegment
@@ -125,23 +133,49 @@ bool intersectEndpoint(const vec2& line_normal, double line_c,
   return true;
 };
 
-// Projection
-bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
-                           double& t) {
-  t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
+bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
+                                       const vec2& endpoint, double radius,
+                                       double& e1T, vec2& circleCenter) {
+  vec2 e = p2 - p1, dir = la::normalize(e), normal = {-e.y, e.x};
 
-  return t >= 0 && t <= 1;
-};
+  if (la::length(e) < EPSILON) {
+    // FIXME: Degenerate
+    std::cout << "Degenerate" << std::endl;
+
+    return false;
+  }
+
+  vec2 projectedEndpoint = p1 + dir * la::dot(endpoint - e, dir);
+  double dist = la::length(projectedEndpoint - endpoint);
+  if (dist > radius * 2.0) {
+    // Bad math, something wrong before
+    throw std::exception();
+  }
+
+  dist = dist > radius ? dist - radius : radius - dist;
+
+  double len = la::sqrt(radius * radius - dist * dist);
+  vec2 tangentPoint1 = projectedEndpoint + dir * len,
+       tangentPoint2 = projectedEndpoint - dir * len;
+
+  //  FIXME: degenerate case
+  circleCenter = (la::length2(tangentPoint1 - circleCenter) <
+                  la::length2(tangentPoint2 - circleCenter))
+                     ? tangentPoint1
+                     : tangentPoint2;
+
+  return true;
+}
 
 bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                          const vec2& p3, const vec2& p4,
                                          double radius, double& e1T,
                                          double& e2T, vec2& circleCenter) {
   vec2 e1 = p2 - p1;
-  vec2 normal1 = {e1.y, -e1.x};
+  vec2 normal1 = {-e1.y, e1.x};
   double c1 = -la::dot(normal1, p1);
   vec2 e2 = p4 - p3;
-  vec2 normal2 = {e2.y, -e2.x};
+  vec2 normal2 = {-e2.y, e2.x};
   double c2 = -la::dot(normal2, p3);
   if (la::length(e1) < EPSILON || la::length(e2) < EPSILON) {
     // FIXME: Degenerate
@@ -169,11 +203,21 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     // Not on both line, invalid result
     return false;
   } else if (onE1) {
+    // Degenerated to Point Segment Intersection
+
     // Only on e1, tangent point might be e2 endpoint
     // Calc new circle center
-    if (!intersectEndpoint(normal1, c1, p3, p4, radius, circleCenter)) {
+    vec2 endpoint =
+        (la::length2(circleCenter - p3) < la::length2(circleCenter - p4)) ? p3
+                                                                          : p4;
+
+    if (!calculatePointSegmentCircleCenter(p1, p2, endpoint, radius, e1T,
+                                           circleCenter))
       return false;
-    }
+
+    // if (!intersectEndpoint(normal1, c1, p3, p4, radius, circleCenter)) {
+    //   return false;
+    // }
 
     e2T = (e2T < 0 ? 0 : 1);
 
@@ -186,9 +230,17 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   } else if (onE2) {
     // tangent point might be e1 endpoint
 
-    if (!intersectEndpoint(normal2, c2, p1, p2, radius, circleCenter)) {
+    vec2 endpoint =
+        (la::length2(circleCenter - p1) < la::length2(circleCenter - p2)) ? p1
+                                                                          : p2;
+
+    if (!calculatePointSegmentCircleCenter(p3, p4, endpoint, radius, e1T,
+                                           circleCenter))
       return false;
-    }
+
+    // if (!intersectEndpoint(normal2, c2, p1, p2, radius, circleCenter)) {
+    //   return false;
+    // }
 
     e1T = (e1T < 0 ? 0 : 1);
 
@@ -260,157 +312,188 @@ struct ArcConnectionInfo {
   double startRad, endRad;
 };
 
+struct ColliderInfo {
+  Collider outerCollider;
+  std::vector<pair> outerPair;
+
+  // Multi inner loops
+  std::vector<Collider> innerCollider;
+  std::vector<std::vector<pair>> innerrPair;
+};
+
 std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
-    const manifold::SimplePolygon& loop, manifold::SimplePolygon& newLoop,
-    const manifold::Collider& collider, const std::vector<pair>& pairs,
+    const Polygons& input, Polygons& output, const ColliderInfo& collider,
     double radius) {
-  std::vector<uint8_t> markEE(loop.size() * loop.size(), 0);
-  std::vector<uint8_t> markEV(loop.size() * loop.size(), 0);
+  auto& outerLoop = input[0];
+
+  std::vector<bool> markEE(outerLoop.size() * outerLoop.size(), false);
+  std::vector<bool> markEV(outerLoop.size() * outerLoop.size(), false);
+  std::vector<bool> markVV(outerLoop.size() * outerLoop.size(), false);
 
   std::vector<std::vector<ArcConnectionInfo>> arcConnection(
-      loop.size(), std::vector<ArcConnectionInfo>());
+      outerLoop.size(), std::vector<ArcConnectionInfo>());
 
   std::cout << "Collider BBox Testing" << std::endl;
 
   // create BBox for every line to find Collision
-  for (size_t i = 0; i != loop.size(); i++) {
-    // CW, p1 p2 -> current edge start end
-    const vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()];
-    vec2 e = p2 - p1;
-    vec2 perp = la::normalize(vec2(e.y, -e.x));
+  for (size_t e1i = 0; e1i != outerLoop.size(); e1i++) {
+    // Outer loop is CCW, p1 p2 -> current edge start end
+    const size_t p1i = e1i, p2i = (e1i + 1) % outerLoop.size();
+    const vec2 p1 = outerLoop[p1i], p2 = outerLoop[p2i];
+    vec2 e1 = p2 - p1;
+    const bool p2IsConvex =
+        la::cross(e1, outerLoop[(p2i + 1) % outerLoop.size()] - p2) >= EPSILON;
 
-    vec2 extendP1 = p1 - e * radius, extendP2 = p2 + e * radius;
+    vec2 normal = la::normalize(vec2(-e1.y, e1.x));
 
-    vec2 offsetExtendP1 = extendP1 + perp * 2.0 * radius,
-         offsetExtendP2 = extendP2 + perp * 2.0 * radius;
+    /* Only check p2 to avoid duplicate process
+    normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
+           |                 |     \----         |
+           |                 |         \----     |
+           |                 | Circle Arc-> \----|
+           |                 | <- 2 * radius ->  \
+          p1 --------------- p2 -----------------
+                                                 |
+                                                 |
+                                                 |
+                                                 |
+                                         circleOffsetP2N
+    */
 
-    vec2 offsetP1 = p1 + perp * 2.0 * radius,
-         offsetP2 = p2 + perp * 2.0 * radius;
+    vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
+         normalOffsetP2 = p2 + normal * 2.0 * radius;
 
-    manifold::Box box(toVec3(extendP1), toVec3(extendP2));
-    box.Union(toVec3(offsetExtendP1));
-    box.Union(toVec3(offsetExtendP2));
+    manifold::Box box(toVec3(p1), toVec3(p2));
+    box.Union(toVec3(normalOffsetP1));
+    box.Union(toVec3(normalOffsetP2));
 
-    auto r = collider.Collisions(manifold::Vec<manifold::Box>({box}).cview());
+    if (!p2IsConvex) {
+      // Handle concave endpoint
+      vec2 circleOffsetP2 = p2 + e1 * 2.0 * radius + normal * 2.0 * radius,
+           circleOffsetP2N = p2 + e1 * 2.0 * radius - normal * 2.0 * radius;
+
+      box.Union(toVec3(circleOffsetP2));
+      box.Union(toVec3(circleOffsetP2N));
+    }
+
+    auto r = collider.outerCollider.Collisions(
+        manifold::Vec<manifold::Box>({box}).cview());
     // r.Dump();
-
     r.Sort();
 
-    // TODO: AABB is too wide for collision test, this part can accelerate with
-    // OBB
-
-    // Intersection
-    std::cout << "Now " << i << "->" << (i + 1) % loop.size() << std::endl;
-    // std::cout << "BBox " << box << std::endl;
-    // r.Dump();
+    std::cout << "Now " << p1i << "->" << (e1i + 1) % outerLoop.size()
+              << std::endl;
 
     // In Out Classify
     for (size_t j = 0; j != r.size(); j++) {
-      auto ele = pairs[r.Get(j, true)];
+      auto ele = collider.outerPair[r.Get(j, true)];
 
-      // CW, p3 p4 -> bbox hit edge start end
-      vec2 p3 = loop[ele.p1Ref], p4 = loop[ele.p2Ref];
+      size_t e2i = ele.p1Ref;
+
+      // Skip self and last one
+      if ((e1i == e2i) ||
+          e2i == (e1i + outerLoop.size() - 1) % outerLoop.size())
+        continue;
+
+      // CCW, p3 p4 -> bbox hit edge start end
+      size_t p3i = e2i, p4i = ele.p2Ref;
+      vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
       vec2 t;
 
-      std::cout << "Testing " << ele.p1Ref << "->" << ele.p2Ref << "\t";
+      bool segmentIntersected = intersectSegmentSegment(
+               normalOffsetP1, normalOffsetP2, p3, p4, t),
+           circleIntersected =
+               p2IsConvex ? intersectCircleSegment(p3, p4, p2, radius) : false;
+      // FIXME: intersectCircleSegment start rad and end rad
 
-      bool flag1 = intersectLine(offsetP1, offsetP2, p3, p4, t),
-           flag2 = intersectCircleDetermine(p3, p4, p1 + perp * radius, radius),
-           flag3 = intersectCircleDetermine(p3, p4, p2 + perp * radius, radius);
+      std::cout << "Testing " << p3i << "->" << p4i << "\t";
 
-      std::cout << (flag1 ? "True" : "False") << " "
-                << (flag2 ? "True" : "False") << " "
-                << (flag3 ? "True" : "False") << " ";
+      std::cout << (segmentIntersected ? "Segment Intersected" : "Segment - ")
+                << " "
+                << (circleIntersected ? "Circle Intersected" : "Circle -");
 
-      if (flag1 || flag2 || flag3) {
-        // Intersect logical
+      double e1T = 0, e2T = 0;
+      vec2 circleCenter(0, 0);
 
-        std::cout << "Intersect ";
-
-        // Check if processed, and add duplicate mark
-        markEE[i * loop.size() + ele.p1Ref] = 1;
-        if (markEE[ele.p1Ref * loop.size() + i] != 0) {
-          std::cout << "Skipped" << std::endl;
+      if (!segmentIntersected && !circleIntersected) {
+        std::cout << std::endl;
+        continue;
+      } else if (segmentIntersected) {
+        if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
+                                                 e2T, circleCenter)) {
           continue;
+        } else {
+          // Check if is endpoint, and add duplicate mark
+          if (e1T == 0) {
+            // p1
+            if (markEV[e2i * outerLoop.size() + p1i]) continue;
+            markEV[e2i * outerLoop.size() + p1i] = 1;
+          } else if (e1T == 1) {
+            // p2
+            if (markEV[e2i * outerLoop.size() + p2i]) continue;
+            markEV[e2i * outerLoop.size() + p2i] = 1;
+          }
+
+          if (e2T == 0) {
+            if (markEV[e1i * outerLoop.size() + p3i]) continue;
+            markEV[e1i * outerLoop.size() + p3i] = 1;
+          } else if (e2T == 1) {
+            if (markEV[e1i * outerLoop.size() + p4i]) continue;
+            markEV[e1i * outerLoop.size() + p4i] = 1;
+          }
         }
+      } else if (circleIntersected) {
+        // p2 endpoint intersected, degenerated natively
 
-        // Calc circle center
-        {
-          double e1T = 0, e2T = 0;
-          vec2 circleCenter(0, 0);
-          if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
-                                                   e2T, circleCenter)) {
-            continue;
-          } else {
-            // Check if is endpoint, and add duplicate mark
-            if (e1T == 0) {
-              // p1
-              if (markEV[ele.p1Ref * loop.size() + i]) continue;
-              markEV[ele.p1Ref * loop.size() + i] = 1;
-            } else if (e1T == 1) {
-              // p2
-              if (markEV[ele.p1Ref * loop.size() + (i + 1) % loop.size()])
-                continue;
-              markEV[ele.p1Ref * loop.size() + (i + 1) % loop.size()] = 1;
-            }
+        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
+                                               circleCenter)) {
+        }
+      }
 
-            if (e2T == 0) {
-              if (markEV[i * loop.size() + ele.p1Ref]) continue;
-              markEV[i * loop.size() + ele.p1Ref] = 1;
-            } else if (e2T == 1) {
-              if (markEV[i * loop.size() + ele.p2Ref]) continue;
-              markEV[i * loop.size() + ele.p2Ref] = 1;
-            }
-          }
+      {
+        vec2 e1 = p2 - p1, e2 = p4 - p3;
 
-          {
-            vec2 e1 = p2 - p1, e2 = p4 - p3;
+        vec2 tangent1 = p1 + e1T * e1;
+        vec2 tangent2 = p3 + e2T * e2;
 
-            vec2 tangent1 = p1 + e1T * e1;
-            vec2 tangent2 = p3 + e2T * e2;
+        vec2 v_start = tangent1 - circleCenter;
+        vec2 v_end = tangent2 - circleCenter;
 
-            vec2 v_start = tangent1 - circleCenter;
-            vec2 v_end = tangent2 - circleCenter;
+        double start_rad = atan2(v_start.y, v_start.x);
+        double end_rad = atan2(v_end.y, v_end.x);
 
-            double start_rad = atan2(v_start.y, v_start.x);
-            double end_rad = atan2(v_end.y, v_end.x);
+        // Normalize to [0, 2π]
+        if (start_rad < 0) start_rad += 2 * M_PI;
+        if (end_rad < 0) end_rad += 2 * M_PI;
 
-            // Normalize to [0, 2π]
-            if (start_rad < 0) start_rad += 2 * M_PI;
-            if (end_rad < 0) end_rad += 2 * M_PI;
+        // Sort result by CW
+        double arcAngle = end_rad - start_rad;
+        if (arcAngle < 0) arcAngle += 2 * M_PI;
 
-            // Sort result by CW
-            double arcAngle = end_rad - start_rad;
-            if (arcAngle < 0) arcAngle += 2 * M_PI;
-
-            if (arcAngle <= M_PI) {
-              arcConnection[ele.p1Ref].emplace_back(ArcConnectionInfo{
-                  circleCenter, e2T, e1T, ele.p1Ref, i, end_rad, start_rad});
-            } else {
-              arcConnection[i].emplace_back(ArcConnectionInfo{
-                  circleCenter, e1T, e2T, i, ele.p1Ref, start_rad, end_rad});
-            }
-          }
+        if (arcAngle <= M_PI) {
+          arcConnection[e1i].emplace_back(ArcConnectionInfo{
+              circleCenter, e1T, e2T, e1i, e2i, start_rad, end_rad});
+        } else {
+          arcConnection[e2i].emplace_back(ArcConnectionInfo{
+              circleCenter, e2T, e1T, e2i, e1i, end_rad, start_rad});
+        }
+      }
 
 #ifdef MANIFOLD_DEBUG
-          if (ManifoldParams().verbose) {
-            std::cout << "Circle center " << circleCenter << " " << i << " "
-                      << ele.p1Ref << " Vetex index " << newLoop.size() << "~"
-                      << newLoop.size() + 20 << std::endl;
-          }
+      if (ManifoldParams().verbose) {
+        std::cout << "Circle center " << circleCenter << " " << e1i << " "
+                  << ele.p1Ref << " Vetex index " << output[0].size() << "~"
+                  << output[0].size() + 20 << std::endl;
+      }
 #endif
 
-          // NOTE: inter result shown in upper figure
-          // const uint32_t seg = 20;
-          // for (size_t k = 0; k != seg; k++) {
-          //   newLoop.push_back(circleCenter +
-          //                     vec2{radius * cos(M_PI * 2 / seg * k),
-          //                          radius * sin(M_PI * 2 / seg * k)});
-          // }
-        }
-      } else {
-        std::cout << std::endl;
-      }
+      // NOTE: inter result shown in upper figure
+      // const uint32_t seg = 20;
+      // for (size_t k = 0; k != seg; k++) {
+      //   newLoop.push_back(circleCenter +
+      //                     vec2{radius * cos(M_PI * 2 / seg * k),
+      //                          radius * sin(M_PI * 2 / seg * k)});
+      // }
     }
   }
 
@@ -455,6 +538,7 @@ manifold::Polygons Tracing(
 
     double currentEdgeT = 0;
 
+    // Find first fillet arc to start
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
@@ -463,8 +547,8 @@ manifold::Polygons Tracing(
         double total_arc_angle =
             ArcConnectionInfo.endRad - ArcConnectionInfo.startRad;
 
-        if (total_arc_angle > 0) {
-          total_arc_angle -= 2.0 * M_PI;
+        if (total_arc_angle < 0) {
+          total_arc_angle += 2.0 * M_PI;
         }
 
         for (int i = 0; i < circularSegments; ++i) {
@@ -495,6 +579,7 @@ manifold::Polygons Tracing(
     mapVV.push_back(rLoop.size());
 
     while (currentEdgeIndex != endEdgeIndex) {
+      // Trace to find next arc on current edge
       auto it = std::find_if(
           arcConnection[currentEdgeIndex].begin(),
           arcConnection[currentEdgeIndex].end(),
@@ -519,14 +604,12 @@ manifold::Polygons Tracing(
         arcConnection[currentEdgeIndex].erase(it);
 
         double total_arc_angle = t.endRad - t.startRad;
-        if (total_arc_angle > 0) {
-          total_arc_angle -= 2.0 * M_PI;
+        if (total_arc_angle < 0) {
+          total_arc_angle += 2.0 * M_PI;
         }
 
-        const uint32_t seg = 10;
-
-        for (uint32_t seg_i = 0; seg_i < seg; ++seg_i) {
-          double fraction = static_cast<double>(seg_i) / (seg - 1);
+        for (int i = 0; i < circularSegments; ++i) {
+          double fraction = static_cast<double>(i) / (circularSegments - 1);
           double current_angle = t.startRad + fraction * total_arc_angle;
 
           vec2 point_on_arc = {t.center.x + radius * cos(current_angle),
@@ -536,7 +619,6 @@ manifold::Polygons Tracing(
         }
 
         // Check if current result contain inner loop
-
         auto itt = std::find(tracingEList.rbegin(), tracingEList.rend(), t.e2);
 
         if (itt != tracingEList.rend()) {
@@ -585,19 +667,25 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
   using namespace manifold;
 
   auto& loop = polygons[0];
-
   manifold::Polygons newPoly = polygons;
   auto& newLoop = newPoly[0];
   newLoop.push_back(loop[0]);
 
-  std::vector<pair> pairs;
+  ColliderInfo info{};
+  info.outerCollider = BuildCollider(polygons[0], info.outerPair);
 
-  Collider collider = BuildCollider(loop, pairs);
+  // Process inner loops
+  info.innerCollider = std::vector<Collider>(polygons.size() - 1, Collider());
+  info.innerrPair =
+      std::vector<std::vector<pair>>(polygons.size() - 1, std::vector<pair>());
+  for (size_t i = 1; i != polygons.size(); i++) {
+    info.innerCollider[i] = BuildCollider(polygons[i], info.innerrPair[i]);
+  }
 
-  auto arcConnection =
-      CalculateFilletArc(loop, newLoop, collider, pairs, radius);
+  // Calc all arc that bridge 2 edge
+  auto arcConnection = CalculateFilletArc(polygons, newPoly, info, radius);
 
-  // Do tracing
+  // Tracing along the arc
   auto result = Tracing(loop, arcConnection, circularSegments, radius);
 
   newPoly.insert(newPoly.end(), result.begin(), result.end());
