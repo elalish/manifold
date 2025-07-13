@@ -29,6 +29,7 @@ using namespace manifold;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+// Check if line segment intersect with another line segement
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
                              const vec2& p4, vec2& intersectionPoint) {
   double det = la::cross(p2 - p1, p4 - p3);
@@ -61,7 +62,7 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
-// Cirle intersection
+// Check if line segment intersect with a cirle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                             double radius) {
   vec2 d = p2 - p1;
@@ -89,7 +90,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   return distanceSquared <= radius * radius;
 };
 
-// Projection
+// Projection point to line and check if it's on the line segment
 bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
                            double& t) {
   t = la::dot(c - p1, p2 - p1) / la::length2(p2 - p1);
@@ -97,42 +98,7 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
   return t >= 0 && t <= 1;
 };
 
-// Handle if projection not on linesegment
-bool intersectEndpoint(const vec2& line_normal, double line_c,
-                       const vec2& vertex_p1, const vec2& vertex_p2,
-                       double filletRadius, vec2& center) {
-  // Closer endpoint
-  vec2 endpoint =
-      (la::length2(center - vertex_p1) < la::length2(center - vertex_p2))
-          ? vertex_p1
-          : vertex_p2;
-
-  double c_offset = line_c - filletRadius * la::length(line_normal);
-
-  double signed_dist_to_offset_line =
-      (la::dot(line_normal, endpoint) + c_offset) / la::length(line_normal);
-
-  // No solution
-  if (std::abs(signed_dist_to_offset_line) > filletRadius + EPSILON) {
-    return false;
-  }
-
-  vec2 proj_point =
-      endpoint -
-      (signed_dist_to_offset_line / la::length(line_normal)) * line_normal;
-  double chord_half_length = std::sqrt(std::max(
-      0.0, filletRadius * filletRadius -
-               signed_dist_to_offset_line * signed_dist_to_offset_line));
-  vec2 line_dir = la::normalize(vec2{-line_normal.y, line_normal.x});
-
-  vec2 sol1 = proj_point + line_dir * chord_half_length;
-  vec2 sol2 = proj_point - line_dir * chord_half_length;
-
-  center =
-      (la::length2(sol1 - center) < la::length2(sol2 - center)) ? sol1 : sol2;
-  return true;
-};
-
+// Calculate Circle center that tangent to one segement, and cross a point
 bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                        const vec2& endpoint, double radius,
                                        double& e1T, vec2& circleCenter) {
@@ -167,6 +133,9 @@ bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
   return true;
 }
 
+// Calculate Circle center that tangent to both line segment
+// If not, degenerate to only tangent to one segment, and cross another's
+// endpoint
 bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                          const vec2& p3, const vec2& p4,
                                          double radius, double& e1T,
@@ -198,15 +167,15 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
 
   // Check Circle center projection for tangent point status
   if (onE1 && onE2) {
-    // Tangent point on both edge
+    // Tangent point on both line segment
   } else if ((!onE1) && (!onE2)) {
-    // Not on both line, invalid result
+    // Both not on line segment, invalid result
     return false;
   } else if (onE1) {
-    // Degenerated to Point Segment Intersection
+    // Won't tangent to both line, degenerated to Point Segment Intersection,
+    // recalculate new circle position
 
     // Only on e1, tangent point might be e2 endpoint
-    // Calc new circle center
     vec2 endpoint =
         (la::length2(circleCenter - p3) < la::length2(circleCenter - p4)) ? p3
                                                                           : p4;
@@ -214,10 +183,6 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     if (!calculatePointSegmentCircleCenter(p1, p2, endpoint, radius, e1T,
                                            circleCenter))
       return false;
-
-    // if (!intersectEndpoint(normal1, c1, p3, p4, radius, circleCenter)) {
-    //   return false;
-    // }
 
     e2T = (e2T < 0 ? 0 : 1);
 
@@ -228,6 +193,9 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     std::cout << "Center (line-vertex on e2): ";
 
   } else if (onE2) {
+    // Won't tangent to both line, degenerated to Point Segment Intersection,
+    // recalculate new circle position
+
     // tangent point might be e1 endpoint
 
     vec2 endpoint =
@@ -237,10 +205,6 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     if (!calculatePointSegmentCircleCenter(p3, p4, endpoint, radius, e1T,
                                            circleCenter))
       return false;
-
-    // if (!intersectEndpoint(normal2, c2, p1, p2, radius, circleCenter)) {
-    //   return false;
-    // }
 
     e1T = (e1T < 0 ? 0 : 1);
 
@@ -346,18 +310,18 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
     vec2 normal = la::normalize(vec2(-e1.y, e1.x));
 
-    /* Only check p2 to avoid duplicate process
+    /* Only check e1 and p2 to avoid duplicate process
     normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
-           |                 |     \----         |
-           |                 |         \----     |
-           |                 | Circle Arc-> \----|
-           |                 | <- 2 * radius ->  \
-          p1 --------------- p2 -----------------
-                                                 |
-                                                 |
-                                                 |
-                                                 |
-                                         circleOffsetP2N
+           |                 |      \--        |
+           |                 |          \--    |
+           |                 | Circle Arc-> \--|
+           |                 | <- 2 * radius ->\
+          p1 --------------- p2 ----------------|
+                             |                 /
+                             | Circle Arc-> /--  |
+                             |           /--     |
+                             |        /--        |
+                             |-----/--    circleOffsetP2N
     */
 
     vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
@@ -418,6 +382,13 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       if (!segmentIntersected && !circleIntersected) {
         std::cout << std::endl;
         continue;
+      } else if (circleIntersected) {
+        // Concave p2 endpoint intersected, degenerated natively
+
+        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
+                                               circleCenter)) {
+          continue;
+        }
       } else if (segmentIntersected) {
         if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
                                                  e2T, circleCenter)) {
@@ -441,12 +412,6 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             if (markEV[e1i * outerLoop.size() + p4i]) continue;
             markEV[e1i * outerLoop.size() + p4i] = 1;
           }
-        }
-      } else if (circleIntersected) {
-        // p2 endpoint intersected, degenerated natively
-
-        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
-                                               circleCenter)) {
         }
       }
 
