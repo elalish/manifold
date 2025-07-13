@@ -74,13 +74,21 @@ class PolygonTestFixture : public testing::Test {
   Polygons polys;
   double epsilon;
   int expectedNumTri;
+  std::string name;
+
   explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri)
-      : polys(polys), epsilon(epsilon), expectedNumTri(expectedNumTri) {}
+                              int expectedNumTri, const std::string &name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-void RegisterPolygonTestsFile(const std::string &filename) {
+template <typename TestFixture>
+void RegisterPolygonTestsFile(const std::string &filename,
+                              const std::string &suitename) {
   auto f = std::ifstream(filename);
   EXPECT_TRUE(f.is_open());
 
@@ -111,9 +119,9 @@ void RegisterPolygonTestsFile(const std::string &filename) {
       }
     }
     testing::RegisterTest(
-        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture * {
-          return new PolygonTestFixture(polys, epsilon, expectedNumTri);
+        suitename, name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> TestFixture * {
+          return new TestFixture(polys, epsilon, expectedNumTri, name);
         });
   }
   f.close();
@@ -130,13 +138,28 @@ void RegisterPolygonTests() {
   std::string file = __FILE__;
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
-  for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+  for (auto f : files)
+    RegisterPolygonTestsFile<PolygonTestFixture>("Polygon",
+                                                 dir + "/polygons/" + f);
 #endif
 }
 
+Polygons TestFillet(const Polygons &polys, int expectedNumTri,
+                    double epsilon = -1.0) {
+  const double radius = 0.7;
+
+  manifold::ManifoldParams().verbose = true;
+
+  auto r = manifold::CrossSection::Fillet(polys, radius, 20);
+
+  EXPECT_GE(manifold::CrossSection(r).Area(), 0);
+
+  return r;
+}
+
 struct PolygonTest {
-  PolygonTest(const manifold::Polygons &polygons)
-      : name("Result"), polygons(polygons) {};
+  PolygonTest(const manifold::Polygons &polygons, const std::string &name)
+      : name(name), polygons(polygons){};
 
   std::string name;
   int expectedNumTri = -1;
@@ -144,6 +167,36 @@ struct PolygonTest {
 
   manifold::Polygons polygons;
 };
+
+class FilletTestFixture : public PolygonTestFixture {
+ public:
+  using PolygonTestFixture::PolygonTestFixture;
+
+  void TestBody() override {
+    result->emplace_back(
+        PolygonTest(TestFillet(polys, expectedNumTri, epsilon), name));
+  }
+
+ private:
+  static std::unique_ptr<std::vector<PolygonTest>,
+                         void (*)(std::vector<PolygonTest> *)>
+      result;
+};
+
+void RegisterFilletTests() {
+  std::string files[] = {"fillet.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files)
+    RegisterPolygonTestsFile<FilletTestFixture>("Fillet",
+                                                dir + "/polygons/" + f);
+#endif
+}
 
 void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
   // Open a file stream for writing.
@@ -177,37 +230,12 @@ void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
             << filename << std::endl;
 }
 
-TEST(Polygons, Fillet) {
-  manifold::Polygons Rect{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}}},
-      Tri{{vec2{0, 0}, vec2{0, 5}, vec2{5, 0}}}, AShape{{vec2{}}},
-      UShape{{vec2{0, 0}, vec2{-1, 5}, vec2{3, 1}, vec2{7, 5}, vec2{6, 0}}},
-      // Corner testcase
-      ZShape{{vec2{0, 0}, vec2{4, 4}, vec2{0, 6}, vec2{6, 6}, vec2{3, 1},
-              vec2{6, 0}}},
-      WShape{{vec2{0, 0}, vec2{-2, 5}, vec2{0, 3}, vec2{2, 5}, vec2{4, 3},
-              vec2{6, 5}, vec2{4, 0}, vec2{2, 3}}},
-      TShape{{vec2{0, 0}, vec2{0, 5}, vec2{2, 5}, vec2{0, 8}, vec2{4, 8},
-              vec2{3, 5}, vec2{5, 5}, vec2{5, 0}}},
-      // Spike case
-      Spike1{{vec2{0, 0}, vec2{0, 5}, vec2{5, 5}, vec2{5, 0}, vec2{3, 0},
-              vec2{3.5, -0.3}, vec2{2.9, 0}}},
-      Spike2{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{2.9, -0.1}, vec2{2.5, 0}}},
-      Spike3{{vec2{0, 0}, vec2{-1, 5}, vec2{2, 1}, vec2{4, 1}, vec2{7, 5},
-              vec2{6, 0}, vec2{2.6, 0}, vec2{5, -1}, vec2{2.5, 0}}};
+std::unique_ptr<std::vector<PolygonTest>, void (*)(std::vector<PolygonTest> *)>
+    FilletTestFixture::result =
+        std::unique_ptr<std::vector<PolygonTest>,
+                        void (*)(std::vector<PolygonTest> *)>(
+            {}, [](std::vector<PolygonTest> *v) -> void {
+              Save("result.txt", *v);
 
-  const manifold::Polygons polygon = ZShape;
-  const double radius = 0.7;
-
-  manifold::ManifoldParams().verbose = true;
-
-  std::vector<PolygonTest> result{
-      // poly,
-      // PolygonTest(VertexByVertex(radius, poly)),
-      manifold::CrossSection::Fillet(polygon, radius, 20),
-  };
-
-  // UnionFind
-
-  Save("result.txt", result);
-}
+              delete v;
+            });
