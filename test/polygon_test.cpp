@@ -234,7 +234,8 @@ std::unique_ptr<std::vector<PolygonTest>, void (*)(std::vector<PolygonTest> *)>
     FilletTestFixture::result =
         std::unique_ptr<std::vector<PolygonTest>,
                         void (*)(std::vector<PolygonTest> *)>(
-            {}, [](std::vector<PolygonTest> *v) -> void {
+            new std::vector<PolygonTest>(),
+            [](std::vector<PolygonTest> *v) -> void {
               Save("result.txt", *v);
 
               delete v;
