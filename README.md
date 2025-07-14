@@ -225,6 +225,15 @@ There is now basic support for the [Tracy profiler](https://github.com/wolfpld/t
 To enable tracing, compile with `-DTRACY_ENABLE=on` cmake option, and run the test with Tracy server running.
 To enable memory profiling in addition to tracing, compile with `-DTRACY_MEMORY_USAGE=ON` in addition to `-DTRACY_ENABLE=ON`.
 
+### Fuzzing
+
+To build with fuzzing support, you should set the following with CMake:
+
+- Enable fuzzing by setting `-DMANIFOLD_FUZZ=ON`
+- Disable python bindings by setting `-DMANIFOLD_PYBIND=OFF`
+- Use `clang` for compiling by setting `-DCMAKE_CXX_COMPILER=clang++`
+- You may need to disable parallelization by setting `-DMANIFOLD_PAR=OFF`, and set `ASAN_OPTIONS=detect_container_overflow=0` when building the binary on MacOS.
+
 ## About the author
 
 This library was started by [Emmett Lalish](https://elalish.blogspot.com/), currently a senior rendering engineer at Wētā FX. This was my 20% project when I was a Google employee, though my day job was maintaining [\<model-viewer\>](https://modelviewer.dev/). I was the first employee at a 3D video startup, [Omnivor](https://www.omnivor.io/), and before that I worked on 3D printing at Microsoft, including [3D Builder](https://www.microsoft.com/en-us/p/3d-builder/9wzdncrfj3t6?activetab=pivot%3Aoverviewtab). Originally an aerospace engineer, I started at a small DARPA contractor doing seedling projects, one of which became [Sea Hunter](https://en.wikipedia.org/wiki/Sea_Hunter). I earned my doctorate from the University of Washington in control theory and published some [papers](https://www.researchgate.net/scientific-contributions/75011026_Emmett_Lalish).

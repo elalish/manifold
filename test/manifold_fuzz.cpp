@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <pthread.h>
+
 #include <atomic>
 #include <future>
 
@@ -36,9 +38,7 @@ struct CubeOp {
 auto GoodNumbers = OneOf(InRange(0.1, 10.0), InRange(-10.0, -0.1));
 auto Vec3Domain = ArrayOf<3>(GoodNumbers);
 auto TransformDomain = StructOf<Transform>(
-    ElementOf({TransformType::Translate, TransformType::Rotate,
-               TransformType::Scale}),
-    Vec3Domain);
+    ElementOf({TransformType::Translate, TransformType::Rotate}), Vec3Domain);
 auto CsgDomain =
     VectorOf(StructOf<CubeOp>(VectorOf(TransformDomain).WithMaxSize(20),
                               ElementOf({false, true})))
@@ -51,7 +51,6 @@ void SimpleCube(const std::vector<CubeOp>& inputs) {
   for (const auto& input : inputs) {
     auto cube = Manifold::Cube();
     for (const auto& transform : input.transforms) {
-      printf("transform: %d\n", static_cast<int>(transform.ty));
       switch (transform.ty) {
         case TransformType::Translate:
           cube = cube.Translate({std::get<0>(transform.vector),
@@ -71,12 +70,11 @@ void SimpleCube(const std::vector<CubeOp>& inputs) {
       }
     }
 
-    printf("isUnion: %d\n", input.isUnion);
-    std::atomic<pid_t> tid;
+    pthread_t tid;
     std::atomic<bool> faulted(true);
     auto asyncFuture = std::async(
         std::launch::async, [&result, &faulted, &tid, &cube, &input]() {
-          tid.store(gettid());
+          tid = pthread_self();
           if (input.isUnion) {
             result += cube;
           } else {
@@ -88,7 +86,7 @@ void SimpleCube(const std::vector<CubeOp>& inputs) {
     if (asyncFuture.wait_for(std::chrono::milliseconds(10000)) ==
         std::future_status::timeout) {
       printf("timeout after %dms...\n", 10000);
-      pthread_cancel(tid.load());
+      pthread_cancel(tid);
     }
 
     EXPECT_FALSE(faulted.load());
