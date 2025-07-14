@@ -59,3 +59,4 @@ void CheckGL(const Manifold& manifold, bool noMerge = true);
 MeshGL ReadMesh(const std::string& filename);
 #endif
 void RegisterPolygonTests();
+void RegisterFilletTests();
