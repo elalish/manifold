@@ -651,7 +651,10 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
   auto arcConnection = CalculateFilletArc(polygons, newPoly, info, radius);
 
   // Tracing along the arc
-  auto result = Tracing(loop, arcConnection, circularSegments, radius);
+  int n = circularSegments > 2 ? circularSegments
+                               : Quality::GetCircularSegments(radius);
+
+  auto result = Tracing(loop, arcConnection, n, radius);
 
   newPoly.insert(newPoly.end(), result.begin(), result.end());
 
