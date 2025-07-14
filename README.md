@@ -231,7 +231,7 @@ To build with fuzzing support, you should set the following with CMake:
 - Enable fuzzing by setting `-DMANIFOLD_FUZZ=ON`
 - Disable python bindings by setting `-DMANIFOLD_PYBIND=OFF`
 - Use `clang` for compiling by setting `-DCMAKE_CXX_COMPILER=clang++`
-- You may need to disable parallelization by setting `-DMANIFOLD_PAR=OFF`
+- You may need to disable parallelization by setting `-DMANIFOLD_PAR=OFF`, and set `ASAN_OPTIONS=detect_container_overflow=0` when building the binary on MacOS.
 
 ## About the author
 
