@@ -155,7 +155,8 @@ CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
                     double miter_limit, double arc_tolerance) {
   auto jt = join_type == 0   ? CrossSection::JoinType::Square
             : join_type == 1 ? CrossSection::JoinType::Round
-                             : CrossSection::JoinType::Miter;
+            : join_type == 2 ? CrossSection::JoinType::Miter
+                             : CrossSection::JoinType::Bevel;
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
 

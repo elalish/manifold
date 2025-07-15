@@ -82,6 +82,23 @@ TEST(CrossSection, RoundOffset) {
   EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
 
+TEST(CrossSection, BevelOffset) {
+  auto a = CrossSection::Square({20., 20.}, true);
+  int segments = 20;
+  auto rounded = a.Offset(5., CrossSection::JoinType::Bevel, 2, segments);
+  auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cross_section_bevel_offset.glb", result.GetMeshGL(), {});
+#endif
+
+  EXPECT_EQ(result.Genus(), 0);
+  EXPECT_NEAR(result.Volume(),
+              5 * (((20. + (2 * 5.)) * (20. + (2 * 5.))) - (2 * 5. * 5)), 1);
+  EXPECT_EQ(rounded.NumVert(), 4 + 4);
+}
+
 TEST(CrossSection, Empty) {
   Polygons polys(2);
   auto e = CrossSection(polys);

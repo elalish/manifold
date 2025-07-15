@@ -90,7 +90,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)
       .value("Round", CrossSection::JoinType::Round)
-      .value("Miter", CrossSection::JoinType::Miter);
+      .value("Miter", CrossSection::JoinType::Miter)
+      .value("Bevel", CrossSection::JoinType::Bevel);
 
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);

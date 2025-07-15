@@ -105,6 +105,7 @@ typedef enum ManifoldJoinType {
   MANIFOLD_JOIN_TYPE_SQUARE,
   MANIFOLD_JOIN_TYPE_ROUND,
   MANIFOLD_JOIN_TYPE_MITER,
+  MANIFOLD_JOIN_TYPE_BEVEL,
 } ManifoldJoinType;
 
 // function pointer
