@@ -144,11 +144,6 @@ def plot_polygon(ax, loops_list, label, color, closed=True, linestyle='-', marke
                     # Add the normal of the outgoing edge
                     normal_vec += np.array([edge_out[1], -edge_out[0]])
                 
-                # For holes (loop_idx > 0), we might want to reverse the normal direction
-                # so indices appear on the "inside" of the hole
-                if loop_idx > 0:
-                    normal_vec = -normal_vec
-                
                 # Normalize the resulting vector to get a direction
                 norm_magnitude = np.linalg.norm(normal_vec)
                 if norm_magnitude > 1e-9:  # Avoid division by zero
@@ -236,8 +231,8 @@ def read_polygon_tests_file(filename: str) -> List[Dict[str, Any]]:
 
 if __name__ == "__main__":
     outer_boundary = [(0, 0), (6, 0), (6, 4), (0, 4)]
-    hole1 = [(1, 1), (2, 1), (2, 2), (1, 2)]
-    hole2 = [(3, 1), (5, 1), (5, 3), (3, 3)]
+    hole1 = [(1, 1), (1, 2),(2, 2),(2, 1)  ]
+    hole2 = [(3, 1), (3, 3), (5, 3), (5, 1) ]
     
     loops = [outer_boundary, hole1, hole2]
     
