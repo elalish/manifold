@@ -94,7 +94,8 @@ TEST(CrossSection, BevelOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.Volume(), (20. + 2*5.)*(20. + 2*5.) - 2*5.*5., 1);
+  EXPECT_NEAR(result.Volume(),
+              5 * (((20. + (2 * 5.)) * (20. + (2 * 5.))) - (2 * 5. * 5)), 1);
   EXPECT_EQ(rounded.NumVert(), 4 + 4);
 }
 

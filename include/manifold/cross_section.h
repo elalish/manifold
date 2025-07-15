@@ -86,7 +86,7 @@ class CrossSection {
     Round,  /*!< Rounding is applied to all joins that have convex external
              angles, and it maintains the exact offset distance from the join
              vertex. */
-    Miter   /*!< There's a necessary limit to mitered joins (to avoid narrow
+    Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
              angled joins producing excessively long and narrow
              [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
              So where mitered joins would exceed a given maximum miter distance
@@ -100,7 +100,7 @@ class CrossSection {
              [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
              and
              [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
-             document formats).*/
+             document formats). */
   };
 
   /** @name Input & Output
