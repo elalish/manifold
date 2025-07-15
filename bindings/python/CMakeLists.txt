@@ -31,7 +31,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     POST_BUILD
     COMMAND
       python "${PROJECT_SOURCE_DIR}/bindings/python/stub_postbuild.py"
-      "$<TARGET_FILE_DIR:manifold3d>/manifold3d.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi"
     VERBATIM
   )
 endif()
