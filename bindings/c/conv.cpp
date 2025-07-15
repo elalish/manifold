@@ -207,6 +207,9 @@ CrossSection::JoinType from_c(ManifoldJoinType join_type) {
     case MANIFOLD_JOIN_TYPE_MITER:
       jt = CrossSection::JoinType::Miter;
       break;
+    case MANIFOLD_JOIN_TYPE_BEVEL:
+      jt = CrossSection::JoinType::Bevel;
+      break;
   };
   return jt;
 }
