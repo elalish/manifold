@@ -316,6 +316,7 @@ void Manifold::Impl::DedupePropVerts() {
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              [&vert2vert, numProp, this](const int edgeIdx) {
                const Halfedge edge = halfedge_[edgeIdx];
+               if (edge.pairedHalfedge < 0) return;
                const int edgeFace = edgeIdx / 3;
                const int pairFace = edge.pairedHalfedge / 3;
 
