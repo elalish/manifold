@@ -78,6 +78,9 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
     case CrossSection::JoinType::Miter:
       jt = C2::JoinType::Miter;
       break;
+    case CrossSection::JoinType::Bevel:
+      jt = C2::JoinType::Bevel;
+      break;
   };
   return jt;
 }
