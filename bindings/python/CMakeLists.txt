@@ -21,7 +21,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     manifold3d_stub
     MODULE manifold3d
     OUTPUT manifold3d.pyi
-    PYTHON_PATH ${CMAKE_CURRENT_BINARY_DIR}
+    PYTHON_PATH $<TARGET_FILE_DIR:manifold3d>
     DEPENDS manifold3d
     PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
   )
