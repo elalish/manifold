@@ -153,7 +153,7 @@ CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
 
 CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
                     double miter_limit, double arc_tolerance) {
-  auto jt =   join_type == 0 ? CrossSection::JoinType::Square
+  auto jt = join_type == 0   ? CrossSection::JoinType::Square
             : join_type == 1 ? CrossSection::JoinType::Round
             : join_type == 2 ? CrossSection::JoinType::Miter
                              : CrossSection::JoinType::Bevel;
