@@ -725,10 +725,11 @@ NB_MODULE(manifold3d, m) {
              "Only sub-regions with winding counts < 0 are filled.");
 
   nb::enum_<CrossSection::JoinType>(m, "JoinType")
-      .value("Square", CrossSection::JoinType::Square,
-             "Squaring is applied uniformly at all joins where the internal "
-             "join angle is less that 90 degrees. The squared edge will be at "
-             "exactly the offset distance from the join vertex.")
+      .value(
+          "Square", CrossSection::JoinType::Square,
+          "Squaring is applied uniformly at all joins where the internal "
+          "join angle is less that 90 degrees. The squared edge will be at "
+          "exactly the offset distance from the join vertex.")
       .value(
           "Round", CrossSection::JoinType::Round,
           "Rounding is applied to all joins that have convex external angles, "
@@ -740,7 +741,14 @@ NB_MODULE(manifold3d, m) {
           "[spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/"
           "Classes/ClipperOffset/Properties/MiterLimit.htm)). So where mitered "
           "joins would exceed a given maximum miter distance (relative to the "
-          "offset distance), these are 'squared' instead.");
+          "offset distance), these are 'squared' instead.")
+      .value(
+          "Bevel", CrossSection::JoinType::Bevel,
+          "Bevelled joins are similar to 'squared' joins except that squaring won't occur at a fixed distance."
+          "While bevelled joins may not be as pretty as squared joins, bevelling is much easier (ie faster) than squaring."
+          "And perhaps this is why bevelling rather than squaring is preferred in numerous graphics display formats"
+          "(including [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)"
+          "and [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html) document formats).");
 
   nb::enum_<OpType>(m, "OpType", "Operation types for batch_boolean")
       .value("Add", OpType::Add)
