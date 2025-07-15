@@ -21,6 +21,7 @@
 //
 #pragma once
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
