@@ -21,7 +21,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     manifold3d_stub
     MODULE manifold3d
     OUTPUT manifold3d.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:manifold3d>
+    PYTHON_PATH ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS manifold3d
     PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
   )
@@ -31,7 +31,7 @@ if(MANIFOLD_PYBIND_STUBGEN)
     POST_BUILD
     COMMAND
       python "${PROJECT_SOURCE_DIR}/bindings/python/stub_postbuild.py"
-      "$<TARGET_FILE_DIR:manifold3d>/manifold3d.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi"
     VERBATIM
   )
 endif()
