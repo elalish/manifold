@@ -18,6 +18,8 @@
 
 #include "../collider.h"
 #include "../vec.h"
+#include "clipper2/clipper.core.h"
+#include "clipper2/clipper.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 
@@ -25,7 +27,11 @@ const double EPSILON = 1e-9;
 
 namespace {
 // Utility
+
 using namespace manifold;
+
+namespace C2 = Clipper2Lib;
+vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
@@ -624,12 +630,8 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
-}  // namespace
-
-namespace manifold {
-
-Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
-                              int circularSegments) {
+Polygons FilletImpl(const Polygons& polygons, double radius,
+                    int circularSegments) {
   using namespace manifold;
 
   auto& loop = polygons[0];
@@ -660,6 +662,41 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
   newPoly.insert(newPoly.end(), result.begin(), result.end());
 
   return newPoly;
+}
+
+}  // namespace
+
+namespace manifold {
+
+struct PathImpl {
+  PathImpl(const C2::PathsD paths_) : paths_(paths_) {}
+  operator const C2::PathsD&() const { return paths_; }
+  const C2::PathsD paths_;
+};
+
+CrossSection CrossSection::Fillet(double radius, int circularSegments) const {
+  auto paths = this->GetPaths()->paths_;
+  Polygons polygons(paths.size(), SimplePolygon());
+
+  for (size_t i = 0; i != paths.size(); i++) {
+    auto& pts = polygons[i];
+
+    for (auto p : paths[i]) {
+      pts.push_back(v2_of_pd(p));
+    }
+  }
+
+  return FilletImpl(polygons, radius, circularSegments);
+}
+
+CrossSection CrossSection::Fillet(const SimplePolygon pts, double radius,
+                                  int circularSegments) {
+  return Fillet(Polygons{pts}, radius, circularSegments);
+}
+
+CrossSection CrossSection::Fillet(const Polygons& polygons, double radius,
+                                  int circularSegments) {
+  return FilletImpl(polygons, radius, circularSegments);
 }
 
 }  // namespace manifold

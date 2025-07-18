@@ -152,9 +152,9 @@ Polygons TestFillet(const Polygons &polys, int expectedNumTri,
 
   auto r = manifold::CrossSection::Fillet(polys, radius, 20);
 
-  EXPECT_GE(manifold::CrossSection(r).Area(), 0);
+  EXPECT_GE(r.Area(), 0);
 
-  return r;
+  return r.ToPolygons();
 }
 
 struct PolygonTest {
