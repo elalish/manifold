@@ -223,6 +223,28 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   return true;
 }
 
+std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
+                                     int circularSegments) {
+  std::vector<vec2> pts;
+
+  double totalRad = arc.endRad - arc.startRad;
+
+  if (totalRad < 0) {
+    totalRad += 2.0 * M_PI;
+  }
+
+  double dPhi = 2 * M_PI / circularSegments;
+  int seg = int(totalRad / dPhi) + 1;
+  for (int i = 0; i < seg; ++i) {
+    double current = arc.startRad + dPhi * i;
+
+    vec2 pnt = {arc.center.x + radius * cos(current),
+                arc.center.y + radius * sin(current)};
+
+    pts.push_back(pnt);
+  }
+}
+
 }  // namespace
 
 // Sub process
@@ -514,30 +536,14 @@ manifold::Polygons Tracing(
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
-        ArcConnectionInfo& ArcConnectionInfo = *it->begin();
+        ArcConnectionInfo& arc = *it->begin();
 
-        double total_arc_angle =
-            ArcConnectionInfo.endRad - ArcConnectionInfo.startRad;
+        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
+        rLoop.insert(rLoop.end(), pts.begin(), pts.end());
 
-        if (total_arc_angle < 0) {
-          total_arc_angle += 2.0 * M_PI;
-        }
-
-        for (int i = 0; i < circularSegments; ++i) {
-          double fraction = static_cast<double>(i) / (circularSegments - 1);
-          double current_angle =
-              ArcConnectionInfo.startRad + fraction * total_arc_angle;
-
-          vec2 point_on_arc = {
-              ArcConnectionInfo.center.x + radius * cos(current_angle),
-              ArcConnectionInfo.center.y + radius * sin(current_angle)};
-
-          rLoop.push_back(point_on_arc);
-        }
-
-        currentEdgeIndex = ArcConnectionInfo.e2;
-        endEdgeIndex = ArcConnectionInfo.e1;
-        currentEdgeT = ArcConnectionInfo.t2;
+        currentEdgeIndex = arc.e2;
+        endEdgeIndex = arc.e1;
+        currentEdgeT = arc.t2;
 
         it->erase(it->begin());
         break;
@@ -572,26 +578,15 @@ manifold::Polygons Tracing(
       } else {
         // Found next circle fillet
 
-        ArcConnectionInfo t = *it;
+        ArcConnectionInfo arc = *it;
         arcConnection[currentEdgeIndex].erase(it);
 
-        double total_arc_angle = t.endRad - t.startRad;
-        if (total_arc_angle < 0) {
-          total_arc_angle += 2.0 * M_PI;
-        }
-
-        for (int i = 0; i < circularSegments; ++i) {
-          double fraction = static_cast<double>(i) / (circularSegments - 1);
-          double current_angle = t.startRad + fraction * total_arc_angle;
-
-          vec2 point_on_arc = {t.center.x + radius * cos(current_angle),
-                               t.center.y + radius * sin(current_angle)};
-
-          rLoop.push_back(point_on_arc);
-        }
+        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
+        rLoop.insert(rLoop.end(), pts.begin(), pts.end());
 
         // Check if current result contain inner loop
-        auto itt = std::find(tracingEList.rbegin(), tracingEList.rend(), t.e2);
+        auto itt =
+            std::find(tracingEList.rbegin(), tracingEList.rend(), arc.e2);
 
         if (itt != tracingEList.rend()) {
           size_t pos = tracingEList.size() -
@@ -611,8 +606,8 @@ manifold::Polygons Tracing(
           continue;
         }
 
-        currentEdgeIndex = t.e2;
-        currentEdgeT = t.t2;
+        currentEdgeIndex = arc.e2;
+        currentEdgeT = arc.t2;
 
         tracingEList.push_back(currentEdgeIndex);
         mapVV.push_back(rLoop.size());
