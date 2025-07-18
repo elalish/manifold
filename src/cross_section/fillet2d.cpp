@@ -29,7 +29,7 @@ using namespace manifold;
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
-// Check if line segment intersect with another line segement
+// Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
                              const vec2& p4, vec2& intersectionPoint) {
   double det = la::cross(p2 - p1, p4 - p3);
@@ -45,7 +45,7 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   double t = num_t / det;
   double u = num_u / det;
 
-  // Check if the intersection point inside line segement
+  // Check if the intersection point inside line segment
   if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
       (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
     // Inside
@@ -62,7 +62,7 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
-// Check if line segment intersect with a cirle
+// Check if line segment intersect with a circle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                             double radius) {
   vec2 d = p2 - p1;
@@ -70,7 +70,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   if (la::length(d) < EPSILON)
     return la::dot(p1 - center, p1 - center) <= radius * radius;
 
-  // Project vec p1 -> circle to line segement
+  // Project vec p1 -> circle to line segment
   double t = la::dot(center - p1, d) / la::dot(d, d);
 
   vec2 closestPoint;
@@ -98,7 +98,7 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
   return t >= 0 && t <= 1;
 };
 
-// Calculate Circle center that tangent to one segement, and cross a point
+// Calculate Circle center that tangent to one segment, and cross a point
 bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                        const vec2& endpoint, double radius,
                                        double& e1T, vec2& circleCenter) {
@@ -224,7 +224,7 @@ namespace {
 using namespace manifold;
 
 // For build and query Collider result
-struct pair {
+struct edgeOld2New {
   manifold::Box box;
   uint32_t morton;
   size_t p1Ref;
@@ -232,7 +232,7 @@ struct pair {
 };
 
 manifold::Collider BuildCollider(const manifold::SimplePolygon& loop,
-                                 std::vector<pair>& pairs) {
+                                 std::vector<edgeOld2New>& edgeOld2NewVec) {
   Vec<manifold::Box> boxVec;
   Vec<uint32_t> mortonVec;
 
@@ -244,16 +244,17 @@ manifold::Collider BuildCollider(const manifold::SimplePolygon& loop,
 
     manifold::Box bbox(toVec3(p1), toVec3(p2));
 
-    pairs.push_back({bbox, manifold::Collider::MortonCode(center, bbox), i,
-                     (i + 1) % loop.size()});
+    edgeOld2NewVec.push_back({bbox,
+                              manifold::Collider::MortonCode(center, bbox), i,
+                              (i + 1) % loop.size()});
   }
 
-  std::stable_sort(pairs.begin(), pairs.end(),
-                   [](const pair& lhs, const pair& rhs) -> bool {
+  std::stable_sort(edgeOld2NewVec.begin(), edgeOld2NewVec.end(),
+                   [](const edgeOld2New& lhs, const edgeOld2New& rhs) -> bool {
                      return rhs.morton > lhs.morton;
                    });
 
-  for (auto it = pairs.begin(); it != pairs.end(); it++) {
+  for (auto it = edgeOld2NewVec.begin(); it != edgeOld2NewVec.end(); it++) {
     boxVec.push_back(it->box);
     mortonVec.push_back(it->morton);
   }
@@ -278,11 +279,11 @@ struct ArcConnectionInfo {
 
 struct ColliderInfo {
   Collider outerCollider;
-  std::vector<pair> outerPair;
+  std::vector<edgeOld2New> outerEdgeOld2NewVec;
 
   // Multi inner loops
   std::vector<Collider> innerCollider;
-  std::vector<std::vector<pair>> innerrPair;
+  std::vector<std::vector<edgeOld2New>> innerVec;
 };
 
 std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
@@ -350,7 +351,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
     // In Out Classify
     for (size_t j = 0; j != r.size(); j++) {
-      auto ele = collider.outerPair[r.Get(j, true)];
+      auto ele = collider.outerEdgeOld2NewVec[r.Get(j, true)];
 
       size_t e2i = ele.p1Ref;
 
@@ -447,7 +448,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 #ifdef MANIFOLD_DEBUG
       if (ManifoldParams().verbose) {
         std::cout << "Circle center " << circleCenter << " " << e1i << " "
-                  << ele.p1Ref << " Vetex index " << output[0].size() << "~"
+                  << ele.p1Ref << " Vertex index " << output[0].size() << "~"
                   << output[0].size() + 20 << std::endl;
       }
 #endif
@@ -462,7 +463,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     }
   }
 
-  // Construct Reuslt
+  // Construct Result
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
@@ -637,14 +638,14 @@ Polygons CrossSection::Fillet(const Polygons& polygons, double radius,
   newLoop.push_back(loop[0]);
 
   ColliderInfo info{};
-  info.outerCollider = BuildCollider(polygons[0], info.outerPair);
+  info.outerCollider = BuildCollider(polygons[0], info.outerEdgeOld2NewVec);
 
   // Process inner loops
   info.innerCollider = std::vector<Collider>(polygons.size() - 1, Collider());
-  info.innerrPair =
-      std::vector<std::vector<pair>>(polygons.size() - 1, std::vector<pair>());
+  info.innerVec = std::vector<std::vector<edgeOld2New>>(
+      polygons.size() - 1, std::vector<edgeOld2New>());
   for (size_t i = 1; i != polygons.size(); i++) {
-    info.innerCollider[i] = BuildCollider(polygons[i], info.innerrPair[i]);
+    info.innerCollider[i] = BuildCollider(polygons[i], info.innerVec[i]);
   }
 
   // Calc all arc that bridge 2 edge
