@@ -326,9 +326,9 @@ jobs:
         brew install googletest
         pip install trimesh pytest
     - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
       with:
         cmake-version: 4.0.2
-    - uses: jwlawson/actions-setup-cmake@v2
     - name: test cmake consumer
       run: |
         cd ..
