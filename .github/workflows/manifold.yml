@@ -22,12 +22,18 @@ jobs:
       matrix:
         cross_section: [ON]
         parallelization: [OFF, ON]
+        os: [ubuntu-24.04]
         gcc: [13, 14]
         include:
           - cross_section: OFF
             parallelization: ON
+            os: ubuntu-24.04
             gcc: 14
-    runs-on: ubuntu-24.04
+          - cross_section: ON
+            parallelization: ON
+            os: ubuntu-22.04
+            gcc: 11
+    runs-on: ${{ matrix.os }}
     env:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
