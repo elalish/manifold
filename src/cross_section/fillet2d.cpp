@@ -117,7 +117,7 @@ bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
     return false;
   }
 
-  vec2 projectedEndpoint = p1 + dir * la::dot(endpoint - e, dir);
+  vec2 projectedEndpoint = p1 + dir * la::dot(endpoint - p1, dir);
   double dist = la::length(projectedEndpoint - endpoint);
   if (dist > radius * 2.0) {
     // Bad math, something wrong before
@@ -223,6 +223,14 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   return true;
 }
 
+struct ArcConnectionInfo {
+  vec2 center;
+
+  double t1, t2;  // Parameter value of arc tangent points of edges
+  size_t e1, e2;  // Edge Idx of tangent points lie on
+  double startRad, endRad;
+};
+
 std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
@@ -243,6 +251,8 @@ std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
 
     pts.push_back(pnt);
   }
+
+  return pts;
 }
 
 }  // namespace
@@ -296,14 +306,6 @@ manifold::Collider BuildCollider(const manifold::SimplePolygon& loop,
 
   return Collider(boxVec, mortonVec);
 }
-
-struct ArcConnectionInfo {
-  vec2 center;
-
-  double t1, t2;  // Parameter value of arc tangent points of edges
-  size_t e1, e2;  // Edge Idx of tangent points lie on
-  double startRad, endRad;
-};
 
 struct ColliderInfo {
   Collider outerCollider;
