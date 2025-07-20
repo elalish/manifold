@@ -23,44 +23,6 @@
 #include "linalg.h"
 #include "optional_assert.h"
 
-#ifdef MANIFOLD_DEBUG
-namespace linalg {
-template <class T>
-std::ostream& operator<<(std::ostream& out, const vec<T, 1>& v) {
-  return out << '{' << v[0] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const vec<T, 2>& v) {
-  return out << '{' << v[0] << ',' << v[1] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const vec<T, 3>& v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << '}';
-}
-template <class T>
-std::ostream& operator<<(std::ostream& out, const vec<T, 4>& v) {
-  return out << '{' << v[0] << ',' << v[1] << ',' << v[2] << ',' << v[3] << '}';
-}
-
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const mat<T, M, 1>& m) {
-  return out << '{' << m[0] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const mat<T, M, 2>& m) {
-  return out << '{' << m[0] << ',' << m[1] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const mat<T, M, 3>& m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << '}';
-}
-template <class T, int M>
-std::ostream& operator<<(std::ostream& out, const mat<T, M, 4>& m) {
-  return out << '{' << m[0] << ',' << m[1] << ',' << m[2] << ',' << m[3] << '}';
-}
-}  // namespace linalg
-#endif
-
 namespace manifold {
 /** @addtogroup Math
  * @ingroup Core
