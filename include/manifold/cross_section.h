@@ -167,8 +167,13 @@ class CrossSection {
   /** @name Fillet
    */
   ///@{
-  static Polygons Fillet(const Polygons&, double radius,
-                         int circularSegments = 0);
+  CrossSection Fillet(double radius, int circularSegments = 0) const;
+  static CrossSection Fillet(const std::vector<CrossSection>& crossSections,
+                             double radius, int circularSegments = 0);
+  static CrossSection Fillet(const SimplePolygon pts, double radius,
+                             int circularSegments = 0);
+  static CrossSection Fillet(const Polygons& polys, double radius,
+                             int circularSegments = 0);
   ///@}
 
  private:

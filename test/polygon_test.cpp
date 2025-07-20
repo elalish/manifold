@@ -87,8 +87,8 @@ class PolygonTestFixture : public testing::Test {
 };
 
 template <typename TestFixture>
-void RegisterPolygonTestsFile(const std::string &filename,
-                              const std::string &suitename) {
+void RegisterPolygonTestsFile(const std::string &suitename,
+                              const std::string &filename) {
   auto f = std::ifstream(filename);
   EXPECT_TRUE(f.is_open());
 
@@ -119,7 +119,7 @@ void RegisterPolygonTestsFile(const std::string &filename,
       }
     }
     testing::RegisterTest(
-        suitename, name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
         [=, polys = std::move(polys)]() -> TestFixture * {
           return new TestFixture(polys, epsilon, expectedNumTri, name);
         });
@@ -152,14 +152,14 @@ Polygons TestFillet(const Polygons &polys, int expectedNumTri,
 
   auto r = manifold::CrossSection::Fillet(polys, radius, 20);
 
-  EXPECT_GE(manifold::CrossSection(r).Area(), 0);
+  EXPECT_GE(r.Area(), 0);
 
-  return r;
+  return r.ToPolygons();
 }
 
 struct PolygonTest {
   PolygonTest(const manifold::Polygons &polygons, const std::string &name)
-      : name(name), polygons(polygons){};
+      : name(name), polygons(polygons) {};
 
   std::string name;
   int expectedNumTri = -1;
@@ -193,7 +193,7 @@ void RegisterFilletTests() {
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
   for (auto f : files)
-    RegisterPolygonTestsFile<FilletTestFixture>("Fillet",
+    RegisterPolygonTestsFile<FilletTestFixture>("Polygon.Fillet",
                                                 dir + "/polygons/" + f);
 #endif
 }
@@ -234,7 +234,8 @@ std::unique_ptr<std::vector<PolygonTest>, void (*)(std::vector<PolygonTest> *)>
     FilletTestFixture::result =
         std::unique_ptr<std::vector<PolygonTest>,
                         void (*)(std::vector<PolygonTest> *)>(
-            {}, [](std::vector<PolygonTest> *v) -> void {
+            new std::vector<PolygonTest>(),
+            [](std::vector<PolygonTest> *v) -> void {
               Save("result.txt", *v);
 
               delete v;
