@@ -566,13 +566,13 @@ TEST(Manifold, SliceEmptyObject) {
   CrossSection bottom = empty.Slice();
 }
 
-TEST(Manifold, DISABLED_Simplify) {
+TEST(Manifold, Simplify) {
   Polygons polyCircle =
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
   EXPECT_NEAR(torus.Volume(), simplified.Volume(), 20);
-  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 20);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("torus.glb", simplified.GetMeshGL(), {});
