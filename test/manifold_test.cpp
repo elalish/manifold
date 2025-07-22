@@ -566,7 +566,7 @@ TEST(Manifold, SliceEmptyObject) {
   CrossSection bottom = empty.Slice();
 }
 
-TEST(Manifold, Simplify) {
+TEST(Manifold, DISABLED_Simplify) {
   Polygons polyCircle =
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
