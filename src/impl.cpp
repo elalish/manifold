@@ -476,61 +476,27 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
 
-  const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
+  for (int i = 0; i < numEdge; ++i) {
     const int pair0 = ids[i];
-    Halfedge& h0 = halfedge_[pair0];
-    int k = consecutiveStart + numEdge;
+    Halfedge h0 = halfedge_[pair0];
+    int k = i + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge& h1 = halfedge_[pair1];
+      Halfedge h1 = halfedge_[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (halfedge_[NextHalfedge(pair0)].endVert ==
           halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
+        h0 = {-1, -1, -1};
+        h1 = {-1, -1, -1};
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
         break;
       }
       ++k;
-      if (k >= segmentEnd + numEdge) break;
+      if (k >= numHalfedge) break;
     }
-    if (i + 1 == segmentEnd) return consecutiveStart;
-    Halfedge& h1 = halfedge_[ids[i + 1]];
-    if (h1.startVert == h0.startVert && h1.endVert == h0.endVert)
-      return consecutiveStart;
-    return i + 1;
-  };
-
-#if MANIFOLD_PAR == 1
-  Vec<std::pair<int, int>> ranges;
-  const int increment = std::min(
-      std::max(numEdge / tbb::this_task_arena::max_concurrency() / 2, 1024),
-      numEdge);
-  const auto duplicated = [&](int a, int b) {
-    const Halfedge& h0 = halfedge_[ids[a]];
-    const Halfedge& h1 = halfedge_[ids[b]];
-    return h0.startVert == h1.startVert && h0.endVert == h1.endVert;
-  };
-  int end = 0;
-  while (end < numEdge) {
-    const int start = end;
-    end = std::min(end + increment, numEdge);
-    // make sure duplicated halfedges are in the same partition
-    while (end < numEdge && duplicated(end - 1, end)) end++;
-    ranges.push_back(std::make_pair(start, end));
   }
-  for_each(ExecutionPolicy::Par, ranges.begin(), ranges.end(),
-           [&](const std::pair<int, int>& range) {
-             const auto [start, end] = range;
-             int consecutiveStart = start;
-             for (int i = start; i < end; ++i)
-               consecutiveStart = body(i, consecutiveStart, end);
-           });
-#else
-  int consecutiveStart = 0;
-  for (int i = 0; i < numEdge; ++i)
-    consecutiveStart = body(i, consecutiveStart, numEdge);
-#endif
+
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
