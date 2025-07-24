@@ -73,7 +73,13 @@ struct CheckHalfedges {
 
   bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
+    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
+        halfedge.pairedHalfedge == -1)
+      return true;
+    if (halfedges[NextHalfedge(edge)].startVert == -1 ||
+        halfedges[NextHalfedge(NextHalfedge(edge))].startVert == -1) {
+      return false;
+    }
     if (halfedge.pairedHalfedge == -1) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
