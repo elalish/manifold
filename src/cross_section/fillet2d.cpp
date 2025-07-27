@@ -627,8 +627,8 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
-Polygons FilletImpl(const Polygons& polygons, double radius,
-                    int circularSegments) {
+Vec<CrossSection> FilletImpl(const Polygons& polygons, double radius,
+                             int circularSegments) {
   using namespace manifold;
 
   auto& loop = polygons[0];
@@ -658,7 +658,7 @@ Polygons FilletImpl(const Polygons& polygons, double radius,
 
   newPoly.insert(newPoly.end(), result.begin(), result.end());
 
-  return newPoly;
+  return Vec<CrossSection>();
 }
 
 }  // namespace
@@ -671,7 +671,8 @@ struct PathImpl {
   const C2::PathsD paths_;
 };
 
-CrossSection CrossSection::Fillet(double radius, int circularSegments) const {
+Vec<CrossSection> CrossSection::Fillet(double radius,
+                                       int circularSegments) const {
   auto paths = this->GetPaths()->paths_;
   Polygons polygons(paths.size(), SimplePolygon());
 
@@ -686,13 +687,13 @@ CrossSection CrossSection::Fillet(double radius, int circularSegments) const {
   return FilletImpl(polygons, radius, circularSegments);
 }
 
-CrossSection CrossSection::Fillet(const SimplePolygon pts, double radius,
-                                  int circularSegments) {
+Vec<CrossSection> CrossSection::Fillet(const SimplePolygon pts, double radius,
+                                       int circularSegments) {
   return Fillet(Polygons{pts}, radius, circularSegments);
 }
 
-CrossSection CrossSection::Fillet(const Polygons& polygons, double radius,
-                                  int circularSegments) {
+Vec<CrossSection> CrossSection::Fillet(const Polygons& polygons, double radius,
+                                       int circularSegments) {
   return FilletImpl(polygons, radius, circularSegments);
 }
 

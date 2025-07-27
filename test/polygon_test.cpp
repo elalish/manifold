@@ -18,6 +18,7 @@
 #include <fstream>
 #include <limits>
 
+#include "../src/vec.h"
 #include "manifold/cross_section.h"
 #include "test.h"
 
@@ -144,28 +145,13 @@ void RegisterPolygonTests() {
 #endif
 }
 
-Polygons TestFillet(const Polygons &polys, int expectedNumTri,
-                    double epsilon = -1.0) {
-  const double radius = 0.7;
-
-  manifold::ManifoldParams().verbose = true;
-
-  auto r = manifold::CrossSection::Fillet(polys, radius, 20);
-
-  EXPECT_GE(r.Area(), 0);
-
-  return r.ToPolygons();
-}
-
-struct PolygonTest {
-  PolygonTest(const manifold::Polygons &polygons, const std::string &name)
-      : name(name), polygons(polygons) {};
+struct FilletResult {
+  FilletResult(const Vec<CrossSection> &crossSections, const std::string &name)
+      : name(name), crossSections(crossSections) {};
 
   std::string name;
-  int expectedNumTri = -1;
-  double epsilon = -1;
 
-  manifold::Polygons polygons;
+  Vec<CrossSection> crossSections;
 };
 
 class FilletTestFixture : public PolygonTestFixture {
@@ -174,14 +160,33 @@ class FilletTestFixture : public PolygonTestFixture {
 
   void TestBody() override {
     result->emplace_back(
-        PolygonTest(TestFillet(polys, expectedNumTri, epsilon), name));
+        FilletResult(TestFillet(polys, expectedNumTri, epsilon), name));
   }
 
+  Vec<CrossSection> TestFillet(const Polygons &polys, int expectedNumTri,
+                               double epsilon = -1.0);
+
  private:
-  static std::unique_ptr<std::vector<PolygonTest>,
-                         void (*)(std::vector<PolygonTest> *)>
+  static std::unique_ptr<std::vector<FilletResult>,
+                         void (*)(std::vector<FilletResult> *)>
       result;
 };
+
+Vec<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
+                                                int expectedNumTri,
+                                                double epsilon = -1.0) {
+  const double radius = 0.7;
+
+  manifold::ManifoldParams().verbose = true;
+
+  auto r = manifold::CrossSection::Fillet(polys, radius, 20);
+
+  for (const auto &ele : r) {
+    EXPECT_GE(ele.Area(), 0);
+  }
+
+  return r;
+}
 
 void RegisterFilletTests() {
   std::string files[] = {"fillet.txt"};
@@ -198,7 +203,8 @@ void RegisterFilletTests() {
 #endif
 }
 
-void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
+void Save(const std::string &filename,
+          const std::vector<FilletResult> &result) {
   // Open a file stream for writing.
   std::ofstream outFile(filename);
 
@@ -211,17 +217,11 @@ void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
   // Write each test case to the file.
   for (const auto &test : result) {
     // Write the header for the test.
-    outFile << test.name << " " << test.expectedNumTri << " " << test.epsilon
-            << " " << test.polygons.size() << "\n";
+    outFile << test.name << " " << test.crossSections.size() << "\n";
 
-    // Write each polygon within the test.
-    for (const auto &poly : test.polygons) {
-      // Write the number of points for the current polygon.
-      outFile << poly.size() << "\n";
-      // Write the coordinates for each point in the polygon.
-      for (const auto &point : poly) {
-        outFile << point.x << " " << point.y << "\n";
-      }
+    // Write each CrossSection within the test.
+    for (const auto &crossSection : test.crossSections) {
+      outFile << crossSection << "\n";
     }
   }
 
@@ -230,12 +230,13 @@ void Save(const std::string &filename, const std::vector<PolygonTest> &result) {
             << filename << std::endl;
 }
 
-std::unique_ptr<std::vector<PolygonTest>, void (*)(std::vector<PolygonTest> *)>
+std::unique_ptr<std::vector<FilletResult>,
+                void (*)(std::vector<FilletResult> *)>
     FilletTestFixture::result =
-        std::unique_ptr<std::vector<PolygonTest>,
-                        void (*)(std::vector<PolygonTest> *)>(
-            new std::vector<PolygonTest>(),
-            [](std::vector<PolygonTest> *v) -> void {
+        std::unique_ptr<std::vector<FilletResult>,
+                        void (*)(std::vector<FilletResult> *)>(
+            new std::vector<FilletResult>(),
+            [](std::vector<FilletResult> *v) -> void {
               Save("result.txt", *v);
 
               delete v;

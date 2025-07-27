@@ -21,6 +21,10 @@
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
 
+#ifdef MANIFOLD_DEBUG
+class FilletTestFixture;
+#endif
+
 namespace manifold {
 
 /** @addtogroup Optional
@@ -167,13 +171,21 @@ class CrossSection {
   /** @name Fillet
    */
   ///@{
-  CrossSection Fillet(double radius, int circularSegments = 0) const;
-  static CrossSection Fillet(const std::vector<CrossSection>& crossSections,
-                             double radius, int circularSegments = 0);
-  static CrossSection Fillet(const SimplePolygon pts, double radius,
-                             int circularSegments = 0);
-  static CrossSection Fillet(const Polygons& polys, double radius,
-                             int circularSegments = 0);
+  Vec<CrossSection> Fillet(double radius, int circularSegments = 0) const;
+  static Vec<CrossSection> Fillet(
+      const std::vector<CrossSection>& crossSections, double radius,
+      int circularSegments = 0);
+  static Vec<CrossSection> Fillet(const SimplePolygon pts, double radius,
+                                  int circularSegments = 0);
+  static Vec<CrossSection> Fillet(const Polygons& polys, double radius,
+                                  int circularSegments = 0);
+
+#ifdef MANIFOLD_DEBUG
+
+  friend std::ostream& operator<<(std::ostream& stream,
+                                  const CrossSection& crossSection);
+  friend class FilletTestFixture;
+#endif
   ///@}
 
  private:
