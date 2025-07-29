@@ -1133,13 +1133,11 @@ export class Mesh {
   runTransform: Float32Array;
 
   /**
-   * Optional: Length NumTri, contains an ID of the source face this triangle
-   * comes from. When auto-generated, this ID will be a triangle index into the
-   * original mesh. All neighboring coplanar triangles from that input mesh
-   * will refer to a single triangle of that group as the faceID. When
-   * supplying faceIDs, ensure that triangles with the same ID are in fact
-   * coplanar and have consistent properties (within some tolerance) or the
-   * output will be surprising.
+   * Optional: Length NumTri, contains the source face ID this triangle comes
+   * from. Simplification will maintain all edges between triangles with
+   * different faceIDs. Input faceIDs will be maintained to the outputs, but if
+   * none are given, they will be filled in with Manifold's coplanar face
+   * calculation based on mesh tolerance.
    */
   faceID: Uint32Array;
 
