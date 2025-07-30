@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "manifold/common.h"
-#include "manifold/vec_view.h"
 
 #ifdef MANIFOLD_DEBUG
 class FilletTestFixture;
@@ -171,14 +170,16 @@ class CrossSection {
   /** @name Fillet
    */
   ///@{
-  Vec<CrossSection> Fillet(double radius, int circularSegments = 0) const;
-  static Vec<CrossSection> Fillet(
+  std::vector<CrossSection> Fillet(double radius,
+                                   int circularSegments = 0) const;
+  static std::vector<CrossSection> Fillet(
       const std::vector<CrossSection>& crossSections, double radius,
       int circularSegments = 0);
-  static Vec<CrossSection> Fillet(const SimplePolygon pts, double radius,
-                                  int circularSegments = 0);
-  static Vec<CrossSection> Fillet(const Polygons& polys, double radius,
-                                  int circularSegments = 0);
+  static std::vector<CrossSection> Fillet(const SimplePolygon pts,
+                                          double radius,
+                                          int circularSegments = 0);
+  static std::vector<CrossSection> Fillet(const Polygons& polys, double radius,
+                                          int circularSegments = 0);
 
 #ifdef MANIFOLD_DEBUG
 

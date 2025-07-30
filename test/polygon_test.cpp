@@ -146,12 +146,13 @@ void RegisterPolygonTests() {
 }
 
 struct FilletResult {
-  FilletResult(const Vec<CrossSection> &crossSections, const std::string &name)
+  FilletResult(const std::vector<CrossSection> &crossSections,
+               const std::string &name)
       : name(name), crossSections(crossSections) {};
 
   std::string name;
 
-  Vec<CrossSection> crossSections;
+  std::vector<CrossSection> crossSections;
 };
 
 class FilletTestFixture : public PolygonTestFixture {
@@ -163,8 +164,9 @@ class FilletTestFixture : public PolygonTestFixture {
         FilletResult(TestFillet(polys, expectedNumTri, epsilon), name));
   }
 
-  Vec<CrossSection> TestFillet(const Polygons &polys, int expectedNumTri,
-                               double epsilon = -1.0);
+  std::vector<CrossSection> TestFillet(const Polygons &polys,
+                                       int expectedNumTri,
+                                       double epsilon = -1.0);
 
  private:
   static std::unique_ptr<std::vector<FilletResult>,
@@ -172,9 +174,9 @@ class FilletTestFixture : public PolygonTestFixture {
       result;
 };
 
-Vec<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
-                                                int expectedNumTri,
-                                                double epsilon = -1.0) {
+std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
+                                                        int expectedNumTri,
+                                                        double epsilon = -1.0) {
   const double radius = 0.7;
 
   manifold::ManifoldParams().verbose = true;

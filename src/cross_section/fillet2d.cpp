@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "../collider.h"
-#include "../vec.h"
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.h"
 #include "manifold/cross_section.h"
@@ -627,8 +626,8 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
-Vec<CrossSection> FilletImpl(const Polygons& polygons, double radius,
-                             int circularSegments) {
+std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
+                                     int circularSegments) {
   using namespace manifold;
 
   auto& loop = polygons[0];
@@ -658,7 +657,7 @@ Vec<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   newPoly.insert(newPoly.end(), result.begin(), result.end());
 
-  return Vec<CrossSection>();
+  return std::vector<CrossSection>{CrossSection(polygons)};
 }
 
 }  // namespace
@@ -671,8 +670,8 @@ struct PathImpl {
   const C2::PathsD paths_;
 };
 
-Vec<CrossSection> CrossSection::Fillet(double radius,
-                                       int circularSegments) const {
+std::vector<CrossSection> CrossSection::Fillet(double radius,
+                                               int circularSegments) const {
   auto paths = this->GetPaths()->paths_;
   Polygons polygons(paths.size(), SimplePolygon());
 
@@ -687,13 +686,15 @@ Vec<CrossSection> CrossSection::Fillet(double radius,
   return FilletImpl(polygons, radius, circularSegments);
 }
 
-Vec<CrossSection> CrossSection::Fillet(const SimplePolygon pts, double radius,
-                                       int circularSegments) {
+std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
+                                               double radius,
+                                               int circularSegments) {
   return Fillet(Polygons{pts}, radius, circularSegments);
 }
 
-Vec<CrossSection> CrossSection::Fillet(const Polygons& polygons, double radius,
-                                       int circularSegments) {
+std::vector<CrossSection> CrossSection::Fillet(const Polygons& polygons,
+                                               double radius,
+                                               int circularSegments) {
   return FilletImpl(polygons, radius, circularSegments);
 }
 
