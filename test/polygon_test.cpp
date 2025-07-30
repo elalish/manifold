@@ -176,7 +176,7 @@ class FilletTestFixture : public PolygonTestFixture {
 
 std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
                                                         int expectedNumTri,
-                                                        double epsilon = -1.0) {
+                                                        double epsilon) {
   const double radius = 0.7;
 
   manifold::ManifoldParams().verbose = true;

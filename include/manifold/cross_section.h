@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "manifold/common.h"
+#include "manifold/vec_view.h"
 
 #ifdef MANIFOLD_DEBUG
 class FilletTestFixture;
@@ -182,7 +183,6 @@ class CrossSection {
                                           int circularSegments = 0);
 
 #ifdef MANIFOLD_DEBUG
-
   friend std::ostream& operator<<(std::ostream& stream,
                                   const CrossSection& crossSection);
   friend class FilletTestFixture;
@@ -195,5 +195,9 @@ class CrossSection {
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };
+
+std::ostream& operator<<(std::ostream& stream,
+                         const CrossSection& crossSection);
 /** @} */
+
 }  // namespace manifold
