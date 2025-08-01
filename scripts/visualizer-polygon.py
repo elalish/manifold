@@ -234,25 +234,38 @@ def read_polygon_results_file(filename: str) -> List[Dict[str, Any]]:
     return all_tests
 
 if __name__ == "__main__":
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 20))
-
     result = read_polygon_results_file(sys.argv[1])
+    data = read_polygon_results_file(sys.argv[2])
+
+    result.append(data[0])
+
+    rows = int(len(result) / 5) + 1
+    cols = len(result) if len(result) < 5 else 5
+
+    fig, axes = plt.subplots(rows, cols, figsize=(15 * cols, 15 * rows))
 
     # plot_polygon(ax1, result[0]["polygons"][0], "", "blue", show_indices=True)
     # plot_polygon(ax1, Poly, "", "blue", show_indices=False)
 
     # ax1.legend(); 
-    ax1.grid(True); 
-    ax1.set_aspect('equal', adjustable='box')
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     
-    ax1.set_title(result[0]["name"])
+    for j in range(0, len(result)):
+      ax = axes if cols == 1 else axes.flatten()[j]
+      
+      ax.grid(True)
+      ax.grid(True); 
+      ax.set_aspect('equal', adjustable='box')
+      ax.set_title(result[j]["name"])
 
-    for i in range(0,len(result[0]["polygons"])):
-      plot_polygon(ax1, result[0]["polygons"][i], "", colors[i], show_indices=True)
-      # ax2.legend(); 
-      ax1.grid(True); 
-      ax1.set_aspect('equal', adjustable='box')
+      for i in range(0, len(result[j]["polygons"])):
+        plot_polygon(ax, result[j]["polygons"][i], "", colors[i], show_indices=True, fill_polygon=False)
+        ax.grid(True); 
+        ax.set_aspect('equal', adjustable='box')
+
+    for i in range(len(result), rows * cols):
+      ax = axes.flatten()[i]
+      ax.axis('off')
 
     plt.tight_layout(rect=[0, 1, 0, 0.96])
     plt.savefig("r.png")

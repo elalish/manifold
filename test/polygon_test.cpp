@@ -160,6 +160,8 @@ class FilletTestFixture : public PolygonTestFixture {
   using PolygonTestFixture::PolygonTestFixture;
 
   void TestBody() override {
+    // result->emplace_back(FilletResult({CrossSection(polys)}, name));
+
     result->emplace_back(
         FilletResult(TestFillet(polys, expectedNumTri, epsilon), name));
   }

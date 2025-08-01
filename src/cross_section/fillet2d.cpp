@@ -23,6 +23,7 @@
 #include "manifold/manifold.h"
 
 const double EPSILON = 1e-9;
+namespace C2 = Clipper2Lib;
 
 namespace {
 // Utility
@@ -324,9 +325,8 @@ struct ColliderInfo {
 };
 
 std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
-    const Polygons& input, const ColliderInfo& collider, double radius) {
-  auto& outerLoop = input[0];
-
+    const SimplePolygon& outerLoop, const ColliderInfo& collider,
+    double radius) {
   std::vector<bool> markEE(outerLoop.size() * outerLoop.size(), false);
   std::vector<bool> markEV(outerLoop.size() * outerLoop.size(), false);
   std::vector<bool> markVV(outerLoop.size() * outerLoop.size(), false);
@@ -397,6 +397,13 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           e2i == (e1i + outerLoop.size() - 1) % outerLoop.size())
         continue;
 
+      // Check if processed, and add duplicate mark
+      markEE[e1i * outerLoop.size() + e2i] = 1;
+      if (markEE[e2i * outerLoop.size() + e1i] != 0) {
+        std::cout << "Skipped" << std::endl;
+        continue;
+      }
+
       // CCW, p3 p4 -> bbox hit edge start end
       size_t p3i = e2i, p4i = ele.p2Ref;
       vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
@@ -430,6 +437,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       } else if (segmentIntersected) {
         if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
                                                  e2T, circleCenter)) {
+          std::cout << std::endl;
           continue;
         } else {
           // Check if is endpoint, and add duplicate mark
@@ -493,8 +501,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
 #ifdef MANIFOLD_DEBUG
       if (ManifoldParams().verbose) {
-        std::cout << "Circle center " << circleCenter << " " << e1i << " "
-                  << ele.p1Ref << std::endl;
+        std::cout << "Circle center " << circleCenter << std::endl;
       }
 #endif
 
@@ -642,28 +649,23 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
-std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
-                                     int circularSegments) {
+Polygons FilletImpl(const SimplePolygon& loop, double radius,
+                    int circularSegments) {
   using namespace manifold;
 
-  auto& loop = polygons[0];
-  manifold::Polygons newPoly = polygons;
-  auto& newLoop = newPoly[0];
-  newLoop.push_back(loop[0]);
-
   ColliderInfo info{};
-  info.outerCollider = BuildCollider(polygons[0], info.outerEdgeOld2NewVec);
+  info.outerCollider = BuildCollider(loop, info.outerEdgeOld2NewVec);
 
-  // Process inner loops
-  info.innerCollider = std::vector<Collider>(polygons.size() - 1, Collider());
-  info.innerVec = std::vector<std::vector<edgeOld2New>>(
-      polygons.size() - 1, std::vector<edgeOld2New>());
-  for (size_t i = 1; i != polygons.size(); i++) {
-    info.innerCollider[i] = BuildCollider(polygons[i], info.innerVec[i]);
-  }
+  // // Process inner loops
+  // info.innerCollider = std::vector<Collider>(polygons.size() - 1,
+  // Collider()); info.innerVec = std::vector<std::vector<edgeOld2New>>(
+  //     polygons.size() - 1, std::vector<edgeOld2New>());
+  // for (size_t i = 1; i != polygons.size(); i++) {
+  //   info.innerCollider[i] = BuildCollider(polygons[i], info.innerVec[i]);
+  // }
 
   // Calc all arc that bridge 2 edge
-  auto arcConnection = CalculateFilletArc(polygons, info, radius);
+  auto arcConnection = CalculateFilletArc(loop, info, radius);
 
   // Tracing along the arc
   int n = circularSegments > 2 ? circularSegments
@@ -671,9 +673,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   auto result = Tracing(loop, arcConnection, n, radius);
 
-  newPoly.insert(newPoly.end(), result.begin(), result.end());
-
-  return std::vector<CrossSection>{CrossSection(result)};
+  return result;
 }
 
 }  // namespace
@@ -689,17 +689,33 @@ struct PathImpl {
 std::vector<CrossSection> CrossSection::Fillet(double radius,
                                                int circularSegments) const {
   auto paths = this->GetPaths()->paths_;
-  Polygons polygons(paths.size(), SimplePolygon());
 
-  for (size_t i = 0; i != paths.size(); i++) {
-    auto& pts = polygons[i];
+  Polygons outer, inner;
+  for (const auto& loop : paths) {
+    SimplePolygon polygon;
+    polygon.reserve(loop.size());
 
-    for (auto p : paths[i]) {
-      pts.push_back(v2_of_pd(p));
+    for (auto p : loop) {
+      polygon.push_back(v2_of_pd(p));
     }
+
+    if (C2::Area(loop) > EPSILON)
+      outer.push_back(polygon);
+    else
+      inner.push_back(polygon);
   }
 
-  return FilletImpl(polygons, radius, circularSegments);
+  std::vector<CrossSection> result;
+
+  for (const auto& loop : outer) {
+    auto r = FilletImpl(loop, radius, circularSegments);
+
+    r.insert(r.end(), inner.begin(), inner.end());
+
+    result.push_back(r);
+  }
+
+  return result;
 }
 
 std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
@@ -711,7 +727,19 @@ std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
 std::vector<CrossSection> CrossSection::Fillet(const Polygons& polygons,
                                                double radius,
                                                int circularSegments) {
-  return FilletImpl(polygons, radius, circularSegments);
+  return CrossSection(polygons).Fillet(radius, circularSegments);
+}
+
+std::vector<CrossSection> Fillet(const std::vector<CrossSection>& crossSections,
+                                 double radius, int circularSegments) {
+  std::vector<CrossSection> result;
+
+  for (const auto& crossSection : crossSections) {
+    auto r = crossSection.Fillet(radius, circularSegments);
+    result.insert(result.end(), r.begin(), r.end());
+  }
+
+  return result;
 }
 
 }  // namespace manifold
