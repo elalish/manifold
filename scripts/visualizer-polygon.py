@@ -236,7 +236,7 @@ def read_polygon_results_file(filename: str) -> List[Dict[str, Any]]:
 if __name__ == "__main__":
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 20))
 
-    result = read_polygon_results_file("/home/dmal_gradstudent_myt/Mesh/manifold/build/test/result.txt")
+    result = read_polygon_results_file(sys.argv[1])
 
     # plot_polygon(ax1, result[0]["polygons"][0], "", "blue", show_indices=True)
     # plot_polygon(ax1, Poly, "", "blue", show_indices=False)

@@ -89,8 +89,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   }
 
   // Calculate the distance from the closest point to the circle's center
-  double distanceSquared =
-      la::dot(closestPoint - center, closestPoint - center);
+  double distanceSquared = la::length2(closestPoint - center);
 
   return distanceSquared <= radius * radius;
 };
@@ -107,7 +106,10 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
 bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                        const vec2& endpoint, double radius,
                                        double& e1T, vec2& circleCenter) {
-  vec2 e = p2 - p1, dir = la::normalize(e), normal = {-e.y, e.x};
+  e1T = 0;
+
+  vec2 e = p2 - p1, dir = la::normalize(e),
+       normal = la::normalize(vec2(-e.y, e.x));
 
   if (la::length(e) < EPSILON) {
     // FIXME: Degenerate
@@ -129,11 +131,15 @@ bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
   vec2 tangentPoint1 = projectedEndpoint + dir * len,
        tangentPoint2 = projectedEndpoint - dir * len;
 
+  e1T = la::dot(tangentPoint1 - p1, e) / la::length2(e);
+
   //  FIXME: degenerate case
-  circleCenter = (la::length2(tangentPoint1 - circleCenter) <
-                  la::length2(tangentPoint2 - circleCenter))
-                     ? tangentPoint1
-                     : tangentPoint2;
+  // circleCenter = (la::length2(tangentPoint1 - circleCenter) <
+  //                 la::length2(tangentPoint2 - circleCenter))
+  //                    ? tangentPoint1
+  //                    : tangentPoint2;
+
+  circleCenter = tangentPoint1 + normal * radius;
 
   return true;
 }
@@ -145,6 +151,8 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
                                          const vec2& p3, const vec2& p4,
                                          double radius, double& e1T,
                                          double& e2T, vec2& circleCenter) {
+  e1T = e2T = 0;
+
   vec2 e1 = p2 - p1;
   vec2 normal1 = {-e1.y, e1.x};
   double c1 = -la::dot(normal1, p1);
@@ -316,8 +324,7 @@ struct ColliderInfo {
 };
 
 std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
-    const Polygons& input, Polygons& output, const ColliderInfo& collider,
-    double radius) {
+    const Polygons& input, const ColliderInfo& collider, double radius) {
   auto& outerLoop = input[0];
 
   std::vector<bool> markEE(outerLoop.size() * outerLoop.size(), false);
@@ -382,9 +389,10 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     for (size_t j = 0; j != r.size(); j++) {
       auto ele = collider.outerEdgeOld2NewVec[r.Get(j, true)];
 
+      // e2i is the index of detected possible bridge edge
       size_t e2i = ele.p1Ref;
 
-      // Skip self and last one
+      // Skip self and pre one, only process forward
       if ((e1i == e2i) ||
           e2i == (e1i + outerLoop.size() - 1) % outerLoop.size())
         continue;
@@ -394,31 +402,31 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
       vec2 t;
 
-      bool segmentIntersected = intersectSegmentSegment(
-               normalOffsetP1, normalOffsetP2, p3, p4, t),
-           circleIntersected =
-               p2IsConvex ? intersectCircleSegment(p3, p4, p2, radius) : false;
+      bool segmentIntersected =
+          intersectSegmentSegment(normalOffsetP1, normalOffsetP2, p3, p4, t) ||
+          intersectCircleSegment(p3, p4, p2 + normal * radius, radius);
+
+      bool intersected =
+          segmentIntersected ||
+          (p2IsConvex ? intersectCircleSegment(p3, p4, p2, 2.0 * radius)
+                      : false);
+
       // FIXME: intersectCircleSegment start rad and end rad
 
       std::cout << "Testing " << p3i << "->" << p4i << "\t";
 
-      std::cout << (segmentIntersected ? "Segment Intersected" : "Segment - ")
+      std::cout << (segmentIntersected ? "Segment Intersected " : "Segment - ")
                 << " "
-                << (circleIntersected ? "Circle Intersected" : "Circle -");
+                << (intersected && (!segmentIntersected)
+                        ? "Endpoint Intersected "
+                        : "Endpoint - ");
 
       double e1T = 0, e2T = 0;
       vec2 circleCenter(0, 0);
 
-      if (!segmentIntersected && !circleIntersected) {
+      if (!intersected) {
         std::cout << std::endl;
         continue;
-      } else if (circleIntersected) {
-        // Concave p2 endpoint intersected, degenerated natively
-
-        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
-                                               circleCenter)) {
-          continue;
-        }
       } else if (segmentIntersected) {
         if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
                                                  e2T, circleCenter)) {
@@ -442,6 +450,15 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             if (markEV[e1i * outerLoop.size() + p4i]) continue;
             markEV[e1i * outerLoop.size() + p4i] = 1;
           }
+        }
+
+      } else {
+        // Concave p2 endpoint intersected, degenerated natively
+
+        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
+                                               circleCenter)) {
+          // TODO: remember to add mask
+          continue;
         }
       }
 
@@ -477,8 +494,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 #ifdef MANIFOLD_DEBUG
       if (ManifoldParams().verbose) {
         std::cout << "Circle center " << circleCenter << " " << e1i << " "
-                  << ele.p1Ref << " Vertex index " << output[0].size() << "~"
-                  << output[0].size() + 20 << std::endl;
+                  << ele.p1Ref << std::endl;
       }
 #endif
 
@@ -647,7 +663,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   }
 
   // Calc all arc that bridge 2 edge
-  auto arcConnection = CalculateFilletArc(polygons, newPoly, info, radius);
+  auto arcConnection = CalculateFilletArc(polygons, info, radius);
 
   // Tracing along the arc
   int n = circularSegments > 2 ? circularSegments
@@ -657,7 +673,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   newPoly.insert(newPoly.end(), result.begin(), result.end());
 
-  return std::vector<CrossSection>{CrossSection(polygons)};
+  return std::vector<CrossSection>{CrossSection(result)};
 }
 
 }  // namespace
