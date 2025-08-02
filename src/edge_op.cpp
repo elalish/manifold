@@ -202,6 +202,7 @@ namespace manifold {
  */
 void Manifold::Impl::CleanupTopology() {
   if (!halfedge_.size()) return;
+  ASSERT(IsManifold(), topologyErr);
 
   // In the case of a very bad triangulation, it is possible to create pinched
   // verts. They must be removed before edge collapse.
