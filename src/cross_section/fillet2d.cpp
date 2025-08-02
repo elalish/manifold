@@ -16,6 +16,9 @@
 #include <optional>
 #include <vector>
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "../collider.h"
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.h"
@@ -103,12 +106,14 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
   return t >= 0 && t <= 1;
 };
 
-// Calculate Circle center that tangent to one segment, and cross a point
-bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
-                                       const vec2& endpoint, double radius,
-                                       double& e1T, vec2& circleCenter) {
-  e1T = 0;
+struct PointSegmentIntersectResult {
+  double eT;
+  vec2 circleCenter;
+};
 
+// Calculate Circle center that tangent to one segment, and cross a point
+std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
+    const vec2& p1, const vec2& p2, const vec2& endpoint, double radius) {
   vec2 e = p2 - p1, dir = la::normalize(e),
        normal = la::normalize(vec2(-e.y, e.x));
 
@@ -116,7 +121,7 @@ bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
     // FIXME: Degenerate
     std::cout << "Degenerate" << std::endl;
 
-    return false;
+    return {};
   }
 
   vec2 projectedEndpoint = p1 + dir * la::dot(endpoint - p1, dir);
@@ -128,21 +133,20 @@ bool calculatePointSegmentCircleCenter(const vec2& p1, const vec2& p2,
 
   dist = dist > radius ? dist - radius : radius - dist;
 
+  std::vector<PointSegmentIntersectResult> result(
+      2, PointSegmentIntersectResult());
+
   double len = la::sqrt(radius * radius - dist * dist);
   vec2 tangentPoint1 = projectedEndpoint + dir * len,
        tangentPoint2 = projectedEndpoint - dir * len;
 
-  e1T = la::dot(tangentPoint1 - p1, e) / la::length2(e);
+  result[0].eT = la::dot(tangentPoint1 - p1, e) / la::length2(e);
+  result[1].eT = la::dot(tangentPoint2 - p1, e) / la::length2(e);
 
-  //  FIXME: degenerate case
-  // circleCenter = (la::length2(tangentPoint1 - circleCenter) <
-  //                 la::length2(tangentPoint2 - circleCenter))
-  //                    ? tangentPoint1
-  //                    : tangentPoint2;
+  result[0].circleCenter = tangentPoint1 + normal * radius;
+  result[1].circleCenter = tangentPoint2 + normal * radius;
 
-  circleCenter = tangentPoint1 + normal * radius;
-
-  return true;
+  return result;
 }
 
 // Calculate Circle center that tangent to both line segment
@@ -182,50 +186,9 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   // Check Circle center projection for tangent point status
   if (onE1 && onE2) {
     // Tangent point on both line segment
-  } else if ((!onE1) && (!onE2)) {
+  } else {
     // Both not on line segment, invalid result
     return false;
-  } else if (onE1) {
-    // Won't tangent to both line, degenerated to Point Segment Intersection,
-    // recalculate new circle position
-
-    // Only on e1, tangent point might be e2 endpoint
-    vec2 endpoint =
-        (la::length2(circleCenter - p3) < la::length2(circleCenter - p4)) ? p3
-                                                                          : p4;
-
-    if (!calculatePointSegmentCircleCenter(p1, p2, endpoint, radius, e1T,
-                                           circleCenter))
-      return false;
-
-    e2T = (e2T < 0 ? 0 : 1);
-
-    // Calc new tangent point's parameter value, and check is valid
-    isProjectionOnSegment(circleCenter, p1, p2, e1T);
-    if (e1T < EPSILON || e1T > (1 + EPSILON)) return false;
-
-    std::cout << "Center (line-vertex on e2): ";
-
-  } else if (onE2) {
-    // Won't tangent to both line, degenerated to Point Segment Intersection,
-    // recalculate new circle position
-
-    // tangent point might be e1 endpoint
-
-    vec2 endpoint =
-        (la::length2(circleCenter - p1) < la::length2(circleCenter - p2)) ? p1
-                                                                          : p2;
-
-    if (!calculatePointSegmentCircleCenter(p3, p4, endpoint, radius, e1T,
-                                           circleCenter))
-      return false;
-
-    e1T = (e1T < 0 ? 0 : 1);
-
-    isProjectionOnSegment(circleCenter, p3, p4, e2T);
-
-    if (e2T < EPSILON || e2T > (1 + EPSILON)) return false;
-    std::cout << "Center (line-vertex on e1): ";
   }
 
   return true;
@@ -460,42 +423,103 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           }
         }
 
+        {
+          vec2 e1 = p2 - p1, e2 = p4 - p3;
+
+          vec2 tangent1 = p1 + e1T * e1;
+          vec2 tangent2 = p3 + e2T * e2;
+
+          vec2 v_start = tangent1 - circleCenter;
+          vec2 v_end = tangent2 - circleCenter;
+
+          double start_rad = atan2(v_start.y, v_start.x);
+          double end_rad = atan2(v_end.y, v_end.x);
+
+          // Normalize to [0, 2π]
+          if (start_rad < 0) start_rad += 2 * M_PI;
+          if (end_rad < 0) end_rad += 2 * M_PI;
+
+          // Sort result by CCW
+          double arcAngle = end_rad - start_rad;
+          if (arcAngle < 0) arcAngle += 2 * M_PI;
+
+          if (arcAngle <= M_PI) {
+            arcConnection[e1i].emplace_back(ArcConnectionInfo{
+                circleCenter, e1T, e2T, e1i, e2i, start_rad, end_rad});
+          } else {
+            arcConnection[e2i].emplace_back(ArcConnectionInfo{
+                circleCenter, e2T, e1T, e2i, e1i, end_rad, start_rad});
+          }
+        }
       } else {
         // Concave p2 endpoint intersected, degenerated natively
 
-        if (!calculatePointSegmentCircleCenter(p3, p4, p2, radius, e1T,
-                                               circleCenter)) {
-          // TODO: remember to add mask
+        auto r = calculatePointSegmentCircleCenter(p3, p4, p2, radius);
+
+        if (markEV[e2i * outerLoop.size() + p2i]) continue;
+        markEV[e2i * outerLoop.size() + p2i] = 1;
+
+        if (r.empty()) {
           continue;
         }
-      }
 
-      {
-        vec2 e1 = p2 - p1, e2 = p4 - p3;
+        auto isValid = [](vec2 a, vec2 b) -> bool {
+          return (la::dot(a, b) > 0) && (la::cross(a, b) > 0);
+        };
 
-        vec2 tangent1 = p1 + e1T * e1;
-        vec2 tangent2 = p3 + e2T * e2;
+        const size_t nextEdgei = (e1i + 1) % outerLoop.size();
+        const vec2 np1 = outerLoop[nextEdgei],
+                   np2 = outerLoop[(nextEdgei + 1) % outerLoop.size()];
 
-        vec2 v_start = tangent1 - circleCenter;
-        vec2 v_end = tangent2 - circleCenter;
+        vec2 nextEdge = np2 - np1;
 
-        double start_rad = atan2(v_start.y, v_start.x);
-        double end_rad = atan2(v_end.y, v_end.x);
+        for (const auto& ele : r) {
+          const vec2 center = ele.circleCenter;
+          double rT = ele.eT;
 
-        // Normalize to [0, 2π]
-        if (start_rad < 0) start_rad += 2 * M_PI;
-        if (end_rad < 0) end_rad += 2 * M_PI;
+          bool curEdgeValid = isValid(e1, center - p2),
+               nextEdgeValid = isValid(center - p2, nextEdge);
 
-        // Sort result by CW
-        double arcAngle = end_rad - start_rad;
-        if (arcAngle < 0) arcAngle += 2 * M_PI;
+          if (!(curEdgeValid || nextEdgeValid)) {
+            continue;
+          } else {
+            vec2 e2 = p4 - p3;
 
-        if (arcAngle <= M_PI) {
-          arcConnection[e1i].emplace_back(ArcConnectionInfo{
-              circleCenter, e1T, e2T, e1i, e2i, start_rad, end_rad});
-        } else {
-          arcConnection[e2i].emplace_back(ArcConnectionInfo{
-              circleCenter, e2T, e1T, e2i, e1i, end_rad, start_rad});
+            vec2 tangent = p3 + rT * e2;
+
+            vec2 v_start = p2 - center;
+            vec2 v_end = tangent - center;
+
+            double start_rad = atan2(v_start.y, v_start.x);
+            double end_rad = atan2(v_end.y, v_end.x);
+
+            // Normalize to [0, 2π]
+            if (start_rad < 0) start_rad += 2 * M_PI;
+            if (end_rad < 0) end_rad += 2 * M_PI;
+
+            // Sort result by CCW
+            double arcAngle = end_rad - start_rad;
+            if (arcAngle < 0) arcAngle += 2 * M_PI;
+
+            if (arcAngle <= M_PI) {
+              if (curEdgeValid) {
+                arcConnection[e1i].emplace_back(ArcConnectionInfo{
+                    center, 1, rT, e1i, e2i, start_rad, end_rad});
+              } else {
+                arcConnection[nextEdgei].emplace_back(ArcConnectionInfo{
+                    center, 0, rT, nextEdgei, e2i, start_rad, end_rad});
+              }
+
+            } else {
+              if (curEdgeValid) {
+                arcConnection[e2i].emplace_back(ArcConnectionInfo{
+                    center, rT, 1, e2i, e1i, end_rad, start_rad});
+              } else {
+                arcConnection[e2i].emplace_back(ArcConnectionInfo{
+                    center, rT, 0, e2i, nextEdgei, end_rad, start_rad});
+              }
+            }
+          }
         }
       }
 
@@ -514,8 +538,6 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       // }
     }
   }
-
-  // Construct Result
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
@@ -710,9 +732,11 @@ std::vector<CrossSection> CrossSection::Fillet(double radius,
   for (const auto& loop : outer) {
     auto r = FilletImpl(loop, radius, circularSegments);
 
-    r.insert(r.end(), inner.begin(), inner.end());
-
-    result.push_back(r);
+    for (const auto& ele : r) {
+      Polygons poly{ele};
+      poly.insert(poly.end(), inner.begin(), inner.end());
+      result.push_back(poly);
+    }
   }
 
   return result;
