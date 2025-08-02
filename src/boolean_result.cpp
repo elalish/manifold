@@ -880,7 +880,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 6
 
   // if (ManifoldParams().intermediateChecks)
-  //   DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
+  //   DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not
+  //   manifold!");
 
   outR.Face2Tri(faceEdge, halfedgeRef);
   halfedgeRef.clear();
