@@ -40,7 +40,7 @@ vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
 // Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
-                             const vec2& p4, vec2& intersectionPoint) {
+                             const vec2& p4) {
   double det = la::cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
@@ -58,15 +58,9 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
       (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
     // Inside
-    double intersect_x = p1.x + t * (p2.x - p1.x);
-    double intersect_y = p1.y + t * (p2.y - p1.y);
-
-    intersectionPoint = {intersect_x, intersect_y};
     return true;
   } else {
     // Outside -> No intersection
-
-    intersectionPoint = {};
     return false;
   }
 };
@@ -109,6 +103,7 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
 struct PointSegmentIntersectResult {
   double eT;
   vec2 circleCenter;
+  double endPointRad, edgeTangentRad;
 };
 
 // Calculate Circle center that tangent to one segment, and cross a point
@@ -145,6 +140,21 @@ std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
 
   result[0].circleCenter = tangentPoint1 + normal * radius;
   result[1].circleCenter = tangentPoint2 + normal * radius;
+
+  vec2 dir = endpoint - result[0].circleCenter;
+  result[0].endPointRad = atan2(dir.x, dir.y);
+  dir = tangentPoint1 - result[0].circleCenter;
+  result[0].edgeTangentRad = atan2(dir.x, dir.y);
+
+  dir = endpoint - result[1].circleCenter;
+  result[1].endPointRad = atan2(dir.x, dir.y);
+  dir = tangentPoint2 - result[1].circleCenter;
+  result[1].edgeTangentRad = atan2(dir.x, dir.y);
+
+  if (result[0].endPointRad < 0) result[0].endPointRad += 2 * M_PI;
+  if (result[0].edgeTangentRad < 0) result[0].edgeTangentRad += 2 * M_PI;
+  if (result[1].endPointRad < 0) result[1].endPointRad += 2 * M_PI;
+  if (result[1].edgeTangentRad < 0) result[1].edgeTangentRad += 2 * M_PI;
 
   return result;
 }
@@ -252,8 +262,9 @@ std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
 
   double dPhi = 2 * M_PI / circularSegments;
   int seg = int(totalRad / dPhi) + 1;
-  for (int i = 0; i < seg; ++i) {
+  for (int i = 0; i != seg + 1; ++i) {
     double current = arc.startRad + dPhi * i;
+    if (i == seg) current = arc.endRad;
 
     vec2 pnt = {arc.center.x + radius * cos(current),
                 arc.center.y + radius * sin(current)};
@@ -409,16 +420,17 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       // CCW, p3 p4 -> bbox hit edge start end
       size_t p3i = e2i, p4i = ele.p2Ref;
       vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
-      vec2 t;
 
       bool segmentIntersected =
-          intersectSegmentSegment(normalOffsetP1, normalOffsetP2, p3, p4, t) ||
+          intersectSegmentSegment(normalOffsetP1, normalOffsetP2, p3, p4) ||
           intersectCircleSegment(p3, p4, p2 + normal * radius, radius);
 
       bool intersected =
           segmentIntersected ||
           (p2IsConvex ? intersectCircleSegment(p3, p4, p2, 2.0 * radius)
                       : false);
+
+      bool endPointIntersected = intersected && !segmentIntersected;
 
       // FIXME: intersectCircleSegment start rad and end rad
 
@@ -448,86 +460,154 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         if (segSegResult == SegmentSegmentIntersectResult::None)
           continue;
         else if (segSegResult == SegmentSegmentIntersectResult::Result) {
-          arcConnection[e1i].emplace_back(ArcConnectionInfo{
-              circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+          // Sort result by CCW
+          double arcAngle = endRad - startRad;
+          if (arcAngle < 0) arcAngle += 2 * M_PI;
+
+          if (arcAngle <= M_PI) {
+            arcConnection[e1i].emplace_back(ArcConnectionInfo{
+                circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+          } else {
+            arcConnection[e2i].emplace_back(ArcConnectionInfo{
+                circleCenter, e2T, e1T, e2i, e1i, endRad, startRad});
+          }
+
           continue;
         }
-      } else {
-        // Concave p2 endpoint intersected, degenerated natively
+      }
 
-        auto r = calculatePointSegmentCircleCenter(p3, p4, p2, radius);
+      // Handle concave vertex degenerate case
+      if (endPointIntersected ||
+          (segSegResult != SegmentSegmentIntersectResult::None &&
+           segSegResult != SegmentSegmentIntersectResult::Result)) {
+        ASSERT(segSegResult != SegmentSegmentIntersectResult::DegenerateP1,
+               std::exception());
 
-        if (markEV[e2i * outerLoop.size() + p2i]) continue;
-        markEV[e2i * outerLoop.size() + p2i] = 1;
+        auto getSegmentSegmentIntersectResultEndPointIndex =
+            [](SegmentSegmentIntersectResult result, const size_t p1i,
+               const size_t p2i, const size_t p3i, const size_t p4i) -> size_t {
+          switch (result) {
+            case SegmentSegmentIntersectResult::DegenerateP1:
+              return p1i;
+            case SegmentSegmentIntersectResult::DegenerateP2:
+              return p2i;
+            case SegmentSegmentIntersectResult::DegenerateP3:
+              return p3i;
+            case SegmentSegmentIntersectResult::DegenerateP4:
+              return p4i;
+            default:
+              throw std::exception();
+          }
+        };
+
+        auto getSegmentSegmentIntersectResultSegmentIndex =
+            [](SegmentSegmentIntersectResult result, const size_t e1i,
+               const size_t e2i) -> size_t {
+          switch (result) {
+            case SegmentSegmentIntersectResult::DegenerateP1:
+            case SegmentSegmentIntersectResult::DegenerateP2:
+              return e2i;
+            case SegmentSegmentIntersectResult::DegenerateP3:
+            case SegmentSegmentIntersectResult::DegenerateP4:
+              return e1i;
+            default:
+              throw std::exception();
+          }
+        };
+
+        const size_t endPointIndex =
+                         endPointIntersected
+                             ? p2i
+                             : getSegmentSegmentIntersectResultEndPointIndex(
+                                   segSegResult, p1i, p2i, p3i, p4i),
+                     intersectSegmentIndex =
+                         endPointIntersected
+                             ? e2i
+                             : getSegmentSegmentIntersectResultSegmentIndex(
+                                   segSegResult, e1i, e2i),
+                     endPointCurrentEdgeIndex = endPointIndex,
+                     endPointNextEdgeIndex =
+                         (endPointIndex + 1) % outerLoop.size();
+
+        const size_t intersectSegmentP1i = intersectSegmentIndex,
+                     intersectSegmentP2i =
+                         (intersectSegmentP1i + 1) % outerLoop.size();
+
+        const vec2 intersectSegmentP1 = outerLoop[intersectSegmentP1i],
+                   intersectSegmentP2 = outerLoop[intersectSegmentP2i],
+                   endPoint = outerLoop[endPointIndex];
+
+        if (markEV[intersectSegmentIndex * outerLoop.size() + endPointIndex])
+          continue;
+        markEV[intersectSegmentIndex * outerLoop.size() + endPointIndex] = 1;
+
+        auto r = calculatePointSegmentCircleCenter(
+            intersectSegmentP1, intersectSegmentP2, endPoint, radius);
 
         if (r.empty()) {
           continue;
         }
 
+        // Check if A and B less than 90 degree, and B is on A's left side
         auto isValid = [](vec2 a, vec2 b) -> bool {
           return (la::dot(a, b) > 0) && (la::cross(a, b) > 0);
         };
 
-        const size_t nextEdgei = (e1i + 1) % outerLoop.size();
-        const vec2 np1 = outerLoop[nextEdgei],
-                   np2 = outerLoop[(nextEdgei + 1) % outerLoop.size()];
-
-        vec2 nextEdge = np2 - np1;
+        const vec2
+            endPointCurrentEdge =
+                outerLoop[(endPointCurrentEdgeIndex + 1) % outerLoop.size()] -
+                outerLoop[endPointCurrentEdgeIndex],
+            endPointNextEdge =
+                outerLoop[(endPointNextEdgeIndex + 1) % outerLoop.size()] -
+                outerLoop[endPointNextEdgeIndex];
 
         for (const auto& ele : r) {
-          const vec2 center = ele.circleCenter;
+          const vec2 center = ele.circleCenter,
+                     endPointToCenter = center - endPoint;
           double rT = ele.eT;
 
-          bool curEdgeValid = isValid(e1, center - p2),
-               nextEdgeValid = isValid(center - p2, nextEdge);
+          bool curEdgeValid =
+                   (la::dot(endPointCurrentEdge, endPointToCenter) > 0) &&
+                   (la::cross(endPointCurrentEdge, endPointToCenter) > 0),
+               nextEdgeValid =
+                   (la::dot(endPointToCenter, endPointNextEdge) < 0) &&
+                   (la::cross(endPointToCenter, endPointNextEdge) > 0);
 
           if (!(curEdgeValid || nextEdgeValid)) {
             continue;
           } else {
-            vec2 e2 = p4 - p3;
-
-            vec2 tangent = p3 + rT * e2;
-
-            vec2 v_start = p2 - center;
-            vec2 v_end = tangent - center;
-
-            double start_rad = atan2(v_start.y, v_start.x);
-            double end_rad = atan2(v_end.y, v_end.x);
-
-            // Normalize to [0, 2π]
-            if (start_rad < 0) start_rad += 2 * M_PI;
-            if (end_rad < 0) end_rad += 2 * M_PI;
-
             // Sort result by CCW
-            double arcAngle = end_rad - start_rad;
+            double arcAngle = ele.edgeTangentRad - ele.endPointRad;
             if (arcAngle < 0) arcAngle += 2 * M_PI;
 
             if (arcAngle <= M_PI) {
               if (curEdgeValid) {
-                arcConnection[e1i].emplace_back(ArcConnectionInfo{
-                    center, 1, rT, e1i, e2i, start_rad, end_rad});
+                arcConnection[endPointCurrentEdgeIndex].emplace_back(
+                    ArcConnectionInfo{center, 1, rT, endPointCurrentEdgeIndex,
+                                      intersectSegmentIndex, ele.endPointRad,
+                                      ele.edgeTangentRad});
               } else {
-                arcConnection[nextEdgei].emplace_back(ArcConnectionInfo{
-                    center, 0, rT, nextEdgei, e2i, start_rad, end_rad});
+                arcConnection[endPointNextEdgeIndex].emplace_back(
+                    ArcConnectionInfo{center, 0, rT, endPointNextEdgeIndex,
+                                      intersectSegmentIndex, ele.endPointRad,
+                                      ele.edgeTangentRad});
               }
 
             } else {
               if (curEdgeValid) {
-                arcConnection[e2i].emplace_back(ArcConnectionInfo{
-                    center, rT, 1, e2i, e1i, end_rad, start_rad});
+                arcConnection[intersectSegmentIndex].emplace_back(
+                    ArcConnectionInfo{center, rT, 1, intersectSegmentIndex,
+                                      endPointCurrentEdgeIndex,
+                                      ele.edgeTangentRad, ele.endPointRad});
               } else {
-                arcConnection[e2i].emplace_back(ArcConnectionInfo{
-                    center, rT, 0, e2i, nextEdgei, end_rad, start_rad});
+                arcConnection[intersectSegmentIndex].emplace_back(
+                    ArcConnectionInfo{center, rT, 0, intersectSegmentIndex,
+                                      endPointNextEdgeIndex, ele.edgeTangentRad,
+                                      ele.endPointRad});
               }
             }
           }
         }
-      }
-
-      // Handle concave vertex degenerate case
-      if ((intersected && !segmentIntersected) ||
-          (segSegResult != SegmentSegmentIntersectResult::None &&
-           segSegResult != SegmentSegmentIntersectResult::Result)) {
       }
 
 #ifdef MANIFOLD_DEBUG
@@ -553,7 +633,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       for (size_t j = 0; j != arcConnection[i].size(); j++) {
         std::cout << "\t" << arcConnection[i][j].e1 << " "
                   << arcConnection[i][j].e2 << " " << arcConnection[i][j].t1
-                  << " " << arcConnection[i][j].t2 << " "
+                  << " " << arcConnection[i][j].t2 << " <"
+                  << arcConnection[i][j].center << "> "
                   << arcConnection[i][j].startRad << " "
                   << arcConnection[i][j].endRad << std::endl;
       }
