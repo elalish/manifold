@@ -149,14 +149,24 @@ std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
   return result;
 }
 
+enum SegmentSegmentIntersectResult {
+  None,
+  Result,
+  DegenerateP1,
+  DegenerateP2,
+  DegenerateP3,
+  DegenerateP4,
+};
+
 // Calculate Circle center that tangent to both line segment
 // If not, degenerate to only tangent to one segment, and cross another's
 // endpoint
-bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
-                                         const vec2& p3, const vec2& p4,
-                                         double radius, double& e1T,
-                                         double& e2T, vec2& circleCenter) {
+SegmentSegmentIntersectResult calculateSegmentSegmentCircleCenter(
+    const vec2& p1, const vec2& p2, const vec2& p3, const vec2& p4,
+    const double radius, double& e1T, double& e2T, vec2& circleCenter,
+    double& startRad, double& endRad) {
   e1T = e2T = 0;
+  circleCenter = vec2(0, 0);
 
   vec2 e1 = p2 - p1;
   vec2 normal1 = {-e1.y, e1.x};
@@ -168,7 +178,7 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     // FIXME: Degenerate
     std::cout << "Degenerate" << std::endl;
 
-    return false;
+    return SegmentSegmentIntersectResult::None;
   }
   mat2 A = {{normal1.x, normal2.x}, {normal1.y, normal2.y}};
   vec2 b = {radius * la::length(normal1) - c1,
@@ -176,22 +186,50 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   if (std::abs(la::determinant(A)) < EPSILON) {
     // FIXME: Parallel line
     std::cout << "Parallel" << std::endl;
-    return false;
+    return SegmentSegmentIntersectResult::None;
   }
-  circleCenter = la::mul(la::inverse(A), b);
 
-  bool onE1 = isProjectionOnSegment(circleCenter, p1, p2, e1T),
-       onE2 = isProjectionOnSegment(circleCenter, p3, p4, e2T);
+  vec2 center = la::mul(la::inverse(A), b);
+  double r1T = 0, r2T = 0;
+
+  bool onE1 = isProjectionOnSegment(center, p1, p2, r1T),
+       onE2 = isProjectionOnSegment(center, p3, p4, r2T);
 
   // Check Circle center projection for tangent point status
   if (onE1 && onE2) {
     // Tangent point on both line segment
+    circleCenter = center;
+
+    e1T = r1T;
+    e2T = r2T;
+
+    vec2 tangent1 = p1 + e1T * e1;
+    vec2 tangent2 = p3 + e2T * e2;
+
+    vec2 dirStart = tangent1 - circleCenter;
+    vec2 dirEnd = tangent2 - circleCenter;
+
+    startRad = atan2(dirStart.y, dirStart.x);
+    endRad = atan2(dirEnd.y, dirEnd.x);
+
+    if (startRad < 0) startRad += 2 * M_PI;
+    if (endRad < 0) endRad += 2 * M_PI;
+
+    return SegmentSegmentIntersectResult::Result;
+  } else if (onE1) {
+    if (la::length2(circleCenter - p3) < la::length2(circleCenter - p4))
+      return SegmentSegmentIntersectResult::DegenerateP3;
+    else
+      return SegmentSegmentIntersectResult::DegenerateP4;
+  } else if (onE2) {
+    if (la::length2(circleCenter - p1) < la::length2(circleCenter - p2))
+      return SegmentSegmentIntersectResult::DegenerateP1;
+    else
+      return SegmentSegmentIntersectResult::DegenerateP2;
   } else {
     // Both not on line segment, invalid result
-    return false;
+    return SegmentSegmentIntersectResult::None;
   }
-
-  return true;
 }
 
 struct ArcConnectionInfo {
@@ -345,7 +383,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     // r.Dump();
     r.Sort();
 
-    std::cout << "Now " << p1i << "->" << (e1i + 1) % outerLoop.size()
+    std::cout << std::endl
+              << "Now " << p1i << "->" << (e1i + 1) % outerLoop.size()
               << std::endl;
 
     // In Out Classify
@@ -363,7 +402,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       // Check if processed, and add duplicate mark
       markEE[e1i * outerLoop.size() + e2i] = 1;
       if (markEE[e2i * outerLoop.size() + e1i] != 0) {
-        std::cout << "Skipped" << std::endl;
+        std::cout << "Skipped";
         continue;
       }
 
@@ -383,7 +422,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
       // FIXME: intersectCircleSegment start rad and end rad
 
-      std::cout << "Testing " << p3i << "->" << p4i << "\t";
+      std::cout << std::endl << "Testing " << p3i << "->" << p4i << "\t";
 
       std::cout << (segmentIntersected ? "Segment Intersected " : "Segment - ")
                 << " "
@@ -394,62 +433,24 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       double e1T = 0, e2T = 0;
       vec2 circleCenter(0, 0);
 
+      SegmentSegmentIntersectResult segSegResult =
+          SegmentSegmentIntersectResult::None;
+
       if (!intersected) {
         std::cout << std::endl;
         continue;
       } else if (segmentIntersected) {
-        if (!calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
-                                                 e2T, circleCenter)) {
-          std::cout << std::endl;
+        double startRad = 0, endRad = 0;
+
+        segSegResult = calculateSegmentSegmentCircleCenter(
+            p1, p2, p3, p4, radius, e1T, e2T, circleCenter, startRad, endRad);
+
+        if (segSegResult == SegmentSegmentIntersectResult::None)
           continue;
-        } else {
-          // Check if is endpoint, and add duplicate mark
-          if (e1T == 0) {
-            // p1
-            if (markEV[e2i * outerLoop.size() + p1i]) continue;
-            markEV[e2i * outerLoop.size() + p1i] = 1;
-          } else if (e1T == 1) {
-            // p2
-            if (markEV[e2i * outerLoop.size() + p2i]) continue;
-            markEV[e2i * outerLoop.size() + p2i] = 1;
-          }
-
-          if (e2T == 0) {
-            if (markEV[e1i * outerLoop.size() + p3i]) continue;
-            markEV[e1i * outerLoop.size() + p3i] = 1;
-          } else if (e2T == 1) {
-            if (markEV[e1i * outerLoop.size() + p4i]) continue;
-            markEV[e1i * outerLoop.size() + p4i] = 1;
-          }
-        }
-
-        {
-          vec2 e1 = p2 - p1, e2 = p4 - p3;
-
-          vec2 tangent1 = p1 + e1T * e1;
-          vec2 tangent2 = p3 + e2T * e2;
-
-          vec2 v_start = tangent1 - circleCenter;
-          vec2 v_end = tangent2 - circleCenter;
-
-          double start_rad = atan2(v_start.y, v_start.x);
-          double end_rad = atan2(v_end.y, v_end.x);
-
-          // Normalize to [0, 2π]
-          if (start_rad < 0) start_rad += 2 * M_PI;
-          if (end_rad < 0) end_rad += 2 * M_PI;
-
-          // Sort result by CCW
-          double arcAngle = end_rad - start_rad;
-          if (arcAngle < 0) arcAngle += 2 * M_PI;
-
-          if (arcAngle <= M_PI) {
-            arcConnection[e1i].emplace_back(ArcConnectionInfo{
-                circleCenter, e1T, e2T, e1i, e2i, start_rad, end_rad});
-          } else {
-            arcConnection[e2i].emplace_back(ArcConnectionInfo{
-                circleCenter, e2T, e1T, e2i, e1i, end_rad, start_rad});
-          }
+        else if (segSegResult == SegmentSegmentIntersectResult::Result) {
+          arcConnection[e1i].emplace_back(ArcConnectionInfo{
+              circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+          continue;
         }
       } else {
         // Concave p2 endpoint intersected, degenerated natively
@@ -521,6 +522,12 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             }
           }
         }
+      }
+
+      // Handle concave vertex degenerate case
+      if ((intersected && !segmentIntersected) ||
+          (segSegResult != SegmentSegmentIntersectResult::None &&
+           segSegResult != SegmentSegmentIntersectResult::Result)) {
       }
 
 #ifdef MANIFOLD_DEBUG
