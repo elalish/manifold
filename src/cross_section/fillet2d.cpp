@@ -141,15 +141,15 @@ std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
   result[0].circleCenter = tangentPoint1 + normal * radius;
   result[1].circleCenter = tangentPoint2 + normal * radius;
 
-  vec2 dir = endpoint - result[0].circleCenter;
-  result[0].endPointRad = atan2(dir.x, dir.y);
-  dir = tangentPoint1 - result[0].circleCenter;
-  result[0].edgeTangentRad = atan2(dir.x, dir.y);
+  vec2 pointToCenter = endpoint - result[0].circleCenter;
+  result[0].endPointRad = atan2(pointToCenter.y, pointToCenter.x);
+  pointToCenter = tangentPoint1 - result[0].circleCenter;
+  result[0].edgeTangentRad = atan2(pointToCenter.y, pointToCenter.x);
 
-  dir = endpoint - result[1].circleCenter;
-  result[1].endPointRad = atan2(dir.x, dir.y);
-  dir = tangentPoint2 - result[1].circleCenter;
-  result[1].edgeTangentRad = atan2(dir.x, dir.y);
+  pointToCenter = endpoint - result[1].circleCenter;
+  result[1].endPointRad = atan2(pointToCenter.y, pointToCenter.x);
+  pointToCenter = tangentPoint2 - result[1].circleCenter;
+  result[1].edgeTangentRad = atan2(pointToCenter.y, pointToCenter.x);
 
   if (result[0].endPointRad < 0) result[0].endPointRad += 2 * M_PI;
   if (result[0].edgeTangentRad < 0) result[0].edgeTangentRad += 2 * M_PI;
@@ -413,7 +413,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       // Check if processed, and add duplicate mark
       markEE[e1i * outerLoop.size() + e2i] = 1;
       if (markEE[e2i * outerLoop.size() + e1i] != 0) {
-        std::cout << "Skipped";
+        std::cout << "Skipped" << std::endl;
         continue;
       }
 
@@ -442,9 +442,6 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
                         ? "Endpoint Intersected "
                         : "Endpoint - ");
 
-      double e1T = 0, e2T = 0;
-      vec2 circleCenter(0, 0);
-
       SegmentSegmentIntersectResult segSegResult =
           SegmentSegmentIntersectResult::None;
 
@@ -453,6 +450,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         continue;
       } else if (segmentIntersected) {
         double startRad = 0, endRad = 0;
+        double e1T = 0, e2T = 0;
+        vec2 circleCenter(0, 0);
 
         segSegResult = calculateSegmentSegmentCircleCenter(
             p1, p2, p3, p4, radius, e1T, e2T, circleCenter, startRad, endRad);
@@ -471,6 +470,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             arcConnection[e2i].emplace_back(ArcConnectionInfo{
                 circleCenter, e2T, e1T, e2i, e1i, endRad, startRad});
           }
+
+          std::cout << "Segment Center " << circleCenter << std::endl;
 
           continue;
         }
@@ -525,9 +526,10 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
                              ? e2i
                              : getSegmentSegmentIntersectResultSegmentIndex(
                                    segSegResult, e1i, e2i),
-                     endPointCurrentEdgeIndex = endPointIndex,
-                     endPointNextEdgeIndex =
-                         (endPointIndex + 1) % outerLoop.size();
+                     endPointCurrentEdgeIndex =
+                         (endPointIndex + outerLoop.size() - 1) %
+                         outerLoop.size(),
+                     endPointNextEdgeIndex = endPointIndex;
 
         const size_t intersectSegmentP1i = intersectSegmentIndex,
                      intersectSegmentP2i =
@@ -580,6 +582,14 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             double arcAngle = ele.edgeTangentRad - ele.endPointRad;
             if (arcAngle < 0) arcAngle += 2 * M_PI;
 
+            std::cout << "EndPoint " << endPoint
+                      << (curEdgeValid
+                              ? " CurEdge " +
+                                    std::to_string(endPointCurrentEdgeIndex)
+                              : "NextEdge " +
+                                    std::to_string(endPointNextEdgeIndex))
+                      << " Center " << center << std::endl;
+
             if (arcAngle <= M_PI) {
               if (curEdgeValid) {
                 arcConnection[endPointCurrentEdgeIndex].emplace_back(
@@ -609,20 +619,6 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           }
         }
       }
-
-#ifdef MANIFOLD_DEBUG
-      if (ManifoldParams().verbose) {
-        std::cout << "Circle center " << circleCenter << std::endl;
-      }
-#endif
-
-      // NOTE: inter result shown in upper figure
-      // const uint32_t seg = 20;
-      // for (size_t k = 0; k != seg; k++) {
-      //   newLoop.push_back(circleCenter +
-      //                     vec2{radius * cos(M_PI * 2 / seg * k),
-      //                          radius * sin(M_PI * 2 / seg * k)});
-      // }
     }
   }
 
