@@ -572,11 +572,7 @@ TEST(Manifold, Simplify) {
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
   EXPECT_NEAR(torus.Volume(), simplified.Volume(), 20);
-
-  // TODO: The threshold for simplified.SurfaceArea() should be 10, set to 20 as
-  // a temporaily fix for platform deterministic issue build CI with Intel CPU
-  // Macos 13 Clang Build. See https://github.com/elalish/manifold/issues/1306
-  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 20);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("torus.glb", simplified.GetMeshGL(), {});
