@@ -251,12 +251,15 @@ jobs:
         $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
 
   build_mac:
-    name: MacOS (TBB:${{matrix.parallelization == 'ON'}})
+    name: MacOS (TBB:${{matrix.parallelization == 'ON'}}, ${{matrix.os}})
     timeout-minutes: 30
     strategy:
       matrix:
         parallelization: [OFF, ON]
-    runs-on: macos-latest
+        # macos-13: intel
+        # macos-latest: arm
+        os: [macos-13, macos-latest]
+    runs-on: ${{matrix.os}}
     steps:
     - name: Install common dependencies
       run: |
