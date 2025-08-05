@@ -342,7 +342,9 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   std::vector<std::shared_ptr<CsgLeafNode>> tmp;
 #if MANIFOLD_PAR == 1
   tbb::task_group group;
-  std::mutex mutex;
+  // make sure the order of result is deterministic
+  std::vector<std::shared_ptr<CsgLeafNode>> parallelTmp;
+  for (int i = 0; i < 4; i++) parallelTmp.push_back(nullptr);
 #endif
   while (results.size() > 1) {
     for (size_t i = 0; i < 4 && results.size() > 1; i++) {
@@ -353,11 +355,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
       auto b = std::move(results.back());
       results.pop_back();
 #if MANIFOLD_PAR == 1
-      group.run([&, a, b]() {
-        auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
-        mutex.lock();
-        tmp.push_back(result);
-        mutex.unlock();
+      group.run([&, i, a, b]() {
+        parallelTmp[i] = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
       });
 #else
       auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
@@ -366,6 +365,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
     }
 #if MANIFOLD_PAR == 1
     group.wait();
+    for (int i = 0; i < 4 && parallelTmp[i]; i++)
+      tmp.emplace_back(std::move(parallelTmp[i]));
 #endif
     for (auto result : tmp) {
       results.push_back(result);
