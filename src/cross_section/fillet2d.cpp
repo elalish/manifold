@@ -378,22 +378,11 @@ std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
   return result;
 }
 
-enum SegmentSegmentIntersectResult {
-  None,
-  Result,
-  DegenerateP1,
-  DegenerateP2,
-  DegenerateP3,
-  DegenerateP4,
-};
-
-// Calculate Circle center that tangent to both line segment
-// If not, degenerate to only tangent to one segment, and cross another's
-// endpoint
-SegmentSegmentIntersectResult calculateSegmentSegmentCircleCenter(
-    const vec2& p1, const vec2& p2, const vec2& p3, const vec2& p4,
-    const double radius, double& e1T, double& e2T, vec2& circleCenter,
-    double& startRad, double& endRad) {
+bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
+                                         const vec2& p3, const vec2& p4,
+                                         const double radius, double& e1T,
+                                         double& e2T, vec2& circleCenter,
+                                         double& startRad, double& endRad) {
   e1T = e2T = 0;
   circleCenter = vec2(0, 0);
 
@@ -407,7 +396,7 @@ SegmentSegmentIntersectResult calculateSegmentSegmentCircleCenter(
     // FIXME: Degenerate
     std::cout << "Degenerate" << std::endl;
 
-    return SegmentSegmentIntersectResult::None;
+    return false;
   }
   mat2 A = {{normal1.x, normal2.x}, {normal1.y, normal2.y}};
   vec2 b = {radius * la::length(normal1) - c1,
@@ -415,7 +404,7 @@ SegmentSegmentIntersectResult calculateSegmentSegmentCircleCenter(
   if (std::abs(la::determinant(A)) < EPSILON) {
     // FIXME: Parallel line
     std::cout << "Parallel" << std::endl;
-    return SegmentSegmentIntersectResult::None;
+    return false;
   }
 
   vec2 center = la::mul(la::inverse(A), b);
@@ -444,21 +433,10 @@ SegmentSegmentIntersectResult calculateSegmentSegmentCircleCenter(
     if (startRad < 0) startRad += 2 * M_PI;
     if (endRad < 0) endRad += 2 * M_PI;
 
-    return SegmentSegmentIntersectResult::Result;
-  } else if (onE1) {
-    if (la::length2(circleCenter - p3) < la::length2(circleCenter - p4))
-      return SegmentSegmentIntersectResult::DegenerateP3;
-    else
-      return SegmentSegmentIntersectResult::DegenerateP4;
-  } else if (onE2) {
-    if (la::length2(circleCenter - p1) < la::length2(circleCenter - p2))
-      return SegmentSegmentIntersectResult::DegenerateP1;
-    else
-      return SegmentSegmentIntersectResult::DegenerateP2;
-  } else {
-    // Both not on line segment, invalid result
-    return SegmentSegmentIntersectResult::None;
+    return true;
   }
+
+  return false;
 }
 
 struct ArcConnectionInfo {
@@ -578,39 +556,42 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
     const vec2 normal = la::normalize(vec2(-e1.y, e1.x));
 
-    // TODO: renew picture
-    /* Only check e1 and p2 to avoid duplicate process
-    normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
-           |                 |      \--        |
-           |                 |          \--    |
-           |                 | Circle Arc-> \--|
-           |                 | <- 2 * radius ->\
-          p1 --------------- p2 ----------------|
-                             |                 /
-                             | Circle Arc-> /--  |
-                             |           /--     |
-                             |        /--        |
-                             |-----/--    circleOffsetP2N
-    */
-
-    vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
-         normalOffsetP2 = p2 + normal * 2.0 * radius;
-
+    // Create BBox
     manifold::Box box(toVec3(p1), toVec3(p2));
-    box.Union(toVec3(normalOffsetP1));
-    box.Union(toVec3(normalOffsetP2));
+    {
+      // TODO: renew picture
+      /* Only check e1 and p2 to avoid duplicate process
+      normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
+             |                 |      \--        |
+             |                 |          \--    |
+             |                 | Circle Arc-> \--|
+             |                 | <- 2 * radius ->\
+            p1 --------------- p2 ----------------|
+                               |                 /
+                               | Circle Arc-> /--  |
+                               |           /--     |
+                               |        /--        |
+                               |-----/--    circleOffsetP2N
+      */
 
-    const vec2 e1n = la::normalize(e1);
-    box.Union(toVec3(p1 - e1n * radius + normal * radius));
-    box.Union(toVec3(p2 + e1n * radius + normal * radius));
+      vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
+           normalOffsetP2 = p2 + normal * 2.0 * radius;
 
-    if (!p2IsConvex) {
-      const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()],
-                 enext = pnext - p2, enextn = la::normalize(enext),
-                 normalnext = la::normalize(vec2(-enext.y, enext.x));
+      box.Union(toVec3(normalOffsetP1));
+      box.Union(toVec3(normalOffsetP2));
 
-      box.Union(toVec3(p2 + normalnext * 2.0 * radius));
-      box.Union(toVec3(p2 + enextn * radius + normalnext * radius));
+      const vec2 e1n = la::normalize(e1);
+      box.Union(toVec3(p1 - e1n * radius + normal * radius));
+      box.Union(toVec3(p2 + e1n * radius + normal * radius));
+
+      if (!p2IsConvex) {
+        const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()],
+                   enext = pnext - p2, enextn = la::normalize(enext),
+                   normalnext = la::normalize(vec2(-enext.y, enext.x));
+
+        box.Union(toVec3(p2 + normalnext * 2.0 * radius));
+        box.Union(toVec3(p2 + enextn * radius + normalnext * radius));
+      }
     }
 
     auto r = collider.outerCollider.Collisions(
@@ -645,62 +626,67 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       size_t p3i = e2i, p4i = ele.p2Ref;
       vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
 
-      bool segmentIntersected =
-          intersectSegmentSegment(normalOffsetP1, normalOffsetP2, p3, p4) ||
-          intersectCircleSegment(p3, p4, p2 + normal * radius, radius);
+      auto r = intersectStadiumCollider(p1, p2, true, p3, p4, false, radius);
 
-      bool intersected =
-          segmentIntersected ||
-          (p2IsConvex ? intersectCircleSegment(p3, p4, p2, 2.0 * radius)
-                      : false);
+      bool continueFlag = false;
+      bool degenerateFlag = false;
 
-      bool endPointIntersected = intersected && !segmentIntersected;
+      switch (r) {
+        case IntersectStadiumResult::EdgeEdgeIntersect: {
+          double startRad = 0, endRad = 0;
+          double e1T = 0, e2T = 0;
+          vec2 circleCenter(0, 0);
 
-      // FIXME: intersectCircleSegment start rad and end rad
+          if (calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
+                                                  e2T, circleCenter, startRad,
+                                                  endRad)) {
+            // Sort result by CCW
+            double arcAngle = endRad - startRad;
+            if (arcAngle < 0) arcAngle += 2 * M_PI;
 
-      std::cout << std::endl << "Testing " << p3i << "->" << p4i << "\t";
+            if (arcAngle <= M_PI) {
+              arcConnection[e1i].emplace_back(ArcConnectionInfo{
+                  circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+            } else {
+              arcConnection[e2i].emplace_back(ArcConnectionInfo{
+                  circleCenter, e2T, e1T, e2i, e1i, endRad, startRad});
+            }
 
-      std::cout << (segmentIntersected ? "Segment Intersected " : "Segment - ")
-                << " "
-                << (intersected && (!segmentIntersected)
-                        ? "Endpoint Intersected "
-                        : "Endpoint - ");
+            std::cout << "Segment Center " << circleCenter << std::endl;
 
-      SegmentSegmentIntersectResult segSegResult =
-          SegmentSegmentIntersectResult::None;
-
-      if (!intersected) {
-        std::cout << std::endl;
-        continue;
-      } else if (segmentIntersected) {
-        double startRad = 0, endRad = 0;
-        double e1T = 0, e2T = 0;
-        vec2 circleCenter(0, 0);
-
-        segSegResult = calculateSegmentSegmentCircleCenter(
-            p1, p2, p3, p4, radius, e1T, e2T, circleCenter, startRad, endRad);
-
-        if (segSegResult == SegmentSegmentIntersectResult::None)
-          continue;
-        else if (segSegResult == SegmentSegmentIntersectResult::Result) {
-          // Sort result by CCW
-          double arcAngle = endRad - startRad;
-          if (arcAngle < 0) arcAngle += 2 * M_PI;
-
-          if (arcAngle <= M_PI) {
-            arcConnection[e1i].emplace_back(ArcConnectionInfo{
-                circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+            continueFlag = true;
           } else {
-            arcConnection[e2i].emplace_back(ArcConnectionInfo{
-                circleCenter, e2T, e1T, e2i, e1i, endRad, startRad});
+            throw std::exception();
           }
 
-          std::cout << "Segment Center " << circleCenter << std::endl;
-
-          continue;
-        } else {
-          // Degenerate to concave vertex
+          break;
         }
+        case IntersectStadiumResult::E2Degenerate: {
+          continueFlag = true;
+          break;
+        }
+        case IntersectStadiumResult::P1Degenerate: {
+          // Check previous flag
+          continueFlag = true;
+          break;
+        }
+        case IntersectStadiumResult::P2Degenerate:
+        case IntersectStadiumResult::P1P2Degenerate: {
+          // Degenerate
+          degenerateFlag = true;
+          break;
+        }
+        case IntersectStadiumResult::Outside: {
+          // Keep checking, no early exit
+          break;
+        }
+      }
+
+      if (continueFlag) continue;
+
+      if (!degenerateFlag && !intersectSectorCollider(p1, p2, vec2(), true, p3,
+                                                      p4, false, radius)) {
+        continue;
       }
 
       // Handle concave vertex degenerate case
