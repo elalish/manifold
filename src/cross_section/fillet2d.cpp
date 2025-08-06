@@ -572,12 +572,13 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     // Outer loop is CCW, p1 p2 -> current edge start end
     const size_t p1i = e1i, p2i = (e1i + 1) % outerLoop.size();
     const vec2 p1 = outerLoop[p1i], p2 = outerLoop[p2i];
-    vec2 e1 = p2 - p1;
+    const vec2 e1 = p2 - p1;
     const bool p2IsConvex =
         la::cross(e1, outerLoop[(p2i + 1) % outerLoop.size()] - p2) >= EPSILON;
 
-    vec2 normal = la::normalize(vec2(-e1.y, e1.x));
+    const vec2 normal = la::normalize(vec2(-e1.y, e1.x));
 
+    // TODO: renew picture
     /* Only check e1 and p2 to avoid duplicate process
     normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
            |                 |      \--        |
@@ -599,13 +600,17 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     box.Union(toVec3(normalOffsetP1));
     box.Union(toVec3(normalOffsetP2));
 
-    if (!p2IsConvex) {
-      // Handle concave endpoint
-      vec2 circleOffsetP2 = p2 + e1 * 2.0 * radius + normal * 2.0 * radius,
-           circleOffsetP2N = p2 + e1 * 2.0 * radius - normal * 2.0 * radius;
+    const vec2 e1n = la::normalize(e1);
+    box.Union(toVec3(p1 - e1n * radius + normal * radius));
+    box.Union(toVec3(p2 + e1n * radius + normal * radius));
 
-      box.Union(toVec3(circleOffsetP2));
-      box.Union(toVec3(circleOffsetP2N));
+    if (!p2IsConvex) {
+      const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()],
+                 enext = pnext - p2, enextn = la::normalize(enext),
+                 normalnext = la::normalize(vec2(-enext.y, enext.x));
+
+      box.Union(toVec3(p2 + normalnext * 2.0 * radius));
+      box.Union(toVec3(p2 + enextn * radius + normalnext * radius));
     }
 
     auto r = collider.outerCollider.Collisions(
