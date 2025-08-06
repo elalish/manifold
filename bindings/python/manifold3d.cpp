@@ -204,16 +204,16 @@ NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
-        nb::arg("angle"), set_min_circular_angle__angle);
+        nb::arg("angle"), quality__set_min_circular_angle__angle);
 
   m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
-        nb::arg("length"), set_min_circular_edge_length__length);
+        nb::arg("length"), quality__set_min_circular_edge_length__length);
 
   m.def("set_circular_segments", Quality::SetCircularSegments,
-        nb::arg("number"), set_circular_segments__number);
+        nb::arg("number"), quality__set_circular_segments__number);
 
   m.def("get_circular_segments", Quality::GetCircularSegments,
-        nb::arg("radius"), get_circular_segments__radius);
+        nb::arg("radius"), quality__get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
