@@ -38,21 +38,23 @@ vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
-enum class IntersectResult {
+enum class IntersectStadiumResult {
   EdgeEdgeIntersect,  // Surely a result
   P2Degenerate,       // Degenerate to P2
   P1Degenerate,       // Only use to check
-  P1P2Degenerate,     // Both degenerate
-  E2Degenerate,       // P3 or P4 degenerated -> later will handle it
+  P1P2Degenerate,     // Both degenerate, and e1 should be removed
+  E2Degenerate,       // NOTE: e2 full inside and parallel with e1, this can be
+                      // skipped by now, later process will handle it
   Outside,            // No result
 };
 
-IntersectResult intersectStadiumCollider(const vec2& p1, const vec2& p2,
-                                         const bool e1CCW,  // p1 -> p2 CCW
-                                         const vec2& p3, const vec2& p4,
-                                         const bool e2CCW,
-                                         const double radius) {
-  // Two boundary shouldn't touch
+IntersectStadiumResult intersectStadiumCollider(
+    const vec2& p1, const vec2& p2,
+    const bool e1CCW,  // p1 -> p2 CCW ?
+    const vec2& p3, const vec2& p4,
+    const bool e2CCW,  // p3 -> p4 CCW ?
+    const double radius) {
+  // Two boundary shouldn't touch, this should be handle previous
   if (e1CCW && e2CCW) throw std::exception();
 
   const vec2 e1 = p2 - p1, e2 = p4 - p3,
@@ -60,71 +62,75 @@ IntersectResult intersectStadiumCollider(const vec2& p1, const vec2& p2,
                  la::normalize(e1CCW ? vec2(-e1.y, e1.x) : vec2(e1.y, -e1.x));
 
   const double det = la::cross(e1, e2);
+  const bool e2Parallel = std::abs(det) < EPSILON;
 
-  if (std::abs(det) < EPSILON) {
+  if (e2Parallel) {
     double distance = la::dot(p3 - p1, normal1);
 
-    if (distance >= radius) return IntersectResult::Outside;
+    if (distance >= radius) return IntersectStadiumResult::Outside;
   }
 
-  auto segmentCircleIntersect = [](const vec2& p1, const vec2& p2,
-                                   const vec2& center, double radius) {
-    vec2 d = p2 - p1;
+  // Check is intersect at endpoint, result in degenerate
+  {
+    auto segmentCircleIntersect = [](const vec2& p1, const vec2& p2,
+                                     const vec2& center, double radius) {
+      vec2 d = p2 - p1;
 
-    if (la::length(d) < EPSILON)
-      return la::dot(p1 - center, p1 - center) <= radius * radius;
+      if (la::length(d) < EPSILON)
+        return la::dot(p1 - center, p1 - center) <= radius * radius;
 
-    // Project vec p1 -> circle to line segment
-    double t = la::dot(center - p1, d) / la::dot(d, d);
+      // Project vec p1 -> circle to line segment
+      double t = la::dot(center - p1, d) / la::dot(d, d);
 
-    vec2 closestPoint;
+      vec2 closestPoint;
 
-    if (t < 0) {
-      closestPoint = p1;
-    } else if (t > 1) {
-      closestPoint = p2;
-    } else {
-      closestPoint = p1 + t * d;
+      if (t < 0) {
+        closestPoint = p1;
+      } else if (t > 1) {
+        closestPoint = p2;
+      } else {
+        closestPoint = p1 + t * d;
+      }
+
+      // Calculate the distance from the closest point to the circle's center
+      double distanceSquared = la::length2(closestPoint - center);
+
+      return distanceSquared <= radius * radius;
+    };
+
+    const bool p1Intersect =
+        segmentCircleIntersect(p3, p4, p1 + normal1 * radius, radius);
+
+    const bool p2Intersect =
+        segmentCircleIntersect(p3, p4, p2 + normal1 * radius, radius);
+
+    if (p1Intersect && p2Intersect)
+      return IntersectStadiumResult::P1P2Degenerate;
+
+    if (p1Intersect) {
+      bool sign = la::cross(e1, e2) > 0;
+
+      if (sign == (e1CCW ^ e2CCW)) {
+        return IntersectStadiumResult::P1Degenerate;
+        // P2 degenerate
+      } else {
+        return IntersectStadiumResult::EdgeEdgeIntersect;
+      }
     }
 
-    // Calculate the distance from the closest point to the circle's center
-    double distanceSquared = la::length2(closestPoint - center);
+    if (p2Intersect) {
+      bool sign = la::cross(e1, e2) < 0;
 
-    return distanceSquared <= radius * radius;
-  };
-
-  const bool p1Intersect =
-      segmentCircleIntersect(p3, p4, p1 + normal1 * radius, radius);
-
-  const bool p2Intersect =
-      segmentCircleIntersect(p3, p4, p2 + normal1 * radius, radius);
-
-  if (p1Intersect && p2Intersect) return IntersectResult::P1P2Degenerate;
-
-  if (p1Intersect) {
-    bool sign = la::cross(e1, e2) > 0;
-
-    if (sign == (e1CCW ^ e2CCW)) {
-      return IntersectResult::P1Degenerate;
-      // P2 degenerate
-    } else {
-      return IntersectResult::EdgeEdgeIntersect;
-    }
-  }
-
-  if (p2Intersect) {
-    bool sign = la::cross(e1, e2) < 0;
-
-    if (sign == (e1CCW ^ e2CCW)) {
-      return IntersectResult::P2Degenerate;
-      // P2 degenerate
-    } else {
-      return IntersectResult::EdgeEdgeIntersect;
+      if (sign == (e1CCW ^ e2CCW)) {
+        return IntersectStadiumResult::P2Degenerate;
+        // P2 degenerate
+      } else {
+        return IntersectStadiumResult::EdgeEdgeIntersect;
+      }
     }
   }
 
   // Check edge intersect
-  bool edgeIntersect = false;
   {
     const double det = la::cross(p2 - p1, p4 - p3);
 
@@ -144,38 +150,57 @@ IntersectResult intersectStadiumCollider(const vec2& p1, const vec2& p2,
         (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
       // Inside, meaning sure will be a result
 
-      return IntersectResult::EdgeEdgeIntersect;
+      return IntersectStadiumResult::EdgeEdgeIntersect;
     }
   }
 
-  const vec2 p1Offset = p1 + normal1 * 2.0 * radius,
-             p2Offset = p2 + normal1 * 2.0 * radius;
+  // Now e2 is either both in or both out, check this
+  {
+    const vec2 p1Offset = p1 + normal1 * 2.0 * radius,
+               p2Offset = p2 + normal1 * 2.0 * radius;
 
-  // Determine full inside or full outside
-  auto isInsideRect = [&](const vec2 p) -> bool {
-    int sign = e1CCW ? 1 : -1;
-    if ((sign * la::cross(e1, p - p1) >= 0) &&
-        (sign * la::cross(p2Offset - p2, p - p2) >= 0) &&
-        (sign * la::cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
-        (sign * la::cross(p1 - p1Offset, p - p1Offset) >= 0))
-      return true;
-  };
+    // Determine full inside or full outside
+    auto isInsideRect = [&](const vec2 p) -> bool {
+      int sign = e1CCW ? 1 : -1;
+      if ((sign * la::cross(e1, p - p1) >= 0) &&
+          (sign * la::cross(p2Offset - p2, p - p2) >= 0) &&
+          (sign * la::cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
+          (sign * la::cross(p1 - p1Offset, p - p1Offset) >= 0))
+        return true;
+    };
 
-  bool p3InsideRect = isInsideRect(p3), p4InsideRect = isInsideRect(p4);
-  if (p3InsideRect && p4InsideRect) {
-    // Full inside, no intersect with boundary
-    return IntersectResult::E2Degenerate;
-  } else if (!p3InsideRect && !p4InsideRect) {
-    // Full outside, no intersect with boundary
-    return IntersectResult::Outside;
-  } else {
-    throw std::exception();
+    bool p3InsideRect = isInsideRect(p3), p4InsideRect = isInsideRect(p4);
+    if (p3InsideRect && p4InsideRect) {
+      // Full inside, no intersect with boundary
+      // FIXME: both inside, which must lead to EdgeEdgeIntersect, but
+      // rethink about it.
+      if (e2Parallel) return IntersectStadiumResult::E2Degenerate;
+
+      return IntersectStadiumResult::EdgeEdgeIntersect;
+    } else if (!p3InsideRect && !p4InsideRect) {
+      // Full outside, no intersect with boundary
+      return IntersectStadiumResult::Outside;
+    } else {
+      // Should be both in or both out
+      throw std::exception();
+    }
   }
 
-  return IntersectResult::Outside;
+  return IntersectStadiumResult::Outside;
 }
 
-IntersectResult intersectSectorCollider() {}
+enum class IntersectSectorResult {
+  EdgeEdgeIntersect,  // No degenerate case, skip
+  P2Degenerate,       // Degenerate to P2
+  P1Degenerate,       // Only use to check
+  P1P2Degenerate,     // Both degenerate
+  E2Degenerate,       // P3 or P4 degenerated -> later will handle it
+  Outside,            // No result
+};
+
+IntersectSectorResult intersectSectorCollider(
+    const vec2& p, const vec2& normal1, const vec2& normal2, const vec2& p1,
+    const vec2& p2, const bool eCCW, const double radius) {}
 
 // Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
