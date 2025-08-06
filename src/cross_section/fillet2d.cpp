@@ -38,6 +38,60 @@ vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+// Check if line segment intersect with a circle
+bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
+                            double radius) {
+  vec2 d = p2 - p1;
+
+  if (la::length(d) < EPSILON)
+    return la::dot(p1 - center, p1 - center) <= radius * radius;
+
+  // Project vec p1 -> circle to line segment
+  double t = la::dot(center - p1, d) / la::dot(d, d);
+
+  vec2 closestPoint;
+
+  if (t < 0) {
+    closestPoint = p1;
+  } else if (t > 1) {
+    closestPoint = p2;
+  } else {
+    closestPoint = p1 + t * d;
+  }
+
+  // Calculate the distance from the closest point to the circle's center
+  double distanceSquared = la::length2(closestPoint - center);
+
+  return distanceSquared <= radius * radius;
+};
+
+// Check if line segment intersect with another line segment
+bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
+                             const vec2& p4) {
+  double det = la::cross(p2 - p1, p4 - p3);
+
+  if (std::abs(det) < EPSILON) {
+    // Parallel
+    return false;
+  }
+
+  double num_t = la::cross(p3 - p1, p4 - p3);
+  double num_u = la::cross(p3 - p1, p2 - p1);
+
+  double t = num_t / det;
+  double u = num_u / det;
+
+  // Check if the intersection point inside line segment
+  if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
+      (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
+    // Inside
+    return true;
+  } else {
+    // Outside -> No intersection
+    return false;
+  }
+};
+
 enum class IntersectStadiumResult {
   EdgeEdgeIntersect,  // Surely a result
   P2Degenerate,       // Degenerate to P2
@@ -72,37 +126,11 @@ IntersectStadiumResult intersectStadiumCollider(
 
   // Check is intersect at endpoint, result in degenerate
   {
-    auto segmentCircleIntersect = [](const vec2& p1, const vec2& p2,
-                                     const vec2& center, double radius) {
-      vec2 d = p2 - p1;
-
-      if (la::length(d) < EPSILON)
-        return la::dot(p1 - center, p1 - center) <= radius * radius;
-
-      // Project vec p1 -> circle to line segment
-      double t = la::dot(center - p1, d) / la::dot(d, d);
-
-      vec2 closestPoint;
-
-      if (t < 0) {
-        closestPoint = p1;
-      } else if (t > 1) {
-        closestPoint = p2;
-      } else {
-        closestPoint = p1 + t * d;
-      }
-
-      // Calculate the distance from the closest point to the circle's center
-      double distanceSquared = la::length2(closestPoint - center);
-
-      return distanceSquared <= radius * radius;
-    };
-
     const bool p1Intersect =
-        segmentCircleIntersect(p3, p4, p1 + normal1 * radius, radius);
+        intersectCircleSegment(p3, p4, p1 + normal1 * radius, radius);
 
     const bool p2Intersect =
-        segmentCircleIntersect(p3, p4, p2 + normal1 * radius, radius);
+        intersectCircleSegment(p3, p4, p2 + normal1 * radius, radius);
 
     if (p1Intersect && p2Intersect)
       return IntersectStadiumResult::P1P2Degenerate;
@@ -111,8 +139,8 @@ IntersectStadiumResult intersectStadiumCollider(
       bool sign = la::cross(e1, e2) > 0;
 
       if (sign == (e1CCW ^ e2CCW)) {
+        // TODO: Ensure degenerate processed
         return IntersectStadiumResult::P1Degenerate;
-        // P2 degenerate
       } else {
         return IntersectStadiumResult::EdgeEdgeIntersect;
       }
@@ -122,8 +150,8 @@ IntersectStadiumResult intersectStadiumCollider(
       bool sign = la::cross(e1, e2) < 0;
 
       if (sign == (e1CCW ^ e2CCW)) {
+        // Degenerate process
         return IntersectStadiumResult::P2Degenerate;
-        // P2 degenerate
       } else {
         return IntersectStadiumResult::EdgeEdgeIntersect;
       }
@@ -132,26 +160,8 @@ IntersectStadiumResult intersectStadiumCollider(
 
   // Check edge intersect
   {
-    const double det = la::cross(p2 - p1, p4 - p3);
-
-    if (std::abs(det) < EPSILON) {
-      // Parallel
-      // return false;
-    }
-
-    double num_t = la::cross(p3 - p1, p4 - p3);
-    double num_u = la::cross(p3 - p1, p2 - p1);
-
-    double t = num_t / det;
-    double u = num_u / det;
-
-    // Check if the intersection point inside line segment
-    if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
-        (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
-      // Inside, meaning sure will be a result
-
+    if (intersectSegmentSegment(p1, p2, p3, p4))
       return IntersectStadiumResult::EdgeEdgeIntersect;
-    }
   }
 
   // Now e2 is either both in or both out, check this
@@ -189,72 +199,117 @@ IntersectStadiumResult intersectStadiumCollider(
   return IntersectStadiumResult::Outside;
 }
 
-enum class IntersectSectorResult {
-  EdgeEdgeIntersect,  // No degenerate case, skip
-  P2Degenerate,       // Degenerate to P2
-  P1Degenerate,       // Only use to check
-  P1P2Degenerate,     // Both degenerate
-  E2Degenerate,       // P3 or P4 degenerated -> later will handle it
-  Outside,            // No result
-};
+// Normalize angle to [0, 2*PI)
+float normalizeAngle(float angle) {
+  while (angle < 0) angle += 2 * M_PI;
+  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+  return angle;
+}
 
-IntersectSectorResult intersectSectorCollider(
-    const vec2& p, const vec2& normal1, const vec2& normal2, const vec2& p1,
-    const vec2& p2, const bool eCCW, const double radius) {}
+bool intersectSectorCollider(const vec2& ppre, const vec2& p, const vec2& pnext,
+                             const bool pCCW, const vec2& p1, const vec2& p2,
+                             const bool eCCW, const double radius) {
+  const bool pIntersect = intersectCircleSegment(p1, p2, p, 2.0 * radius);
+  if (!pIntersect) return false;
 
-// Check if line segment intersect with another line segment
-bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
-                             const vec2& p4) {
-  double det = la::cross(p2 - p1, p4 - p3);
+  const vec2 epre = p - ppre, enext = pnext - p, e = p1 - p2,
+             normalpre = la::normalize(pCCW ? vec2(-epre.y, epre.x)
+                                            : vec2(epre.y, -epre.x)),
+             normalnext = la::normalize(pCCW ? vec2(-enext.y, enext.x)
+                                             : vec2(enext.y, -enext.x));
 
-  if (std::abs(det) < EPSILON) {
-    // Parallel
-    return false;
+  // ppreIntersect have been checked in intersectStadiumCollider
+
+  const bool pnextIntersect =
+      intersectCircleSegment(p1, p2, p + normalnext * radius, radius);
+  if (pnextIntersect) {
+    bool sign = la::cross(enext, e) > 0;
+
+    if (sign == (pCCW ^ eCCW)) {
+      // Degenerate
+      return true;
+    } else {
+      // EdgeEdge Intersect will be processed next edge
+      return false;
+    }
   }
 
-  double num_t = la::cross(p3 - p1, p4 - p3);
-  double num_u = la::cross(p3 - p1, p2 - p1);
+  auto getLineCircleIntersection =
+      [](const vec2& p1, const vec2& p2, const vec2& center, float radius,
+         vec2& intersection1, vec2& intersection2) -> int {
+    vec2 d = p2 - p1;
+    vec2 f = p1 - center;
 
-  double t = num_t / det;
-  double u = num_u / det;
+    float a = dot(d, d);
+    float b = 2 * dot(f, d);
+    float c = dot(f, f) - radius * radius;
 
-  // Check if the intersection point inside line segment
-  if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
-      (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
-    // Inside
-    return true;
-  } else {
-    // Outside -> No intersection
-    return false;
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant < 0) return 0;  // No intersection
+
+    float sqrtDisc = sqrt(discriminant);
+    float t1 = (-b - sqrtDisc) / (2 * a);
+    float t2 = (-b + sqrtDisc) / (2 * a);
+
+    int count = 0;
+    if (t1 >= -EPSILON && t1 <= 1 + EPSILON) {
+      intersection1 = p1 + d * t1;
+      count++;
+    }
+    if (t2 >= -EPSILON && t2 <= 1 + EPSILON && abs(t2 - t1) > EPSILON) {
+      if (count == 0) {
+        intersection1 = p1 + d * t2;
+      } else {
+        intersection2 = p1 + d * t2;
+      }
+      count++;
+    }
+
+    return count;
+  };
+
+  auto isAngleInSector = [](float angle, float startRad, float endRad) -> bool {
+    angle = normalizeAngle(angle);
+    startRad = normalizeAngle(startRad);
+    endRad = normalizeAngle(endRad);
+
+    if (startRad <= endRad) {
+      return angle >= startRad && angle <= endRad;
+    } else {
+      // Sector crosses 0 degrees
+      return angle >= startRad || angle <= endRad;
+    }
+  };
+
+  auto isPointInPie = [&isAngleInSector](const vec2& p, const vec2& center,
+                                         float radius, float startRad,
+                                         float endRad) -> bool {
+    vec2 diff = p - center;
+    float distSq = length2(diff);
+
+    if (distSq > radius * radius + EPSILON) return false;
+
+    float angle = atan2(diff.y, diff.x);
+    return isAngleInSector(angle, startRad, endRad);
+  };
+
+  vec2 intersections[2];
+  int numIntersections = getLineCircleIntersection(
+      p1, p2, p, 2.0 * radius, intersections[0], intersections[1]);
+
+  double startRad = atan2(epre.y, epre.x), endRad = atan2(enext.y, enext.x);
+
+  for (int i = 0; i < numIntersections; i++) {
+    vec2 diff = intersections[i] - p;
+    float angle = atan2(diff.y, diff.x);
+    if (isAngleInSector(angle, startRad, endRad)) {
+      return true;
+    }
   }
-};
 
-// Check if line segment intersect with a circle
-bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
-                            double radius) {
-  vec2 d = p2 - p1;
-
-  if (la::length(d) < EPSILON)
-    return la::dot(p1 - center, p1 - center) <= radius * radius;
-
-  // Project vec p1 -> circle to line segment
-  double t = la::dot(center - p1, d) / la::dot(d, d);
-
-  vec2 closestPoint;
-
-  if (t < 0) {
-    closestPoint = p1;
-  } else if (t > 1) {
-    closestPoint = p2;
-  } else {
-    closestPoint = p1 + t * d;
-  }
-
-  // Calculate the distance from the closest point to the circle's center
-  double distanceSquared = la::length2(closestPoint - center);
-
-  return distanceSquared <= radius * radius;
-};
+  return false;
+}
 
 // Projection point to line and check if it's on the line segment
 bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
