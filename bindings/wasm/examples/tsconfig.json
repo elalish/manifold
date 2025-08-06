@@ -18,7 +18,9 @@
     "skipLibCheck": true,
   },
   "include": [
-    "./*.ts"
+    "./*.ts",
+    "lib/*.ts"
   ],
   "exclude": []
 }
+

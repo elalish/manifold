@@ -16,7 +16,7 @@ import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, prune} from '@gltf-transform/functions';
 
 import Module, {Manifold, Mesh} from './built/manifold';
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './gltf-io';
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './lib/gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
