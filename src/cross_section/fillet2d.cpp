@@ -38,6 +38,145 @@ vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+enum class IntersectResult {
+  EdgeEdgeIntersect,  // Surely a result
+  P2Degenerate,       // Degenerate to P2
+  P1Degenerate,       // Only use to check
+  P1P2Degenerate,     // Both degenerate
+  E2Degenerate,       // P3 or P4 degenerated -> later will handle it
+  Outside,            // No result
+};
+
+IntersectResult intersectStadiumCollider(const vec2& p1, const vec2& p2,
+                                         const bool e1CCW,  // p1 -> p2 CCW
+                                         const vec2& p3, const vec2& p4,
+                                         const bool e2CCW,
+                                         const double radius) {
+  // Two boundary shouldn't touch
+  if (e1CCW && e2CCW) throw std::exception();
+
+  const vec2 e1 = p2 - p1, e2 = p4 - p3,
+             normal1 =
+                 la::normalize(e1CCW ? vec2(-e1.y, e1.x) : vec2(e1.y, -e1.x));
+
+  const double det = la::cross(e1, e2);
+
+  if (std::abs(det) < EPSILON) {
+    double distance = la::dot(p3 - p1, normal1);
+
+    if (distance >= radius) return IntersectResult::Outside;
+  }
+
+  auto segmentCircleIntersect = [](const vec2& p1, const vec2& p2,
+                                   const vec2& center, double radius) {
+    vec2 d = p2 - p1;
+
+    if (la::length(d) < EPSILON)
+      return la::dot(p1 - center, p1 - center) <= radius * radius;
+
+    // Project vec p1 -> circle to line segment
+    double t = la::dot(center - p1, d) / la::dot(d, d);
+
+    vec2 closestPoint;
+
+    if (t < 0) {
+      closestPoint = p1;
+    } else if (t > 1) {
+      closestPoint = p2;
+    } else {
+      closestPoint = p1 + t * d;
+    }
+
+    // Calculate the distance from the closest point to the circle's center
+    double distanceSquared = la::length2(closestPoint - center);
+
+    return distanceSquared <= radius * radius;
+  };
+
+  const bool p1Intersect =
+      segmentCircleIntersect(p3, p4, p1 + normal1 * radius, radius);
+
+  const bool p2Intersect =
+      segmentCircleIntersect(p3, p4, p2 + normal1 * radius, radius);
+
+  if (p1Intersect && p2Intersect) return IntersectResult::P1P2Degenerate;
+
+  if (p1Intersect) {
+    bool sign = la::cross(e1, e2) > 0;
+
+    if (sign == (e1CCW ^ e2CCW)) {
+      return IntersectResult::P1Degenerate;
+      // P2 degenerate
+    } else {
+      return IntersectResult::EdgeEdgeIntersect;
+    }
+  }
+
+  if (p2Intersect) {
+    bool sign = la::cross(e1, e2) < 0;
+
+    if (sign == (e1CCW ^ e2CCW)) {
+      return IntersectResult::P2Degenerate;
+      // P2 degenerate
+    } else {
+      return IntersectResult::EdgeEdgeIntersect;
+    }
+  }
+
+  // Check edge intersect
+  bool edgeIntersect = false;
+  {
+    const double det = la::cross(p2 - p1, p4 - p3);
+
+    if (std::abs(det) < EPSILON) {
+      // Parallel
+      // return false;
+    }
+
+    double num_t = la::cross(p3 - p1, p4 - p3);
+    double num_u = la::cross(p3 - p1, p2 - p1);
+
+    double t = num_t / det;
+    double u = num_u / det;
+
+    // Check if the intersection point inside line segment
+    if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
+        (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
+      // Inside, meaning sure will be a result
+
+      return IntersectResult::EdgeEdgeIntersect;
+    }
+  }
+
+  const vec2 p1Offset = p1 + normal1 * 2.0 * radius,
+             p2Offset = p2 + normal1 * 2.0 * radius;
+
+  // Determine full inside or full outside
+  auto isInsideRect = [&](const vec2 p) -> bool {
+    int sign = e1CCW ? 1 : -1;
+    if ((sign * la::cross(e1, p - p1) >= 0) &&
+        (sign * la::cross(p2Offset - p2, p - p2) >= 0) &&
+        (sign * la::cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
+        (sign * la::cross(p1 - p1Offset, p - p1Offset) >= 0))
+      return true;
+  };
+
+  bool p3InsideRect = isInsideRect(p3), p4InsideRect = isInsideRect(p4);
+  if (p3InsideRect && p4InsideRect) {
+    // Full inside, no intersect with boundary
+    return IntersectResult::E2Degenerate;
+  } else if (!p3InsideRect && !p4InsideRect) {
+    // Full outside, no intersect with boundary
+    return IntersectResult::Outside;
+  } else {
+    throw std::exception();
+  }
+
+  return IntersectResult::Outside;
+}
+
+IntersectResult intersectSectorCollider() {}
+
 // Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
                              const vec2& p4) {
@@ -474,6 +613,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           std::cout << "Segment Center " << circleCenter << std::endl;
 
           continue;
+        } else {
+          // Degenerate to concave vertex
         }
       }
 
