@@ -12,21 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as glMatrix from 'gl-matrix'
+
 import Module from './built/manifold';
-import {cleanup as evalCleanup, evaluateCADToManifold, setup as evalSetup} from './lib/evaluate';
-import {cleanup as GLTFCleanup, exportModels, setup as GLTFSetup} from './lib/export';
+import {Evaluator} from './lib/evaluate';
+import {cleanup as GLTFCleanup, exportModels, GlobalDefaults, setup as GLTFSetup} from './lib/export';
 
 export const module = await Module() as any;
-module.setup()
-evalSetup(module)
-GLTFSetup(module)
+module.setup();
+
+GLTFSetup(module);
+
+// Setup the evaluator and it's context.
+const evaluator = new Evaluator(module);
+
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
+
+evaluator.context = {
+  ...evaluator.context,
+  glMatrix,
+  GLTFNode: module.GLTFNode,
+  setMaterial: module.setMaterial,
+  setMorphStart: module.setMorphStart,
+  setMorphEnd: module.setMorphEnd,
+  show: module.show,
+  only: module.only,
+};
 
 export function cleanup() {
   GLTFCleanup();
-  evalCleanup();
+  evaluator.cleanup();
 }
 
 export async function evaluateCADToModel(code: string) {
-  const {globalDefaults, manifold} = evaluateCADToManifold(code);
-  return await exportModels(globalDefaults, manifold);
+  // Global defaults can be populated by the script.  I's set per
+  // evaluation, while the rest of evaluator context doesn't change from
+  // run to run.
+  // This can be used to set parameters elsewhere in ManifoldCAD.  For
+  // example, the GLTF exporter will look for animation type and
+  // framerate.
+  const globalDefaults = {};
+
+  evaluator.context.globalDefaults = globalDefaults;
+  const manifold = evaluator.evaluate(code);
+
+  return await exportModels(globalDefaults as GlobalDefaults, manifold);
 }

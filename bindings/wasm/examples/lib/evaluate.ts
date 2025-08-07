@@ -12,16 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as glMatrix from 'gl-matrix';
-
-import {CrossSection, Manifold} from '../built/manifold';
-
-import {exportModels, GlobalDefaults} from './export';
-
-var _module = null as any;
-
-// Faster on modern browsers than Float32Array
-glMatrix.glMatrix.setMatrixArrayType(Array);
+import {CrossSection, Manifold, ManifoldToplevel} from '../built/manifold';
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
@@ -58,6 +49,7 @@ const manifoldMemberFunctions = [
   'project',
   'hull'
 ];
+
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
   'square', 'circle', 'union', 'difference', 'intersection', 'compose',
@@ -68,6 +60,7 @@ const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
   'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
 ];
+
 // top level functions that construct a new manifold/mesh
 const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
@@ -75,79 +68,126 @@ const toplevel = [
   'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'GLTFNode',
   'Manifold', 'CrossSection', 'setMorphStart', 'setMorphEnd'
 ];
-const exposedFunctions = toplevelConstructors.concat(toplevel);
 
-// Setup memory management, such that users don't have to care about
-// calling `delete` manually.
-// Note that this only fixes memory leak across different runs: the memory
-// will only be freed when the compilation finishes.
+/**
+ * An object that will evaluate ManifoldCAD scripts on demand.
+ *
+ * It inserts the Manifold instance (`module`) into the evaluation
+ * context, as well as a selection of available methods.  Additional
+ * values can be directly inserted into the `context` property.
+ *
+ * This class provides some simple garbage collection.  It does this by
+ * intercepting calls to a white-list of functions, tracking new
+ * instances of `Manifold` and `CrossSection`.  This way, users don't
+ * have to care about calling `delete` manually.  Note that this only
+ * fixes memory leak across different runs: the memory will only be freed
+ * when `cleanup()` is called.
+ *
+ * @param module A Manifold WASM instance, already set up.
+ * @property context Additional objects inserted into the evaluation
+ * context.
+ * @property beforeScript Boilerplate script run before the supplied
+ * code.
+ * @property afterScript Boilerplate code run after the supplied code.
+ */
+export class Evaluator {
+  context: any = {};
+  beforeScript: string = 'resetToCircularDefaults();';
+  afterScript: string =
+      'return typeof result === "undefined" ? undefined : result;';
 
-const memoryRegistry = new Array<Manifold|CrossSection>();
+  protected module?: ManifoldToplevel;
+  protected memoryRegistry: Array<Manifold|CrossSection>;
 
-export function setup(module: any) {
-  _module = module;
 
-  function addMembers(
-      className: string, methodNames: Array<string>, areStatic: boolean) {
-    //@ts-ignore
-    const cls = module[className];
-    const obj = areStatic ? cls : cls.prototype;
-    for (const name of methodNames) {
-      const originalFn = obj[name];
-      obj[name] = function(...args: any) {
-        //@ts-ignore
+  /**
+   * Construct a new evaluator.
+   *
+   */
+  constructor(module: ManifoldToplevel) {
+    this.module = module;
+    this.memoryRegistry = new Array<Manifold|CrossSection>();
+
+    this.addMembers('Manifold', manifoldMemberFunctions, false);
+    this.addMembers('Manifold', manifoldStaticFunctions, true);
+    this.addMembers('CrossSection', crossSectionMemberFunctions, false);
+    this.addMembers('CrossSection', crossSectionStaticFunctions, true);
+
+    for (const name of toplevelConstructors) {
+      //@ts-ignore
+      const originalFn = module[name];
+      //@ts-ignore
+      this.module[name] = (...args: any) => {
         const result = originalFn(...args);
-        memoryRegistry.push(result);
+        this.memoryRegistry.push(result);
         return result;
       };
     }
   }
 
-  addMembers('Manifold', manifoldMemberFunctions, false);
-  addMembers('Manifold', manifoldStaticFunctions, true);
-  addMembers('CrossSection', crossSectionMemberFunctions, false);
-  addMembers('CrossSection', crossSectionStaticFunctions, true);
+  /**
+   * Intercept calls and add their results to our garbage collection
+   * list.
+   *
+   * @param className The class to intercept.
+   * @param methodNames An array of methods to intercept.
+   * @param areStatic Are these static methods?  If so, intercept them at
+   * the prototype level.
+   */
+  protected addMembers(
+      className: string, methodNames: Array<string>, areStatic: boolean) {
+    //@ts-ignore
+    const cls = this.module[className];
+    const obj = areStatic ? cls : cls.prototype;
+    for (const name of methodNames) {
+      const originalFn = obj[name];
+      obj[name] = (...args: any) => {
+        //@ts-ignore
+        const result = originalFn(...args);
+        this.memoryRegistry.push(result);
+        return result;
+      };
+    }
+  }
 
-  for (const name of toplevelConstructors) {
-    //@ts-ignore
-    const originalFn = module[name];
-    //@ts-ignore
-    module[name] = function(...args: any) {
-      const result = originalFn(...args);
-      memoryRegistry.push(result);
-      return result;
+  /**
+   * Delete any objects tagged for garbage collection.
+   */
+  cleanup() {
+    for (const obj of this.memoryRegistry) {
+      // decompose result is an array of manifolds
+      if (obj instanceof Array)
+        for (const elem of obj) elem.delete();
+      else
+        obj.delete();
+    }
+    this.memoryRegistry.length = 0;
+  }
+
+  /**
+   * Evaluate a string as javascript code creating a Manifold model.
+   *
+   * This function assembles the final execution context.  It then runs
+   * `beforeScript`, `code` and `afterScript` in order.  Finally, it
+   * returns the end result.
+   *
+   * @param code The input string.
+   * @returns any By default, this script will return either `undefined`
+   * or a `Manifold` object.  Changing `afterScript` will affect this
+   * behaviour.
+   */
+  evaluate(code: string) {
+    const exposedFunctions = toplevelConstructors.concat(toplevel).map(
+        (name) => [name, (this.module as any)[name]]);
+    const context = {
+      ...Object.fromEntries(exposedFunctions),
+      module: this.module,
+      ...this.context
     };
-  }
-}
 
-export function cleanup() {
-  for (const obj of memoryRegistry) {
-    // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
+    const evalFn = new Function(
+        ...Object.keys(context),
+        this.beforeScript + '\n' + code + '\n' + this.afterScript + '\n');
+    return evalFn(...Object.values(context));
   }
-  memoryRegistry.length = 0;
-}
-
-export function evaluateCADToManifold(code: string) {
-  const globalDefaults = {} as GlobalDefaults;
-  const module = _module;
-  const context = {
-    globalDefaults,
-    exportModels,
-    glMatrix,
-    module,
-    ...Object.fromEntries(
-        exposedFunctions.map((name) => [name, (module as any)[name]]),
-        ),
-  };
-  const evalFn = new Function(
-      ...Object.keys(context),
-      'resetToCircularDefaults();\n' + code +
-          '\n return typeof result === "undefined" ? undefined : result;',
-  );
-  const manifold = evalFn(...Object.values(context));
-  return {globalDefaults, manifold};
 }
