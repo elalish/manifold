@@ -175,35 +175,47 @@ function log(...args: any[]) {
   }
 }
 
-export function setup(module: any) {
-  module.GLTFNode = GLTFNode;
+export const setMaterial =
+    (manifold: Manifold, material: GLTFMaterial): Manifold => {
+      const out = manifold.asOriginal();
+      id2material.set(out.originalID(), material);
+      return out;
+    };
 
-  module.setMaterial =
-      (manifold: Manifold, material: GLTFMaterial): Manifold => {
-        const out = manifold.asOriginal();
-        id2material.set(out.originalID(), material);
-        return out;
-      };
+export const setMorphStart =
+    (manifold: Manifold, func: (v: Vec3) => void): void => {
+      const morph = manifold2morph.get(manifold);
+      if (morph != null) {
+        morph.start = func;
+      } else {
+        manifold2morph.set(manifold, {start: func});
+      }
+    };
 
-  module.setMorphStart =
-      (manifold: Manifold, func: (v: Vec3) => void): void => {
-        const morph = manifold2morph.get(manifold);
-        if (morph != null) {
-          morph.start = func;
-        } else {
-          manifold2morph.set(manifold, {start: func});
-        }
-      };
+export const setMorphEnd =
+    (manifold: Manifold, func: (v: Vec3) => void): void => {
+      const morph = manifold2morph.get(manifold);
+      if (morph != null) {
+        morph.end = func;
+      } else {
+        manifold2morph.set(manifold, {end: func});
+      }
+    };
 
-  module.setMorphEnd = (manifold: Manifold, func: (v: Vec3) => void): void => {
-    const morph = manifold2morph.get(manifold);
-    if (morph != null) {
-      morph.end = func;
-    } else {
-      manifold2morph.set(manifold, {end: func});
-    }
-  };
-}
+export const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
+  let result = manifold.asOriginal();
+  map.set(result.originalID(), result.getMesh());
+  return result;
+};
+
+export const show = (manifold: Manifold) => {
+  return debug(manifold, shown);
+};
+
+export const only = (manifold: Manifold) => {
+  ghost = true;
+  return debug(manifold, singles);
+};
 
 function euler2quat(rotation: Vec3): Quat {
   const deg2rad = Math.PI / 180;

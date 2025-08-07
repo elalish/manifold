@@ -16,12 +16,11 @@ import * as glMatrix from 'gl-matrix'
 
 import Module from './built/manifold';
 import {Evaluator} from './lib/evaluate';
-import {cleanup as GLTFCleanup, exportModels, GlobalDefaults, setup as GLTFSetup} from './lib/export';
+import * as exporter from './lib/export';
+import {GlobalDefaults} from './lib/export';
 
 export const module = await Module() as any;
 module.setup();
-
-GLTFSetup(module);
 
 // Setup the evaluator and it's context.
 const evaluator = new Evaluator(module);
@@ -32,21 +31,21 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 evaluator.context = {
   ...evaluator.context,
   glMatrix,
-  GLTFNode: module.GLTFNode,
-  setMaterial: module.setMaterial,
-  setMorphStart: module.setMorphStart,
-  setMorphEnd: module.setMorphEnd,
-  show: module.show,
-  only: module.only,
+  GLTFNode: exporter.GLTFNode,
+  setMaterial: exporter.setMaterial,
+  setMorphStart: exporter.setMorphStart,
+  setMorphEnd: exporter.setMorphEnd,
+  show: exporter.show,
+  only: exporter.only,
 };
 
 export function cleanup() {
-  GLTFCleanup();
   evaluator.cleanup();
+  exporter.cleanup();
 }
 
 export async function evaluateCADToModel(code: string) {
-  // Global defaults can be populated by the script.  I's set per
+  // Global defaults can be populated by the script.  It's set per
   // evaluation, while the rest of evaluator context doesn't change from
   // run to run.
   // This can be used to set parameters elsewhere in ManifoldCAD.  For
@@ -57,5 +56,6 @@ export async function evaluateCADToModel(code: string) {
   evaluator.context.globalDefaults = globalDefaults;
   const manifold = evaluator.evaluate(code);
 
-  return await exportModels(globalDefaults as GlobalDefaults, manifold);
+  return await exporter.exportModels(
+      globalDefaults as GlobalDefaults, manifold);
 }
