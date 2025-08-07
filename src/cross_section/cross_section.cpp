@@ -31,6 +31,23 @@ struct PathImpl {
 };
 }  // namespace manifold
 
+#ifdef MANIFOLD_DEBUG
+std::ostream& manifold::operator<<(std::ostream& stream,
+                                   const CrossSection& crossSection) {
+  stream << crossSection.paths_->paths_.size() << "\n";
+  for (const auto& path : crossSection.paths_->paths_) {
+    // Write the number of points for the current polygon.
+    stream << path.size() << "\n";
+    // Write the coordinates for each point in the polygon.
+    for (const auto& point : path) {
+      stream << point.x << " " << point.y << "\n";
+    }
+  }
+
+  return stream;
+}
+#endif
+
 namespace {
 const int precision_ = 8;
 
