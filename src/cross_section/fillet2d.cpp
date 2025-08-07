@@ -38,31 +38,39 @@ vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
+                            double& t) {
+  vec2 d = p2 - p1;
+
+  t = -1;
+
+  t = la::dot(p - p1, d) / la::dot(d, d);
+
+  vec2 closestPoint;
+
+  if (t < 0) {
+    t = 0;
+    closestPoint = p1;
+  } else if (t > 1) {
+    t = 1;
+    closestPoint = p2;
+  } else {
+    closestPoint = p1 + t * d;
+  }
+
+  return la::length(closestPoint - p);
+}
+
 // Check if line segment intersect with a circle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                             double radius) {
   vec2 d = p2 - p1;
 
   if (la::length(d) < EPSILON)
-    return la::dot(p1 - center, p1 - center) <= radius * radius;
+    return la::length2(p1 - center) <= radius * radius;
 
-  // Project vec p1 -> circle to line segment
-  double t = la::dot(center - p1, d) / la::dot(d, d);
-
-  vec2 closestPoint;
-
-  if (t < 0) {
-    closestPoint = p1;
-  } else if (t > 1) {
-    closestPoint = p2;
-  } else {
-    closestPoint = p1 + t * d;
-  }
-
-  // Calculate the distance from the closest point to the circle's center
-  double distanceSquared = la::length2(closestPoint - center);
-
-  return distanceSquared <= radius * radius;
+  double t;
+  return distancePointSegment(center, p1, p2, t) <= radius;
 };
 
 // Check if line segment intersect with another line segment
@@ -92,10 +100,13 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
+double distanceSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
+                              const vec2& p4, bool& isEndpoint) {}
+
 enum class IntersectStadiumResult {
   EdgeEdgeIntersect,  // Surely a result
   P2Degenerate,       // Degenerate to P2
-  P1Degenerate,       // Only use to check
+  P1Degenerate,       // Only use to assert
   P1P2Degenerate,     // Both degenerate, and e1 should be removed
   E2Degenerate,       // NOTE: e2 full inside and parallel with e1, this can be
                       // skipped by now, later process will handle it
@@ -319,6 +330,13 @@ bool isProjectionOnSegment(const vec2& c, const vec2& p1, const vec2& p2,
   return t >= 0 && t <= 1;
 };
 
+enum class PointSegmentResult {
+  PreviousEdgeIntersect,
+  NextEdgeIntersect,
+  BothIntersect,
+  Ignore
+};
+
 struct PointSegmentIntersectResult {
   double eT;
   vec2 circleCenter;
@@ -326,56 +344,53 @@ struct PointSegmentIntersectResult {
 };
 
 // Calculate Circle center that tangent to one segment, and cross a point
-std::vector<PointSegmentIntersectResult> calculatePointSegmentCircleCenter(
-    const vec2& p1, const vec2& p2, const vec2& endpoint, double radius) {
-  vec2 e = p2 - p1, dir = la::normalize(e),
-       normal = la::normalize(vec2(-e.y, e.x));
-
-  if (la::length(e) < EPSILON) {
-    // FIXME: Degenerate
-    std::cout << "Degenerate" << std::endl;
-
-    return {};
-  }
-
-  vec2 projectedEndpoint = p1 + dir * la::dot(endpoint - p1, dir);
-  double dist = la::length(projectedEndpoint - endpoint);
-  if (dist > radius * 2.0) {
-    // Bad math, something wrong before
+PointSegmentResult calculatePointSegmentCircleCenter(
+    const vec2& ppre, const vec2& p, const vec2& pnext, const bool pCCW,
+    const vec2& p1, const vec2& p2, const bool eCCW, double radius,
+    PointSegmentIntersectResult& result1,
+    PointSegmentIntersectResult& result2) {
+  double t, dis = distancePointSegment(p, p1, p2, t);
+  if (dis > radius)
     throw std::exception();
+  else if (dis == radius) {
+    // FIXME: EPSILON
+    // Ignore, mark as outside
+    return PointSegmentResult::Ignore;
   }
 
-  dist = dist > radius ? dist - radius : radius - dist;
+  // TODO: Check neighbour collision
+  if (t == 0 || t == 1) {
+    // Point Point degenerate
 
-  std::vector<PointSegmentIntersectResult> result(
-      2, PointSegmentIntersectResult());
+    if (t == 0) {
+    } else {
+    }
+  } else {
+    double p1Distance = la::length2(p1 - p), p2Distance = la::length2(p2 - p);
 
-  double len = la::sqrt(radius * radius - dist * dist);
-  vec2 tangentPoint1 = projectedEndpoint + dir * len,
-       tangentPoint2 = projectedEndpoint - dir * len;
+    // Degenerate Ignore
+    if (p1Distance < radius * radius && p2Distance < radius * radius)
+      return PointSegmentResult::Ignore;
 
-  result[0].eT = la::dot(tangentPoint1 - p1, e) / la::length2(e);
-  result[1].eT = la::dot(tangentPoint2 - p1, e) / la::length2(e);
+    // Only handle point edge intersect, point point degenerate will be handle
+    // by other process
 
-  result[0].circleCenter = tangentPoint1 + normal * radius;
-  result[1].circleCenter = tangentPoint2 + normal * radius;
+    if (la::length2(p1 - p) < radius * radius) {
+      // P1 Degenerate
+      // FIXME: This should be handle by other's Point Point degenerate, rethink
+      // about it
+    } else {
+      // Point Edge Intersect
+    }
 
-  vec2 pointToCenter = endpoint - result[0].circleCenter;
-  result[0].endPointRad = atan2(pointToCenter.y, pointToCenter.x);
-  pointToCenter = tangentPoint1 - result[0].circleCenter;
-  result[0].edgeTangentRad = atan2(pointToCenter.y, pointToCenter.x);
-
-  pointToCenter = endpoint - result[1].circleCenter;
-  result[1].endPointRad = atan2(pointToCenter.y, pointToCenter.x);
-  pointToCenter = tangentPoint2 - result[1].circleCenter;
-  result[1].edgeTangentRad = atan2(pointToCenter.y, pointToCenter.x);
-
-  if (result[0].endPointRad < 0) result[0].endPointRad += 2 * M_PI;
-  if (result[0].edgeTangentRad < 0) result[0].edgeTangentRad += 2 * M_PI;
-  if (result[1].endPointRad < 0) result[1].endPointRad += 2 * M_PI;
-  if (result[1].edgeTangentRad < 0) result[1].edgeTangentRad += 2 * M_PI;
-
-  return result;
+    if (la::length2(p2 - p) < radius * radius) {
+      // P2 Degenerate
+      // FIXME: This should be handle by other's Point Point degenerate, rethink
+      // about it
+    } else {
+      // Point Edge Intersect
+    }
+  }
 }
 
 bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
@@ -402,9 +417,8 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   vec2 b = {radius * la::length(normal1) - c1,
             radius * la::length(normal2) - c2};
   if (std::abs(la::determinant(A)) < EPSILON) {
-    // FIXME: Parallel line
-    std::cout << "Parallel" << std::endl;
-    return false;
+    // NOTE: degenerate case, should be handled in PointSegment
+    throw std::exception();
   }
 
   vec2 center = la::mul(la::inverse(A), b);
@@ -626,12 +640,10 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       size_t p3i = e2i, p4i = ele.p2Ref;
       vec2 p3 = outerLoop[p3i], p4 = outerLoop[p4i];
 
-      auto r = intersectStadiumCollider(p1, p2, true, p3, p4, false, radius);
-
       bool continueFlag = false;
       bool degenerateFlag = false;
 
-      switch (r) {
+      switch (intersectStadiumCollider(p1, p2, true, p3, p4, false, radius)) {
         case IntersectStadiumResult::EdgeEdgeIntersect: {
           double startRad = 0, endRad = 0;
           double e1T = 0, e2T = 0;
@@ -684,152 +696,33 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
       if (continueFlag) continue;
 
-      if (!degenerateFlag && !intersectSectorCollider(p1, p2, vec2(), true, p3,
-                                                      p4, false, radius)) {
+      if (p2IsConvex ||
+          (!degenerateFlag && !intersectSectorCollider(p1, p2, vec2(), true, p3,
+                                                       p4, false, radius))) {
         continue;
       }
 
       // Handle concave vertex degenerate case
-      if (endPointIntersected ||
-          (segSegResult != SegmentSegmentIntersectResult::None &&
-           segSegResult != SegmentSegmentIntersectResult::Result)) {
-        ASSERT(segSegResult != SegmentSegmentIntersectResult::DegenerateP1,
-               std::exception());
 
-        auto getSegmentSegmentIntersectResultEndPointIndex =
-            [](SegmentSegmentIntersectResult result, const size_t p1i,
-               const size_t p2i, const size_t p3i, const size_t p4i) -> size_t {
-          switch (result) {
-            case SegmentSegmentIntersectResult::DegenerateP1:
-              return p1i;
-            case SegmentSegmentIntersectResult::DegenerateP2:
-              return p2i;
-            case SegmentSegmentIntersectResult::DegenerateP3:
-              return p3i;
-            case SegmentSegmentIntersectResult::DegenerateP4:
-              return p4i;
-            default:
-              throw std::exception();
-          }
-        };
+      std::vector<PointSegmentIntersectResult> r(2,
+                                                 PointSegmentIntersectResult{});
 
-        auto getSegmentSegmentIntersectResultSegmentIndex =
-            [](SegmentSegmentIntersectResult result, const size_t e1i,
-               const size_t e2i) -> size_t {
-          switch (result) {
-            case SegmentSegmentIntersectResult::DegenerateP1:
-            case SegmentSegmentIntersectResult::DegenerateP2:
-              return e2i;
-            case SegmentSegmentIntersectResult::DegenerateP3:
-            case SegmentSegmentIntersectResult::DegenerateP4:
-              return e1i;
-            default:
-              throw std::exception();
-          }
-        };
-
-        const size_t endPointIndex =
-                         endPointIntersected
-                             ? p2i
-                             : getSegmentSegmentIntersectResultEndPointIndex(
-                                   segSegResult, p1i, p2i, p3i, p4i),
-                     intersectSegmentIndex =
-                         endPointIntersected
-                             ? e2i
-                             : getSegmentSegmentIntersectResultSegmentIndex(
-                                   segSegResult, e1i, e2i),
-                     endPointCurrentEdgeIndex =
-                         (endPointIndex + outerLoop.size() - 1) %
-                         outerLoop.size(),
-                     endPointNextEdgeIndex = endPointIndex;
-
-        const size_t intersectSegmentP1i = intersectSegmentIndex,
-                     intersectSegmentP2i =
-                         (intersectSegmentP1i + 1) % outerLoop.size();
-
-        const vec2 intersectSegmentP1 = outerLoop[intersectSegmentP1i],
-                   intersectSegmentP2 = outerLoop[intersectSegmentP2i],
-                   endPoint = outerLoop[endPointIndex];
-
-        if (markEV[intersectSegmentIndex * outerLoop.size() + endPointIndex])
-          continue;
-        markEV[intersectSegmentIndex * outerLoop.size() + endPointIndex] = 1;
-
-        auto r = calculatePointSegmentCircleCenter(
-            intersectSegmentP1, intersectSegmentP2, endPoint, radius);
-
-        if (r.empty()) {
-          continue;
-        }
-
-        // Check if A and B less than 90 degree, and B is on A's left side
-        auto isValid = [](vec2 a, vec2 b) -> bool {
-          return (la::dot(a, b) > 0) && (la::cross(a, b) > 0);
-        };
-
-        const vec2
-            endPointCurrentEdge =
-                outerLoop[(endPointCurrentEdgeIndex + 1) % outerLoop.size()] -
-                outerLoop[endPointCurrentEdgeIndex],
-            endPointNextEdge =
-                outerLoop[(endPointNextEdgeIndex + 1) % outerLoop.size()] -
-                outerLoop[endPointNextEdgeIndex];
-
-        for (const auto& ele : r) {
-          const vec2 center = ele.circleCenter,
-                     endPointToCenter = center - endPoint;
-          double rT = ele.eT;
-
-          bool curEdgeValid =
-                   (la::dot(endPointCurrentEdge, endPointToCenter) > 0) &&
-                   (la::cross(endPointCurrentEdge, endPointToCenter) > 0),
-               nextEdgeValid =
-                   (la::dot(endPointToCenter, endPointNextEdge) < 0) &&
-                   (la::cross(endPointToCenter, endPointNextEdge) > 0);
-
-          if (!(curEdgeValid || nextEdgeValid)) {
-            continue;
-          } else {
-            // Sort result by CCW
-            double arcAngle = ele.edgeTangentRad - ele.endPointRad;
-            if (arcAngle < 0) arcAngle += 2 * M_PI;
-
-            std::cout << "EndPoint " << endPoint
-                      << (curEdgeValid
-                              ? " CurEdge " +
-                                    std::to_string(endPointCurrentEdgeIndex)
-                              : "NextEdge " +
-                                    std::to_string(endPointNextEdgeIndex))
-                      << " Center " << center << std::endl;
-
-            if (arcAngle <= M_PI) {
-              if (curEdgeValid) {
-                arcConnection[endPointCurrentEdgeIndex].emplace_back(
-                    ArcConnectionInfo{center, 1, rT, endPointCurrentEdgeIndex,
-                                      intersectSegmentIndex, ele.endPointRad,
-                                      ele.edgeTangentRad});
-              } else {
-                arcConnection[endPointNextEdgeIndex].emplace_back(
-                    ArcConnectionInfo{center, 0, rT, endPointNextEdgeIndex,
-                                      intersectSegmentIndex, ele.endPointRad,
-                                      ele.edgeTangentRad});
-              }
-
-            } else {
-              if (curEdgeValid) {
-                arcConnection[intersectSegmentIndex].emplace_back(
-                    ArcConnectionInfo{center, rT, 1, intersectSegmentIndex,
-                                      endPointCurrentEdgeIndex,
-                                      ele.edgeTangentRad, ele.endPointRad});
-              } else {
-                arcConnection[intersectSegmentIndex].emplace_back(
-                    ArcConnectionInfo{center, rT, 0, intersectSegmentIndex,
-                                      endPointNextEdgeIndex, ele.edgeTangentRad,
-                                      ele.endPointRad});
-              }
-            }
-          }
-        }
+      const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()],
+                 enext = pnext - p2, enextn = la::normalize(enext),
+                 normalnext = la::normalize(vec2(-enext.y, enext.x));
+      switch (calculatePointSegmentCircleCenter(p1, p2, pnext, true, p3, p4,
+                                                false, radius, r[0], r[1])) {
+        case PointSegmentResult::PreviousEdgeIntersect:
+          // Add to previous edge
+          break;
+        case PointSegmentResult::NextEdgeIntersect:
+          // Add to next edge
+          break;
+        case PointSegmentResult::BothIntersect:
+          break;
+        case PointSegmentResult::Ignore:
+        default:
+          break;
       }
     }
   }
