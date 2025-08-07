@@ -18,9 +18,9 @@
 #include "quickhull.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <unordered_map>
-#include <cstddef>
 
 #include "impl.h"
 

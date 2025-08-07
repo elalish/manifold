@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unordered_map>
+
 #include "impl.h"
 #include "parallel.h"
-#include <unordered_map>
 
 namespace {
 using namespace manifold;
