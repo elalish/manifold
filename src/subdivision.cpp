@@ -15,6 +15,8 @@
 #include "impl.h"
 #include "parallel.h"
 
+#include <unordered_map>
+
 template <>
 struct std::hash<manifold::ivec4> {
   size_t operator()(const manifold::ivec4& p) const {

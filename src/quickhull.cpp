@@ -19,6 +19,8 @@
 
 #include <algorithm>
 #include <limits>
+#include <unordered_map>
+#include <cstddef>
 
 #include "impl.h"
 

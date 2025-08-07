@@ -14,6 +14,7 @@
 
 #include "impl.h"
 #include "parallel.h"
+#include <unordered_map>
 
 namespace {
 using namespace manifold;
