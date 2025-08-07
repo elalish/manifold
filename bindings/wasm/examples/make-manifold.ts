@@ -96,7 +96,8 @@ async function writeGLB(doc: Document): Promise<void> {
   }
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  const blob = new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
   outputGLBurl = URL.createObjectURL(blob);
 }
 

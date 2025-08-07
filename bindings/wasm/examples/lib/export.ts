@@ -21,7 +21,7 @@ import {quat} from 'gl-matrix';
 import {Manifold, ManifoldToplevel, Mesh, Vec3} from '../built/manifold';
 import {GLTFMaterial, Quat} from '../public/editor';
 
-import {Properties, setupIO, writeMesh} from './gltf-io';
+import {Properties, setupIO, writeMesh} from './gltf-io.ts';
 
 export interface GLTFManifold extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
@@ -643,7 +643,8 @@ export async function exportModels(
   }
 
   const glb = await io.writeBinary(doc);
-  const blobGLB = new Blob([glb], {type: 'application/octet-stream'});
+  const blobGLB = new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
 
   const fileForRelThumbnail = new FileForRelThumbnail();
   fileForRelThumbnail.add3dModel('3D/3dmodel.model')
@@ -655,7 +656,7 @@ export async function exportModels(
   files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
   const blob3MF = new Blob(
-      [zipFile],
+      [zipFile as Uint8Array<ArrayBuffer>],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
 
   const t2 = performance.now();

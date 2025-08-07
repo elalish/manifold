@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
+
+import { Command } from 'commander';
+import glMatrix from 'gl-matrix';
+
+import Module from '../built/manifold.js';
+import { Evaluator } from '../built/lib/evaluate.js';
+import * as exporter from '../built/lib/export.js';
+
+// Instantiate Manifold WASM
+const manifold = await Module();
+manifold.setup();
+
+// Setup the evaluator and context.
+const evaluator = new Evaluator(manifold);
+evaluator.context = {
+  ...evaluator.context,
+  glMatrix,
+  GLTFNode: exporter.GLTFNode,
+  setMaterial: exporter.setMaterial,
+  setMorphStart: exporter.setMorphStart,
+  setMorphEnd: exporter.setMorphEnd,
+  show: exporter.show,
+  only: exporter.only,
+  env: process.env
+};
+
+
+const evaluateCADToModel = async (code) => {
+  const globalDefaults = {};
+
+  evaluator.context.globalDefaults = globalDefaults;
+  const manifold = evaluator.evaluate(code);
+
+  return await exporter.exportModels(globalDefaults, manifold);
+}
+
+const program = new Command();
+
+program
+  .name('manifold-cli')
+  .description('A simple CLI for ManifoldCAD')
+  .argument('<infile.js>', 'Input file')
+  .argument('<outfile>', 'Output file')
+  .action( async (infile, outfile) => {
+    const inPath = resolve(infile);
+    const outPath = resolve(outfile);
+
+    const is3mf = extname(outPath) === '.3mf';
+    const isGlb = extname(outPath) === '.glb';
+    if (!is3mf && !isGlb) {
+      throw new Error('Output file must be either .glb or .3mf');
+    }
+
+    const code = await readFile(inPath);
+
+    const { glbURL, threeMFURL } = await evaluateCADToModel(code);
+    const res = await fetch(is3mf ? threeMFURL : glbURL);
+    const binary = await res.arrayBuffer();
+    await writeFile(outPath, Buffer.from(binary));
+  })
+
+
+program.parseAsync(process.argv);

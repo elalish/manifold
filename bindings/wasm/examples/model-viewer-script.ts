@@ -117,7 +117,8 @@ async function push2MV(manifold: Manifold) {
 
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  const blob = new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
   URL.revokeObjectURL(objectURL);
   objectURL = URL.createObjectURL(blob);
   (mv as any).src = objectURL;
