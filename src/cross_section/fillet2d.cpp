@@ -573,20 +573,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     // Create BBox
     manifold::Box box(toVec3(p1), toVec3(p2));
     {
-      // TODO: renew picture
-      /* Only check e1 and p2 to avoid duplicate process
-      normalOffsetP1 --- normalOffsetP2  --- circleOffsetP2
-             |                 |      \--        |
-             |                 |          \--    |
-             |                 | Circle Arc-> \--|
-             |                 | <- 2 * radius ->\
-            p1 --------------- p2 ----------------|
-                               |                 /
-                               | Circle Arc-> /--  |
-                               |           /--     |
-                               |        /--        |
-                               |-----/--    circleOffsetP2N
-      */
+      // See
+      // https://docs.google.com/presentation/d/1P-3oxmjmEw_Av0rq7q7symoL5VB5DSWpRvqoa3LK7Pg/edit?usp=sharing
 
       vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
            normalOffsetP2 = p2 + normal * 2.0 * radius;
