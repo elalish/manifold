@@ -212,8 +212,8 @@ IntersectStadiumResult intersectStadiumCollider(
 
 // Normalize angle to [0, 2*PI)
 float normalizeAngle(float angle) {
-  while (angle < 0) angle += 2 * M_PI;
-  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+  while (angle < 0) angle += M_2_PI;
+  while (angle >= M_2_PI) angle -= M_2_PI;
   return angle;
 }
 
@@ -358,39 +358,96 @@ PointSegmentResult calculatePointSegmentCircleCenter(
     return PointSegmentResult::Ignore;
   }
 
-  // TODO: Check neighbour collision
-  if (t == 0 || t == 1) {
-    // Point Point degenerate
+  vec2 e = p2 - p1, dir = la::normalize(e),
+       normal = la::normalize(vec2(-e.y, e.x));
 
-    if (t == 0) {
+  vec2 projectedP = p1 + dir * la::dot(p - p1, dir);
+  double dist = la::length(projectedP - p);
+  dist = dist > radius ? dist - radius : radius - dist;
+
+  double len = la::sqrt(radius * radius - dist * dist);
+
+  std::array<vec2, 2> tangentPoint{projectedP - dir * len,
+                                   projectedP + dir * len};
+
+  auto isOnSegment = [](const vec2& p1, const vec2& p2, const vec2& p) -> bool {
+    return 0 <= la::dot(p - p1, p2 - p1) <= la::length2(p2 - p1);
+  };
+
+  std::array<bool, 2> edgeIntersect = {false, false};
+
+  for (int i = 0; i != 2; i++) {
+    vec2 tangent = tangentPoint[i];
+    vec2 center(0, 0);
+
+    if (!isOnSegment(p1, p2, tangent)) {
+      // Tangent valid -> check circle valid
+      vec2 center = tangent + normal * radius;
+
     } else {
+      tangent = (i == 0) ? p1 : p2;
+
+      vec2 d = p1 - p, ddir = la::normalize(d);
+      vec2 dnormal = vec2(-ddir.y, ddir.x);
+
+      double halfLength = la::length(d) / 2;
+      double projectDistance =
+          la::sqrt(radius * radius - halfLength * halfLength);
+
+      vec2 center1 = p + halfLength * ddir + projectDistance * dnormal,
+           center2 = p + halfLength * ddir - projectDistance * dnormal;
+
+      center = center1;
+      double t = 0;
+      if (distancePointSegment(center1, p1, p2, t) < radius || t != (i == 0)
+              ? 0
+              : 1) {
+        center = center2;
+      }
     }
-  } else {
-    double p1Distance = la::length2(p1 - p), p2Distance = la::length2(p2 - p);
 
-    // Degenerate Ignore
-    if (p1Distance < radius * radius && p2Distance < radius * radius)
-      return PointSegmentResult::Ignore;
+    vec2 pointToCenter = center - p;
+    vec2 tangentToCenter = center - tangent;
+    PointSegmentIntersectResult result{
+        la::dot(tangent - p1, e) / la::length2(e), tangent + normal * radius,
+        atan2(pointToCenter.y, pointToCenter.x),
+        atan2(tangentToCenter.y, tangentToCenter.x)};
 
-    // Only handle point edge intersect, point point degenerate will be handle
-    // by other process
+    vec2 tangentDir = vec2(pointToCenter.y, -pointToCenter.x);
 
-    if (la::length2(p1 - p) < radius * radius) {
-      // P1 Degenerate
-      // FIXME: This should be handle by other's Point Point degenerate, rethink
-      // about it
+    const vec2 epre = p - ppre, enext = pnext - p;
+
+    bool sign = la::cross(e, pointToCenter) > 0;
+    if (sign & eCCW) {
+      // Pre Edge
+
+      // Check is collision with next edge
+      if (la::cross(enext, tangentDir) > 0) {
+        edgeIntersect[0] = true;
+        result1 = result;
+      }
     } else {
-      // Point Edge Intersect
-    }
+      // Next Edge
 
-    if (la::length2(p2 - p) < radius * radius) {
-      // P2 Degenerate
-      // FIXME: This should be handle by other's Point Point degenerate, rethink
-      // about it
-    } else {
-      // Point Edge Intersect
+      // Check is collision with pre edge
+      if (la::cross(epre, tangentDir) > 0) {
+        edgeIntersect[1] = true;
+        result2 = result;
+      }
     }
   }
+
+  if (edgeIntersect[0] && edgeIntersect[1]) {
+    return PointSegmentResult::BothIntersect;
+
+  } else if (edgeIntersect[0]) {
+    return PointSegmentResult::PreviousEdgeIntersect;
+
+  } else if (edgeIntersect[1]) {
+    return PointSegmentResult::NextEdgeIntersect;
+  }
+
+  return PointSegmentResult::Ignore;
 }
 
 bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
