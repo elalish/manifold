@@ -116,7 +116,8 @@ if(MANIFOLD_CROSS_SECTION)
       # Jun 15, 2025
       GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
       GIT_PROGRESS TRUE
-      SOURCE_SUBDIR CPP
+      SOURCE_SUBDIR
+      CPP
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(Clipper2)
