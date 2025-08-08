@@ -643,7 +643,7 @@ export async function exportModels(
   }
 
   const glb = await io.writeBinary(doc);
-  const blobGLB = new Blob(
+  const glbBlob = new Blob(
       [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
 
   const fileForRelThumbnail = new FileForRelThumbnail();
@@ -655,7 +655,7 @@ export async function exportModels(
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
   files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
-  const blob3MF = new Blob(
+  const threeMFBlob = new Blob(
       [zipFile as Uint8Array<ArrayBuffer>],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
 
@@ -663,8 +663,5 @@ export async function exportModels(
   console.log(`Exporting GLB & 3MF took ${
       (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
 
-  return ({
-    glbURL: URL.createObjectURL(blobGLB),
-    threeMFURL: URL.createObjectURL(blob3MF)
-  });
+  return ({glbBlob, threeMFBlob});
 }

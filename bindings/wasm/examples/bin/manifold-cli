@@ -56,11 +56,10 @@ program
     }
 
     const code = await readFile(inPath);
+    const { glbBlob, threeMFBlob} = await evaluateCADToModel(code);
 
-    const { glbURL, threeMFURL } = await evaluateCADToModel(code);
-    const res = await fetch(is3mf ? threeMFURL : glbURL);
-    const binary = await res.arrayBuffer();
-    await writeFile(outPath, Buffer.from(binary));
+    const binary = is3mf ? threeMFBlob : glbBlob;
+    const outStream = writeFile(outfile, binary.stream());
   })
 
 

@@ -56,6 +56,11 @@ export async function evaluateCADToModel(code: string) {
   evaluator.context.globalDefaults = globalDefaults;
   const manifold = evaluator.evaluate(code);
 
-  return await exporter.exportModels(
-      globalDefaults as GlobalDefaults, manifold);
+  const exports =
+      await exporter.exportModels(globalDefaults as GlobalDefaults, manifold);
+
+  return ({
+    glbURL: URL.createObjectURL(exports?.glbBlob ?? new Blob([])),
+    threeMFURL: URL.createObjectURL(exports?.threeMFBlob ?? new Blob([]))
+  });
 }
