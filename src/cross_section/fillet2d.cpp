@@ -26,15 +26,29 @@
 #include "manifold/manifold.h"
 
 const double EPSILON = 1e-9;
+
+using namespace manifold;
 namespace C2 = Clipper2Lib;
 
 namespace {
-// Utility
 
-using namespace manifold;
-
-namespace C2 = Clipper2Lib;
 vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
+
+C2::PointD v2_to_pd(const vec2 v) { return C2::PointD(v.x, v.y); }
+
+C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
+  auto p = C2::PathD();
+  p.reserve(ctr.size());
+  for (auto v : ctr) {
+    p.push_back(v2_to_pd(v));
+  }
+  return p;
+}
+
+}  // namespace
+
+namespace {
+// Utility
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
@@ -99,9 +113,6 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
     return false;
   }
 };
-
-double distanceSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
-                              const vec2& p4, bool& isEndpoint) {}
 
 enum class IntersectStadiumResult {
   EdgeEdgeIntersect,  // Surely a result
@@ -923,8 +934,14 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
-Polygons FilletImpl(const SimplePolygon& loop, double radius,
-                    int circularSegments) {
+using Loops = std::vector<SimpleLoop>;
+
+struct SimpleLoop {
+  SimplePolygon Loop;
+  bool isCCW;
+};
+
+Polygons FilletImpl(const Loops& loops, double radius, int circularSegments) {
   using namespace manifold;
 
   ColliderInfo info{};
@@ -954,44 +971,22 @@ Polygons FilletImpl(const SimplePolygon& loop, double radius,
 
 namespace manifold {
 
-struct PathImpl {
-  PathImpl(const C2::PathsD paths_) : paths_(paths_) {}
-  operator const C2::PathsD&() const { return paths_; }
-  const C2::PathsD paths_;
-};
-
 std::vector<CrossSection> CrossSection::Fillet(double radius,
                                                int circularSegments) const {
-  auto paths = this->GetPaths()->paths_;
+  auto polygons = ToPolygons();
 
-  Polygons outer, inner;
-  for (const auto& loop : paths) {
-    SimplePolygon polygon;
-    polygon.reserve(loop.size());
+  Loops loops;
+  loops.reserve(polygons.size());
 
-    for (auto p : loop) {
-      polygon.push_back(v2_of_pd(p));
-    }
+  for (const auto& loop : polygons) {
+    C2::PathD path = pathd_of_contour(loop);
 
-    if (C2::Area(loop) > EPSILON)
-      outer.push_back(polygon);
-    else
-      inner.push_back(polygon);
+    loops.push_back(SimpleLoop{loop, C2::Area(path) > EPSILON});
   }
 
-  std::vector<CrossSection> result;
+  auto r = FilletImpl(loops, radius, circularSegments);
 
-  for (const auto& loop : outer) {
-    auto r = FilletImpl(loop, radius, circularSegments);
-
-    for (const auto& ele : r) {
-      Polygons poly{ele};
-      poly.insert(poly.end(), inner.begin(), inner.end());
-      result.push_back(poly);
-    }
-  }
-
-  return result;
+  return std::vector<CrossSection>{};
 }
 
 std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
@@ -1008,14 +1003,7 @@ std::vector<CrossSection> CrossSection::Fillet(const Polygons& polygons,
 
 std::vector<CrossSection> Fillet(const std::vector<CrossSection>& crossSections,
                                  double radius, int circularSegments) {
-  std::vector<CrossSection> result;
-
-  for (const auto& crossSection : crossSections) {
-    auto r = crossSection.Fillet(radius, circularSegments);
-    result.insert(result.end(), r.begin(), r.end());
-  }
-
-  return result;
+  return CrossSection::Compose(crossSections).Fillet(radius, circularSegments);
 }
 
 }  // namespace manifold
