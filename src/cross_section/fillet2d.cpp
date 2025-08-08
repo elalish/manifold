@@ -501,8 +501,8 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
     startRad = atan2(dirStart.y, dirStart.x);
     endRad = atan2(dirEnd.y, dirEnd.x);
 
-    if (startRad < 0) startRad += 2 * M_PI;
-    if (endRad < 0) endRad += 2 * M_PI;
+    startRad = normalizeAngle(startRad);
+    endRad = normalizeAngle(endRad);
 
     return true;
   }
@@ -522,11 +522,7 @@ std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
 
-  double totalRad = arc.endRad - arc.startRad;
-
-  if (totalRad < 0) {
-    totalRad += 2.0 * M_PI;
-  }
+  double totalRad = normalizeAngle(arc.endRad - arc.startRad);
 
   double dPhi = 2 * M_PI / circularSegments;
   int seg = int(totalRad / dPhi) + 1;
@@ -699,7 +695,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
                                                   endRad)) {
             // Sort result by CCW
             double arcAngle = endRad - startRad;
-            if (arcAngle < 0) arcAngle += 2 * M_PI;
+            arcAngle = normalizeAngle(arcAngle);
 
             if (arcAngle <= M_PI) {
               arcConnection[e1i].emplace_back(ArcConnectionInfo{
@@ -749,21 +745,43 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
       // Handle concave vertex degenerate case
 
-      std::vector<PointSegmentIntersectResult> r(2,
-                                                 PointSegmentIntersectResult{});
+      std::array<PointSegmentIntersectResult, 2> r{};
 
-      const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()],
-                 enext = pnext - p2, enextn = la::normalize(enext),
-                 normalnext = la::normalize(vec2(-enext.y, enext.x));
+      const vec2 pnext = outerLoop[(p2i + 1) % outerLoop.size()];
+
+      const size_t enexti = p2i, eprei = e1i;
+
+      auto addArcConnection = [&arcConnection](
+                                  const double t, const size_t edgeIndex,
+                                  const size_t resultEdgeIndex,
+                                  PointSegmentIntersectResult& result) -> void {
+        double arcAngle =
+            normalizeAngle(result.edgeTangentRad - result.endPointRad);
+
+        if (arcAngle <= M_PI) {
+          arcConnection[edgeIndex].emplace_back(ArcConnectionInfo{
+              result.circleCenter, t, result.eT, edgeIndex, resultEdgeIndex,
+              result.endPointRad, result.edgeTangentRad});
+        } else {
+          arcConnection[resultEdgeIndex].emplace_back(ArcConnectionInfo{
+              result.circleCenter, result.eT, t, resultEdgeIndex, edgeIndex,
+              result.edgeTangentRad, result.endPointRad});
+        }
+      };
+
       switch (calculatePointSegmentCircleCenter(p1, p2, pnext, true, p3, p4,
                                                 false, radius, r[0], r[1])) {
         case PointSegmentResult::PreviousEdgeIntersect:
           // Add to previous edge
+          addArcConnection(1, eprei, e2i, r[0]);
           break;
         case PointSegmentResult::NextEdgeIntersect:
           // Add to next edge
+          addArcConnection(0, enexti, e2i, r[1]);
           break;
         case PointSegmentResult::BothIntersect:
+          addArcConnection(1, eprei, e2i, r[0]);
+          addArcConnection(0, enexti, e2i, r[1]);
           break;
         case PointSegmentResult::Ignore:
         default:
