@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "es2022",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "node",
     "lib": [
       "es2022",
       "dom"
@@ -20,7 +20,7 @@
     "rewriteRelativeImportExtensions": true,
   },
   "include": [
-    "./*.ts",
+    "./*.ts"
   ],
   "exclude": []
 }

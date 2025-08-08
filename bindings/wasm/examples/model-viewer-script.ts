@@ -16,7 +16,7 @@ import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, prune} from '@gltf-transform/functions';
 
 import Module, {Manifold, Mesh} from './built/manifold';
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './gltf-io';
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './lib/gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
@@ -117,7 +117,8 @@ async function push2MV(manifold: Manifold) {
 
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  const blob = new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
   URL.revokeObjectURL(objectURL);
   objectURL = URL.createObjectURL(blob);
   (mv as any).src = objectURL;
