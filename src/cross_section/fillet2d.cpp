@@ -95,7 +95,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
     return la::length2(p1 - center) <= radius * radius;
 
   double t;
-  return distancePointSegment(center, p1, p2, t) <= radius;
+  return distancePointSegment(center, p1, p2, t) < radius;
 };
 
 // Check if line segment intersect with another line segment
@@ -142,7 +142,7 @@ IntersectStadiumResult intersectStadiumCollider(
     const bool e2CCW,  // p3 -> p4 CCW ?
     const double radius) {
   // Two boundary shouldn't touch, this should be handle previous
-  if (e1CCW && e2CCW) throw std::exception();
+  // if (e1CCW && e2CCW) throw std::exception();
 
   const vec2 e1 = p2 - p1, e2 = p4 - p3,
              normal1 =
@@ -540,6 +540,8 @@ struct ArcConnectionInfo {
 
   double t1, t2;  // Parameter value of arc tangent points of edges
   size_t e1, e2;  // Edge Idx of tangent points lie on
+  size_t e1Loopi, e2Loopi;
+
   double startRad, endRad;
 };
 
@@ -755,11 +757,13 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
               arcAngle = normalizeAngle(arcAngle);
 
               if (arcAngle <= M_PI) {
-                arcConnection[e1i].emplace_back(ArcConnectionInfo{
-                    circleCenter, e1T, e2T, e1i, e2i, startRad, endRad});
+                arcConnection[loopOffset[e1Loopi] + e1i].emplace_back(
+                    ArcConnectionInfo{circleCenter, e1T, e2T, e1i, e2i, e1Loopi,
+                                      e2Loopi, startRad, endRad});
               } else {
-                arcConnection[e2i].emplace_back(ArcConnectionInfo{
-                    circleCenter, e2T, e1T, e2i, e1i, endRad, startRad});
+                arcConnection[loopOffset[e2Loopi] + e2i].emplace_back(
+                    ArcConnectionInfo{circleCenter, e2T, e1T, e2i, e1i, e2Loopi,
+                                      e1Loopi, endRad, startRad});
               }
 
               std::cout << "Segment Center " << circleCenter << std::endl;
@@ -809,20 +813,23 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         const size_t enexti = p2i, eprei = e1i;
 
         auto addArcConnection =
-            [&arcConnection](const double t, const size_t edgeIndex,
-                             const size_t resultEdgeIndex,
-                             PointSegmentIntersectResult& result) -> void {
+            [&arcConnection, loopOffset, e1Loopi, e2Loopi](
+                const double t, const size_t edgeIndex,
+                const size_t resultEdgeIndex,
+                PointSegmentIntersectResult& result) -> void {
           double arcAngle =
               normalizeAngle(result.edgeTangentRad - result.endPointRad);
 
           if (arcAngle <= M_PI) {
-            arcConnection[edgeIndex].emplace_back(ArcConnectionInfo{
-                result.circleCenter, t, result.eT, edgeIndex, resultEdgeIndex,
-                result.endPointRad, result.edgeTangentRad});
+            arcConnection[loopOffset[e1Loopi] + edgeIndex].emplace_back(
+                ArcConnectionInfo{result.circleCenter, t, result.eT, edgeIndex,
+                                  resultEdgeIndex, e1Loopi, e2Loopi,
+                                  result.endPointRad, result.edgeTangentRad});
           } else {
-            arcConnection[resultEdgeIndex].emplace_back(ArcConnectionInfo{
-                result.circleCenter, result.eT, t, resultEdgeIndex, edgeIndex,
-                result.edgeTangentRad, result.endPointRad});
+            arcConnection[loopOffset[e2Loopi] + resultEdgeIndex].emplace_back(
+                ArcConnectionInfo{result.circleCenter, result.eT, t,
+                                  resultEdgeIndex, edgeIndex, e2Loopi, e1Loopi,
+                                  result.edgeTangentRad, result.endPointRad});
           }
         };
 
@@ -844,6 +851,41 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           case PointSegmentResult::Ignore:
           default:
             break;
+        }
+      }
+    }
+  }
+
+  // Detect arc self-intersection, and remove
+  for (size_t i = 0; i != arcConnection.size(); i++) {
+    for (auto it = arcConnection[i].begin(); it != arcConnection[i].end();
+         it++) {
+      const auto& arc = *it;
+
+      manifold::Box box(toVec3(arc.center - vec2(1, 0) * radius),
+                        toVec3(arc.center + vec2(1, 0) * radius));
+
+      box.Union(toVec3(arc.center - vec2(0, 1) * radius));
+      box.Union(toVec3(arc.center + vec2(0, 1) * radius));
+
+      auto r = collider.outerCollider.Collisions(
+          manifold::Vec<manifold::Box>({box}).cview());
+      // r.Dump();
+      r.Sort();
+
+      for (size_t k = 0; k != r.size(); k++) {
+        const auto& edge = collider.outerEdgeOld2NewVec[r.Get(k, true)];
+
+        if (edge.loopRef == arc.e1Loopi && edge.p1Ref == arc.e1)
+          continue;
+        else if (edge.loopRef == arc.e2Loopi && edge.p1Ref == arc.e2)
+          continue;
+
+        const auto& eLoop = loops[edge.loopRef].Loop;
+        const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
+        const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
+        if (intersectCircleSegment(p1, p2, arc.center, radius)) {
+          it = arcConnection[i].erase(it);
         }
       }
     }
