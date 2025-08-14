@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <vector>
@@ -169,7 +170,7 @@ IntersectStadiumResult intersectStadiumCollider(
       return IntersectStadiumResult::P1P2Degenerate;
 
     if (p1Intersect) {
-      bool sign = la::cross(e1, e2) > 0;
+      bool sign = la::cross(e1, e2) < 0;
 
       if (sign == (e1CCW ^ e2CCW)) {
         // TODO: Ensure degenerate processed
@@ -180,7 +181,7 @@ IntersectStadiumResult intersectStadiumCollider(
     }
 
     if (p2Intersect) {
-      bool sign = la::cross(e1, e2) < 0;
+      bool sign = la::cross(e1, e2) > 0;
 
       if (sign == (e1CCW ^ e2CCW)) {
         // Degenerate process
@@ -710,8 +711,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
       r.Sort();
 
       std::cout << std::endl
-                << "Now " << p1i << "->" << (e1i + 1) % e1Loop.size()
-                << std::endl;
+                << "Now " << p1i << "->" << (e1i + 1) % e1Loop.size() << " "
+                << r.size() << std::endl;
 
       // In Out Classify
       for (size_t j = 0; j != r.size(); j++) {
@@ -725,7 +726,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
         // Skip self and pre one, only process forward
         if (e1Loopi == e2Loopi &&
-            ((e1i == e2i) || e2i == (e1i + e1Loop.size() - 1) % e1Loop.size()))
+            ((e1i == e2i) ||
+             (e1i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
         // Check if processed, and add duplicate mark
@@ -886,10 +888,13 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
         if (intersectCircleSegment(p1, p2, arc.center, radius)) {
           it = arcConnection[i].erase(it);
+          std::cout << "Remove" << arc.center << std::endl;
         }
       }
     }
   }
+
+  std::ofstream f("circle.txt");
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
@@ -902,12 +907,17 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
                   << arcConnection[i][j].center << "> "
                   << arcConnection[i][j].startRad << " "
                   << arcConnection[i][j].endRad << std::endl;
+
+        f << arcConnection[i][j].center.x << " " << arcConnection[i][j].center.y
+          << std::endl;
       }
 
       std::cout << std::endl;
     }
   }
 #endif
+
+  f.close();
 
   return arcConnection;
 }
@@ -1040,6 +1050,14 @@ Polygons FilletImpl(const Polygons& polygons, double radius,
     loops.push_back(SimpleLoop{loop, C2::Area(path) > EPSILON});
   }
 
+  for (size_t i = 0; i != polygons.size(); i++) {
+    std::cout << "------ Loop " << i << " START" << std::endl;
+    for (size_t j = 0; j != polygons[i].size(); j++) {
+      std::cout << polygons[i][j] << std::endl;
+    }
+    std::cout << "------ Loop " << i << " END" << std::endl;
+  }
+
   // Calc all arc that bridge 2 edge
   auto arcConnection = CalculateFilletArc(loops, info, radius);
 
@@ -1060,7 +1078,11 @@ std::vector<CrossSection> CrossSection::Fillet(double radius,
                                                int circularSegments) const {
   auto r = FilletImpl(ToPolygons(), radius, circularSegments);
 
-  return std::vector<CrossSection>{};
+  std::vector<CrossSection> crossSections;
+  for (const auto& ele : r) {
+    crossSections.push_back(CrossSection(r));
+  }
+  return crossSections;
 }
 
 std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
