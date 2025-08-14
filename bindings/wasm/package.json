@@ -8,7 +8,8 @@
   },
   "scripts": {
     "docs": "npx typedoc",
-    "build": "tsc -p lib"
+    "build": "tsc -p lib",
+    "prepare": "npm run build"
   },
   "files": [
     "manifold.js",

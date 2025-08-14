@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
+    "prebuild": "cd .. && npm run build",
+    "preinstall": "cd .. && npm ci",
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",
