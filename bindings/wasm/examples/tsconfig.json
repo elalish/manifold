@@ -21,6 +21,7 @@
   },
   "include": [
     "./*.ts",
+    "./lib/*.ts"
   ],
   "exclude": []
 }

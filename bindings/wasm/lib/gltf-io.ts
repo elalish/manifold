@@ -16,7 +16,7 @@ import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gl
 
 import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
 
-import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
+import {EXTManifold, ManifoldPrimitive} from './gltf-transform/manifold-gltf.ts';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},

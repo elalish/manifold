@@ -17,10 +17,20 @@ import * as glMatrix from 'gl-matrix'
 import {Evaluator} from '../lib/evaluate';
 import * as exporter from '../lib/export';
 import {GlobalDefaults} from '../lib/export';
+import {Export3MF} from '../lib/gltf-transform/export-3mf'
+
+// Swallow informational logs in testing framework
+function log(...args: any[]) {
+  if (typeof self !== 'undefined' && self.console) {
+    self.console.log(...args);
+  }
+}
 
 // Setup the evaluator and it's context.
 const evaluator = new Evaluator();
 export const module = evaluator.getModule();
+
+const export3mf = new Export3MF();
 
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
@@ -54,16 +64,34 @@ export async function evaluateCADToModel(code: string) {
   // This can be used to set parameters elsewhere in ManifoldCAD.  For
   // example, the GLTF exporter will look for animation type and
   // framerate.
-  const globalDefaults = {};
-
+  const globalDefaults = {} as GlobalDefaults;
   evaluator.context.globalDefaults = globalDefaults;
-  const manifold = evaluator.evaluate(code);
 
-  const exports =
-      await exporter.exportModels(globalDefaults as GlobalDefaults, manifold);
+  const t0 = performance.now();
+  const manifold = evaluator.evaluate(code);
+  const t1 = performance.now();
+  log(`Manifold took ${
+      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+
+  if (!manifold && !exporter.hasGLTFNodes()) {
+    log('No output because "result" is undefined and no "GLTFNode"s were created.');
+    return ({
+      glbURL: URL.createObjectURL(new Blob([])),
+      threeMFURL: URL.createObjectURL(new Blob([]))
+    })
+  }
+  const doc = exporter.hasGLTFNodes() ?
+      exporter.GLTFNodesToGLTFDoc(exporter.getGLTFNodes(), globalDefaults) :
+      exporter.manifoldToGLTFDoc(manifold, globalDefaults);
+  const glbBlob = await exporter.GLTFDocToGLB(doc);
+  const threeMFBlob = export3mf.asBlob(doc);
+
+  const t2 = performance.now();
+  log(`Exporting GLB & 3MF took ${
+      (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
 
   return ({
-    glbURL: URL.createObjectURL(exports?.glbBlob ?? new Blob([])),
-    threeMFURL: URL.createObjectURL(exports?.threeMFBlob ?? new Blob([]))
+    glbURL: URL.createObjectURL(glbBlob),
+    threeMFURL: URL.createObjectURL(threeMFBlob)
   });
 }

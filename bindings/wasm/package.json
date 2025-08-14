@@ -9,7 +9,8 @@
   "scripts": {
     "docs": "npx typedoc",
     "build": "tsc",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "clean": "rm -f lib/*.js lib/*.js.map lib/*.d.ts lib/gltf-transform/*.js lib/gltf-transform/*.js.map lib/gltf-transform/export-3mf.d.ts lib/gltf-transform/manifold-gltf.d.ts"
   },
   "files": [
     "manifold.js",
@@ -24,8 +25,11 @@
     "lib/export.js",
     "lib/gltf-io.d.ts",
     "lib/gltf-io.js",
-    "lib/manifold-gltf.d.ts",
-    "lib/manifold-gltf.js"
+    "lib/gltf-transform/manifold-gltf.d.ts",
+    "lib/gltf-transform/manifold-gltf.js",
+    "lib/gltf-transform/3mf-export.d.ts",
+    "lib/gltf-transform/export3mf.d.ts",
+    "lib/gltf-transform/export3mf.js"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",

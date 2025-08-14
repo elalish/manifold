@@ -20,7 +20,8 @@
     "rewriteRelativeImportExtensions": true,
   },
   "include": [
-    "./lib/*.ts"
+    "./lib/*.ts",
+    "lib/gltf-transform/*.ts"
   ],
   "exclude": []
 }
