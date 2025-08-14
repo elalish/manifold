@@ -17,8 +17,9 @@ import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {prune} from '@gltf-transform/functions';
 import {SimpleDropzone} from 'simple-dropzone';
 
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from '../lib/gltf-io';
+
 import Module from './built/manifold.js';
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './lib/gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());

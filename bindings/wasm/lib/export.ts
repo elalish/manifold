@@ -18,8 +18,8 @@ import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-
 import {strToU8, Zippable, zipSync} from 'fflate'
 import {quat} from 'gl-matrix';
 
-import {Manifold, ManifoldToplevel, Mesh, Vec3} from '../built/manifold';
-import {GLTFMaterial, Quat} from '../public/editor';
+import {Manifold, ManifoldToplevel, Mesh, Vec3} from '../examples/built/manifold';
+import {GLTFMaterial, Quat} from '../examples/public/editor';
 
 import {Properties, setupIO, writeMesh} from './gltf-io.ts';
 

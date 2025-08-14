@@ -14,10 +14,11 @@
 
 import * as glMatrix from 'gl-matrix'
 
+import {Evaluator} from '../lib/evaluate';
+import * as exporter from '../lib/export';
+import {GlobalDefaults} from '../lib/export';
+
 import Module from './built/manifold';
-import {Evaluator} from './lib/evaluate';
-import * as exporter from './lib/export';
-import {GlobalDefaults} from './lib/export';
 
 export const module = await Module() as any;
 module.setup();

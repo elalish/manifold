@@ -6,9 +6,9 @@ import { resolve, extname } from 'node:path';
 import { Command } from 'commander';
 import glMatrix from 'gl-matrix';
 
-import Module from '../built/manifold.js';
-import { Evaluator } from '../built/lib/evaluate.js';
-import * as exporter from '../built/lib/export.js';
+import Module from '../manifold.js';
+import { Evaluator } from '../lib/evaluate.js';
+import * as exporter from '../lib/export.js';
 
 // Instantiate Manifold WASM
 const manifold = await Module();

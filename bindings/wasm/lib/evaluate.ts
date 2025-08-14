@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {CrossSection, Manifold, ManifoldToplevel} from '../built/manifold';
+import {CrossSection, Manifold, ManifoldToplevel} from '../examples/built/manifold';
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
