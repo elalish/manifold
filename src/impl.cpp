@@ -149,7 +149,11 @@ int GetLabels(std::vector<int>& components,
 namespace manifold {
 
 #if (MANIFOLD_PAR == 1)
+#if (TBB_VERSION_MAJOR < 2021)
+tbb::task_arena gc_arena(1, 1, tbb::priority_t::priority_low);
+#else
 tbb::task_arena gc_arena(1, 1, tbb::task_arena::priority::low);
+#endif
 #endif
 
 std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
