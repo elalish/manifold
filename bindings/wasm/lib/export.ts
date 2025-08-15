@@ -1,4 +1,4 @@
-// Copyright 2022 The Manifold Authors.
+// Copyright 2022-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: This file is undergoing active refactoring, as of August 2025.
+// Interfaces and semantics may change.  Beware of wild geese.
+
 import {Accessor, Animation, AnimationSampler, Document, mat4, Material, Mesh as GLTFMesh, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
 import {quat} from 'gl-matrix';
 
-import {Manifold, ManifoldToplevel, Mesh, Vec3} from '../examples/built/manifold';
+import {Manifold, Mesh, Vec3} from '../examples/built/manifold';
 import {GLTFMaterial, Quat} from '../examples/public/editor';
 
 import {Properties, setupIO, writeMesh} from './gltf-io.ts';
-
-export interface GLTFManifold extends ManifoldToplevel {
-  GLTFNode: typeof GLTFNode;
-  show(manifold: Manifold): Manifold;
-  only(manifold: Manifold): Manifold;
-  setMaterial(manifold: Manifold, material: GLTFMaterial): Manifold;
-  setMorphStart(manifold: Manifold, func: (v: Vec3) => void): void;
-  setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void;
-  cleanup(): void;
-}
 
 export interface GlobalDefaults {
   roughness: number;
