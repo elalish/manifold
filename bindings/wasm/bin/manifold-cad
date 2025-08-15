@@ -6,28 +6,26 @@ import { resolve, extname } from 'node:path';
 import { Command } from 'commander';
 import glMatrix from 'gl-matrix';
 
-import Module from '../manifold.js';
 import { Evaluator } from '../lib/evaluate.js';
 import * as exporter from '../lib/export.js';
 
-// Instantiate Manifold WASM
-const manifold = await Module();
-manifold.setup();
-
 // Setup the evaluator and context.
-const evaluator = new Evaluator(manifold);
-evaluator.context = {
-  ...evaluator.context,
-  glMatrix,
+const evaluator = new Evaluator();
+evaluator.addContext({glMatrix})
+
+// These are exporter methods that generate Manifold
+// or CrossSection objects.  Tell the evaluator to intercept
+// the calls, and add any created objects to the clean up list.
+for (const name of ['show', 'only', 'setMaterial']) {
+  evaluator.addContextMethodWithCleanup(name, exporter[name]);
+}
+
+// Add additional exporter context.  These need no garbage collection.
+evaluator.addContext({
   GLTFNode: exporter.GLTFNode,
-  setMaterial: exporter.setMaterial,
   setMorphStart: exporter.setMorphStart,
   setMorphEnd: exporter.setMorphEnd,
-  show: exporter.show,
-  only: exporter.only,
-  env: process.env
-};
-
+});
 
 const evaluateCADToModel = async (code) => {
   const globalDefaults = {};
@@ -41,8 +39,8 @@ const evaluateCADToModel = async (code) => {
 const program = new Command();
 
 program
-  .name('manifold-cli')
-  .description('A simple CLI for ManifoldCAD')
+  .name('manifold-cad')
+  .description('Compile a ManifoldCAD program into a mesh.')
   .argument('<infile.js>', 'Input file')
   .argument('<outfile>', 'Output file')
   .action( async (infile, outfile) => {
@@ -61,6 +59,5 @@ program
     const binary = is3mf ? threeMFBlob : glbBlob;
     const outStream = writeFile(outfile, binary.stream());
   })
-
 
 program.parseAsync(process.argv);

@@ -20,7 +20,7 @@
     "rewriteRelativeImportExtensions": true,
   },
   "include": [
-    "./*.ts"
+    "./lib/*.ts"
   ],
   "exclude": []
 }

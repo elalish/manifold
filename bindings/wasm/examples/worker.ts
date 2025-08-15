@@ -18,28 +18,30 @@ import {Evaluator} from '../lib/evaluate';
 import * as exporter from '../lib/export';
 import {GlobalDefaults} from '../lib/export';
 
-import Module from './built/manifold';
-
-export const module = await Module() as any;
-module.setup();
-
 // Setup the evaluator and it's context.
-const evaluator = new Evaluator(module);
+const evaluator = new Evaluator();
+export const module = evaluator.getModule();
 
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
+evaluator.addContext({glMatrix})
 
-evaluator.context = {
-  ...evaluator.context,
-  glMatrix,
+
+// These are exporter methods that generate Manifold
+// or CrossSection objects.  Tell the evaluator to intercept
+// the calls, and add any created objects to the clean up list.
+for (const name of ['show', 'only', 'setMaterial']) {
+  evaluator.addContextMethodWithCleanup(name, (exporter as any)[name]);
+}
+
+// Add additional exporter context.  These need no garbage collection.
+evaluator.addContext({
   GLTFNode: exporter.GLTFNode,
-  setMaterial: exporter.setMaterial,
   setMorphStart: exporter.setMorphStart,
   setMorphEnd: exporter.setMorphEnd,
-  show: exporter.show,
-  only: exporter.only,
-};
+});
 
+// Clean up the evaluator and exporter between runs.
 export function cleanup() {
   evaluator.cleanup();
   exporter.cleanup();
