@@ -232,11 +232,7 @@ class Vec : public VecView<T> {
 #if !__has_feature(address_sanitizer)
 #if (MANIFOLD_PAR == 1)
     if (size * sizeof(T) > ASYNC_FREE_THRESHOLD)
-#if (TBB_VERSION_MAJOR < 2021)
-      gc_arena.enqueue([ptr]() { free(ptr); }, tbb::priority_t::priority_low);
-#else
       gc_arena.enqueue([ptr]() { free(ptr); });
-#endif
     else
 #endif
 #endif
