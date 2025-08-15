@@ -6,7 +6,7 @@ import emscriptenStaticWorkerOptions from './vite-fixup-plugin.js'
 
 export default defineConfig({
   test: {testTimeout: 15000},
-  worker: {format: 'es', plugins: [emscriptenStaticWorkerOptions]},
+  worker: {format: 'es', plugins: () => ([emscriptenStaticWorkerOptions])},
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',

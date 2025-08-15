@@ -13,10 +13,11 @@
 // limitations under the License.
 
 import {Document, WebIO} from '@gltf-transform/core';
-import {clearNodeTransform, flatten, prune} from '@gltf-transform/functions';
+import {clearNodeTransform, flatten, mergeDocuments, prune} from '@gltf-transform/functions';
+
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from '../lib/gltf-io';
 
 import Module, {Manifold, Mesh} from './built/manifold';
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
@@ -60,7 +61,7 @@ async function readGLB(url: string) {
   }
   // pull in materials, TODO: replace with transfer() when available
   const startIdx = doc.getRoot().listMaterials().length;
-  doc.merge(docIn);
+  mergeDocuments(doc, docIn);
   doc.getRoot().listScenes().forEach((s) => s.dispose());
   doc.getRoot().listBuffers().forEach((s) => s.dispose());
   doc.getRoot().listAccessors().forEach((s) => s.dispose());
@@ -117,7 +118,8 @@ async function push2MV(manifold: Manifold) {
 
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  const blob = new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
   URL.revokeObjectURL(objectURL);
   objectURL = URL.createObjectURL(blob);
   (mv as any).src = objectURL;

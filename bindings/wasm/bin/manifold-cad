@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+// Copyright 2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
+
+import { Command } from 'commander';
+import glMatrix from 'gl-matrix';
+
+import { Evaluator } from '../lib/evaluate.js';
+import * as exporter from '../lib/export.js';
+
+// Setup the evaluator and context.
+const evaluator = new Evaluator();
+evaluator.addContext({glMatrix})
+
+// These are exporter methods that generate Manifold
+// or CrossSection objects.  Tell the evaluator to intercept
+// the calls, and add any created objects to the clean up list.
+for (const name of ['show', 'only', 'setMaterial']) {
+  evaluator.addContextMethodWithCleanup(name, exporter[name]);
+}
+
+// Add additional exporter context.  These need no garbage collection.
+evaluator.addContext({
+  GLTFNode: exporter.GLTFNode,
+  setMorphStart: exporter.setMorphStart,
+  setMorphEnd: exporter.setMorphEnd,
+});
+
+const evaluateCADToModel = async (code) => {
+  const globalDefaults = {};
+
+  evaluator.context.globalDefaults = globalDefaults;
+  const manifold = evaluator.evaluate(code);
+
+  return await exporter.exportModels(globalDefaults, manifold);
+}
+
+const program = new Command();
+
+program
+  .name('manifold-cad')
+  .description('Compile a ManifoldCAD program into a mesh.')
+  .argument('<infile.js>', 'Input file')
+  .argument('<outfile>', 'Output file')
+  .action( async (infile, outfile) => {
+    const inPath = resolve(infile);
+    const outPath = resolve(outfile);
+
+    const is3mf = extname(outPath) === '.3mf';
+    const isGlb = extname(outPath) === '.glb';
+    if (!is3mf && !isGlb) {
+      throw new Error('Output file must be either .glb or .3mf');
+    }
+
+    const code = await readFile(inPath);
+    const { glbBlob, threeMFBlob} = await evaluateCADToModel(code);
+
+    const binary = is3mf ? threeMFBlob : glbBlob;
+    const outStream = writeFile(outfile, binary.stream());
+  })
+
+program.parseAsync(process.argv);
