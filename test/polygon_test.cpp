@@ -171,6 +171,8 @@ class FilletTestFixture : public PolygonTestFixture {
                                        double epsilon = -1.0);
 
  private:
+  bool checkLoopAngle(const SimplePolygon &polygon) {}
+
   static std::unique_ptr<std::vector<FilletResult>,
                          void (*)(std::vector<FilletResult> *)>
       result;
@@ -180,13 +182,40 @@ std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
                                                         int expectedNumTri,
                                                         double epsilon) {
   const double radius = 0.7;
+  const int inputCircularSegments = 20;
+
+  const int circularSegments = inputCircularSegments > 2
+                                   ? inputCircularSegments
+                                   : Quality::GetCircularSegments(radius);
+
+  const double dPhi = M_PI_2 / circularSegments;
 
   manifold::ManifoldParams().verbose = true;
 
-  auto r = manifold::CrossSection::Fillet(polys, radius, 20);
+  auto r = manifold::CrossSection::Fillet(polys, radius, circularSegments);
 
-  for (const auto &ele : r) {
-    EXPECT_GE(ele.Area(), 0);
+  auto rr = manifold::CrossSection::Compose(r);
+  EXPECT_TRUE(rr.Area() < manifold::CrossSection(polys).Area());
+
+  for (const auto &crossSection : r) {
+    auto polygon = crossSection.ToPolygons();
+    for (const auto &loop : polygon) {
+      const auto &cs = CrossSection(loop);
+
+      bool isCCW = cs.Area() > 0;
+
+      for (size_t i = 0; i != loop.size(); i++) {
+        vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
+             p3 = loop[(i + 2) % loop.size()];
+
+        vec2 e1 = p2 - p1, e2 = p3 - p2;
+        double det = la::cross(e1, e2);
+        EXPECT_TRUE(isCCW && (det > 0));
+
+        float angle = la::asin(det / (la::length(e1) * la::length(e2)));
+        EXPECT_TRUE(angle < dPhi);
+      }
+    }
   }
 
   return r;
