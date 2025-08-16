@@ -101,7 +101,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
 
 // Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
-                             const vec2& p4) {
+                             const vec2& p4, double& t, double& u) {
   double det = la::cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
@@ -112,8 +112,8 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   double num_t = la::cross(p3 - p1, p4 - p3);
   double num_u = la::cross(p3 - p1, p2 - p1);
 
-  double t = num_t / det;
-  double u = num_u / det;
+  t = num_t / det;
+  u = num_u / det;
 
   // Check if the intersection point inside line segment
   if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
@@ -122,6 +122,8 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
     return true;
   } else {
     // Outside -> No intersection
+    t = u = 0;
+
     return false;
   }
 };
@@ -194,7 +196,8 @@ IntersectStadiumResult intersectStadiumCollider(
 
   // Check edge intersect
   {
-    if (intersectSegmentSegment(p1, p2, p3, p4))
+    double t, u;
+    if (intersectSegmentSegment(p1, p2, p3, p4, t, u))
       return IntersectStadiumResult::EdgeEdgeIntersect;
   }
 
@@ -534,6 +537,309 @@ bool calculateSegmentSegmentCircleCenter(const vec2& p1, const vec2& p2,
   }
 
   return false;
+}
+
+enum class ArcEdgeState {
+  E1CurrentEdge,
+  E1NextEdge,
+  E2PreviousEdge,
+  E2CurrentEdge,
+  E2NextEdge
+};
+
+struct ArcBridgeInfo {
+  std::array<ArcEdgeState, 2> States;
+  std::array<double, 2> ParameterValues;
+  vec2 CircleCenter;
+  std::array<double, 2> RadValues;
+};
+
+int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
+                                 const bool eCCW, double radius,
+                                 std::array<vec2, 2>& circleCenters) {
+  vec2 e = p2 - p1, dir = la::normalize(e),
+       normal = la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+
+  vec2 projectedP = p1 + dir * la::dot(p - p1, dir);
+  double dist = la::length(projectedP - p);
+  dist = dist > radius ? dist - radius : radius - dist;
+
+  double len = la::sqrt(radius * radius - dist * dist);
+
+  std::array<vec2, 2> tangentPoint{projectedP - dir * len,
+                                   projectedP + dir * len};
+
+  auto isOnSegment = [](const vec2& p1, const vec2& p2, const vec2& p) -> bool {
+    double v = la::dot(p - p1, p2 - p1);
+    return 0 <= v && v <= la::length2(p2 - p1);
+  };
+
+  int count = 0;
+  for (int i = 0; i != 2; i++) {
+    vec2 tangent = tangentPoint[i];
+    if (isOnSegment(p1, p2, tangent)) {
+      // Tangent valid -> check circle valid
+      circleCenters[i] = tangent + normal * radius;
+      count++;
+    }
+  }
+
+  // No result check
+  if (!count) throw std::exception();
+
+  return count;
+}
+
+int calculatePointPointCircles(const vec2& p1, const vec2& p2, double radius,
+                               std::array<vec2, 2>& circleCenters) {
+  double dx = p2.x - p1.x;
+  double dy = p2.y - p1.y;
+  double distance = sqrt(dx * dx + dy * dy);
+
+  vec2 v = p2 - p1;
+
+  // Find midpoint between the two points
+  vec2 midpoint((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
+
+  // If distance equals 2*radius, there's exactly one solution (midpoint)
+  if (abs(la::length(v) - 2 * radius) < 1e-9) {
+    circleCenters[0] = midpoint;
+    return 1;
+  }
+
+  // Calculate distance from midpoint to circle centers
+  double h = sqrt(radius * radius - (distance / 2.0) * (distance / 2.0));
+
+  // Calculate unit vector perpendicular to the line connecting p1 and p2
+  vec2 d(-dy, dx);
+  d /= distance;
+
+  circleCenters[0] = midpoint + h * d;
+  circleCenters[1] = midpoint - h * d;
+
+  return 2;
+}
+
+std::vector<ArcBridgeInfo> calculateStadiumIntersect(
+    const std::array<vec2, 3>& e1Points, const bool e1CCW,
+    const std::array<vec2, 4>& e2Points, const bool e2CCW,
+    const double radius) {
+  const vec2 e1Cur = e1Points[1] - e1Points[0],
+             e1Next = e1Points[2] - e1Points[1],
+             e2Pre = e2Points[1] - e2Points[0],
+             e2Cur = e2Points[2] - e2Points[1],
+             e2Next = e2Points[3] - e2Points[2];
+  auto getNormal = [](bool CCW, vec2 e) -> vec2 {
+    return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+  };
+
+  std::vector<ArcBridgeInfo> arcBridgeInfoVec;
+
+  const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
+             e2CurNormal = getNormal(e2CCW, e2Cur);
+  {
+    // Edge - Edge
+
+    const std::array<vec2, 2> offsetE1{
+        e1Points[0] + e1CurNormal * radius,
+        e1Points[1] + e1CurNormal * radius,
+    },
+        offsetE2{
+            e2Points[1] + e2CurNormal * radius,
+            e2Points[2] + e2CurNormal * radius,
+        };
+
+    double t, u;
+    if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
+                                offsetE2[1], t, u)) {
+      arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
+          std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
+                                      ArcEdgeState::E2CurrentEdge},
+          std::array<double, 2>{t, u}, e1Points[0] + e1Cur * t,
+          std::array<double, 2>{0, 0}});
+    }
+  }
+
+  {
+    const vec2 p1 = e1Points[0], p2 = e1Points[1];
+    const vec2 p1Offset = p1 + e1CurNormal * 2.0 * radius,
+               p2Offset = p2 + e1CurNormal * 2.0 * radius;
+
+    // Determine full inside or full outside
+    auto isInsideRect = [&](const vec2 p) -> bool {
+      int sign = e1CCW ? 1 : -1;
+      if ((sign * la::cross(e1Cur, p - p1) >= 0) &&
+          (sign * la::cross(p2Offset - p2, p - p2) >= 0) &&
+          (sign * la::cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
+          (sign * la::cross(p1 - p1Offset, p - p1Offset) >= 0))
+        return true;
+
+      return false;
+    };
+
+    auto isInsideEndpointCircles = [&](const vec2 p) -> bool {
+      if (la::length2(p - e1Points[0] + e1CurNormal * radius) <=
+          radius * radius)
+        return true;
+
+      if (la::length2(p - e2Points[0] + e2CurNormal * radius) <=
+          radius * radius)
+        return true;
+
+      return false;
+    };
+
+    // Edge - Point
+
+    std::array<vec2, 2> points{e2Points[1], e2Points[2]};
+    for (int i = 0; i != 2; i++) {
+      const vec2 point = points[i];
+      if (isInsideRect(point) || isInsideEndpointCircles(point)) {
+        std::array<vec2, 2> centers;
+        int count =
+            calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
+        for (int j = 0; j != count; j++) {
+          int sign = e2CCW ? 1 : -1;
+          if (sign * la::cross(e2Points[i] - point, centers[j] - point) < 0 &&
+              sign * la::cross(e2Points[i + 2] - point, centers[j] - point) >
+                  0) {
+            arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
+                std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
+                                            j == 0
+                                                ? ArcEdgeState::E2PreviousEdge
+                                                : ArcEdgeState::E2NextEdge},
+                std::array<double, 2>{0, 1}, centers[j],
+                std::array<double, 2>{0, 0}});
+          }
+        }
+      }
+    }
+  }
+
+  return arcBridgeInfoVec;
+}
+
+std::vector<ArcBridgeInfo> calculateSectorIntersect(
+    const std::array<vec2, 3>& e1Points, const bool e1CCW,
+    const std::array<vec2, 4>& e2Points, const bool e2CCW,
+    const double radius) {
+  if (!intersectCircleSegment(e2Points[1], e2Points[2], e1Points[1],
+                              2.0 * radius))
+    return {};
+
+  std::vector<ArcBridgeInfo> arcBridgeInfoVec;
+
+  const vec2 e1Cur = e1Points[1] - e1Points[0],
+             e1Next = e1Points[2] - e1Points[1],
+             e2Pre = e2Points[1] - e2Points[0],
+             e2Cur = e2Points[2] - e2Points[1],
+             e2Next = e2Points[3] - e2Points[2];
+  auto getNormal = [](bool CCW, vec2 e) -> vec2 {
+    return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+  };
+
+  const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
+             e1NextNormal = getNormal(e1CCW, e1Next);
+
+  double startRad = atan2(e1CurNormal.y, e1CurNormal.x),
+         endRad = atan2(e1NextNormal.y, e1NextNormal.x);
+
+  auto getLineCircleIntersection =
+      [](const vec2& p1, const vec2& p2, const vec2& center, float radius,
+         std::array<vec2, 2> intersections) -> int {
+    vec2 d = p2 - p1;
+    vec2 f = p1 - center;
+
+    float a = dot(d, d);
+    float b = 2 * dot(f, d);
+    float c = dot(f, f) - radius * radius;
+
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant < 0) return 0;  // No intersection
+
+    float sqrtDisc = sqrt(discriminant);
+    double t1 = (-b - sqrtDisc) / (2 * a);
+    double t2 = (-b + sqrtDisc) / (2 * a);
+
+    int count = 0;
+    if (t1 >= -EPSILON && t1 <= 1 + EPSILON) {
+      intersections[count] = p1 + d * t1;
+      count++;
+    }
+    if (t2 >= -EPSILON && t2 <= 1 + EPSILON && abs(t2 - t1) > EPSILON) {
+      intersections[count] = p1 + d * t2;
+      count++;
+    }
+
+    return count;
+  };
+
+  auto isAngleInSector = [](float angle, float startRad, float endRad) -> bool {
+    angle = normalizeAngle(angle);
+    startRad = normalizeAngle(startRad);
+    endRad = normalizeAngle(endRad);
+
+    if (startRad <= endRad) {
+      return angle >= startRad && angle <= endRad;
+    } else {
+      // Sector crosses 0 degrees
+      return angle >= startRad || angle <= endRad;
+    }
+  };
+
+  auto isPointInPie = [&isAngleInSector](const vec2& p, const vec2& center,
+                                         float radius, float startRad,
+                                         float endRad) -> bool {
+    vec2 diff = p - center;
+    float distSq = length2(diff);
+
+    if (distSq > radius * radius + EPSILON) return false;
+
+    float angle = atan2(diff.y, diff.x);
+    return isAngleInSector(angle, startRad, endRad);
+  };
+
+  // Point - Edge
+  std::array<vec2, 2> intersections;
+  int count = getLineCircleIntersection(e2Points[1], e2Points[2], e1Points[1],
+                                        radius, intersections);
+  for (int i = 0; i != count; i++) {
+    vec2 diff = intersections[i] - e1Points[1];
+    float angle = atan2(diff.y, diff.x);
+    if (isAngleInSector(angle, startRad, endRad)) {
+      arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
+          std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
+                                      ArcEdgeState::E2CurrentEdge},
+          std::array<double, 2>{0, 1}, intersections[i],
+          std::array<double, 2>{0, 0}});
+    }
+  }
+
+  //  Point - Point
+  std::array<vec2, 2> points{e2Points[1], e2Points[2]};
+  for (int i = 0; i != 2; i++) {
+    const vec2 point = points[i];
+    if (isPointInPie(point, e1Points[1], radius, startRad, endRad)) {
+      std::array<vec2, 2> centers;
+      int count =
+          calculatePointPointCircles(point, e1Points[1], radius, centers);
+      for (int j = 0; j != count; j++) {
+        int sign = e2CCW ? 1 : -1;
+        if (sign * la::cross(e2Points[i] - point, centers[j] - point) < 0 &&
+            sign * la::cross(e2Points[i + 2] - point, centers[j] - point) > 0) {
+          arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
+              std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
+                                          j == 0 ? ArcEdgeState::E2PreviousEdge
+                                                 : ArcEdgeState::E2NextEdge},
+              std::array<double, 2>{0, 1}, centers[j],
+              std::array<double, 2>{0, 0}});
+        }
+      }
+    }
+  }
+
+  return arcBridgeInfoVec;
 }
 
 struct ArcConnectionInfo {
