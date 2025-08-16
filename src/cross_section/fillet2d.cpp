@@ -1060,13 +1060,15 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
                                            isE2LoopCCW, radius);
         r1.insert(r1.end(), r2.begin(), r2.end());
         for (const auto& e : r1) {
-          f << e.CircleCenter << std::endl;
+          f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
       }
     }
   }
 
   f.close();
+
+  return {};
 
   // Detect arc self-intersection, and remove
   for (size_t i = 0; i != arcConnection.size(); i++) {
@@ -1104,7 +1106,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     }
   }
 
-  std::ofstream f("circle.txt");
+  std::ofstream c("circle.txt");
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
@@ -1127,7 +1129,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
   }
 #endif
 
-  f.close();
+  c.close();
 
   return arcConnection;
 }
@@ -1246,10 +1248,37 @@ manifold::Polygons Tracing(
   return newPoly;
 }
 
+void SavePolygons(const std::string& filename, const Polygons& polygons) {
+  // Open a file stream for writing.
+  std::ofstream outFile(filename);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Could not open file " << filename << " for writing."
+              << std::endl;
+    return;
+  }
+
+  outFile << filename << " " << 1 << "\n";
+  outFile << polygons.size() << "\n";
+
+  for (const auto& loop : polygons) {
+    outFile << loop.size() << "\n";
+    for (const auto& point : loop) {
+      outFile << point.x << " " << point.y << "\n";
+    }
+  }
+
+  outFile.close();
+  std::cout << "Successfully saved " << polygons.size() << " tests to "
+            << filename << std::endl;
+}
+
 Polygons FilletImpl(const Polygons& polygons, double radius,
                     int circularSegments) {
   ColliderInfo info{};
   info.outerCollider = BuildCollider(polygons, info.outerEdgeOld2NewVec);
+
+  SavePolygons("input.txt", polygons);
 
   Loops loops;
   loops.reserve(polygons.size());

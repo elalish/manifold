@@ -148,7 +148,7 @@ void RegisterPolygonTests() {
 struct FilletResult {
   FilletResult(const std::vector<CrossSection> &crossSections,
                const std::string &name)
-      : name(name), crossSections(crossSections) {};
+      : name(name), crossSections(crossSections){};
 
   std::string name;
 
@@ -171,11 +171,13 @@ class FilletTestFixture : public PolygonTestFixture {
                                        double epsilon = -1.0);
 
  private:
-  bool checkLoopAngle(const SimplePolygon &polygon) {}
-
   static std::unique_ptr<std::vector<FilletResult>,
                          void (*)(std::vector<FilletResult> *)>
       result;
+
+  static std::unique_ptr<std::vector<FilletResult>,
+                         void (*)(std::vector<FilletResult> *)>
+      input;
 };
 
 std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
@@ -254,7 +256,15 @@ void Save(const std::string &filename,
 
     // Write each CrossSection within the test.
     for (const auto &crossSection : test.crossSections) {
-      outFile << crossSection << "\n";
+      const auto polygons = crossSection.ToPolygons();
+
+      outFile << polygons.size() << "\n";
+      for (const auto &loop : polygons) {
+        outFile << loop.size() << "\n";
+        for (const auto &point : loop) {
+          outFile << point.x << " " << point.y << "\n";
+        }
+      }
     }
   }
 
