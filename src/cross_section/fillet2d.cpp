@@ -970,6 +970,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
   std::cout << "Collider BBox Testing" << std::endl;
 
+  std::ofstream f("circle.txt");
+
   for (size_t e1Loopi = 0; e1Loopi != loops.size(); e1Loopi++) {
     const auto& e1Loop = loops[e1Loopi].Loop;
     const bool isE1LoopCCW = loops[e1Loopi].isCCW ^ invert;
@@ -978,36 +980,39 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     for (size_t e1i = 0; e1i != e1Loop.size(); e1i++) {
       // Outer loop is CCW, p1 p2 -> current edge start end
       const size_t p1i = e1i, p2i = (e1i + 1) % e1Loop.size();
-      const vec2 p1 = e1Loop[p1i], p2 = e1Loop[p2i];
-      const vec2 e1 = p2 - p1;
+      const std::array<vec2, 3> e1Points{e1Loop[e1i],
+                                         e1Loop[(e1i + 1) % e1Loop.size()],
+                                         e1Loop[(e1i + 2) % e1Loop.size()]};
+      const vec2 e1 = e1Points[1] - e1Points[0];
       const bool p2IsConvex =
-          la::cross(e1, e1Loop[(p2i + 1) % e1Loop.size()] - p2) >= EPSILON;
+          la::cross(e1, e1Points[2] - e1Points[1]) >= EPSILON;
 
       const vec2 normal = la::normalize(vec2(-e1.y, e1.x));
 
       // Create BBox
-      manifold::Box box(toVec3(p1), toVec3(p2));
+      manifold::Box box(toVec3(e1Points[0]), toVec3(e1Points[1]));
       {
         // See
         // https://docs.google.com/presentation/d/1P-3oxmjmEw_Av0rq7q7symoL5VB5DSWpRvqoa3LK7Pg/edit?usp=sharing
 
-        vec2 normalOffsetP1 = p1 + normal * 2.0 * radius,
-             normalOffsetP2 = p2 + normal * 2.0 * radius;
+        vec2 normalOffsetP1 = e1Points[0] + normal * 2.0 * radius,
+             normalOffsetP2 = e1Points[1] + normal * 2.0 * radius;
 
         box.Union(toVec3(normalOffsetP1));
         box.Union(toVec3(normalOffsetP2));
 
         const vec2 e1n = la::normalize(e1);
-        box.Union(toVec3(p1 - e1n * radius + normal * radius));
-        box.Union(toVec3(p2 + e1n * radius + normal * radius));
+        box.Union(toVec3(e1Points[0] - e1n * radius + normal * radius));
+        box.Union(toVec3(e1Points[1] + e1n * radius + normal * radius));
 
         if (!p2IsConvex) {
           const vec2 pnext = e1Loop[(p2i + 1) % e1Loop.size()],
-                     enext = pnext - p2, enextn = la::normalize(enext),
+                     enext = pnext - e1Points[1], enextn = la::normalize(enext),
                      normalnext = la::normalize(vec2(-enext.y, enext.x));
 
-          box.Union(toVec3(p2 + normalnext * 2.0 * radius));
-          box.Union(toVec3(p2 + enextn * radius + normalnext * radius));
+          box.Union(toVec3(e1Points[1] + normalnext * 2.0 * radius));
+          box.Union(
+              toVec3(e1Points[1] + enextn * radius + normalnext * radius));
         }
       }
 
@@ -1030,6 +1035,11 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         const auto& e2Loop = loops[e2Loopi].Loop;
         const bool isE2LoopCCW = loops[e2Loopi].isCCW ^ invert;
 
+        const std::array<vec2, 4> e2Points{
+            e2Loop[(e2i + e2Loop.size() - 1) % e2Loop.size()], e2Loop[e2i],
+            e2Loop[(e2i + 1) % e2Loop.size()],
+            e2Loop[(e2i + 2) % e2Loop.size()]};
+
         // Skip self and pre one, only process forward
         if (e1Loopi == e2Loopi &&
             ((e1i == e2i) ||
@@ -1043,126 +1053,20 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           continue;
         }
 
-        // CCW, p3 p4 -> bbox hit edge start end
-        size_t p3i = e2i, p4i = ele.p2Ref;
-        vec2 p3 = e2Loop[p3i], p4 = e2Loop[p4i];
+        auto r1 = calculateStadiumIntersect(e1Points, isE1LoopCCW, e2Points,
+                                            isE2LoopCCW, radius);
 
-        bool continueFlag = false;
-        bool degenerateFlag = false;
-
-        switch (intersectStadiumCollider(p1, p2, isE1LoopCCW, p3, p4,
-                                         isE2LoopCCW, radius)) {
-          case IntersectStadiumResult::EdgeEdgeIntersect: {
-            double startRad = 0, endRad = 0;
-            double e1T = 0, e2T = 0;
-            vec2 circleCenter(0, 0);
-
-            if (calculateSegmentSegmentCircleCenter(p1, p2, p3, p4, radius, e1T,
-                                                    e2T, circleCenter, startRad,
-                                                    endRad)) {
-              // Sort result by CCW
-              double arcAngle = endRad - startRad;
-              arcAngle = normalizeAngle(arcAngle);
-
-              if (arcAngle <= M_PI) {
-                arcConnection[loopOffset[e1Loopi] + e1i].emplace_back(
-                    ArcConnectionInfo{circleCenter, e1T, e2T, e1i, e2i, e1Loopi,
-                                      e2Loopi, startRad, endRad});
-              } else {
-                arcConnection[loopOffset[e2Loopi] + e2i].emplace_back(
-                    ArcConnectionInfo{circleCenter, e2T, e1T, e2i, e1i, e2Loopi,
-                                      e1Loopi, endRad, startRad});
-              }
-
-              std::cout << "Segment Center " << circleCenter << std::endl;
-
-              continueFlag = true;
-            } else {
-              throw std::exception();
-            }
-
-            break;
-          }
-          case IntersectStadiumResult::E2Degenerate: {
-            continueFlag = true;
-            break;
-          }
-          case IntersectStadiumResult::P1Degenerate: {
-            // Check previous flag
-            continueFlag = true;
-            break;
-          }
-          case IntersectStadiumResult::P2Degenerate:
-          case IntersectStadiumResult::P1P2Degenerate: {
-            // Degenerate
-            degenerateFlag = true;
-            break;
-          }
-          case IntersectStadiumResult::Outside: {
-            // Keep checking, no early exit
-            break;
-          }
-        }
-
-        if (continueFlag) continue;
-
-        if (p2IsConvex || (!degenerateFlag &&
-                           !intersectSectorCollider(p1, p2, vec2(), true, p3,
-                                                    p4, false, radius))) {
-          continue;
-        }
-
-        // Handle concave vertex degenerate case
-
-        std::array<PointSegmentIntersectResult, 2> r{};
-
-        const vec2 pnext = e1Loop[(p2i + 1) % e1Loop.size()];
-
-        const size_t enexti = p2i, eprei = e1i;
-
-        auto addArcConnection =
-            [&arcConnection, loopOffset, e1Loopi, e2Loopi](
-                const double t, const size_t edgeIndex,
-                const size_t resultEdgeIndex,
-                PointSegmentIntersectResult& result) -> void {
-          double arcAngle =
-              normalizeAngle(result.edgeTangentRad - result.endPointRad);
-
-          if (arcAngle <= M_PI) {
-            arcConnection[loopOffset[e1Loopi] + edgeIndex].emplace_back(
-                ArcConnectionInfo{result.circleCenter, t, result.eT, edgeIndex,
-                                  resultEdgeIndex, e1Loopi, e2Loopi,
-                                  result.endPointRad, result.edgeTangentRad});
-          } else {
-            arcConnection[loopOffset[e2Loopi] + resultEdgeIndex].emplace_back(
-                ArcConnectionInfo{result.circleCenter, result.eT, t,
-                                  resultEdgeIndex, edgeIndex, e2Loopi, e1Loopi,
-                                  result.edgeTangentRad, result.endPointRad});
-          }
-        };
-
-        switch (calculatePointSegmentCircleCenter(p1, p2, pnext, isE1LoopCCW,
-                                                  p3, p4, isE2LoopCCW, radius,
-                                                  r[0], r[1])) {
-          case PointSegmentResult::PreviousEdgeIntersect:
-            // Add to previous edge
-            addArcConnection(1, eprei, e2i, r[0]);
-            break;
-          case PointSegmentResult::NextEdgeIntersect:
-            // Add to next edge
-            addArcConnection(0, enexti, e2i, r[1]);
-            break;
-          case PointSegmentResult::BothIntersect:
-            addArcConnection(1, eprei, e2i, r[0]);
-            addArcConnection(0, enexti, e2i, r[1]);
-            break;
-          case PointSegmentResult::Ignore:
-          default:
-            break;
+        auto r2 = calculateSectorIntersect(e1Points, isE1LoopCCW, e2Points,
+                                           isE2LoopCCW, radius);
+        r1.insert(r1.end(), r2.begin(), r2.end());
+        for (const auto& e : r1) {
+          f << e.CircleCenter << std::endl;
         }
       }
     }
   }
+
+  f.close();
 
   // Detect arc self-intersection, and remove
   for (size_t i = 0; i != arcConnection.size(); i++) {
