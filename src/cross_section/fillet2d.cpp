@@ -287,6 +287,20 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
 
     // Edge - Point
 
+    auto isAngleInSector = [](double angle, double startRad,
+                              double endRad) -> bool {
+      angle = normalizeAngle(angle);
+      startRad = normalizeAngle(startRad);
+      endRad = normalizeAngle(endRad);
+
+      if (startRad <= endRad) {
+        return angle >= startRad && angle <= endRad;
+      } else {
+        // Sector crosses 0 degrees
+        return angle >= startRad || angle <= endRad;
+      }
+    };
+
     std::array<vec2, 2> points{e2Points[1], e2Points[2]};
     for (int i = 0; i != 2; i++) {
       const vec2 point = points[i];
@@ -295,10 +309,16 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
         int count =
             calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
         for (int j = 0; j != count; j++) {
-          int sign = e2CCW ? 1 : -1;
-          if (sign * la::cross(e2Points[i] - point, centers[j] - point) < 0 &&
-              sign * la::cross(e2Points[i + 2] - point, centers[j] - point) >
-                  0) {
+          vec2 n1 = getNormal(true, centers[j] - point),
+               n2 = getNormal(false, centers[j] - point);
+          double rad1 = atan2(n1.y, n1.x), rad2 = atan2(n2.y, n2.x);
+
+          vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
+          double startRad = atan2(pre.y, pre.x), endRad = atan2(next.y, next.x);
+          if ((endRad < startRad) ^ e2CCW) std::swap(startRad, endRad);
+
+          if (isAngleInSector(rad1, startRad, endRad) &&
+              isAngleInSector(rad2, startRad, endRad)) {
             arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
                 std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                             j == 0
@@ -371,7 +391,8 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
     return count;
   };
 
-  auto isAngleInSector = [](float angle, float startRad, float endRad) -> bool {
+  auto isAngleInSector = [](double angle, double startRad,
+                            double endRad) -> bool {
     angle = normalizeAngle(angle);
     startRad = normalizeAngle(startRad);
     endRad = normalizeAngle(endRad);
@@ -431,9 +452,17 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
       int count =
           calculatePointPointCircles(point, e1Points[1], radius, centers);
       for (int j = 0; j != count; j++) {
-        int sign = e2CCW ? 1 : -1;
-        if (sign * la::cross(e2Points[i] - point, centers[j] - point) < 0 &&
-            sign * la::cross(e2Points[i + 2] - point, centers[j] - point) > 0) {
+        vec2 n1 = getNormal(true, centers[j] - point),
+             n2 = getNormal(false, centers[j] - point);
+        double rad1 = atan2(n1.y, n1.x), rad2 = atan2(n2.y, n2.x);
+
+        vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
+        double startRad = normalizeAngle(atan2(pre.y, pre.x)),
+               endRad = normalizeAngle(atan2(next.y, next.x));
+        if ((endRad < startRad) ^ e2CCW) std::swap(startRad, endRad);
+
+        if (isAngleInSector(rad1, startRad, endRad) &&
+            isAngleInSector(rad2, startRad, endRad)) {
           arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
               std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                           j == 0 ? ArcEdgeState::E2PreviousEdge
