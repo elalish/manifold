@@ -7,6 +7,7 @@ import sys
 from typing import List, Dict, Any
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
+from matplotlib.patches import Circle
 
 def patchify(polys):
     """Returns a matplotlib patch representing the polygon with holes.
@@ -233,16 +234,87 @@ def read_polygon_results_file(filename: str) -> List[Dict[str, Any]]:
         
     return all_tests
 
+def read_and_draw_circles(filename, ax, colors=None):
+    """
+    Read circle data from a text file and draw them using matplotlib.
+    
+    File format:
+    - First line: radius (float)
+    - Following lines: center_x center_y (two floats separated by space)
+    
+    Parameters:
+    filename (str): Path to the text file
+    figsize (tuple): Figure size (width, height)
+    colors (list): List of colors for circles (optional)
+    
+    Returns:
+    fig, ax: matplotlib figure and axis objects
+    """
+    circles = []
+    
+    try:
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+            
+            # Read radius from first line
+            radius = float(lines[0].strip())
+            
+            # Read circle centers from remaining lines
+            centers = []
+            for line in lines[1:]:
+                line = line.strip()
+                if line:  # Skip empty lines
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        x = float(parts[0])
+                        y = float(parts[1])
+                        centers.append((x, y))
+            
+            circles = [(center[0], center[1], radius) for center in centers]
+            
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
+        return None, None
+    except ValueError as e:
+        print(f"Error reading file: {e}")
+        return None, None
+    
+    if not circles:
+        print("No valid circle data found.")
+        return None, None
+    
+    # Set default colors if not provided
+    if colors is None:
+        colors = plt.cm.tab10(np.linspace(0, 1, len(circles)))
+    
+    # Draw circles
+    for i, (x, y, r) in enumerate(circles):
+        color = colors[i % len(colors)]
+        circle = Circle((x, y), r, linewidth=2, edgecolor=color, 
+                               facecolor=color, alpha=0.3, label=f'Circle {i+1}')
+        ax.add_patch(circle)
+        
+        # Add center point
+        ax.plot(x, y, 'ko', markersize=4)
+        
+        # Add text annotation
+        ax.annotate(f'({x:.1f}, {y:.1f})', (x, y), 
+                   xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+    return ax
+
 if __name__ == "__main__":
     result = read_polygon_results_file(sys.argv[1])
-    data = read_polygon_results_file(sys.argv[2])
+    # data = read_polygon_results_file(sys.argv[2])
 
-    result.append(data[0])
+    # result.append(data[0])
 
     rows = int(len(result) / 5) + 1
     cols = len(result) if len(result) < 5 else 5
 
     fig, axes = plt.subplots(rows, cols, figsize=(15 * cols, 15 * rows))
+
+    read_and_draw_circles("circle.txt", axes)
 
     # plot_polygon(ax1, result[0]["polygons"][0], "", "blue", show_indices=True)
     # plot_polygon(ax1, Poly, "", "blue", show_indices=False)
