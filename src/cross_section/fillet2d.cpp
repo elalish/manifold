@@ -130,8 +130,8 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
 
 // Normalize angle to [0, 2*PI)
 float normalizeAngle(float angle) {
-  while (angle < 0) angle += M_2_PI;
-  while (angle >= M_2_PI) angle -= M_2_PI;
+  while (angle < 0) angle += 2 * M_PI;
+  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
   return angle;
 }
 
@@ -248,6 +248,7 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
     double t, u;
     if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
                                 offsetE2[1], t, u)) {
+      std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
       arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
           std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                       ArcEdgeState::E2CurrentEdge},
@@ -314,11 +315,15 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
           double rad1 = atan2(n1.y, n1.x), rad2 = atan2(n2.y, n2.x);
 
           vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
-          double startRad = atan2(pre.y, pre.x), endRad = atan2(next.y, next.x);
-          if ((endRad < startRad) ^ e2CCW) std::swap(startRad, endRad);
+          double startRad = normalizeAngle(atan2(pre.y, pre.x)),
+                 endRad = normalizeAngle(atan2(next.y, next.x));
 
-          if (isAngleInSector(rad1, startRad, endRad) &&
-              isAngleInSector(rad2, startRad, endRad)) {
+          if ((e2CCW ^ isAngleInSector(rad1, startRad, endRad)) &&
+              (e2CCW ^ isAngleInSector(rad2, startRad, endRad))) {
+            std::cout << "E-P" << centers[j] << std::endl;
+            bool r1 = isAngleInSector(rad1, startRad, endRad);
+            bool r2 = isAngleInSector(rad2, startRad, endRad);
+
             arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
                 std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                             j == 0
@@ -434,6 +439,8 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
       vec2 diff = intersections[i] - e1Points[1];
       float angle = atan2(diff.y, diff.x);
       if (isAngleInSector(angle, startRad, endRad)) {
+        std::cout << "P-E" << intersections[i] << std::endl;
+
         arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
             std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                         ArcEdgeState::E2CurrentEdge},
@@ -459,10 +466,11 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
         double startRad = normalizeAngle(atan2(pre.y, pre.x)),
                endRad = normalizeAngle(atan2(next.y, next.x));
-        if ((endRad < startRad) ^ e2CCW) std::swap(startRad, endRad);
 
-        if (isAngleInSector(rad1, startRad, endRad) &&
-            isAngleInSector(rad2, startRad, endRad)) {
+        if ((e2CCW ^ isAngleInSector(rad1, startRad, endRad)) &&
+            (e2CCW ^ isAngleInSector(rad2, startRad, endRad))) {
+          std::cout << "P-P" << centers[j] << std::endl;
+
           arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
               std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                           j == 0 ? ArcEdgeState::E2PreviousEdge
@@ -695,9 +703,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         auto r1 = calculateStadiumIntersect(e1Points, isE1LoopCCW, e2Points,
                                             isE2LoopCCW, radius);
 
-        std::cout << "R 1" << std::endl;
         for (const auto& e : r1) {
-          std::cout << e.CircleCenter << std::endl;
           f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
 
@@ -710,9 +716,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         auto r2 = calculateSectorIntersect(e1Points, isE1LoopCCW, e2Points,
                                            isE2LoopCCW, radius);
 
-        std::cout << "R 2" << std::endl;
         for (const auto& e : r2) {
-          std::cout << e.CircleCenter << std::endl;
           f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
       }
