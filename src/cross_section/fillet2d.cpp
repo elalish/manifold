@@ -28,7 +28,7 @@
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 
-const double EPSILON = 1e-9;
+const double EPSILON = 1e-6;
 
 using namespace manifold;
 namespace C2 = Clipper2Lib;
@@ -180,8 +180,8 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
     }
   }
 
-  // No result check
-  if (!count) throw std::exception();
+  // // No result check
+  // if (!count) throw std::exception();
 
   return count;
 }
@@ -286,8 +286,6 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
       return false;
     };
 
-    // Edge - Point
-
     auto isAngleInSector = [](double angle, double startRad,
                               double endRad) -> bool {
       angle = normalizeAngle(angle);
@@ -302,6 +300,23 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
       }
     };
 
+    // For P-* situation to check local validation
+    auto isCircleLocalValid = [&getNormal, &isAngleInSector](
+                                  const std::array<vec2, 3>& points, bool isCCW,
+                                  vec2 circleCenter) -> bool {
+      vec2 pointToCenter = circleCenter - points[1];
+      double rad = atan2(pointToCenter.y, pointToCenter.x);
+
+      vec2 pre = getNormal(!isCCW, points[0] - points[1]),
+           next = getNormal(isCCW, points[2] - points[1]);
+      double startRad = normalizeAngle(atan2(pre.y, pre.x)),
+             endRad = normalizeAngle(atan2(next.y, next.x));
+
+      return isCCW ^ isAngleInSector(rad, startRad, endRad);
+    };
+
+    // Edge - Point
+
     std::array<vec2, 2> points{e2Points[1], e2Points[2]};
     for (int i = 0; i != 2; i++) {
       const vec2 point = points[i];
@@ -310,15 +325,10 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
         int count =
             calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
         for (int j = 0; j != count; j++) {
-          vec2 pointToCenter = centers[j] - point;
-          double rad = atan2(pointToCenter.y, pointToCenter.x);
-
-          vec2 pre = getNormal(!e2CCW, e2Points[i] - point),
-               next = getNormal(e2CCW, e2Points[i + 2] - point);
-          double startRad = normalizeAngle(atan2(pre.y, pre.x)),
-                 endRad = normalizeAngle(atan2(next.y, next.x));
-
-          if (e2CCW ^ isAngleInSector(rad, startRad, endRad)) {
+          if (isCircleLocalValid(
+                  std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
+                                      e2Points[i + 2]},
+                  e2CCW, centers[j])) {
             std::cout << "E-P" << centers[j] << std::endl;
 
             arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
@@ -359,12 +369,9 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
   const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
              e1NextNormal = getNormal(e1CCW, e1Next);
 
-  double startRad = atan2(e1CurNormal.y, e1CurNormal.x),
-         endRad = atan2(e1NextNormal.y, e1NextNormal.x);
-
   auto getLineCircleIntersection =
       [](const vec2& p1, const vec2& p2, const vec2& center, float radius,
-         std::array<vec2, 2> intersections) -> int {
+         std::array<vec2, 2>& intersections) -> int {
     vec2 d = p2 - p1;
     vec2 f = p1 - center;
 
@@ -419,6 +426,21 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
     return isAngleInSector(angle, startRad, endRad);
   };
 
+  // For P-* situation to check local validation
+  auto isCircleLocalValid = [&getNormal, &isAngleInSector](
+                                const std::array<vec2, 3>& points, bool isCCW,
+                                vec2 circleCenter) -> bool {
+    vec2 pointToCenter = circleCenter - points[1];
+    double rad = atan2(pointToCenter.y, pointToCenter.x);
+
+    vec2 pre = getNormal(!isCCW, points[0] - points[1]),
+         next = getNormal(isCCW, points[2] - points[1]);
+    double startRad = normalizeAngle(atan2(pre.y, pre.x)),
+           endRad = normalizeAngle(atan2(next.y, next.x));
+
+    return isCCW ^ isAngleInSector(rad, startRad, endRad);
+  };
+
   // Point - Edge
   {
     std::array<vec2, 2> intersections;
@@ -430,13 +452,18 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         e2Points[2] + e2CurNormal * radius,
     };
 
+    if (la::length(e2Points[1] - vec2(5, -1)) < EPSILON &&
+        la::length(e2Points[2] - vec2(2.6, 0)) < EPSILON) {
+      int i = 0;
+    }
     int count = getLineCircleIntersection(offsetE2[0], offsetE2[1], e1Points[1],
                                           radius, intersections);
     for (int i = 0; i != count; i++) {
-      vec2 diff = intersections[i] - e1Points[1];
-      float angle = atan2(diff.y, diff.x);
-      if (isAngleInSector(angle, startRad, endRad)) {
+      if (isCircleLocalValid(e1Points, e1CCW, intersections[i])) {
         std::cout << "P-E" << intersections[i] << std::endl;
+
+        std::cout << offsetE2[0] << offsetE2[1] << e1Points[1] << radius
+                  << std::endl;
 
         arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
             std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
@@ -448,25 +475,26 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
   }
 
   //  Point - Point
+
+  double startRad = atan2(e1CurNormal.y, e1CurNormal.x),
+         endRad = atan2(e1NextNormal.y, e1NextNormal.x);
+
   std::array<vec2, 2> points{e2Points[1], e2Points[2]};
   for (int i = 0; i != 2; i++) {
     const vec2 point = points[i];
+    if (la::length(point - e1Points[1]) < EPSILON) continue;
+
     if (isPointInPie(point, e1Points[1], radius, startRad, endRad)) {
       std::array<vec2, 2> centers;
       int count =
           calculatePointPointCircles(point, e1Points[1], radius, centers);
+
       for (int j = 0; j != count; j++) {
-        vec2 pointToCenter = centers[j] - point;
-        double rad = atan2(pointToCenter.y, pointToCenter.x);
-
-        vec2 pre = getNormal(!e2CCW, e2Points[i] - point),
-             next = getNormal(e2CCW, e2Points[i + 2] - point);
-        double startRad = normalizeAngle(atan2(pre.y, pre.x)),
-               endRad = normalizeAngle(atan2(next.y, next.x));
-
-        if (e2CCW ^ isAngleInSector(rad, startRad, endRad)) {
+        if (isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
+                                                   e2Points[i + 2]},
+                               e2CCW, centers[j])) {
           std::cout << "P-P" << centers[j] << std::endl;
-
+          std::cout << point << e1Points[1] << radius << std::endl;
           arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
               std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                           j == 0 ? ArcEdgeState::E2PreviousEdge
