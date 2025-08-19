@@ -310,19 +310,16 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
         int count =
             calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
         for (int j = 0; j != count; j++) {
-          vec2 n1 = getNormal(true, centers[j] - point),
-               n2 = getNormal(false, centers[j] - point);
-          double rad1 = atan2(n1.y, n1.x), rad2 = atan2(n2.y, n2.x);
+          vec2 pointToCenter = centers[j] - point;
+          double rad = atan2(pointToCenter.y, pointToCenter.x);
 
-          vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
+          vec2 pre = getNormal(!e2CCW, e2Points[i] - point),
+               next = getNormal(e2CCW, e2Points[i + 2] - point);
           double startRad = normalizeAngle(atan2(pre.y, pre.x)),
                  endRad = normalizeAngle(atan2(next.y, next.x));
 
-          if ((e2CCW ^ isAngleInSector(rad1, startRad, endRad)) &&
-              (e2CCW ^ isAngleInSector(rad2, startRad, endRad))) {
+          if (e2CCW ^ isAngleInSector(rad, startRad, endRad)) {
             std::cout << "E-P" << centers[j] << std::endl;
-            bool r1 = isAngleInSector(rad1, startRad, endRad);
-            bool r2 = isAngleInSector(rad2, startRad, endRad);
 
             arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
                 std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
@@ -459,16 +456,15 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
       int count =
           calculatePointPointCircles(point, e1Points[1], radius, centers);
       for (int j = 0; j != count; j++) {
-        vec2 n1 = getNormal(true, centers[j] - point),
-             n2 = getNormal(false, centers[j] - point);
-        double rad1 = atan2(n1.y, n1.x), rad2 = atan2(n2.y, n2.x);
+        vec2 pointToCenter = centers[j] - point;
+        double rad = atan2(pointToCenter.y, pointToCenter.x);
 
-        vec2 pre = e2Points[i] - point, next = e2Points[i + 2] - point;
+        vec2 pre = getNormal(!e2CCW, e2Points[i] - point),
+             next = getNormal(e2CCW, e2Points[i + 2] - point);
         double startRad = normalizeAngle(atan2(pre.y, pre.x)),
                endRad = normalizeAngle(atan2(next.y, next.x));
 
-        if ((e2CCW ^ isAngleInSector(rad1, startRad, endRad)) &&
-            (e2CCW ^ isAngleInSector(rad2, startRad, endRad))) {
+        if (e2CCW ^ isAngleInSector(rad, startRad, endRad)) {
           std::cout << "P-P" << centers[j] << std::endl;
 
           arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
