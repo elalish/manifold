@@ -93,10 +93,10 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   vec2 d = p2 - p1;
 
   if (la::length(d) < EPSILON)
-    return la::length2(p1 - center) <= radius * radius;
+    return la::length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
 
   double t;
-  return distancePointSegment(center, p1, p2, t) < radius;
+  return distancePointSegment(center, p1, p2, t) < radius + EPSILON;
 };
 
 // Check if line segment intersect with another line segment
@@ -739,22 +739,68 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
         auto r1 = calculateStadiumIntersect(e1Points, isE1LoopCCW, e2Points,
                                             isE2LoopCCW, radius);
 
+        auto r2 = calculateSectorIntersect(e1Points, isE1LoopCCW, e2Points,
+                                           isE2LoopCCW, radius);
+
+        auto size1 = r1.size(), size2 = r2.size();
+
+        r1.insert(r1.end(), r2.begin(), r2.end());
+
+        auto size3 = r1.size();
+
+        // Check for Collision
+
+        std::vector<size_t> intersectEdgeIndex;
+
+        if (true) {
+          for (auto it = r1.begin(); it != r1.end();) {
+            const auto& arc = *it;
+
+            manifold::Box box(toVec3(arc.CircleCenter - vec2(1, 0) * radius),
+                              toVec3(arc.CircleCenter + vec2(1, 0) * radius));
+
+            box.Union(toVec3(arc.CircleCenter - vec2(0, 1) * radius));
+            box.Union(toVec3(arc.CircleCenter + vec2(0, 1) * radius));
+
+            auto rr = collider.outerCollider.Collisions(
+                manifold::Vec<manifold::Box>({box}).cview());
+
+            // r.Dump();
+            rr.Sort();
+            bool eraseFlag = false;
+
+            for (size_t k = 0; k != rr.size(); k++) {
+              const auto& edge = collider.outerEdgeOld2NewVec[rr.Get(k, true)];
+
+              if (edge.loopRef == e1Loopi && edge.p1Ref == e1i)
+                continue;
+              else if (edge.loopRef == e2Loopi && edge.p1Ref == e2i)
+                continue;
+
+              const auto& eLoop = loops[edge.loopRef].Loop;
+              const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
+              const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
+              if (intersectCircleSegment(p1, p2, arc.CircleCenter, radius)) {
+                std::cout << "Remove" << arc.CircleCenter << std::endl;
+                eraseFlag = true;
+                intersectEdgeIndex.push_back(p1i);
+              }
+            }
+
+            if (eraseFlag)
+              it = r1.erase(it);
+            else
+              it++;
+          }
+        }
+
         for (const auto& e : r1) {
           f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
 
-        // If edge pair is neighbour, Point-Edge and Point-Point won't happen.
-        // if (e1Loopi == e2Loopi &&
-        //     (e1i == (e2i + 1) % e2Loop.size() ||
-        //      e1i == (e2i + e2Loop.size() - 1) % e2Loop.size()))
-        //   continue;
+        // Calculate all intersection to avoid double processed
 
-        auto r2 = calculateSectorIntersect(e1Points, isE1LoopCCW, e2Points,
-                                           isE2LoopCCW, radius);
-
-        for (const auto& e : r2) {
-          f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
-        }
+        //
       }
     }
   }
@@ -762,42 +808,6 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
   f.close();
 
   return {};
-
-  // Detect arc self-intersection, and remove
-  for (size_t i = 0; i != arcConnection.size(); i++) {
-    for (auto it = arcConnection[i].begin(); it != arcConnection[i].end();
-         it++) {
-      const auto& arc = *it;
-
-      manifold::Box box(toVec3(arc.center - vec2(1, 0) * radius),
-                        toVec3(arc.center + vec2(1, 0) * radius));
-
-      box.Union(toVec3(arc.center - vec2(0, 1) * radius));
-      box.Union(toVec3(arc.center + vec2(0, 1) * radius));
-
-      auto r = collider.outerCollider.Collisions(
-          manifold::Vec<manifold::Box>({box}).cview());
-      // r.Dump();
-      r.Sort();
-
-      for (size_t k = 0; k != r.size(); k++) {
-        const auto& edge = collider.outerEdgeOld2NewVec[r.Get(k, true)];
-
-        if (edge.loopRef == arc.e1Loopi && edge.p1Ref == arc.e1)
-          continue;
-        else if (edge.loopRef == arc.e2Loopi && edge.p1Ref == arc.e2)
-          continue;
-
-        const auto& eLoop = loops[edge.loopRef].Loop;
-        const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
-        const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
-        if (intersectCircleSegment(p1, p2, arc.center, radius)) {
-          it = arcConnection[i].erase(it);
-          std::cout << "Remove" << arc.center << std::endl;
-        }
-      }
-    }
-  }
 
   std::ofstream c("circle.txt");
 
