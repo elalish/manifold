@@ -153,6 +153,14 @@ struct ArcBridgeInfo {
 int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
                                  const bool eCCW, double radius,
                                  std::array<vec2, 2>& circleCenters) {
+  auto isOnSegment = [](const vec2& p1, const vec2& p2, const vec2& p) -> bool {
+    double v = la::dot(p - p1, p2 - p1);
+    return 0 <= v && v <= la::length2(p2 - p1);
+  };
+
+  // If p on edge p1->p2, degenerate
+  if (isOnSegment(p1, p2, p)) return 0;
+
   vec2 e = p2 - p1, dir = la::normalize(e),
        normal = la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
 
@@ -165,17 +173,12 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
   std::array<vec2, 2> tangentPoint{projectedP - dir * len,
                                    projectedP + dir * len};
 
-  auto isOnSegment = [](const vec2& p1, const vec2& p2, const vec2& p) -> bool {
-    double v = la::dot(p - p1, p2 - p1);
-    return 0 <= v && v <= la::length2(p2 - p1);
-  };
-
   int count = 0;
   for (int i = 0; i != 2; i++) {
     vec2 tangent = tangentPoint[i];
     if (isOnSegment(p1, p2, tangent)) {
       // Tangent valid -> check circle valid
-      circleCenters[i] = tangent + normal * radius;
+      circleCenters[count] = tangent + normal * radius;
       count++;
     }
   }
@@ -322,14 +325,22 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
       const vec2 point = points[i];
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
         std::array<vec2, 2> centers;
+
+        if (la::length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
+            la::length(e2Points[2] - vec2(3, 0)) < EPSILON) {
+          int i = 0;
+        }
+
         int count =
             calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
+
         for (int j = 0; j != count; j++) {
           if (isCircleLocalValid(
                   std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
                                       e2Points[i + 2]},
                   e2CCW, centers[j])) {
             std::cout << "E-P" << centers[j] << std::endl;
+            std::cout << point << p1 << p2 << std::endl;
 
             arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
                 std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
@@ -456,6 +467,7 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         la::length(e2Points[2] - vec2(2.6, 0)) < EPSILON) {
       int i = 0;
     }
+
     int count = getLineCircleIntersection(offsetE2[0], offsetE2[1], e1Points[1],
                                           radius, intersections);
     for (int i = 0; i != count; i++) {
