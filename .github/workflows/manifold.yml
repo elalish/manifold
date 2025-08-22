@@ -251,11 +251,12 @@ jobs:
         $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
 
   build_mac:
-    name: MacOS (TBB:${{matrix.parallelization == 'ON'}}, ${{matrix.os}})
+    name: MacOS (TBB:${{matrix.parallelization == 'ON'}}, shared lib:${{matrix.shared == 'ON'}}, ${{matrix.os}})
     timeout-minutes: 30
     strategy:
       matrix:
         parallelization: [OFF, ON]
+        shared: [OFF, ON]
         # macos-13: intel
         # macos-latest: arm
         os: [macos-13, macos-latest]
@@ -276,7 +277,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
     - name: Test
       run: |
         cd build/test
