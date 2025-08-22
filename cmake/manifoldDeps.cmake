@@ -70,9 +70,12 @@ if(MANIFOLD_PAR)
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
       GIT_TAG v2022.0.0
       GIT_PROGRESS TRUE
-      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(TBB)
+    set_property(
+      DIRECTORY ${tbb_SOURCE_DIR}
+      PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
+    )
   endif()
 endif()
 
@@ -116,11 +119,13 @@ if(MANIFOLD_CROSS_SECTION)
       # Jun 15, 2025
       GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
       GIT_PROGRESS TRUE
-      SOURCE_SUBDIR
-      CPP
-      EXCLUDE_FROM_ALL
+      SOURCE_SUBDIR CPP
     )
     FetchContent_MakeAvailable(Clipper2)
+    set_property(
+      DIRECTORY ${clipper2_SOURCE_DIR}
+      PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
+    )
   endif()
   if(NOT TARGET Clipper2::Clipper2)
     add_library(Clipper2::Clipper2 ALIAS Clipper2)
