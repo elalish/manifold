@@ -123,7 +123,7 @@ if(MANIFOLD_CROSS_SECTION)
     )
     FetchContent_MakeAvailable(Clipper2)
     set_property(
-      DIRECTORY ${clipper2_SOURCE_DIR}
+      DIRECTORY ${clipper2_SOURCE_DIR}/CPP
       PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
     )
   endif()
