@@ -289,6 +289,9 @@ jobs:
         sudo cmake --install .
         cd ..
         ./scripts/test-cmake.sh
+    - name: test pkg-config consumer
+      if: matrix.shared == 'ON'
+      run: |
         LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
 
   build_mac_builtin_tbb:
