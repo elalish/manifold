@@ -1,10 +1,22 @@
+// Copyright 2023-2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 import {Document, mat4, Mesh, Node} from '@gltf-transform/core';
+import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
+import {strToU8, Zippable, zipSync} from 'fflate';
 
 import {ManifoldPrimitive} from './manifold-gltf';
-
-import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
-import {strToU8, Zippable, zipSync} from 'fflate'
 
 interface Mesh3MF {
   id: string;
@@ -15,14 +27,14 @@ interface Mesh3MF {
 
 interface Child3MF {
   objectID: string;
-  transform?: mat4 | Array<string>;
+  transform?: mat4|Array<string>;
 }
 
 interface Component3MF {
   id: string;
   children: Array<Child3MF>;
   name?: string;
-  transform?: mat4 | Array<string>;
+  transform?: mat4|Array<string>;
 }
 
 interface Header {
@@ -46,8 +58,8 @@ interface To3MF {
 
 /**
  * Object to convert GLTF documents to a 3MF binary.
- * 
- * @property unit 
+ *
+ * @property unit
  * @property title
  * @property author
  * @property description
@@ -75,7 +87,7 @@ export class Export3MF {
    * @param doc The GLTF document to convert.
    * @returns A blob containing the converted model.
    */
-  asBlob (doc: Document) {
+  asBlob(doc: Document) {
     const to3mf = {
       meshes: [],
       components: [],
@@ -96,7 +108,7 @@ export class Export3MF {
     // 3MF references by ID.
     let nextGlobalID = 1;
     const object2globalID = new Map<Node|Mesh, string>();
-    const getObjectID = (obj: Node | Mesh) => `${object2globalID.get(obj)}`;
+    const getObjectID = (obj: Node|Mesh) => `${object2globalID.get(obj)}`;
     const getMeshID = (mesh: Mesh) => {
       // If a mesh has been cloned with a different material, find
       // the original mesh.  This isn't a general GLTF feature; this is set
@@ -106,12 +118,13 @@ export class Export3MF {
         return object2globalID.get(clonedFrom as Mesh)
       }
       return object2globalID.get(mesh);
-    }
-    const setObjectID = (obj: Node | Mesh) => {
-      const objectID = `${nextGlobalID++}`;
-      object2globalID.set(obj, objectID);
-      return objectID
-    }
+    };
+    const setObjectID =
+        (obj: Node|Mesh) => {
+          const objectID = `${nextGlobalID++}`;
+          object2globalID.set(obj, objectID);
+          return objectID
+        }
 
     // Get meshes in place first.
     for (const mesh of doc.getRoot().listMeshes()) {
@@ -120,7 +133,8 @@ export class Export3MF {
       if (manifoldPrimitive) {
         // This mesh has a list of triangle vertices already.
         const indices = manifoldPrimitive.getIndices();
-        const positionAccessor = mesh.listPrimitives()[0].getAttribute('POSITION')!;
+        const positionAccessor =
+            mesh.listPrimitives()[0].getAttribute('POSITION')!;
 
         const objectID = setObjectID(mesh)
         to3mf.meshes.push({
@@ -129,15 +143,15 @@ export class Export3MF {
           id: objectID
         });
       }
-      
-      const { clonedFrom } = mesh.getExtras();
+
+      const {clonedFrom} = mesh.getExtras();
       if (!manifoldPrimitive && clonedFrom) {
         // GLTF Mesh, instance of another mesh.
         // getMeshID will find this when adding it to components.
         continue;
       }
       if (!manifoldPrimitive && !clonedFrom) {
-        // GLTF Mesh, no manifold primitive, 
+        // GLTF Mesh, no manifold primitive,
         // not an instance of another mesh.
         // We should handle this case, but for now we do not.
         console.log('skipping non-ManifoldCAD mesh')
@@ -152,10 +166,10 @@ export class Export3MF {
       to3mf.components.push({
         id: setObjectID(node),
         name: node.getName(),
-        children: meshID ? [{ objectID: meshID }] : [],
+        children: meshID ? [{objectID: meshID}] : [],
         transform: node.getMatrix().map(n => n.toFixed(to3mf.precision))
       });
-    } 
+    }
 
     // Now we can work out our node hierarchy.
     for (const node of doc.getRoot().listNodes()) {
@@ -177,13 +191,12 @@ export class Export3MF {
       if (parent) {
         // This is a child node, add it to it's parent.
         const parentID = getObjectID(parent);
-        const parent3mf = to3mf.components.find(
-            (comp) => comp.id == parentID)!;
+        const parent3mf = to3mf.components.find((comp) => comp.id == parentID)!;
         parent3mf.children.push(child);
       } else {
         // This is a root node.
         // Add it to the build list.
-        to3mf.items.push({ objectID })
+        to3mf.items.push({objectID})
       }
     }
 

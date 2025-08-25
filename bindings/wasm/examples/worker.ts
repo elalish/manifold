@@ -14,10 +14,13 @@
 
 import * as glMatrix from 'gl-matrix'
 
+import * as animation from '../lib/animation';
+import * as debug from '../lib/debug';
 import {Evaluator} from '../lib/evaluate';
 import * as exporter from '../lib/export';
 import {GlobalDefaults} from '../lib/export';
 import {Export3MF} from '../lib/gltf-transform/export-3mf'
+import * as material from '../lib/material';
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
@@ -40,21 +43,25 @@ evaluator.addContext({glMatrix})
 // These are exporter methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
-for (const name of ['show', 'only', 'setMaterial']) {
-  evaluator.addContextMethodWithCleanup(name, (exporter as any)[name]);
-}
+evaluator.addContextMethodWithCleanup('show', debug.show)
+evaluator.addContextMethodWithCleanup('only', debug.only)
+evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial)
+
 
 // Add additional exporter context.  These need no garbage collection.
 evaluator.addContext({
   GLTFNode: exporter.GLTFNode,
-  setMorphStart: exporter.setMorphStart,
-  setMorphEnd: exporter.setMorphEnd,
+  setMorphStart: animation.setMorphStart,
+  setMorphEnd: animation.setMorphEnd,
 });
 
 // Clean up the evaluator and exporter between runs.
 export function cleanup() {
   evaluator.cleanup();
   exporter.cleanup();
+  material.cleanup();
+  animation.cleanup();
+  debug.cleanup();
 }
 
 export async function evaluateCADToModel(code: string) {

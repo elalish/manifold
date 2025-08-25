@@ -1,0 +1,104 @@
+import {Document} from '@gltf-transform/core';
+
+import {Manifold, Mesh} from '../examples/built/manifold';
+import {GLTFMaterial} from '../examples/public/editor';
+
+import {Properties, writeMesh} from './gltf-io.ts';
+import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material';
+
+// Debug setup to show source meshes
+let ghost = false;
+const shown = new Map<number, Mesh>();
+const singles = new Map<number, Mesh>();
+
+export const SHOW = {
+  baseColorFactor: [1, 0, 0],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+} as GLTFMaterial;
+
+export const GHOST = {
+  baseColorFactor: [0.5, 0.5, 0.5],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+} as GLTFMaterial;
+
+export function cleanup() {
+  ghost = false;
+  shown.clear();
+  singles.clear();
+}
+
+const getDebugMeshByID = (id: number):
+    Mesh|undefined => {
+      return shown.has(id) ? shown.get(id) : singles.get(id);
+    }
+
+/**
+ * Material for a debug visualization.
+ *
+ * There are two conditions:
+ *
+ *   * This is a mesh that has been flagged with `show`.
+ *     It will be highlighted with the SHOW material.
+ *   * This is a mesh that has been flagged with `only`.
+ *     Any other mesh will have the GHOST material, while
+ *     this one gets it's natural material.
+ *
+ * @param id The `originalID` of the mesh.
+ */
+export const getDebugMaterialByID = (id: number):
+    GLTFMaterial|undefined => {
+      const show = shown.has(id);
+      const inMesh = show ? shown.get(id) : singles.get(id);
+      if (show && inMesh) {
+        return SHOW;
+      }
+
+      return getOriginalMaterialByID(id);
+    }
+
+export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
+    ghost ? GHOST : getOriginalMaterialByID(id);
+
+const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
+  let result = manifold.asOriginal();
+  map.set(result.originalID(), result.getMesh());
+  console.log({fn: debug, ghost})
+  return result;
+};
+
+export const show = (manifold: Manifold) => {
+  return debug(manifold, shown);
+};
+
+export const only = (manifold: Manifold) => {
+  ghost = true;
+  return debug(manifold, singles);
+};
+
+export const getDebugGLTFMesh =
+    (doc: Document, manifoldMesh: Mesh, id2properties: Map<number, Properties>,
+     backupMaterial: GLTFMaterial = {}) => {
+      const debugNodes = [];
+
+      for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
+        const debugMesh = getDebugMeshByID(id)
+        if (!debugMesh) {
+          continue;
+        }
+
+        // Here, we'll get back either a debug material (like SHOW),
+        // or the original mesh material.
+        const material = getDebugMaterialByID(id) || backupMaterial;
+        id2properties.get(id)!.material = getCachedMaterial(doc, material);
+
+        const debugNode = doc.createNode('debug')
+                              .setMesh(writeMesh(doc, debugMesh, id2properties))
+                              .setMatrix(manifoldMesh.transform(run));
+        debugNodes.push(debugNode)
+      }
+      return debugNodes
+    }

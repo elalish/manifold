@@ -12,6 +12,7 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
+    fs: {allow: [resolve(__dirname, '..')]}
   },
   build: {
     target: 'esnext',
@@ -28,6 +29,6 @@ export default defineConfig({
         chunkFileNames: `assets/[name].js`,
         assetFileNames: `assets/[name].[ext]`
       }
-    },
+    }
   },
 })

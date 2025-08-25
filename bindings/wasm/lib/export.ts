@@ -15,17 +15,16 @@
 // NOTE: This file is undergoing active refactoring, as of August 2025.
 // Interfaces and semantics may change.  Beware of wild geese.
 
-import {Accessor, Animation, AnimationSampler, Document, Material, Mesh as GLTFMesh, Node, WebIO} from '@gltf-transform/core';
-import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import {Document, Material, Node, WebIO} from '@gltf-transform/core';
+import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {quat} from 'gl-matrix';
+import {Manifold, Vec3} from '../examples/built/manifold';
+import {GLTFMaterial} from '../examples/public/editor';
 
-import {GLTFMaterial, Quat} from '../examples/public/editor';
-import {Manifold, Mesh} from '../manifold-encapsulated-types';
-import {Vec3} from '../manifold-global-types';
-
+import {addAnimationToDoc, addMotion, cleanupAnimation, euler2quat, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
+import {getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, setupIO, writeMesh} from './gltf-io.ts';
-//import {ManifoldPrimitive} from './manifold-gltf.ts';
+import {getBackupMaterial, getCachedMaterial} from './material.ts';
 
 export interface GlobalDefaults {
   roughness: number;
@@ -37,13 +36,6 @@ export interface GlobalDefaults {
   animationMode: 'loop'|'ping-pong';
 }
 
-// Debug setup to show source meshes
-let ghost = false;
-const shown = new Map<number, Mesh>();
-const singles = new Map<number, Mesh>();
-
-const FPS = 30;
-
 const GLOBAL_DEFAULTS = {
   roughness: 0.2,
   metallic: 1,
@@ -54,47 +46,12 @@ const GLOBAL_DEFAULTS = {
   animationMode: 'loop'
 };
 
-const SHOW = {
-  baseColorFactor: [1, 0, 0],
-  alpha: 0.25,
-  roughness: 1,
-  metallic: 0
-} as GLTFMaterial;
+export const globalDefaults = {...GLOBAL_DEFAULTS};
 
-const GHOST = {
-  baseColorFactor: [0.5, 0.5, 0.5],
-  alpha: 0.25,
-  roughness: 1,
-  metallic: 0
-} as GLTFMaterial;
-
-
-const globalDefaults = {...GLOBAL_DEFAULTS};
-
-const id2material = new Map<number, GLTFMaterial>();
 const nodes = new Array<GLTFNode>();
 
-const materialCache = new Map<GLTFMaterial, Material>();
-const manifold2morph = new Map<Manifold, Morph>();
-let animation: Animation;
-let timesAccessor: Accessor;
-let weightsAccessor: Accessor;
-let weightsSampler: AnimationSampler;
-let hasAnimation: boolean;
-
 export function cleanup() {
-  ghost = false;
-  shown.clear();
-  singles.clear();
   nodes.length = 0;
-  id2material.clear();
-  materialCache.clear();
-  manifold2morph.clear();
-}
-
-interface Morph {
-  start?: (v: Vec3) => void;
-  end?: (v: Vec3) => void;
 }
 
 export class GLTFNode {
@@ -128,173 +85,10 @@ function log(...args: any[]) {
   }
 }
 
-export const setMaterial =
-    (manifold: Manifold, material: GLTFMaterial): Manifold => {
-      const out = manifold.asOriginal();
-      id2material.set(out.originalID(), material);
-      return out;
-    };
-
-export const setMorphStart =
-    (manifold: Manifold, func: (v: Vec3) => void): void => {
-      const morph = manifold2morph.get(manifold);
-      if (morph != null) {
-        morph.start = func;
-      } else {
-        manifold2morph.set(manifold, {start: func});
-      }
-    };
-
-export const setMorphEnd =
-    (manifold: Manifold, func: (v: Vec3) => void): void => {
-      const morph = manifold2morph.get(manifold);
-      if (morph != null) {
-        morph.end = func;
-      } else {
-        manifold2morph.set(manifold, {end: func});
-      }
-    };
-
-export const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
-  let result = manifold.asOriginal();
-  map.set(result.originalID(), result.getMesh());
-  return result;
-};
-
-export const show = (manifold: Manifold) => {
-  return debug(manifold, shown);
-};
-
-export const only = (manifold: Manifold) => {
-  ghost = true;
-  return debug(manifold, singles);
-};
-
-function euler2quat(rotation: Vec3): Quat {
-  const deg2rad = Math.PI / 180;
-  const q = [0,0,0,1] as Quat;
-  quat.rotateZ(q, q, deg2rad * rotation[2]);
-  quat.rotateY(q, q, deg2rad * rotation[1]);
-  quat.rotateX(q, q, deg2rad * rotation[0]);
-  return q;
-}
-
-function addMotion(
-    doc: Document, type: 'translation'|'rotation'|'scale', node: GLTFNode,
-    out: Node): Vec3|null {
-  const motion = node[type];
-  if (motion == null) {
-    return null;
-  }
-  if (typeof motion !== 'function') {
-    return motion;
-  }
-
-  const nFrames = timesAccessor.getCount();
-  const nEl = type == 'rotation' ? 4 : 3;
-  const frames = new Float32Array(nEl * nFrames);
-  for (let i = 0; i < nFrames; ++i) {
-    const x = i / (nFrames - 1);
-    const m = motion(
-        globalDefaults.animationMode !== 'ping-pong' ?
-            x :
-            (1 - Math.cos(x * 2 * Math.PI)) / 2);
-    frames.set(nEl === 4 ? euler2quat(m) : m, nEl * i);
-  }
-
-  const framesAccessor =
-      doc.createAccessor(node.name + ' ' + type + ' frames')
-          .setBuffer(doc.getRoot().listBuffers()[0])
-          .setArray(frames)
-          .setType(nEl === 4 ? Accessor.Type.VEC4 : Accessor.Type.VEC3);
-  const sampler = doc.createAnimationSampler()
-                      .setInput(timesAccessor)
-                      .setOutput(framesAccessor)
-                      .setInterpolation('LINEAR');
-  const channel = doc.createAnimationChannel()
-                      .setTargetPath(type)
-                      .setTargetNode(out)
-                      .setSampler(sampler);
-  animation.addSampler(sampler);
-  animation.addChannel(channel);
-  hasAnimation = true;
-  return motion(0);
-}
-
-function setMorph(doc: Document, node: Node, manifold: Manifold) {
-  if (manifold2morph.has(manifold)) {
-    const channel = doc.createAnimationChannel()
-                        .setTargetPath('weights')
-                        .setTargetNode(node)
-                        .setSampler(weightsSampler);
-    animation.addChannel(channel);
-    hasAnimation = true;
-  }
-}
-
-function morphStart(manifoldMesh: Mesh, morph?: Morph): number[] {
-  const inputPositions: number[] = [];
-  if (morph == null) {
-    return inputPositions;
-  }
-
-  for (let i = 0; i < manifoldMesh.numVert; ++i) {
-    for (let j = 0; j < 3; ++j)
-      inputPositions[i * 3 + j] =
-          manifoldMesh.vertProperties[i * manifoldMesh.numProp + j];
-  }
-  if (morph.start) {
-    for (let i = 0; i < manifoldMesh.numVert; ++i) {
-      const vertProp = manifoldMesh.vertProperties;
-      const offset = i * manifoldMesh.numProp;
-      const pos = inputPositions.slice(offset, offset + 3) as Vec3;
-      morph.start(pos);
-      for (let j = 0; j < 3; ++j) vertProp[offset + j] = pos[j];
-    }
-  }
-  return inputPositions;
-}
-
-function morphEnd(
-    doc: Document, manifoldMesh: Mesh, mesh: GLTFMesh, inputPositions: number[],
-    morph?: Morph) {
-  if (morph == null) {
-    return;
-  }
-
-  mesh.setWeights([0]);
-
-  mesh.listPrimitives().forEach((primitive, i) => {
-    if (morph.end) {
-      for (let i = 0; i < manifoldMesh.numVert; ++i) {
-        const pos = inputPositions.slice(3 * i, 3 * (i + 1)) as Vec3;
-        morph.end(pos);
-        inputPositions.splice(3 * i, 3, ...pos);
-      }
-    }
-
-    const startPosition = primitive.getAttribute('POSITION')!.getArray()!;
-    const array = new Float32Array(startPosition.length);
-
-    const offset = manifoldMesh.runIndex[i];
-    for (let j = 0; j < array.length; ++j) {
-      array[j] = inputPositions[offset + j] - startPosition[j];
-    }
-
-    const morphAccessor = doc.createAccessor(mesh.getName() + ' morph target')
-                              .setBuffer(doc.getRoot().listBuffers()[0])
-                              .setArray(array)
-                              .setType(Accessor.Type.VEC3);
-    const morphTarget =
-        doc.createPrimitiveTarget().setAttribute('POSITION', morphAccessor);
-    primitive.addTarget(morphTarget);
-  });
-}
-
 function createGLTFnode(doc: Document, node: GLTFNode): Node {
   const out = doc.createNode(node.name);
 
-  // Animation
+  // Animation Motion
   const pos = addMotion(doc, 'translation', node, out);
   if (pos != null) {
     out.setTranslation(pos);
@@ -311,45 +105,6 @@ function createGLTFnode(doc: Document, node: GLTFNode): Node {
   }
 
   return out;
-}
-
-function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
-  if (node == null) {
-    return {};
-  }
-  if (node.material == null) {
-    node.material = getBackupMaterial(node.parent);
-  }
-  return node.material;
-}
-
-function makeDefaultedMaterial(
-    doc: Document, matIn: GLTFMaterial = {}): Material {
-  const defaults = {...globalDefaults};
-  Object.assign(defaults, matIn);
-  const {roughness, metallic, baseColorFactor, alpha, unlit} = defaults;
-
-  const material = doc.createMaterial(matIn.name ?? '');
-
-  if (unlit) {
-    const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
-    material.setExtension('KHR_materials_unlit', unlit);
-  }
-
-  if (alpha < 1) {
-    material.setAlphaMode(Material.AlphaMode.BLEND).setDoubleSided(true);
-  }
-
-  return material.setRoughnessFactor(roughness)
-      .setMetallicFactor(metallic)
-      .setBaseColorFactor([...baseColorFactor, alpha]);
-}
-
-function getCachedMaterial(doc: Document, matDef: GLTFMaterial): Material {
-  if (!materialCache.has(matDef)) {
-    materialCache.set(matDef, makeDefaultedMaterial(doc, matDef));
-  }
-  return materialCache.get(matDef)!;
 }
 
 function addMesh(
@@ -379,39 +134,31 @@ function addMesh(
   // Material
   const id2properties = new Map<number, Properties>();
   for (const id of manifoldMesh.runOriginalID!) {
-    const material = id2material.get(id) || backupMaterial;
+    const material = getMaterialByID(id) || backupMaterial;
     id2properties.set(id, {
-      material: getCachedMaterial(doc, ghost ? GHOST : material), // Debug.
+      material: getCachedMaterial(doc, material),
       attributes: ['POSITION', ...material.attributes ?? []]
     });
   }
 
-  // Animation
-  const morph = manifold2morph.get(manifold);
+  // Animation Morph
+  const morph = getMorph(manifold);
   const inputPositions = morphStart(manifoldMesh, morph);
 
   // Core
   const mesh = writeMesh(doc, manifoldMesh, id2properties);
   node.setMesh(mesh);
 
-  // Animation
+  // Animation Morph
   morphEnd(doc, manifoldMesh, mesh, inputPositions, morph);
 
-  // Debug
-  for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
-    const show = shown.has(id);
-    const inMesh = show ? shown.get(id) : singles.get(id);
-    if (inMesh == null) {
-      continue;
-    }
 
-    id2properties.get(id)!.material = getCachedMaterial(
-        doc, show ? SHOW : (id2material.get(id) || backupMaterial));
-
-    const debugNode = doc.createNode('debug')
-                          .setMesh(writeMesh(doc, inMesh, id2properties))
-                          .setMatrix(manifoldMesh.transform(run));
-    node.addChild(debugNode);
+  // If we're using a debug mode (`show` or `only`), check
+  // to see if this mesh requires special handling.
+  const debugNodes =
+      getDebugGLTFMesh(doc, manifoldMesh, id2properties, backupMaterial)
+  for (const debugNode of debugNodes) {
+    node.addChild(debugNode)
   }
 }
 
@@ -438,9 +185,7 @@ function cloneNodeNewMaterial(
     newMesh.addPrimitive(newPrimitive);
   });
   // Track cloned meshes for easier export, later.
-  newMesh.setExtras({
-    clonedFrom: oldMesh
-  });
+  newMesh.setExtras({clonedFrom: oldMesh});
 }
 
 function createNodeFromCache(
@@ -449,24 +194,32 @@ function createNodeFromCache(
   const node = createGLTFnode(doc, nodeDef);
   const {manifold} = nodeDef;
   if (manifold) {
+    // Animation Morph
     setMorph(doc, node, manifold);
     const backupMaterial = getBackupMaterial(nodeDef);
     const cachedNodes = manifold2node.get(manifold);
+
     if (cachedNodes == null) {
+      // Cache miss.
       addMesh(doc, node, manifold, backupMaterial);
       const cache = new Map<GLTFMaterial, Node>();
       cache.set(backupMaterial, node);
       manifold2node.set(manifold, cache);
+
     } else {
+      // Cache hit...
       const cachedNode = cachedNodes.get(backupMaterial);
       if (cachedNode == null) {
+        // ...but not for this material.
         const [oldBackupMaterial, oldNode] =
             cachedNodes.entries().next().value!;
         cloneNodeNewMaterial(
             doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
             getCachedMaterial(doc, oldBackupMaterial));
         cachedNodes.set(backupMaterial, node);
+
       } else {
+        // ...for this exact material.
         cloneNode(node, cachedNode);
       }
     }
@@ -474,83 +227,47 @@ function createNodeFromCache(
   return node;
 }
 
-function addAnimationToDoc(doc:Document) {
-  animation = doc.createAnimation('');
-  hasAnimation = false;
-  const nFrames = Math.round(globalDefaults.animationLength * FPS) + 1;
-  const times = new Float32Array(nFrames);
-  const weights = new Float32Array(nFrames);
-  for (let i = 0; i < nFrames; ++i) {
-    const x = i / (nFrames - 1);
-    times[i] = x * globalDefaults.animationLength;
-    weights[i] = globalDefaults.animationMode !== 'ping-pong' ?
-        x :
-        (1 - Math.cos(x * 2 * Math.PI)) / 2;
-  }
-  timesAccessor = doc.createAccessor('animation times')
-                      .setBuffer(doc.createBuffer())
-                      .setArray(times)
-                      .setType(Accessor.Type.SCALAR);
-  weightsAccessor = doc.createAccessor('animation weights')
-                        .setBuffer(doc.getRoot().listBuffers()[0])
-                        .setArray(weights)
-                        .setType(Accessor.Type.SCALAR);
-  weightsSampler = doc.createAnimationSampler()
-                       .setInput(timesAccessor)
-                       .setOutput(weightsAccessor)
-                       .setInterpolation('LINEAR');
-  animation.addSampler(weightsSampler);
-}
-
-function cleanupAnimation() {
-  if (!hasAnimation) {
-    timesAccessor.dispose();
-    weightsAccessor.dispose();
-    weightsSampler.dispose();
-    animation.dispose();
-  }
-}
-
-export function manifoldToGLTFDoc(manifold: Manifold, defaults: GlobalDefaults) {
+function parseOptions(defaults: GlobalDefaults) {
   Object.assign(globalDefaults, GLOBAL_DEFAULTS);
   Object.assign(globalDefaults, defaults);
+}
 
-  const doc = new Document();
+function createWrapper(doc: Document) {
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
   const wrapper = doc.createNode('wrapper')
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
+  return wrapper
+}
 
+export function manifoldToGLTFDoc(
+    manifold: Manifold, defaults: GlobalDefaults) {
+  parseOptions(defaults)
+
+  const doc = new Document();
+  const root = createWrapper(doc);
   addAnimationToDoc(doc)
-  
+
   const node = doc.createNode();
   addMesh(doc, node, manifold);
-  wrapper.addChild(node);
+  root.addChild(node);
 
   cleanupAnimation();
   return doc;
 }
 
 export function GLTFNodesToGLTFDoc(
-    nodes: Array<GLTFNode>,
-    defaults: GlobalDefaults) {
+    nodes: Array<GLTFNode>, defaults: GlobalDefaults) {
+  parseOptions(defaults)
 
   if (nodes.length == 0) {
-    throw new TypeError("nodes[] must contain at least one GLTFNode.")
+    throw new TypeError('nodes[] must contain at least one GLTFNode.')
   }
 
-  Object.assign(globalDefaults, GLOBAL_DEFAULTS);
-  Object.assign(globalDefaults, defaults);
-
   const doc = new Document();
-  const halfRoot2 = Math.sqrt(2) / 2;
-  const mm2m = 1 / 1000;
-  const wrapper = doc.createNode('wrapper')
-                      .setRotation([-halfRoot2, 0, 0, halfRoot2])
-                      .setScale([mm2m, mm2m, mm2m]);
-  doc.createScene().addChild(wrapper);
+  const root = createWrapper(doc);
 
   addAnimationToDoc(doc);
 
@@ -558,21 +275,23 @@ export function GLTFNodesToGLTFDoc(
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
   let leafNodes = 0;
 
+  // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of nodes) {
-    node2gltf.set(
-        nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
+    node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
     if (nodeDef.manifold) {
       ++leafNodes;
     }
   }
 
+  // Step through each node and set its parent.
+  // Nodes without parents are added directly to the root.
   for (const nodeDef of nodes) {
     const gltfNode = node2gltf.get(nodeDef)!;
     const {parent} = nodeDef;
-    if (parent == null) {
-      wrapper.addChild(gltfNode);
-    } else {
+    if (parent) {
       node2gltf.get(parent)!.addChild(gltfNode);
+    } else {
+      root.addChild(gltfNode);
     }
   }
 
