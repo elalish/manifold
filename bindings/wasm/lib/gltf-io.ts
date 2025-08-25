@@ -14,7 +14,7 @@
 
 import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gltf-transform/core';
 
-import {Mesh as ManifoldMesh, MeshOptions} from '../examples/public/manifold-encapsulated-types';
+import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 
