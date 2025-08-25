@@ -3,15 +3,29 @@
   "version": "3.2.1",
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
+  "bin": {
+    "manifold-cad": "./bin/manifold-cad"
+  },
   "scripts": {
-    "docs": "npx typedoc"
+    "docs": "npx typedoc",
+    "build": "tsc",
+    "prepare": "npm run build"
   },
   "files": [
     "manifold.js",
     "manifold.wasm",
     "manifold.d.ts",
     "manifold-encapsulated-types.d.ts",
-    "manifold-global-types.d.ts"
+    "manifold-global-types.d.ts",
+    "bin/manifold-cad",
+    "lib/evaluate.d.ts",
+    "lib/evaluate.js",
+    "lib/export.d.ts",
+    "lib/export.js",
+    "lib/gltf-io.d.ts",
+    "lib/gltf-io.js",
+    "lib/manifold-gltf.d.ts",
+    "lib/manifold-gltf.js"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -40,6 +54,17 @@
   },
   "homepage": "https://github.com/elalish/manifold#readme",
   "devDependencies": {
-    "typedoc": "^0.26.6"
+    "@types/node": "^24.2.1",
+    "typedoc": "^0.28.10",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "@jscadui/3mf-export": "^0.5.0",
+    "commander": "^13.1.0",
+    "fflate": "^0.8.0",
+    "gl-matrix": "^3.4.3"
   }
 }

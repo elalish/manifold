@@ -32,6 +32,19 @@ Since Manifold is a WASM module, it does not automatically garbage-collect like 
 
 Please see our usage [examples](https://github.com/elalish/manifold/tree/master/bindings/wasm/examples) to see how to interface this library with `three.js`, `<model-viewer>`, and `glTF`. Of particular note are the included libraries for lossless roundtrip of manifold meshes through glTF files, via a new extension: [EXT_mesh_manifold](https://github.com/KhronosGroup/glTF/pull/2286). 
 
+## Command Line Interface
+
+ManifoldCAD now has a [command line interface](./bin/manifold-cad).  It can be run directly as `./bin/manifold-cad`, or via npx: `npx manifold-cad`.
+
+```
+Usage: manifold-cad [options] <infile.js> <outfile>
+```
+
+The output file can be in either `.glb` or `.3mf` format, determined by extension.
+
+This CLI is written in relatively plain JavaScript and serves as an example of how to use Manifold in a `node.js` environment.
+
+
 ## 3D Formats
 
 Please avoid saving to STL files! They are lossy and inefficient - when saving a manifold mesh to STL there is no guarantee that the re-imported mesh will still be manifold, as the topology is lost. Please consider using [3MF](https://3mf.io/) instead, as this format was designed from the beginning for manifold meshes representing solid objects. 
