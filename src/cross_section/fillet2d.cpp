@@ -1027,21 +1027,4 @@ std::vector<CrossSection> CrossSection::Fillet(double radius,
   return crossSections;
 }
 
-std::vector<CrossSection> CrossSection::Fillet(const SimplePolygon pts,
-                                               double radius,
-                                               int circularSegments) {
-  return Fillet(Polygons{pts}, radius, circularSegments);
-}
-
-std::vector<CrossSection> CrossSection::Fillet(const Polygons& polygons,
-                                               double radius,
-                                               int circularSegments) {
-  return CrossSection(polygons).Fillet(radius, circularSegments);
-}
-
-std::vector<CrossSection> Fillet(const std::vector<CrossSection>& crossSections,
-                                 double radius, int circularSegments) {
-  return CrossSection::Compose(crossSections).Fillet(radius, circularSegments);
-}
-
 }  // namespace manifold

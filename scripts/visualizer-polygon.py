@@ -298,7 +298,7 @@ def read_and_draw_circles(filename, ax, colors=None):
         ax.plot(x, y, 'ko', markersize=4)
         
         # Add text annotation
-        ax.annotate(f'({x:.1f}, {y:.1f})', (x, y), 
+        ax.annotate(f'({x:.3f}, {y:.3f})', (x, y), 
                    xytext=(5, 5), textcoords='offset points', fontsize=8)
 
     return ax

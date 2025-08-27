@@ -173,14 +173,6 @@ class CrossSection {
   ///@{
   std::vector<CrossSection> Fillet(double radius,
                                    int circularSegments = 0) const;
-  static std::vector<CrossSection> Fillet(
-      const std::vector<CrossSection>& crossSections, double radius,
-      int circularSegments = 0);
-  static std::vector<CrossSection> Fillet(const SimplePolygon pts,
-                                          double radius,
-                                          int circularSegments = 0);
-  static std::vector<CrossSection> Fillet(const Polygons& polys, double radius,
-                                          int circularSegments = 0);
 
 #ifdef MANIFOLD_DEBUG
   friend std::ostream& operator<<(std::ostream& stream,
