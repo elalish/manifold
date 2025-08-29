@@ -64,6 +64,61 @@ namespace {
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+// Get line normal direction
+vec2 getNormal(bool CCW, const vec2& e) {
+  return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+};
+
+double getRad(const vec2& v) { return atan2(v.y, v.x); }
+
+// Get 2 rad vec by 3 point
+std::array<double, 2> getRadVec(const vec2& p1, const vec2& p2,
+                                const vec2& center) {
+  return std::array<double, 2>{normalizeAngle(getRad(p1 - center)),
+                               normalizeAngle(getRad(p2 - center))};
+};
+
+// Get Point by parameter value
+vec2 getPoint(const vec2& p1, const vec2& p2, double t) {
+  return p1 + t * (p2 - p1);
+};
+
+/// @brief Is angle inside CCW sector range
+/// @param angle target angle
+/// @param startRad CCW sector start rad
+/// @param endRad CCW sector end rad
+/// @return Is inside
+bool isAngleInSector(double angle, double startRad, double endRad) {
+  angle = normalizeAngle(angle);
+  startRad = normalizeAngle(startRad);
+  endRad = normalizeAngle(endRad);
+
+  if (startRad <= endRad) {
+    return angle >= startRad && angle <= endRad;
+  } else {
+    // Sector crosses 0 degrees
+    return angle >= startRad || angle <= endRad;
+  }
+};
+
+// For P-* situation to check local validation
+bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
+                        vec2 circleCenter) {
+  double rad = getRad(circleCenter - points[1]);
+
+  vec2 pre = getNormal(!isCCW, points[0] - points[1]),
+       next = getNormal(isCCW, points[2] - points[1]);
+
+  double startRad = normalizeAngle(getRad(pre)),
+         endRad = normalizeAngle(getRad(next));
+
+  return isCCW ^ isAngleInSector(rad, startRad, endRad);
+};
+
+}  // namespace
+
+namespace {
+
 // Projection point to line and check if it's on the line segment
 bool isProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
                            double& t) {
@@ -245,21 +300,6 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
              e2Pre = e2Points[1] - e2Points[0],
              e2Cur = e2Points[2] - e2Points[1],
              e2Next = e2Points[3] - e2Points[2];
-  auto getNormal = [](bool CCW, const vec2& e) -> vec2 {
-    return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
-  };
-
-  auto getRadVec = [](const vec2& p1, const vec2& p2,
-                      const vec2& center) -> std::array<double, 2> {
-    vec2 v1 = p1 - center, v2 = p2 - center;
-
-    return std::array<double, 2>{normalizeAngle(atan2(v1.y, v1.x)),
-                                 normalizeAngle(atan2(v2.y, v2.x))};
-  };
-
-  auto getPoint = [](const vec2& p1, const vec2& p2, double t) -> vec2 {
-    return p1 + t * (p2 - p1);
-  };
 
   std::vector<ArcBridgeInfo> arcBridgeInfoVec;
 
@@ -320,35 +360,6 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
         return true;
 
       return false;
-    };
-
-    auto isAngleInSector = [](double angle, double startRad,
-                              double endRad) -> bool {
-      angle = normalizeAngle(angle);
-      startRad = normalizeAngle(startRad);
-      endRad = normalizeAngle(endRad);
-
-      if (startRad <= endRad) {
-        return angle >= startRad && angle <= endRad;
-      } else {
-        // Sector crosses 0 degrees
-        return angle >= startRad || angle <= endRad;
-      }
-    };
-
-    // For P-* situation to check local validation
-    auto isCircleLocalValid = [&getNormal, &isAngleInSector](
-                                  const std::array<vec2, 3>& points, bool isCCW,
-                                  vec2 circleCenter) -> bool {
-      vec2 pointToCenter = circleCenter - points[1];
-      double rad = atan2(pointToCenter.y, pointToCenter.x);
-
-      vec2 pre = getNormal(!isCCW, points[0] - points[1]),
-           next = getNormal(isCCW, points[2] - points[1]);
-      double startRad = normalizeAngle(atan2(pre.y, pre.x)),
-             endRad = normalizeAngle(atan2(next.y, next.x));
-
-      return isCCW ^ isAngleInSector(rad, startRad, endRad);
     };
 
     // Edge - Point
@@ -421,9 +432,6 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
              e2Pre = e2Points[1] - e2Points[0],
              e2Cur = e2Points[2] - e2Points[1],
              e2Next = e2Points[3] - e2Points[2];
-  auto getNormal = [](bool CCW, vec2 e) -> vec2 {
-    return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
-  };
 
   const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
              e1NextNormal = getNormal(e1CCW, e1Next);
@@ -459,57 +467,15 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
     return count;
   };
 
-  auto isAngleInSector = [](double angle, double startRad,
-                            double endRad) -> bool {
-    angle = normalizeAngle(angle);
-    startRad = normalizeAngle(startRad);
-    endRad = normalizeAngle(endRad);
-
-    if (startRad <= endRad) {
-      return angle >= startRad && angle <= endRad;
-    } else {
-      // Sector crosses 0 degrees
-      return angle >= startRad || angle <= endRad;
-    }
-  };
-
-  auto isPointInPie = [&isAngleInSector](const vec2& p, const vec2& center,
-                                         float radius, float startRad,
-                                         float endRad) -> bool {
+  auto isPointInPie = [](const vec2& p, const vec2& center, float radius,
+                         float startRad, float endRad) -> bool {
     vec2 diff = p - center;
     float distSq = length2(diff);
 
     if (distSq > radius * radius + EPSILON) return false;
 
-    float angle = atan2(diff.y, diff.x);
+    float angle = getRad(diff);
     return isAngleInSector(angle, startRad, endRad);
-  };
-
-  // For P-* situation to check local validation
-  auto isCircleLocalValid = [&getNormal, &isAngleInSector](
-                                const std::array<vec2, 3>& points, bool isCCW,
-                                vec2 circleCenter) -> bool {
-    vec2 pointToCenter = circleCenter - points[1];
-    double rad = atan2(pointToCenter.y, pointToCenter.x);
-
-    vec2 pre = getNormal(!isCCW, points[0] - points[1]),
-         next = getNormal(isCCW, points[2] - points[1]);
-    double startRad = normalizeAngle(atan2(pre.y, pre.x)),
-           endRad = normalizeAngle(atan2(next.y, next.x));
-
-    return isCCW ^ isAngleInSector(rad, startRad, endRad);
-  };
-
-  auto getRadVec = [](const vec2& p1, const vec2& p2,
-                      const vec2& center) -> std::array<double, 2> {
-    vec2 v1 = p1 - center, v2 = p2 - center;
-
-    return std::array<double, 2>{normalizeAngle(atan2(v1.y, v1.x)),
-                                 normalizeAngle(atan2(v2.y, v2.x))};
-  };
-
-  auto getPoint = [](const vec2& p1, const vec2& p2, double t) -> vec2 {
-    return p1 + t * (p2 - p1);
   };
 
   // Point - Edge
@@ -565,8 +531,7 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
 
   //  Point - Point
 
-  double startRad = atan2(e1CurNormal.y, e1CurNormal.x),
-         endRad = atan2(e1NextNormal.y, e1NextNormal.x);
+  double startRad = getRad(e1CurNormal), endRad = getRad(e1NextNormal);
 
   for (int i = 0; i != 2; i++) {
     const vec2 point = e2Points[i + 1];
