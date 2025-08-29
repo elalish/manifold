@@ -64,6 +64,14 @@ namespace {
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+// Projection point to line and check if it's on the line segment
+bool isProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
+                           double& t) {
+  t = la::dot(p - p1, p2 - p1) / la::length2(p2 - p1);
+
+  return t >= 0 && t <= 1;
+};
+
 double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
                             double& t) {
   vec2 d = p2 - p1;
@@ -147,19 +155,27 @@ struct ArcBridgeInfo {
   std::array<ArcEdgeState, 2> States;
   std::array<double, 2> ParameterValues;
   vec2 CircleCenter;
+
+  // CCW or CW is determined by loop's direction
   std::array<double, 2> RadValues;
+
+  ArcBridgeInfo Swap() {
+    ArcBridgeInfo info = *this;
+    std::swap(info.States[0], info.States[1]);
+    std::swap(info.ParameterValues[0], info.ParameterValues[1]);
+    std::swap(info.RadValues[0], info.RadValues[1]);
+    return info;
+  }
 };
 
 int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
                                  const bool eCCW, double radius,
-                                 std::array<vec2, 2>& circleCenters) {
-  auto isOnSegment = [](const vec2& p1, const vec2& p2, const vec2& p) -> bool {
-    double v = la::dot(p - p1, p2 - p1);
-    return 0 <= v && v <= la::length2(p2 - p1);
-  };
+                                 std::array<vec2, 2>& circleCenters,
+                                 std::array<double, 2>& tangentParameterValue) {
+  double t;
 
   // If p on edge p1->p2, degenerate
-  if (isOnSegment(p1, p2, p)) return 0;
+  if (isProjectionOnSegment(p, p1, p2, t)) return 0;
 
   vec2 e = p2 - p1, dir = la::normalize(e),
        normal = la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
@@ -176,8 +192,9 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
   int count = 0;
   for (int i = 0; i != 2; i++) {
     vec2 tangent = tangentPoint[i];
-    if (isOnSegment(p1, p2, tangent)) {
+    if (isProjectionOnSegment(tangent, p1, p2, t)) {
       // Tangent valid -> check circle valid
+      tangentParameterValue[count] = t;
       circleCenters[count] = tangent + normal * radius;
       count++;
     }
@@ -228,8 +245,20 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
              e2Pre = e2Points[1] - e2Points[0],
              e2Cur = e2Points[2] - e2Points[1],
              e2Next = e2Points[3] - e2Points[2];
-  auto getNormal = [](bool CCW, vec2 e) -> vec2 {
+  auto getNormal = [](bool CCW, const vec2& e) -> vec2 {
     return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+  };
+
+  auto getRadVec = [](const vec2& p1, const vec2& p2,
+                      const vec2& center) -> std::array<double, 2> {
+    vec2 v1 = p1 - center, v2 = p2 - center;
+
+    return std::array<double, 2>{normalizeAngle(atan2(v1.y, v1.x)),
+                                 normalizeAngle(atan2(v2.y, v2.x))};
+  };
+
+  auto getPoint = [](const vec2& p1, const vec2& p2, double t) -> vec2 {
+    return p1 + t * (p2 - p1);
   };
 
   std::vector<ArcBridgeInfo> arcBridgeInfoVec;
@@ -252,11 +281,15 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
     if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
                                 offsetE2[1], t, u)) {
       std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
+      vec2 center = offsetE1[0] + e1Cur * t,
+           tangent1 = getPoint(offsetE1[0], offsetE1[1], t),
+           tangent2 = getPoint(offsetE2[0], offsetE2[1], u);
+
       arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
           std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                       ArcEdgeState::E2CurrentEdge},
-          std::array<double, 2>{t, u}, offsetE1[0] + e1Cur * t,
-          std::array<double, 2>{0, 0}});
+          std::array<double, 2>{t, u}, center,
+          getRadVec(tangent1, tangent2, center)});
     }
   }
 
@@ -320,19 +353,20 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
 
     // Edge - Point
 
-    std::array<vec2, 2> points{e2Points[1], e2Points[2]};
     for (int i = 0; i != 2; i++) {
-      const vec2 point = points[i];
+      // e2Point2 1, 2
+      const vec2 point = e2Points[i + 1];
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
         std::array<vec2, 2> centers;
+        std::array<double, 2> tangentParameterValue;
 
         if (la::length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
             la::length(e2Points[2] - vec2(3, 0)) < EPSILON) {
           int i = 0;
         }
 
-        int count =
-            calculatePointSegmentCircles(point, p1, p2, e1CCW, radius, centers);
+        int count = calculatePointSegmentCircles(
+            point, p1, p2, e1CCW, radius, centers, tangentParameterValue);
 
         for (int j = 0; j != count; j++) {
           if (isCircleLocalValid(
@@ -342,13 +376,27 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
             std::cout << "E-P" << centers[j] << std::endl;
             std::cout << point << p1 << p2 << std::endl;
 
-            arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
-                std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
-                                            j == 0
-                                                ? ArcEdgeState::E2PreviousEdge
-                                                : ArcEdgeState::E2NextEdge},
-                std::array<double, 2>{0, 1}, centers[j],
-                std::array<double, 2>{0, 0}});
+            auto radVec = getRadVec(
+                getPoint(e1Points[0], e1Points[1], tangentParameterValue[j]),
+                point, centers[j]);
+
+            std::array<double, 2> paramVal{tangentParameterValue[j], 1};
+
+            ArcEdgeState e2ArcEdgeState =
+                (i == 0 ? ArcEdgeState::E2PreviousEdge
+                        : ArcEdgeState::E2CurrentEdge);
+
+            // CCW Loop must end with CW, or start with CCW
+            if (e2CCW ^ (normalizeAngle(radVec[1] - radVec[0]) > M_PI)) {
+              e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2CurrentEdge
+                                       : ArcEdgeState::E2NextEdge);
+              paramVal[1] = 0;
+            }
+
+            arcBridgeInfoVec.emplace_back(
+                ArcBridgeInfo{std::array<ArcEdgeState, 2>{
+                                  ArcEdgeState::E1CurrentEdge, e2ArcEdgeState},
+                              paramVal, centers[j], radVec});
           }
         }
       }
@@ -452,6 +500,18 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
     return isCCW ^ isAngleInSector(rad, startRad, endRad);
   };
 
+  auto getRadVec = [](const vec2& p1, const vec2& p2,
+                      const vec2& center) -> std::array<double, 2> {
+    vec2 v1 = p1 - center, v2 = p2 - center;
+
+    return std::array<double, 2>{normalizeAngle(atan2(v1.y, v1.x)),
+                                 normalizeAngle(atan2(v2.y, v2.x))};
+  };
+
+  auto getPoint = [](const vec2& p1, const vec2& p2, double t) -> vec2 {
+    return p1 + t * (p2 - p1);
+  };
+
   // Point - Edge
   {
     std::array<vec2, 2> intersections;
@@ -477,11 +537,28 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         std::cout << offsetE2[0] << offsetE2[1] << e1Points[1] << radius
                   << std::endl;
 
-        arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
-            std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
-                                        ArcEdgeState::E2CurrentEdge},
-            std::array<double, 2>{0, 1}, intersections[i],
-            std::array<double, 2>{0, 0}});
+        double t;
+        if (!isProjectionOnSegment(intersections[i], e2Points[1], e2Points[2],
+                                   t))
+          throw std::exception();
+
+        auto radVec =
+            getRadVec(e1Points[1], getPoint(e2Points[1], e2Points[2], t),
+                      intersections[i]);
+
+        ArcEdgeState e1ArcEdgeState = ArcEdgeState::E1CurrentEdge;
+        std::array<double, 2> paramVal{1, t};
+
+        // CCW Loop must end with CW, or start with CCW
+        if (e1CCW ^ (normalizeAngle(radVec[1] - radVec[0]) > M_PI)) {
+          e1ArcEdgeState = ArcEdgeState::E1NextEdge;
+          paramVal[0] = 0;
+        }
+
+        arcBridgeInfoVec.emplace_back(
+            ArcBridgeInfo{std::array<ArcEdgeState, 2>{
+                              e1ArcEdgeState, ArcEdgeState::E2CurrentEdge},
+                          paramVal, intersections[i], radVec});
       }
     }
   }
@@ -491,15 +568,14 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
   double startRad = atan2(e1CurNormal.y, e1CurNormal.x),
          endRad = atan2(e1NextNormal.y, e1NextNormal.x);
 
-  std::array<vec2, 2> points{e2Points[1], e2Points[2]};
   for (int i = 0; i != 2; i++) {
-    const vec2 point = points[i];
+    const vec2 point = e2Points[i + 1];
     if (la::length(point - e1Points[1]) < EPSILON) continue;
 
     if (isPointInPie(point, e1Points[1], radius, startRad, endRad)) {
       std::array<vec2, 2> centers;
       int count =
-          calculatePointPointCircles(point, e1Points[1], radius, centers);
+          calculatePointPointCircles(e1Points[1], point, radius, centers);
 
       for (int j = 0; j != count; j++) {
         if (isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
@@ -507,12 +583,35 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
                                e2CCW, centers[j])) {
           std::cout << "P-P" << centers[j] << std::endl;
           std::cout << point << e1Points[1] << radius << std::endl;
+
+          std::array<double, 2> paramVal{1, 1};
+          auto radVec = getRadVec(e1Points[1], point, centers[j]);
+
+          ArcEdgeState e1ArcEdgeState = ArcEdgeState::E1CurrentEdge;
+
+          // CCW Loop must end with CW, or start with CCW
+
+          bool arcCCW = normalizeAngle(radVec[1] - radVec[0]) > M_PI;
+          if (e1CCW ^ arcCCW) {
+            e1ArcEdgeState = ArcEdgeState::E1NextEdge;
+            paramVal[0] = 0;
+          }
+
+          ArcEdgeState e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2PreviousEdge
+                                                : ArcEdgeState::E2CurrentEdge);
+
+          // CCW Loop must end with CW, or start with CCW
+          if (e2CCW ^ arcCCW) {
+            e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2CurrentEdge
+                                     : ArcEdgeState::E2NextEdge);
+            paramVal[1] = 0;
+          }
+
           arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
               std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
                                           j == 0 ? ArcEdgeState::E2PreviousEdge
                                                  : ArcEdgeState::E2NextEdge},
-              std::array<double, 2>{0, 1}, centers[j],
-              std::array<double, 2>{0, 0}});
+              paramVal, centers[j], radVec});
         }
       }
     }
@@ -523,6 +622,8 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
 
 struct ArcConnectionInfo {
   vec2 center;
+
+  bool CCW;
 
   double t1, t2;  // Parameter value of arc tangent points of edges
   size_t e1, e2;  // Edge Idx of tangent points lie on
@@ -619,22 +720,22 @@ struct ColliderInfo {
 
 std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
     const Loops& loops, const ColliderInfo& collider, double radius) {
-  std::vector<size_t> loopOffset(loops.size());
-
   bool invert = false;
   if (radius < EPSILON) invert = true;
 
-  size_t count = 0;
-  for (size_t i = 0; i != loops.size(); i++) {
-    loopOffset[i] = count;
-    count += loops[i].Loop.size();
-  }
+  std::vector<size_t> loopOffset(loops.size());
 
-  const size_t loopElementCount = count;
+  const size_t loopElementCount = ([&loopOffset, &loops]() -> size_t {
+    size_t count = 0;
+    for (size_t i = 0; i != loops.size(); i++) {
+      loopOffset[i] = count;
+      count += loops[i].Loop.size();
+    }
 
-  std::vector<bool> markEE(loopElementCount * loopElementCount, false);
-  std::vector<bool> markEV(loopElementCount * loopElementCount, false);
-  std::vector<bool> markVV(loopElementCount * loopElementCount, false);
+    return count;
+  })();
+
+  std::vector<uint8_t> processedMark(loopElementCount * loopElementCount, 0);
 
   auto getMarkPosition = [&loopElementCount, &loopOffset](
                              const size_t loop1i, const size_t ele1i,
@@ -727,8 +828,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
           continue;
 
         // Check if processed, and add duplicate mark
-        markEE[getMarkPosition(e1Loopi, e1i, e2Loopi, e2i)] = 1;
-        if (markEE[getMarkPosition(e2Loopi, e2i, e1Loopi, e1i)] != 0) {
+        processedMark[getMarkPosition(e1Loopi, e1i, e2Loopi, e2i)] = 1;
+        if (processedMark[getMarkPosition(e2Loopi, e2i, e1Loopi, e1i)] != 0) {
           std::cout << "Skipped" << std::endl;
           continue;
         }
@@ -748,59 +849,59 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
         auto size3 = r1.size();
 
-        // Check for Collision
-
         std::vector<size_t> intersectEdgeIndex;
 
-        if (true) {
-          for (auto it = r1.begin(); it != r1.end();) {
-            const auto& arc = *it;
+        // Check each potential circle center
+        for (auto it = r1.begin(); it != r1.end();) {
+          const auto& arc = *it;
 
-            manifold::Box box(toVec3(arc.CircleCenter - vec2(1, 0) * radius),
-                              toVec3(arc.CircleCenter + vec2(1, 0) * radius));
+          manifold::Box box(toVec3(arc.CircleCenter - vec2(1, 0) * radius),
+                            toVec3(arc.CircleCenter + vec2(1, 0) * radius));
 
-            box.Union(toVec3(arc.CircleCenter - vec2(0, 1) * radius));
-            box.Union(toVec3(arc.CircleCenter + vec2(0, 1) * radius));
+          box.Union(toVec3(arc.CircleCenter - vec2(0, 1) * radius));
+          box.Union(toVec3(arc.CircleCenter + vec2(0, 1) * radius));
 
-            auto rr = collider.outerCollider.Collisions(
-                manifold::Vec<manifold::Box>({box}).cview());
+          auto rr = collider.outerCollider.Collisions(
+              manifold::Vec<manifold::Box>({box}).cview());
 
-            // r.Dump();
-            rr.Sort();
-            bool eraseFlag = false;
+          // r.Dump();
+          rr.Sort();
+          bool eraseFlag = false;
 
-            for (size_t k = 0; k != rr.size(); k++) {
-              const auto& edge = collider.outerEdgeOld2NewVec[rr.Get(k, true)];
+          for (size_t k = 0; k != rr.size(); k++) {
+            const auto& edge = collider.outerEdgeOld2NewVec[rr.Get(k, true)];
 
-              if (edge.loopRef == e1Loopi && edge.p1Ref == e1i)
-                continue;
-              else if (edge.loopRef == e2Loopi && edge.p1Ref == e2i)
-                continue;
+            if (edge.loopRef == e1Loopi && edge.p1Ref == e1i)
+              continue;
+            else if (edge.loopRef == e2Loopi && edge.p1Ref == e2i)
+              continue;
 
-              const auto& eLoop = loops[edge.loopRef].Loop;
-              const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
-              const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
-              if (intersectCircleSegment(p1, p2, arc.CircleCenter, radius)) {
-                std::cout << "Remove" << arc.CircleCenter << std::endl;
-                eraseFlag = true;
-                intersectEdgeIndex.push_back(p1i);
-              }
+            const auto& eLoop = loops[edge.loopRef].Loop;
+            const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
+            const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
+
+            double t;
+            double distance = distancePointSegment(arc.CircleCenter, p1, p2, t);
+
+            if (std::abs(distance - radius) < EPSILON) {
+              // TODO: Intersected, this can be used to optimize speed for
+              // pre-detect all intersected point and avoid double processed
+            } else if (distance < radius) {
+              std::cout << "Remove" << arc.CircleCenter << std::endl;
+              eraseFlag = true;
+              break;
             }
-
-            if (eraseFlag)
-              it = r1.erase(it);
-            else
-              it++;
           }
+
+          if (eraseFlag)
+            it = r1.erase(it);
+          else
+            it++;
         }
 
         for (const auto& e : r1) {
           f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
-
-        // Calculate all intersection to avoid double processed
-
-        //
       }
     }
   }
