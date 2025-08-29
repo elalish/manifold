@@ -71,6 +71,13 @@ vec2 getNormal(bool CCW, const vec2& e) {
 
 double getRad(const vec2& v) { return atan2(v.y, v.x); }
 
+// Normalize angle to [0, 2*PI)
+float normalizeAngle(float angle) {
+  while (angle < 0) angle += 2 * M_PI;
+  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+  return angle;
+}
+
 // Get 2 rad vec by 3 point
 std::array<double, 2> getRadVec(const vec2& p1, const vec2& p2,
                                 const vec2& center) {
@@ -191,13 +198,6 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
-// Normalize angle to [0, 2*PI)
-float normalizeAngle(float angle) {
-  while (angle < 0) angle += 2 * M_PI;
-  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
-  return angle;
-}
-
 enum class ArcEdgeState {
   E1CurrentEdge,
   E1NextEdge,
@@ -317,7 +317,7 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
             e2Points[2] + e2CurNormal * radius,
         };
 
-    double t, u;
+    double t = 0, u = 0;
     if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
                                 offsetE2[1], t, u)) {
       std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
@@ -480,7 +480,7 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
 
   // Point - Edge
   {
-    std::array<vec2, 2> intersections;
+    std::array<vec2, 2> centers;
 
     const vec2 e2CurNormal = getNormal(e2CCW, e2Cur);
 
@@ -495,22 +495,20 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
     }
 
     int count = getLineCircleIntersection(offsetE2[0], offsetE2[1], e1Points[1],
-                                          radius, intersections);
+                                          radius, centers);
     for (int i = 0; i != count; i++) {
-      if (isCircleLocalValid(e1Points, e1CCW, intersections[i])) {
-        std::cout << "P-E" << intersections[i] << std::endl;
+      if (isCircleLocalValid(e1Points, e1CCW, centers[i])) {
+        std::cout << "P-E" << centers[i] << std::endl;
 
         std::cout << offsetE2[0] << offsetE2[1] << e1Points[1] << radius
                   << std::endl;
 
         double t;
-        if (!isProjectionOnSegment(intersections[i], e2Points[1], e2Points[2],
-                                   t))
+        if (!isProjectionOnSegment(centers[i], e2Points[1], e2Points[2], t))
           throw std::exception();
 
-        auto radVec =
-            getRadVec(e1Points[1], getPoint(e2Points[1], e2Points[2], t),
-                      intersections[i]);
+        auto radVec = getRadVec(
+            e1Points[1], getPoint(e2Points[1], e2Points[2], t), centers[i]);
 
         ArcEdgeState e1ArcEdgeState = ArcEdgeState::E1CurrentEdge;
         std::array<double, 2> paramVal{1, t};
@@ -524,7 +522,7 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         arcBridgeInfoVec.emplace_back(
             ArcBridgeInfo{std::array<ArcEdgeState, 2>{
                               e1ArcEdgeState, ArcEdgeState::E2CurrentEdge},
-                          paramVal, intersections[i], radVec});
+                          paramVal, centers[i], radVec});
       }
     }
   }
