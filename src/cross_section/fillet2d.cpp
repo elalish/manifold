@@ -74,17 +74,20 @@ struct GeomTangentPair {
 
   // CCW or CW is determined by loop's direction
   std::array<double, 2> RadValues;
-
-  // GeomTangentPair Swap() {
-  //   GeomTangentPair info = *this;
-  //   std::swap(info.States[0], info.States[1]);
-  //   std::swap(info.ParameterValues[0], info.ParameterValues[1]);
-  //   std::swap(info.RadValues[0], info.RadValues[1]);
-  //   return info;
-  // }
 };
 
 struct TopoConnectionPair {
+  TopoConnectionPair(const GeomTangentPair& geomPair, size_t Edge1Index,
+                     size_t Edge1LoopIndex, size_t Edge2Index,
+                     size_t Edge2LoopIndex) {
+    CircleCenter = geomPair.CircleCenter;
+    ParameterValues = geomPair.ParameterValues;
+    RadValues = geomPair.RadValues;
+
+    EdgeIndex = std::array<size_t, 2>{Edge1Index, Edge2Index};
+    LoopIndex = std::array<size_t, 2>{Edge1LoopIndex, Edge2LoopIndex};
+  }
+
   vec2 CircleCenter;
   std::array<double, 2> ParameterValues;
   std::array<double, 2> RadValues;
@@ -92,36 +95,15 @@ struct TopoConnectionPair {
   // CCW or CW is determined by loop's direction
   std::array<size_t, 2> EdgeIndex;
   std::array<size_t, 2> LoopIndex;
-};
 
-struct ArcConnectionInfo {
-  ArcConnectionInfo(const GeomTangentPair& geomPair, size_t e1, size_t e1Loopi,
-                    size_t e2, size_t e2Loopi) {}
-
-  std::array<double, 2> ParameterValues;
-  vec2 CircleCenter;
-
-  // CCW or CW is determined by loop's direction
-  std::array<double, 2> RadValues;
-  std::array<size_t, 2> EdgeIndex;
-  std::array<size_t, 2> LoopIndex;
-
-  ArcConnectionInfo Swap(){};
-  // GeomTangentPair Swap() {
-  //   GeomTangentPair info = *this;
-  //   std::swap(info.States[0], info.States[1]);
-  //   std::swap(info.ParameterValues[0], info.ParameterValues[1]);
-  //   std::swap(info.RadValues[0], info.RadValues[1]);
-  //   return info;
-  // }
-
-  vec2 center;
-
-  double t1, t2;  // Parameter value of arc tangent points of edges
-  size_t e1, e2;  // Edge Idx of tangent points lie on
-  size_t e1Loopi, e2Loopi;
-
-  double startRad, endRad;
+  TopoConnectionPair Swap() {
+    TopoConnectionPair pair = *this;
+    std::swap(ParameterValues[0], ParameterValues[1]);
+    std::swap(RadValues[0], RadValues[1]);
+    std::swap(EdgeIndex[0], EdgeIndex[1]);
+    std::swap(LoopIndex[0], LoopIndex[1]);
+    return pair;
+  };
 };
 
 }  // namespace
@@ -625,7 +607,7 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
   return GeomTangentPairVec;
 }
 
-std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
+std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
 
@@ -711,7 +693,7 @@ struct ColliderInfo {
   std::vector<std::vector<edgeOld2New>> innerVec;
 };
 
-std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
+std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     const Loops& loops, const ColliderInfo& collider, double radius) {
   bool invert = false;
   if (radius < EPSILON) invert = true;
@@ -738,8 +720,8 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
            loopOffset[loop2i] + ele2i;
   };
 
-  std::vector<std::vector<ArcConnectionInfo>> arcConnection(
-      loopElementCount, std::vector<ArcConnectionInfo>());
+  std::vector<std::vector<TopoConnectionPair>> arcConnection(
+      loopElementCount, std::vector<TopoConnectionPair>());
 
   std::vector<std::vector<GeomTangentPair>> arcInfoVec(
       loopElementCount, std::vector<GeomTangentPair>());
@@ -922,7 +904,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             }
           }
 
-          auto connectPair = ArcConnectionInfo(*it, i, e1Loopi, j, e2Loopi);
+          auto connectPair = TopoConnectionPair(*it, i, e1Loopi, j, e2Loopi);
           arcConnection[loopOffset[e1Loopi] + i].push_back(connectPair);
           arcConnection[loopOffset[e2Loopi] + j].push_back(connectPair.Swap());
         }
@@ -962,7 +944,7 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
 std::vector<CrossSection> Tracing(
     const Loops& loops,
-    std::vector<std::vector<ArcConnectionInfo>> arcConnection,
+    std::vector<std::vector<TopoConnectionPair>> arcConnection,
     int circularSegments, double radius) {
   std::vector<size_t> loopOffset(loops.size());
 
@@ -1015,7 +997,7 @@ std::vector<CrossSection> Tracing(
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
-        ArcConnectionInfo& arc = *it->begin();
+        TopoConnectionPair& arc = *it->begin();
 
         const auto pts = discreteArcToPoint(arc, radius, circularSegments);
         tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
@@ -1048,8 +1030,8 @@ std::vector<CrossSection> Tracing(
       auto it = std::find_if(
           arcConnection[getEdgePosition(current)].begin(),
           arcConnection[getEdgePosition(current)].end(),
-          [current, EPSILON](const ArcConnectionInfo& ele) -> bool {
-            return ele.t1 + EPSILON > current.ParameterValue;
+          [current, EPSILON](const TopoConnectionPair& ele) -> bool {
+            return ele.ParameterValues[0] + EPSILON > current.ParameterValue;
           });
 
       if (it == arcConnection[currentEdgeIndex].end()) {
@@ -1074,7 +1056,7 @@ std::vector<CrossSection> Tracing(
           break;
         }
 
-        ArcConnectionInfo arc = *it;
+        TopoConnectionPair arc = *it;
         arcConnection[getEdgePosition(current)].erase(it);
         arcConnection[getEdgePosition(current.Swap())].erase(it);
 
