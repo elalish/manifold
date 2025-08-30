@@ -79,7 +79,8 @@ struct GeomTangentPair {
 struct TopoConnectionPair {
   TopoConnectionPair(const GeomTangentPair& geomPair, size_t Edge1Index,
                      size_t Edge1LoopIndex, size_t Edge2Index,
-                     size_t Edge2LoopIndex) {
+                     size_t Edge2LoopIndex, size_t index)
+      : Index(index) {
     CircleCenter = geomPair.CircleCenter;
     ParameterValues = geomPair.ParameterValues;
     RadValues = geomPair.RadValues;
@@ -87,6 +88,8 @@ struct TopoConnectionPair {
     EdgeIndex = std::array<size_t, 2>{Edge1Index, Edge2Index};
     LoopIndex = std::array<size_t, 2>{Edge1LoopIndex, Edge2LoopIndex};
   }
+
+  const size_t Index;
 
   vec2 CircleCenter;
   std::array<double, 2> ParameterValues;
@@ -696,6 +699,8 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
   bool invert = false;
   if (radius < EPSILON) invert = true;
 
+  size_t circleIndex = 0;
+
   std::vector<size_t> loopOffset(loops.size());
 
   const size_t loopElementCount = ([&loopOffset, &loops]() -> size_t {
@@ -902,7 +907,9 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
             }
           }
 
-          auto connectPair = TopoConnectionPair(*it, i, e1Loopi, j, e2Loopi);
+          auto connectPair =
+              TopoConnectionPair(*it, i, e1Loopi, j, e2Loopi, circleIndex++);
+
           arcConnection[loopOffset[e1Loopi] + i].push_back(connectPair);
           arcConnection[loopOffset[e2Loopi] + j].push_back(connectPair.Swap());
         }
@@ -956,32 +963,27 @@ std::vector<CrossSection> Tracing(
     return count;
   })();
 
+  struct EdgeLoopPair {
+    size_t EdgeIndex, LoopIndex;
+    double ParameterValue;
+
+    bool operator==(const EdgeLoopPair& o) {
+      return (EdgeIndex == o.EdgeIndex) && (LoopIndex == o.LoopIndex);
+    }
+
+    bool operator!=(const EdgeLoopPair& o) { return !(*this == o); }
+  };
+
+  auto getEdgePosition = [&loopOffset](const EdgeLoopPair& edge) -> size_t {
+    return loopOffset[edge.LoopIndex] + edge.EdgeIndex;
+  };
+
   std::vector<uint8_t> loopFlag(loops.size(), 0);
 
   manifold::Polygons resultLoops;
 
   while (true) {
     SimplePolygon tracingLoop{};
-
-    struct EdgeLoopPair {
-      size_t EdgeIndex, LoopIndex;
-      double ParameterValue;
-
-      bool operator==(const EdgeLoopPair& o) {
-        return (EdgeIndex == o.EdgeIndex) && (LoopIndex == o.LoopIndex);
-      }
-
-      bool operator!=(const EdgeLoopPair& o) { return !(*this == o); }
-
-      EdgeLoopPair Swap() {}
-    };
-
-    auto getEdgePosition = [&loopOffset](const EdgeLoopPair& edge) -> size_t {
-      return loopOffset[edge.LoopIndex] + edge.EdgeIndex;
-    };
-
-    std::vector<EdgeLoopPair> tracingEList;
-    std::vector<size_t> mapVV;
 
     // Tracing to construct result
     EdgeLoopPair current, end;
@@ -1014,11 +1016,6 @@ std::vector<CrossSection> Tracing(
     }
 
     if (it == arcConnection.end()) break;
-
-    // For detecting inner loop
-    tracingEList.push_back(current);
-
-    mapVV.push_back(tracingLoop.size());
 
     while (true) {
       // Trace to find next arc on current edge
@@ -1056,7 +1053,22 @@ std::vector<CrossSection> Tracing(
 
         TopoConnectionPair arc = *it;
         arcConnection[getEdgePosition(current)].erase(it);
-        arcConnection[getEdgePosition(current.Swap())].erase(it);
+
+        {
+          // Remove paired connection
+          EdgeLoopPair next{arc.EdgeIndex[1], arc.LoopIndex[1]};
+          auto itt = std::find_if(arcConnection[getEdgePosition(next)].begin(),
+                                  arcConnection[getEdgePosition(next)].end(),
+                                  [arc](const TopoConnectionPair& ele) -> bool {
+                                    return ele.Index == arc.Index;
+                                  });
+
+          if (itt == arcConnection[getEdgePosition(next)].end()) {
+            ASSERT(false, "Pair not found.");
+          }
+
+          arcConnection[getEdgePosition(next)].erase(itt);
+        }
 
         const auto pts = discreteArcToPoint(arc, radius, circularSegments);
         tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
