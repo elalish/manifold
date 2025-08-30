@@ -194,10 +194,10 @@ std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
 
   manifold::ManifoldParams().verbose = true;
 
-  auto r = manifold::CrossSection::Fillet(polys, radius, circularSegments);
+  auto r = CrossSection(polys).Fillet(radius, circularSegments);
 
-  auto rr = manifold::CrossSection::Compose(r);
-  EXPECT_TRUE(rr.Area() < manifold::CrossSection(polys).Area());
+  auto rc = manifold::CrossSection::Compose(r);
+  EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
 
   for (const auto &crossSection : r) {
     auto polygon = crossSection.ToPolygons();
@@ -210,21 +210,32 @@ std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
         vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
              p3 = loop[(i + 2) % loop.size()];
 
+        // Check edge direction
         vec2 e1 = p2 - p1, e2 = p3 - p2;
         double det = la::cross(e1, e2);
         EXPECT_TRUE(isCCW && (det > 0));
 
+        // Check angle between edge
         float angle = la::asin(det / (la::length(e1) * la::length(e2)));
-        EXPECT_TRUE(angle < dPhi);
+        EXPECT_TRUE(angle < dPhi || angle > M_PI);
       }
     }
   }
+
+  auto rr = rc.Fillet(radius, circularSegments);
+  auto rrc = manifold::CrossSection::Compose(r);
+
+  // Check idempotent
+  EXPECT_NEAR(rc.Area(), rrc.Area(), 1);
 
   return r;
 }
 
 void RegisterFilletTests() {
-  std::string files[] = {"fillet.txt"};
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+  // std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);

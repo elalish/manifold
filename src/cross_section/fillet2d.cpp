@@ -279,9 +279,6 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
     }
   }
 
-  // // No result check
-  // if (!count) throw std::exception();
-
   return count;
 }
 
@@ -528,8 +525,9 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
                   << std::endl;
 
         double t;
-        if (!isProjectionOnSegment(centers[i], e2Points[1], e2Points[2], t))
-          throw std::exception();
+        if (!isProjectionOnSegment(centers[i], e2Points[1], e2Points[2], t)) {
+          DEBUG_ASSERT(false, logicErr, "Tangent not on segment");
+        }
 
         auto radVec = getRadVec(
             e1Points[1], getPoint(e2Points[1], e2Points[2], t), centers[i]);
@@ -1154,8 +1152,6 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   // Tracing along the arc
   auto result = Tracing(loops, arcConnection, n, radius);
-
-  // Post apply untouched contour
 
   return result;
 }
