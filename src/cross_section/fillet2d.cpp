@@ -57,6 +57,73 @@ struct SimpleLoop {
 };
 
 using Loops = std::vector<SimpleLoop>;
+
+enum class EdgeTangentState {
+  E1CurrentEdge,
+  E1NextEdge,
+  E2PreviousEdge,
+  E2CurrentEdge,
+  E2NextEdge
+};
+
+// Two edge tangent by same circle
+struct GeomTangentPair {
+  std::array<EdgeTangentState, 2> States;
+  std::array<double, 2> ParameterValues;
+  vec2 CircleCenter;
+
+  // CCW or CW is determined by loop's direction
+  std::array<double, 2> RadValues;
+
+  // GeomTangentPair Swap() {
+  //   GeomTangentPair info = *this;
+  //   std::swap(info.States[0], info.States[1]);
+  //   std::swap(info.ParameterValues[0], info.ParameterValues[1]);
+  //   std::swap(info.RadValues[0], info.RadValues[1]);
+  //   return info;
+  // }
+};
+
+struct TopoConnectionPair {
+  vec2 CircleCenter;
+  std::array<double, 2> ParameterValues;
+  std::array<double, 2> RadValues;
+
+  // CCW or CW is determined by loop's direction
+  std::array<size_t, 2> EdgeIndex;
+  std::array<size_t, 2> LoopIndex;
+};
+
+struct ArcConnectionInfo {
+  ArcConnectionInfo(const GeomTangentPair& geomPair, size_t e1, size_t e1Loopi,
+                    size_t e2, size_t e2Loopi) {}
+
+  std::array<double, 2> ParameterValues;
+  vec2 CircleCenter;
+
+  // CCW or CW is determined by loop's direction
+  std::array<double, 2> RadValues;
+  std::array<size_t, 2> EdgeIndex;
+  std::array<size_t, 2> LoopIndex;
+
+  ArcConnectionInfo Swap(){};
+  // GeomTangentPair Swap() {
+  //   GeomTangentPair info = *this;
+  //   std::swap(info.States[0], info.States[1]);
+  //   std::swap(info.ParameterValues[0], info.ParameterValues[1]);
+  //   std::swap(info.RadValues[0], info.RadValues[1]);
+  //   return info;
+  // }
+
+  vec2 center;
+
+  double t1, t2;  // Parameter value of arc tangent points of edges
+  size_t e1, e2;  // Edge Idx of tangent points lie on
+  size_t e1Loopi, e2Loopi;
+
+  double startRad, endRad;
+};
+
 }  // namespace
 
 namespace {
@@ -198,31 +265,6 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
-enum class ArcEdgeState {
-  E1CurrentEdge,
-  E1NextEdge,
-  E2PreviousEdge,
-  E2CurrentEdge,
-  E2NextEdge
-};
-
-struct ArcBridgeInfo {
-  std::array<ArcEdgeState, 2> States;
-  std::array<double, 2> ParameterValues;
-  vec2 CircleCenter;
-
-  // CCW or CW is determined by loop's direction
-  std::array<double, 2> RadValues;
-
-  ArcBridgeInfo Swap() {
-    ArcBridgeInfo info = *this;
-    std::swap(info.States[0], info.States[1]);
-    std::swap(info.ParameterValues[0], info.ParameterValues[1]);
-    std::swap(info.RadValues[0], info.RadValues[1]);
-    return info;
-  }
-};
-
 int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
                                  const bool eCCW, double radius,
                                  std::array<vec2, 2>& circleCenters,
@@ -291,7 +333,7 @@ int calculatePointPointCircles(const vec2& p1, const vec2& p2, double radius,
   return 2;
 }
 
-std::vector<ArcBridgeInfo> calculateStadiumIntersect(
+std::vector<GeomTangentPair> calculateStadiumIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
     const double radius) {
@@ -301,7 +343,7 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
              e2Cur = e2Points[2] - e2Points[1],
              e2Next = e2Points[3] - e2Points[2];
 
-  std::vector<ArcBridgeInfo> arcBridgeInfoVec;
+  std::vector<GeomTangentPair> GeomTangentPairVec;
 
   const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
              e2CurNormal = getNormal(e2CCW, e2Cur);
@@ -325,9 +367,9 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
            tangent1 = getPoint(offsetE1[0], offsetE1[1], t),
            tangent2 = getPoint(offsetE2[0], offsetE2[1], u);
 
-      arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
-          std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
-                                      ArcEdgeState::E2CurrentEdge},
+      GeomTangentPairVec.emplace_back(GeomTangentPair{
+          std::array<EdgeTangentState, 2>{EdgeTangentState::E1CurrentEdge,
+                                          EdgeTangentState::E2CurrentEdge},
           std::array<double, 2>{t, u}, center,
           getRadVec(tangent1, tangent2, center)});
     }
@@ -393,31 +435,31 @@ std::vector<ArcBridgeInfo> calculateStadiumIntersect(
 
             std::array<double, 2> paramVal{tangentParameterValue[j], 1};
 
-            ArcEdgeState e2ArcEdgeState =
-                (i == 0 ? ArcEdgeState::E2PreviousEdge
-                        : ArcEdgeState::E2CurrentEdge);
+            EdgeTangentState e2EdgeTangentState =
+                (i == 0 ? EdgeTangentState::E2PreviousEdge
+                        : EdgeTangentState::E2CurrentEdge);
 
             // CCW Loop must end with CW, or start with CCW
             if (e2CCW ^ (normalizeAngle(radVec[1] - radVec[0]) > M_PI)) {
-              e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2CurrentEdge
-                                       : ArcEdgeState::E2NextEdge);
+              e2EdgeTangentState = (i == 0 ? EdgeTangentState::E2CurrentEdge
+                                           : EdgeTangentState::E2NextEdge);
               paramVal[1] = 0;
             }
 
-            arcBridgeInfoVec.emplace_back(
-                ArcBridgeInfo{std::array<ArcEdgeState, 2>{
-                                  ArcEdgeState::E1CurrentEdge, e2ArcEdgeState},
-                              paramVal, centers[j], radVec});
+            GeomTangentPairVec.emplace_back(GeomTangentPair{
+                std::array<EdgeTangentState, 2>{EdgeTangentState::E1CurrentEdge,
+                                                e2EdgeTangentState},
+                paramVal, centers[j], radVec});
           }
         }
       }
     }
   }
 
-  return arcBridgeInfoVec;
+  return GeomTangentPairVec;
 }
 
-std::vector<ArcBridgeInfo> calculateSectorIntersect(
+std::vector<GeomTangentPair> calculateSectorIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
     const double radius) {
@@ -425,7 +467,7 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
                               2.0 * radius))
     return {};
 
-  std::vector<ArcBridgeInfo> arcBridgeInfoVec;
+  std::vector<GeomTangentPair> GeomTangentPairVec;
 
   const vec2 e1Cur = e1Points[1] - e1Points[0],
              e1Next = e1Points[2] - e1Points[1],
@@ -510,19 +552,19 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
         auto radVec = getRadVec(
             e1Points[1], getPoint(e2Points[1], e2Points[2], t), centers[i]);
 
-        ArcEdgeState e1ArcEdgeState = ArcEdgeState::E1CurrentEdge;
+        EdgeTangentState e1EdgeTangentState = EdgeTangentState::E1CurrentEdge;
         std::array<double, 2> paramVal{1, t};
 
         // CCW Loop must end with CW, or start with CCW
         if (e1CCW ^ (normalizeAngle(radVec[1] - radVec[0]) > M_PI)) {
-          e1ArcEdgeState = ArcEdgeState::E1NextEdge;
+          e1EdgeTangentState = EdgeTangentState::E1NextEdge;
           paramVal[0] = 0;
         }
 
-        arcBridgeInfoVec.emplace_back(
-            ArcBridgeInfo{std::array<ArcEdgeState, 2>{
-                              e1ArcEdgeState, ArcEdgeState::E2CurrentEdge},
-                          paramVal, centers[i], radVec});
+        GeomTangentPairVec.emplace_back(GeomTangentPair{
+            std::array<EdgeTangentState, 2>{e1EdgeTangentState,
+                                            EdgeTangentState::E2CurrentEdge},
+            paramVal, centers[i], radVec});
       }
     }
   }
@@ -550,65 +592,53 @@ std::vector<ArcBridgeInfo> calculateSectorIntersect(
           std::array<double, 2> paramVal{1, 1};
           auto radVec = getRadVec(e1Points[1], point, centers[j]);
 
-          ArcEdgeState e1ArcEdgeState = ArcEdgeState::E1CurrentEdge;
+          EdgeTangentState e1EdgeTangentState = EdgeTangentState::E1CurrentEdge;
 
           // CCW Loop must end with CW, or start with CCW
 
           bool arcCCW = normalizeAngle(radVec[1] - radVec[0]) > M_PI;
           if (e1CCW ^ arcCCW) {
-            e1ArcEdgeState = ArcEdgeState::E1NextEdge;
+            e1EdgeTangentState = EdgeTangentState::E1NextEdge;
             paramVal[0] = 0;
           }
 
-          ArcEdgeState e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2PreviousEdge
-                                                : ArcEdgeState::E2CurrentEdge);
+          EdgeTangentState e2EdgeTangentState =
+              (i == 0 ? EdgeTangentState::E2PreviousEdge
+                      : EdgeTangentState::E2CurrentEdge);
 
           // CCW Loop must end with CW, or start with CCW
           if (e2CCW ^ arcCCW) {
-            e2ArcEdgeState = (i == 0 ? ArcEdgeState::E2CurrentEdge
-                                     : ArcEdgeState::E2NextEdge);
+            e2EdgeTangentState = (i == 0 ? EdgeTangentState::E2CurrentEdge
+                                         : EdgeTangentState::E2NextEdge);
             paramVal[1] = 0;
           }
 
-          arcBridgeInfoVec.emplace_back(ArcBridgeInfo{
-              std::array<ArcEdgeState, 2>{ArcEdgeState::E1CurrentEdge,
-                                          j == 0 ? ArcEdgeState::E2PreviousEdge
-                                                 : ArcEdgeState::E2NextEdge},
-              paramVal, centers[j], radVec});
+          GeomTangentPairVec.emplace_back(
+              GeomTangentPair{std::array<EdgeTangentState, 2>{
+                                  e1EdgeTangentState, e2EdgeTangentState},
+                              paramVal, centers[j], radVec});
         }
       }
     }
   }
 
-  return arcBridgeInfoVec;
+  return GeomTangentPairVec;
 }
-
-struct ArcConnectionInfo {
-  vec2 center;
-
-  bool CCW;
-
-  double t1, t2;  // Parameter value of arc tangent points of edges
-  size_t e1, e2;  // Edge Idx of tangent points lie on
-  size_t e1Loopi, e2Loopi;
-
-  double startRad, endRad;
-};
 
 std::vector<vec2> discreteArcToPoint(ArcConnectionInfo arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
 
-  double totalRad = normalizeAngle(arc.endRad - arc.startRad);
+  double totalRad = normalizeAngle(arc.RadValues[1] - arc.RadValues[0]);
 
   double dPhi = 2 * M_PI / circularSegments;
   int seg = int(totalRad / dPhi) + 1;
   for (int i = 0; i != seg + 1; ++i) {
-    double current = arc.startRad + dPhi * i;
-    if (i == seg) current = arc.endRad;
+    double current = arc.RadValues[0] + dPhi * i;
+    if (i == seg) current = arc.RadValues[1];
 
-    vec2 pnt = {arc.center.x + radius * cos(current),
-                arc.center.y + radius * sin(current)};
+    vec2 pnt = {arc.CircleCenter.x + radius * cos(current),
+                arc.CircleCenter.y + radius * sin(current)};
 
     pts.push_back(pnt);
   }
@@ -710,6 +740,9 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
   std::vector<std::vector<ArcConnectionInfo>> arcConnection(
       loopElementCount, std::vector<ArcConnectionInfo>());
+
+  std::vector<std::vector<GeomTangentPair>> arcInfoVec(
+      loopElementCount, std::vector<GeomTangentPair>());
 
   std::cout << "Collider BBox Testing" << std::endl;
 
@@ -862,6 +895,38 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
             it++;
         }
 
+        size_t e1Nexti = (e1i + 1) % e1Loop.size(),
+               e2Prei = (e2i + e2Loop.size() - 1) % e2Loop.size(),
+               e2Nexti = (e2i + 1) % e2Loop.size();
+
+        for (auto it = r1.begin(); it != r1.end(); it++) {
+          size_t i, j;
+
+          for (auto k = 0; k != 2; k++) {
+            switch (it->States[k]) {
+              case EdgeTangentState::E1CurrentEdge:
+                i = e1i;
+                break;
+              case EdgeTangentState::E1NextEdge:
+                i = e1Nexti;
+                break;
+              case EdgeTangentState::E2PreviousEdge:
+                j = e2Prei;
+                break;
+              case EdgeTangentState::E2CurrentEdge:
+                j = e2i;
+                break;
+              case EdgeTangentState::E2NextEdge:
+                j = e2Nexti;
+                break;
+            }
+          }
+
+          auto connectPair = ArcConnectionInfo(*it, i, e1Loopi, j, e2Loopi);
+          arcConnection[loopOffset[e1Loopi] + i].push_back(connectPair);
+          arcConnection[loopOffset[e2Loopi] + j].push_back(connectPair.Swap());
+        }
+
         for (const auto& e : r1) {
           f << e.CircleCenter.x << " " << e.CircleCenter.y << std::endl;
         }
@@ -871,24 +936,20 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
 
   f.close();
 
-  return {};
-
-  std::ofstream c("circle.txt");
-
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
     for (size_t i = 0; i != arcConnection.size(); i++) {
       std::cout << i << " " << arcConnection[i].size();
       for (size_t j = 0; j != arcConnection[i].size(); j++) {
-        std::cout << "\t" << arcConnection[i][j].e1 << " "
-                  << arcConnection[i][j].e2 << " " << arcConnection[i][j].t1
-                  << " " << arcConnection[i][j].t2 << " <"
-                  << arcConnection[i][j].center << "> "
-                  << arcConnection[i][j].startRad << " "
-                  << arcConnection[i][j].endRad << std::endl;
-
-        f << arcConnection[i][j].center.x << " " << arcConnection[i][j].center.y
-          << std::endl;
+        std::cout << "\t" << arcConnection[i][j].LoopIndex[0]
+                  << arcConnection[i][j].EdgeIndex[0] << " "
+                  << arcConnection[i][j].LoopIndex[1] << " "
+                  << arcConnection[i][j].EdgeIndex[1] << " "
+                  << arcConnection[i][j].ParameterValues[0] << " "
+                  << arcConnection[i][j].ParameterValues[1]
+                  << " { Center: " << arcConnection[i][j].CircleCenter << "} "
+                  << arcConnection[i][j].RadValues[0] << " "
+                  << arcConnection[i][j].RadValues[1] << std::endl;
       }
 
       std::cout << std::endl;
@@ -896,31 +957,59 @@ std::vector<std::vector<ArcConnectionInfo>> CalculateFilletArc(
   }
 #endif
 
-  c.close();
-
   return arcConnection;
 }
 
-manifold::Polygons Tracing(
+std::vector<CrossSection> Tracing(
     const Loops& loops,
     std::vector<std::vector<ArcConnectionInfo>> arcConnection,
     int circularSegments, double radius) {
-  const double EPSILON = 1e-9;
+  std::vector<size_t> loopOffset(loops.size());
 
-  const manifold::SimplePolygon& loop = loops[0].Loop;
+  const size_t loopElementCount = ([&loopOffset, &loops]() -> size_t {
+    size_t count = 0;
+    for (size_t i = 0; i != loops.size(); i++) {
+      loopOffset[i] = count;
+      count += loops[i].Loop.size();
+    }
 
-  manifold::Polygons newPoly;
+    return count;
+  })();
+
+  std::vector<uint8_t> loopFlag(loops.size(), 0);
+
+  manifold::Polygons resultLoops;
 
   while (true) {
-    SimplePolygon rLoop{};
+    SimplePolygon tracingLoop{};
 
-    std::vector<size_t> tracingEList;
+    struct EdgeLoopPair {
+      size_t EdgeIndex, LoopIndex;
+      double ParameterValue;
+
+      bool operator==(const EdgeLoopPair& o) {
+        return (EdgeIndex == o.EdgeIndex) && (LoopIndex == o.LoopIndex);
+      }
+
+      bool operator!=(const EdgeLoopPair& o) { return !(*this == o); }
+
+      EdgeLoopPair Swap() {}
+    };
+
+    auto getEdgePosition = [&loopOffset](const EdgeLoopPair& edge) -> size_t {
+      return loopOffset[edge.LoopIndex] + edge.EdgeIndex;
+    };
+
+    std::vector<EdgeLoopPair> tracingEList;
     std::vector<size_t> mapVV;
 
     // Tracing to construct result
-    size_t currentEdgeIndex = 0, endEdgeIndex = 0;
+    EdgeLoopPair current, end;
 
-    double currentEdgeT = 0;
+    size_t currentEdgeIndex = 0, endEdgeIndex = 0, currentEdgeLoopIndex = 0,
+           endEdgeLoopIndex = 0;
+
+    double currentEdgeParamValue = 0;
 
     // Find first fillet arc to start
     auto it = arcConnection.begin();
@@ -929,11 +1018,15 @@ manifold::Polygons Tracing(
         ArcConnectionInfo& arc = *it->begin();
 
         const auto pts = discreteArcToPoint(arc, radius, circularSegments);
-        rLoop.insert(rLoop.end(), pts.begin(), pts.end());
+        tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
 
-        currentEdgeIndex = arc.e2;
-        endEdgeIndex = arc.e1;
-        currentEdgeT = arc.t2;
+        current = EdgeLoopPair{arc.EdgeIndex[1], arc.LoopIndex[1],
+                               arc.ParameterValues[1]};
+        end = EdgeLoopPair{arc.EdgeIndex[0], arc.LoopIndex[0],
+                           arc.ParameterValues[0]};
+
+        loopFlag[arc.LoopIndex[0]] = 1;
+        loopFlag[arc.LoopIndex[1]] = 1;
 
         it->erase(it->begin());
         break;
@@ -943,76 +1036,83 @@ manifold::Polygons Tracing(
     if (it == arcConnection.end()) break;
 
     // For detecting inner loop
-    tracingEList.push_back(currentEdgeIndex);
-    mapVV.push_back(rLoop.size());
+    tracingEList.push_back(current);
 
-    while (currentEdgeIndex != endEdgeIndex) {
+    mapVV.push_back(tracingLoop.size());
+
+    while (true) {
       // Trace to find next arc on current edge
+
+      const double EPSILON = 1e-6;
+
       auto it = std::find_if(
-          arcConnection[currentEdgeIndex].begin(),
-          arcConnection[currentEdgeIndex].end(),
-          [currentEdgeT, EPSILON](const ArcConnectionInfo& ele) -> bool {
-            return ele.t1 + EPSILON > currentEdgeT;
+          arcConnection[getEdgePosition(current)].begin(),
+          arcConnection[getEdgePosition(current)].end(),
+          [current, EPSILON](const ArcConnectionInfo& ele) -> bool {
+            return ele.t1 + EPSILON > current.ParameterValue;
           });
 
       if (it == arcConnection[currentEdgeIndex].end()) {
         // Not found, just add vertex
         // FIXME: shouldn't add vertex directly, should search for next edge
         // with fillet arc
-        rLoop.push_back(loop[(currentEdgeIndex + 1) % loop.size()]);
-        currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
-        currentEdgeT = 0;
 
-        tracingEList.push_back(currentEdgeIndex);
-        mapVV.push_back(rLoop.size());
+        if (current == end) {
+          break;
+        }
+
+        const auto& loop = loops[current.LoopIndex].Loop;
+        tracingLoop.push_back(loop[(current.EdgeIndex + 1) % loop.size()]);
+
+        current.EdgeIndex = (current.EdgeIndex + 1) % loop.size();
+        current.ParameterValue = 0;
+
       } else {
         // Found next circle fillet
 
-        ArcConnectionInfo arc = *it;
-        arcConnection[currentEdgeIndex].erase(it);
-
-        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
-        rLoop.insert(rLoop.end(), pts.begin(), pts.end());
-
-        // Check if current result contain inner loop
-        auto itt =
-            std::find(tracingEList.rbegin(), tracingEList.rend(), arc.e2);
-
-        if (itt != tracingEList.rend()) {
-          size_t pos = tracingEList.size() -
-                       std::distance(tracingEList.rbegin(), itt) - 1;
-
-          SimplePolygon innerLoop{};
-          innerLoop.insert(innerLoop.end(), rLoop.begin() + mapVV[pos],
-                           rLoop.end());
-
-          newPoly.push_back(innerLoop);
-
-          rLoop.erase(rLoop.begin() + mapVV[pos], rLoop.end());
-
-          currentEdgeIndex = (currentEdgeIndex + 1) % loop.size();
-          currentEdgeT = 0;
-
-          continue;
+        if (current == end && it->ParameterValues[0] > end.ParameterValue) {
+          break;
         }
 
-        currentEdgeIndex = arc.e2;
-        currentEdgeT = arc.t2;
+        ArcConnectionInfo arc = *it;
+        arcConnection[getEdgePosition(current)].erase(it);
+        arcConnection[getEdgePosition(current.Swap())].erase(it);
 
-        tracingEList.push_back(currentEdgeIndex);
-        mapVV.push_back(rLoop.size());
+        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
+        tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
+
+        current.EdgeIndex = arc.EdgeIndex[1];
+        current.LoopIndex = arc.LoopIndex[1];
+        current.ParameterValue = arc.ParameterValues[1];
+
+        loopFlag[arc.LoopIndex[1]] = 1;
       }
     }
-    newPoly.push_back(rLoop);
+    resultLoops.push_back(tracingLoop);
   }
 
+  CrossSection hole;
+  bool invert = false;
+  if (radius < EPSILON) invert = true;
+
+  for (size_t i = 0; i != loops.size(); i++) {
+    if (loopFlag[i] == 0 && (invert ^ (!loops[i].isCCW)))
+      hole = hole.Boolean(CrossSection(Polygons{loops[i].Loop}),
+                          manifold::OpType::Add);
+  }
+
+  std::vector<CrossSection> result;
+  for (auto it = resultLoops.begin(); it != resultLoops.end(); it++) {
+    result.push_back(
+        CrossSection(Polygons{*it}).Boolean(hole, manifold::OpType::Subtract));
+  }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
-    std::cout << "Result loop count:" << newPoly.size() << std::endl;
+    std::cout << "Result loop count:" << resultLoops.size() << std::endl;
   }
 #endif
 
-  return newPoly;
+  return result;
 }
 
 void SavePolygons(const std::string& filename, const Polygons& polygons) {
@@ -1040,8 +1140,8 @@ void SavePolygons(const std::string& filename, const Polygons& polygons) {
             << filename << std::endl;
 }
 
-Polygons FilletImpl(const Polygons& polygons, double radius,
-                    int circularSegments) {
+std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
+                                     int circularSegments) {
   ColliderInfo info{};
   info.outerCollider = BuildCollider(polygons, info.outerEdgeOld2NewVec);
 
@@ -1067,11 +1167,13 @@ Polygons FilletImpl(const Polygons& polygons, double radius,
   // Calc all arc that bridge 2 edge
   auto arcConnection = CalculateFilletArc(loops, info, radius);
 
-  // Tracing along the arc
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
 
+  // Tracing along the arc
   auto result = Tracing(loops, arcConnection, n, radius);
+
+  // Post apply untouched contour
 
   return result;
 }
@@ -1082,13 +1184,7 @@ namespace manifold {
 
 std::vector<CrossSection> CrossSection::Fillet(double radius,
                                                int circularSegments) const {
-  auto r = FilletImpl(ToPolygons(), radius, circularSegments);
-
-  std::vector<CrossSection> crossSections;
-  for (const auto& ele : r) {
-    crossSections.push_back(CrossSection(r));
-  }
-  return crossSections;
+  return FilletImpl(ToPolygons(), radius, circularSegments);
 }
 
 }  // namespace manifold
