@@ -89,7 +89,7 @@ struct TopoConnectionPair {
     LoopIndex = std::array<size_t, 2>{Edge1LoopIndex, Edge2LoopIndex};
   }
 
-  const size_t Index;
+  size_t Index;
 
   vec2 CircleCenter;
   std::array<double, 2> ParameterValues;
@@ -101,10 +101,10 @@ struct TopoConnectionPair {
 
   TopoConnectionPair Swap() {
     TopoConnectionPair pair = *this;
-    std::swap(ParameterValues[0], ParameterValues[1]);
-    std::swap(RadValues[0], RadValues[1]);
-    std::swap(EdgeIndex[0], EdgeIndex[1]);
-    std::swap(LoopIndex[0], LoopIndex[1]);
+    std::swap(pair.ParameterValues[0], pair.ParameterValues[1]);
+    std::swap(pair.RadValues[0], pair.RadValues[1]);
+    std::swap(pair.EdgeIndex[0], pair.EdgeIndex[1]);
+    std::swap(pair.LoopIndex[0], pair.LoopIndex[1]);
     return pair;
   };
 };

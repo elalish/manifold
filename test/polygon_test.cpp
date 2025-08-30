@@ -184,6 +184,7 @@ std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
                                                         int expectedNumTri,
                                                         double epsilon) {
   const double radius = 0.7;
+
   const int inputCircularSegments = 20;
 
   const int circularSegments = inputCircularSegments > 2
@@ -194,7 +195,9 @@ std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
 
   manifold::ManifoldParams().verbose = true;
 
-  auto r = CrossSection(polys).Fillet(radius, circularSegments);
+  auto input = CrossSection(polys);
+
+  auto r = input.Fillet(radius, circularSegments);
 
   auto rc = manifold::CrossSection::Compose(r);
   EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
