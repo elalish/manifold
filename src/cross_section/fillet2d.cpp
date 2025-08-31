@@ -118,17 +118,17 @@ vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
 double toRad(const vec2& v) { return atan2(v.y, v.x); }
 
-// Get line normal direction
-vec2 getEdgeNormal(bool CCW, const vec2& e) {
-  return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
-};
-
 // Normalize angle to [0, 2*PI)
 double normalizeAngle(double angle) {
   while (angle < 0) angle += 2 * M_PI;
   while (angle >= 2 * M_PI) angle -= 2 * M_PI;
   return angle;
 }
+
+// Get line normal direction
+vec2 getEdgeNormal(bool CCW, const vec2& e) {
+  return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+};
 
 // Get 2 rad vec by 3 point
 std::array<double, 2> getRadPair(const vec2& p1, const vec2& p2,
@@ -182,29 +182,6 @@ bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
   return t >= 0 && t <= 1;
 };
 
-double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
-                            double& t) {
-  vec2 d = p2 - p1;
-
-  t = -1;
-
-  t = la::dot(p - p1, d) / la::dot(d, d);
-
-  vec2 closestPoint;
-
-  if (t < 0) {
-    t = 0;
-    closestPoint = p1;
-  } else if (t > 1) {
-    t = 1;
-    closestPoint = p2;
-  } else {
-    closestPoint = p1 + t * d;
-  }
-
-  return la::length(closestPoint - p);
-}
-
 std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
@@ -229,6 +206,29 @@ std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
 }  // namespace
 
 namespace {
+
+double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
+                            double& t) {
+  t = -1;
+
+  vec2 d = p2 - p1;
+
+  t = la::dot(p - p1, d) / la::dot(d, d);
+
+  vec2 closestPoint;
+
+  if (t < 0) {
+    t = 0;
+    closestPoint = p1;
+  } else if (t > 1) {
+    t = 1;
+    closestPoint = p2;
+  } else {
+    closestPoint = p1 + t * d;
+  }
+
+  return la::length(closestPoint - p);
+}
 
 // Check if line segment intersect with a circle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
@@ -275,6 +275,9 @@ int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
 // Check if line segment intersect with another line segment
 bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
                              const vec2& p4, double& t, double& u) {
+  t = -1;
+  u = -1;
+
   double det = la::cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
