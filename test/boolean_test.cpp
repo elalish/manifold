@@ -531,17 +531,22 @@ TEST(Boolean, NastyGears) {
   }
   Manifold innerGear = Manifold::BatchBoolean(innerCubes, OpType::Add);
 
-  // Subtract inner from outer to create the nasty gear with potential slivers
+  // Subtract inner from outer to create the nasty gear with slivers
   Manifold nastyGear = outerGear - innerGear;
 
   // The gear should be valid and manifold
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
+  EXPECT_EQ(nastyGear.Genus(), 1);
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - innerGear.Volume(),
+              1e-5);
 
-  // Get initial mesh stats
-  MeshGL initialMesh = nastyGear.GetMeshGL();
-  const size_t initialTriCount = initialMesh.triVerts.size() / 3;
-  EXPECT_GT(initialTriCount, 0);
+  // The gear should have some antiparallel slivers
+
+  // These should be eliminated after simplification
+  nastyGear = nastyGear.Simplify(0.0000000001);
+  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
   EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - innerGear.Volume(),
               1e-5);
