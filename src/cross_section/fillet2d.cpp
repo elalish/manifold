@@ -152,11 +152,11 @@ bool isAngleInSector(double angle, double startRad, double endRad) {
   startRad = normalizeAngle(startRad);
   endRad = normalizeAngle(endRad);
 
-  if (startRad <= endRad) {
-    return angle >= startRad && angle <= endRad;
+  if (startRad <= endRad + EPSILON) {
+    return (angle >= startRad + EPSILON) && (angle <= endRad + EPSILON);
   } else {
     // Sector crosses 0 degrees
-    return angle >= startRad || angle <= endRad;
+    return (angle >= startRad + EPSILON) || (angle <= endRad + EPSILON);
   }
 };
 
@@ -184,7 +184,7 @@ bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
 
   t = dot(p - p1, p2 - p1) / length2(p2 - p1);
 
-  return t >= 0 && t <= 1;
+  return (t >= 0.0 - EPSILON) && (t <= 1.0 + EPSILON);
 };
 
 std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
@@ -379,6 +379,7 @@ int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
   return 2;
 }
 
+// E - * Intersect
 std::vector<GeomTangentPair> processPillShapeIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
@@ -410,8 +411,8 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
                                 offsetE2[1], t, u)) {
       std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
       vec2 center = offsetE1[0] + e1Cur * t,
-           tangent1 = getPointOnEdgeByParameter(offsetE1[0], offsetE1[1], t),
-           tangent2 = getPointOnEdgeByParameter(offsetE2[0], offsetE2[1], u);
+           tangent1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1], t),
+           tangent2 = getPointOnEdgeByParameter(e2Points[1], e2Points[2], u);
 
       GeomTangentPairVec.emplace_back(GeomTangentPair{
           std::array<EdgeTangentState, 2>{EdgeTangentState::E1CurrentEdge,
@@ -504,6 +505,7 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
   return GeomTangentPairVec;
 }
 
+// P - * Intersect
 std::vector<GeomTangentPair> processPieShapeIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
@@ -536,8 +538,6 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
 
   // Point - Edge
   {
-    std::array<vec2, 2> centers;
-
     const vec2 e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
 
     const std::array<vec2, 2> offsetE2{
@@ -550,6 +550,7 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
       int i = 0;
     }
 
+    std::array<vec2, 2> centers;
     int count = intersectCircleSegment(offsetE2[0], offsetE2[1], e1Points[1],
                                        radius, centers);
     for (int i = 0; i != count; i++) {
@@ -614,7 +615,7 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
           // CCW Loop must end with CW, or start with CCW
 
           bool arcCCW = normalizeAngle(radVec[1] - radVec[0]) > M_PI;
-          if (e1CCW ^ arcCCW) {
+          if (e1CCW ^ !arcCCW) {
             e1EdgeTangentState = EdgeTangentState::E1NextEdge;
             paramVal[0] = 0;
           }
@@ -816,8 +817,8 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
         // Skip self and pre one, only process forward
         if (e1Loopi == e2Loopi &&
-            ((e1i == e2i) ||
-             (e1i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
+            ((e2i == e1i) ||
+             (e2i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
         // Check if processed, and add duplicate mark
@@ -833,14 +834,17 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         auto r1 = processPillShapeIntersect(e1Points, isE1LoopCCW, e2Points,
                                             isE2LoopCCW, radius);
 
-        auto r2 = processPieShapeIntersect(e1Points, isE1LoopCCW, e2Points,
-                                           isE2LoopCCW, radius);
+        if (true || e1Loopi != e2Loopi ||
+            (e2i != (e1i + e1Loop.size() - 1) % e1Loop.size())) {
+          // P-* won't happened if e1 e2 is neighbour
+          // Only check forward neighbour because pre neighbour have been
+          // skipped
 
-        auto size1 = r1.size(), size2 = r2.size();
+          auto r2 = processPieShapeIntersect(e1Points, isE1LoopCCW, e2Points,
+                                             isE2LoopCCW, radius);
 
-        r1.insert(r1.end(), r2.begin(), r2.end());
-
-        auto size3 = r1.size();
+          r1.insert(r1.end(), r2.begin(), r2.end());
+        }
 
         std::vector<size_t> intersectEdgeIndex;
 
@@ -881,7 +885,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               // pre-detect all intersected point and avoid double processed
             } else if (distance < radius) {
               std::cout << "Remove" << arc.CircleCenter << std::endl;
-              eraseFlag = true;
+              // eraseFlag = true;
               break;
             }
           }
@@ -944,12 +948,12 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
                   << arcConnection[i][j].LoopIndex[0] << ", "
                   << arcConnection[i][j].EdgeIndex[0] << "] ["
                   << arcConnection[i][j].LoopIndex[1] << ", "
-                  << arcConnection[i][j].EdgeIndex[1] << "] "
-                  << arcConnection[i][j].ParameterValues[0] << " "
+                  << arcConnection[i][j].EdgeIndex[1] << "] \t Param # "
+                  << arcConnection[i][j].ParameterValues[0] << ", "
                   << arcConnection[i][j].ParameterValues[1]
-                  << " { Center: " << arcConnection[i][j].CircleCenter << "} "
-                  << arcConnection[i][j].RadValues[0] << " "
-                  << arcConnection[i][j].RadValues[1] << std::endl;
+                  << " # \t { Center: " << arcConnection[i][j].CircleCenter
+                  << " } \t Rad <" << arcConnection[i][j].RadValues[0] << ", "
+                  << arcConnection[i][j].RadValues[1] << " >" << std::endl;
       }
 
       std::cout << std::endl;
@@ -1005,7 +1009,7 @@ std::vector<CrossSection> Tracing(
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
-        TopoConnectionPair& arc = *it->begin();
+        TopoConnectionPair arc = *it->begin();
 
         const auto pts = discreteArcToPoint(arc, radius, circularSegments);
         tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
@@ -1019,6 +1023,19 @@ std::vector<CrossSection> Tracing(
         loopFlag[arc.LoopIndex[1]] = 1;
 
         it->erase(it->begin());
+
+        auto itt = std::find_if(arcConnection[getEdgePosition(current)].begin(),
+                                arcConnection[getEdgePosition(current)].end(),
+                                [arc](const TopoConnectionPair& ele) -> bool {
+                                  return ele.Index == arc.Index;
+                                });
+
+        if (itt == arcConnection[getEdgePosition(current)].end()) {
+          ASSERT(false, "Pair not found.");
+        }
+
+        arcConnection[getEdgePosition(current)].erase(itt);
+
         break;
       }
     }
@@ -1065,7 +1082,6 @@ std::vector<CrossSection> Tracing(
         {
           // Remove paired connection
           EdgeLoopPair next{arc.EdgeIndex[1], arc.LoopIndex[1]};
-          auto pos = getEdgePosition(next);
 
           auto itt = std::find_if(arcConnection[getEdgePosition(next)].begin(),
                                   arcConnection[getEdgePosition(next)].end(),

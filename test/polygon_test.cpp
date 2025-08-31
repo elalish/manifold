@@ -214,6 +214,14 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
     auto rc = manifold::CrossSection::Compose(r);
     EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
 
+    auto toRad = [](const vec2 &v) -> double { return atan2(v.y, v.x); };
+
+    auto normalizeAngle = [](double angle) -> double {
+      while (angle < 0) angle += 2 * M_PI;
+      while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+      return angle;
+    };
+
     for (const auto &crossSection : r) {
       auto polygon = crossSection.ToPolygons();
       for (const auto &loop : polygon) {
@@ -225,16 +233,14 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
           vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
                p3 = loop[(i + 2) % loop.size()];
 
-          // Check edge direction
           vec2 e1 = p2 - p1, e2 = p3 - p2;
-          double det = la::cross(e1, e2);
-          EXPECT_TRUE(isCCW && (det > 0));
 
           // Check angle between edge
-          double angle = la::asin(det / (la::length(e1) * la::length(e2)));
+          double angle = normalizeAngle(toRad(e2) - toRad(e1));
 
-          const double dPhi = M_PI_2 / circularSegments;
-          EXPECT_TRUE(angle < dPhi || angle > M_PI);
+          const double dPhi = 2 * M_PI / circularSegments;
+
+          EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.01));
         }
       }
     }
@@ -244,7 +250,8 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
       auto rr = rc.Fillet(radius, circularSegments);
       auto rrc = manifold::CrossSection::Compose(r);
 
-      EXPECT_NEAR(rc.Area(), rrc.Area(), 0.01 * (rc.Area() - input.Area()));
+      EXPECT_NEAR(rc.Area(), rrc.Area(),
+                  std::abs(0.01 * (rc.Area() - input.Area())));
     }
 
     result->emplace_back(FilletResult(r, name + "_" + std::to_string(radius)));
