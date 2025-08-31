@@ -128,7 +128,9 @@
     "-DMANIFOLD_PYBIND=ON",
     "-DMANIFOLD_EXPORT=ON",
     "-DMANIFOLD_DEBUG=ON",
+    "-DMANIFOLD_ASSERT=ON",
     "-DMANIFOLD_PAR=ON",
+    "-DMANIFOLD_FUZZ=OFF",
     "-DCODE_COVERAGE=OFF",
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
   ],
@@ -158,4 +160,8 @@
   },
   "python.formatting.provider": "none",
   "clang-format.executable": "clang-format",
+  "clangd.arguments": [
+    "--header-insertion=never"
+  ],
+  "editor.defaultFormatter": "xaver.clang-format",
 }

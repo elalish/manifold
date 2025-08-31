@@ -70,9 +70,12 @@ if(MANIFOLD_PAR)
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
       GIT_TAG v2022.0.0
       GIT_PROGRESS TRUE
-      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(TBB)
+    set_property(
+      DIRECTORY ${tbb_SOURCE_DIR}
+      PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
+    )
   endif()
 endif()
 
@@ -113,13 +116,16 @@ if(MANIFOLD_CROSS_SECTION)
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      # Jan 27, 2025
-      GIT_TAG Clipper2_1.5.2
+      # Jun 15, 2025
+      GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR CPP
-      EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(Clipper2)
+    set_property(
+      DIRECTORY ${clipper2_SOURCE_DIR}/CPP
+      PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
+    )
   endif()
   if(NOT TARGET Clipper2::Clipper2)
     add_library(Clipper2::Clipper2 ALIAS Clipper2)
@@ -224,7 +230,7 @@ if(MANIFOLD_FUZZ)
   FetchContent_Declare(
     fuzztest
     GIT_REPOSITORY https://github.com/google/fuzztest.git
-    GIT_TAG 7b107216fa6cd62659234366aee493d6f8832d46
+    GIT_TAG f1e26613f66997aa09d3026762e275de22b2daae
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(fuzztest)

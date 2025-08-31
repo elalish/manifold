@@ -16,9 +16,12 @@
     "noFallthroughCasesInSwitch": true,
     "declaration": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
   },
   "include": [
-    "./*.ts"
+    "./*.ts",
   ],
   "exclude": []
 }
+

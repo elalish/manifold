@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./impl.h"
+#include "impl.h"
 
 #include <algorithm>
 #include <atomic>
@@ -20,16 +20,14 @@
 #include <map>
 #include <optional>
 
-#include "./csg_tree.h"
-#include "./hashtable.h"
-#include "./mesh_fixes.h"
-#include "./parallel.h"
-#include "./svd.h"
-
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
-#include <iomanip>
-#include <iostream>
-#endif
+#include "csg_tree.h"
+#include "disjoint_sets.h"
+#include "hashtable.h"
+#include "manifold/optional_assert.h"
+#include "mesh_fixes.h"
+#include "parallel.h"
+#include "shared.h"
+#include "svd.h"
 
 namespace {
 using namespace manifold;
@@ -138,10 +136,10 @@ struct UpdateMeshID {
 
 int GetLabels(std::vector<int>& components,
               const Vec<std::pair<int, int>>& edges, int numNodes) {
-  UnionFind<> uf(numNodes);
+  DisjointSets uf(numNodes);
   for (auto edge : edges) {
     if (edge.first == -1 || edge.second == -1) continue;
-    uf.unionXY(edge.first, edge.second);
+    uf.unite(edge.first, edge.second);
   }
 
   return uf.connectedComponents(components);
@@ -149,6 +147,14 @@ int GetLabels(std::vector<int>& components,
 }  // namespace
 
 namespace manifold {
+
+#if (MANIFOLD_PAR == 1)
+#if (TBB_VERSION_MAJOR < 2021)
+tbb::task_arena gc_arena(1, 1);
+#else
+tbb::task_arena gc_arena(1, 1, tbb::task_arena::priority::low);
+#endif
+#endif
 
 std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
@@ -205,7 +211,7 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeOriginal();
-  CreateFaces();
+  MarkCoplanar();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -234,14 +240,14 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, keepFaceID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, tri,
-                              keepFaceID ? triRef[tri].faceID : tri};
+               triRef[tri] = {meshID, meshID, -1,
+                              keepFaceID ? triRef[tri].coplanarID : tri};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::CreateFaces() {
+void Manifold::Impl::MarkCoplanar() {
   ZoneScoped;
   const int numTri = NumTri();
   struct TriPriority {
@@ -251,7 +257,7 @@ void Manifold::Impl::CreateFaces() {
   Vec<TriPriority> triPriority(numTri);
   for_each_n(autoPolicy(numTri), countAt(0), numTri,
              [&triPriority, this](int tri) {
-               meshRelation_.triRef[tri].faceID = -1;
+               meshRelation_.triRef[tri].coplanarID = -1;
                if (halfedge_[3 * tri].startVert < 0) {
                  triPriority[tri] = {0, tri};
                  return;
@@ -268,9 +274,9 @@ void Manifold::Impl::CreateFaces() {
 
   Vec<int> interiorHalfedges;
   for (const auto tp : triPriority) {
-    if (meshRelation_.triRef[tp.tri].faceID >= 0) continue;
+    if (meshRelation_.triRef[tp.tri].coplanarID >= 0) continue;
 
-    meshRelation_.triRef[tp.tri].faceID = tp.tri;
+    meshRelation_.triRef[tp.tri].coplanarID = tp.tri;
     if (halfedge_[3 * tp.tri].startVert < 0) continue;
     const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
     const vec3 normal = faceNormal_[tp.tri];
@@ -282,11 +288,11 @@ void Manifold::Impl::CreateFaces() {
       const int h =
           NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
       interiorHalfedges.pop_back();
-      if (meshRelation_.triRef[h / 3].faceID >= 0) continue;
+      if (meshRelation_.triRef[h / 3].coplanarID >= 0) continue;
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (std::abs(dot(v - base, normal)) < tolerance_) {
-        meshRelation_.triRef[h / 3].faceID = tp.tri;
+        meshRelation_.triRef[h / 3].coplanarID = tp.tri;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
@@ -301,42 +307,42 @@ void Manifold::Impl::CreateFaces() {
   }
 }
 
+/**
+ * Dereference duplicate property vertices if they are exactly floating-point
+ * equal. These unreferenced properties are then removed by CompactProps.
+ */
 void Manifold::Impl::DedupePropVerts() {
   ZoneScoped;
   const size_t numProp = NumProp();
   if (numProp == 0) return;
 
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
-  for_each_n(
-      autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
-      [&vert2vert, numProp, this](const int edgeIdx) {
-        const Halfedge edge = halfedge_[edgeIdx];
-        const int edgeFace = edgeIdx / 3;
-        const int pairFace = edge.pairedHalfedge / 3;
+  for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
+             [&vert2vert, numProp, this](const int edgeIdx) {
+               const Halfedge edge = halfedge_[edgeIdx];
+               if (edge.pairedHalfedge < 0) return;
+               const int edgeFace = edgeIdx / 3;
+               const int pairFace = edge.pairedHalfedge / 3;
 
-        if (meshRelation_.triRef[edgeFace].meshID !=
-            meshRelation_.triRef[pairFace].meshID)
-          return;
+               if (meshRelation_.triRef[edgeFace].meshID !=
+                   meshRelation_.triRef[pairFace].meshID)
+                 return;
 
-        const int baseNum = edgeIdx - 3 * edgeFace;
-        const int jointNum = edge.pairedHalfedge - 3 * pairFace;
-
-        const int prop0 = meshRelation_.triProperties[edgeFace][baseNum];
-        const int prop1 =
-            meshRelation_
-                .triProperties[pairFace][jointNum == 2 ? 0 : jointNum + 1];
-        bool propEqual = true;
-        for (size_t p = 0; p < numProp; ++p) {
-          if (meshRelation_.properties[numProp * prop0 + p] !=
-              meshRelation_.properties[numProp * prop1 + p]) {
-            propEqual = false;
-            break;
-          }
-        }
-        if (propEqual) {
-          vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
-        }
-      });
+               const int prop0 = halfedge_[edgeIdx].propVert;
+               const int prop1 =
+                   halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
+               bool propEqual = true;
+               for (size_t p = 0; p < numProp; ++p) {
+                 if (properties_[numProp * prop0 + p] !=
+                     properties_[numProp * prop1 + p]) {
+                   propEqual = false;
+                   break;
+                 }
+               }
+               if (propEqual) {
+                 vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
+               }
+             });
 
   std::vector<int> vertLabels;
   const size_t numPropVert = NumPropVert();
@@ -344,48 +350,131 @@ void Manifold::Impl::DedupePropVerts() {
 
   std::vector<int> label2vert(numLabels);
   for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
-  for (auto& prop : meshRelation_.triProperties)
-    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
+  for (Halfedge& edge : halfedge_)
+    edge.propVert = label2vert[vertLabels[edge.propVert]];
 }
 
 constexpr int kRemovedHalfedge = -2;
 
+struct HalfedgePairData {
+  int largeVert;
+  int tri;
+  int edgeIndex;
+
+  bool operator<(const HalfedgePairData& other) const {
+    return largeVert < other.largeVert ||
+           (largeVert == other.largeVert && tri < other.tri);
+  }
+};
+
+template <bool useProp, typename F>
+struct PrepHalfedges {
+  VecView<Halfedge> halfedges;
+  const VecView<ivec3> triProp;
+  const VecView<ivec3> triVert;
+  F& f;
+
+  void operator()(const int tri) {
+    const ivec3& props = triProp[tri];
+    for (const int i : {0, 1, 2}) {
+      const int j = Next3(i);
+      const int k = Next3(j);
+      const int e = 3 * tri + i;
+      const int v0 = useProp ? props[i] : triVert[tri][i];
+      const int v1 = useProp ? props[j] : triVert[tri][j];
+      DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
+      halfedges[e] = {v0, v1, -1, props[i]};
+      f(e, v0, v1);
+    }
+  }
+};
+
 /**
- * Create the halfedge_ data structure from an input triVerts array like Mesh.
+ * Create the halfedge_ data structure from a list of triangles. If the optional
+ * prop2vert array is missing, it's assumed these triangles are are pointing to
+ * both vert and propVert indices. If prop2vert is present, the triangles are
+ * assumed to be pointing to propVert indices only. The prop2vert array is used
+ * to map the propVert indices to vert indices.
  */
-void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
+void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
+                                     const Vec<ivec3>& triVert) {
   ZoneScoped;
-  const size_t numTri = triVerts.size();
+  const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
   halfedge_.clear(true);
   halfedge_.resize_nofill(numHalfedge);
-  Vec<uint64_t> edge(numHalfedge);
-  Vec<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
-  sequence(ids.begin(), ids.end());
-  for_each_n(policy, countAt(0), numTri,
-             [this, &edge, &triVerts](const int tri) {
-               const ivec3& verts = triVerts[tri];
-               for (const int i : {0, 1, 2}) {
-                 const int j = (i + 1) % 3;
-                 const int e = 3 * tri + i;
-                 halfedge_[e] = {verts[i], verts[j], -1};
-                 // Sort the forward halfedges in front of the backward ones
-                 // by setting the highest-order bit.
-                 edge[e] = uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
-                           ((uint64_t)std::min(verts[i], verts[j])) << 32 |
-                           std::max(verts[i], verts[j]);
-               }
-             });
-  // Stable sort is required here so that halfedges from the same face are
-  // paired together (the triangles were created in face order). In some
-  // degenerate situations the triangulator can add the same internal edge in
-  // two different faces, causing this edge to not be 2-manifold. These are
-  // fixed by duplicating verts in SimplifyTopology.
-  stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
-    return edge[a] < edge[b];
-  });
+
+  int vertCount = static_cast<int>(vertPos_.size());
+  Vec<int> ids(numHalfedge);
+  {
+    ZoneScopedN("PrepHalfedges");
+    if (vertCount < (1 << 18)) {
+      // For small vertex count, it is faster to just do sorting
+      Vec<uint64_t> edge(numHalfedge);
+      auto setEdge = [&edge](int e, int v0, int v1) {
+        edge[e] = static_cast<uint64_t>(v0 < v1 ? 1 : 0) << 63 |
+                  (static_cast<uint64_t>(std::min(v0, v1))) << 32 |
+                  static_cast<uint64_t>(std::max(v0, v1));
+      };
+      if (triVert.empty()) {
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<true, decltype(setEdge)>{halfedge_, triProp,
+                                                          triVert, setEdge});
+      } else {
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<false, decltype(setEdge)>{halfedge_, triProp,
+                                                           triVert, setEdge});
+      }
+      sequence(ids.begin(), ids.end());
+      stable_sort(ids.begin(), ids.end(), [&edge](const int& a, const int& b) {
+        return edge[a] < edge[b];
+      });
+    } else {
+      // For larger vertex count, we separate the ids into slices for halfedges
+      // with the same smaller vertex.
+      // We first copy them there (as HalfedgePairData), and then do sorting
+      // locally for each slice.
+      // This helps with memory locality, and is faster for larger meshes.
+      Vec<HalfedgePairData> entries(numHalfedge);
+      Vec<int> offsets(vertCount * 2, 0);
+      auto setOffset = [&offsets, vertCount](int _e, int v0, int v1) {
+        const int offset = v0 > v1 ? 0 : vertCount;
+        AtomicAdd(offsets[std::min(v0, v1) + offset], 1);
+      };
+      if (triVert.empty()) {
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<true, decltype(setOffset)>{
+                       halfedge_, triProp, triVert, setOffset});
+      } else {
+        for_each_n(policy, countAt(0), numTri,
+                   PrepHalfedges<false, decltype(setOffset)>{
+                       halfedge_, triProp, triVert, setOffset});
+      }
+      exclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
+      for_each_n(policy, countAt(0), numTri,
+                 [this, &offsets, &entries, vertCount](const int tri) {
+                   for (const int i : {0, 1, 2}) {
+                     const int e = 3 * tri + i;
+                     const int v0 = halfedge_[e].startVert;
+                     const int v1 = halfedge_[e].endVert;
+                     const int offset = v0 > v1 ? 0 : vertCount;
+                     const int start = std::min(v0, v1);
+                     const int index = AtomicAdd(offsets[start + offset], 1);
+                     entries[index] = {std::max(v0, v1), tri, e};
+                   }
+                 });
+      for_each_n(policy, countAt(0), offsets.size(), [&](const int v) {
+        int start = v == 0 ? 0 : offsets[v - 1];
+        int end = offsets[v];
+        for (int i = start; i < end; ++i) ids[i] = i;
+        std::sort(ids.begin() + start, ids.begin() + end,
+                  [&entries](int a, int b) { return entries[a] < entries[b]; });
+        for (int i = start; i < end; ++i) ids[i] = entries[ids[i]].edgeIndex;
+      });
+    }
+  }
 
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
@@ -399,8 +488,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
       const int pair1 = ids[k];
       Halfedge& h1 = halfedge_[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
-      if (halfedge_[NextHalfedge(pair0)].endVert ==
-          halfedge_[NextHalfedge(pair1)].endVert) {
+      if (h1.pairedHalfedge != kRemovedHalfedge &&
+          halfedge_[NextHalfedge(pair0)].endVert ==
+              halfedge_[NextHalfedge(pair1)].endVert) {
         h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
         // Reorder so that remaining edges pair up
         if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
@@ -411,7 +501,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
     }
     if (i + 1 == segmentEnd) return consecutiveStart;
     Halfedge& h1 = halfedge_[ids[i + 1]];
-    if (h0.startVert == h1.startVert && h0.endVert == h1.endVert)
+    if (h1.startVert == h0.startVert && h1.endVert == h0.endVert)
       return consecutiveStart;
     return i + 1;
   };
@@ -446,10 +536,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triVerts) {
   for (int i = 0; i < numEdge; ++i)
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
-
-  // Once sorted, the first half of the range is the forward halfedges, which
-  // correspond to their backward pair at the same offset in the second half
-  // of the range.
   for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
@@ -502,7 +588,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
   Finish();
-  CreateFaces();
+  MarkCoplanar();
   meshRelation_.originalID = -1;
 }
 
@@ -523,6 +609,8 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
+  result.numProp_ = numProp_;
+  result.properties_ = properties_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
@@ -720,7 +808,6 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
  * Write function.
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
-#ifdef MANIFOLD_DEBUG
   if (!stream.good()) return Invalid();
 
   MeshGL64 mesh;
@@ -782,9 +869,6 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   auto m = std::make_shared<Manifold::Impl>(mesh);
   if (epsilon) m->SetEpsilon(*epsilon);
   return Manifold(m);
-#else
-  return Invalid();
-#endif
 }
 
 /**
@@ -794,15 +878,10 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
  * by WriteOBJ should be read back in with ReadOBJ.
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
-#ifdef MANIFOLD_DEBUG
   if (!stream.good()) return false;
   stream << *this->GetCsgLeafNode().GetImpl();
   return true;
-#else
-  return false;
-#endif
 }
-
 #endif
 
 }  // namespace manifold

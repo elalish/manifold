@@ -24,47 +24,47 @@ extern "C" {
 
 // Polygons
 
-ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
+ManifoldSimplePolygon* manifold_simple_polygon(void* mem, ManifoldVec2* ps,
                                                size_t length);
-ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
+ManifoldPolygons* manifold_polygons(void* mem, ManifoldSimplePolygon** ps,
                                     size_t length);
-size_t manifold_simple_polygon_length(ManifoldSimplePolygon *p);
-size_t manifold_polygons_length(ManifoldPolygons *ps);
-size_t manifold_polygons_simple_length(ManifoldPolygons *ps, size_t idx);
-ManifoldVec2 manifold_simple_polygon_get_point(ManifoldSimplePolygon *p,
+size_t manifold_simple_polygon_length(ManifoldSimplePolygon* p);
+size_t manifold_polygons_length(ManifoldPolygons* ps);
+size_t manifold_polygons_simple_length(ManifoldPolygons* ps, size_t idx);
+ManifoldVec2 manifold_simple_polygon_get_point(ManifoldSimplePolygon* p,
                                                size_t idx);
-ManifoldSimplePolygon *manifold_polygons_get_simple(void *mem,
-                                                    ManifoldPolygons *ps,
+ManifoldSimplePolygon* manifold_polygons_get_simple(void* mem,
+                                                    ManifoldPolygons* ps,
                                                     size_t idx);
-ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons *ps,
+ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons* ps,
                                          size_t simple_idx, size_t pt_idx);
 
 // Mesh Construction
 
-ManifoldMeshGL *manifold_meshgl(void *mem, float *vert_props, size_t n_verts,
-                                size_t n_props, uint32_t *tri_verts,
+ManifoldMeshGL* manifold_meshgl(void* mem, float* vert_props, size_t n_verts,
+                                size_t n_props, uint32_t* tri_verts,
                                 size_t n_tris);
 
-ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
+ManifoldMeshGL* manifold_meshgl_w_tangents(void* mem, float* vert_props,
                                            size_t n_verts, size_t n_props,
-                                           uint32_t *tri_verts, size_t n_tris,
-                                           float *halfedge_tangent);
-ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
-ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
-ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
+                                           uint32_t* tri_verts, size_t n_tris,
+                                           float* halfedge_tangent);
+ManifoldMeshGL* manifold_get_meshgl(void* mem, ManifoldManifold* m);
+ManifoldMeshGL* manifold_meshgl_copy(void* mem, ManifoldMeshGL* m);
+ManifoldMeshGL* manifold_meshgl_merge(void* mem, ManifoldMeshGL* m);
 
-ManifoldMeshGL64 *manifold_meshgl64(void *mem, double *vert_props,
+ManifoldMeshGL64* manifold_meshgl64(void* mem, double* vert_props,
                                     size_t n_verts, size_t n_props,
-                                    uint64_t *tri_verts, size_t n_tris);
+                                    uint64_t* tri_verts, size_t n_tris);
 
-ManifoldMeshGL64 *manifold_meshgl64_w_tangents(void *mem, double *vert_props,
+ManifoldMeshGL64* manifold_meshgl64_w_tangents(void* mem, double* vert_props,
                                                size_t n_verts, size_t n_props,
-                                               uint64_t *tri_verts,
+                                               uint64_t* tri_verts,
                                                size_t n_tris,
-                                               double *halfedge_tangent);
-ManifoldMeshGL64 *manifold_get_meshgl64(void *mem, ManifoldManifold *m);
-ManifoldMeshGL64 *manifold_meshgl64_copy(void *mem, ManifoldMeshGL64 *m);
-ManifoldMeshGL64 *manifold_meshgl64_merge(void *mem, ManifoldMeshGL64 *m);
+                                               double* halfedge_tangent);
+ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m);
+ManifoldMeshGL64* manifold_meshgl64_copy(void* mem, ManifoldMeshGL64* m);
+ManifoldMeshGL64* manifold_meshgl64_merge(void* mem, ManifoldMeshGL64* m);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of
@@ -73,46 +73,46 @@ ManifoldMeshGL64 *manifold_meshgl64_merge(void *mem, ManifoldMeshGL64 *m);
 // using these bindings from a language that has a runtime lock preventing the
 // parallel execution of closures, then you should use manifold_level_set_seq to
 // force sequential execution.
-ManifoldManifold *manifold_level_set(void *mem, ManifoldSdf sdf,
-                                     ManifoldBox *bounds, double edge_length,
-                                     double level, double tolerance, void *ctx);
-ManifoldManifold *manifold_level_set_seq(void *mem, ManifoldSdf sdf,
-                                         ManifoldBox *bounds,
+ManifoldManifold* manifold_level_set(void* mem, ManifoldSdf sdf,
+                                     ManifoldBox* bounds, double edge_length,
+                                     double level, double tolerance, void* ctx);
+ManifoldManifold* manifold_level_set_seq(void* mem, ManifoldSdf sdf,
+                                         ManifoldBox* bounds,
                                          double edge_length, double level,
-                                         double tolerance, void *ctx);
+                                         double tolerance, void* ctx);
 
 // Manifold Vectors
 
-ManifoldManifoldVec *manifold_manifold_empty_vec(void *mem);
-ManifoldManifoldVec *manifold_manifold_vec(void *mem, size_t sz);
-void manifold_manifold_vec_reserve(ManifoldManifoldVec *ms, size_t sz);
-size_t manifold_manifold_vec_length(ManifoldManifoldVec *ms);
-ManifoldManifold *manifold_manifold_vec_get(void *mem, ManifoldManifoldVec *ms,
+ManifoldManifoldVec* manifold_manifold_empty_vec(void* mem);
+ManifoldManifoldVec* manifold_manifold_vec(void* mem, size_t sz);
+void manifold_manifold_vec_reserve(ManifoldManifoldVec* ms, size_t sz);
+size_t manifold_manifold_vec_length(ManifoldManifoldVec* ms);
+ManifoldManifold* manifold_manifold_vec_get(void* mem, ManifoldManifoldVec* ms,
                                             size_t idx);
-void manifold_manifold_vec_set(ManifoldManifoldVec *ms, size_t idx,
-                               ManifoldManifold *m);
-void manifold_manifold_vec_push_back(ManifoldManifoldVec *ms,
-                                     ManifoldManifold *m);
+void manifold_manifold_vec_set(ManifoldManifoldVec* ms, size_t idx,
+                               ManifoldManifold* m);
+void manifold_manifold_vec_push_back(ManifoldManifoldVec* ms,
+                                     ManifoldManifold* m);
 
 // Manifold Booleans
 
-ManifoldManifold *manifold_boolean(void *mem, ManifoldManifold *a,
-                                   ManifoldManifold *b, ManifoldOpType op);
-ManifoldManifold *manifold_batch_boolean(void *mem, ManifoldManifoldVec *ms,
+ManifoldManifold* manifold_boolean(void* mem, ManifoldManifold* a,
+                                   ManifoldManifold* b, ManifoldOpType op);
+ManifoldManifold* manifold_batch_boolean(void* mem, ManifoldManifoldVec* ms,
                                          ManifoldOpType op);
-ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
-                                 ManifoldManifold *b);
-ManifoldManifold *manifold_difference(void *mem, ManifoldManifold *a,
-                                      ManifoldManifold *b);
-ManifoldManifold *manifold_intersection(void *mem, ManifoldManifold *a,
-                                        ManifoldManifold *b);
-ManifoldManifoldPair manifold_split(void *mem_first, void *mem_second,
-                                    ManifoldManifold *a, ManifoldManifold *b);
-ManifoldManifoldPair manifold_split_by_plane(void *mem_first, void *mem_second,
-                                             ManifoldManifold *m,
+ManifoldManifold* manifold_union(void* mem, ManifoldManifold* a,
+                                 ManifoldManifold* b);
+ManifoldManifold* manifold_difference(void* mem, ManifoldManifold* a,
+                                      ManifoldManifold* b);
+ManifoldManifold* manifold_intersection(void* mem, ManifoldManifold* a,
+                                        ManifoldManifold* b);
+ManifoldManifoldPair manifold_split(void* mem_first, void* mem_second,
+                                    ManifoldManifold* a, ManifoldManifold* b);
+ManifoldManifoldPair manifold_split_by_plane(void* mem_first, void* mem_second,
+                                             ManifoldManifold* m,
                                              double normal_x, double normal_y,
                                              double normal_z, double offset);
-ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_trim_by_plane(void* mem, ManifoldManifold* m,
                                          double normal_x, double normal_y,
                                          double normal_z, double offset);
 ManifoldManifold *manifold_minkowski_sum(void *mem, ManifoldManifold *a,
@@ -122,253 +122,253 @@ ManifoldManifold *manifold_minkowski_difference(void *mem, ManifoldManifold *a,
 
 // 3D to 2D
 
-ManifoldPolygons *manifold_slice(void *mem, ManifoldManifold *m, double height);
-ManifoldPolygons *manifold_project(void *mem, ManifoldManifold *m);
+ManifoldPolygons* manifold_slice(void* mem, ManifoldManifold* m, double height);
+ManifoldPolygons* manifold_project(void* mem, ManifoldManifold* m);
 
 // Convex Hulls
 
-ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m);
-ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms);
-ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps, size_t length);
+ManifoldManifold* manifold_hull(void* mem, ManifoldManifold* m);
+ManifoldManifold* manifold_batch_hull(void* mem, ManifoldManifoldVec* ms);
+ManifoldManifold* manifold_hull_pts(void* mem, ManifoldVec3* ps, size_t length);
 
 // Manifold Transformations
 
-ManifoldManifold *manifold_translate(void *mem, ManifoldManifold *m, double x,
+ManifoldManifold* manifold_translate(void* mem, ManifoldManifold* m, double x,
                                      double y, double z);
-ManifoldManifold *manifold_rotate(void *mem, ManifoldManifold *m, double x,
+ManifoldManifold* manifold_rotate(void* mem, ManifoldManifold* m, double x,
                                   double y, double z);
-ManifoldManifold *manifold_scale(void *mem, ManifoldManifold *m, double x,
+ManifoldManifold* manifold_scale(void* mem, ManifoldManifold* m, double x,
                                  double y, double z);
-ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, double x1,
+ManifoldManifold* manifold_transform(void* mem, ManifoldManifold* m, double x1,
                                      double y1, double z1, double x2, double y2,
                                      double z2, double x3, double y3, double z3,
                                      double x4, double y4, double z4);
-ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, double nx,
+ManifoldManifold* manifold_mirror(void* mem, ManifoldManifold* m, double nx,
                                   double ny, double nz);
-ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_warp(void* mem, ManifoldManifold* m,
                                 ManifoldVec3 (*fun)(double, double, double,
-                                                    void *),
-                                void *ctx);
-ManifoldManifold *manifold_smooth_by_normals(void *mem, ManifoldManifold *m,
+                                                    void*),
+                                void* ctx);
+ManifoldManifold* manifold_smooth_by_normals(void* mem, ManifoldManifold* m,
                                              int normalIdx);
-ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_smooth_out(void* mem, ManifoldManifold* m,
                                       double minSharpAngle,
                                       double minSmoothness);
-ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
-ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine);
+ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length);
-ManifoldManifold *manifold_refine_to_tolerance(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
                                                double tolerance);
 
 // Manifold Shapes / Constructors
 
-ManifoldManifold *manifold_empty(void *mem);
-ManifoldManifold *manifold_copy(void *mem, ManifoldManifold *m);
-ManifoldManifold *manifold_tetrahedron(void *mem);
-ManifoldManifold *manifold_cube(void *mem, double x, double y, double z,
+ManifoldManifold* manifold_empty(void* mem);
+ManifoldManifold* manifold_copy(void* mem, ManifoldManifold* m);
+ManifoldManifold* manifold_tetrahedron(void* mem);
+ManifoldManifold* manifold_cube(void* mem, double x, double y, double z,
                                 int center);
-ManifoldManifold *manifold_cylinder(void *mem, double height, double radius_low,
+ManifoldManifold* manifold_cylinder(void* mem, double height, double radius_low,
                                     double radius_high, int circular_segments,
                                     int center);
-ManifoldManifold *manifold_sphere(void *mem, double radius,
+ManifoldManifold* manifold_sphere(void* mem, double radius,
                                   int circular_segments);
-ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh);
-ManifoldManifold *manifold_of_meshgl64(void *mem, ManifoldMeshGL64 *mesh);
-ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  size_t *half_edges, double *smoothness,
+ManifoldManifold* manifold_of_meshgl(void* mem, ManifoldMeshGL* mesh);
+ManifoldManifold* manifold_of_meshgl64(void* mem, ManifoldMeshGL64* mesh);
+ManifoldManifold* manifold_smooth(void* mem, ManifoldMeshGL* mesh,
+                                  size_t* half_edges, double* smoothness,
                                   size_t n_idxs);
-ManifoldManifold *manifold_smooth64(void *mem, ManifoldMeshGL64 *mesh,
-                                    size_t *half_edges, double *smoothness,
+ManifoldManifold* manifold_smooth64(void* mem, ManifoldMeshGL64* mesh,
+                                    size_t* half_edges, double* smoothness,
                                     size_t n_idxs);
-ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
+ManifoldManifold* manifold_extrude(void* mem, ManifoldPolygons* cs,
                                    double height, int slices,
                                    double twist_degrees, double scale_x,
                                    double scale_y);
-ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
+ManifoldManifold* manifold_revolve(void* mem, ManifoldPolygons* cs,
                                    int circular_segments,
                                    double revolve_degrees);
-ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms);
-ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m);
+ManifoldManifold* manifold_compose(void* mem, ManifoldManifoldVec* ms);
+ManifoldManifoldVec* manifold_decompose(void* mem, ManifoldManifold* m);
 
-ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 
 // Manifold Info
 
-int manifold_is_empty(ManifoldManifold *m);
-ManifoldError manifold_status(ManifoldManifold *m);
-size_t manifold_num_vert(ManifoldManifold *m);
-size_t manifold_num_edge(ManifoldManifold *m);
-size_t manifold_num_tri(ManifoldManifold *m);
-size_t manifold_num_prop(ManifoldManifold *m);
-ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
-double manifold_epsilon(ManifoldManifold *m);
-int manifold_genus(ManifoldManifold *m);
-double manifold_surface_area(ManifoldManifold *m);
-double manifold_volume(ManifoldManifold *m);
+int manifold_is_empty(ManifoldManifold* m);
+ManifoldError manifold_status(ManifoldManifold* m);
+size_t manifold_num_vert(ManifoldManifold* m);
+size_t manifold_num_edge(ManifoldManifold* m);
+size_t manifold_num_tri(ManifoldManifold* m);
+size_t manifold_num_prop(ManifoldManifold* m);
+ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m);
+double manifold_epsilon(ManifoldManifold* m);
+int manifold_genus(ManifoldManifold* m);
+double manifold_surface_area(ManifoldManifold* m);
+double manifold_volume(ManifoldManifold* m);
 int manifold_get_circular_segments(double radius);
-int manifold_original_id(ManifoldManifold *m);
+int manifold_original_id(ManifoldManifold* m);
 uint32_t manifold_reserve_ids(uint32_t n);
-ManifoldManifold *manifold_set_properties(
-    void *mem, ManifoldManifold *m, int num_prop,
-    void (*fun)(double *new_prop, ManifoldVec3 position, const double *old_prop,
-                void *ctx),
-    void *ctx);
-ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_set_properties(
+    void* mem, ManifoldManifold* m, int num_prop,
+    void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
+                void* ctx),
+    void* ctx);
+ManifoldManifold* manifold_calculate_curvature(void* mem, ManifoldManifold* m,
                                                int gaussian_idx, int mean_idx);
-double manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
+double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
                         double searchLength);
-ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
+ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle);
 
 // CrossSection Shapes/Constructors
-ManifoldCrossSection *manifold_cross_section_empty(void *mem);
-ManifoldCrossSection *manifold_cross_section_copy(void *mem,
-                                                  ManifoldCrossSection *cs);
-ManifoldCrossSection *manifold_cross_section_of_simple_polygon(
-    void *mem, ManifoldSimplePolygon *p, ManifoldFillRule fr);
-ManifoldCrossSection *manifold_cross_section_of_polygons(void *mem,
-                                                         ManifoldPolygons *p,
+ManifoldCrossSection* manifold_cross_section_empty(void* mem);
+ManifoldCrossSection* manifold_cross_section_copy(void* mem,
+                                                  ManifoldCrossSection* cs);
+ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
+    void* mem, ManifoldSimplePolygon* p, ManifoldFillRule fr);
+ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
+                                                         ManifoldPolygons* p,
                                                          ManifoldFillRule fr);
-ManifoldCrossSection *manifold_cross_section_square(void *mem, double x,
+ManifoldCrossSection* manifold_cross_section_square(void* mem, double x,
                                                     double y, int center);
-ManifoldCrossSection *manifold_cross_section_circle(void *mem, double radius,
+ManifoldCrossSection* manifold_cross_section_circle(void* mem, double radius,
                                                     int circular_segments);
-ManifoldCrossSection *manifold_cross_section_compose(
-    void *mem, ManifoldCrossSectionVec *csv);
-ManifoldCrossSectionVec *manifold_cross_section_decompose(
-    void *mem, ManifoldCrossSection *cs);
+ManifoldCrossSection* manifold_cross_section_compose(
+    void* mem, ManifoldCrossSectionVec* csv);
+ManifoldCrossSectionVec* manifold_cross_section_decompose(
+    void* mem, ManifoldCrossSection* cs);
 
 // CrossSection Vectors
 
-ManifoldCrossSectionVec *manifold_cross_section_empty_vec(void *mem);
-ManifoldCrossSectionVec *manifold_cross_section_vec(void *mem, size_t sz);
-void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec *csv,
+ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void* mem);
+ManifoldCrossSectionVec* manifold_cross_section_vec(void* mem, size_t sz);
+void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec* csv,
                                         size_t sz);
-size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec *csv);
-ManifoldCrossSection *manifold_cross_section_vec_get(
-    void *mem, ManifoldCrossSectionVec *csv, size_t idx);
-void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, size_t idx,
-                                    ManifoldCrossSection *cs);
-void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec *csv,
-                                          ManifoldCrossSection *cs);
+size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec* csv);
+ManifoldCrossSection* manifold_cross_section_vec_get(
+    void* mem, ManifoldCrossSectionVec* csv, size_t idx);
+void manifold_cross_section_vec_set(ManifoldCrossSectionVec* csv, size_t idx,
+                                    ManifoldCrossSection* cs);
+void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec* csv,
+                                          ManifoldCrossSection* cs);
 
 // CrossSection Booleans
 
-ManifoldCrossSection *manifold_cross_section_boolean(void *mem,
-                                                     ManifoldCrossSection *a,
-                                                     ManifoldCrossSection *b,
+ManifoldCrossSection* manifold_cross_section_boolean(void* mem,
+                                                     ManifoldCrossSection* a,
+                                                     ManifoldCrossSection* b,
                                                      ManifoldOpType op);
-ManifoldCrossSection *manifold_cross_section_batch_boolean(
-    void *mem, ManifoldCrossSectionVec *csv, ManifoldOpType op);
-ManifoldCrossSection *manifold_cross_section_union(void *mem,
-                                                   ManifoldCrossSection *a,
-                                                   ManifoldCrossSection *b);
-ManifoldCrossSection *manifold_cross_section_difference(
-    void *mem, ManifoldCrossSection *a, ManifoldCrossSection *b);
-ManifoldCrossSection *manifold_cross_section_intersection(
-    void *mem, ManifoldCrossSection *a, ManifoldCrossSection *b);
+ManifoldCrossSection* manifold_cross_section_batch_boolean(
+    void* mem, ManifoldCrossSectionVec* csv, ManifoldOpType op);
+ManifoldCrossSection* manifold_cross_section_union(void* mem,
+                                                   ManifoldCrossSection* a,
+                                                   ManifoldCrossSection* b);
+ManifoldCrossSection* manifold_cross_section_difference(
+    void* mem, ManifoldCrossSection* a, ManifoldCrossSection* b);
+ManifoldCrossSection* manifold_cross_section_intersection(
+    void* mem, ManifoldCrossSection* a, ManifoldCrossSection* b);
 
 // CrossSection Convex Hulls
 
-ManifoldCrossSection *manifold_cross_section_hull(void *mem,
-                                                  ManifoldCrossSection *cs);
-ManifoldCrossSection *manifold_cross_section_batch_hull(
-    void *mem, ManifoldCrossSectionVec *css);
-ManifoldCrossSection *manifold_cross_section_hull_simple_polygon(
-    void *mem, ManifoldSimplePolygon *ps);
-ManifoldCrossSection *manifold_cross_section_hull_polygons(
-    void *mem, ManifoldPolygons *ps);
+ManifoldCrossSection* manifold_cross_section_hull(void* mem,
+                                                  ManifoldCrossSection* cs);
+ManifoldCrossSection* manifold_cross_section_batch_hull(
+    void* mem, ManifoldCrossSectionVec* css);
+ManifoldCrossSection* manifold_cross_section_hull_simple_polygon(
+    void* mem, ManifoldSimplePolygon* ps);
+ManifoldCrossSection* manifold_cross_section_hull_polygons(
+    void* mem, ManifoldPolygons* ps);
 
 // CrossSection Transformation
 
-ManifoldCrossSection *manifold_cross_section_translate(void *mem,
-                                                       ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_translate(void* mem,
+                                                       ManifoldCrossSection* cs,
                                                        double x, double y);
-ManifoldCrossSection *manifold_cross_section_rotate(void *mem,
-                                                    ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_rotate(void* mem,
+                                                    ManifoldCrossSection* cs,
                                                     double deg);
-ManifoldCrossSection *manifold_cross_section_scale(void *mem,
-                                                   ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_scale(void* mem,
+                                                   ManifoldCrossSection* cs,
                                                    double x, double y);
-ManifoldCrossSection *manifold_cross_section_mirror(void *mem,
-                                                    ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_mirror(void* mem,
+                                                    ManifoldCrossSection* cs,
                                                     double ax_x, double ax_y);
-ManifoldCrossSection *manifold_cross_section_transform(void *mem,
-                                                       ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_transform(void* mem,
+                                                       ManifoldCrossSection* cs,
                                                        double x1, double y1,
                                                        double x2, double y2,
                                                        double x3, double y3);
-ManifoldCrossSection *manifold_cross_section_warp(
-    void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(double, double));
-ManifoldCrossSection *manifold_cross_section_warp_context(
-    void *mem, ManifoldCrossSection *cs,
-    ManifoldVec2 (*fun)(double, double, void *), void *ctx);
-ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
-                                                      ManifoldCrossSection *cs,
+ManifoldCrossSection* manifold_cross_section_warp(
+    void* mem, ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double));
+ManifoldCrossSection* manifold_cross_section_warp_context(
+    void* mem, ManifoldCrossSection* cs,
+    ManifoldVec2 (*fun)(double, double, void*), void* ctx);
+ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
+                                                      ManifoldCrossSection* cs,
                                                       double epsilon);
-ManifoldCrossSection *manifold_cross_section_offset(
-    void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
+ManifoldCrossSection* manifold_cross_section_offset(
+    void* mem, ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
     double miter_limit, int circular_segments);
 
 // CrossSection Info
 
-double manifold_cross_section_area(ManifoldCrossSection *cs);
-size_t manifold_cross_section_num_vert(ManifoldCrossSection *cs);
-size_t manifold_cross_section_num_contour(ManifoldCrossSection *cs);
-int manifold_cross_section_is_empty(ManifoldCrossSection *cs);
-ManifoldRect *manifold_cross_section_bounds(void *mem,
-                                            ManifoldCrossSection *cs);
-ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,
-                                                     ManifoldCrossSection *cs);
+double manifold_cross_section_area(ManifoldCrossSection* cs);
+size_t manifold_cross_section_num_vert(ManifoldCrossSection* cs);
+size_t manifold_cross_section_num_contour(ManifoldCrossSection* cs);
+int manifold_cross_section_is_empty(ManifoldCrossSection* cs);
+ManifoldRect* manifold_cross_section_bounds(void* mem,
+                                            ManifoldCrossSection* cs);
+ManifoldPolygons* manifold_cross_section_to_polygons(void* mem,
+                                                     ManifoldCrossSection* cs);
 
 // Rectangle
 
-ManifoldRect *manifold_rect(void *mem, double x1, double y1, double x2,
+ManifoldRect* manifold_rect(void* mem, double x1, double y1, double x2,
                             double y2);
-ManifoldVec2 manifold_rect_min(ManifoldRect *r);
-ManifoldVec2 manifold_rect_max(ManifoldRect *r);
-ManifoldVec2 manifold_rect_dimensions(ManifoldRect *r);
-ManifoldVec2 manifold_rect_center(ManifoldRect *r);
-double manifold_rect_scale(ManifoldRect *r);
-int manifold_rect_contains_pt(ManifoldRect *r, double x, double y);
-int manifold_rect_contains_rect(ManifoldRect *a, ManifoldRect *b);
-void manifold_rect_include_pt(ManifoldRect *r, double x, double y);
-ManifoldRect *manifold_rect_union(void *mem, ManifoldRect *a, ManifoldRect *b);
-ManifoldRect *manifold_rect_transform(void *mem, ManifoldRect *r, double x1,
+ManifoldVec2 manifold_rect_min(ManifoldRect* r);
+ManifoldVec2 manifold_rect_max(ManifoldRect* r);
+ManifoldVec2 manifold_rect_dimensions(ManifoldRect* r);
+ManifoldVec2 manifold_rect_center(ManifoldRect* r);
+double manifold_rect_scale(ManifoldRect* r);
+int manifold_rect_contains_pt(ManifoldRect* r, double x, double y);
+int manifold_rect_contains_rect(ManifoldRect* a, ManifoldRect* b);
+void manifold_rect_include_pt(ManifoldRect* r, double x, double y);
+ManifoldRect* manifold_rect_union(void* mem, ManifoldRect* a, ManifoldRect* b);
+ManifoldRect* manifold_rect_transform(void* mem, ManifoldRect* r, double x1,
                                       double y1, double x2, double y2,
                                       double x3, double y3);
-ManifoldRect *manifold_rect_translate(void *mem, ManifoldRect *r, double x,
+ManifoldRect* manifold_rect_translate(void* mem, ManifoldRect* r, double x,
                                       double y);
-ManifoldRect *manifold_rect_mul(void *mem, ManifoldRect *r, double x, double y);
-int manifold_rect_does_overlap_rect(ManifoldRect *a, ManifoldRect *r);
-int manifold_rect_is_empty(ManifoldRect *r);
-int manifold_rect_is_finite(ManifoldRect *r);
+ManifoldRect* manifold_rect_mul(void* mem, ManifoldRect* r, double x, double y);
+int manifold_rect_does_overlap_rect(ManifoldRect* a, ManifoldRect* r);
+int manifold_rect_is_empty(ManifoldRect* r);
+int manifold_rect_is_finite(ManifoldRect* r);
 
 // Bounding Box
 
-ManifoldBox *manifold_box(void *mem, double x1, double y1, double z1, double x2,
+ManifoldBox* manifold_box(void* mem, double x1, double y1, double z1, double x2,
                           double y2, double z2);
-ManifoldVec3 manifold_box_min(ManifoldBox *b);
-ManifoldVec3 manifold_box_max(ManifoldBox *b);
-ManifoldVec3 manifold_box_dimensions(ManifoldBox *b);
-ManifoldVec3 manifold_box_center(ManifoldBox *b);
-double manifold_box_scale(ManifoldBox *b);
-int manifold_box_contains_pt(ManifoldBox *b, double x, double y, double z);
-int manifold_box_contains_box(ManifoldBox *a, ManifoldBox *b);
-void manifold_box_include_pt(ManifoldBox *b, double x, double y, double z);
-ManifoldBox *manifold_box_union(void *mem, ManifoldBox *a, ManifoldBox *b);
-ManifoldBox *manifold_box_transform(void *mem, ManifoldBox *b, double x1,
+ManifoldVec3 manifold_box_min(ManifoldBox* b);
+ManifoldVec3 manifold_box_max(ManifoldBox* b);
+ManifoldVec3 manifold_box_dimensions(ManifoldBox* b);
+ManifoldVec3 manifold_box_center(ManifoldBox* b);
+double manifold_box_scale(ManifoldBox* b);
+int manifold_box_contains_pt(ManifoldBox* b, double x, double y, double z);
+int manifold_box_contains_box(ManifoldBox* a, ManifoldBox* b);
+void manifold_box_include_pt(ManifoldBox* b, double x, double y, double z);
+ManifoldBox* manifold_box_union(void* mem, ManifoldBox* a, ManifoldBox* b);
+ManifoldBox* manifold_box_transform(void* mem, ManifoldBox* b, double x1,
                                     double y1, double z1, double x2, double y2,
                                     double z2, double x3, double y3, double z3,
                                     double x4, double y4, double z4);
-ManifoldBox *manifold_box_translate(void *mem, ManifoldBox *b, double x,
+ManifoldBox* manifold_box_translate(void* mem, ManifoldBox* b, double x,
                                     double y, double z);
-ManifoldBox *manifold_box_mul(void *mem, ManifoldBox *b, double x, double y,
+ManifoldBox* manifold_box_mul(void* mem, ManifoldBox* b, double x, double y,
                               double z);
-int manifold_box_does_overlap_pt(ManifoldBox *b, double x, double y, double z);
-int manifold_box_does_overlap_box(ManifoldBox *a, ManifoldBox *b);
-int manifold_box_is_finite(ManifoldBox *b);
+int manifold_box_does_overlap_pt(ManifoldBox* b, double x, double y, double z);
+int manifold_box_does_overlap_box(ManifoldBox* a, ManifoldBox* b);
+int manifold_box_is_finite(ManifoldBox* b);
 
 // Static Quality Globals
 
@@ -379,54 +379,54 @@ void manifold_reset_to_circular_defaults();
 
 // Manifold Mesh Extraction
 
-int manifold_meshgl_num_prop(ManifoldMeshGL *m);
-int manifold_meshgl_num_vert(ManifoldMeshGL *m);
-int manifold_meshgl_num_tri(ManifoldMeshGL *m);
-size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_tri_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_merge_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_run_original_id_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_run_transform_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m);
-float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_run_original_id(void *mem, ManifoldMeshGL *m);
-float *manifold_meshgl_run_transform(void *mem, ManifoldMeshGL *m);
-uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m);
-float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
+int manifold_meshgl_num_prop(ManifoldMeshGL* m);
+int manifold_meshgl_num_vert(ManifoldMeshGL* m);
+int manifold_meshgl_num_tri(ManifoldMeshGL* m);
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_tri_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_merge_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_run_index_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_run_original_id_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_run_transform_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_face_id_length(ManifoldMeshGL* m);
+size_t manifold_meshgl_tangent_length(ManifoldMeshGL* m);
+float* manifold_meshgl_vert_properties(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_tri_verts(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_merge_from_vert(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_merge_to_vert(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_run_index(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_run_original_id(void* mem, ManifoldMeshGL* m);
+float* manifold_meshgl_run_transform(void* mem, ManifoldMeshGL* m);
+uint32_t* manifold_meshgl_face_id(void* mem, ManifoldMeshGL* m);
+float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m);
 
-size_t manifold_meshgl64_num_prop(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_num_vert(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_num_tri(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_vert_properties_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_tri_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_merge_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_run_index_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_run_original_id_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_run_transform_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_face_id_length(ManifoldMeshGL64 *m);
-size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64 *m);
-double *manifold_meshgl64_vert_properties(void *mem, ManifoldMeshGL64 *m);
-uint64_t *manifold_meshgl64_tri_verts(void *mem, ManifoldMeshGL64 *m);
-uint64_t *manifold_meshgl64_merge_from_vert(void *mem, ManifoldMeshGL64 *m);
-uint64_t *manifold_meshgl64_merge_to_vert(void *mem, ManifoldMeshGL64 *m);
-uint64_t *manifold_meshgl64_run_index(void *mem, ManifoldMeshGL64 *m);
-uint32_t *manifold_meshgl64_run_original_id(void *mem, ManifoldMeshGL64 *m);
-double *manifold_meshgl64_run_transform(void *mem, ManifoldMeshGL64 *m);
-uint64_t *manifold_meshgl64_face_id(void *mem, ManifoldMeshGL64 *m);
-double *manifold_meshgl64_halfedge_tangent(void *mem, ManifoldMeshGL64 *m);
+size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_num_vert(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_num_tri(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_vert_properties_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_tri_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_merge_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_run_index_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_run_original_id_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_run_transform_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_face_id_length(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64* m);
+double* manifold_meshgl64_vert_properties(void* mem, ManifoldMeshGL64* m);
+uint64_t* manifold_meshgl64_tri_verts(void* mem, ManifoldMeshGL64* m);
+uint64_t* manifold_meshgl64_merge_from_vert(void* mem, ManifoldMeshGL64* m);
+uint64_t* manifold_meshgl64_merge_to_vert(void* mem, ManifoldMeshGL64* m);
+uint64_t* manifold_meshgl64_run_index(void* mem, ManifoldMeshGL64* m);
+uint32_t* manifold_meshgl64_run_original_id(void* mem, ManifoldMeshGL64* m);
+double* manifold_meshgl64_run_transform(void* mem, ManifoldMeshGL64* m);
+uint64_t* manifold_meshgl64_face_id(void* mem, ManifoldMeshGL64* m);
+double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m);
 
 // Triangulation
 
-ManifoldTriangulation *manifold_triangulate(void *mem, ManifoldPolygons *ps,
+ManifoldTriangulation* manifold_triangulate(void* mem, ManifoldPolygons* ps,
                                             double epsilon);
-size_t manifold_triangulation_num_tri(ManifoldTriangulation *m);
-int *manifold_triangulation_tri_verts(void *mem, ManifoldTriangulation *m);
+size_t manifold_triangulation_num_tri(ManifoldTriangulation* m);
+int* manifold_triangulation_tri_verts(void* mem, ManifoldTriangulation* m);
 
 // memory size
 
@@ -446,71 +446,71 @@ size_t manifold_triangulation_size();
 
 // allocation
 
-ManifoldManifold *manifold_alloc_manifold();
-ManifoldManifoldVec *manifold_alloc_manifold_vec();
-ManifoldCrossSection *manifold_alloc_cross_section();
-ManifoldCrossSectionVec *manifold_alloc_cross_section_vec();
-ManifoldSimplePolygon *manifold_alloc_simple_polygon();
-ManifoldPolygons *manifold_alloc_polygons();
-ManifoldMeshGL *manifold_alloc_meshgl();
-ManifoldMeshGL64 *manifold_alloc_meshgl64();
-ManifoldBox *manifold_alloc_box();
-ManifoldRect *manifold_alloc_rect();
-ManifoldTriangulation *manifold_alloc_triangulation();
+ManifoldManifold* manifold_alloc_manifold();
+ManifoldManifoldVec* manifold_alloc_manifold_vec();
+ManifoldCrossSection* manifold_alloc_cross_section();
+ManifoldCrossSectionVec* manifold_alloc_cross_section_vec();
+ManifoldSimplePolygon* manifold_alloc_simple_polygon();
+ManifoldPolygons* manifold_alloc_polygons();
+ManifoldMeshGL* manifold_alloc_meshgl();
+ManifoldMeshGL64* manifold_alloc_meshgl64();
+ManifoldBox* manifold_alloc_box();
+ManifoldRect* manifold_alloc_rect();
+ManifoldTriangulation* manifold_alloc_triangulation();
 
 // destruction
 
-void manifold_destruct_manifold(ManifoldManifold *m);
-void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms);
-void manifold_destruct_cross_section(ManifoldCrossSection *m);
-void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv);
-void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p);
-void manifold_destruct_polygons(ManifoldPolygons *p);
-void manifold_destruct_meshgl(ManifoldMeshGL *m);
-void manifold_destruct_meshgl64(ManifoldMeshGL64 *m);
-void manifold_destruct_box(ManifoldBox *b);
-void manifold_destruct_rect(ManifoldRect *b);
-void manifold_destruct_triangulation(ManifoldTriangulation *M);
+void manifold_destruct_manifold(ManifoldManifold* m);
+void manifold_destruct_manifold_vec(ManifoldManifoldVec* ms);
+void manifold_destruct_cross_section(ManifoldCrossSection* m);
+void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p);
+void manifold_destruct_polygons(ManifoldPolygons* p);
+void manifold_destruct_meshgl(ManifoldMeshGL* m);
+void manifold_destruct_meshgl64(ManifoldMeshGL64* m);
+void manifold_destruct_box(ManifoldBox* b);
+void manifold_destruct_rect(ManifoldRect* b);
+void manifold_destruct_triangulation(ManifoldTriangulation* M);
 
 // pointer free + destruction
 
-void manifold_delete_manifold(ManifoldManifold *m);
-void manifold_delete_manifold_vec(ManifoldManifoldVec *ms);
-void manifold_delete_cross_section(ManifoldCrossSection *cs);
-void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv);
-void manifold_delete_simple_polygon(ManifoldSimplePolygon *p);
-void manifold_delete_polygons(ManifoldPolygons *p);
-void manifold_delete_meshgl(ManifoldMeshGL *m);
-void manifold_delete_meshgl64(ManifoldMeshGL64 *m);
-void manifold_delete_box(ManifoldBox *b);
-void manifold_delete_rect(ManifoldRect *b);
-void manifold_delete_triangulation(ManifoldTriangulation *m);
+void manifold_delete_manifold(ManifoldManifold* m);
+void manifold_delete_manifold_vec(ManifoldManifoldVec* ms);
+void manifold_delete_cross_section(ManifoldCrossSection* cs);
+void manifold_delete_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_delete_simple_polygon(ManifoldSimplePolygon* p);
+void manifold_delete_polygons(ManifoldPolygons* p);
+void manifold_delete_meshgl(ManifoldMeshGL* m);
+void manifold_delete_meshgl64(ManifoldMeshGL64* m);
+void manifold_delete_box(ManifoldBox* b);
+void manifold_delete_rect(ManifoldRect* b);
+void manifold_delete_triangulation(ManifoldTriangulation* m);
 
 // MeshIO / Export
 
 #ifdef MANIFOLD_EXPORT
-ManifoldMaterial *manifold_material(void *mem);
-void manifold_material_set_roughness(ManifoldMaterial *mat, double roughness);
-void manifold_material_set_metalness(ManifoldMaterial *mat, double metalness);
-void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec3 color);
-ManifoldExportOptions *manifold_export_options(void *mem);
-void manifold_export_options_set_faceted(ManifoldExportOptions *options,
+ManifoldMaterial* manifold_material(void* mem);
+void manifold_material_set_roughness(ManifoldMaterial* mat, double roughness);
+void manifold_material_set_metalness(ManifoldMaterial* mat, double metalness);
+void manifold_material_set_color(ManifoldMaterial* mat, ManifoldVec3 color);
+ManifoldExportOptions* manifold_export_options(void* mem);
+void manifold_export_options_set_faceted(ManifoldExportOptions* options,
                                          int faceted);
-void manifold_export_options_set_material(ManifoldExportOptions *options,
-                                          ManifoldMaterial *mat);
-void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
-                            ManifoldExportOptions *options);
-ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
+void manifold_export_options_set_material(ManifoldExportOptions* options,
+                                          ManifoldMaterial* mat);
+void manifold_export_meshgl(const char* filename, ManifoldMeshGL* mesh,
+                            ManifoldExportOptions* options);
+ManifoldMeshGL* manifold_import_meshgl(void* mem, const char* filename,
                                        int force_cleanup);
 
 size_t manifold_material_size();
 size_t manifold_export_options_size();
 
-void manifold_destruct_material(ManifoldMaterial *m);
-void manifold_destruct_export_options(ManifoldExportOptions *options);
+void manifold_destruct_material(ManifoldMaterial* m);
+void manifold_destruct_export_options(ManifoldExportOptions* options);
 
-void manifold_delete_material(ManifoldMaterial *m);
-void manifold_delete_export_options(ManifoldExportOptions *options);
+void manifold_delete_material(ManifoldMaterial* m);
+void manifold_delete_export_options(ManifoldExportOptions* options);
 #endif
 
 #ifdef __cplusplus

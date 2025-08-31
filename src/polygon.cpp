@@ -18,11 +18,11 @@
 #include <map>
 #include <set>
 
-#include "./parallel.h"
-#include "./tree2d.h"
-#include "./utils.h"
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
+#include "parallel.h"
+#include "tree2d.h"
+#include "utils.h"
 
 #ifdef MANIFOLD_DEBUG
 #include <iomanip>
@@ -45,9 +45,9 @@ struct PolyEdge {
   int startVert, endVert;
 };
 
-std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
+std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx& polys) {
   std::vector<PolyEdge> halfedges;
-  for (const auto &poly : polys) {
+  for (const auto& poly : polys) {
     for (size_t i = 1; i < poly.size(); ++i) {
       halfedges.push_back({poly[i - 1].idx, poly[i].idx});
     }
@@ -56,10 +56,10 @@ std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
   return halfedges;
 }
 
-std::vector<PolyEdge> Triangles2Edges(const std::vector<ivec3> &triangles) {
+std::vector<PolyEdge> Triangles2Edges(const std::vector<ivec3>& triangles) {
   std::vector<PolyEdge> halfedges;
   halfedges.reserve(triangles.size() * 3);
-  for (const ivec3 &tri : triangles) {
+  for (const ivec3& tri : triangles) {
     halfedges.push_back({tri[0], tri[1]});
     halfedges.push_back({tri[1], tri[2]});
     halfedges.push_back({tri[2], tri[0]});
@@ -67,7 +67,7 @@ std::vector<PolyEdge> Triangles2Edges(const std::vector<ivec3> &triangles) {
   return halfedges;
 }
 
-void CheckTopology(const std::vector<PolyEdge> &halfedges) {
+void CheckTopology(const std::vector<PolyEdge>& halfedges) {
   DEBUG_ASSERT(halfedges.size() % 2 == 0, topologyErr,
                "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
@@ -88,8 +88,8 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   backward.resize(n_edges);
 
   std::for_each(backward.begin(), backward.end(),
-                [](PolyEdge &e) { std::swap(e.startVert, e.endVert); });
-  auto cmp = [](const PolyEdge &a, const PolyEdge &b) {
+                [](PolyEdge& e) { std::swap(e.startVert, e.endVert); });
+  auto cmp = [](const PolyEdge& a, const PolyEdge& b) {
     return a.startVert < b.startVert ||
            (a.startVert == b.startVert && a.endVert < b.endVert);
   };
@@ -102,8 +102,8 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   }
 }
 
-void CheckTopology(const std::vector<ivec3> &triangles,
-                   const PolygonsIdx &polys) {
+void CheckTopology(const std::vector<ivec3>& triangles,
+                   const PolygonsIdx& polys) {
   std::vector<PolyEdge> halfedges = Triangles2Edges(triangles);
   std::vector<PolyEdge> openEdges = Polygons2Edges(polys);
   for (PolyEdge e : openEdges) {
@@ -112,23 +112,23 @@ void CheckTopology(const std::vector<ivec3> &triangles,
   CheckTopology(halfedges);
 }
 
-void CheckGeometry(const std::vector<ivec3> &triangles,
-                   const PolygonsIdx &polys, double epsilon) {
+void CheckGeometry(const std::vector<ivec3>& triangles,
+                   const PolygonsIdx& polys, double epsilon) {
   std::unordered_map<int, vec2> vertPos;
-  for (const auto &poly : polys) {
+  for (const auto& poly : polys) {
     for (size_t i = 0; i < poly.size(); ++i) {
       vertPos[poly[i].idx] = poly[i].pos;
     }
   }
   DEBUG_ASSERT(std::all_of(triangles.begin(), triangles.end(),
-                           [&vertPos, epsilon](const ivec3 &tri) {
+                           [&vertPos, epsilon](const ivec3& tri) {
                              return CCW(vertPos[tri[0]], vertPos[tri[1]],
                                         vertPos[tri[2]], epsilon) >= 0;
                            }),
                geometryErr, "triangulation is not entirely CCW!");
 }
 
-void Dump(const PolygonsIdx &polys, double epsilon) {
+void Dump(const PolygonsIdx& polys, double epsilon) {
   std::cout << std::setprecision(19);
   std::cout << "Polygon 0 " << epsilon << " " << polys.size() << std::endl;
   for (auto poly : polys) {
@@ -149,8 +149,8 @@ void Dump(const PolygonsIdx &polys, double epsilon) {
 
 std::atomic<int> numFailures(0);
 
-void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
-                  std::vector<ivec3> &triangles, double epsilon) {
+void PrintFailure(const std::exception& e, const PolygonsIdx& polys,
+                  std::vector<ivec3>& triangles, double epsilon) {
   // only print the first triangulation failure
   if (numFailures.fetch_add(1) != 0) return;
   std::cout << std::setprecision(19);
@@ -183,8 +183,8 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
  * Exactly colinear edges and zero-length edges are treated conservatively as
  * reflex. Does not check for overlaps.
  */
-bool IsConvex(const PolygonsIdx &polys, double epsilon) {
-  for (const SimplePolygonIdx &poly : polys) {
+bool IsConvex(const PolygonsIdx& polys, double epsilon) {
+  for (const SimplePolygonIdx& poly : polys) {
     const vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
     // Zero-length edges comes out NaN, which won't trip the early return, but
     // it's okay because that zero-length edge will also get tested
@@ -206,14 +206,14 @@ bool IsConvex(const PolygonsIdx &polys, double epsilon) {
  * Triangulates a set of convex polygons by alternating instead of a fan, to
  * avoid creating high-degree vertices.
  */
-std::vector<ivec3> TriangulateConvex(const PolygonsIdx &polys) {
+std::vector<ivec3> TriangulateConvex(const PolygonsIdx& polys) {
   const size_t numTri = manifold::transform_reduce(
       polys.begin(), polys.end(), 0_uz,
       [](size_t a, size_t b) { return a + b; },
-      [](const SimplePolygonIdx &poly) { return poly.size() - 2; });
+      [](const SimplePolygonIdx& poly) { return poly.size() - 2; });
   std::vector<ivec3> triangles;
   triangles.reserve(numTri);
-  for (const SimplePolygonIdx &poly : polys) {
+  for (const SimplePolygonIdx& poly : polys) {
     size_t i = 0;
     size_t k = poly.size() - 1;
     bool right = true;
@@ -245,11 +245,11 @@ std::vector<ivec3> TriangulateConvex(const PolygonsIdx &polys) {
 
 class EarClip {
  public:
-  EarClip(const PolygonsIdx &polys, double epsilon) : epsilon_(epsilon) {
+  EarClip(const PolygonsIdx& polys, double epsilon) : epsilon_(epsilon) {
     ZoneScoped;
 
     size_t numVert = 0;
-    for (const SimplePolygonIdx &poly : polys) {
+    for (const SimplePolygonIdx& poly : polys) {
       numVert += poly.size();
     }
     polygon_.reserve(numVert + 2 * polys.size());
@@ -286,12 +286,12 @@ class EarClip {
   using VertItr = std::vector<Vert>::iterator;
   using VertItrC = std::vector<Vert>::const_iterator;
   struct MaxX {
-    bool operator()(const VertItr &a, const VertItr &b) const {
+    bool operator()(const VertItr& a, const VertItr& b) const {
       return a->pos.x > b->pos.x;
     }
   };
   struct MinCost {
-    bool operator()(const VertItr &a, const VertItr &b) const {
+    bool operator()(const VertItr& a, const VertItr& b) const {
       return a->cost < b->cost;
     }
   };
@@ -488,7 +488,7 @@ class EarClip {
     // values < -epsilon so they will never affect validity. The first
     // totalCost is designed to give priority to sharper angles. Any cost < (-1
     // - epsilon) has satisfied the Delaunay condition.
-    double EarCost(double epsilon, IdxCollider &collider) const {
+    double EarCost(double epsilon, IdxCollider& collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
       const double scale = 4 / la::dot(openSide, openSide);
@@ -553,7 +553,8 @@ class EarClip {
 
   // Apply func to each un-clipped vert in a polygon and return an un-clipped
   // vert.
-  VertItrC Loop(VertItr first, std::function<void(VertItr)> func) const {
+  template <typename F>
+  VertItrC Loop(VertItr first, F func) const {
     VertItr v = first;
     do {
       if (Clipped(v)) {
@@ -614,10 +615,10 @@ class EarClip {
   }
 
   // Build the circular list polygon structures.
-  std::vector<VertItr> Initialize(const PolygonsIdx &polys) {
+  std::vector<VertItr> Initialize(const PolygonsIdx& polys) {
     std::vector<VertItr> starts;
     const auto invalidItr = polygon_.begin();
-    for (const SimplePolygonIdx &poly : polys) {
+    for (const SimplePolygonIdx& poly : polys) {
       auto vert = poly.begin();
       polygon_.push_back({vert->idx,
                           0.0,
@@ -808,7 +809,7 @@ class EarClip {
 
   // Recalculate the cost of the Vert v ear, updating it in the queue by
   // removing and reinserting it.
-  void ProcessEar(VertItr v, IdxCollider &collider) {
+  void ProcessEar(VertItr v, IdxCollider& collider) {
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
@@ -937,7 +938,7 @@ namespace manifold {
  * @return std::vector<ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon,
+std::vector<ivec3> TriangulateIdx(const PolygonsIdx& polys, double epsilon,
                                   bool allowConvex) {
   std::vector<ivec3> triangles;
   double updatedEpsilon = epsilon;
@@ -958,12 +959,12 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon,
         CheckGeometry(triangles, polys, 2 * updatedEpsilon);
       }
     }
-  } catch (const geometryErr &e) {
+  } catch (const geometryErr& e) {
     if (!ManifoldParams().suppressErrors) {
       PrintFailure(e, polys, triangles, updatedEpsilon);
     }
     throw;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     PrintFailure(e, polys, triangles, updatedEpsilon);
     throw;
   }
@@ -987,13 +988,13 @@ std::vector<ivec3> TriangulateIdx(const PolygonsIdx &polys, double epsilon,
  * @return std::vector<ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<ivec3> Triangulate(const Polygons &polygons, double epsilon,
+std::vector<ivec3> Triangulate(const Polygons& polygons, double epsilon,
                                bool allowConvex) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
-  for (const auto &poly : polygons) {
+  for (const auto& poly : polygons) {
     SimplePolygonIdx simpleIndexed;
-    for (const vec2 &polyVert : poly) {
+    for (const vec2& polyVert : poly) {
       simpleIndexed.push_back({polyVert, idx++});
     }
     polygonsIndexed.push_back(simpleIndexed);

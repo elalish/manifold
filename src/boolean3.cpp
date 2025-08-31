@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./boolean3.h"
+#include "boolean3.h"
 
 #include <limits>
+#include <unordered_set>
 
-#include "./parallel.h"
+#include "disjoint_sets.h"
+#include "parallel.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -47,7 +49,7 @@ vec2 Interpolate(vec3 pL, vec3 pR, double x) {
   return yz;
 }
 
-vec4 Intersect(const vec3 &pL, const vec3 &pR, const vec3 &qL, const vec3 &qR) {
+vec4 Intersect(const vec3& pL, const vec3& pR, const vec3& qL, const vec3& qR) {
   const double dyL = qL.y - pL.y;
   const double dyR = qR.y - pR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
@@ -325,20 +327,18 @@ struct Kernel12Tmp {
 
 struct Kernel12Recorder {
   using Local = Kernel12Tmp;
-  Kernel12 &k12;
-  VecView<const TmpEdge> tmpedges;
+  Kernel12& k12;
   bool forward;
 
 #if MANIFOLD_PAR == 1
   tbb::combinable<Kernel12Tmp> store;
-  Local &local() { return store.local(); }
+  Local& local() { return store.local(); }
 #else
   Kernel12Tmp localStore;
-  Local &local() { return localStore; }
+  Local& local() { return localStore; }
 #endif
 
-  void record(int queryIdx, int leafIdx, Local &tmp) {
-    queryIdx = tmpedges[queryIdx].halfedgeIdx;
+  void record(int queryIdx, int leafIdx, Local& tmp) {
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
@@ -355,10 +355,10 @@ struct Kernel12Recorder {
     Kernel12Tmp result;
     std::vector<Kernel12Tmp> tmps;
     store.combine_each(
-        [&](Kernel12Tmp &data) { tmps.emplace_back(std::move(data)); });
+        [&](Kernel12Tmp& data) { tmps.emplace_back(std::move(data)); });
     std::vector<size_t> sizes;
     size_t total_size = 0;
-    for (const auto &tmp : tmps) {
+    for (const auto& tmp : tmps) {
       sizes.push_back(total_size);
       total_size += tmp.x12_.size();
     }
@@ -380,43 +380,44 @@ struct Kernel12Recorder {
   }
 };
 
-std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
-                                            const Manifold::Impl &inQ,
-                                            Vec<std::array<int, 2>> &p1q2,
+std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
+                                            const Manifold::Impl& inQ,
+                                            Vec<std::array<int, 2>>& p1q2,
                                             double expandP, bool forward) {
   ZoneScoped;
   // a: 1 (edge), b: 2 (face)
-  const Manifold::Impl &a = forward ? inP : inQ;
-  const Manifold::Impl &b = forward ? inQ : inP;
+  const Manifold::Impl& a = forward ? inP : inQ;
+  const Manifold::Impl& b = forward ? inQ : inP;
 
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
   Kernel11 k11{inP.vertPos_,  inQ.vertPos_, inP.halfedge_,
                inQ.halfedge_, expandP,      inP.vertNormal_};
 
-  Vec<TmpEdge> tmpedges = CreateTmpEdges(a.halfedge_);
-  Vec<Box> AEdgeBB(tmpedges.size());
-  for_each_n(autoPolicy(tmpedges.size(), 1e5), countAt(0), tmpedges.size(),
-             [&](const int e) {
-               AEdgeBB[e] = Box(a.vertPos_[tmpedges[e].first],
-                                a.vertPos_[tmpedges[e].second]);
-             });
   Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
-  Kernel12Recorder recorder{k12, tmpedges, forward, {}};
-
-  b.collider_.Collisions<false, Box, Kernel12Recorder>(AEdgeBB.cview(),
-                                                       recorder);
+  Kernel12Recorder recorder{k12, forward, {}};
+  auto f = [&a](int i) {
+    return a.halfedge_[i].IsForward()
+               ? Box(a.vertPos_[a.halfedge_[i].startVert],
+                     a.vertPos_[a.halfedge_[i].endVert])
+               : Box();
+  };
+  b.collider_.Collisions<false, decltype(f), Kernel12Recorder>(
+      f, a.halfedge_.size(), recorder);
 
   Kernel12Tmp result = recorder.get();
   p1q2 = std::move(result.p1q2_);
   auto x12 = std::move(result.x12_);
   auto v12 = std::move(result.v12_);
-  // sort p1q2
+  // sort p1q2 according to edges
   Vec<size_t> i12(p1q2.size());
   sequence(i12.begin(), i12.end());
+
+  int index = forward ? 0 : 1;
   stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
-    return p1q2[a][0] < p1q2[b][0] ||
-           (p1q2[a][0] == p1q2[b][0] && p1q2[a][1] < p1q2[b][1]);
+    return p1q2[a][index] < p1q2[b][index] ||
+           (p1q2[a][index] == p1q2[b][index] &&
+            p1q2[a][1 - index] < p1q2[b][1 - index]);
   });
   Permute(p1q2, i12);
   Permute(x12, i12);
@@ -424,28 +425,75 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl &inP,
   return std::make_tuple(x12, v12);
 };
 
-Vec<int> Winding03(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                   double expandP, bool forward) {
+Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                   const VecView<std::array<int, 2>> p1q2, double expandP,
+                   bool forward) {
   ZoneScoped;
-  // verts that are not shadowed (not in p0q2) have winding number zero.
-  // a: 0 (vertex), b: 2 (face)
-  const Manifold::Impl &a = forward ? inP : inQ;
-  const Manifold::Impl &b = forward ? inQ : inP;
+  const Manifold::Impl& a = forward ? inP : inQ;
+  const Manifold::Impl& b = forward ? inQ : inP;
+  Vec<int> brokenHalfedges;
+  int index = forward ? 0 : 1;
+
+  DisjointSets uA(a.vertPos_.size());
+  for_each(autoPolicy(a.halfedge_.size()), countAt(0),
+           countAt(a.halfedge_.size()), [&](int edge) {
+             const Halfedge& he = a.halfedge_[edge];
+             if (!he.IsForward()) return;
+             // check if the edge is broken
+             auto it = std::lower_bound(
+                 p1q2.begin(), p1q2.end(), edge,
+                 [index](const std::array<int, 2>& collisionPair, int e) {
+                   return collisionPair[index] < e;
+                 });
+             if (it == p1q2.end() || (*it)[index] != edge)
+               uA.unite(he.startVert, he.endVert);
+           });
+
+  // find components, the hope is the number of components should be small
+  std::unordered_set<int> components;
+#if (MANIFOLD_PAR == 1)
+  if (a.vertPos_.size() > 1e5) {
+    tbb::combinable<std::unordered_set<int>> componentsShared;
+    for_each(autoPolicy(a.vertPos_.size()), countAt(0),
+             countAt(a.vertPos_.size()),
+             [&](int v) { componentsShared.local().insert(uA.find(v)); });
+    componentsShared.combine_each([&](const std::unordered_set<int>& data) {
+      components.insert(data.begin(), data.end());
+    });
+  } else
+#endif
+  {
+    for (size_t v = 0; v < a.vertPos_.size(); v++)
+      components.insert(uA.find(v));
+  }
+  Vec<int> verts;
+  verts.reserve(components.size());
+  for (int c : components) verts.push_back(c);
+
   Vec<int> w03(a.NumVert(), 0);
   Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
                expandP,    inP.vertNormal_, forward};
-  auto f = [&](int a, int b) {
-    const auto [s02, z02] = k02(a, b);
-    if (std::isfinite(z02)) AtomicAdd(w03[a], s02 * (!forward ? -1 : 1));
+  auto recorderf = [&](int i, int b) {
+    const auto [s02, z02] = k02(verts[i], b);
+    if (std::isfinite(z02)) w03[verts[i]] += s02 * (!forward ? -1 : 1);
   };
-  auto recorder = MakeSimpleRecorder(f);
-  b.collider_.Collisions<false>(a.vertPos_.cview(), recorder);
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&](int i) { return a.vertPos_[verts[i]]; };
+  b.collider_.Collisions<false, decltype(f), decltype(recorder)>(
+      f, verts.size(), recorder);
+  // flood fill
+  for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
+           [&](size_t i) {
+             size_t root = uA.find(i);
+             if (root == i) return;
+             w03[i] = w03[root];
+           });
   return w03;
-};
+}
 }  // namespace
 
 namespace manifold {
-Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
+Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add ? 1.0 : -1.0) {
   // Symbolic perturbation:
@@ -481,9 +529,10 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
     return;
   }
 
-  // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, inQ, expandP_, true);
-  w30_ = Winding03(inP, inQ, expandP_, false);
+  // Compute winding numbers of all vertices using flood fill
+  // Vertices on the same connected component have the same winding number
+  w03_ = Winding03(inP, inQ, p1q2_, expandP_, true);
+  w30_ = Winding03(inP, inQ, p2q1_, expandP_, false);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();

@@ -22,12 +22,18 @@ jobs:
       matrix:
         cross_section: [ON]
         parallelization: [OFF, ON]
+        os: [ubuntu-24.04]
         gcc: [13, 14]
         include:
           - cross_section: OFF
             parallelization: ON
+            os: ubuntu-24.04
             gcc: 14
-    runs-on: ubuntu-24.04
+          - cross_section: ON
+            parallelization: ON
+            os: ubuntu-22.04
+            gcc: 11
+    runs-on: ${{ matrix.os }}
     env:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
@@ -42,12 +48,14 @@ jobs:
         python -m pip install -U trimesh pytest
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 4.0.2
     - name: Build ${{matrix.parallelization}}
       if: matrix.parallelization != 'OFF'
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_FLAGS=-UNDEBUG -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_FLAGS=-UNDEBUG -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
     - name: Test ${{matrix.parallelization}}
       if: matrix.parallelization != 'OFF'
       run: |
@@ -119,7 +127,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_DEBUG=${{matrix.debug}} .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_DEBUG=${{matrix.debug}} -DMANIFOLD_ASSERT=${{matrix.debug}} .. && emmake make
     - name: Test WASM
       if: matrix.parallelization == 'OFF'
       run: |
@@ -142,6 +150,43 @@ jobs:
         retention-days: 90
         overwrite: true
 
+  build_fuzzer:
+    name: fuzzer
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y update
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y libgtest-dev clang
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMANIFOLD_DEBUG=ON -DMANIFOLD_FUZZ=ON -DMANIFOLD_PYBIND=OFF -DCMAKE_CXX_COMPILER=clang++ ..
+        make
+
+  build_fuzzer_mac:
+    name: fuzzer mac
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install common dependencies
+      run: |
+        brew install googletest
+    - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 3.31.6
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMANIFOLD_DEBUG=ON -DMANIFOLD_FUZZ=ON -DMANIFOLD_PYBIND=OFF -DCMAKE_CXX_COMPILER=clang++ -DMANIFOLD_PAR=OFF ..
+        ASAN_OPTIONS=detect_container_overflow=0 make
+
   build_windows:
     name: Windows (TBB:${{matrix.parallelization}}, SHARED:${{matrix.shared}})
     timeout-minutes: 30
@@ -149,15 +194,17 @@ jobs:
       matrix:
         parallelization: [OFF, ON]
         shared: [OFF, ON]
-    runs-on: windows-2019
+    runs-on: windows-2025
     steps:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 4.0.2
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build ${{matrix.parallelization}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test dll location
@@ -204,12 +251,16 @@ jobs:
         $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
 
   build_mac:
-    name: MacOS (TBB:${{matrix.parallelization == 'ON'}})
+    name: MacOS (TBB:${{matrix.parallelization == 'ON'}}, shared lib:${{matrix.shared == 'ON'}}, ${{matrix.os}})
     timeout-minutes: 30
     strategy:
       matrix:
         parallelization: [OFF, ON]
-    runs-on: macos-latest
+        shared: [OFF, ON]
+        # macos-13: intel
+        # macos-latest: arm
+        os: [macos-13, macos-latest]
+    runs-on: ${{matrix.os}}
     steps:
     - name: Install common dependencies
       run: |
@@ -221,12 +272,12 @@ jobs:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
       with:
-        cmake-version: 3.31.6
+        cmake-version: 4.0.2
     - name: Build
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
     - name: Test
       run: |
         cd build/test
@@ -238,6 +289,9 @@ jobs:
         sudo cmake --install .
         cd ..
         ./scripts/test-cmake.sh
+    - name: test pkg-config consumer
+      if: matrix.shared == 'ON'
+      run: |
         LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
 
   build_mac_builtin_tbb:
@@ -251,12 +305,12 @@ jobs:
     - uses: actions/checkout@v4
     - uses: jwlawson/actions-setup-cmake@v2
       with:
-        cmake-version: 3.31.6
+        cmake-version: 4.0.2
     - name: Build
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
     - name: Test
       run: |
         cd build/test
@@ -279,9 +333,9 @@ jobs:
         brew install googletest
         pip install trimesh pytest
     - uses: actions/checkout@v4
-      with:
-        cmake-version: 3.31.6
     - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 4.0.2
     - name: test cmake consumer
       run: |
         cd ..

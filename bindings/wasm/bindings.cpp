@@ -15,12 +15,9 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
-#include <vector>
-
 #include "helpers.cpp"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <tbb/parallel_for.h>
@@ -93,7 +90,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)
       .value("Round", CrossSection::JoinType::Round)
-      .value("Miter", CrossSection::JoinType::Miter);
+      .value("Miter", CrossSection::JoinType::Miter)
+      .value("Bevel", CrossSection::JoinType::Bevel);
 
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
@@ -176,7 +174,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Decompose", select_overload<std::vector<Manifold>() const>(
                                   &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)
-      .function("status", &Manifold::Status)
+      .function("status", &man_js::Status)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)
@@ -185,6 +183,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_boundingBox", &Manifold::BoundingBox)
       .function("tolerance", &Manifold::GetTolerance)
       .function("setTolerance", &Manifold::SetTolerance)
+      .function("simplify", &Manifold::Simplify)
       .function("genus", &Manifold::Genus)
       .function("volume", &Manifold::Volume)
       .function("surfaceArea", &Manifold::SurfaceArea)

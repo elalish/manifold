@@ -12,11 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./csg_tree.h"
-#include "./impl.h"
-#include "./parallel.h"
+#include "csg_tree.h"
+#include "disjoint_sets.h"
+#include "impl.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
+#include "parallel.h"
+
+namespace {
+using namespace manifold;
+
+template <typename P, typename I>
+std::shared_ptr<Manifold::Impl> SmoothImpl(
+    const MeshGLP<P, I>& meshGL,
+    const std::vector<Smoothness>& sharpenedEdges) {
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
+
+  MeshGLP<P, I> meshTmp = meshGL;
+  meshTmp.faceID.resize(meshGL.NumTri());
+  std::iota(meshTmp.faceID.begin(), meshTmp.faceID.end(), 0);
+
+  std::shared_ptr<Manifold::Impl> impl =
+      std::make_shared<Manifold::Impl>(meshTmp);
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
+  // Restore the original faceID
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (meshGL.faceID.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          meshGL.faceID[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
+  return impl;
+}
+}  // namespace
 
 namespace manifold {
 /**
@@ -49,13 +82,7 @@ namespace manifold {
  */
 Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
-               "when supplying tangents, the normal constructor should be used "
-               "rather than Smooth().");
-
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
-  return Manifold(impl);
+  return Manifold(SmoothImpl(meshGL, sharpenedEdges));
 }
 
 /**
@@ -88,13 +115,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  */
 Manifold Manifold::Smooth(const MeshGL64& meshGL64,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(meshGL64.halfedgeTangent.empty(), std::runtime_error,
-               "when supplying tangents, the normal constructor should be used "
-               "rather than Smooth().");
-
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(meshGL64);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
-  return Manifold(impl);
+  return Manifold(SmoothImpl(meshGL64, sharpenedEdges));
 }
 
 /**
@@ -277,7 +298,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -420,7 +441,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
-  pImpl_->CreateFaces();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -446,11 +467,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
-  UnionFind<> uf(NumVert());
+  DisjointSets uf(NumVert());
   // Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
   for (const Halfedge& halfedge : pImpl_->halfedge_) {
-    if (halfedge.IsForward()) uf.unionXY(halfedge.startVert, halfedge.endVert);
+    if (halfedge.IsForward()) uf.unite(halfedge.startVert, halfedge.endVert);
   }
   std::vector<int> componentIndices;
   const int numComponents = uf.connectedComponents(componentIndices);

@@ -18,9 +18,11 @@
 #include "quickhull.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
+#include <unordered_map>
 
-#include "./impl.h"
+#include "impl.h"
 
 namespace manifold {
 
@@ -853,7 +855,7 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   SetEpsilon();
   InitializeOriginal();
   Finish();
-  CreateFaces();
+  MarkCoplanar();
 }
 
 }  // namespace manifold

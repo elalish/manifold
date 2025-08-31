@@ -18,6 +18,7 @@
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
+#include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 #include "manifold/polygon.h"
 
@@ -26,21 +27,21 @@ using namespace fuzztest;
 void TriangulationNoCrash(
     std::vector<std::vector<std::pair<float, float>>> input, float precision) {
   if (precision < 0) precision = -1;
-  manifold::PolygonParams().intermediateChecks = true;
+  manifold::ManifoldParams().intermediateChecks = true;
   manifold::Polygons polys;
   size_t size = 0;
-  for (const auto &simplePoly : input) {
+  for (const auto& simplePoly : input) {
     polys.emplace_back();
-    for (const auto &p : simplePoly) {
+    for (const auto& p : simplePoly) {
       polys.back().emplace_back(p.first, p.second);
       size++;
     }
   }
-  std::atomic<pid_t> tid;
+  pthread_t tid;
   std::atomic<bool> faulted(true);
   auto asyncFuture =
       std::async(std::launch::async, [&polys, &faulted, &tid, precision]() {
-        tid.store(gettid());
+        tid = pthread_self();
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
@@ -54,7 +55,7 @@ void TriangulationNoCrash(
   if (asyncFuture.wait_for(std::chrono::milliseconds(
           std::max<size_t>(size, 10000))) == std::future_status::timeout) {
     printf("timeout after %ldms...\n", std::max<size_t>(size, 10000));
-    pthread_cancel(tid.load());
+    pthread_cancel(tid);
   }
 
   EXPECT_FALSE(faulted.load());
@@ -85,8 +86,8 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrash)
 FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
     .WithDomains(ReversibleMap(
                      [](auto input) {
-                       for (auto &poly : input) {
-                         for (auto &pair : poly) {
+                       for (auto& poly : input) {
+                         for (auto& pair : poly) {
                            pair.first = std::round(pair.first);
                            pair.second = std::round(pair.second);
                          }
@@ -99,11 +100,6 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
                      PolygonDomain),
                  InRange<float>(-1.0, 0.1))
     .WithSeeds(SeedProvider);
-
-static std::vector<TestCase> TestCases;
-void TestPoly(Polygons polys, int _unused, float precision = -1.0) {
-  TestCases.push_back({polys, precision});
-}
 
 std::vector<TestCase> SeedProvider() {
   std::string file = __FILE__;
