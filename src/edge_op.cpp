@@ -274,7 +274,6 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 
   CleanupTopology();
   CollapseShortEdges(firstNewVert);
-  CollapseAntiparallelEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
 }
 
