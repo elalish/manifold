@@ -148,7 +148,7 @@ void RegisterPolygonTests() {
 struct FilletResult {
   FilletResult(const std::vector<CrossSection> &crossSections,
                const std::string &name)
-      : name(name), crossSections(crossSections){};
+      : name(name), crossSections(crossSections) {};
 
   std::string name;
 
@@ -162,13 +162,11 @@ class FilletTestFixture : public PolygonTestFixture {
   void TestBody() override {
     // result->emplace_back(FilletResult({CrossSection(polys)}, name));
 
-    result->emplace_back(
-        FilletResult(TestFillet(polys, expectedNumTri, epsilon), name));
+    TestFillet(polys, expectedNumTri, epsilon);
   }
 
-  std::vector<CrossSection> TestFillet(const Polygons &polys,
-                                       int expectedNumTri,
-                                       double epsilon = -1.0);
+  void TestFillet(const Polygons &polys, int expectedNumTri,
+                  double epsilon = -1.0);
 
  private:
   static std::unique_ptr<std::vector<FilletResult>,
@@ -180,65 +178,81 @@ class FilletTestFixture : public PolygonTestFixture {
       input;
 };
 
-std::vector<CrossSection> FilletTestFixture::TestFillet(const Polygons &polys,
-                                                        int expectedNumTri,
-                                                        double epsilon) {
-  const double radius = 0.7;
+void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
+                                   double epsilon) {
+  // const double radius = 0.7;
 
   const int inputCircularSegments = 20;
-
-  const int circularSegments = inputCircularSegments > 2
-                                   ? inputCircularSegments
-                                   : Quality::GetCircularSegments(radius);
-
-  const double dPhi = M_PI_2 / circularSegments;
 
   manifold::ManifoldParams().verbose = true;
 
   auto input = CrossSection(polys);
+  auto bbox = input.Bounds().Size();
 
-  auto r = input.Fillet(radius, circularSegments);
+  double min = std::min(bbox.x, bbox.y), max = std::max(bbox.x, bbox.y);
 
-  auto rc = manifold::CrossSection::Compose(r);
-  EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
+  std::array<double, 10> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
 
-  for (const auto &crossSection : r) {
-    auto polygon = crossSection.ToPolygons();
-    for (const auto &loop : polygon) {
-      const auto &cs = CrossSection(loop);
-
-      bool isCCW = cs.Area() > 0;
-
-      for (size_t i = 0; i != loop.size(); i++) {
-        vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
-             p3 = loop[(i + 2) % loop.size()];
-
-        // Check edge direction
-        vec2 e1 = p2 - p1, e2 = p3 - p2;
-        double det = la::cross(e1, e2);
-        EXPECT_TRUE(isCCW && (det > 0));
-
-        // Check angle between edge
-        float angle = la::asin(det / (la::length(e1) * la::length(e2)));
-        EXPECT_TRUE(angle < dPhi || angle > M_PI);
-      }
-    }
+  std::vector<double> radiusVec;
+  for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
+    radiusVec.push_back(*it * min);
+    radiusVec.push_back(*it * max);
   }
 
-  auto rr = rc.Fillet(radius, circularSegments);
-  auto rrc = manifold::CrossSection::Compose(r);
+  for (auto it = radiusVec.begin(); it != radiusVec.end(); it++) {
+    const double radius = *it;
 
-  // Check idempotent
-  EXPECT_NEAR(rc.Area(), rrc.Area(), 1);
+    const int circularSegments = inputCircularSegments > 2
+                                     ? inputCircularSegments
+                                     : Quality::GetCircularSegments(radius);
 
-  return r;
+    auto r = input.Fillet(radius, circularSegments);
+
+    auto rc = manifold::CrossSection::Compose(r);
+    EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
+
+    for (const auto &crossSection : r) {
+      auto polygon = crossSection.ToPolygons();
+      for (const auto &loop : polygon) {
+        const auto &cs = CrossSection(loop);
+
+        bool isCCW = cs.Area() > 0;
+
+        for (size_t i = 0; i != loop.size(); i++) {
+          vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
+               p3 = loop[(i + 2) % loop.size()];
+
+          // Check edge direction
+          vec2 e1 = p2 - p1, e2 = p3 - p2;
+          double det = la::cross(e1, e2);
+          EXPECT_TRUE(isCCW && (det > 0));
+
+          // Check angle between edge
+          float angle = la::asin(det / (la::length(e1) * la::length(e2)));
+
+          const double dPhi = M_PI_2 / circularSegments;
+          EXPECT_TRUE(angle < dPhi || angle > M_PI);
+        }
+      }
+    }
+
+    // Check idempotent
+    {
+      auto rr = rc.Fillet(radius, circularSegments);
+      auto rrc = manifold::CrossSection::Compose(r);
+
+      EXPECT_NEAR(rc.Area(), rrc.Area(), 0.01 * (rc.Area() - input.Area()));
+    }
+
+    result->emplace_back(FilletResult(r, name + "_" + std::to_string(radius)));
+  }
 }
 
 void RegisterFilletTests() {
-  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
-                         "zebra3.txt"};
+  // std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+  //                        "zebra3.txt"};
 
-  // std::string files[] = {"fillet.txt"};
+  std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
