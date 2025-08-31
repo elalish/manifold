@@ -116,12 +116,12 @@ namespace {
 
 vec3 toVec3(vec2 in) { return vec3(in.x, in.y, 0); }
 
+double toRad(const vec2& v) { return atan2(v.y, v.x); }
+
 // Get line normal direction
-vec2 getNormal(bool CCW, const vec2& e) {
+vec2 getEdgeNormal(bool CCW, const vec2& e) {
   return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
 };
-
-double getRad(const vec2& v) { return atan2(v.y, v.x); }
 
 // Normalize angle to [0, 2*PI)
 float normalizeAngle(float angle) {
@@ -131,14 +131,14 @@ float normalizeAngle(float angle) {
 }
 
 // Get 2 rad vec by 3 point
-std::array<double, 2> getRadVec(const vec2& p1, const vec2& p2,
-                                const vec2& center) {
-  return std::array<double, 2>{normalizeAngle(getRad(p1 - center)),
-                               normalizeAngle(getRad(p2 - center))};
+std::array<double, 2> getRadPair(const vec2& p1, const vec2& p2,
+                                 const vec2& center) {
+  return std::array<double, 2>{normalizeAngle(toRad(p1 - center)),
+                               normalizeAngle(toRad(p2 - center))};
 };
 
 // Get Point by parameter value
-vec2 getPoint(const vec2& p1, const vec2& p2, double t) {
+vec2 getPointOnEdgeByParameter(const vec2& p1, const vec2& p2, double t) {
   return p1 + t * (p2 - p1);
 };
 
@@ -163,24 +163,20 @@ bool isAngleInSector(double angle, double startRad, double endRad) {
 // For P-* situation to check local validation
 bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
                         vec2 circleCenter) {
-  double rad = getRad(circleCenter - points[1]);
+  double rad = toRad(circleCenter - points[1]);
 
-  vec2 pre = getNormal(!isCCW, points[0] - points[1]),
-       next = getNormal(isCCW, points[2] - points[1]);
+  vec2 pre = getEdgeNormal(!isCCW, points[0] - points[1]),
+       next = getEdgeNormal(isCCW, points[2] - points[1]);
 
-  double startRad = normalizeAngle(getRad(pre)),
-         endRad = normalizeAngle(getRad(next));
+  double startRad = normalizeAngle(toRad(pre)),
+         endRad = normalizeAngle(toRad(next));
 
   return isCCW ^ isAngleInSector(rad, startRad, endRad);
 };
 
-}  // namespace
-
-namespace {
-
 // Projection point to line and check if it's on the line segment
-bool isProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
-                           double& t) {
+bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
+                                double& t) {
   t = la::dot(p - p1, p2 - p1) / la::length2(p2 - p1);
 
   return t >= 0 && t <= 1;
@@ -209,6 +205,31 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
   return la::length(closestPoint - p);
 }
 
+std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
+                                     int circularSegments) {
+  std::vector<vec2> pts;
+
+  double totalRad = normalizeAngle(arc.RadValues[1] - arc.RadValues[0]);
+
+  double dPhi = 2 * M_PI / circularSegments;
+  int seg = int(totalRad / dPhi) + 1;
+  for (int i = 0; i != seg + 1; ++i) {
+    double current = arc.RadValues[0] + dPhi * i;
+    if (i == seg) current = arc.RadValues[1];
+
+    vec2 pnt = {arc.CircleCenter.x + radius * cos(current),
+                arc.CircleCenter.y + radius * sin(current)};
+
+    pts.push_back(pnt);
+  }
+
+  return pts;
+}
+
+}  // namespace
+
+namespace {
+
 // Check if line segment intersect with a circle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                             double radius) {
@@ -218,7 +239,37 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
     return la::length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
 
   double t;
-  return distancePointSegment(center, p1, p2, t) < radius + EPSILON;
+  return distancePointSegment(center, p1, p2, t) < (radius + EPSILON);
+};
+
+int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
+                           float radius, std::array<vec2, 2>& intersections) {
+  vec2 d = p2 - p1;
+  vec2 f = p1 - center;
+
+  float a = dot(d, d);
+  float b = 2 * dot(f, d);
+  float c = dot(f, f) - radius * radius;
+
+  float discriminant = b * b - 4 * a * c;
+
+  if (discriminant < 0) return 0;  // No intersection
+
+  float sqrtDisc = sqrt(discriminant);
+  double t1 = (-b - sqrtDisc) / (2 * a);
+  double t2 = (-b + sqrtDisc) / (2 * a);
+
+  int count = 0;
+  if (t1 >= -EPSILON && t1 <= 1 + EPSILON) {
+    intersections[count] = p1 + d * t1;
+    count++;
+  }
+  if (t2 >= -EPSILON && t2 <= 1 + EPSILON && abs(t2 - t1) > EPSILON) {
+    intersections[count] = p1 + d * t2;
+    count++;
+  }
+
+  return count;
 };
 
 // Check if line segment intersect with another line segment
@@ -250,14 +301,14 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   }
 };
 
-int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
-                                 const bool eCCW, double radius,
-                                 std::array<vec2, 2>& circleCenters,
-                                 std::array<double, 2>& tangentParameterValue) {
+int calculatePointSegmentTangentCircles(
+    const vec2& p, const vec2& p1, const vec2& p2, const bool eCCW,
+    double radius, std::array<vec2, 2>& circleCenters,
+    std::array<double, 2>& tangentParameterValue) {
   double t;
 
   // If p on edge p1->p2, degenerate
-  if (isProjectionOnSegment(p, p1, p2, t)) return 0;
+  if (isPointProjectionOnSegment(p, p1, p2, t)) return 0;
 
   vec2 e = p2 - p1, dir = la::normalize(e),
        normal = la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
@@ -274,7 +325,7 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
   int count = 0;
   for (int i = 0; i != 2; i++) {
     vec2 tangent = tangentPoint[i];
-    if (isProjectionOnSegment(tangent, p1, p2, t)) {
+    if (isPointProjectionOnSegment(tangent, p1, p2, t)) {
       // Tangent valid -> check circle valid
       tangentParameterValue[count] = t;
       circleCenters[count] = tangent + normal * radius;
@@ -285,10 +336,12 @@ int calculatePointSegmentCircles(const vec2& p, const vec2& p1, const vec2& p2,
   return count;
 }
 
-int calculatePointPointCircles(const vec2& p1, const vec2& p2, double radius,
-                               std::array<vec2, 2>& circleCenters) {
+int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
+                                      double radius,
+                                      std::array<vec2, 2>& circleCenters) {
   double dx = p2.x - p1.x;
   double dy = p2.y - p1.y;
+
   double distance = sqrt(dx * dx + dy * dy);
 
   vec2 v = p2 - p1;
@@ -315,7 +368,7 @@ int calculatePointPointCircles(const vec2& p1, const vec2& p2, double radius,
   return 2;
 }
 
-std::vector<GeomTangentPair> calculateStadiumIntersect(
+std::vector<GeomTangentPair> processPillShapeIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
     const double radius) {
@@ -327,8 +380,8 @@ std::vector<GeomTangentPair> calculateStadiumIntersect(
 
   std::vector<GeomTangentPair> GeomTangentPairVec;
 
-  const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
-             e2CurNormal = getNormal(e2CCW, e2Cur);
+  const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur),
+             e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
   {
     // Edge - Edge
 
@@ -346,14 +399,14 @@ std::vector<GeomTangentPair> calculateStadiumIntersect(
                                 offsetE2[1], t, u)) {
       std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
       vec2 center = offsetE1[0] + e1Cur * t,
-           tangent1 = getPoint(offsetE1[0], offsetE1[1], t),
-           tangent2 = getPoint(offsetE2[0], offsetE2[1], u);
+           tangent1 = getPointOnEdgeByParameter(offsetE1[0], offsetE1[1], t),
+           tangent2 = getPointOnEdgeByParameter(offsetE2[0], offsetE2[1], u);
 
       GeomTangentPairVec.emplace_back(GeomTangentPair{
           std::array<EdgeTangentState, 2>{EdgeTangentState::E1CurrentEdge,
                                           EdgeTangentState::E2CurrentEdge},
           std::array<double, 2>{t, u}, center,
-          getRadVec(tangent1, tangent2, center)});
+          getRadPair(tangent1, tangent2, center)});
     }
   }
 
@@ -400,7 +453,7 @@ std::vector<GeomTangentPair> calculateStadiumIntersect(
           int i = 0;
         }
 
-        int count = calculatePointSegmentCircles(
+        int count = calculatePointSegmentTangentCircles(
             point, p1, p2, e1CCW, radius, centers, tangentParameterValue);
 
         for (int j = 0; j != count; j++) {
@@ -411,9 +464,10 @@ std::vector<GeomTangentPair> calculateStadiumIntersect(
             std::cout << "E-P" << centers[j] << std::endl;
             std::cout << point << p1 << p2 << std::endl;
 
-            auto radVec = getRadVec(
-                getPoint(e1Points[0], e1Points[1], tangentParameterValue[j]),
-                point, centers[j]);
+            auto radVec =
+                getRadPair(getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                                     tangentParameterValue[j]),
+                           point, centers[j]);
 
             std::array<double, 2> paramVal{tangentParameterValue[j], 1};
 
@@ -441,7 +495,7 @@ std::vector<GeomTangentPair> calculateStadiumIntersect(
   return GeomTangentPairVec;
 }
 
-std::vector<GeomTangentPair> calculateSectorIntersect(
+std::vector<GeomTangentPair> processPieShapeIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
     const double radius) {
@@ -457,48 +511,17 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
              e2Cur = e2Points[2] - e2Points[1],
              e2Next = e2Points[3] - e2Points[2];
 
-  const vec2 e1CurNormal = getNormal(e1CCW, e1Cur),
-             e1NextNormal = getNormal(e1CCW, e1Next);
+  const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur),
+             e1NextNormal = getEdgeNormal(e1CCW, e1Next);
 
-  auto getLineCircleIntersection =
-      [](const vec2& p1, const vec2& p2, const vec2& center, float radius,
-         std::array<vec2, 2>& intersections) -> int {
-    vec2 d = p2 - p1;
-    vec2 f = p1 - center;
-
-    float a = dot(d, d);
-    float b = 2 * dot(f, d);
-    float c = dot(f, f) - radius * radius;
-
-    float discriminant = b * b - 4 * a * c;
-
-    if (discriminant < 0) return 0;  // No intersection
-
-    float sqrtDisc = sqrt(discriminant);
-    double t1 = (-b - sqrtDisc) / (2 * a);
-    double t2 = (-b + sqrtDisc) / (2 * a);
-
-    int count = 0;
-    if (t1 >= -EPSILON && t1 <= 1 + EPSILON) {
-      intersections[count] = p1 + d * t1;
-      count++;
-    }
-    if (t2 >= -EPSILON && t2 <= 1 + EPSILON && abs(t2 - t1) > EPSILON) {
-      intersections[count] = p1 + d * t2;
-      count++;
-    }
-
-    return count;
-  };
-
-  auto isPointInPie = [](const vec2& p, const vec2& center, float radius,
-                         float startRad, float endRad) -> bool {
+  auto isPointInPieArea = [](const vec2& p, const vec2& center, float radius,
+                             float startRad, float endRad) -> bool {
     vec2 diff = p - center;
     float distSq = length2(diff);
 
     if (distSq > radius * radius + EPSILON) return false;
 
-    float angle = getRad(diff);
+    float angle = toRad(diff);
     return isAngleInSector(angle, startRad, endRad);
   };
 
@@ -506,7 +529,7 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
   {
     std::array<vec2, 2> centers;
 
-    const vec2 e2CurNormal = getNormal(e2CCW, e2Cur);
+    const vec2 e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
 
     const std::array<vec2, 2> offsetE2{
         e2Points[1] + e2CurNormal * radius,
@@ -518,8 +541,8 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
       int i = 0;
     }
 
-    int count = getLineCircleIntersection(offsetE2[0], offsetE2[1], e1Points[1],
-                                          radius, centers);
+    int count = intersectCircleSegment(offsetE2[0], offsetE2[1], e1Points[1],
+                                       radius, centers);
     for (int i = 0; i != count; i++) {
       if (isCircleLocalValid(e1Points, e1CCW, centers[i])) {
         std::cout << "P-E" << centers[i] << std::endl;
@@ -528,12 +551,14 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
                   << std::endl;
 
         double t;
-        if (!isProjectionOnSegment(centers[i], e2Points[1], e2Points[2], t)) {
+        if (!isPointProjectionOnSegment(centers[i], e2Points[1], e2Points[2],
+                                        t)) {
           DEBUG_ASSERT(false, logicErr, "Tangent not on segment");
         }
 
-        auto radVec = getRadVec(
-            e1Points[1], getPoint(e2Points[1], e2Points[2], t), centers[i]);
+        auto radVec = getRadPair(
+            e1Points[1], getPointOnEdgeByParameter(e2Points[1], e2Points[2], t),
+            centers[i]);
 
         EdgeTangentState e1EdgeTangentState = EdgeTangentState::E1CurrentEdge;
         std::array<double, 2> paramVal{1, t};
@@ -554,16 +579,16 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
 
   //  Point - Point
 
-  double startRad = getRad(e1CurNormal), endRad = getRad(e1NextNormal);
+  double startRad = toRad(e1CurNormal), endRad = toRad(e1NextNormal);
 
   for (int i = 0; i != 2; i++) {
     const vec2 point = e2Points[i + 1];
     if (la::length(point - e1Points[1]) < EPSILON) continue;
 
-    if (isPointInPie(point, e1Points[1], radius, startRad, endRad)) {
+    if (isPointInPieArea(point, e1Points[1], radius, startRad, endRad)) {
       std::array<vec2, 2> centers;
-      int count =
-          calculatePointPointCircles(e1Points[1], point, radius, centers);
+      int count = calculatePointPointTangentCircles(e1Points[1], point, radius,
+                                                    centers);
 
       for (int j = 0; j != count; j++) {
         if (isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
@@ -573,7 +598,7 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
           std::cout << point << e1Points[1] << radius << std::endl;
 
           std::array<double, 2> paramVal{1, 1};
-          auto radVec = getRadVec(e1Points[1], point, centers[j]);
+          auto radVec = getRadPair(e1Points[1], point, centers[j]);
 
           EdgeTangentState e1EdgeTangentState = EdgeTangentState::E1CurrentEdge;
 
@@ -606,27 +631,6 @@ std::vector<GeomTangentPair> calculateSectorIntersect(
   }
 
   return GeomTangentPairVec;
-}
-
-std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
-                                     int circularSegments) {
-  std::vector<vec2> pts;
-
-  double totalRad = normalizeAngle(arc.RadValues[1] - arc.RadValues[0]);
-
-  double dPhi = 2 * M_PI / circularSegments;
-  int seg = int(totalRad / dPhi) + 1;
-  for (int i = 0; i != seg + 1; ++i) {
-    double current = arc.RadValues[0] + dPhi * i;
-    if (i == seg) current = arc.RadValues[1];
-
-    vec2 pnt = {arc.CircleCenter.x + radius * cos(current),
-                arc.CircleCenter.y + radius * sin(current)};
-
-    pts.push_back(pnt);
-  }
-
-  return pts;
 }
 
 }  // namespace
@@ -818,10 +822,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         std::cout << "-----------" << std::endl
                   << e2Points[1] << " " << e2Points[2] << std::endl;
 
-        auto r1 = calculateStadiumIntersect(e1Points, isE1LoopCCW, e2Points,
+        auto r1 = processPillShapeIntersect(e1Points, isE1LoopCCW, e2Points,
                                             isE2LoopCCW, radius);
 
-        auto r2 = calculateSectorIntersect(e1Points, isE1LoopCCW, e2Points,
+        auto r2 = processPieShapeIntersect(e1Points, isE1LoopCCW, e2Points,
                                            isE2LoopCCW, radius);
 
         auto size1 = r1.size(), size2 = r2.size();
@@ -928,10 +932,11 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     for (size_t i = 0; i != arcConnection.size(); i++) {
       std::cout << i << " " << arcConnection[i].size();
       for (size_t j = 0; j != arcConnection[i].size(); j++) {
-        std::cout << "\t" << arcConnection[i][j].LoopIndex[0]
-                  << arcConnection[i][j].EdgeIndex[0] << " "
-                  << arcConnection[i][j].LoopIndex[1] << " "
-                  << arcConnection[i][j].EdgeIndex[1] << " "
+        std::cout << "\t Index:" << arcConnection[i][j].Index << " ["
+                  << arcConnection[i][j].LoopIndex[0] << ", "
+                  << arcConnection[i][j].EdgeIndex[0] << "] ["
+                  << arcConnection[i][j].LoopIndex[1] << ", "
+                  << arcConnection[i][j].EdgeIndex[1] << "] "
                   << arcConnection[i][j].ParameterValues[0] << " "
                   << arcConnection[i][j].ParameterValues[1]
                   << " { Center: " << arcConnection[i][j].CircleCenter << "} "
@@ -988,11 +993,6 @@ std::vector<CrossSection> Tracing(
     // Tracing to construct result
     EdgeLoopPair current, end;
 
-    size_t currentEdgeIndex = 0, endEdgeIndex = 0, currentEdgeLoopIndex = 0,
-           endEdgeLoopIndex = 0;
-
-    double currentEdgeParamValue = 0;
-
     // Find first fillet arc to start
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
@@ -1029,7 +1029,7 @@ std::vector<CrossSection> Tracing(
             return ele.ParameterValues[0] + EPSILON > current.ParameterValue;
           });
 
-      if (it == arcConnection[currentEdgeIndex].end()) {
+      if (it == arcConnection[getEdgePosition(current)].end()) {
         // Not found, just add vertex
         // FIXME: shouldn't add vertex directly, should search for next edge
         // with fillet arc
@@ -1057,6 +1057,8 @@ std::vector<CrossSection> Tracing(
         {
           // Remove paired connection
           EdgeLoopPair next{arc.EdgeIndex[1], arc.LoopIndex[1]};
+          auto pos = getEdgePosition(next);
+
           auto itt = std::find_if(arcConnection[getEdgePosition(next)].begin(),
                                   arcConnection[getEdgePosition(next)].end(),
                                   [arc](const TopoConnectionPair& ele) -> bool {
