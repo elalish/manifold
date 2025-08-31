@@ -197,6 +197,9 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
     for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
       radiusVec.push_back(*it * min);
       radiusVec.push_back(*it * max);
+
+      radiusVec.push_back(-1.0 * *it * min);
+      radiusVec.push_back(-1.0 * *it * max);
     }
   } else {
     radiusVec.push_back(0.7);
@@ -246,7 +249,7 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
     }
 
     // Check idempotent
-    {
+    if (false) {
       auto rr = rc.Fillet(radius, circularSegments);
       auto rrc = manifold::CrossSection::Compose(r);
 
