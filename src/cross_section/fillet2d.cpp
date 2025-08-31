@@ -127,7 +127,7 @@ double normalizeAngle(double angle) {
 
 // Get line normal direction
 vec2 getEdgeNormal(bool CCW, const vec2& e) {
-  return la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+  return normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
 };
 
 // Get 2 rad vec by 3 point
@@ -177,7 +177,12 @@ bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
 // Projection point to line and check if it's on the line segment
 bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
                                 double& t) {
-  t = la::dot(p - p1, p2 - p1) / la::length2(p2 - p1);
+  if (length(p2 - p1) < EPSILON) {
+    t = 0;
+    return false;
+  }
+
+  t = dot(p - p1, p2 - p1) / length2(p2 - p1);
 
   return t >= 0 && t <= 1;
 };
@@ -211,9 +216,14 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
                             double& t) {
   t = -1;
 
+  if (length(p2 - p1) < EPSILON) {
+    t = 0;
+    return length(p1 - p);
+  }
+
   vec2 d = p2 - p1;
 
-  t = la::dot(p - p1, d) / la::dot(d, d);
+  t = dot(p - p1, d) / dot(d, d);
 
   vec2 closestPoint;
 
@@ -227,16 +237,14 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
     closestPoint = p1 + t * d;
   }
 
-  return la::length(closestPoint - p);
+  return length(closestPoint - p);
 }
 
 // Check if line segment intersect with a circle
 bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                             double radius) {
-  vec2 d = p2 - p1;
-
-  if (la::length(d) < EPSILON)
-    return la::length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
+  if (length(p2 - p1) < EPSILON)
+    return length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
 
   double t;
   return distancePointSegment(center, p1, p2, t) < (radius + EPSILON);
@@ -278,15 +286,15 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   t = -1;
   u = -1;
 
-  double det = la::cross(p2 - p1, p4 - p3);
+  double det = cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
     // Parallel
     return false;
   }
 
-  double num_t = la::cross(p3 - p1, p4 - p3);
-  double num_u = la::cross(p3 - p1, p2 - p1);
+  double num_t = cross(p3 - p1, p4 - p3);
+  double num_u = cross(p3 - p1, p2 - p1);
 
   t = num_t / det;
   u = num_u / det;
@@ -313,14 +321,14 @@ int calculatePointSegmentTangentCircles(
   // If p on edge p1->p2, degenerate
   if (isPointProjectionOnSegment(p, p1, p2, t)) return 0;
 
-  vec2 e = p2 - p1, dir = la::normalize(e),
-       normal = la::normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
+  vec2 e = p2 - p1, dir = normalize(e),
+       normal = normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
 
-  vec2 projectedP = p1 + dir * la::dot(p - p1, dir);
-  double dist = la::length(projectedP - p);
+  vec2 projectedP = p1 + dir * dot(p - p1, dir);
+  double dist = length(projectedP - p);
   dist = dist > radius ? dist - radius : radius - dist;
 
-  double len = la::sqrt(radius * radius - dist * dist);
+  double len = sqrt(radius * radius - dist * dist);
 
   std::array<vec2, 2> tangentPoint{projectedP - dir * len,
                                    projectedP + dir * len};
@@ -353,7 +361,7 @@ int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
   vec2 midpoint((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
 
   // If distance equals 2*radius, there's exactly one solution (midpoint)
-  if (abs(la::length(v) - 2 * radius) < 1e-9) {
+  if (abs(length(v) - 2 * radius) < 1e-9) {
     circleCenters[0] = midpoint;
     return 1;
   }
@@ -421,22 +429,20 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
     // Determine full inside or full outside
     auto isInsideRect = [&](const vec2 p) -> bool {
       int sign = e1CCW ? 1 : -1;
-      if ((sign * la::cross(e1Cur, p - p1) >= 0) &&
-          (sign * la::cross(p2Offset - p2, p - p2) >= 0) &&
-          (sign * la::cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
-          (sign * la::cross(p1 - p1Offset, p - p1Offset) >= 0))
+      if ((sign * cross(e1Cur, p - p1) >= 0) &&
+          (sign * cross(p2Offset - p2, p - p2) >= 0) &&
+          (sign * cross(p1Offset - p2Offset, p - p2Offset) >= 0) &&
+          (sign * cross(p1 - p1Offset, p - p1Offset) >= 0))
         return true;
 
       return false;
     };
 
     auto isInsideEndpointCircles = [&](const vec2 p) -> bool {
-      if (la::length2(p - e1Points[0] + e1CurNormal * radius) <=
-          radius * radius)
+      if (length2(p - e1Points[0] + e1CurNormal * radius) <= radius * radius)
         return true;
 
-      if (la::length2(p - e2Points[0] + e2CurNormal * radius) <=
-          radius * radius)
+      if (length2(p - e2Points[0] + e2CurNormal * radius) <= radius * radius)
         return true;
 
       return false;
@@ -451,8 +457,8 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
         std::array<vec2, 2> centers;
         std::array<double, 2> tangentParameterValue;
 
-        if (la::length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
-            la::length(e2Points[2] - vec2(3, 0)) < EPSILON) {
+        if (length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
+            length(e2Points[2] - vec2(3, 0)) < EPSILON) {
           int i = 0;
         }
 
@@ -539,8 +545,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
         e2Points[2] + e2CurNormal * radius,
     };
 
-    if (la::length(e2Points[1] - vec2(5, -1)) < EPSILON &&
-        la::length(e2Points[2] - vec2(2.6, 0)) < EPSILON) {
+    if (length(e2Points[1] - vec2(5, -1)) < EPSILON &&
+        length(e2Points[2] - vec2(2.6, 0)) < EPSILON) {
       int i = 0;
     }
 
@@ -586,7 +592,7 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
 
   for (int i = 0; i != 2; i++) {
     const vec2 point = e2Points[i + 1];
-    if (la::length(point - e1Points[1]) < EPSILON) continue;
+    if (length(point - e1Points[1]) < EPSILON) continue;
 
     if (isPointInPieArea(point, e1Points[1], radius, startRad, endRad)) {
       std::array<vec2, 2> centers;
@@ -753,10 +759,9 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
                                          e1Loop[(e1i + 1) % e1Loop.size()],
                                          e1Loop[(e1i + 2) % e1Loop.size()]};
       const vec2 e1 = e1Points[1] - e1Points[0];
-      const bool p2IsConvex =
-          la::cross(e1, e1Points[2] - e1Points[1]) >= EPSILON;
+      const bool p2IsConvex = cross(e1, e1Points[2] - e1Points[1]) >= EPSILON;
 
-      const vec2 normal = la::normalize(vec2(-e1.y, e1.x));
+      const vec2 normal = normalize(vec2(-e1.y, e1.x));
 
       // Create BBox
       manifold::Box box(toVec3(e1Points[0]), toVec3(e1Points[1]));
@@ -770,14 +775,14 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         box.Union(toVec3(normalOffsetP1));
         box.Union(toVec3(normalOffsetP2));
 
-        const vec2 e1n = la::normalize(e1);
+        const vec2 e1n = normalize(e1);
         box.Union(toVec3(e1Points[0] - e1n * radius + normal * radius));
         box.Union(toVec3(e1Points[1] + e1n * radius + normal * radius));
 
         if (!p2IsConvex) {
           const vec2 pnext = e1Loop[(p2i + 1) % e1Loop.size()],
-                     enext = pnext - e1Points[1], enextn = la::normalize(enext),
-                     normalnext = la::normalize(vec2(-enext.y, enext.x));
+                     enext = pnext - e1Points[1], enextn = normalize(enext),
+                     normalnext = normalize(vec2(-enext.y, enext.x));
 
           box.Union(toVec3(e1Points[1] + normalnext * 2.0 * radius));
           box.Union(
