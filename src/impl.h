@@ -342,6 +342,7 @@ struct Manifold::Impl {
   void RemoveDegenerates(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);
   void CollapseColinearEdges(int firstNewVert = 0);
+  void CollapseAntiparallelEdges(int firstNewVert = 0);
   void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
   bool CollapseEdge(int edge, std::vector<int>& edges);
