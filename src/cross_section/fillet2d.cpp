@@ -319,7 +319,7 @@ int calculatePointSegmentTangentCircles(
   double t;
 
   // If p on edge p1->p2, degenerate
-  if (isPointProjectionOnSegment(p, p1, p2, t)) return 0;
+  if (distancePointSegment(p, p1, p2, t) < EPSILON) return 0;
 
   vec2 e = p2 - p1, dir = normalize(e),
        normal = normalize(CCW ? vec2(-e.y, e.x) : vec2(e.y, -e.x));
@@ -526,14 +526,15 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
              e1NextNormal = getEdgeNormal(e1CCW, e1Next);
 
   auto isPointInPieArea = [](const vec2& p, const vec2& center, double radius,
-                             double startRad, double endRad) -> bool {
+                             bool isCCW, double startRad,
+                             double endRad) -> bool {
     vec2 diff = p - center;
     double distSq = length2(diff);
 
-    if (distSq > radius * radius + EPSILON) return false;
+    if (distSq > (radius * radius + EPSILON)) return false;
 
     double angle = toRad(diff);
-    return isAngleInSector(angle, startRad, endRad);
+    return isCCW ^ isAngleInSector(angle, startRad, endRad);
   };
 
   // Point - Edge
@@ -595,7 +596,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     const vec2 point = e2Points[i + 1];
     if (length(point - e1Points[1]) < EPSILON) continue;
 
-    if (isPointInPieArea(point, e1Points[1], radius, startRad, endRad)) {
+    if (isPointInPieArea(point, e1Points[1], 2.0 * radius, e1CCW, startRad,
+                         endRad)) {
       std::array<vec2, 2> centers;
       int count = calculatePointPointTangentCircles(e1Points[1], point, radius,
                                                     centers);
@@ -831,6 +833,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         std::cout << "-----------" << std::endl
                   << e2Points[1] << " " << e2Points[2] << std::endl;
 
+        if (e1i == 4 && e2i == 5) {
+          int i = 0;
+        }
+
         auto r1 = processPillShapeIntersect(e1Points, isE1LoopCCW, e2Points,
                                             isE2LoopCCW, radius);
 
@@ -885,7 +891,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               // pre-detect all intersected point and avoid double processed
             } else if (distance < radius) {
               std::cout << "Remove" << arc.CircleCenter << std::endl;
-              // eraseFlag = true;
+              eraseFlag = true;
               break;
             }
           }
