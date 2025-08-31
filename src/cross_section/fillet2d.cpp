@@ -177,6 +177,12 @@ bool isAngleInSector(double angle, double startRad, double endRad) {
   }
 };
 
+// Check by convex CCW is the same
+bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW) {
+  return (cross(points[1] - points[0], points[2] - points[1]) >= EPSILON) ^
+         isCCW;
+}
+
 // For P-* situation to check local validation
 bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
                         vec2 circleCenter) {
@@ -441,11 +447,15 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
     };
 
     for (int i = 0; i != 2; i++) {
-      // e2Point2 1, 2
+      // Check if E2's point convex
+      if (!isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
+                                                  e2Points[i + 2]},
+                              e2CCW))
+        continue;
+
       const vec2 point = e2Points[i + 1];
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
         std::array<vec2, 2> centers;
-
         if (length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
             length(e2Points[2] - vec2(3, 0)) < EPSILON) {
           int i = 0;
@@ -509,6 +519,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     const std::array<vec2, 3>& e1Points, const bool e1CCW,
     const std::array<vec2, 4>& e2Points, const bool e2CCW,
     const double radius) {
+  if (!isCircleLocalValid(e1Points, e1CCW)) return {};
+
   if (!intersectCircleSegment(e2Points[1], e2Points[2], e1Points[1],
                               2.0 * radius))
     return {};
@@ -592,6 +604,11 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
   double startRad = toRad(e1CurNormal), endRad = toRad(e1NextNormal);
 
   for (int i = 0; i != 2; i++) {
+    if (!isCircleLocalValid(
+            std::array<vec2, 3>{e2Points[i], e2Points[i + 1], e2Points[i + 2]},
+            e2CCW))
+      continue;
+
     const vec2 point = e2Points[i + 1];
     if (length(point - e1Points[1]) < EPSILON) continue;
 
