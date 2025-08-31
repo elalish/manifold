@@ -99,21 +99,25 @@ struct AntiparallelEdge {
   VecView<const Halfedge> halfedge;
   VecView<const vec3> triNormal;
   const int firstNewVert;
-  const double angleThreshold;  // Threshold for considering normals antiparallel
+  const double
+      angleThreshold;  // Threshold for considering normals antiparallel
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
     if (half.pairedHalfedge < 0) return false;
     // Only process edges where at least one vertex is new
-    if (half.startVert < firstNewVert && half.endVert < firstNewVert) return false;
-    
-    // Check if the adjacent triangle normals are antiparallel (180 degrees apart)
+    if (half.startVert < firstNewVert && half.endVert < firstNewVert)
+      return false;
+
+    // Check if the adjacent triangle normals are antiparallel (180 degrees
+    // apart)
     const int tri1 = edge / 3;
     const int tri2 = half.pairedHalfedge / 3;
     const double dotProduct = la::dot(triNormal[tri1], triNormal[tri2]);
-    
+
     // If normals are pointing in opposite directions (dot product close to -1)
-    // This indicates a sliver where triangles are nearly coplanar but facing opposite directions
+    // This indicates a sliver where triangles are nearly coplanar but facing
+    // opposite directions
     return dotProduct < angleThreshold;  // e.g., -0.99 for nearly antiparallel
   }
 };
@@ -338,9 +342,10 @@ void Manifold::Impl::CollapseAntiparallelEdges(int firstNewVert) {
   const size_t nbEdges = halfedge_.size();
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
-  
-  // Use -0.9999 as threshold - edges where normals are nearly opposite (angle > ~179.982 degrees)
-  // This targets slivers where triangles are nearly coplanar but facing opposite directions
+
+  // Use -0.9999 as threshold - edges where normals are nearly opposite (angle >
+  // ~179.982 degrees) This targets slivers where triangles are nearly coplanar
+  // but facing opposite directions
   AntiparallelEdge ae{halfedge_, faceNormal_, firstNewVert, -0.9999};
   s.run(nbEdges, ae, [&](size_t i) {
     const bool didCollapse = CollapseEdge(i, scratchBuffer);
@@ -350,7 +355,8 @@ void Manifold::Impl::CollapseAntiparallelEdges(int firstNewVert) {
 
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose > 0 && numFlagged > 0) {
-    std::cout << "collapsed " << numFlagged << " antiparallel edges" << std::endl;
+    std::cout << "collapsed " << numFlagged << " antiparallel edges"
+              << std::endl;
   }
 #endif
 }

@@ -505,3 +505,44 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
+
+TEST(Boolean, NastyGears) {
+  // Create a nasty gear pattern with many rotated cubes that creates
+  // antiparallel slivers (triangles with normals ~180 degrees apart)
+  // https://github.com/BrunoLevy/thingiCSG/blob/main/DATABASE/Basic/nasty_gear_1.scad
+
+  const int N = 50;  // Number of rotations for the gear pattern
+  const double alpha = 360.0 / N;
+
+  // Create outer gear - many rotated cubes unioned together
+  std::vector<Manifold> outerCubes;
+  for (int i = 0; i < N; ++i) {
+    outerCubes.push_back(
+        Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
+  }
+  Manifold outerGear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  outerGear = outerGear.Scale({2, 2, 1});
+
+  // Create inner gear - same pattern but not scaled
+  std::vector<Manifold> innerCubes;
+  for (int i = 0; i < N; ++i) {
+    innerCubes.push_back(
+        Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
+  }
+  Manifold innerGear = Manifold::BatchBoolean(innerCubes, OpType::Add);
+
+  // Subtract inner from outer to create the nasty gear with potential slivers
+  Manifold nastyGear = outerGear - innerGear;
+
+  // The gear should be valid and manifold
+  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(nastyGear.IsEmpty());
+
+  // Get initial mesh stats
+  MeshGL initialMesh = nastyGear.GetMeshGL();
+  const size_t initialTriCount = initialMesh.triVerts.size() / 3;
+  EXPECT_GT(initialTriCount, 0);
+  EXPECT_EQ(nastyGear.Genus(), 1);
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - innerGear.Volume(),
+              1e-5);
+}
