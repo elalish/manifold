@@ -124,7 +124,7 @@ vec2 getEdgeNormal(bool CCW, const vec2& e) {
 };
 
 // Normalize angle to [0, 2*PI)
-float normalizeAngle(float angle) {
+double normalizeAngle(double angle) {
   while (angle < 0) angle += 2 * M_PI;
   while (angle >= 2 * M_PI) angle -= 2 * M_PI;
   return angle;
@@ -243,19 +243,19 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
 };
 
 int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
-                           float radius, std::array<vec2, 2>& intersections) {
+                           double radius, std::array<vec2, 2>& intersections) {
   vec2 d = p2 - p1;
   vec2 f = p1 - center;
 
-  float a = dot(d, d);
-  float b = 2 * dot(f, d);
-  float c = dot(f, f) - radius * radius;
+  double a = dot(d, d);
+  double b = 2 * dot(f, d);
+  double c = dot(f, f) - radius * radius;
 
-  float discriminant = b * b - 4 * a * c;
+  double discriminant = b * b - 4 * a * c;
 
   if (discriminant < 0) return 0;  // No intersection
 
-  float sqrtDisc = sqrt(discriminant);
+  double sqrtDisc = sqrt(discriminant);
   double t1 = (-b - sqrtDisc) / (2 * a);
   double t2 = (-b + sqrtDisc) / (2 * a);
 
@@ -514,14 +514,14 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
   const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur),
              e1NextNormal = getEdgeNormal(e1CCW, e1Next);
 
-  auto isPointInPieArea = [](const vec2& p, const vec2& center, float radius,
-                             float startRad, float endRad) -> bool {
+  auto isPointInPieArea = [](const vec2& p, const vec2& center, double radius,
+                             double startRad, double endRad) -> bool {
     vec2 diff = p - center;
-    float distSq = length2(diff);
+    double distSq = length2(diff);
 
     if (distSq > radius * radius + EPSILON) return false;
 
-    float angle = toRad(diff);
+    double angle = toRad(diff);
     return isAngleInSector(angle, startRad, endRad);
   };
 
