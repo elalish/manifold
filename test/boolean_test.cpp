@@ -520,28 +520,20 @@ TEST(Boolean, NastyGears) {
     outerCubes.push_back(
         Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
   }
-  Manifold outerGear = Manifold::BatchBoolean(outerCubes, OpType::Add);
-  outerGear = outerGear.Scale({2, 2, 1});
-
-  // Create inner gear - same pattern but not scaled
-  std::vector<Manifold> innerCubes;
-  for (int i = 0; i < N; ++i) {
-    innerCubes.push_back(
-        Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
-  }
-  Manifold innerGear = Manifold::BatchBoolean(innerCubes, OpType::Add);
+  Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  Manifold outerGear = gear.Scale({2, 2, 1});
 
   // Subtract inner from outer to create the nasty gear with slivers
-  Manifold nastyGear = outerGear - innerGear;
+  Manifold nastyGear = outerGear - gear;
 
   // The gear should be valid and manifold
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
-  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - innerGear.Volume(),
-              1e-5);
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
 
   // The gear should have some antiparallel slivers
+  // TODO: Add a function to count antiparallel slivers
 
   // These should be eliminated after simplification
   nastyGear = nastyGear.Simplify(0.0000000001);
