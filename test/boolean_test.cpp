@@ -516,7 +516,7 @@ TEST(Boolean, NastyGears) {
 
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < N; i++) {
     outerCubes.push_back(
         Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
   }
@@ -536,7 +536,7 @@ TEST(Boolean, NastyGears) {
   // TODO: Add a function to count antiparallel slivers
 
   // These should be eliminated after simplification
-  nastyGear = nastyGear.Simplify(0.0000000001);
+  nastyGear = nastyGear.AsOriginal().Simplify(0.0000000001);
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
