@@ -233,111 +233,149 @@ def read_polygon_results_file(filename: str) -> List[Dict[str, Any]]:
         return []
         
     return all_tests
+def read_and_draw_circles(filename, axes_array, colors=None):
+    """
+    Reads circle data from a text file and draws them on each subplot in an array.
 
-def read_and_draw_circles(filename, ax, colors=None):
-    """
-    Read circle data from a text file and draw them using matplotlib.
-    
-    File format:
-    - First line: radius (float)
-    - Following lines: center_x center_y (two floats separated by space)
-    
+    The file should contain a single radius on the first line, followed by
+    x y center coordinates on subsequent lines.
+
     Parameters:
-    filename (str): Path to the text file
-    figsize (tuple): Figure size (width, height)
-    colors (list): List of colors for circles (optional)
-    
-    Returns:
-    fig, ax: matplotlib figure and axis objects
+    filename (str): Path to the text file.
+    axes_array (np.ndarray): A NumPy array of Matplotlib Axes objects to draw on.
+    colors (list): Optional list of colors for the circles.
     """
-    circles = []
-    
+    # --- 1. Read and Parse Circle Data (This part is done only once) ---
     try:
         with open(filename, 'r') as file:
             lines = file.readlines()
+            if not lines:
+                print(f"Error: File '{filename}' is empty.")
+                return
             
-            # Read radius from first line
             radius = float(lines[0].strip())
             
-            # Read circle centers from remaining lines
             centers = []
             for line in lines[1:]:
-                line = line.strip()
-                if line:  # Skip empty lines
+                if line.strip():  # Skip empty lines
                     parts = line.split()
                     if len(parts) >= 2:
-                        x = float(parts[0])
-                        y = float(parts[1])
-                        centers.append((x, y))
+                        centers.append((float(parts[0]), float(parts[1])))
             
-            circles = [(center[0], center[1], radius) for center in centers]
-            
+            if not centers:
+                print(f"Warning: No center points found in '{filename}'.")
+                return
+
+            # Create a list of circle properties: (x, y, radius)
+            circles_to_draw = [(center[0], center[1], radius) for center in centers]
+
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")
-        return None, None
-    except ValueError as e:
-        print(f"Error reading file: {e}")
-        return None, None
-    
-    if not circles:
-        print("No valid circle data found.")
-        return None, None
-    
-    # Set default colors if not provided
-    if colors is None:
-        colors = plt.cm.tab10(np.linspace(0, 1, len(circles)))
-    
-    # Draw circles
-    for i, (x, y, r) in enumerate(circles):
-        color = colors[i % len(colors)]
-        circle = Circle((x, y), r, linewidth=2, edgecolor=color, 
-                               facecolor=color, alpha=0.3, label=f'Circle {i+1}')
-        ax.add_patch(circle)
-        
-        # Add center point
-        ax.plot(x, y, 'ko', markersize=4)
-        
-        # Add text annotation
-        ax.annotate(f'({x:.3f}, {y:.3f})', (x, y), 
-                   xytext=(5, 5), textcoords='offset points', fontsize=8)
+        return
+    except (ValueError, IndexError) as e:
+        print(f"Error processing file '{filename}': {e}")
+        return
 
-    return ax
+    # --- 2. Draw the Circles on Each Subplot ---
+    # Use a clear name for the individual subplot in the loop.
+    for single_ax in axes_array.flatten():
+        
+        # This inner loop draws ALL circles onto the CURRENT subplot.
+        for i, (x, y, r) in enumerate(circles_to_draw):
+            # Use a default color cycle if none is provided.
+            color = colors[i % len(colors)] if colors else plt.cm.tab10(i)
+
+            # Create a NEW patch for each circle on each subplot.
+            circle_patch = Circle((x, y), r, linewidth=2, edgecolor=color,
+                                  facecolor=color, alpha=0.25)
+            
+            # Use the individual subplot 'single_ax' for all drawing commands.
+            single_ax.add_patch(circle_patch)
+            single_ax.plot(x, y, 'o', color=color, markersize=5, label=f'Center {i+1}')
+            single_ax.annotate(f'({x:.2f}, {y:.2f})', (x, y),
+                             xytext=(5, 5), textcoords='offset points',
+                             fontsize=8, color='black')
+
+
+# CORRECTED FUNCTION: It now uses the 'polygons' argument passed to it.
+def draw_polygon_file(axes, polygons_data, rows, cols):
+    """
+    Draws a set of polygons onto a given set of axes.
+    - axes: The matplotlib axes array to draw on.
+    - polygons_data: The list of polygon data to plot (e.g., your 'input' or 'result').
+    - rows, cols: The dimensions of this specific axes grid.
+    """
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k'] # Removed 'w' (white) as it's usually invisible
+    
+    # Flatten the axes array for easy iteration, this works for 1D and 2D arrays.
+    flat_axes = axes.flatten()
+
+    # Loop over the data that was actually PASSED to the function
+    for j in range(len(polygons_data)):
+        ax = flat_axes[j]
+        
+        ax.grid(True)
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_title(polygons_data[j]["name"])
+
+        # Plot each polygon within the current item
+        for i in range(len(polygons_data[j]["polygons"])):
+            # Make sure we don't run out of colors
+            color = colors[i % len(colors)]
+            plot_polygon(ax, polygons_data[j]["polygons"][i], "", color, show_indices=True, fill_polygon=False)
+
+    # Turn off any unused axes in this grid section
+    for i in range(len(polygons_data), rows * cols):
+        ax = flat_axes[i]
+        ax.axis('off')
 
 if __name__ == "__main__":
-    result = read_polygon_results_file(sys.argv[1])
-    # data = read_polygon_results_file(sys.argv[2])
+    # Read the input and result data files
+    input_data = read_polygon_results_file(sys.argv[1])
+    result_data = read_polygon_results_file(sys.argv[2])
 
-    # result.append(data[0])
-
-    rows = int(len(result) / 5) + 1
-    cols = len(result) if len(result) < 5 else 5
-
-    fig, axes = plt.subplots(rows, cols, figsize=(15 * cols, 15 * rows))
-
-    read_and_draw_circles("circle.txt", axes)
-
-    # plot_polygon(ax1, result[0]["polygons"][0], "", "blue", show_indices=True)
-    # plot_polygon(ax1, Poly, "", "blue", show_indices=False)
-
-    # ax1.legend(); 
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    # --- Grid Calculation ---
+    # The grid size should be determined by the larger of the two datasets
+    # to ensure there's enough space for everything.
+    num_items = max(len(input_data), len(result_data))
+    cols = 5 if num_items > 4 else num_items
+    if cols == 0: # Avoid division by zero if there's no data
+        rows = 0
+    else:
+        rows = (num_items + cols - 1) // cols # This is a robust way to calculate rows
     
-    for j in range(0, len(result)):
-      ax = axes if cols == 1 else axes.flatten()[j]
-      
-      ax.grid(True)
-      ax.grid(True); 
-      ax.set_aspect('equal', adjustable='box')
-      ax.set_title(result[j]["name"])
+    if rows == 0:
+        print("No data to plot. Exiting.")
+        sys.exit()
 
-      for i in range(0, len(result[j]["polygons"])):
-        plot_polygon(ax, result[j]["polygons"][i], "", colors[i], show_indices=True, fill_polygon=False)
-        ax.grid(True); 
-        ax.set_aspect('equal', adjustable='box')
+    # --- Plot Creation ---
+    # Create ONE figure with enough columns for both input and result
+    fig, allAxes = plt.subplots(rows, 2 * cols, figsize=(15 * 2 * cols, 15 * rows))
 
-    for i in range(len(result), rows * cols):
-      ax = axes.flatten()[i]
-      ax.axis('off')
+    # Handle the case of a single row/column, where subplots doesn't return a 2D array
+    if rows == 1:
+        allAxes = allAxes.reshape(1, -1)
 
-    plt.tight_layout(rect=[0, 1, 0, 0.96])
+    # Slice the axes array for input (left) and result (right)
+    inputAxes = allAxes[:, :cols]
+    resultAxes = allAxes[:, cols:]
+
+    # --- Drawing ---
+    # Draw the circles if that function exists and is needed
+    # read_and_draw_circles("circle.txt", inputAxes)
+
+    # Call the FIXED function with the correct data
+    print("Drawing input polygons...")
+    draw_polygon_file(inputAxes, input_data, rows, cols)
+    
+    read_and_draw_circles("circle.txt", inputAxes)
+    
+    print("Drawing result polygons...")
+    draw_polygon_file(resultAxes, result_data, rows, cols)
+    
+    # --- Finalization and Saving ---
+    fig.suptitle('Input vs. Result Comparison', fontsize=24)
+    plt.tight_layout(rect=[0, 0, 1, 0.96]) # Adjust rect for suptitle
     plt.savefig("r.png")
+    print("Saved plot to r.png")
+    # plt.show() # Uncomment to display the plot interactively
