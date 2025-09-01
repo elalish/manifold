@@ -367,10 +367,10 @@ void Manifold::Impl::CollapseAntiparallelEdges(int firstNewVert) {
       // Check which triangle on this halfedge has two other edges that are
       // concave
       // const Halfedge& half = halfedge_[i];
-      int concaveEdgesTri1 = 0;
-      const int tri1 = i / 3;
-      for (int e = 0; e < 3; e++) {
-        const int edgeIndex = tri1 * 3 + e;
+      size_t concaveEdgesTri1 = 0;
+      const size_t tri1 = i / 3;
+      for (size_t e = 0; e < 3; e++) {
+        const size_t edgeIndex = tri1 * 3 + e;
         if (i / 3 == edgeIndex) continue;
         const Halfedge& he = halfedge_[edgeIndex];
         if (he.pairedHalfedge >= 0) {
@@ -386,10 +386,10 @@ void Manifold::Impl::CollapseAntiparallelEdges(int firstNewVert) {
           }
         }
       }
-      int concaveEdgesTri2 = 0;
-      const int tri2 = halfedge_[i].pairedHalfedge / 3;
-      for (int e = 0; e < 3; e++) {
-        const int edgeIndex = tri2 * 3 + e;
+      size_t concaveEdgesTri2 = 0;
+      const size_t tri2 = halfedge_[i].pairedHalfedge / 3;
+      for (size_t e = 0; e < 3; e++) {
+        const size_t edgeIndex = tri2 * 3 + e;
         if (halfedge_[i].pairedHalfedge == edgeIndex) continue;
         const Halfedge& he = halfedge_[edgeIndex];
         if (he.pairedHalfedge >= 0) {
