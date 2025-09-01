@@ -397,7 +397,6 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
     double t = 0, u = 0;
     if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
                                 offsetE2[1], t, u)) {
-      std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
       vec2 center = offsetE1[0] + e1Cur * t,
            tangent1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1], t),
            tangent2 = getPointOnEdgeByParameter(e2Points[1], e2Points[2], u);
@@ -407,6 +406,12 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
                                           EdgeTangentState::E2CurrentEdge},
           std::array<double, 2>{t, u}, center,
           getRadPair(tangent1, tangent2, center)});
+
+#ifdef MANIFOLD_DEBUG
+      if (ManifoldParams().verbose) {
+        std::cout << "E-E" << offsetE1[0] + e1Cur * t << std::endl;
+      }
+#endif
     }
   }
 
@@ -495,16 +500,20 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
               paramVal[1] = 0;
             }
 
-            std::cout << "E-P" << centers[j] << p1 << p2 << "->" << point
-                      << std::endl;
-
-            std::cout << EdgeTangentStateToString(e2EdgeTangentState)
-                      << std::endl;
-
             GeomTangentPairVec.emplace_back(GeomTangentPair{
                 std::array<EdgeTangentState, 2>{EdgeTangentState::E1CurrentEdge,
                                                 e2EdgeTangentState},
                 paramVal, centers[j], radVec});
+
+#ifdef MANIFOLD_DEBUG
+            if (ManifoldParams().verbose) {
+              std::cout << "E-P" << centers[j] << p1 << p2 << "->" << point
+                        << std::endl;
+
+              std::cout << EdgeTangentStateToString(e2EdgeTangentState)
+                        << std::endl;
+            }
+#endif
           }
         }
       }
@@ -586,15 +595,20 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
           paramVal[0] = 0;
         }
 
-        std::cout << "P-E" << centers[i] << "\t" << e1Points[1] << "->"
-                  << offsetE2[0] << offsetE2[1] << std::endl;
-
-        std::cout << EdgeTangentStateToString(e1EdgeTangentState) << std::endl;
-
         GeomTangentPairVec.emplace_back(GeomTangentPair{
             std::array<EdgeTangentState, 2>{e1EdgeTangentState,
                                             EdgeTangentState::E2CurrentEdge},
             paramVal, centers[i], radVec});
+
+#ifdef MANIFOLD_DEBUG
+        if (ManifoldParams().verbose) {
+          std::cout << "P-E" << centers[i] << "\t" << e1Points[1] << "->"
+                    << offsetE2[0] << offsetE2[1] << std::endl;
+
+          std::cout << EdgeTangentStateToString(e1EdgeTangentState)
+                    << std::endl;
+        }
+#endif
       }
     }
   }
@@ -646,16 +660,19 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
             paramVal[1] = 0;
           }
 
-          std::cout << "P-P" << centers[j] << "\t" << point << "->"
-                    << e1Points[1] << std::endl;
-          std::cout << EdgeTangentStateToString(e1EdgeTangentState) << "->"
-                    << EdgeTangentStateToString(e2EdgeTangentState)
-                    << std::endl;
-
           GeomTangentPairVec.emplace_back(
               GeomTangentPair{std::array<EdgeTangentState, 2>{
                                   e1EdgeTangentState, e2EdgeTangentState},
                               paramVal, centers[j], radVec});
+#ifdef MANIFOLD_DEBUG
+          if (ManifoldParams().verbose) {
+            std::cout << "P-P" << centers[j] << "\t" << point << "->"
+                      << e1Points[1] << std::endl;
+            std::cout << EdgeTangentStateToString(e1EdgeTangentState) << "->"
+                      << EdgeTangentStateToString(e2EdgeTangentState)
+                      << std::endl;
+          }
+#endif
         }
       }
     }
@@ -767,8 +784,6 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
   std::vector<std::vector<GeomTangentPair>> arcInfoVec(
       loopElementCount, std::vector<GeomTangentPair>());
 
-  std::cout << "Collider BBox Testing" << std::endl;
-
   std::ofstream f("circle.txt");
   f << radius << std::endl;
 
@@ -820,9 +835,13 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
       // r.Dump();
       r.Sort();
 
-      std::cout << std::endl
-                << "Now " << p1i << "->" << (e1i + 1) % e1Loop.size() << " "
-                << r.size() << std::endl;
+#ifdef MANIFOLD_DEBUG
+      if (ManifoldParams().verbose) {
+        std::cout << std::endl
+                  << "Now " << p1i << "->" << (e1i + 1) % e1Loop.size() << " "
+                  << r.size() << std::endl;
+      }
+#endif
 
       // In Out Classify
       for (size_t j = 0; j != r.size(); j++) {
@@ -847,8 +866,12 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
              (e2i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
-        std::cout << "-----------" << std::endl
-                  << e2Points[1] << " " << e2Points[2] << std::endl;
+#ifdef MANIFOLD_DEBUG
+        if (ManifoldParams().verbose) {
+          std::cout << "-----------" << std::endl
+                    << e2Points[1] << " " << e2Points[2] << std::endl;
+        }
+#endif
 
         if (e1i == 0 && e2i == 5) {
           int i = 0;
@@ -944,7 +967,11 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               // TODO: Intersected, this can be used to optimize speed for
               // pre-detect all intersected point and avoid double processed
             } else if (distance < radius) {
-              std::cout << "Remove" << arc.CircleCenter << std::endl;
+#ifdef MANIFOLD_DEBUG
+              if (ManifoldParams().verbose) {
+                std::cout << "Remove" << arc.CircleCenter << std::endl;
+              }
+#endif
               eraseFlag = true;
               break;
             }
@@ -1213,12 +1240,19 @@ void SavePolygons(const std::string& filename, const Polygons& polygons) {
   }
 
   outFile.close();
-  std::cout << "Successfully saved " << polygons.size() << " tests to "
-            << filename << std::endl;
+
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    std::cout << "Successfully saved " << polygons.size() << " tests to "
+              << filename << std::endl;
+  }
+#endif
 }
 
 std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
                                      int circularSegments) {
+  if (polygons.empty()) return {};
+
   ColliderInfo info{};
   info.outerCollider = BuildCollider(polygons, info.outerEdgeOld2NewVec);
 
@@ -1233,13 +1267,17 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
     loops.push_back(SimpleLoop{loop, C2::Area(path) > EPSILON});
   }
 
-  for (size_t i = 0; i != polygons.size(); i++) {
-    std::cout << "------ Loop " << i << " START" << std::endl;
-    for (size_t j = 0; j != polygons[i].size(); j++) {
-      std::cout << polygons[i][j] << std::endl;
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    for (size_t i = 0; i != polygons.size(); i++) {
+      std::cout << "------ Loop " << i << " START" << std::endl;
+      for (size_t j = 0; j != polygons[i].size(); j++) {
+        std::cout << polygons[i][j] << std::endl;
+      }
+      std::cout << "------ Loop " << i << " END" << std::endl;
     }
-    std::cout << "------ Loop " << i << " END" << std::endl;
   }
+#endif
 
   // Calc all arc that bridge 2 edge
   auto arcConnection = CalculateFilletArc(loops, info, radius);
