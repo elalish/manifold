@@ -148,7 +148,7 @@ void RegisterPolygonTests() {
 struct FilletResult {
   FilletResult(const std::vector<CrossSection> &crossSections,
                const std::string &name)
-      : name(name), crossSections(crossSections) {};
+      : name(name), crossSections(crossSections){};
 
   std::string name;
 
@@ -172,10 +172,6 @@ class FilletTestFixture : public PolygonTestFixture {
   static std::unique_ptr<std::vector<FilletResult>,
                          void (*)(std::vector<FilletResult> *)>
       result;
-
-  static std::unique_ptr<std::vector<FilletResult>,
-                         void (*)(std::vector<FilletResult> *)>
-      input;
 };
 
 void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
@@ -184,7 +180,7 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
 
   const int inputCircularSegments = 20;
 
-  manifold::ManifoldParams().verbose = true;
+  manifold::ManifoldParams().verbose = false;
 
   auto input = CrossSection(polys);
   auto bbox = input.Bounds().Size();
@@ -192,14 +188,21 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
   double min = std::min(bbox.x, bbox.y), max = std::max(bbox.x, bbox.y);
 
   std::vector<double> radiusVec;
-  if (false) {
-    std::array<double, 10> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
+  if (true) {
+    std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
+    // std::array<double, 1> multipliers{0.5};
     for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
-      radiusVec.push_back(*it * min);
-      radiusVec.push_back(*it * max);
+      double mmin = *it * min, mmax = *it * max;
+      if (std::abs(mmin - mmax) < 1E-6) {
+        radiusVec.push_back(mmin);
+        // radiusVec.push_back(-1.0 * mmin);
+      } else {
+        radiusVec.push_back(min);
+        radiusVec.push_back(max);
 
-      radiusVec.push_back(-1.0 * *it * min);
-      radiusVec.push_back(-1.0 * *it * max);
+        // radiusVec.push_back(-1.0 * mmin);
+        // radiusVec.push_back(-1.0 * mmax);
+      }
     }
   } else {
     radiusVec.push_back(0.7);
@@ -213,8 +216,8 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
                                      : Quality::GetCircularSegments(radius);
 
     auto r = input.Fillet(radius, circularSegments);
-
     auto rc = manifold::CrossSection::Compose(r);
+
     EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
 
     auto toRad = [](const vec2 &v) -> double { return atan2(v.y, v.x); };
@@ -249,12 +252,11 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
     }
 
     // Check idempotent
-    if (false) {
+    if (true) {
       auto rr = rc.Fillet(radius, circularSegments);
-      auto rrc = manifold::CrossSection::Compose(r);
+      auto rrc = manifold::CrossSection::Compose(rr);
 
-      EXPECT_NEAR(rc.Area(), rrc.Area(),
-                  std::abs(0.01 * (rc.Area() - input.Area())));
+      EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
     }
 
     result->emplace_back(FilletResult(r, name + "_" + std::to_string(radius)));
@@ -262,10 +264,10 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
 }
 
 void RegisterFilletTests() {
-  // std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
-  //                        "zebra3.txt"};
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
 
-  std::string files[] = {"fillet.txt"};
+  // std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
