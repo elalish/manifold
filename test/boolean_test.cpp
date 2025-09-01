@@ -540,6 +540,6 @@ TEST(Boolean, NastyGears) {
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
-  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - innerGear.Volume(),
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(),
               1e-5);
 }
