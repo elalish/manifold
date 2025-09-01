@@ -104,7 +104,7 @@ struct AntiparallelEdge {
 
   bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
-    if (half.pairedHalfedge < 0) return false;
+    if (half.pairedHalfedge < 0 || !half.IsForward()) return false;
     // Only process edges where at least one vertex is new
     if (half.startVert < firstNewVert && half.endVert < firstNewVert)
       return false;
@@ -264,7 +264,11 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
 
   CleanupTopology();
   CollapseShortEdges(firstNewVert);
+  CollapseColinearEdges(firstNewVert);
   CollapseAntiparallelEdges(firstNewVert);
+  // Hack: Repeat the removal of degenerate triangles, which may be created by antiparallel edge collapse
+  CleanupTopology();
+  CollapseShortEdges(firstNewVert);
   CollapseColinearEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
 }
@@ -349,6 +353,92 @@ void Manifold::Impl::CollapseAntiparallelEdges(int firstNewVert) {
   s.run(nbEdges, ae, [&](size_t i) {
     const bool didCollapse = CollapseEdge(i, scratchBuffer);
     if (didCollapse) numFlagged++;
+
+    if(!didCollapse){
+      #ifdef MANIFOLD_DEBUG
+      //if (ManifoldParams().verbose > 0) {
+        std::cout << "Could not collapse edge " << i << " connecting " << halfedge_[i].startVert << " and " << halfedge_[i].endVert << std::endl;
+      //}
+      #endif
+
+      // Check which triangle on this halfedge has two other edges that are concave
+      //const Halfedge& half = halfedge_[i];
+      int concaveEdgesTri1 = 0;
+      const int tri1 = i / 3;
+      for(int e = 0; e < 3; e++){
+        const int edgeIndex = tri1 * 3 + e;
+        if (i / 3 == edgeIndex) continue;
+        const Halfedge& he = halfedge_[edgeIndex];
+        if(he.pairedHalfedge >= 0){
+          manifold::vec3 tangent =
+            la::cross((manifold::vec3)faceNormal_[tri1],
+                          (manifold::vec3)vertPos_[he.endVert] -
+                              (manifold::vec3)vertPos_[he.startVert]);
+          double tangentProjection =
+            la::dot((manifold::vec3)faceNormal_[he.pairedHalfedge / 3], tangent);
+          //  If we've found a pair of reflex triangles, add them to the set
+          if (tangentProjection > 1e-5) {
+            concaveEdgesTri1++;
+          }
+        }
+      }
+      int concaveEdgesTri2 = 0;
+      const int tri2 = halfedge_[i].pairedHalfedge / 3;
+      for(int e = 0; e < 3; e++){
+        const int edgeIndex = tri2 * 3 + e;
+        if (halfedge_[i].pairedHalfedge == edgeIndex) continue;
+        const Halfedge& he = halfedge_[edgeIndex];
+        if(he.pairedHalfedge >= 0){
+          manifold::vec3 tangent =
+            la::cross((manifold::vec3)faceNormal_[tri2],
+                          (manifold::vec3)vertPos_[he.endVert] -
+                              (manifold::vec3)vertPos_[he.startVert]);
+          double tangentProjection =
+            la::dot((manifold::vec3)faceNormal_[he.pairedHalfedge / 3], tangent);
+          //  If we've found a pair of reflex triangles, add them to the set
+          if (tangentProjection > 1e-5) {
+            concaveEdgesTri2++;
+          }
+        }
+      }
+
+      #ifdef MANIFOLD_DEBUG
+      //if (ManifoldParams().verbose > 0) {
+        std::cout << "  Tri " << tri1 << " has " << concaveEdgesTri1 << " concave edges" << std::endl;
+        std::cout << "  Tri " << tri2 << " has " << concaveEdgesTri2 << " concave edges" << std::endl;
+      //}
+      #endif
+
+      if(concaveEdgesTri1 == 2){
+        // Thicken the triangle by creating a hull from the vertices offset along the normal
+        vec3 offset = faceNormal_[tri1] * tolerance_ * 0.5;
+        Manifold thickSliver = 
+        Manifold::Hull({vertPos_[halfedge_[tri1 * 3    ].startVert] + offset,
+                        vertPos_[halfedge_[tri1 * 3 + 1].startVert] + offset,
+                        vertPos_[halfedge_[tri1 * 3 + 2].startVert] + offset,
+                        vertPos_[halfedge_[tri1 * 3    ].startVert] - offset,
+                        vertPos_[halfedge_[tri1 * 3 + 1].startVert] - offset,
+                        vertPos_[halfedge_[tri1 * 3 + 2].startVert] - offset});
+        
+        //*this = this->Boolean(thickSliver, OpType::Subtract);
+      }
+
+      if(concaveEdgesTri2 == 2){
+        // Thicken the triangle by creating a hull from the vertices offset along the normal
+        vec3 offset = faceNormal_[tri2] * tolerance_ * 0.5;
+        Manifold thickSliver = 
+        Manifold::Hull({vertPos_[halfedge_[tri2 * 3    ].startVert] + offset,
+                        vertPos_[halfedge_[tri2 * 3 + 1].startVert] + offset,
+                        vertPos_[halfedge_[tri2 * 3 + 2].startVert] + offset,
+                        vertPos_[halfedge_[tri2 * 3    ].startVert] - offset,
+                        vertPos_[halfedge_[tri2 * 3 + 1].startVert] - offset,
+                        vertPos_[halfedge_[tri2 * 3 + 2].startVert] - offset});
+        
+        //*this = this->Boolean(thickSliver, OpType::Subtract);
+      }
+  
+    }
+
     scratchBuffer.resize(0);
   });
 
