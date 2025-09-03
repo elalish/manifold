@@ -5,23 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python Debugger: Current File with Arguments",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/scripts/visualizer-polygon.py",
-      "console": "integratedTerminal",
-      "args": [
-        "${workspaceFolder}/result.txt",
-      ],
-    },
-    {
       "name": "manifold test",
       "type": "cppdbg",
+      "MIMode": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_catch_exceptions=0",
-        "--gtest_filter=Polygon.Fillet.Rect"
+        "--gtest_filter=Properties.ToleranceSphere"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",
@@ -32,25 +23,6 @@
         }
       ],
       "externalConsole": false
-    },
-    {
-      "name": "OffsetMain",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/build/proj/OffsetMain",
-      "args": [
-        "--gtest_catch_exceptions=0",
-        "--gtest_filter=Polygon.Fillet.Rect"
-      ],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/build/test",
-      "environment": [
-        {
-          "name": "MALLOC_CHECK_",
-          "value": "2"
-        }
-      ],
-      "externalConsole": false
-    },
+    }
   ]
 }
