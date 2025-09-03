@@ -177,13 +177,16 @@ bool isAngleInSector(double angle, double startRad, double endRad) {
   }
 };
 
-// Check by convex CCW is the same
+// For P-* situation to check local validation
+// If circle only touch endpoint of edge, meaning this endpoint should be convex
 bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW) {
   return (cross(points[1] - points[0], points[2] - points[1]) >= EPSILON) ^
          isCCW;
 }
 
 // For P-* situation to check local validation
+// The circle should be the correct side determine by isCCW and negative radius
+// FIXME: negative radius situation
 bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
                         vec2 circleCenter) {
   double rad = toRad(circleCenter - points[1]);
@@ -273,6 +276,7 @@ bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   return distancePointSegment(center, p1, p2, t) < (radius + EPSILON);
 };
 
+// Calculate line segment intersections with a circle
 int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
                            double radius, std::array<vec2, 2>& intersections) {
   vec2 d = p2 - p1;
@@ -384,6 +388,8 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
              e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
   {
     // Edge - Edge
+    // Offset two edge by radius and calculate intersection to get tangent
+    // circle center
 
     const std::array<vec2, 2> offsetE1{
         e1Points[0] + e1CurNormal * radius,
@@ -395,6 +401,7 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
         };
 
     double t = 0, u = 0;
+
     if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
                                 offsetE2[1], t, u)) {
       vec2 center = offsetE1[0] + e1Cur * t,
@@ -443,7 +450,8 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
     };
 
     // Edge - Point
-
+    // Offset e1 and test if intersect with circle center at e2's endpoints, and
+    // get tangent circle center
     const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur);
 
     const std::array<vec2, 2> offsetE1{
@@ -452,7 +460,7 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
     };
 
     for (int i = 0; i != 2; i++) {
-      // Check if E2's point convex
+      // FIXME: Check if E2's point convex
       if (!isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
                                                   e2Points[i + 2]},
                               e2CCW))
@@ -461,10 +469,6 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
       const vec2 point = e2Points[i + 1];
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
         std::array<vec2, 2> centers;
-        if (length(e2Points[1] - vec2(3.5, -0.3)) < EPSILON &&
-            length(e2Points[2] - vec2(3, 0)) < EPSILON) {
-          int i = 0;
-        }
 
         double t;
         if (distancePointSegment(point, p1, p2, t) < EPSILON) continue;
@@ -557,8 +561,11 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     return isCCW ^ isAngleInSector(angle, startRad, endRad);
   };
 
-  // Point - Edge
   {
+    // Point - Edge
+    // Offset e2 and test if intersect with circle center at e1's endpoints, and
+    // get tangent circle center
+
     const vec2 e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
 
     const std::array<vec2, 2> offsetE2{
@@ -613,7 +620,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     }
   }
 
-  //  Point - Point
+  // Point - Point
+  // Get two circles which passed both point, and check if they valid.
 
   double startRad = toRad(e1CurNormal), endRad = toRad(e1NextNormal);
 
