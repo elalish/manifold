@@ -70,7 +70,7 @@ interface To3MF {
  */
 
 export class Export3MF {
-  extension: string = '.3mf';
+  extensions: Array<string> = ['.3mf'];
 
   unit: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter' = 'millimeter';
   title?: string = 'ManifoldCAD.org model';
@@ -87,7 +87,7 @@ export class Export3MF {
    * @param doc The GLTF document to convert.
    * @returns A blob containing the converted model.
    */
-  asBlob(doc: Document) {
+  async asBlob(doc: Document) {
     const to3mf = {
       meshes: [],
       components: [],
@@ -189,7 +189,7 @@ export class Export3MF {
       const parent = node.getParentNode();
 
       if (parent) {
-        // This is a child node, add it to it's parent.
+        // This is a child node, add it to its parent.
         const parentID = getObjectID(parent);
         const parent3mf = to3mf.components.find((comp) => comp.id == parentID)!;
         parent3mf.children.push(child);

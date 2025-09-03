@@ -19,7 +19,8 @@ import * as debug from '../lib/debug';
 import {Evaluator} from '../lib/evaluate';
 import * as exporter from '../lib/export';
 import {GlobalDefaults} from '../lib/export';
-import {Export3MF} from '../lib/gltf-transform/export-3mf'
+import {Export3MF} from '../lib/export-3mf';
+import {ExportGLTF} from '../lib/export-gltf';
 import * as material from '../lib/material';
 
 // Swallow informational logs in testing framework
@@ -31,14 +32,18 @@ function log(...args: any[]) {
 
 // Setup the evaluator and it's context.
 const evaluator = new Evaluator();
-export const module = evaluator.getModule();
+export const module = evaluator.getModule();  // Used in tests.
 
+// Exporters.
+// The end user can download either.
+// GLB (Binary GLTF) is used to send the model from this worker
+// to the viewer.
 const export3mf = new Export3MF();
+const exportGltf = new ExportGLTF();
 
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
 evaluator.addContext({glMatrix})
-
 
 // These are exporter methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
@@ -46,7 +51,6 @@ evaluator.addContext({glMatrix})
 evaluator.addContextMethodWithCleanup('show', debug.show)
 evaluator.addContextMethodWithCleanup('only', debug.only)
 evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial)
-
 
 // Add additional exporter context.  These need no garbage collection.
 evaluator.addContext({
@@ -77,9 +81,11 @@ export async function evaluateCADToModel(code: string) {
   const t0 = performance.now();
   const manifold = evaluator.evaluate(code);
   const t1 = performance.now();
+
   log(`Manifold took ${
       (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 
+  // If we don't actually have a model, complain.
   if (!manifold && !exporter.hasGLTFNodes()) {
     log('No output because "result" is undefined and no "GLTFNode"s were created.');
     return ({
@@ -87,18 +93,20 @@ export async function evaluateCADToModel(code: string) {
       threeMFURL: URL.createObjectURL(new Blob([]))
     })
   }
+
+  // Create a gltf-transform document.
   const doc = exporter.hasGLTFNodes() ?
       exporter.GLTFNodesToGLTFDoc(exporter.getGLTFNodes(), globalDefaults) :
       exporter.manifoldToGLTFDoc(manifold, globalDefaults);
-  const glbBlob = await exporter.GLTFDocToGLB(doc);
-  const threeMFBlob = export3mf.asBlob(doc);
+
+  const blobs = {
+    glbURL: URL.createObjectURL(await exportGltf.asBlob(doc)),
+    threeMFURL: URL.createObjectURL(await export3mf.asBlob(doc))
+  };
 
   const t2 = performance.now();
   log(`Exporting GLB & 3MF took ${
       (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
 
-  return ({
-    glbURL: URL.createObjectURL(glbBlob),
-    threeMFURL: URL.createObjectURL(threeMFBlob)
-  });
+  return blobs;
 }

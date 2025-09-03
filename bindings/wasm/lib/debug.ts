@@ -1,10 +1,24 @@
+// Copyright 2022-2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import {Document} from '@gltf-transform/core';
 
 import {Manifold, Mesh} from '../examples/built/manifold';
 import {GLTFMaterial} from '../examples/public/editor';
 
 import {Properties, writeMesh} from './gltf-io.ts';
-import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material';
+import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
 
 // Debug setup to show source meshes
 let ghost = false;
@@ -49,7 +63,7 @@ const getDebugMeshByID = (id: number):
  *
  * @param id The `originalID` of the mesh.
  */
-export const getDebugMaterialByID = (id: number):
+const getDebugMaterialByID = (id: number):
     GLTFMaterial|undefined => {
       const show = shown.has(id);
       const inMesh = show ? shown.get(id) : singles.get(id);
@@ -60,6 +74,15 @@ export const getDebugMaterialByID = (id: number):
       return getOriginalMaterialByID(id);
     }
 
+/**
+ * Override materials when debugging.
+ *
+ * When a mesh is flagged with `only`, we set the `ghost` global.
+ * Everything gets rendered in the GHOST material, while the flagged
+ * mesh is added as a debug node.
+ *
+ * @param id The `originalID` of the mesh.
+ */
 export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
     ghost ? GHOST : getOriginalMaterialByID(id);
 

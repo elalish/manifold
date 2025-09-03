@@ -15,15 +15,14 @@
 // NOTE: This file is undergoing active refactoring, as of August 2025.
 // Interfaces and semantics may change.  Beware of wild geese.
 
-import {Document, Material, Node, WebIO} from '@gltf-transform/core';
-import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import {Document, Material, Node} from '@gltf-transform/core';
 
 import {Manifold, Vec3} from '../examples/built/manifold';
 import {GLTFMaterial} from '../examples/public/editor';
 
 import {addAnimationToDoc, addMotion, cleanupAnimation, euler2quat, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {getDebugGLTFMesh, getMaterialByID} from './debug.ts'
-import {Properties, setupIO, writeMesh} from './gltf-io.ts';
+import {Properties, writeMesh} from './gltf-io.ts';
 import {getBackupMaterial, getCachedMaterial} from './material.ts';
 
 export interface GlobalDefaults {
@@ -244,18 +243,9 @@ function createWrapper(doc: Document) {
 
 export function manifoldToGLTFDoc(
     manifold: Manifold, defaults: GlobalDefaults) {
-  parseOptions(defaults)
-
-  const doc = new Document();
-  const root = createWrapper(doc);
-  addAnimationToDoc(doc)
-
-  const node = doc.createNode();
-  addMesh(doc, node, manifold);
-  root.addChild(node);
-
-  cleanupAnimation();
-  return doc;
+  const node = new GLTFNode();
+  node.manifold = manifold;
+  return GLTFNodesToGLTFDoc([node], defaults)
 }
 
 export function GLTFNodesToGLTFDoc(
@@ -308,13 +298,4 @@ export function hasGLTFNodes() {
 
 export function getGLTFNodes() {
   return nodes;
-}
-
-export async function GLTFDocToGLB(doc: Document) {
-  const io = setupIO(new WebIO());
-  io.registerExtensions(KHRONOS_EXTENSIONS);
-
-  const glb = await io.writeBinary(doc);
-  return new Blob(
-      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
 }
