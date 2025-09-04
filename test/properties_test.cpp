@@ -53,15 +53,15 @@ TEST(Properties, Tolerance) {
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
   Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  EXPECT_EQ(imperfect.NumTri(), 28);
 
-  Manifold imperfect2 = imperfect.SetTolerance(tol);
+  Manifold imperfect2 = imperfect.Simplify(tol);
+  EXPECT_EQ(imperfect2.NumTri(), 12);
+
   MeshGL mesh = imperfect.GetMeshGL();
   mesh.tolerance = tol;
   Manifold imperfect3(mesh);
-
-  EXPECT_EQ(imperfect.NumTri(), 28);
-  EXPECT_EQ(imperfect2.NumTri(), 12);
-  EXPECT_EQ(imperfect3.NumTri(), 12);
+  EXPECT_EQ(imperfect3.NumTri(), 28);  // Don't automatically simplify
 
   EXPECT_NEAR(imperfect.Volume(), imperfect2.Volume(), 0.01);
   EXPECT_NEAR(imperfect.SurfaceArea(), imperfect2.SurfaceArea(), 0.02);
@@ -123,6 +123,38 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
   }
+}
+
+TEST(Properties, Coplanar) {
+  Manifold peg = Manifold::Cube({1, 1, 2}).Translate({1, 1, 0}).AsOriginal();
+  const size_t pegID = peg.OriginalID();
+  Manifold hole = Manifold::Cube({3, 3, 1}) - peg;
+  hole = hole.AsOriginal();
+  std::vector<MeshGL> input = {hole.GetMeshGL(), peg.GetMeshGL()};
+  EXPECT_EQ(peg.Genus(), 0);
+  EXPECT_EQ(hole.Genus(), 1);
+
+  Manifold result = hole + peg;
+  EXPECT_EQ(result.Genus(), 0);
+  RelatedGL(result, input);
+
+  MeshGL resultGL = result.GetMeshGL();
+  float minPegZ = std::numeric_limits<float>::max();
+  for (size_t run = 0; run < resultGL.runOriginalID.size(); run++) {
+    if (resultGL.runOriginalID[run] == pegID) {
+      for (size_t t3 = resultGL.runIndex[run]; t3 < resultGL.runIndex[run + 1];
+           t3++) {
+        const size_t v = resultGL.triVerts[t3];
+        minPegZ = std::min(minPegZ,
+                           resultGL.vertProperties[v * resultGL.numProp + 2]);
+      }
+    }
+  }
+  EXPECT_EQ(minPegZ, 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("coplanar.glb", resultGL, {});
+#endif
 }
 
 // These tests verify the calculation of MinGap functions.

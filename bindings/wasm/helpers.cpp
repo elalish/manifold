@@ -155,7 +155,8 @@ CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
                     double miter_limit, double arc_tolerance) {
   auto jt = join_type == 0   ? CrossSection::JoinType::Square
             : join_type == 1 ? CrossSection::JoinType::Round
-                             : CrossSection::JoinType::Miter;
+            : join_type == 2 ? CrossSection::JoinType::Miter
+                             : CrossSection::JoinType::Bevel;
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
 
@@ -209,6 +210,37 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
                   double level, double tolerance) {
   double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
   return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
+}
+
+std::string Status(Manifold& manifold) {
+  switch (manifold.Status()) {
+    case Manifold::Error::NoError:
+      return "NoError";
+    case Manifold::Error::NonFiniteVertex:
+      return "NonFiniteVertex";
+    case Manifold::Error::NotManifold:
+      return "NotManifold";
+    case Manifold::Error::VertexOutOfBounds:
+      return "VertexOutOfBounds";
+    case Manifold::Error::PropertiesWrongLength:
+      return "PropertiesWrongLength";
+    case Manifold::Error::MissingPositionProperties:
+      return "MissingPositionProperties";
+    case Manifold::Error::MergeVectorsDifferentLengths:
+      return "MergeVectorsDifferentLengths";
+    case Manifold::Error::MergeIndexOutOfBounds:
+      return "MergeIndexOutOfBounds";
+    case Manifold::Error::TransformWrongLength:
+      return "TransformWrongLength";
+    case Manifold::Error::RunIndexWrongLength:
+      return "RunIndexWrongLength";
+    case Manifold::Error::FaceIDWrongLength:
+      return "FaceIDWrongLength";
+    case Manifold::Error::InvalidConstruction:
+      return "InvalidConstruction";
+    default:
+      return "UnknownError";
+  }
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

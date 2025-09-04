@@ -48,7 +48,6 @@ set(
   parallel.h
   quickhull.h
   shared.h
-  sparse.h
   svd.h
   tree2d.h
   tri_dist.h
@@ -78,6 +77,7 @@ target_compile_features(manifold PUBLIC cxx_std_17)
 set(
   OPTIONS
   MANIFOLD_DEBUG
+  MANIFOLD_ASSERT
   MANIFOLD_CROSS_SECTION
   MANIFOLD_EXPORT
   TRACY_ENABLE

@@ -16,8 +16,8 @@
 
 #include <atomic>
 
-#include "./utils.h"
-#include "./vec.h"
+#include "utils.h"
+#include "vec.h"
 
 namespace {
 using hash_fun_t = uint64_t(uint64_t);
@@ -44,13 +44,6 @@ T AtomicLoad(const T& target) {
   return tar.load(std::memory_order_acquire);
 }
 
-// https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
-inline uint64_t hash64bit(uint64_t x) {
-  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
-  x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
-  x = x ^ (x >> 31);
-  return x;
-}
 }  // namespace
 
 namespace manifold {

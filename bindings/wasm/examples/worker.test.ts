@@ -16,7 +16,8 @@ import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
 import {afterEach, expect, suite, test} from 'vitest';
 
-import {readMesh, setupIO} from './gltf-io';
+import {readMesh, setupIO} from '../lib/gltf-io';
+
 // @ts-ignore
 import {examples} from './public/examples.js';
 import {Mesh} from './public/manifold';

@@ -26,11 +26,24 @@ Also included are a novel and powerful suite of refining functions for smooth me
 
 ## Note on memory management
 
-Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each manifold object constructed by your scripts, see [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
+Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each object constructed by your scripts (both `Manifold` and `CrossSection`), see [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
 
 ## Examples
 
 Please see our usage [examples](https://github.com/elalish/manifold/tree/master/bindings/wasm/examples) to see how to interface this library with `three.js`, `<model-viewer>`, and `glTF`. Of particular note are the included libraries for lossless roundtrip of manifold meshes through glTF files, via a new extension: [EXT_mesh_manifold](https://github.com/KhronosGroup/glTF/pull/2286). 
+
+## Command Line Interface
+
+ManifoldCAD now has a [command line interface](./bin/manifold-cad).  It can be run directly as `./bin/manifold-cad`, or via npx: `npx manifold-cad`.
+
+```
+Usage: manifold-cad [options] <infile.js> <outfile>
+```
+
+The output file can be in either `.glb` or `.3mf` format, determined by extension.
+
+This CLI is written in relatively plain JavaScript and serves as an example of how to use Manifold in a `node.js` environment.
+
 
 ## 3D Formats
 

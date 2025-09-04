@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "./hashtable.h"
-#include "./impl.h"
-#include "./parallel.h"
-#include "./utils.h"
-#include "./vec.h"
+#include "hashtable.h"
+#include "impl.h"
 #include "manifold/manifold.h"
+#include "parallel.h"
+#include "utils.h"
+#include "vec.h"
 
 namespace {
 using namespace manifold;
@@ -530,6 +530,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->RemoveUnreferencedVerts();
   pImpl_->Finish();
   pImpl_->InitializeOriginal();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 }  // namespace manifold

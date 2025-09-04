@@ -21,7 +21,7 @@ using namespace manifold;
 using high_resolution_clock = std::chrono::high_resolution_clock;
 using time_point = high_resolution_clock::time_point;
 
-const char *benchmark_filename = "benchmark.csv";
+const char* benchmark_filename = "benchmark.csv";
 
 /* Append a stats line to the file with name benchmark_filename.
  * If the file doesn't exist yet, write a CSV header line first.
@@ -32,7 +32,7 @@ const char *benchmark_filename = "benchmark.csv";
  * and that the conversion of the result from Manifold back to
  * MeshGL happens between after_boolean and end.
  */
-static void record_time(const std::string &file1, const std::string &file2,
+static void record_time(const std::string& file1, const std::string& file2,
                         time_point start, time_point before_boolean,
                         time_point after_boolean, time_point end) {
   using duration = std::chrono::duration<double, std::milli>;
@@ -67,8 +67,8 @@ static void record_time(const std::string &file1, const std::string &file2,
 /* Convert a MeshGL to Manifold and check status.
  * If there is an error status, throw an exception.
  * The file argument is inserted into the exception message. */
-static Manifold manifold_from_meshgl(const MeshGL &meshgl,
-                                     const std::string &file) {
+static Manifold manifold_from_meshgl(const MeshGL& meshgl,
+                                     const std::string& file) {
   Manifold man = Manifold(meshgl);
   if (man.Status() != Manifold::Error::NoError) {
     if (man.Status() == Manifold::Error::NotManifold) {
@@ -77,6 +77,43 @@ static Manifold manifold_from_meshgl(const MeshGL &meshgl,
     throw std::invalid_argument("error converting " + file + " to manifold");
   }
   return man;
+}
+
+/* Return true if the meshes are identical, including element order. */
+bool compare_mgls(const MeshGL& mgl1, const MeshGL& mgl2) {
+  bool verbose = true;
+  if (mgl1.NumVert() != mgl2.NumVert() || mgl1.NumTri() != mgl2.NumTri() ||
+      mgl1.numProp != mgl2.numProp) {
+    if (verbose) {
+      std::cout << "basic sizes differ\n";
+    }
+    return false;
+  }
+  int ntri = mgl1.NumTri();
+  for (int t = 0; t < ntri; t++) {
+    for (int i = 0; i < 3; i++) {
+      if (mgl1.triVerts[3 * t + i] != mgl2.triVerts[3 * t + i]) {
+        if (verbose) {
+          std::cout << "tri verts differ at t = " << t << "\n";
+        }
+        return false;
+      }
+    }
+  }
+  int nprop = mgl1.numProp;
+  int nvert = mgl1.NumVert();
+  for (int v = 0; v < nvert; v++) {
+    for (int p = 0; p < nprop; p++) {
+      if (mgl1.vertProperties[v * nprop + p] !=
+          mgl2.vertProperties[v * nprop + p]) {
+        if (verbose) {
+          std::cout << "vert props differ at v = " << v << "\n";
+        }
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 /* Do a Difference boolean between the meshes in file1 and file2,
@@ -90,8 +127,8 @@ static Manifold manifold_from_meshgl(const MeshGL &meshgl,
  * the files and conversion to MeshGL), and use record_time() to
  * append a stats line to the benchmark file.
  */
-static MeshGL do_boolean(const std::string &file1, const std::string &file2,
-                         const mat3x4 &transform1, const mat3x4 &transform2) {
+static MeshGL do_boolean(const std::string& file1, const std::string& file2,
+                         const mat3x4& transform1, const mat3x4& transform2) {
   MeshGL meshgl1 = ImportMesh(file1, true);
   MeshGL meshgl2 = ImportMesh(file2, true);
   time_point time0 = high_resolution_clock::now();
@@ -106,6 +143,12 @@ static MeshGL do_boolean(const std::string &file1, const std::string &file2,
   time_point time2 = high_resolution_clock::now();
   MeshGL meshgl_ans = man_ans.GetMeshGL();
   time_point time3 = high_resolution_clock::now();
+
+  MeshGL meshgl_ans2 = (man1 - man2).GetMeshGL();
+  if (!compare_mgls(meshgl_ans, meshgl_ans2)) {
+    throw std::runtime_error("non-deterministic");
+  }
+
   record_time(file1, file2, time0, time1, time2, time3);
   return meshgl_ans;
 }
@@ -115,7 +158,7 @@ static void usage() {
                "[--threads <int>]\n";
 }
 
-int main(int argc, const char **argv) {
+int main(int argc, const char** argv) {
   if (argc < 3) {
     usage();
     return 1;
@@ -135,7 +178,7 @@ int main(int argc, const char **argv) {
           usage();
           return 1;
         }
-        mat3x4 &t = argv[argi][2] == '1' ? transform1 : transform2;
+        mat3x4& t = argv[argi][2] == '1' ? transform1 : transform2;
         for (int i = 0; i < 12; i++) {
           try {
             double v = std::stod(argv[argi + 1 + i]);
@@ -171,7 +214,7 @@ int main(int argc, const char **argv) {
     }
     for (int i : {0, 1}) {
       std::cout << "transform " << i << "\n";
-      const mat3x4 &t = i == 0 ? transform1 : transform2;
+      const mat3x4& t = i == 0 ? transform1 : transform2;
       for (int row = 0; row < 3; row++) {
         for (int col = 0; col < 4; col++) {
           std::cout << t[col][row] << " ";

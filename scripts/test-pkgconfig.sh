@@ -13,7 +13,7 @@ cat <<EOT > testing.cpp
 #include <manifold/manifold.h>
 #include <manifold/version.h>
 
-#if MANIFOLD_VERSION < MANIFOLD_VERSION_NUMBER(2, 5, 1)
+#if MANIFOLD_VERSION < MANIFOLD_VERSION_NUMBER(3, 2, 1)
 # error "Unexpected: minimum version number not available"
 #endif
 

@@ -90,11 +90,21 @@ class CrossSection {
     Round,  /*!< Rounding is applied to all joins that have convex external
              angles, and it maintains the exact offset distance from the join
              vertex. */
-    Miter   /*!< There's a necessary limit to mitered joins (to avoid narrow
+    Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
              angled joins producing excessively long and narrow
              [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
              So where mitered joins would exceed a given maximum miter distance
              (relative to the offset distance), these are 'squared' instead. */
+    Bevel   /*!< Bevelled joins are similar to 'squared' joins except that
+             squaring won't occur at a fixed distance. While bevelled joins may
+             not be as pretty as squared joins, bevelling is much easier (ie
+             faster) than squaring. And perhaps this is why bevelling rather
+             than squaring is preferred in numerous graphics display formats
+             (including
+             [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
+             and
+             [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
+             document formats). */
   };
 
   /** @name Input & Output
@@ -140,8 +150,8 @@ class CrossSection {
   CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
   CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
-  CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
-                      int circularSegments = 0) const;
+  CrossSection Offset(double delta, JoinType jt = JoinType::Round,
+                      double miter_limit = 2.0, int circularSegments = 0) const;
   ///@}
 
   /** @name Boolean

@@ -13,7 +13,7 @@ jobs:
       matrix:
         # macos-13: x86-64
         # macos-14: arm64
-        os: [ubuntu-22.04, windows-2019, macos-14, macos-13]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-14, macos-13]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
@@ -22,7 +22,7 @@ jobs:
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        uses: pypa/cibuildwheel@v2.23.0
       - uses: actions/upload-artifact@v4
         with:
           name: python-${{ matrix.os }}

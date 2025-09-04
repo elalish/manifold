@@ -26,13 +26,9 @@ constexpr double AtomicRadiusSi = 1.1;
 constexpr double LatticeCellSizeSi = 5.4309;
 constexpr double fccOffset = 0.25;
 constexpr double AtomicRadiusC = 0.7;
-constexpr double LatticeCellSizeC = 3.65;
 constexpr double cellLenA = 2.464;
 constexpr double cellLenB = cellLenA;
 constexpr double cellLenC = 6.711;
-constexpr double cellAngleA = 90;
-constexpr double cellAngleB = cellAngleA;
-constexpr double cellAngleC = 120;
 constexpr double LayerSeperationC = 3.364;
 
 Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1},

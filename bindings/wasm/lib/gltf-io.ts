@@ -1,4 +1,4 @@
-// Copyright 2023 The Manifold Authors.
+// Copyright 2023-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 
 import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gltf-transform/core';
 
-import {EXTManifold, ManifoldPrimitive} from './manifold-gltf';
-import {Mesh as ManifoldMesh, MeshOptions} from './public/manifold-encapsulated-types';
+import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
+
+import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},

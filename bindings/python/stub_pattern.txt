@@ -1,8 +1,8 @@
 manifold3d.__prefix__:
   import numpy as np
-  from typing import Literal, TypeVar, Union
+  from typing import Literal, TypeVar, Union, Any
 
-  N = TypeVar('N', bound=np.generic)
+  N = TypeVar('N', bound=int)
   DoubleNx2 = np.ndarray[tuple[N, Literal[2]], np.dtype[np.double]]
   Doublex2 = Union[np.ndarray[tuple[Literal[2]], np.dtype[np.double]], tuple[float, float], list[float]]
   Doublex3 = Union[np.ndarray[tuple[Literal[3]], np.dtype[np.double]], tuple[float, float, float], list[float]]

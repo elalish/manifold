@@ -16,6 +16,8 @@ nanobind_add_module(manifold3d NB_STATIC STABLE_ABI LTO autogen_docstrings.inl
                     manifold3d.cpp
 )
 
+message(Python_EXECUTABLE = ${Python_EXECUTABLE})
+
 if(MANIFOLD_PYBIND_STUBGEN)
   nanobind_add_stub(
     manifold3d_stub
@@ -24,6 +26,16 @@ if(MANIFOLD_PYBIND_STUBGEN)
     PYTHON_PATH $<TARGET_FILE_DIR:manifold3d>
     DEPENDS manifold3d
     PATTERN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/stub_pattern.txt
+  )
+
+  add_custom_command(
+    TARGET manifold3d_stub
+    POST_BUILD
+    COMMAND
+      "${Python_EXECUTABLE}"
+      "${PROJECT_SOURCE_DIR}/bindings/python/stub_postbuild.py"
+      "${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi"
+    VERBATIM
   )
 endif()
 
@@ -34,7 +46,6 @@ target_compile_options(
 )
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 
-message(Python_EXECUTABLE = ${Python_EXECUTABLE})
 # ideally we should generate a dependency file from python...
 set(
   DOCSTRING_DEPS

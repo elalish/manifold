@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#include <filesystem>
 
 #include "manifold/manifold.h"
-#include "manifold/polygon.h"
 #include "test.h"
+
+#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
+#include <fstream>
+#endif
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>
@@ -50,7 +54,7 @@ void print_usage() {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
-  const char* name = "test setup";
+  [[maybe_unused]] const char* name = "test setup";
   FrameMarkStart(name);
 
   // warmup tbb for emscripten, according to
@@ -460,10 +464,52 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
   CheckFinite(meshGL);
 }
 
+void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
+  EXPECT_EQ(mgl1.NumVert(), mgl2.NumVert());
+  EXPECT_EQ(mgl1.NumTri(), mgl2.NumTri());
+  EXPECT_EQ(mgl1.numProp, mgl2.numProp);
+
+  int ntri = mgl1.NumTri();
+  for (int t = 0; t < ntri; t++) {
+    for (int i = 0; i < 3; i++) {
+      EXPECT_EQ(mgl1.triVerts[3 * t + i], mgl2.triVerts[3 * t + i]);
+      // early return to avoid spam
+      if (mgl1.triVerts[3 * t + i] != mgl2.triVerts[3 * t + i]) return;
+    }
+  }
+
+  int nprop = mgl1.numProp;
+  int nvert = mgl1.NumVert();
+  for (int v = 0; v < nvert; v++) {
+    for (int p = 0; p < nprop; p++) {
+      EXPECT_EQ(mgl1.vertProperties[v * nprop + p],
+                mgl2.vertProperties[v * nprop + p]);
+      // early return to avoid spam
+      if (mgl1.vertProperties[v * nprop + p] !=
+          mgl2.vertProperties[v * nprop + p])
+        return;
+    }
+  }
+}
+
 #ifdef MANIFOLD_EXPORT
 MeshGL ReadMesh(const std::string& filename) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
   return ImportMesh(dir + "/models/" + filename);
+}
+#endif
+
+#ifdef MANIFOLD_DEBUG
+Manifold ReadTestOBJ(const std::string& filename) {
+  std::filesystem::path file(__FILE__);
+  std::filesystem::path obj = file.parent_path();
+  obj.append("models");
+  obj.append(filename);
+  std::ifstream f;
+  f.open(obj);
+  Manifold a = Manifold::ReadOBJ(f);
+  f.close();
+  return a;
 }
 #endif
