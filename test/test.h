@@ -62,3 +62,4 @@ MeshGL ReadMesh(const std::string& filename);
 Manifold ReadTestOBJ(const std::string& filename);
 #endif
 void RegisterPolygonTests();
+void RegisterFilletTests();

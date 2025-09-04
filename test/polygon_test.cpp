@@ -18,6 +18,8 @@
 #include <fstream>
 #include <limits>
 
+#include "../src/vec.h"
+#include "manifold/cross_section.h"
 #include "test.h"
 
 namespace {
@@ -73,9 +75,15 @@ class PolygonTestFixture : public testing::Test {
   Polygons polys;
   double epsilon;
   int expectedNumTri;
+  std::string name;
+
   explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri)
-      : polys(polys), epsilon(epsilon), expectedNumTri(expectedNumTri) {}
+                              int expectedNumTri, const std::string &name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
@@ -129,6 +137,191 @@ void RegisterPolygonTests() {
   std::string file = __FILE__;
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
-  for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+  for (auto f : files)
+    RegisterPolygonTestsFile<PolygonTestFixture>("Polygon",
+                                                 dir + "/polygons/" + f);
 #endif
 }
+
+struct FilletResult {
+  FilletResult(const std::vector<CrossSection> &crossSections,
+               const std::string &name)
+      : name(name), crossSections(crossSections){};
+
+  std::string name;
+
+  std::vector<CrossSection> crossSections;
+};
+
+class FilletTestFixture : public PolygonTestFixture {
+ public:
+  using PolygonTestFixture::PolygonTestFixture;
+
+  void TestBody() override {
+    // result->emplace_back(FilletResult({CrossSection(polys)}, name));
+
+    TestFillet(polys, expectedNumTri, epsilon);
+  }
+
+  void TestFillet(const Polygons &polys, int expectedNumTri,
+                  double epsilon = -1.0);
+
+ private:
+  static std::unique_ptr<std::vector<FilletResult>,
+                         void (*)(std::vector<FilletResult> *)>
+      result;
+};
+
+void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
+                                   double epsilon) {
+  // const double radius = 0.7;
+
+  const int inputCircularSegments = 20;
+
+  manifold::ManifoldParams().verbose = false;
+
+  auto input = CrossSection(polys);
+  auto bbox = input.Bounds().Size();
+
+  double min = std::min(bbox.x, bbox.y), max = std::max(bbox.x, bbox.y);
+
+  std::vector<double> radiusVec;
+  if (true) {
+    std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
+    // std::array<double, 1> multipliers{0.5};
+    for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
+      double mmin = *it * min, mmax = *it * max;
+      if (std::abs(mmin - mmax) < 1E-6) {
+        radiusVec.push_back(mmin);
+        // radiusVec.push_back(-1.0 * mmin);
+      } else {
+        radiusVec.push_back(min);
+        radiusVec.push_back(max);
+
+        // radiusVec.push_back(-1.0 * mmin);
+        // radiusVec.push_back(-1.0 * mmax);
+      }
+    }
+  } else {
+    radiusVec.push_back(0.7);
+  }
+
+  for (auto it = radiusVec.begin(); it != radiusVec.end(); it++) {
+    const double radius = *it;
+
+    const int circularSegments = inputCircularSegments > 2
+                                     ? inputCircularSegments
+                                     : Quality::GetCircularSegments(radius);
+
+    auto r = input.Fillet(radius, circularSegments);
+    auto rc = manifold::CrossSection::Compose(r);
+
+    EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
+
+    auto toRad = [](const vec2 &v) -> double { return atan2(v.y, v.x); };
+
+    auto normalizeAngle = [](double angle) -> double {
+      while (angle < 0) angle += 2 * M_PI;
+      while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+      return angle;
+    };
+
+    for (const auto &crossSection : r) {
+      auto polygon = crossSection.ToPolygons();
+      for (const auto &loop : polygon) {
+        const auto &cs = CrossSection(loop);
+
+        bool isCCW = cs.Area() > 0;
+
+        for (size_t i = 0; i != loop.size(); i++) {
+          vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
+               p3 = loop[(i + 2) % loop.size()];
+
+          vec2 e1 = p2 - p1, e2 = p3 - p2;
+
+          // Check angle between edge
+          double angle = normalizeAngle(toRad(e2) - toRad(e1));
+
+          const double dPhi = 2 * M_PI / circularSegments;
+
+          EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.01));
+        }
+      }
+    }
+
+    // Check idempotent
+    if (true) {
+      auto rr = rc.Fillet(radius, circularSegments);
+      auto rrc = manifold::CrossSection::Compose(rr);
+
+      EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
+    }
+
+    result->emplace_back(FilletResult(r, name + "_" + std::to_string(radius)));
+  }
+}
+
+void RegisterFilletTests() {
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+  // std::string files[] = {"fillet.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files)
+    RegisterPolygonTestsFile<FilletTestFixture>("Polygon.Fillet",
+                                                dir + "/polygons/" + f);
+#endif
+}
+
+void Save(const std::string &filename,
+          const std::vector<FilletResult> &result) {
+  // Open a file stream for writing.
+  std::ofstream outFile(filename);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Could not open file " << filename << " for writing."
+              << std::endl;
+    return;
+  }
+
+  // Write each test case to the file.
+  for (const auto &test : result) {
+    // Write the header for the test.
+    outFile << test.name << " " << test.crossSections.size() << "\n";
+
+    // Write each CrossSection within the test.
+    for (const auto &crossSection : test.crossSections) {
+      const auto polygons = crossSection.ToPolygons();
+
+      outFile << polygons.size() << "\n";
+      for (const auto &loop : polygons) {
+        outFile << loop.size() << "\n";
+        for (const auto &point : loop) {
+          outFile << point.x << " " << point.y << "\n";
+        }
+      }
+    }
+  }
+
+  outFile.close();
+  std::cout << "Successfully saved " << result.size() << " tests to "
+            << filename << std::endl;
+}
+
+std::unique_ptr<std::vector<FilletResult>,
+                void (*)(std::vector<FilletResult> *)>
+    FilletTestFixture::result =
+        std::unique_ptr<std::vector<FilletResult>,
+                        void (*)(std::vector<FilletResult> *)>(
+            new std::vector<FilletResult>(),
+            [](std::vector<FilletResult> *v) -> void {
+              Save("result.txt", *v);
+
+              delete v;
+            });
