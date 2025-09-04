@@ -126,6 +126,20 @@ struct TopoConnectionPair {
   };
 };
 
+// For build and query Collider result
+struct EdgeOld2New {
+  manifold::Box box;
+  uint32_t morton;
+  size_t p1Ref;
+  size_t p2Ref;
+  size_t loopRef;
+};
+
+struct ColliderInfo {
+  Collider Collider;
+  std::vector<EdgeOld2New> EdgeOld2NewVec;
+};
+
 }  // namespace
 
 namespace {
@@ -697,19 +711,11 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
 namespace {
 using namespace manifold;
 
-// For build and query Collider result
-struct edgeOld2New {
-  manifold::Box box;
-  uint32_t morton;
-  size_t p1Ref;
-  size_t p2Ref;
-  size_t loopRef;
-};
-
-manifold::Collider BuildCollider(const manifold::Polygons& polygons,
-                                 std::vector<edgeOld2New>& edgeOld2NewVec) {
+ColliderInfo BuildCollider(const manifold::Polygons& polygons) {
   Vec<manifold::Box> boxVec;
   Vec<uint32_t> mortonVec;
+
+  std::vector<EdgeOld2New> edgeOld2NewVec;
 
   for (size_t j = 0; j != polygons.size(); j++) {
     auto& loop = polygons[j];
@@ -728,7 +734,7 @@ manifold::Collider BuildCollider(const manifold::Polygons& polygons,
   }
 
   std::stable_sort(edgeOld2NewVec.begin(), edgeOld2NewVec.end(),
-                   [](const edgeOld2New& lhs, const edgeOld2New& rhs) -> bool {
+                   [](const EdgeOld2New& lhs, const EdgeOld2New& rhs) -> bool {
                      return rhs.morton > lhs.morton;
                    });
 
@@ -744,20 +750,11 @@ manifold::Collider BuildCollider(const manifold::Polygons& polygons,
   }
 #endif
 
-  return Collider(boxVec, mortonVec);
+  return ColliderInfo{Collider(boxVec, mortonVec), edgeOld2NewVec};
 }
 
-struct ColliderInfo {
-  Collider outerCollider;
-  std::vector<edgeOld2New> outerEdgeOld2NewVec;
-
-  // Multi inner loops
-  std::vector<Collider> innerCollider;
-  std::vector<std::vector<edgeOld2New>> innerVec;
-};
-
 std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
-    const Loops& loops, const ColliderInfo& collider, double radius) {
+    const Loops& loops, const ColliderInfo& colliderInfo, double radius) {
   bool invert = false;
   if (radius < EPSILON) invert = true;
 
@@ -840,10 +837,14 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         }
       }
 
-      auto r = collider.outerCollider.Collisions(
-          manifold::Vec<manifold::Box>({box}).cview());
-      // r.Dump();
-      r.Sort();
+      std::vector<EdgeOld2New> r;
+      auto recordCollision = [&](int, int edge) {
+        r.push_back(colliderInfo.EdgeOld2NewVec[edge]);
+      };
+      auto recorder = MakeSimpleRecorder(recordCollision);
+
+      colliderInfo.Collider.Collisions(
+          manifold::Vec<manifold::Box>({box}).cview(), recorder);
 
 #ifdef MANIFOLD_DEBUG
       if (ManifoldParams().verbose) {
@@ -854,8 +855,8 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 #endif
 
       // In Out Classify
-      for (size_t j = 0; j != r.size(); j++) {
-        const auto& ele = collider.outerEdgeOld2NewVec[r.Get(j, true)];
+      for (auto it = r.begin(); it != r.end(); it++) {
+        const auto& ele = *it;
 
         // e2i is the index of detected possible bridge edge
 
@@ -951,15 +952,19 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
           box.Union(toVec3(arc.CircleCenter - vec2(0, 1) * radius));
           box.Union(toVec3(arc.CircleCenter + vec2(0, 1) * radius));
 
-          auto rr = collider.outerCollider.Collisions(
-              manifold::Vec<manifold::Box>({box}).cview());
+          std::vector<EdgeOld2New> rr;
+          auto recordCollision = [&](int, int edge) {
+            rr.push_back(colliderInfo.EdgeOld2NewVec[edge]);
+          };
+          auto recorder = MakeSimpleRecorder(recordCollision);
 
-          // r.Dump();
-          rr.Sort();
+          colliderInfo.Collider.Collisions(
+              manifold::Vec<manifold::Box>({box}).cview(), recorder);
+
           bool eraseFlag = false;
 
-          for (size_t k = 0; k != rr.size(); k++) {
-            const auto& edge = collider.outerEdgeOld2NewVec[rr.Get(k, true)];
+          for (auto it = rr.begin(); it != rr.end(); it++) {
+            const auto& edge = *it;
 
             if (edge.loopRef == e1Loopi && edge.p1Ref == e1i)
               continue;
@@ -1262,8 +1267,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
                                      int circularSegments) {
   if (polygons.empty()) return {};
 
-  ColliderInfo info{};
-  info.outerCollider = BuildCollider(polygons, info.outerEdgeOld2NewVec);
+  ColliderInfo colliderInfo = BuildCollider(polygons);
 
   SavePolygons("input.txt", polygons);
 
@@ -1289,7 +1293,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 #endif
 
   // Calc all arc that bridge 2 edge
-  auto arcConnection = CalculateFilletArc(loops, info, radius);
+  auto arcConnection = CalculateFilletArc(loops, colliderInfo, radius);
 
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
