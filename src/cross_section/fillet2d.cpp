@@ -15,14 +15,14 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <tuple>
 #include <vector>
-
-#include "../vec.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
 #include "../collider.h"
+#include "../vec.h"
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.h"
 #include "manifold/cross_section.h"
@@ -116,7 +116,7 @@ struct TopoConnectionPair {
   std::array<size_t, 2> EdgeIndex;
   std::array<size_t, 2> LoopIndex;
 
-  TopoConnectionPair Swap() {
+  TopoConnectionPair Swap() const {
     TopoConnectionPair pair = *this;
     std::swap(pair.ParameterValues[0], pair.ParameterValues[1]);
     std::swap(pair.RadValues[0], pair.RadValues[1]);
@@ -213,6 +213,15 @@ bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
   return (t >= 0.0 - EPSILON) && (t <= 1.0 + EPSILON);
 };
 
+// Check if line segment intersect with a circle
+bool isIntersectCircleSegment(const vec2& p1, const vec2& p2,
+                              const vec2& center, double radius) {
+  if (length(p2 - p1) < EPSILON)
+    return length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
+
+  return distancePointSegment(center, p1, p2) < (radius + EPSILON);
+};
+
 std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
@@ -238,26 +247,25 @@ std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
 
 namespace {
 
-double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
-                            double& t) {
-  t = -1;
-
+/// @brief Distance from a point to a segment
+/// @param p Point
+/// @param p1 Edge start point
+/// @param p2 Edge end point
+/// @return length, parameter value of closest point
+double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2) {
   if (length(p2 - p1) < EPSILON) {
-    t = 0;
     return length(p1 - p);
   }
 
   vec2 d = p2 - p1;
 
-  t = dot(p - p1, d) / dot(d, d);
+  double t = dot(p - p1, d) / dot(d, d);
 
   vec2 closestPoint;
 
   if (t < 0) {
-    t = 0;
     closestPoint = p1;
   } else if (t > 1) {
-    t = 1;
     closestPoint = p2;
   } else {
     closestPoint = p1 + t * d;
@@ -266,19 +274,11 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2,
   return length(closestPoint - p);
 }
 
-// Check if line segment intersect with a circle
-bool intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
-                            double radius) {
-  if (length(p2 - p1) < EPSILON)
-    return length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
-
-  double t;
-  return distancePointSegment(center, p1, p2, t) < (radius + EPSILON);
-};
-
 // Calculate line segment intersections with a circle
-int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
-                           double radius, std::array<vec2, 2>& intersections) {
+std::pair<int, std::array<vec2, 2>> intersectCircleSegment(const vec2& p1,
+                                                           const vec2& p2,
+                                                           const vec2& center,
+                                                           double radius) {
   vec2 d = p2 - p1;
   vec2 f = p1 - center;
 
@@ -287,8 +287,10 @@ int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
   double c = dot(f, f) - radius * radius;
 
   double discriminant = b * b - 4 * a * c;
+  std::array<vec2, 2> intersections{};
 
-  if (discriminant < 0) return 0;  // No intersection
+  if (discriminant < 0)
+    return std::make_pair(0, intersections);  // No intersection
 
   double sqrtDisc = sqrt(discriminant);
   double t1 = (-b - sqrtDisc) / (2 * a);
@@ -299,25 +301,26 @@ int intersectCircleSegment(const vec2& p1, const vec2& p2, const vec2& center,
     intersections[count] = p1 + d * t1;
     count++;
   }
-  if (t2 >= -EPSILON && t2 <= 1 + EPSILON && abs(t2 - t1) > EPSILON) {
+  if (t2 >= -EPSILON && t2 <= 1 + EPSILON && std::abs(t2 - t1) > EPSILON) {
     intersections[count] = p1 + d * t2;
     count++;
   }
 
-  return count;
+  return std::make_pair(count, intersections);
 };
 
 // Check if line segment intersect with another line segment
-bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
-                             const vec2& p4, double& t, double& u) {
-  t = -1;
-  u = -1;
+std::tuple<bool, double, double> intersectSegmentSegment(const vec2& p1,
+                                                         const vec2& p2,
+                                                         const vec2& p3,
+                                                         const vec2& p4) {
+  double t = -1, u = -1;
 
   double det = cross(p2 - p1, p4 - p3);
 
   if (std::abs(det) < EPSILON) {
     // Parallel
-    return false;
+    return std::make_tuple(false, -1.0, -1.0);
   }
 
   double num_t = cross(p3 - p1, p4 - p3);
@@ -330,18 +333,16 @@ bool intersectSegmentSegment(const vec2& p1, const vec2& p2, const vec2& p3,
   if ((t >= 0.0 - EPSILON && t <= 1.0 + EPSILON) &&
       (u >= 0.0 - EPSILON && u <= 1.0 + EPSILON)) {
     // Inside
-    return true;
+    return std::make_tuple(true, t, u);
   } else {
-    // Outside -> No intersection
-    t = u = 0;
-
-    return false;
+    return std::make_tuple(false, -1.0, -1.0);
   }
 };
 
-int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
-                                      double radius,
-                                      std::array<vec2, 2>& circleCenters) {
+std::pair<int, std::array<vec2, 2>> calculatePointPointTangentCircles(
+    const vec2& p1, const vec2& p2, double radius) {
+  std::array<vec2, 2> circleCenters{};
+
   double dx = p2.x - p1.x;
   double dy = p2.y - p1.y;
 
@@ -353,9 +354,10 @@ int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
   vec2 midpoint((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
 
   // If distance equals 2*radius, there's exactly one solution (midpoint)
-  if (abs(length(v) - 2 * radius) < 1e-9) {
+  if (std::abs(length(v) - 2 * radius) < 1e-9) {
     circleCenters[0] = midpoint;
-    return 1;
+
+    return std::make_pair(1, circleCenters);
   }
 
   // Calculate distance from midpoint to circle centers
@@ -368,7 +370,7 @@ int calculatePointPointTangentCircles(const vec2& p1, const vec2& p2,
   circleCenters[0] = midpoint + h * d;
   circleCenters[1] = midpoint - h * d;
 
-  return 2;
+  return std::make_pair(2, circleCenters);
 }
 
 // E - * Intersect
@@ -402,8 +404,10 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
 
     double t = 0, u = 0;
 
-    if (intersectSegmentSegment(offsetE1[0], offsetE1[1], offsetE2[0],
-                                offsetE2[1], t, u)) {
+    const auto& [isIntersected, t, u] = intersectSegmentSegment(
+        offsetE1[0], offsetE1[1], offsetE2[0], offsetE2[1]);
+
+    if (isIntersected) {
       vec2 center = offsetE1[0] + e1Cur * t,
            tangent1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1], t),
            tangent2 = getPointOnEdgeByParameter(e2Points[1], e2Points[2], u);
@@ -470,11 +474,10 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
         std::array<vec2, 2> centers;
 
-        double t;
-        if (distancePointSegment(point, p1, p2, t) < EPSILON) continue;
+        if (distancePointSegment(point, p1, p2) < EPSILON) continue;
 
-        int count = intersectCircleSegment(offsetE1[0], offsetE1[1], point,
-                                           radius, centers);
+        const auto& [count, centers] =
+            intersectCircleSegment(offsetE1[0], offsetE1[1], point, radius);
 
         for (int j = 0; j != count; j++) {
           if (isCircleLocalValid(
@@ -534,8 +537,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     const double radius) {
   if (!isCircleLocalValid(e1Points, e1CCW)) return {};
 
-  if (!intersectCircleSegment(e2Points[1], e2Points[2], e1Points[1],
-                              2.0 * radius))
+  if (!isIntersectCircleSegment(e2Points[1], e2Points[2], e1Points[1],
+                                2.0 * radius))
     return {};
 
   std::vector<GeomTangentPair> GeomTangentPairVec;
@@ -578,9 +581,9 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
       int i = 0;
     }
 
-    std::array<vec2, 2> centers;
-    int count = intersectCircleSegment(offsetE2[0], offsetE2[1], e1Points[1],
-                                       radius, centers);
+    const auto& [count, centers] =
+        intersectCircleSegment(offsetE2[0], offsetE2[1], e1Points[1], radius);
+
     for (int i = 0; i != count; i++) {
       if (isCircleLocalValid(e1Points, e1CCW, centers[i])) {
         double t;
@@ -636,9 +639,8 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
 
     if (isPointInPieArea(point, e1Points[1], 2.0 * radius, e1CCW, startRad,
                          endRad)) {
-      std::array<vec2, 2> centers;
-      int count = calculatePointPointTangentCircles(e1Points[1], point, radius,
-                                                    centers);
+      const auto& [count, centers] =
+          calculatePointPointTangentCircles(e1Points[1], point, radius);
 
       for (int j = 0; j != count; j++) {
         if (isCircleLocalValid(std::array<vec2, 3>{e2Points[i], e2Points[i + 1],
@@ -968,8 +970,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
             const size_t p1i = edge.p1Ref, p2i = edge.p2Ref;
             const vec2 p1 = eLoop[p1i], p2 = eLoop[p2i];
 
-            double t;
-            double distance = distancePointSegment(arc.CircleCenter, p1, p2, t);
+            double distance = distancePointSegment(arc.CircleCenter, p1, p2);
 
             if (std::abs(distance - radius) < EPSILON) {
               // TODO: Intersected, this can be used to optimize speed for
