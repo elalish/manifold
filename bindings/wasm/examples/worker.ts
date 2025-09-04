@@ -17,11 +17,11 @@ import * as glMatrix from 'gl-matrix'
 import * as animation from '../lib/animation';
 import * as debug from '../lib/debug';
 import {Evaluator} from '../lib/evaluate';
-import * as exporter from '../lib/export';
-import {GlobalDefaults} from '../lib/export';
 import {Export3MF} from '../lib/export-3mf';
 import {ExportGLTF} from '../lib/export-gltf';
 import * as material from '../lib/material';
+import * as scenebuilder from '../lib/scene-builder';
+import {GlobalDefaults} from '../lib/scene-builder';
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
@@ -45,24 +45,24 @@ const exportGltf = new ExportGLTF();
 glMatrix.glMatrix.setMatrixArrayType(Array);
 evaluator.addContext({glMatrix})
 
-// These are exporter methods that generate Manifold
+// These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
 evaluator.addContextMethodWithCleanup('show', debug.show)
 evaluator.addContextMethodWithCleanup('only', debug.only)
 evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial)
 
-// Add additional exporter context.  These need no garbage collection.
+// Add additional context.  These need no garbage collection.
 evaluator.addContext({
-  GLTFNode: exporter.GLTFNode,
+  GLTFNode: scenebuilder.GLTFNode,
   setMorphStart: animation.setMorphStart,
   setMorphEnd: animation.setMorphEnd,
 });
 
-// Clean up the evaluator and exporter between runs.
+// Clean up the evaluator and scene builder between runs.
 export function cleanup() {
   evaluator.cleanup();
-  exporter.cleanup();
+  scenebuilder.cleanup();
   material.cleanup();
   animation.cleanup();
   debug.cleanup();
@@ -86,7 +86,7 @@ export async function evaluateCADToModel(code: string) {
       (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 
   // If we don't actually have a model, complain.
-  if (!manifold && !exporter.hasGLTFNodes()) {
+  if (!manifold && !scenebuilder.hasGLTFNodes()) {
     log('No output because "result" is undefined and no "GLTFNode"s were created.');
     return ({
       glbURL: URL.createObjectURL(new Blob([])),
@@ -95,9 +95,10 @@ export async function evaluateCADToModel(code: string) {
   }
 
   // Create a gltf-transform document.
-  const doc = exporter.hasGLTFNodes() ?
-      exporter.GLTFNodesToGLTFDoc(exporter.getGLTFNodes(), globalDefaults) :
-      exporter.manifoldToGLTFDoc(manifold, globalDefaults);
+  const doc = scenebuilder.hasGLTFNodes() ?
+      scenebuilder.GLTFNodesToGLTFDoc(
+          scenebuilder.getGLTFNodes(), globalDefaults) :
+      scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
 
   const blobs = {
     glbURL: URL.createObjectURL(await exportGltf.asBlob(doc)),

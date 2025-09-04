@@ -18,7 +18,7 @@ import {quat} from 'gl-matrix';
 import {Manifold, Mesh, Vec3} from '../examples/built/manifold';
 import {Quat} from '../examples/public/editor';
 
-import {globalDefaults, GLTFNode} from './export.ts'
+import {globalDefaults, GLTFNode} from './scene-builder.ts'
 
 const FPS = 30;
 

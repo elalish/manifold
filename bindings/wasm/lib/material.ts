@@ -18,7 +18,7 @@ import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
 import {Manifold} from '../examples/built/manifold.ts';
 import {GLTFMaterial} from '../examples/public/editor.ts';
 
-import {globalDefaults, GLTFNode} from './export.ts'
+import {globalDefaults, GLTFNode} from './scene-builder.ts'
 
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();

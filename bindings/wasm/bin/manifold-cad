@@ -13,16 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve, extname } from 'node:path';
+import {readFile, writeFile} from 'node:fs/promises';
+import {resolve, extname} from 'node:path';
 
-import { Command } from 'commander';
+import {Command} from 'commander';
 import glMatrix from 'gl-matrix';
 
 import * as animation from '../lib/animation.js';
 import * as debug from '../lib/debug.js';
 import {Evaluator} from '../lib/evaluate.js';
-import * as exporter from '../lib/export.js';
+import * as scenebuilder from '../lib/scene-builder.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
 import * as material from '../lib/material.js';
@@ -31,16 +31,16 @@ import * as material from '../lib/material.js';
 const evaluator = new Evaluator();
 evaluator.addContext({glMatrix});
 
-// These are exporter methods that generate Manifold
+// These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
-evaluator.addContextMethodWithCleanup('show', debug.show)
-evaluator.addContextMethodWithCleanup('only', debug.only)
-evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial)
+evaluator.addContextMethodWithCleanup('show', debug.show);
+evaluator.addContextMethodWithCleanup('only', debug.only);
+evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial);
 
-// Add additional exporter context.  These need no garbage collection.
+// Add additional context.  These need no garbage collection.
 evaluator.addContext({
-  GLTFNode: exporter.GLTFNode,
+  GLTFNode: scenebuilder.GLTFNode,
   setMorphStart: animation.setMorphStart,
   setMorphEnd: animation.setMorphEnd,
 });
@@ -65,42 +65,44 @@ const evaluateCADToModel = (code) => {
   const manifold = evaluator.evaluate(code);
 
   // If we don't actually have a model, complain.
-  if (!manifold && !exporter.hasGLTFNodes()) {
+  if (!manifold && !scenebuilder.hasGLTFNodes()) {
     console.error('No output because "result" is undefined and no "GLTFNode"s were created.');
     process.exit(2);
   }
 
   // Create a gltf-transform document.
-  return exporter.hasGLTFNodes() ?
-      exporter.GLTFNodesToGLTFDoc(exporter.getGLTFNodes(), globalDefaults) :
-      exporter.manifoldToGLTFDoc(manifold, globalDefaults);}
+  return scenebuilder.hasGLTFNodes()
+      ? scenebuilder.GLTFNodesToGLTFDoc(scenebuilder.getGLTFNodes(), globalDefaults)
+      : scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
+};
 
 const program = new Command();
 
-program
-  .name('manifold-cad')
-  .description('Compile a ManifoldCAD program into a mesh.')
-  .argument('<infile.js>', 'Input file')
-  .argument('<outfile>', 'Output file')
-  .action( async (infile, outfile) => {
-    const inPath = resolve(infile);
-    const outPath = resolve(outfile);
+program.name('manifold-cad')
+    .description('Compile a ManifoldCAD program into a mesh.')
+    .argument('<infile.js>', 'Input file')
+    .argument('<outfile>', 'Output file')
+    .action(async(infile, outfile) => {
+      const inPath = resolve(infile);
+      const outPath = resolve(outfile);
 
-    // Choose an exporter.
-    const exporter = exporters.find(ex => ex.extensions.includes(extname(outPath)));
-    if (!exporter) {
-      const extensions = exporters.map(ex => ex.extensions.join(', ')).join(', ');
-      console.error(`Output file must be one of ${extensions}`);
-      process.exit(1);
-    }
+      // Choose an exporter.
+      const exporter = exporters.find(ex => ex.extensions.includes(extname(outPath)));
+      if (!exporter) {
+        const extensions = exporters
+            .reduce((acc, cur) => ([... acc.extensions, ... cur.extensions ]))
+            .reduceRight((prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
+        console.error(`Output file must be one of ${extensions}`);
+        process.exit(1);
+      }
 
-    // Build the model.
-    const code = await readFile(inPath);
-    const doc = evaluateCADToModel(code);
+      // Build the model.
+      const code = await readFile(inPath);
+      const doc = evaluateCADToModel(code);
 
-    // Convert it and write it to disk.
-    const binary = await exporter.asBlob(doc);
-    await writeFile(outfile, binary.stream());
-  })
+      // Convert it and write it to disk.
+      const binary = await exporter.asBlob(doc);
+      await writeFile(outfile, binary.stream());
+    });
 
 program.parseAsync(process.argv);
