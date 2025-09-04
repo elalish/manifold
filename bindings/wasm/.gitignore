@@ -1,2 +1,5 @@
 manifold.js
 manifold.wasm
+lib/*.js
+lib/*.js.map
+lib/*.d.ts

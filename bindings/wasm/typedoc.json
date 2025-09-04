@@ -3,7 +3,8 @@
   "entryPoints": [
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
-    "lib/evaluate.ts"
+    "lib/evaluate.ts",
+    "lib/manifold-gltf.ts"
   ],
   "sortEntryPoints": false,
   "projectDocuments": ["documents/*.md"],

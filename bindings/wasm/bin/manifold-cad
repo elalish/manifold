@@ -13,64 +13,96 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve, extname } from 'node:path';
+import {readFile, writeFile} from 'node:fs/promises';
+import {resolve, extname} from 'node:path';
 
-import { Command } from 'commander';
+import {Command} from 'commander';
 import glMatrix from 'gl-matrix';
 
-import { Evaluator } from '../lib/evaluate.js';
-import * as exporter from '../lib/export.js';
+import * as animation from '../lib/animation.js';
+import * as debug from '../lib/debug.js';
+import {Evaluator} from '../lib/evaluate.js';
+import * as scenebuilder from '../lib/scene-builder.js';
+import {Export3MF} from '../lib/export-3mf.js';
+import {ExportGLTF} from '../lib/export-gltf.js';
+import * as material from '../lib/material.js';
 
 // Setup the evaluator and context.
 const evaluator = new Evaluator();
-evaluator.addContext({glMatrix})
+evaluator.addContext({glMatrix});
 
-// These are exporter methods that generate Manifold
+// These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
-for (const name of ['show', 'only', 'setMaterial']) {
-  evaluator.addContextMethodWithCleanup(name, exporter[name]);
-}
+evaluator.addContextMethodWithCleanup('show', debug.show);
+evaluator.addContextMethodWithCleanup('only', debug.only);
+evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial);
 
-// Add additional exporter context.  These need no garbage collection.
+// Add additional context.  These need no garbage collection.
 evaluator.addContext({
-  GLTFNode: exporter.GLTFNode,
-  setMorphStart: exporter.setMorphStart,
-  setMorphEnd: exporter.setMorphEnd,
+  GLTFNode: scenebuilder.GLTFNode,
+  setMorphStart: animation.setMorphStart,
+  setMorphEnd: animation.setMorphEnd,
 });
 
-const evaluateCADToModel = async (code) => {
+// Instantiate exporters for later use.
+const exporters = [
+  new Export3MF(),
+  new ExportGLTF()
+];
+
+const evaluateCADToModel = (code) => {
+  // Global defaults can be populated by the script.  It's set per
+  // evaluation, while the rest of evaluator context doesn't change from
+  // run to run.
+  // This can be used to set parameters elsewhere in ManifoldCAD.  For
+  // example, the GLTF exporter will look for animation type and
+  // framerate.
   const globalDefaults = {};
 
+  // Evaluate the code
   evaluator.context.globalDefaults = globalDefaults;
   const manifold = evaluator.evaluate(code);
 
-  return await exporter.exportModels(globalDefaults, manifold);
-}
+  // If we don't actually have a model, complain.
+  if (!manifold && !scenebuilder.hasGLTFNodes()) {
+    console.error('No output because "result" is undefined and no "GLTFNode"s were created.');
+    process.exit(2);
+  }
+
+  // Create a gltf-transform document.
+  return scenebuilder.hasGLTFNodes()
+      ? scenebuilder.GLTFNodesToGLTFDoc(scenebuilder.getGLTFNodes(), globalDefaults)
+      : scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
+};
 
 const program = new Command();
 
-program
-  .name('manifold-cad')
-  .description('Compile a ManifoldCAD program into a mesh.')
-  .argument('<infile.js>', 'Input file')
-  .argument('<outfile>', 'Output file')
-  .action( async (infile, outfile) => {
-    const inPath = resolve(infile);
-    const outPath = resolve(outfile);
+program.name('manifold-cad')
+    .description('Compile a ManifoldCAD program into a mesh.')
+    .argument('<infile.js>', 'Input file')
+    .argument('<outfile>', 'Output file')
+    .action(async(infile, outfile) => {
+      const inPath = resolve(infile);
+      const outPath = resolve(outfile);
 
-    const is3mf = extname(outPath) === '.3mf';
-    const isGlb = extname(outPath) === '.glb';
-    if (!is3mf && !isGlb) {
-      throw new Error('Output file must be either .glb or .3mf');
-    }
+      // Choose an exporter.
+      const exporter = exporters.find(ex => ex.extensions.includes(extname(outPath)));
+      if (!exporter) {
+        const extensions = exporters
+            .reduce((acc, cur) => ([... acc.extensions, ... cur.extensions ]))
+            .reduceRight((prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
+        console.error(`Output file must be one of ${extensions}`);
+        process.exit(1);
+      }
 
-    const code = await readFile(inPath);
-    const { glbBlob, threeMFBlob} = await evaluateCADToModel(code);
+      // Build the model.
+      const code = await readFile(inPath);
+      const doc = evaluateCADToModel(code);
 
-    const binary = is3mf ? threeMFBlob : glbBlob;
-    const outStream = writeFile(outfile, binary.stream());
-  })
+      // Convert it and write it to disk.
+      const binary = await exporter.asBlob(doc);
+      await writeFile(outfile, binary.stream());
+    });
 
 program.parseAsync(process.argv);
