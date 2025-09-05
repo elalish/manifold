@@ -15,10 +15,11 @@
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
 import {quat} from 'gl-matrix';
 
-import {Manifold, Mesh, Vec3} from '../examples/built/manifold';
 import {Quat} from '../examples/public/editor';
+import {Manifold, Mesh} from '../manifold-encapsulated-types';
+import {Vec3} from '../manifold-global-types';
 
-import {globalDefaults, GLTFNode} from './scene-builder.ts'
+import {globalDefaults, GLTFNode} from './scene-builder.ts';
 
 const FPS = 30;
 

@@ -17,8 +17,9 @@
 
 import {Document, Material, Node} from '@gltf-transform/core';
 
-import {Manifold, Vec3} from '../examples/built/manifold';
 import {GLTFMaterial} from '../examples/public/editor';
+import {Manifold} from '../manifold-encapsulated-types';
+import {Vec3} from '../manifold-global-types';
 
 import {addAnimationToDoc, addMotion, cleanupAnimation, euler2quat, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {getDebugGLTFMesh, getMaterialByID} from './debug.ts'
