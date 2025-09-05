@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {CrossSection, Manifold} from '../manifold-encapsulated-types.js';
+import {CrossSection, Manifold} from '../manifold-encapsulated-types';
 import type {ManifoldToplevel} from '../manifold.d.ts';
 import Module from '../manifold.js';
 
