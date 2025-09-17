@@ -532,9 +532,6 @@ TEST(Boolean, NastyGears) {
   EXPECT_EQ(nastyGear.Genus(), 1);
   EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
 
-  // The gear should have some antiparallel slivers
-  // TODO: Add a function to count antiparallel slivers
-
   // These should be eliminated after simplification
   nastyGear = nastyGear.AsOriginal().Simplify(0.0000000001);
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);

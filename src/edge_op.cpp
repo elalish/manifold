@@ -266,11 +266,6 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   CollapseShortEdges(firstNewVert);
   CollapseColinearEdges(firstNewVert);
   CollapseAntiparallelEdges(firstNewVert);
-  // Hack: Repeat the removal of degenerate triangles, which may be created by
-  // antiparallel edge collapse
-  CleanupTopology();
-  CollapseShortEdges(firstNewVert);
-  CollapseColinearEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
 }
 
