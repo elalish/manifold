@@ -89,7 +89,6 @@ export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
 const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
   let result = manifold.asOriginal();
   map.set(result.originalID(), result.getMesh());
-  console.log({fn: debug, ghost})
   return result;
 };
 

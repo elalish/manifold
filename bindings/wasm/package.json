@@ -22,6 +22,8 @@
     "lib/animation.js",
     "lib/debug.d.ts",
     "lib/debug.js",
+    "lib/euler2quat.js",
+    "lib/euler2quat.d.ts",
     "lib/evaluate.d.ts",
     "lib/evaluate.js",
     "lib/scene-builder.d.ts",

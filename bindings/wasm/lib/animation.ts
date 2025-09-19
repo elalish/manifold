@@ -13,12 +13,11 @@
 // limitations under the License.
 
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
-import {quat} from 'gl-matrix';
 
-import {Quat} from '../examples/public/editor';
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
+import {euler2quat} from './euler2quat.ts';
 import {globalDefaults, GLTFNode} from './scene-builder.ts';
 
 const FPS = 30;
@@ -37,15 +36,6 @@ let hasAnimation: boolean;
 
 export function cleanup() {
   manifold2morph.clear();
-}
-
-export function euler2quat(rotation: Vec3): Quat {
-  const deg2rad = Math.PI / 180;
-  const q = [0, 0, 0, 1] as Quat;
-  quat.rotateZ(q, q, deg2rad * rotation[2]);
-  quat.rotateY(q, q, deg2rad * rotation[1]);
-  quat.rotateX(q, q, deg2rad * rotation[0]);
-  return q;
 }
 
 export function addMotion(
