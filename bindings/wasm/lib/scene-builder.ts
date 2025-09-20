@@ -23,9 +23,9 @@ import {Vec3} from '../manifold-global-types';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAni, cleanupAnimation, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
-import {euler2quat} from './euler2quat.ts';
 import {Properties, writeMesh} from './gltf-io.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
+import {euler2quat} from './math.ts';
 
 export {setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';

@@ -17,7 +17,7 @@ import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node}
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
-import {euler2quat} from './euler2quat.ts';
+import {euler2quat} from './math.ts';
 import {globalDefaults, GLTFNode} from './scene-builder.ts';
 
 const FPS = 30;
