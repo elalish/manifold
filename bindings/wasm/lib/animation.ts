@@ -153,6 +153,16 @@ export function morphEnd(
   });
 }
 
+/**
+ * Apply a morphing animation to the input manifold. Specify the start
+ * function which will be applied to the vertex positions of the first frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @group Modelling Functions
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the first animation frame.
+ */
 export const setMorphStart =
     (manifold: Manifold, func: (v: Vec3) => void): void => {
       const morph = manifold2morph.get(manifold);
@@ -163,6 +173,16 @@ export const setMorphStart =
       }
     };
 
+/**
+ * Apply a morphing animation to the input manifold. Specify the end
+ * function which will be applied to the vertex positions of the last frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @group Modelling Functions
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the last animation frame.
+ */
 export const setMorphEnd =
     (manifold: Manifold, func: (v: Vec3) => void): void => {
       const morph = manifold2morph.get(manifold);
@@ -202,7 +222,7 @@ export function addAnimationToDoc(doc: Document) {
   animation.addSampler(weightsSampler);
 }
 
-export function cleanupAnimation() {
+export function cleanupAnimationInDoc() {
   if (!hasAnimation) {
     timesAccessor.dispose();
     weightsAccessor.dispose();

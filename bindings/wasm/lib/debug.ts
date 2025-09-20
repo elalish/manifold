@@ -92,10 +92,28 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
   return result;
 };
 
+/**
+ * Wrap any shape object with this method to display it and any copies in
+ * transparent red. This is particularly useful for debugging `subtract()` as it
+ * will allow you find the object even if it doesn't currently intersect the
+ * result.
+ *
+ * @group Modelling Functions
+ * @param shape The object to show - returned for chaining.
+ */
 export const show = (manifold: Manifold) => {
   return debug(manifold, shown);
 };
 
+/**
+ * Wrap any shape object with this method to display it and any copies as the
+ * result, while ghosting out the final result in transparent gray. Helpful for
+ * debugging as it allows you to see objects that may be hidden in the interior
+ * of the result. Multiple objects marked `only()` will all be shown.
+ *
+ * @group Modelling Functions
+ * @param shape The object to show - returned for chaining.
+ */
 export const only = (manifold: Manifold) => {
   ghost = true;
   return debug(manifold, singles);

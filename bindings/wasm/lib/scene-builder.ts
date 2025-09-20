@@ -21,7 +21,7 @@ import {GLTFMaterial} from '../examples/public/editor';
 import {Manifold} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
-import {addAnimationToDoc, addMotion, cleanup as cleanupAni, cleanupAnimation, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
+import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
@@ -56,7 +56,7 @@ export const globalDefaults = {...GLOBAL_DEFAULTS};
 const nodes = new Array<GLTFNode>();
 
 export function cleanup() {
-  cleanupAni();
+  cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
   nodes.length = 0;
@@ -297,7 +297,7 @@ export function GLTFNodesToGLTFDoc(
   log('Total glTF nodes: ', nodes.length,
       ', Total mesh references: ', leafNodes);
 
-  cleanupAnimation();
+  cleanupAnimationInDoc();
   return doc;
 }
 
