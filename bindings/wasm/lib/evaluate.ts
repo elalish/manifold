@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as glMatrix from 'gl-matrix'
-
 import {CrossSection, Manifold} from '../manifold-encapsulated-types';
 import type {ManifoldToplevel} from '../manifold.d.ts';
 import Module from '../manifold.js';
@@ -21,9 +19,6 @@ import Module from '../manifold.js';
 // Instantiate Manifold WASM
 const manifoldwasm = await Module();
 manifoldwasm.setup();
-
-// Faster on modern browsers than Float32Array
-glMatrix.glMatrix.setMatrixArrayType(Array);
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
@@ -214,7 +209,6 @@ export class Evaluator {
     const context = {
       ...Object.fromEntries(exposedFunctions),
       module: this.module,
-      glMatrix,
       ...this.context
     };
     const AsyncFunction =

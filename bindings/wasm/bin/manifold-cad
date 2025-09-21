@@ -17,6 +17,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {resolve, extname} from 'node:path';
 
 import {Command} from 'commander';
+import glMatrix from 'gl-matrix';
 
 import {Evaluator} from '../lib/evaluate.js';
 import * as scenebuilder from '../lib/scene-builder.js';
@@ -25,6 +26,7 @@ import {ExportGLTF} from '../lib/export-gltf.js';
 
 // Setup the evaluator and context.
 const evaluator = new Evaluator();
+evaluator.addContext({glMatrix});
 
 // These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept

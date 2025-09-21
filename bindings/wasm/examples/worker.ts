@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as glMatrix from 'gl-matrix';
+
 import {Evaluator} from '../lib/evaluate';
 import {Export3MF} from '../lib/export-3mf';
 import {ExportGLTF} from '../lib/export-gltf';
@@ -36,6 +38,9 @@ export const module = evaluator.getModule();  // Used in tests.
 const export3mf = new Export3MF();
 const exportGltf = new ExportGLTF();
 
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
+evaluator.addContext({glMatrix});
 
 // These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
@@ -48,7 +53,7 @@ evaluator.addContextMethodWithCleanup('setMaterial', scenebuilder.setMaterial)
 evaluator.addContext({
   GLTFNode: scenebuilder.GLTFNode,
   setMorphStart: scenebuilder.setMorphStart,
-  setMorphEnd: scenebuilder.setMorphEnd,
+  setMorphEnd: scenebuilder.setMorphEnd
 });
 
 // Clean up the evaluator and scene builder between runs.
