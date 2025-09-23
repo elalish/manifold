@@ -13,12 +13,11 @@
 // limitations under the License.
 
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
-import {quat} from 'gl-matrix';
 
-import {Quat} from '../examples/public/editor';
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
+import {euler2quat} from './math.ts';
 import {globalDefaults, GLTFNode} from './scene-builder.ts';
 
 const FPS = 30;
@@ -37,15 +36,6 @@ let hasAnimation: boolean;
 
 export function cleanup() {
   manifold2morph.clear();
-}
-
-export function euler2quat(rotation: Vec3): Quat {
-  const deg2rad = Math.PI / 180;
-  const q = [0, 0, 0, 1] as Quat;
-  quat.rotateZ(q, q, deg2rad * rotation[2]);
-  quat.rotateY(q, q, deg2rad * rotation[1]);
-  quat.rotateX(q, q, deg2rad * rotation[0]);
-  return q;
 }
 
 export function addMotion(
@@ -163,6 +153,16 @@ export function morphEnd(
   });
 }
 
+/**
+ * Apply a morphing animation to the input manifold. Specify the start
+ * function which will be applied to the vertex positions of the first frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @group Modelling Functions
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the first animation frame.
+ */
 export const setMorphStart =
     (manifold: Manifold, func: (v: Vec3) => void): void => {
       const morph = manifold2morph.get(manifold);
@@ -173,6 +173,16 @@ export const setMorphStart =
       }
     };
 
+/**
+ * Apply a morphing animation to the input manifold. Specify the end
+ * function which will be applied to the vertex positions of the last frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @group Modelling Functions
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the last animation frame.
+ */
 export const setMorphEnd =
     (manifold: Manifold, func: (v: Vec3) => void): void => {
       const morph = manifold2morph.get(manifold);
@@ -212,7 +222,7 @@ export function addAnimationToDoc(doc: Document) {
   animation.addSampler(weightsSampler);
 }
 
-export function cleanupAnimation() {
+export function cleanupAnimationInDoc() {
   if (!hasAnimation) {
     timesAccessor.dispose();
     weightsAccessor.dispose();

@@ -19,13 +19,10 @@ import {resolve, extname} from 'node:path';
 import {Command} from 'commander';
 import glMatrix from 'gl-matrix';
 
-import * as animation from '../lib/animation.js';
-import * as debug from '../lib/debug.js';
 import {Evaluator} from '../lib/evaluate.js';
 import * as scenebuilder from '../lib/scene-builder.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
-import * as material from '../lib/material.js';
 
 // Setup the evaluator and context.
 const evaluator = new Evaluator();
@@ -34,15 +31,15 @@ evaluator.addContext({glMatrix});
 // These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
-evaluator.addContextMethodWithCleanup('show', debug.show);
-evaluator.addContextMethodWithCleanup('only', debug.only);
-evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial);
+evaluator.addContextMethodWithCleanup('show', scenebuilder.show);
+evaluator.addContextMethodWithCleanup('only', scenebuilder.only);
+evaluator.addContextMethodWithCleanup('setMaterial', scenebuilder.setMaterial);
 
 // Add additional context.  These need no garbage collection.
 evaluator.addContext({
   GLTFNode: scenebuilder.GLTFNode,
-  setMorphStart: animation.setMorphStart,
-  setMorphEnd: animation.setMorphEnd,
+  setMorphStart: scenebuilder.setMorphStart,
+  setMorphEnd: scenebuilder.setMorphEnd,
 });
 
 // Instantiate exporters for later use.
@@ -51,7 +48,7 @@ const exporters = [
   new ExportGLTF()
 ];
 
-const evaluateCADToModel = (code) => {
+const evaluateCADToModel = async (code) => {
   // Global defaults can be populated by the script.  It's set per
   // evaluation, while the rest of evaluator context doesn't change from
   // run to run.
@@ -62,7 +59,7 @@ const evaluateCADToModel = (code) => {
 
   // Evaluate the code
   evaluator.context.globalDefaults = globalDefaults;
-  const manifold = evaluator.evaluate(code);
+  const manifold = await evaluator.evaluate(code);
 
   // If we don't actually have a model, complain.
   if (!manifold && !scenebuilder.hasGLTFNodes()) {
@@ -98,7 +95,7 @@ program.name('manifold-cad')
 
       // Build the model.
       const code = await readFile(inPath);
-      const doc = evaluateCADToModel(code);
+      const doc = await evaluateCADToModel(code);
 
       // Convert it and write it to disk.
       const binary = await exporter.asBlob(doc);

@@ -28,6 +28,14 @@ export function cleanup() {
   materialCache.clear();
 }
 
+/**
+ * Returns a shallow copy of the input manifold with the given material
+ * properties applied. They will be carried along through operations.
+ *
+ * @group Modelling Functions
+ * @param manifold The input object.
+ * @param material A set of material properties to apply to this manifold.
+ */
 export const setMaterial =
     (manifold: Manifold, material: GLTFMaterial): Manifold => {
       const out = manifold.asOriginal();

@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as glMatrix from 'gl-matrix'
+import * as glMatrix from 'gl-matrix';
 
-import * as animation from '../lib/animation';
-import * as debug from '../lib/debug';
 import {Evaluator} from '../lib/evaluate';
 import {Export3MF} from '../lib/export-3mf';
 import {ExportGLTF} from '../lib/export-gltf';
-import * as material from '../lib/material';
 import * as scenebuilder from '../lib/scene-builder';
 import {GlobalDefaults} from '../lib/scene-builder';
 
@@ -43,29 +40,26 @@ const exportGltf = new ExportGLTF();
 
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
-evaluator.addContext({glMatrix})
+evaluator.addContext({glMatrix});
 
 // These are methods that generate Manifold
 // or CrossSection objects.  Tell the evaluator to intercept
 // the calls, and add any created objects to the clean up list.
-evaluator.addContextMethodWithCleanup('show', debug.show)
-evaluator.addContextMethodWithCleanup('only', debug.only)
-evaluator.addContextMethodWithCleanup('setMaterial', material.setMaterial)
+evaluator.addContextMethodWithCleanup('show', scenebuilder.show)
+evaluator.addContextMethodWithCleanup('only', scenebuilder.only)
+evaluator.addContextMethodWithCleanup('setMaterial', scenebuilder.setMaterial)
 
 // Add additional context.  These need no garbage collection.
 evaluator.addContext({
   GLTFNode: scenebuilder.GLTFNode,
-  setMorphStart: animation.setMorphStart,
-  setMorphEnd: animation.setMorphEnd,
+  setMorphStart: scenebuilder.setMorphStart,
+  setMorphEnd: scenebuilder.setMorphEnd
 });
 
 // Clean up the evaluator and scene builder between runs.
 export function cleanup() {
   evaluator.cleanup();
   scenebuilder.cleanup();
-  material.cleanup();
-  animation.cleanup();
-  debug.cleanup();
 }
 
 export async function evaluateCADToModel(code: string) {
@@ -79,7 +73,7 @@ export async function evaluateCADToModel(code: string) {
   evaluator.context.globalDefaults = globalDefaults;
 
   const t0 = performance.now();
-  const manifold = evaluator.evaluate(code);
+  const manifold = await evaluator.evaluate(code);
   const t1 = performance.now();
 
   log(`Manifold took ${

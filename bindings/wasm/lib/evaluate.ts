@@ -71,7 +71,7 @@ const crossSectionMemberFunctions = [
 const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
   'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'Manifold',
-  'CrossSection'
+  'CrossSection', 'triangulate'
 ];
 
 /**
@@ -203,7 +203,7 @@ export class Evaluator {
    * or a `Manifold` object.  Changing `afterScript` will affect this
    * behaviour.
    */
-  evaluate(code: string): any {
+  async evaluate(code: string): Promise<any> {
     const exposedFunctions =
         toplevel.map((name) => [name, (this.module as any)[name]]);
     const context = {
@@ -211,11 +211,12 @@ export class Evaluator {
       module: this.module,
       ...this.context
     };
-
-    const evalFn = new Function(
+    const AsyncFunction =
+        Object.getPrototypeOf(async function() {}).constructor;
+    const evalFn = new AsyncFunction(
         ...Object.keys(context),
         this.beforeScript + '\n' + code + '\n' + this.afterScript + '\n');
-    return evalFn(...Object.values(context));
+    return await evalFn(...Object.values(context));
   }
 
   /**
