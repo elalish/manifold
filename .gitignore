@@ -135,3 +135,14 @@ CMakeSettings.json
 # Benchmark stl files
 extras/ember_tests/testfiles/raw_meshes
 
+# Debian packaging build artifacts
+obj-x86_64-linux-gnu/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/manifold/
+debian/manifold-dev/
+debian/*.debhelper.log
+debian/*.substvars
+debian/tmp/
+

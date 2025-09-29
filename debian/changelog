@@ -1,0 +1,6 @@
+manifold (3.2.1-1) unstable; urgency=medium
+
+  * Initial Debian package release
+  * Package version 3.2.1 of the Manifold geometry library
+
+ -- Nomike <nomike@nomike.com>  Mon, 29 Sep 2025 19:30:00 +0000

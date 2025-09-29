@@ -26,12 +26,13 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 |  [BREP.io](https://github.com/mmiscool/BREP)  |
 ### Bindings & Packages
 
-Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git) or as a Debian package.
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
 | C | N/A | N/A | internal |
 | C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
+| C++ | Debian | manifold / manifold-dev | internal |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
 | Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
@@ -139,6 +140,23 @@ Offline building (with missing dependencies/dependency version override):
 > `MANIFOLD_DOWNLOADS`.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
+
+### Debian Package
+
+To build Debian packages (.deb):
+```
+sudo apt install debhelper cmake g++ libtbb-dev libclipper2-dev
+dpkg-buildpackage -us -uc -b
+```
+
+This will create two packages in the parent directory:
+- `manifold_*.deb`: Runtime library package
+- `manifold-dev_*.deb`: Development headers and files
+
+Install with:
+```
+sudo dpkg -i ../manifold_*.deb ../manifold-dev_*.deb
+```
 
 ### WASM
 

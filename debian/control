@@ -1,0 +1,50 @@
+Source: manifold
+Section: libs
+Priority: optional
+Maintainer: Nomike <nomike@nomike.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake (>= 3.18),
+               g++ (>= 4:9),
+               libtbb-dev,
+               libclipper2-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/elalish/manifold
+Vcs-Git: https://github.com/elalish/manifold.git
+Vcs-Browser: https://github.com/elalish/manifold
+Rules-Requires-Root: no
+
+Package: manifold
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Geometry library for triangle mesh operations
+ Manifold is a geometry library dedicated to creating and operating on
+ manifold triangle meshes. A manifold mesh is a mesh that represents a solid
+ object, and so is very important in manufacturing, CAD, structural analysis,
+ etc.
+ .
+ The library provides guaranteed manifold output with fast, robust mesh
+ Boolean operations. It supports arbitrary vertex properties and enables
+ mapping of materials for rendering use-cases. The library makes extensive
+ use of parallelization through TBB for performance.
+ .
+ This package contains the shared libraries.
+
+Package: manifold-dev
+Section: libdevel
+Architecture: any
+Depends: manifold (= ${binary:Version}),
+         ${misc:Depends},
+         libtbb-dev
+Description: Geometry library for triangle mesh operations (development files)
+ Manifold is a geometry library dedicated to creating and operating on
+ manifold triangle meshes. A manifold mesh is a mesh that represents a solid
+ object, and so is very important in manufacturing, CAD, structural analysis,
+ etc.
+ .
+ The library provides guaranteed manifold output with fast, robust mesh
+ Boolean operations. It supports arbitrary vertex properties and enables
+ mapping of materials for rendering use-cases. The library makes extensive
+ use of parallelization through TBB for performance.
+ .
+ This package contains the header files, static libraries, and development
+ documentation.

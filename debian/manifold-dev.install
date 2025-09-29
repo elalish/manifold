@@ -1,0 +1,5 @@
+usr/include/*
+usr/lib/*/libmanifold.so
+usr/lib/*/libmanifoldc.so
+usr/lib/*/cmake/*
+usr/lib/*/pkgconfig/*.pc
