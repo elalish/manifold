@@ -29,7 +29,6 @@ function log(...args: any[]) {
 
 // Setup the evaluator and it's context.
 const evaluator = new Evaluator();
-export const module = evaluator.getModule();  // Used in tests.
 
 // Exporters.
 // The end user can download either.

@@ -14,11 +14,8 @@
 
 import {CrossSection, Manifold} from '../manifold-encapsulated-types';
 import type {ManifoldToplevel} from '../manifold.d.ts';
-import Module from '../manifold.js';
 
-// Instantiate Manifold WASM
-const manifoldwasm = await Module();
-manifoldwasm.setup();
+import {getManifoldModule} from './wasm.ts';
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
@@ -102,44 +99,34 @@ export class Evaluator {
   afterScript: string =
       'return typeof result === "undefined" ? undefined : result;';
 
-  protected module: ManifoldToplevel = manifoldwasm;
+  protected module: ManifoldToplevel|undefined;
   protected memoryRegistry: Array<Manifold|CrossSection>;
+  protected moduleIntercepted: boolean = false;
 
   /**
    * Construct a new evaluator.
+   *
+   * @param module An optional Manifold module instance.
    */
-  constructor() {
+  constructor(module?: ManifoldToplevel) {
     this.memoryRegistry = new Array<Manifold|CrossSection>();
-
-    this.addMembers('Manifold', manifoldMemberFunctions, false);
-    this.addMembers('Manifold', manifoldStaticFunctions, true);
-    this.addMembers('CrossSection', crossSectionMemberFunctions, false);
-    this.addMembers('CrossSection', crossSectionStaticFunctions, true);
+    if (module) {
+      this.module = module;
+    }
   }
 
   /**
-   * Intercept calls and add their results to our garbage collection
-   * list.
+   * Pass an existing, instantiated manifold module to this evaluator.
    *
-   * @param className The class to intercept.
-   * @param methodNames An array of methods to intercept.
-   * @param areStatic Are these static methods?  If so, intercept them at
-   * the prototype level.
+   * @param module The manifold module to use.
    */
-  protected addMembers(
-      className: string, methodNames: Array<string>, areStatic: boolean) {
-    //@ts-ignore
-    const cls = this.module[className];
-    const obj = areStatic ? cls : cls.prototype;
-    for (const name of methodNames) {
-      const originalFn = obj[name];
-      obj[name] = (...args: any) => {
-        //@ts-ignore
-        const result = originalFn(...args);
-        this.memoryRegistry.push(result);
-        return result;
-      };
+  setModule(module: ManifoldToplevel) {
+    if (this.memoryRegistry.length) {
+      throw new Error(
+          'Cannot replace manifold module while there are outstanding objects to clean up.');
     }
+    this.module = module;
+    this.moduleIntercepted = false;
   }
 
   /**
@@ -192,6 +179,48 @@ export class Evaluator {
   }
 
   /**
+   * Set up garbage collection for a white listed set of methods belonging
+   * to the Manifold WASM module.
+   */
+  protected setupGarbageCollection(): undefined {
+    if (this.moduleIntercepted) {
+      return;
+    }
+
+    this.addMembers('Manifold', manifoldMemberFunctions, false);
+    this.addMembers('Manifold', manifoldStaticFunctions, true);
+    this.addMembers('CrossSection', crossSectionMemberFunctions, false);
+    this.addMembers('CrossSection', crossSectionStaticFunctions, true);
+
+    this.moduleIntercepted = true;
+  }
+
+  /**
+   * Intercept calls and add their results to our garbage collection
+   * list.
+   *
+   * @param className The class to intercept.
+   * @param methodNames An array of methods to intercept.
+   * @param areStatic Are these static methods?  If so, intercept them at
+   * the prototype level.
+   */
+  protected addMembers(
+      className: string, methodNames: Array<string>, areStatic: boolean) {
+    //@ts-ignore
+    const cls = this.module[className];
+    const obj = areStatic ? cls : cls.prototype;
+    for (const name of methodNames) {
+      const originalFn = obj[name];
+      obj[name] = (...args: any) => {
+        //@ts-ignore
+        const result = originalFn(...args);
+        this.memoryRegistry.push(result);
+        return result;
+      };
+    }
+  }
+
+  /**
    * Evaluate a string as javascript code creating a Manifold model.
    *
    * This function assembles the final execution context.  It then runs
@@ -204,6 +233,11 @@ export class Evaluator {
    * behaviour.
    */
   async evaluate(code: string): Promise<any> {
+    if (!this.module) {
+      this.module = await getManifoldModule();
+    }
+    this.setupGarbageCollection();
+
     const exposedFunctions =
         toplevel.map((name) => [name, (this.module as any)[name]]);
     const context = {
@@ -226,6 +260,6 @@ export class Evaluator {
    * collection will continue to be intercepted, even outside of the evaluator.
    */
   getModule(): ManifoldToplevel {
-    return this.module;
+    return this.module!;
   }
 }
