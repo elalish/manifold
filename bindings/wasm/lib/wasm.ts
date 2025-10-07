@@ -16,8 +16,8 @@ import type {ManifoldToplevel} from '../manifold.d.ts';
 import Module from '../manifold.js';
 
 // Instantiate Manifold WASM
-let manifoldwasm: ManifoldToplevel|undefined;
-let wasmUrl: string|undefined = undefined;
+let manifoldwasm: ManifoldToplevel|null = null;
+let wasmUrl: string|null = null;
 
 /**
  * Tell us how to find `manifold.wasm`.
