@@ -17,15 +17,18 @@ import {strict as assert} from 'assert';
 import {afterEach, expect, suite, test} from 'vitest';
 
 import {readMesh, setupIO} from '../lib/gltf-io';
+import {getManifoldModule} from '../lib/wasm.js';
+import type {ManifoldToplevel} from '../manifold.d.ts';
 
 // @ts-ignore
 import {examples} from './public/examples.js';
 import {Mesh} from './public/manifold';
-import {cleanup, evaluateCADToModel, module} from './worker';
+import {cleanup, evaluateCADToModel} from './worker';
 
 const io = setupIO(new WebIO());
 
 async function runExample(name: string) {
+  const module: ManifoldToplevel = await getManifoldModule();
   const code = examples.functionBodies.get(name);
   const result = await evaluateCADToModel(code);
   cleanup();
