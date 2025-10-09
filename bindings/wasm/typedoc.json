@@ -4,6 +4,8 @@
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
     "lib/evaluate.ts",
+    "lib/scene-builder.ts",
+    "lib/worker.ts",
     "lib/manifold-gltf.ts"
   ],
   "sortEntryPoints": false,

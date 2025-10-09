@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import ManifoldWorker from './worker-wrapper?worker';
+// '?worker' is vite convention to load a module as a web worker.
+import ManifoldWorker from '../lib/worker?worker';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -448,42 +449,59 @@ const output = {
 let manifoldWorker = null;
 
 function createWorker() {
+  manifoldInitialized = false;
   manifoldWorker = new ManifoldWorker();
-  manifoldWorker.onmessage = function(e) {
-    if (e.data == null) {
-      if (tsWorker != null && !manifoldInitialized) {
-        initializeRun();
-      }
+
+  manifoldWorker.onmessage = (e) => {
+    const message = e.data;
+
+    if (message?.type === 'ready') {
       manifoldInitialized = true;
-      return;
-    }
+      if (tsWorker) initializeRun();
 
-    if (e.data.log != null) {
-      consoleElement.textContent += e.data.log + '\r\n';
+    } else if (message?.type === 'error') {
+      consoleElement.textContent += message.message + '\r\n';
       consoleElement.scrollTop = consoleElement.scrollHeight;
-      return;
-    }
 
-    finishRun();
-    runButton.disabled = true;
-
-    if (output.threeMFURL != null) {
-      URL.revokeObjectURL(output.threeMFURL);
+      if (output.glbURL) URL.revokeObjectURL(output.glbURL);
+      if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
+      output.glbURL = null;
       output.threeMFURL = null;
-    }
-    URL.revokeObjectURL(output.glbURL);
-    output.glbURL = e.data.glbURL;
-    output.threeMFURL = e.data.threeMFURL;
-    threemfButton.disabled = output.threeMFURL == null;
-    mv.src = output.glbURL;
-    if (output.glbURL == null) {
+      threemfButton.disabled = true;
+
       mv.showPoster();
       poster.textContent = 'Error';
       createWorker();
-    } else {
+
+      finishRun();
+
+    } else if (message?.type === 'log') {
+      consoleElement.textContent += message.message + '\r\n';
+      consoleElement.scrollTop = consoleElement.scrollHeight;
+
+    } else if (message?.type === 'done') {
       setScript('safe', 'true');
+      manifoldWorker.postMessage({type: 'export', extension: '.glb'});
+      manifoldWorker.postMessage({type: 'export', extension: '.3mf'});
+
+      finishRun();
+      runButton.disabled = true;
+
+    } else if (message?.type === 'blob') {
+      if (message.extension === '.glb') {
+        if (output.glbURL) URL.revokeObjectURL(output.glbURL);
+        output.glbURL = message.blobURL;
+
+        mv.src = output.glbURL;
+      } else if (message?.extension === '.3mf') {
+        if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
+        output.threeMFURL = message.blobURL;
+        threemfButton.disabled = false;
+      }
     }
-  }
+  };
+
+  manifoldWorker.postMessage({type: 'initialize'});
 }
 
 createWorker();
@@ -495,7 +513,8 @@ async function run() {
   clearConsole();
   console.log('Running...');
   const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
-  manifoldWorker.postMessage(output.outputFiles[0].text);
+  manifoldWorker.postMessage(
+      {type: 'evaluate', code: output.outputFiles[0].text});
 }
 
 function cancel() {

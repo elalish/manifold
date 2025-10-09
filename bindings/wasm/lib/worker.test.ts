@@ -16,25 +16,26 @@ import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
 import {afterEach, expect, suite, test} from 'vitest';
 
-import {readMesh, setupIO} from '../lib/gltf-io';
-import {getManifoldModule} from '../lib/wasm.js';
-import type {ManifoldToplevel} from '../manifold.d.ts';
-
 // @ts-ignore
-import {examples} from './public/examples.js';
-import {Mesh} from './public/manifold';
-import {cleanup, evaluateCADToModel} from './worker';
+import {examples} from '../examples/public/examples.js';
+import {Mesh} from '../examples/public/manifold';
+import type {ManifoldToplevel} from '../manifold';
+
+import {readMesh, setupIO} from './gltf-io.ts';
+import {getManifoldModule} from './wasm.js';
+import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 
 const io = setupIO(new WebIO());
 
 async function runExample(name: string) {
   const module: ManifoldToplevel = await getManifoldModule();
   const code = examples.functionBodies.get(name);
-  const result = await evaluateCADToModel(code);
+  const doc = await evaluate(code);
+  const glbURL = await exportBlobURL(doc, '.glb')
   cleanup();
-  assert.ok(result?.glbURL);
-  const docIn = await io.read(result?.glbURL);
-  URL.revokeObjectURL(result?.glbURL);
+  assert.ok(glbURL);
+  const docIn = await io.read(glbURL);
+  URL.revokeObjectURL(glbURL);
   const nodes = docIn.getRoot().listNodes();
   for (const node of nodes) {
     const docMesh = node.getMesh();
