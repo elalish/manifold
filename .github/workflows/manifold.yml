@@ -127,7 +127,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_DEBUG=${{matrix.debug}} -DMANIFOLD_ASSERT=${{matrix.debug}} .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=${{matrix.debug}} -DMANIFOLD_ASSERT=${{matrix.debug}} .. && emmake make
     - name: Test WASM
       if: matrix.parallelization == 'OFF'
       run: |
@@ -204,7 +204,7 @@ jobs:
     - name: Build ${{matrix.parallelization}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test dll location
@@ -310,7 +310,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_PAR=ON .. && make
     - name: Test
       run: |
         cd build/test
