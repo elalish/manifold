@@ -124,7 +124,14 @@ Dependency version override:
 > via `FETCHCONTENT_SOURCE_DIR_*` (see below), or fetch the source from GitHub.
 > Note that the dependency will be built as static dependency to avoid dynamic
 > library conflict. When the system package is unavailable, the option will be
-> automatically set to true.
+> automatically set to true (except for tbb).
+
+> WARNING: These packages are statically linked to the library, which may be
+> unexpected for other consumers of the library. In particular, for tbb, this
+> create two versions of tbb when another library also bring their own tbb,
+> which may cause performance issues or crash the system.
+> It is not recommended to install manifold compiled with builtin tbb, and this
+> option requires explicit opt-in now.
 
 Offline building (with missing dependencies/dependency version override):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.

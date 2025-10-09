@@ -96,6 +96,7 @@
             cd build
             emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
+            -DMANIFOLD_USE_BUILTIN_TBB=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
             -DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src} \
             -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
