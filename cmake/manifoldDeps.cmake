@@ -60,9 +60,11 @@ if(MANIFOLD_PAR)
         add_library(TBB::tbb ALIAS tbb)
       endif()
     endif()
-  else()
+  elseif(MANIFOLD_USE_BUILTIN_TBB)
     logmissingdep("TBB" , "Parallel mode")
-    set(MANIFOLD_USE_BUILTIN_TBB ON)
+    message(WARNING
+      "MANIFOLD_USE_BUILTIN_TBB will statically link TBB,"
+      "which may cause issues when you use manifold with other libraries bundling their own TBB.")
     set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
     set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
     FetchContent_Declare(
@@ -76,6 +78,8 @@ if(MANIFOLD_PAR)
       DIRECTORY ${tbb_SOURCE_DIR}
       PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
     )
+  else()
+    message(FATAL_ERROR "Parallel mode enabled, but tbb was not found.")
   endif()
 endif()
 
