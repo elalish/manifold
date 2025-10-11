@@ -12,6 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * The worker is where the scene builder and evaluator come together.
+ * It handles instantiation of an evaluator, execution of a model and
+ * exporting the final scene as a GLTF-Transform Document or URL encoded
+ * Blob.
+ *
+ * This is a polymorphic module that can be used directly as a JavaScript or
+ * TypeScript module.  It can be imported as a web worker, and defines
+ * a set of interfaces for communication in that case.
+ *
+ * @module worker
+ */
+
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
@@ -32,53 +45,90 @@ export interface Message {
   type: MessageType;
 }
 
-export type MessageToWorker = Message;
 export namespace MessageToWorker {
+  /**
+   * Initialize the web worker.
+   * If this message is not sent, the worker will
+   * be instantiated when first evaluating a model.
+   *
+   * The worker will respond with `MessageFromWorker.Ready`
+   * or `MessageFromWorker.Error`.
+   */
   export interface Initialize extends Message {
     type: 'initialize';
-    wasmUrl?: string;
+    manifoldWasmUrl?: string;
   }
 
+  /**
+   * Evaluate a ManifoldCAD script.
+   *
+   * The worker will respond with `MessageFromWorker.Done`
+   * or `MessageFromWorker.Error`.
+   */
   export interface Evaluate extends Message {
     type: 'evaluate';
     code: string;
-    filename?: string;
   }
 
+  /**
+   * Export an evaluated model as a URL encoded Blob.
+   *
+   * The worker will respond with `MessageFromWorker.Blob`
+   * or `MessageFromWorker.Error`.
+   */
   export interface Export extends Message {
     type: 'export';
     extension: string;
   }
 }
 
-export type MessageFromWorker = Message;
 export namespace MessageFromWorker {
+  /**
+   * The worker is instantiated and ready.
+   */
   export interface Ready extends Message {
     type: 'ready';
   }
 
+  /**
+   * The worker has successfully evaluated a model.
+   */
   export interface Done extends Message {
     type: 'done';
   }
 
+  /**
+   * The worker has encountered an error.
+   *
+   * After an error, the state of the worker is undefined.
+   * Discard it and re-instantiate.
+   */
   export interface Error extends Message {
     type: 'error';
     message: string;
   }
 
+  /**
+   * The worker has emitted a log message.
+   *
+   * This is not an error condition.  Log messages may
+   * be sent at any time.
+   */
   export interface Log extends Message {
     type: 'log';
     message: string;
   }
 
+  /**
+   * The worker has successfully exported a model
+   * as a URL encoded Blob.
+   */
   export interface Blob extends Message {
     type: 'blob';
     blobURL: string;
     extension: string;
-    filename?: string;
   }
 }
-
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
@@ -93,7 +143,7 @@ function log(...args: any[]) {
  * This is where the scene builder meets the evaluator.
  * @returns The evaluator.
  */
-export function initialize() {
+export function initialize(): Evaluator {
   evaluator = new Evaluator();
 
   // Exporters.
@@ -129,7 +179,7 @@ export function initialize() {
  * This includes any outstanding Manifold, Mesh or CrossSection objects,
  * even if referenced elsewhere.
  */
-export function cleanup() {
+export function cleanup(): void {
   evaluator?.cleanup();
   scenebuilder?.cleanup();
 }
@@ -140,7 +190,7 @@ export function cleanup() {
  * @param code A string containing the code to evaluate.
  * @returns A gltf-transform Document.
  */
-export async function evaluate(code: string) {
+export async function evaluate(code: string): Promise<Document> {
   if (!evaluator) initialize();
 
   // Global defaults can be populated by the script.  It's set per
@@ -185,26 +235,24 @@ export async function evaluate(code: string) {
  * @param extension The target file extension.
  * @returns A URL encoded blob.
  */
-export const exportBlobURL =
-    async (doc: Document, extension: string) => {
-  const t0 = performance.now();
+export const exportBlobURL = async(doc: Document, extension: string):
+    Promise<string> => {
+      const t0 = performance.now();
 
-  const blob =
-      await exporters.find(ex => ex.extensions.includes(extension)).asBlob(doc)
-  const blobURL = URL.createObjectURL(blob);
+      const blob = await exporters.find(ex => ex.extensions.includes(extension))
+                       .asBlob(doc)
+      const blobURL = URL.createObjectURL(blob);
 
-  const t1 = performance.now();
-  log(`Exporting ${extension.toUpperCase()} took ${
-      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
-  return blobURL;
-}
+      const t1 = performance.now();
+      log(`Exporting ${extension.toUpperCase()} took ${
+          (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+      return blobURL;
+    }
 
 /**
- * This module is polymorphic.  If it's run as a web worker,
- * set up message handlers and logging.
+ * Set up message handlers and logging when run as a web worker.
  */
-const initializeWebWorker =
-    function() {
+const initializeWebWorker = (): void => {
   if (self.console) {
     const oldLog = self.console.log;
     self.console.log = function(...args) {
@@ -225,7 +273,7 @@ const initializeWebWorker =
 
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
-      if (message.wasmUrl) setWasmUrl(message.wasmUrl);
+      if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
       initialize();
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
@@ -246,11 +294,8 @@ const initializeWebWorker =
     try {
       gltfdoc = await evaluate(message.code);
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
-
     } catch (error: any) {
       console.error('Worker caught error', error);
-      console.log(error.toString());
-
       self.postMessage(
           {type: 'error', message: error.toString()} as
           MessageFromWorker.Error);
@@ -261,16 +306,12 @@ const initializeWebWorker =
 
   const handleExport = async (message: MessageToWorker.Export) => {
     const blobURL = await exportBlobURL(gltfdoc!, message.extension);
-
-    self.postMessage({
-      type: 'blob',
-      extension: message.extension,
-      filename: `manifold${message.extension}`,
-      blobURL
-    } as MessageFromWorker.Blob);
+    self.postMessage(
+        {type: 'blob', extension: message.extension, blobURL} as
+        MessageFromWorker.Blob);
   };
 
-  self.onmessage = async function(e) {
+  self.onmessage = async (e) => {
     const message = e.data as Message;
 
     if (message.type === 'initialize') {
@@ -280,8 +321,8 @@ const initializeWebWorker =
     } else if (message.type === 'export') {
       handleExport(message as MessageToWorker.Export)
     }
-  };
-}
+  }
+};
 
 const isWebWorker = () =>
     typeof self !== 'undefined' && typeof self.document == 'undefined';

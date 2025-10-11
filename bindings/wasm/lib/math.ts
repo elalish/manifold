@@ -14,12 +14,13 @@
 
 import {quat} from 'gl-matrix';
 
-import {Quat} from '../examples/public/editor';
 import {Vec3} from '../manifold-global-types';
 
-export function euler2quat(rotation: Vec3): Quat {
+type Vec4 = [number, number, number, number];
+
+export function euler2quat(rotation: Vec3): Vec4 {
   const deg2rad = Math.PI / 180;
-  const q = [0, 0, 0, 1] as Quat;
+  const q: Vec4 = [0, 0, 0, 1];
   quat.rotateZ(q, q, deg2rad * rotation[2]);
   quat.rotateY(q, q, deg2rad * rotation[1]);
   quat.rotateX(q, q, deg2rad * rotation[0]);

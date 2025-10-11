@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * The evaluator executes ManifoldCAD scripts and manages
+ * the execution context for those scripts.
+ *
+ * It also manages the Manifold WASM object.  This includes
+ * instantiation as well as simple garbage collection on Manifold
+ * and CrossSection objects.
+ *
+ * @module evaluate
+ */
+
 import {CrossSection, Manifold} from '../manifold-encapsulated-types';
 import type {ManifoldToplevel} from '../manifold.d.ts';
 

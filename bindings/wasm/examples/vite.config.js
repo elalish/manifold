@@ -1,6 +1,7 @@
 // vite.config.js
 import {resolve} from 'path'
 import {defineConfig} from 'vite'
+import {viteStaticCopy} from 'vite-plugin-static-copy'
 
 import emscriptenStaticWorkerOptions from './vite-fixup-plugin.js'
 
@@ -14,6 +15,14 @@ export default defineConfig({
     },
     fs: {allow: [resolve(__dirname, '..')]}
   },
+  plugins: [
+    viteStaticCopy({
+      targets: [{
+        src: '../types/manifoldCAD.d.ts',
+        dest: './',
+      }],
+    }),
+  ],
   build: {
     target: 'esnext',
     sourcemap: true,

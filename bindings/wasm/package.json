@@ -45,7 +45,8 @@
     "lib/wasm.js",
     "lib/wasm.d.ts",
     "lib/worker.js",
-    "lib/worker.d.ts"
+    "lib/worker.d.ts",
+    "types/manifoldCAD.d.ts"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",

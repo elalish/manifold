@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// NOTE: This file is undergoing active refactoring, as of August 2025.
-// Interfaces and semantics may change.  Beware of wild geese.
+/**
+ * The scene builder provides modelling outside of the native
+ * capabilities of Maniold WASM.  This includes scene graphs, materials,
+ * and animation functions.  In general, the scene builder
+ * follows GLTF semantics.
+ *
+ * This module includes modelling functions for use inside a ManifoldCAD script
+ * (e.g.: `show`, `only`, `setMaterial`, etc.).  It also includes a set of
+ * management functions (e.g.: `manifoldToGLTFDoc`, `cleanup`, etc.) that are
+ * used to export complete scenes and generally manage the state of the scene
+ * builder.
+ *
+ * @module scene-builder
+ */
 
 import {Document, Material, Node} from '@gltf-transform/core';
 
-import {GLTFMaterial} from '../examples/public/editor';
 import {Manifold} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
+import type {GLTFMaterial} from '../types/manifoldCAD';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
@@ -55,6 +67,12 @@ export const globalDefaults = {...GLOBAL_DEFAULTS};
 
 const nodes = new Array<GLTFNode>();
 
+/**
+ * Reset and garbage collect the scene builder and any
+ * encapsulated modules.
+ *
+ * @group Management Functions
+ */
 export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
@@ -250,6 +268,14 @@ function createWrapper(doc: Document) {
   return wrapper
 }
 
+/**
+ * Convert a Manifold object into a GLTF-Transform Document.
+ *
+ * @group Management Functions
+ * @param manifold The Manifold object
+ * @param defaults Parameters potentially set by a ManifoldCAD script
+ * @returns An in-memory GLTF-Transform Document
+ */
 export function manifoldToGLTFDoc(
     manifold: Manifold, defaults: GlobalDefaults) {
   const node = new GLTFNode();
@@ -257,6 +283,14 @@ export function manifoldToGLTFDoc(
   return GLTFNodesToGLTFDoc([node], defaults)
 }
 
+/**
+ * Convert a list of GLTF Nodes into a GLTF-Transform Document.
+ *
+ * @group Management Functions
+ * @param nodes A list of GLTF Nodes
+ * @param defaults Parameters potentially set by a ManifoldCAD script
+ * @returns An in-memory GLTF-Transform Document
+ */
 export function GLTFNodesToGLTFDoc(
     nodes: Array<GLTFNode>, defaults: GlobalDefaults) {
   parseOptions(defaults)
@@ -301,10 +335,22 @@ export function GLTFNodesToGLTFDoc(
   return doc;
 }
 
-export function hasGLTFNodes() {
+/**
+ * Does the scene builder have any GLTF nodes?
+ *
+ * @group Management Functions
+ * @returns A boolean value
+ */
+export function hasGLTFNodes(): boolean {
   return nodes.length > 0;
 }
 
-export function getGLTFNodes() {
+/**
+ * Get GLTF Nodes from the scene builder.
+ *
+ * @group Management Functions
+ * @returns An array of GLTF Nodes.
+ */
+export function getGLTFNodes(): Array<GLTFNode> {
   return nodes;
 }

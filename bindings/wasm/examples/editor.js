@@ -284,8 +284,15 @@ declare const module: ManifoldToplevel;
 `;
 }
 
-async function getEditorDTS() {
-  const global = await fetch('/editor.d.ts').then(response => response.text());
+async function getManifoldCadDTS() {
+  const global =
+      await fetch('/manifoldCAD.d.ts').then(response => response.text());
+  return `${global.replace(/^import.*$/gm, '')}`;
+}
+
+async function getGlMatrixDTS() {
+  const global =
+      await fetch('/gl-matrix.d.ts').then(response => response.text());
   return `${global.replace(/^import.*$/gm, '')}`;
 }
 
@@ -297,7 +304,9 @@ require(['vs/editor/editor.main'], async function() {
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldDTS());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getEditorDTS());
+      await getManifoldCadDTS());
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await getGlMatrixDTS());
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
@@ -449,31 +458,32 @@ const output = {
 let manifoldWorker = null;
 
 function createWorker() {
-  manifoldInitialized = false;
   manifoldWorker = new ManifoldWorker();
 
   manifoldWorker.onmessage = (e) => {
     const message = e.data;
 
     if (message?.type === 'ready') {
+      if (tsWorker != null && !manifoldInitialized) {
+        initializeRun();
+      }
       manifoldInitialized = true;
-      if (tsWorker) initializeRun();
 
     } else if (message?.type === 'error') {
+      setScript('safe', 'false');
+      finishRun();
+
       consoleElement.textContent += message.message + '\r\n';
       consoleElement.scrollTop = consoleElement.scrollHeight;
-
       if (output.glbURL) URL.revokeObjectURL(output.glbURL);
       if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
       output.glbURL = null;
       output.threeMFURL = null;
       threemfButton.disabled = true;
-
       mv.showPoster();
       poster.textContent = 'Error';
-      createWorker();
 
-      finishRun();
+      createWorker();
 
     } else if (message?.type === 'log') {
       consoleElement.textContent += message.message + '\r\n';
@@ -481,19 +491,19 @@ function createWorker() {
 
     } else if (message?.type === 'done') {
       setScript('safe', 'true');
-      manifoldWorker.postMessage({type: 'export', extension: '.glb'});
-      manifoldWorker.postMessage({type: 'export', extension: '.3mf'});
+      manifoldWorker.postMessage({type: 'export', extension: 'glb'});
+      manifoldWorker.postMessage({type: 'export', extension: '3mf'});
 
       finishRun();
       runButton.disabled = true;
 
     } else if (message?.type === 'blob') {
-      if (message.extension === '.glb') {
+      if (message.extension === 'glb') {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
         output.glbURL = message.blobURL;
 
         mv.src = output.glbURL;
-      } else if (message?.extension === '.3mf') {
+      } else if (message?.extension === '3mf') {
         if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
         output.threeMFURL = message.blobURL;
         threemfButton.disabled = false;

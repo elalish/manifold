@@ -22,7 +22,7 @@ import {setupIO} from './gltf-io.ts';
  *
  */
 export class ExportGLTF {
-  extensions: Array<string> = ['.glb', '.gltf'];
+  extensions: Array<string> = ['glb', 'gltf'];
 
   /**
    * Convert a GLTF-Transform document to a blob.

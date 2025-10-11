@@ -31,7 +31,7 @@ async function runExample(name: string) {
   const module: ManifoldToplevel = await getManifoldModule();
   const code = examples.functionBodies.get(name);
   const doc = await evaluate(code);
-  const glbURL = await exportBlobURL(doc, '.glb')
+  const glbURL = await exportBlobURL(doc, 'glb')
   cleanup();
   assert.ok(glbURL);
   const docIn = await io.read(glbURL);
