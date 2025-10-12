@@ -84,10 +84,11 @@ program.name('manifold-cad')
       const outPath = resolve(outfile);
 
       // Choose an exporter.
-      const exporter = exporters.find(ex => ex.extensions.includes(extname(outPath)));
+      const exporter = exporters.find(ex => ex.extensions.map(ext => `.${ext}`).includes(extname(outPath)));
       if (!exporter) {
         const extensions = exporters
             .reduce((acc, cur) => ([... acc.extensions, ... cur.extensions ]))
+            .map(ext => `.${ext}`)
             .reduceRight((prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
         console.error(`Output file must be one of ${extensions}`);
         process.exit(1);

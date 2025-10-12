@@ -70,7 +70,7 @@ interface To3MF {
  */
 
 export class Export3MF {
-  extensions: Array<string> = ['.3mf'];
+  extensions: Array<string> = ['3mf'];
 
   unit: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter' = 'millimeter';
   title?: string = 'ManifoldCAD.org model';

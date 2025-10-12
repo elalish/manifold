@@ -14,8 +14,8 @@
 
 import {Document} from '@gltf-transform/core';
 
-import {GLTFMaterial} from '../examples/public/editor';
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
+import type {GLTFMaterial} from '../types/manifoldCAD';
 
 import {Properties, writeMesh} from './gltf-io.ts';
 import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';

@@ -133,6 +133,12 @@ jobs:
       run: |
         cd build/test
         node ./manifold_test.js
+    - name: Test package
+      run: |
+        cd bindings/wasm
+        npm ci
+        npm run build
+        npm test
     - name: Test examples
       if: matrix.parallelization == 'OFF'
       run: |

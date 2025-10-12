@@ -15,8 +15,8 @@
 import {Document, Material} from '@gltf-transform/core';
 import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
 
-import {GLTFMaterial} from '../examples/public/editor';
 import {Manifold} from '../manifold-encapsulated-types';
+import type {GLTFMaterial} from '../types/manifoldCAD';
 
 import {globalDefaults, GLTFNode} from './scene-builder.ts'
 

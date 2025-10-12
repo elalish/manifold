@@ -9,7 +9,10 @@
   "scripts": {
     "docs": "npx typedoc",
     "build": "tsc",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:dev": "vitest"
   },
   "files": [
     "manifold.js",
@@ -40,7 +43,10 @@
     "lib/material.d.ts",
     "lib/material.js",
     "lib/wasm.js",
-    "lib/wasm.d.ts"
+    "lib/wasm.d.ts",
+    "lib/worker.js",
+    "lib/worker.d.ts",
+    "types/manifoldCAD.d.ts"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -71,7 +77,8 @@
   "devDependencies": {
     "@types/node": "^24.2.1",
     "typedoc": "^0.28.10",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.2.0",
