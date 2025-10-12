@@ -18,7 +18,7 @@ import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
 import {examples} from '../examples/public/examples.js';
-import {Mesh} from '../examples/public/manifold';
+import {Mesh} from '../manifold';
 import type {ManifoldToplevel} from '../manifold';
 
 import {readMesh, setupIO} from './gltf-io.ts';
