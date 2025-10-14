@@ -638,8 +638,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
                 *impl = {frame->positive_children[0]};
               } else {
                 auto negative = BatchUnion(frame->negative_children);
-                *impl = {SimpleBoolean(*positive->GetImpl(), *negative->GetImpl(),
-                                       OpType::Subtract)};
+                *impl = {SimpleBoolean(*positive->GetImpl(),
+                                       *negative->GetImpl(), OpType::Subtract)};
               }
             }
             break;
