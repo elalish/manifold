@@ -28,12 +28,12 @@
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
-import {Evaluator} from './evaluate';
-import {Export3MF} from './export-3mf';
-import {ExportGLTF} from './export-gltf';
-import * as scenebuilder from './scene-builder';
-import {GlobalDefaults} from './scene-builder';
-import {getManifoldModule, setWasmUrl} from './wasm';
+import {Evaluator} from './evaluate.ts';
+import {Export3MF} from './export-3mf.ts';
+import {ExportGLTF} from './export-gltf.ts';
+import * as scenebuilder from './scene-builder.ts';
+import {GlobalDefaults} from './scene-builder.ts';
+import {getManifoldModule, setWasmUrl} from './wasm.ts';
 
 let evaluator: Evaluator|null = null;
 let exporters: Array<any>;
@@ -144,7 +144,10 @@ function log(...args: any[]) {
  * @returns The evaluator.
  */
 export function initialize(): Evaluator {
-  evaluator = new Evaluator();
+  if (evaluator)
+    return evaluator;
+  else
+    evaluator = new Evaluator();
 
   // Exporters.
   // The end user can download either.
