@@ -618,33 +618,35 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
     std::shared_ptr<CsgStackFrame> frame = stack.back();
     auto impl = frame->op_node->impl_.GetGuard();
     if (frame->finalize) {
-      switch (frame->op_node->op_) {
-        case OpType::Add:
-          *impl = {BatchUnion(frame->positive_children)};
-          break;
-        case OpType::Intersect: {
-          *impl = {BatchBoolean(OpType::Intersect, frame->positive_children)};
-          break;
-        };
-        case OpType::Subtract:
-          if (frame->positive_children.empty()) {
-            // nothing to subtract from, so the result is empty.
-            *impl = {std::make_shared<CsgLeafNode>()};
-          } else {
-            auto positive = BatchUnion(frame->positive_children);
-            if (frame->negative_children.empty()) {
-              // nothing to subtract, result equal to the LHS.
-              *impl = {frame->positive_children[0]};
+      if (!frame->op_node->cache_) {
+        switch (frame->op_node->op_) {
+          case OpType::Add:
+            *impl = {BatchUnion(frame->positive_children)};
+            break;
+          case OpType::Intersect: {
+            *impl = {BatchBoolean(OpType::Intersect, frame->positive_children)};
+            break;
+          };
+          case OpType::Subtract:
+            if (frame->positive_children.empty()) {
+              // nothing to subtract from, so the result is empty.
+              *impl = {std::make_shared<CsgLeafNode>()};
             } else {
-              auto negative = BatchUnion(frame->negative_children);
-              *impl = {SimpleBoolean(*positive->GetImpl(), *negative->GetImpl(),
-                                     OpType::Subtract)};
+              auto positive = BatchUnion(frame->positive_children);
+              if (frame->negative_children.empty()) {
+                // nothing to subtract, result equal to the LHS.
+                *impl = {frame->positive_children[0]};
+              } else {
+                auto negative = BatchUnion(frame->negative_children);
+                *impl = {SimpleBoolean(*positive->GetImpl(), *negative->GetImpl(),
+                                       OpType::Subtract)};
+              }
             }
-          }
-          break;
+            break;
+        }
+        frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
+            (*impl)[0]->Transform(frame->op_node->transform_));
       }
-      frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
-          (*impl)[0]->Transform(frame->op_node->transform_));
       if (frame->positive_dest != nullptr)
         frame->positive_dest->push_back(std::static_pointer_cast<CsgLeafNode>(
             frame->op_node->cache_->Transform(frame->transform)));
