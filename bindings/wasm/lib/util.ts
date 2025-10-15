@@ -1,3 +1,17 @@
+// Copyright 2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import * as lexer from 'es-module-lexer';
 
 /**
@@ -14,9 +28,7 @@ export const isWebWorker = (): boolean =>
  * Static imports can only be used at the module level, and are typically
  * evaluated when bundling.  Dynamic imports will be evaluated at run time.
  *
- * This is a naive implementation.  Rather than building an edit list, it edits
- * and reparses the source code iteratively.  It will return when it cannot
- * find any import statements it is able to modify; any imports beyond basic
+ * This is a naive implementation.  Any imports beyond basic
  * static imports will be left untouched.  This includes static imports with
  * assertions, deferred imports and source imports.
  *
@@ -34,37 +46,59 @@ export const transformStaticImportsToDynamic =
 
       const isLocal = (x: string) => x.match(/^(\/|\.\/|\.\.\/)/);
       const isHttp = (x: string) => x.match(/^https?:\/\//);
+      const decomment = (x: string) =>
+          x.replaceAll(/\/\*[\s\S]*?\*\/|\/\/.*/gm, '');
       lexer.initSync();
 
-      while (true) {
-        const [imports] = lexer.parse(transformed);
-        const staticImports =
-            imports
-                .filter(imp => imp.t === 1)    // Static imports.
-                .filter(imp => imp.a === -1);  // No assertions.
+      const [imports] = lexer.parse(transformed);
+      const staticImports = imports
+                                .filter(imp => imp.t === 1)  // Static imports.
+                                .filter(imp => imp.a === -1);  // No assertions.
 
-        const imp = staticImports.pop();
-        if (!imp) break;  // Nothing to do.
-
+      // Work from back to front.
+      // This way we only change the positions of imports
+      // we have already transformed.
+      for (const imp of staticImports.reverse()) {
         let specifier = code.slice(imp.s, imp.e);
-        if (!isLocal(specifier) && !isHttp(specifier)) {
+        if (remotePrefix && !isLocal(specifier) && !isHttp(specifier)) {
           // This is a remote package, but apparently not a URL.
           specifier = remotePrefix + specifier;
         }
 
-        const assignee = code.slice(imp.ss, imp.se)
-                             .replace(/^import/, '')
-                             .replace(/from.+$/, '')
-                             .trim();
+        let assignee = code.slice(imp.ss, imp.se)
+                           .replace(/^import/, '')
+                           .replace(/from.+$/, '');
+        assignee = decomment(assignee).trim();
 
         let dynamicImport = '';
         if (assignee.match(/\{/)) {  // Is the assignee an object?
           // Destructuring assignment.
-          dynamicImport = `const ${assignee} = await import('${specifier}')`;
-        } else {
-          // Default assignment.
+          // '{ foo as bar }' -> '{ foo: bar }'
+          // '{ foo, bar }' => '{ foo, bar }'
+          const assignments =
+              assignee.trim()
+                  .replace(/^{/, '')
+                  .replace(/}$/, '')
+                  .split(',')
+                  .map(x => x.split('as').map(x => x.trim()))
+                  .map(
+                      ([theirname, ourname]) =>
+                          `${theirname}${ourname ? ': ' + ourname : ''}`)
+                  .join(', ');
           dynamicImport =
-              `const {default:${assignee}} = await import('${specifier}')`;
+              `const { ${assignments} } = await import('${specifier}')`;
+        } else {
+          // Single assignment.
+          if (assignee.match(/\*\s+as/)) {
+            // Return a named object.
+            const namespace = assignee.replace(/\*\s+as/, '').trim();
+            dynamicImport = `const ${namespace} = await import('${specifier}')`;
+
+          } else {
+            // Assign default export.
+            dynamicImport =
+                `const {default:${assignee}} = await import('${specifier}')`;
+          }
         }
 
         // Replace the import.
