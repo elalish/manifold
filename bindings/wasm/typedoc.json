@@ -7,7 +7,8 @@
     "lib/evaluate.ts",
     "lib/scene-builder.ts",
     "lib/worker.ts",
-    "lib/manifold-gltf.ts"
+    "lib/manifold-gltf.ts",
+    "lib/util.ts"
   ],
   "sortEntryPoints": false,
   "projectDocuments": ["documents/*.md"],

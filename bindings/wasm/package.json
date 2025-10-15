@@ -42,6 +42,8 @@
     "lib/manifold-gltf.js",
     "lib/material.d.ts",
     "lib/material.js",
+    "lib/util.js",
+    "lib/util.d.ts",
     "lib/wasm.js",
     "lib/wasm.d.ts",
     "lib/worker.js",
@@ -86,6 +88,7 @@
     "@gltf-transform/functions": "^4.2.0",
     "@jscadui/3mf-export": "^0.5.0",
     "commander": "^13.1.0",
+    "es-module-lexer": "^1.7.0",
     "fflate": "^0.8.0",
     "gl-matrix": "^3.4.3"
   }
