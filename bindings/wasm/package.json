@@ -11,8 +11,11 @@
     "build": "tsc",
     "prepare": "npm run build",
     "test": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:dev": "vitest"
+    "test:ui": "vitest --coverage --ui",
+    "test:dev": "vitest",
+    "test:fast": "vitest --exclude './lib/worker.test.ts' run",
+    "test:coverage": "vitest run --coverage",
+    "format": "cd ../.. && ./scripts/format.sh"
   },
   "files": [
     "manifold.js",
@@ -78,6 +81,8 @@
   "homepage": "https://github.com/elalish/manifold#readme",
   "devDependencies": {
     "@types/node": "^24.2.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "typedoc": "^0.28.10",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

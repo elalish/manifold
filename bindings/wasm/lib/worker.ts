@@ -33,7 +33,7 @@ import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {GlobalDefaults} from './scene-builder.ts';
-import {isWebWorker, transformStaticImportsToDynamic} from './util.ts';
+import {isWebWorker, transformImportsForCDN, transformStaticImportsToDynamic} from './util.ts';
 import {getManifoldModule, setWasmUrl} from './wasm.ts';
 
 let evaluator: Evaluator|null = null;
@@ -58,7 +58,7 @@ export namespace MessageToWorker {
   export interface Initialize extends Message {
     type: 'initialize';
     manifoldWasmUrl?: string;
-    remotePackagePrefix?: string;
+    jsCDN?: string;
   }
 
   /**
@@ -276,14 +276,11 @@ const initializeWebWorker = (): void => {
     };
   };
 
-  let remotePackagePrefix = 'https://esm.run/';
-
+  let jsCDN: string|null = null;
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
       if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
-      if (message.remotePackagePrefix) {
-        remotePackagePrefix = message.remotePackagePrefix;
-      }
+      if (message.jsCDN) jsCDN = message.jsCDN;
 
       initialize();
       await getManifoldModule();
@@ -303,8 +300,9 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      const code =
-          transformStaticImportsToDynamic(message.code, remotePackagePrefix);
+      let code = message.code;
+      if (jsCDN) code = transformImportsForCDN(code, jsCDN);
+      code = transformStaticImportsToDynamic(code);
       gltfdoc = await evaluate(code);
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error: any) {

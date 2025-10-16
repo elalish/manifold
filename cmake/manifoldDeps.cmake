@@ -62,9 +62,11 @@ if(MANIFOLD_PAR)
     endif()
   elseif(MANIFOLD_USE_BUILTIN_TBB)
     logmissingdep("TBB" , "Parallel mode")
-    message(WARNING
+    message(
+      WARNING
       "MANIFOLD_USE_BUILTIN_TBB will statically link TBB,"
-      "which may cause issues when you use manifold with other libraries bundling their own TBB.")
+      "which may cause issues when you use manifold with other libraries bundling their own TBB."
+    )
     set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
     set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
     FetchContent_Declare(
@@ -123,7 +125,8 @@ if(MANIFOLD_CROSS_SECTION)
       # Jun 15, 2025
       GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
       GIT_PROGRESS TRUE
-      SOURCE_SUBDIR CPP
+      SOURCE_SUBDIR
+      CPP
     )
     FetchContent_MakeAvailable(Clipper2)
     set_property(

@@ -6,7 +6,6 @@ import {viteStaticCopy} from 'vite-plugin-static-copy'
 import emscriptenStaticWorkerOptions from './vite-fixup-plugin.js'
 
 export default defineConfig({
-  test: {testTimeout: 15000},
   worker: {format: 'es', plugins: () => ([emscriptenStaticWorkerOptions])},
   server: {
     headers: {

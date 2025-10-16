@@ -231,6 +231,20 @@ export class Evaluator {
     }
   }
 
+  async getFullContext() {
+    if (!this.module) {
+      this.module = await getManifoldModule();
+    }
+    this.setupGarbageCollection();
+    const exposedFunctions =
+        toplevel.map((name) => [name, (this.module as any)[name]]);
+    return {
+      ...Object.fromEntries(exposedFunctions),
+      module: this.module,
+      ...this.context
+    };
+  }
+
   /**
    * Evaluate a string as javascript code creating a Manifold model.
    *
@@ -244,24 +258,14 @@ export class Evaluator {
    * behaviour.
    */
   async evaluate(code: string): Promise<any> {
-    if (!this.module) {
-      this.module = await getManifoldModule();
-    }
-    this.setupGarbageCollection();
+    const context = await this.getFullContext()
 
-    const exposedFunctions =
-        toplevel.map((name) => [name, (this.module as any)[name]]);
-    const context = {
-      ...Object.fromEntries(exposedFunctions),
-      module: this.module,
-      ...this.context
-    };
     const AsyncFunction =
         Object.getPrototypeOf(async function() {}).constructor;
     const evalFn = new AsyncFunction(
-        ...Object.keys(context),
+        ...Object.keys(context), '_manifold_context',
         this.beforeScript + '\n' + code + '\n' + this.afterScript + '\n');
-    return await evalFn(...Object.values(context));
+    return await evalFn(...Object.values(context), context);
   }
 
   /**

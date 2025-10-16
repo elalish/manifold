@@ -1,5 +1,7 @@
 manifold.js
 manifold.wasm
+manifold-3d-*.tgz
 lib/*.js
 lib/*.js.map
 lib/*.d.ts
+coverage

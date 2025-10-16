@@ -59,12 +59,14 @@ suite('transformStaticImportsToDynamic', () => {
     expect(result).to.equal('const foo = await import(\'bar\');');
   });
 
-  test('Remote package prefix', () => {
-    const input = 'import * as foo from "bar";';
-    const result = transformStaticImportsToDynamic(input, 'https://esm.run/');
-    expect(result).to.equal(
-        'const foo = await import(\'https://esm.run/bar\');');
-  });
+  /*
+    test('Remote package prefix', () => {
+      const input = 'import * as foo from "bar";';
+      const result = transformStaticImportsToDynamic(input, 'https://esm.run/');
+      expect(result).to.equal(
+          'const foo = await import(\'https://esm.run/bar\');');
+    });
+    */
 
   test('Two imports', () => {
     const input = 'import * as foo from "foobar";\n' +

@@ -16,70 +16,40 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {resolve, extname} from 'node:path';
 
-import {Command} from 'commander';
-import glMatrix from 'gl-matrix';
+import {Command, Option} from 'commander';
 
-import {Evaluator} from '../lib/evaluate.js';
-import * as scenebuilder from '../lib/scene-builder.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
+import {transformStaticImportsToDynamic, cdnUrlHelpers, transformImportsForCDN, dropStaticImport} from '../lib/util.js';
+import * as worker from '../lib/worker.js';
 
-// Setup the evaluator and context.
-const evaluator = new Evaluator();
-evaluator.addContext({glMatrix});
-
-// These are methods that generate Manifold
-// or CrossSection objects.  Tell the evaluator to intercept
-// the calls, and add any created objects to the clean up list.
-evaluator.addContextMethodWithCleanup('show', scenebuilder.show);
-evaluator.addContextMethodWithCleanup('only', scenebuilder.only);
-evaluator.addContextMethodWithCleanup('setMaterial', scenebuilder.setMaterial);
-
-// Add additional context.  These need no garbage collection.
-evaluator.addContext({
-  GLTFNode: scenebuilder.GLTFNode,
-  setMorphStart: scenebuilder.setMorphStart,
-  setMorphEnd: scenebuilder.setMorphEnd,
-});
-
-// Instantiate exporters for later use.
 const exporters = [
   new Export3MF(),
   new ExportGLTF()
 ];
-
-const evaluateCADToModel = async (code) => {
-  // Global defaults can be populated by the script.  It's set per
-  // evaluation, while the rest of evaluator context doesn't change from
-  // run to run.
-  // This can be used to set parameters elsewhere in ManifoldCAD.  For
-  // example, the GLTF exporter will look for animation type and
-  // framerate.
-  const globalDefaults = {};
-
-  // Evaluate the code
-  evaluator.context.globalDefaults = globalDefaults;
-  const manifold = await evaluator.evaluate(code);
-
-  // If we don't actually have a model, complain.
-  if (!manifold && !scenebuilder.hasGLTFNodes()) {
-    console.error('No output because "result" is undefined and no "GLTFNode"s were created.');
-    process.exit(2);
-  }
-
-  // Create a gltf-transform document.
-  return scenebuilder.hasGLTFNodes()
-      ? scenebuilder.GLTFNodesToGLTFDoc(scenebuilder.getGLTFNodes(), globalDefaults)
-      : scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
-};
-
 const program = new Command();
 
 program.name('manifold-cad')
     .description('Compile a ManifoldCAD program into a mesh.')
-    .argument('<infile.js>', 'Input file')
+
+    .addOption(new Option('-w', 'Behaviour matches https://manifoldcad.org')
+      .implies({cdn: 'jsDelivr'})
+    )
+
+    .addOption(new Option('--cdn <string>', "Dynamically load modules from a CDN")
+       .choices([...Object.keys(cdnUrlHelpers), 'none'])
+       .implies({transformStaticImportsToDynamic: true})
+       .default('jsDelivr')
+    )
+
+    .addOption(new Option('--transformStaticImportsToDynamic', "Transform static imports to dynamic imports").default(true))
+
+    .argument('<infile.[js|ts]>', 'Input file')
     .argument('<outfile>', 'Output file')
-    .action(async(infile, outfile) => {
+
+    .action(async(infile, outfile, options) => {
+
+      console.log(options);
       const inPath = resolve(infile);
       const outPath = resolve(outfile);
 
@@ -95,8 +65,20 @@ program.name('manifold-cad')
       }
 
       // Build the model.
-      const code = await readFile(inPath);
-      const doc = await evaluateCADToModel(code);
+      let code = await readFile(inPath, 'utf-8');
+      code = dropStaticImport(code, '../../manifoldCAD.ts');
+      code = dropStaticImport(code, 'manifold-3d/lib/manifoldCAD.js');
+      
+      if (options.cdn && options.cdn !== 'none') {
+        // Rewrite imports to use the CDN in question.
+        code = transformImportsForCDN(code, options.cdn);
+      }
+      if (options.transformStaticImportsToDynamic) {
+        // Dynamically load esm modules.  This requires an import hook to work in node.
+        await import('../lib/node-http-import-hook.mjs');
+        code = transformStaticImportsToDynamic(code);
+      }
+      const doc = await worker.evaluate(code);
 
       // Convert it and write it to disk.
       const binary = await exporter.asBlob(doc);
