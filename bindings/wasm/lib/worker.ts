@@ -33,6 +33,7 @@ import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {GlobalDefaults} from './scene-builder.ts';
+import {isWebWorker, transformStaticImportsToDynamic} from './util.ts';
 import {getManifoldModule, setWasmUrl} from './wasm.ts';
 
 let evaluator: Evaluator|null = null;
@@ -57,6 +58,7 @@ export namespace MessageToWorker {
   export interface Initialize extends Message {
     type: 'initialize';
     manifoldWasmUrl?: string;
+    remotePackagePrefix?: string;
   }
 
   /**
@@ -274,9 +276,15 @@ const initializeWebWorker = (): void => {
     };
   };
 
+  let remotePackagePrefix = 'https://esm.run/';
+
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
       if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
+      if (message.remotePackagePrefix) {
+        remotePackagePrefix = message.remotePackagePrefix;
+      }
+
       initialize();
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
@@ -295,7 +303,9 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      gltfdoc = await evaluate(message.code);
+      const code =
+          transformStaticImportsToDynamic(message.code, remotePackagePrefix);
+      gltfdoc = await evaluate(code);
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error: any) {
       console.error('Worker caught error', error);
@@ -326,7 +336,4 @@ const initializeWebWorker = (): void => {
     }
   }
 };
-
-const isWebWorker = () =>
-    typeof self !== 'undefined' && typeof self.document == 'undefined';
 if (isWebWorker()) initializeWebWorker();
