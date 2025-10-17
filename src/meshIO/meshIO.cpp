@@ -147,7 +147,7 @@ MeshGL ImportMesh(const std::string& filename, bool forceCleanup) {
   for (size_t i = 0; i < scene->mNumMeshes; ++i) {
     const aiMesh* mesh_i = scene->mMeshes[i];
     for (size_t j = 0; j < mesh_i->mNumVertices; ++j) {
-      const aiVector3D vert = mesh_i->mVertices[j];
+      const aiVector3f vert = mesh_i->mVertices[j];
       if (isYup)
         mesh_out.vertProperties.insert(mesh_out.vertProperties.end(),
                                        {vert.z, vert.x, vert.y});
