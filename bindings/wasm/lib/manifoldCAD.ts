@@ -3,6 +3,7 @@ import {initialize} from './worker.ts';
 const evaluator = initialize();
 const context = await evaluator.getFullContext();
 
+// FIXME set types.
 export const {
   Manifold,
   CrossSection,

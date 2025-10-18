@@ -14,35 +14,33 @@ export default defineConfig({
     },
     fs: {allow: [resolve(__dirname, '..')]}
   },
-  plugins: [
-    viteStaticCopy({
-      targets: [
-        {
-          src: '../types/manifoldCAD.d.ts',
-          dest: './',  // Targets are relative to 'dist'.
-        },
-        // If 'dist/manifold-encapsulated-types.d.ts' and
-        // 'dist/manifold-global-types.d.ts' are missing, the web editor can't
-        // load them, and type validation won't work for our core modules.
-        //
-        // They are generated when building the wasm module.  But we don't
-        // really need to build the whole thing when working up here in JS/TS
-        // territory.  Additionally, they rarely change.  In the case where the
-        // binding files are not present, grab the checked in copies, and use
-        // those instead.  But if they _are_ present, don't overwrite them.
-        {
-          src: '../manifold-encapsulated-types.d.ts',
-          dest: './',
-          overwrite: false,
-        },
-        {
-          src: '../manifold-global-types.d.ts',
-          dest: './',
-          overwrite: false,
-        }
-      ],
-    }),
-  ],
+  plugins: [viteStaticCopy({
+    targets: [
+      {
+        src: '../types/manifoldCAD.d.ts',
+        dest: './',  // Targets are relative to 'dist'.
+      },
+      // If 'dist/manifold-encapsulated-types.d.ts' and
+      // 'dist/manifold-global-types.d.ts' are missing, the web editor can't
+      // load them, and type validation won't work for our core modules.
+      //
+      // They are generated when building the wasm module.  But we don't
+      // really need to build the whole thing when working up here in JS/TS
+      // territory.  Additionally, they rarely change.  In the case where the
+      // binding files are not present, grab the checked in copies, and use
+      // those instead.  But if they _are_ present, don't overwrite them.
+      {
+        src: '../manifold-encapsulated-types.d.ts',
+        dest: './',
+        overwrite: false,
+      },
+      {
+        src: '../manifold-global-types.d.ts',
+        dest: './',
+        overwrite: false,
+      }
+    ],
+  })],
   build: {
     target: 'esnext',
     sourcemap: true,

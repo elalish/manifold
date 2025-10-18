@@ -1,3 +1,3 @@
-import { unitSphere } from './unitSphere.mjs';
+import { unitSphere } from './unitSphereExport.mjs';
 
 export const result = unitSphere();

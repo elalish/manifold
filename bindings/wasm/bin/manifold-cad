@@ -16,11 +16,10 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {resolve, extname} from 'node:path';
 
-import {Command, Option} from 'commander';
+import {Command} from 'commander';
 
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
-import {transformStaticImportsToDynamic, cdnUrlHelpers, transformImportsForCDN, dropStaticImport} from '../lib/util.js';
 import * as worker from '../lib/worker.js';
 
 const exporters = [
@@ -31,25 +30,10 @@ const program = new Command();
 
 program.name('manifold-cad')
     .description('Compile a ManifoldCAD program into a mesh.')
-
-    .addOption(new Option('-w', 'Behaviour matches https://manifoldcad.org')
-      .implies({cdn: 'jsDelivr'})
-    )
-
-    .addOption(new Option('--cdn <string>', "Dynamically load modules from a CDN")
-       .choices([...Object.keys(cdnUrlHelpers), 'none'])
-       .implies({transformStaticImportsToDynamic: true})
-       .default('jsDelivr')
-    )
-
-    .addOption(new Option('--transformStaticImportsToDynamic', "Transform static imports to dynamic imports").default(true))
-
     .argument('<infile.[js|ts]>', 'Input file')
     .argument('<outfile>', 'Output file')
 
     .action(async(infile, outfile, options) => {
-
-      console.log(options);
       const inPath = resolve(infile);
       const outPath = resolve(outfile);
 
@@ -66,19 +50,7 @@ program.name('manifold-cad')
 
       // Build the model.
       let code = await readFile(inPath, 'utf-8');
-      code = dropStaticImport(code, '../../manifoldCAD.ts');
-      code = dropStaticImport(code, 'manifold-3d/lib/manifoldCAD.js');
-      
-      if (options.cdn && options.cdn !== 'none') {
-        // Rewrite imports to use the CDN in question.
-        code = transformImportsForCDN(code, options.cdn);
-      }
-      if (options.transformStaticImportsToDynamic) {
-        // Dynamically load esm modules.  This requires an import hook to work in node.
-        await import('../lib/node-http-import-hook.mjs');
-        code = transformStaticImportsToDynamic(code);
-      }
-      const doc = await worker.evaluate(code);
+      const doc = await worker.evaluateFile(infile);
 
       // Convert it and write it to disk.
       const binary = await exporter.asBlob(doc);

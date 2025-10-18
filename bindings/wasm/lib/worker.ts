@@ -28,12 +28,13 @@
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
+import {bundleCode, bundleFile} from './bundle.ts';
 import {Evaluator} from './evaluate.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {GlobalDefaults} from './scene-builder.ts';
-import {isWebWorker, transformImportsForCDN, transformStaticImportsToDynamic} from './util.ts';
+import {isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl} from './wasm.ts';
 
 let evaluator: Evaluator|null = null;
@@ -208,13 +209,46 @@ export async function evaluate(code: string): Promise<Document> {
   evaluator!.context.globalDefaults = globalDefaults;
 
   const t0 = performance.now();
-  const manifold = await evaluator!.evaluate(code);
-  const t1 = performance.now();
+  const bundle = await bundleCode(code);
+  const manifold = await evaluator!.evaluate(bundle);
 
+  const t1 = performance.now();
   log(`Manifold took ${
       (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 
   // If we don't actually have a model, complain.
+  if (!manifold && !scenebuilder.hasGLTFNodes()) {
+    throw new Error(
+        'No output because "result" is undefined and no GLTF nodes were created.');
+  }
+
+  // Create a gltf-transform document.
+  const doc = scenebuilder.hasGLTFNodes() ?
+      scenebuilder.GLTFNodesToGLTFDoc(
+          scenebuilder.getGLTFNodes(), globalDefaults) :
+      scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
+
+  const t2 = performance.now();
+  log(`Creating GLTF Document took ${
+      (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
+
+  return doc;
+}
+
+
+export async function evaluateFile(entrypoint: string): Promise<Document> {
+  if (!evaluator) initialize();
+  const globalDefaults = {} as GlobalDefaults;
+  evaluator!.context.globalDefaults = globalDefaults;
+
+  const t0 = performance.now();
+  const bundle = await bundleFile(entrypoint);
+  const manifold = await evaluator!.evaluate(bundle);
+
+  const t1 = performance.now();
+  log(`Manifold took ${
+      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+
   if (!manifold && !scenebuilder.hasGLTFNodes()) {
     throw new Error(
         'No output because "result" is undefined and no GLTF nodes were created.');
@@ -276,12 +310,10 @@ const initializeWebWorker = (): void => {
     };
   };
 
-  let jsCDN: string|null = null;
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
       if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
-      if (message.jsCDN) jsCDN = message.jsCDN;
-
+      
       initialize();
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
@@ -300,10 +332,7 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      let code = message.code;
-      if (jsCDN) code = transformImportsForCDN(code, jsCDN);
-      code = transformStaticImportsToDynamic(code);
-      gltfdoc = await evaluate(code);
+      gltfdoc = await evaluate(message.code);
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error: any) {
       console.error('Worker caught error', error);

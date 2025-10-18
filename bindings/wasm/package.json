@@ -7,15 +7,16 @@
     "manifold-cad": "./bin/manifold-cad"
   },
   "scripts": {
-    "docs": "npx typedoc",
     "build": "tsc",
-    "prepare": "npm run build",
+    "clean": "tsc --build --clean",
+    "format": "cd ../.. && ./scripts/format.sh",
+    "docs": "npx typedoc",
+    "pretest": "npm run build",
     "test": "vitest run",
     "test:ui": "vitest --coverage --ui",
     "test:dev": "vitest",
-    "test:fast": "vitest --exclude './lib/worker.test.ts' run",
     "test:coverage": "vitest run --coverage",
-    "format": "cd ../.. && ./scripts/format.sh"
+    "prepare": "npm run build"
   },
   "files": [
     "manifold.js",
@@ -26,6 +27,8 @@
     "bin/manifold-cad",
     "lib/animation.d.ts",
     "lib/animation.js",
+    "lib/bundle.js",
+    "lib/bundle.d.ts",
     "lib/debug.d.ts",
     "lib/debug.js",
     "lib/math.js",
@@ -93,7 +96,8 @@
     "@gltf-transform/functions": "^4.2.0",
     "@jscadui/3mf-export": "^0.5.0",
     "commander": "^13.1.0",
-    "es-module-lexer": "^1.7.0",
+    "esbuild-plugin-text-replace": "^1.3.0",
+    "esbuild-wasm": "^0.25.11",
     "fflate": "^0.8.0",
     "gl-matrix": "^3.4.3"
   }

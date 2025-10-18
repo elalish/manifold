@@ -15,6 +15,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "declaration": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
