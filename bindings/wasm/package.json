@@ -54,8 +54,16 @@
     "lib/wasm.d.ts",
     "lib/worker.js",
     "lib/worker.d.ts",
+    "lib/manifoldCAD.js",
+    "lib/manifoldCAD.d.ts",
     "types/manifoldCAD.d.ts"
   ],
+  "exports": {
+    ".": "./manifold.js",
+    "./manifold.wasm": "./manifold.wasm",
+    "./lib/*": "./lib/*",
+    "./manifoldCAD" : "./lib/manifoldCAD.js"
+  },
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
   "type": "module",
