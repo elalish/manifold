@@ -12,41 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import {expect, suite, test} from 'vitest';
+import {beforeEach, expect, suite, test} from 'vitest';
 import * as worker from '../lib/worker.ts';
 import {bundleFile} from '../lib/bundle.ts';
 
+let evaluator = worker.getEvaluator() || worker.initialize();
+beforeEach(() => worker.cleanup());
+
 suite('Build model with the evaluator', () => {
   test('Import a model that declares \'result\'', async () => {
-    const filepath = resolve(__dirname, "./fixtures/unitSphereResult.mjs");
-
+    const filepath = resolve(__dirname, './fixtures/unitSphereResult.mjs');
     let code = await bundleFile(filepath);
 
-    const evaluator = worker.initialize();
     const result = await evaluator.evaluate(code);
     expect(result.volume()).toBeCloseTo(2.9428, 4);
   });
 
   test('Import a model that exports `result`', async () => {
-    const filepath = resolve(__dirname, "./fixtures/unitSphereExportResult.mjs");
-
+    const filepath =
+        resolve(__dirname, './fixtures/unitSphereExportResult.mjs');
     let code = await bundleFile(filepath);
 
-    const evaluator = worker.initialize();
     const result = await evaluator.evaluate(code);
     expect(result.volume()).toBeCloseTo(2.9428, 4);
   });
 
   test('Import a model with imports', async () => {
-    const filepath = resolve(__dirname, "./fixtures/importUnitSphere.mjs");
-
+    const filepath = resolve(__dirname, './fixtures/importUnitSphere.mjs');
     let code = await bundleFile(filepath);
-    
-    const evaluator = worker.initialize();
+
     const result = await evaluator.evaluate(code);
     expect(result.volume()).toBeCloseTo(2.9428, 4);
   })
@@ -55,17 +53,17 @@ suite('Build model with the evaluator', () => {
 suite('Build model without the evaluator', () => {
   test('Importing a model with no exports does nothing.', async () => {
     // @ts-ignore
-    const { result } = await import("./fixtures/unitSphereResult.mjs");
+    const {result} = await import('./fixtures/unitSphereResult.mjs');
     expect(result).toBeUndefined();
-  })
+  });
+
   test('Import a model that exports `result`', async () => {
-    const { result } = await import("./fixtures/unitSphereExportResult.mjs");
+    const {result} = await import('./fixtures/unitSphereExportResult.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 4);
-  })
+  });
 
   test('Import a model with imports', async () => {
-    const { result } = await import("./fixtures/importUnitSphere.mjs");
+    const {result} = await import('./fixtures/importUnitSphere.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 4);
-  })
+  });
 });
-

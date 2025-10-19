@@ -13,33 +13,32 @@
 // limitations under the License.
 
 import {readFile} from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import {expect, suite, test} from 'vitest';
+import {beforeEach, expect, suite, test} from 'vitest';
 import * as worker from '../lib/worker.ts';
 import {bundleFile, bundleCode} from '../lib/bundle.ts';
 
+let evaluator = worker.getEvaluator() || worker.initialize();
+beforeEach(() => worker.cleanup());
 
-suite('Import modules...', () => {
-  test('...from jsDelivr', async () => {
-    const entrypoint = resolve(__dirname, "./fixtures/importFromCDN.mjs");
+suite('Import modules', () => {
+  test('when bundled from a file', async () => {
+    const entrypoint = resolve(__dirname, './fixtures/importFromCDN.mjs');
     const bundle = await bundleFile(entrypoint);
 
-    const evaluator = worker.initialize();
     const result = await evaluator.evaluate(bundle);
     expect(result.volume()).toBeGreaterThan(0);
-  })
+  });
 
-    test('...from a string', async () => {
-    const filepath = resolve(__dirname, "./fixtures/importFromCDN.mjs");
-      let code = await readFile(filepath, 'utf-8');
-        code = await bundleCode(code);
-  
+  test('when bundled from a string', async () => {
+    const filepath = resolve(__dirname, './fixtures/importFromCDN.mjs');
+    const code = await readFile(filepath, 'utf-8');
 
-    const evaluator = worker.initialize();
-    const result = await evaluator.evaluate(code);
+    const bundle = await bundleCode(code);
+    const result = await evaluator.evaluate(bundle);
     expect(result.volume()).toBeGreaterThan(0);
-  })
+  });
 });

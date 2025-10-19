@@ -8,6 +8,7 @@
     "lib/scene-builder.ts",
     "lib/worker.ts",
     "lib/manifold-gltf.ts",
+    "lib/bundle.ts",
     "lib/util.ts"
   ],
   "sortEntryPoints": false,

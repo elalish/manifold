@@ -13,11 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {readFile, writeFile} from 'node:fs/promises';
-import {resolve, extname} from 'node:path';
+import {writeFile} from 'node:fs/promises';
+import {extname} from 'node:path';
 
 import {Command} from 'commander';
 
+import {bundleFile} from '../lib/bundle.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
 import * as worker from '../lib/worker.js';
@@ -32,13 +33,9 @@ program.name('manifold-cad')
     .description('Compile a ManifoldCAD program into a mesh.')
     .argument('<infile.[js|ts]>', 'Input file')
     .argument('<outfile>', 'Output file')
-
-    .action(async(infile, outfile, options) => {
-      const inPath = resolve(infile);
-      const outPath = resolve(outfile);
-
+    .action(async(infile, outfile) => {
       // Choose an exporter.
-      const exporter = exporters.find(ex => ex.extensions.map(ext => `.${ext}`).includes(extname(outPath)));
+      const exporter = exporters.find(ex => ex.extensions.map(ext => `.${ext}`).includes(extname(outfile)));
       if (!exporter) {
         const extensions = exporters
             .reduce((acc, cur) => ([... acc.extensions, ... cur.extensions ]))
@@ -49,8 +46,8 @@ program.name('manifold-cad')
       }
 
       // Build the model.
-      let code = await readFile(inPath, 'utf-8');
-      const doc = await worker.evaluateFile(infile);
+      const bundle = await bundleFile(infile);
+      const doc = await worker.evaluate(bundle, {bundle:false});
 
       // Convert it and write it to disk.
       const binary = await exporter.asBlob(doc);

@@ -28,7 +28,7 @@
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
-import {bundleCode, bundleFile} from './bundle.ts';
+import {bundleCode} from './bundle.ts';
 import {Evaluator} from './evaluate.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
@@ -59,6 +59,7 @@ export namespace MessageToWorker {
   export interface Initialize extends Message {
     type: 'initialize';
     manifoldWasmUrl?: string;
+    esBuildWasmUrl?: string;
     jsCDN?: string;
   }
 
@@ -67,10 +68,15 @@ export namespace MessageToWorker {
    *
    * The worker will respond with `MessageFromWorker.Done`
    * or `MessageFromWorker.Error`.
+   *
+   * If `bundle` is set to false, the worker will not bundle code,
+   * and assume that it has already been bundled.  An undefined
+   * value will be treated by default as true.
    */
   export interface Evaluate extends Message {
     type: 'evaluate';
     code: string;
+    bundle?: boolean;
   }
 
   /**
@@ -179,6 +185,10 @@ export function initialize(): Evaluator {
   return evaluator;
 }
 
+export function getEvaluator(): Evaluator|null {
+  return evaluator;
+}
+
 /**
  * Clean up any state stored in the evaluator or scene builder.
  *
@@ -189,6 +199,15 @@ export function cleanup(): void {
   evaluator?.cleanup();
   scenebuilder?.cleanup();
 }
+/**
+ * If `bundle` is set to false, the worker will not bundle code,
+ * and assume that it has already been bundled.  An undefined
+ * value will be treated by default as true.
+ */
+interface evaluateOptions {
+  bundle?: boolean
+}
+;
 
 /**
  * Transform a model from code to a GLTF document.
@@ -196,7 +215,8 @@ export function cleanup(): void {
  * @param code A string containing the code to evaluate.
  * @returns A gltf-transform Document.
  */
-export async function evaluate(code: string): Promise<Document> {
+export async function evaluate(
+    code: string, options: evaluateOptions = {}): Promise<Document> {
   if (!evaluator) initialize();
 
   // Global defaults can be populated by the script.  It's set per
@@ -209,12 +229,16 @@ export async function evaluate(code: string): Promise<Document> {
   evaluator!.context.globalDefaults = globalDefaults;
 
   const t0 = performance.now();
-  const bundle = await bundleCode(code);
-  const manifold = await evaluator!.evaluate(bundle);
 
+  const bundle = options.bundle === false ? code : await bundleCode(code);
   const t1 = performance.now();
-  log(`Manifold took ${
-      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+  if (options.bundle !== false) {
+    log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+  }
+
+  const manifold = await evaluator!.evaluate(bundle);
+  const t2 = performance.now();
+  log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
   // If we don't actually have a model, complain.
   if (!manifold && !scenebuilder.hasGLTFNodes()) {
@@ -228,41 +252,8 @@ export async function evaluate(code: string): Promise<Document> {
           scenebuilder.getGLTFNodes(), globalDefaults) :
       scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
 
-  const t2 = performance.now();
-  log(`Creating GLTF Document took ${
-      (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
-
-  return doc;
-}
-
-
-export async function evaluateFile(entrypoint: string): Promise<Document> {
-  if (!evaluator) initialize();
-  const globalDefaults = {} as GlobalDefaults;
-  evaluator!.context.globalDefaults = globalDefaults;
-
-  const t0 = performance.now();
-  const bundle = await bundleFile(entrypoint);
-  const manifold = await evaluator!.evaluate(bundle);
-
-  const t1 = performance.now();
-  log(`Manifold took ${
-      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
-
-  if (!manifold && !scenebuilder.hasGLTFNodes()) {
-    throw new Error(
-        'No output because "result" is undefined and no GLTF nodes were created.');
-  }
-
-  // Create a gltf-transform document.
-  const doc = scenebuilder.hasGLTFNodes() ?
-      scenebuilder.GLTFNodesToGLTFDoc(
-          scenebuilder.getGLTFNodes(), globalDefaults) :
-      scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
-
-  const t2 = performance.now();
-  log(`Creating GLTF Document took ${
-      (Math.round((t2 - t1) / 10) / 100).toLocaleString()} seconds`);
+  const t3 = performance.now();
+  log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);
 
   return doc;
 }
@@ -288,6 +279,8 @@ export const exportBlobURL = async(doc: Document, extension: string):
       return blobURL;
     }
 
+
+/* v8 ignore start -- @preserve */
 /**
  * Set up message handlers and logging when run as a web worker.
  */
@@ -313,7 +306,7 @@ const initializeWebWorker = (): void => {
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
       if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
-      
+
       initialize();
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
@@ -332,7 +325,7 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      gltfdoc = await evaluate(message.code);
+      gltfdoc = await evaluate(message.code, {bundle: message.bundle});
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error: any) {
       console.error('Worker caught error', error);
@@ -364,3 +357,5 @@ const initializeWebWorker = (): void => {
   }
 };
 if (isWebWorker()) initializeWebWorker();
+
+/* v8 ignore end -- @preserve */

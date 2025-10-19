@@ -19,3 +19,11 @@
  */
 export const isWebWorker = (): boolean =>
     typeof self !== 'undefined' && typeof self.document == 'undefined';
+
+/**
+ * Are we in Node?
+ *
+ * @returns A boolean.
+ */
+export const isNode = (): boolean =>
+    typeof process !== 'undefined' && !!process?.versions?.node;
