@@ -28,14 +28,14 @@
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
-import {bundleCode} from './bundle.ts';
+import {bundleCode, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
 import {Evaluator} from './evaluate.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {GlobalDefaults} from './scene-builder.ts';
 import {isWebWorker} from './util.ts';
-import {getManifoldModule, setWasmUrl} from './wasm.ts';
+import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
 
 let evaluator: Evaluator|null = null;
 let exporters: Array<any>;
@@ -59,7 +59,7 @@ export namespace MessageToWorker {
   export interface Initialize extends Message {
     type: 'initialize';
     manifoldWasmUrl?: string;
-    esBuildWasmUrl?: string;
+    esbuildWasmUrl?: string;
     jsCDN?: string;
   }
 
@@ -209,15 +209,15 @@ export function cleanup(): void {
   evaluator?.cleanup();
   scenebuilder?.cleanup();
 }
+
 /**
  * If `bundle` is set to false, the worker will not bundle code,
  * and assume that it has already been bundled.  An undefined
  * value will be treated by default as true.
  */
 interface evaluateOptions {
-  filename?: string, bundle?: boolean
+  filename?: string, bundle?: boolean,
 }
-;
 
 /**
  * Transform a model from code to a GLTF document.
@@ -277,20 +277,19 @@ export async function evaluate(
  * @param extension The target file extension.
  * @returns A URL encoded blob.
  */
-export const exportBlobURL = async(doc: Document, extension: string):
-    Promise<string> => {
-      const t0 = performance.now();
+export const exportBlobURL =
+    async(doc: Document, extension: string): Promise<string> => {
+  const t0 = performance.now();
 
-      const blob = await exporters.find(ex => ex.extensions.includes(extension))
-                       .asBlob(doc)
-      const blobURL = URL.createObjectURL(blob);
+  const blob =
+      await exporters.find(ex => ex.extensions.includes(extension)).asBlob(doc)
+  const blobURL = URL.createObjectURL(blob);
 
-      const t1 = performance.now();
-      log(`Exporting ${extension.toUpperCase()} took ${
-          (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
-      return blobURL;
-    }
-
+  const t1 = performance.now();
+  log(`Exporting ${extension.toUpperCase()} took ${
+      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+  return blobURL;
+};
 
 /* v8 ignore start -- @preserve */
 /**
@@ -317,7 +316,8 @@ const initializeWebWorker = (): void => {
 
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
-      if (message.manifoldWasmUrl) setWasmUrl(message.manifoldWasmUrl);
+      if (message.manifoldWasmUrl) setManifoldWasmUrl(message.manifoldWasmUrl);
+      if (message.esbuildWasmUrl) setEsbuildWasmUrl(message.esbuildWasmUrl);
 
       initialize();
       await getManifoldModule();
@@ -325,11 +325,13 @@ const initializeWebWorker = (): void => {
 
     } catch (error: any) {
       console.error('Error initializing web worker', error);
-      console.log(error.toString());
 
-      self.postMessage(
-          {type: 'error', message: error.toString()} as
-          MessageFromWorker.Error);
+      self.postMessage({
+        type: 'error',
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } as MessageFromWorker.Error);
     }
   };
 

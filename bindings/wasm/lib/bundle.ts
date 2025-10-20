@@ -5,6 +5,13 @@ import * as esbuild from 'esbuild-wasm';
 
 import {isNode} from './util.ts';
 
+let esbuildWasmUrl: string|null = null;
+
+export const setWasmUrl =
+    (url: string) => {
+      esbuildWasmUrl = url;
+    }
+
 export class BundlerError extends Error {
   location?: esbuild.Location;
   error: esbuild.Message;
@@ -167,14 +174,11 @@ export const esbuildManifoldPlugin = (jsCDN: string =
 let esbuild_initialized: boolean = false;
 const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
   if (!esbuild_initialized) {
-    try {
-      // FIXME package this better.
-      await esbuild.initialize(
-          {wasmURL: 'https://unpkg.com/esbuild-wasm/esbuild.wasm'});
-    } catch (e) {
-      // FIXME catch specific error.
-      await esbuild.initialize({});
+    const options: esbuild.InitializeOptions = {worker: false};
+    if (!isNode() && esbuildWasmUrl) {
+      options.wasmURL = esbuildWasmUrl;
     }
+    await esbuild.initialize(options);
     esbuild_initialized = true;
   }
 

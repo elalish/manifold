@@ -133,7 +133,7 @@ export class EvaluatorError extends Error {
  */
 export class Evaluator {
   context: any = {};
-  beforeScript: string = 'resetToCircularDefaults()';
+  beforeScript: string = 'resetToCircularDefaults();';
   afterScript: string =
       'return typeof result === "undefined" ? undefined : result;';
 

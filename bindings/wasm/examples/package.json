@@ -17,6 +17,7 @@
     "@gltf-transform/functions": "^4.2.0",
     "@jscadui/3mf-export": "^0.5.0",
     "@types/three": "^0.179.0",
+    "esbuild-wasm": "^0.25.11",
     "gl-matrix": "^3.4.4",
     "simple-dropzone": "0.8.3",
     "three": "0.179.1"

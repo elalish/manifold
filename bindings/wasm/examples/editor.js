@@ -13,7 +13,12 @@
 // limitations under the License.
 
 // '?worker' is vite convention to load a module as a web worker.
+// '?url' is vite convention to reference a static asset.
+// vite will package the asset and provide a proper URL.
+import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+
 import ManifoldWorker from '../lib/worker?worker';
+import manifoldWasmUrl from '../manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -521,7 +526,8 @@ function createWorker() {
     }
   };
 
-  manifoldWorker.postMessage({type: 'initialize'});
+  manifoldWorker.postMessage(
+      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
 }
 
 createWorker();
@@ -532,8 +538,7 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
-  // const output = await
-  // tsWorker.getEmitOutput(editor.getModel().uri.toString());
+  // FIXME pass other files in for import?
   const filename = currentFileElement.textContent
   const code = editor.getValue();
   manifoldWorker.postMessage({type: 'evaluate', code, filename});
