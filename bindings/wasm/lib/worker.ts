@@ -69,6 +69,9 @@ export namespace MessageToWorker {
    * The worker will respond with `MessageFromWorker.Done`
    * or `MessageFromWorker.Error`.
    *
+   * `filename` doesn't have much meaning at the moment, but it
+   * is useful for ensuring effective error messages later.
+   *
    * If `bundle` is set to false, the worker will not bundle code,
    * and assume that it has already been bundled.  An undefined
    * value will be treated by default as true.
@@ -76,6 +79,7 @@ export namespace MessageToWorker {
   export interface Evaluate extends Message {
     type: 'evaluate';
     code: string;
+    filename?: string;
     bundle?: boolean;
   }
 
@@ -111,10 +115,16 @@ export namespace MessageFromWorker {
    *
    * After an error, the state of the worker is undefined.
    * Discard it and re-instantiate.
+   *
+   * The stack trace format is platform dependant.  Errors
+   * caught by the evaluator should be formatted into something
+   * vaguely node-ish.
    */
   export interface Error extends Message {
     type: 'error';
     message: string;
+    name?: string;
+    stack?: string;
   }
 
   /**
@@ -205,7 +215,7 @@ export function cleanup(): void {
  * value will be treated by default as true.
  */
 interface evaluateOptions {
-  bundle?: boolean
+  filename?: string, bundle?: boolean
 }
 ;
 
@@ -230,7 +240,9 @@ export async function evaluate(
 
   const t0 = performance.now();
 
-  const bundle = options.bundle === false ? code : await bundleCode(code);
+  const bundle = options.bundle === false ?
+      code :
+      await bundleCode(code, options.filename);
   const t1 = performance.now();
   if (options.bundle !== false) {
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
@@ -325,13 +337,21 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      gltfdoc = await evaluate(message.code, {bundle: message.bundle});
+      const {bundle, filename} = message;
+      gltfdoc = await evaluate(message.code, {bundle, filename});
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error: any) {
-      console.error('Worker caught error', error);
-      self.postMessage(
-          {type: 'error', message: error.toString()} as
-          MessageFromWorker.Error);
+      // Log the error / stack trace to the console.
+      console.error(
+          error.stack.startsWith(error.toString()) ? error.stack :
+                                                     error.toString());
+
+      self.postMessage({
+        type: 'error',
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } as MessageFromWorker.Error);
     } finally {
       cleanup();
     }

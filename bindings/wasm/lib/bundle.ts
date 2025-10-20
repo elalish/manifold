@@ -1,8 +1,33 @@
 import {Plugin} from 'esbuild';
+import type {BuildFailure} from 'esbuild';
 import textReplace from 'esbuild-plugin-text-replace';
 import * as esbuild from 'esbuild-wasm';
 
 import {isNode} from './util.ts';
+
+export class BundlerError extends Error {
+  location?: esbuild.Location;
+  error: esbuild.Message;
+
+  constructor(failure: BuildFailure, options?: ErrorOptions) {
+    super(undefined, options);
+    this.cause = failure;
+    this.error = failure.errors[0];
+  }
+
+  get name(): string {
+    return 'BundlerError';
+  }
+
+  get message(): string {
+    return this.error.text;
+  }
+
+  get stack(): string|undefined {
+    const {file, line, column} = this.error.location!;
+    return `${this.toString()}\n    at ${file}:${line}:${column}`;
+  }
+};
 
 /**
  * These content delivery networks provide NPM modules as ES modules,
@@ -47,8 +72,8 @@ export const esbuildManifoldPlugin = (jsCDN: string =
       // We only need to check against the local manifoldCAD context on disk if
       // we happen to be running in node.
       (async () => {
-        const {dirname, resolve} = await import('path');
-        const {fileURLToPath} = await import('url');
+        const {dirname, resolve} = await import('node:path');
+        const {fileURLToPath} = await import('node:url');
         const __dirname = dirname(fileURLToPath(import.meta.url));
         manifoldCADExportPath = resolve(__dirname, './manifoldCAD.ts');
       })();
@@ -90,6 +115,7 @@ export const esbuildManifoldPlugin = (jsCDN: string =
 
       // Built in resolver failed.  Let's try to get it from a CDN.
       return {
+        // Fixme.  Cases for no CDN, or unknown CDN (i.e. prefix).
         path: cdnUrlHelpers[jsCDN](args.path),
         namespace: 'http-url',
       };
@@ -123,14 +149,17 @@ export const esbuildManifoldPlugin = (jsCDN: string =
         }));
 
     // Fetch urls.
+    // Fixme.  Should be possible to disable this.
     build.onLoad(
         {filter: /.*/, namespace: 'http-url'},
         async(args): Promise<esbuild.OnLoadResult> => {
-          console.log(`Fetching ${args.path}.`)
           const response = await fetch(args.path);
-          // Fixme handle missing files.
-          // Fixme better logging.
-          return {contents: await response.text()};
+          if (response.ok) {
+            console.log(`Fetching ${args.path}.`);
+            return {contents: await response.text()};
+          } else {
+            return {errors: [{text: await response.text()}]};
+          }
         });
   },
 });
@@ -153,13 +182,17 @@ const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
     // Create a bundle in memory.
     bundle: true,
     write: false,
-    treeShaking: false,
+    treeShaking: false,  // FIXME ensure that 'result' and dependencies are not
+                         // shaken out.
     platform: 'node',
+    sourcemap: 'inline',
+    sourcesContent: false,  // We have the source handy already.
     format: 'cjs',
 
     plugins: [
       esbuildManifoldPlugin(),
       textReplace({
+        // FIXME how necessary is this?
         include: /./,
         pattern: [
           [/^const\s+result\s/g, 'export const result '],
@@ -176,21 +209,34 @@ const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
 };
 
 export const bundleFile = async(entrypoint: string): Promise<string> => {
-  let transpiled: string|null = null;
-  const built = await esbuild.build({
-    ...(await getEsbuildConfig()),
-    entryPoints: [entrypoint],
-  });
-  transpiled = built.outputFiles![0].text;
-  // FIXME throw errror.s
-
-  return transpiled;
+  try {
+    const built = await esbuild.build({
+      ...(await getEsbuildConfig()),
+      entryPoints: [entrypoint],
+    });
+    return built.outputFiles![0].text;
+  } catch (error) {
+    if ((error as any).errors?.length) {
+      throw new BundlerError(error as BuildFailure);
+    } else {
+      throw error;
+    }
+  }
 };
 
-export const bundleCode = async(code: string): Promise<string> => {
-  let transpiled: string|null = null;
-  const built = await esbuild.build(
-      {...(await getEsbuildConfig()), stdin: {contents: code}});
-  transpiled = built.outputFiles![0].text;
-  return transpiled;
+export const bundleCode =
+    async(code: string, filename?: string): Promise<string> => {
+  try {
+    const built = await esbuild.build({
+      ...(await getEsbuildConfig()),
+      stdin: {contents: code, sourcefile: filename}
+    });
+    return built.outputFiles![0].text;
+  } catch (error) {
+    if ((error as any).errors?.length) {
+      throw new BundlerError(error as BuildFailure);
+    } else {
+      throw error;
+    }
+  }
 };

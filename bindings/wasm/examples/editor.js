@@ -470,19 +470,29 @@ function createWorker() {
       manifoldInitialized = true;
 
     } else if (message?.type === 'error') {
+      // Clean up.
       setScript('safe', 'false');
       finishRun();
 
-      consoleElement.textContent += message.message + '\r\n';
+      // Show errors.  If the stack trace makes more sense, show that.
+      const errorText = `${message.name}: ${message.message}`;
+      if (message.stack && message.stack.startsWith(errorText)) {
+        consoleElement.textContent += message.stack + '\r\n';
+      } else {
+        consoleElement.textContent += errorText + '\r\n';
+      }
       consoleElement.scrollTop = consoleElement.scrollHeight;
+      mv.showPoster();
+      poster.textContent = 'Error';
+
+      // Clear models.
       if (output.glbURL) URL.revokeObjectURL(output.glbURL);
       if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
       output.glbURL = null;
       output.threeMFURL = null;
       threemfButton.disabled = true;
-      mv.showPoster();
-      poster.textContent = 'Error';
 
+      // Start all over again.
       createWorker();
 
     } else if (message?.type === 'log') {
@@ -522,9 +532,11 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
-  const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
-  manifoldWorker.postMessage(
-      {type: 'evaluate', code: output.outputFiles[0].text});
+  // const output = await
+  // tsWorker.getEmitOutput(editor.getModel().uri.toString());
+  const filename = currentFileElement.textContent
+  const code = editor.getValue();
+  manifoldWorker.postMessage({type: 'evaluate', code, filename});
 }
 
 function cancel() {

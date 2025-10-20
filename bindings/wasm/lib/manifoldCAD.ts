@@ -4,6 +4,7 @@ const evaluator = initialize();
 const context = await evaluator.getFullContext();
 
 // FIXME set types.
+// Fixme add manifoldMain() and manifoldEvaluator() functions?
 export const {
   Manifold,
   CrossSection,

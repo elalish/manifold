@@ -26,6 +26,7 @@
 import {CrossSection, Manifold} from '../manifold-encapsulated-types';
 import type {ManifoldToplevel} from '../manifold.d.ts';
 
+import {getSourceMappedStackTrace} from './util.ts';
 import {getManifoldModule} from './wasm.ts';
 
 // manifold static methods (that return a new manifold)
@@ -82,6 +83,32 @@ const toplevel = [
   'CrossSection', 'triangulate'
 ];
 
+export class EvaluatorError extends Error {
+  manifoldStack?: string;
+  cause: Error;
+
+  constructor(cause: Error, options?: ErrorOptions) {
+    super(cause.message, options);
+    this.cause = cause;
+  }
+
+  get name(): string {
+    return this.cause.name;
+  }
+
+  get message(): string {
+    return this.cause.message;
+  }
+
+  get stack(): string|undefined {
+    return this.manifoldStack;
+  }
+
+  toString() {
+    return this.cause.toString();
+  }
+}
+
 /**
  * An object that will evaluate ManifoldCAD scripts on demand.
  *
@@ -106,7 +133,7 @@ const toplevel = [
  */
 export class Evaluator {
   context: any = {};
-  beforeScript: string = 'resetToCircularDefaults();';
+  beforeScript: string = 'resetToCircularDefaults()';
   afterScript: string =
       'return typeof result === "undefined" ? undefined : result;';
 
@@ -259,13 +286,27 @@ export class Evaluator {
    */
   async evaluate(code: string): Promise<any> {
     const context = await this.getFullContext()
-
     const AsyncFunction =
         Object.getPrototypeOf(async function() {}).constructor;
-    const evalFn = new AsyncFunction(
-        ...Object.keys(context), '_manifold_context',
-        this.beforeScript + '\n' + code + '\n' + this.afterScript + '\n');
-    return await evalFn(...Object.values(context), context);
+
+    try {
+      const evalFn = new AsyncFunction(
+          ...Object.keys(context), '_manifold_context',
+          [this.beforeScript, code, this.afterScript].join('\n'));
+      return await evalFn(...Object.values(context), context);
+
+    } catch (error: any) {
+      // "According to step 12 of
+      // https://tc39.es/ecma262/#sec-createdynamicfunction, the Function
+      // constructor always prefixes the source with additional 2 lines."
+      // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
+      const lineOffset = -2 - (this.beforeScript.split('\n').length);
+
+      const newError = new EvaluatorError(error);
+      newError.manifoldStack =
+          getSourceMappedStackTrace(code, error, lineOffset);
+      throw (newError);
+    }
   }
 
   /**
