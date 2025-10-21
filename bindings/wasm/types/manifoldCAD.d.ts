@@ -100,3 +100,10 @@ declare function show(shape: CrossSection|Manifold): Manifold;
  * @param shape The object to show - returned for chaining.
  */
 declare function only(shape: CrossSection|Manifold): Manifold;
+
+/**
+ * Is this module running in manifoldCAD evaluator?
+ *
+ * @returns boolean
+ */
+declare function isManifoldCAD(): boolean

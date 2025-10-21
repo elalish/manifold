@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
+import {resolve} from 'node:path';
 import {beforeEach, expect, suite, test} from 'vitest';
-import * as worker from '../lib/worker.ts';
+
 import {bundleFile} from '../lib/bundle.ts';
+import * as worker from '../lib/worker.ts';
 
 let evaluator = worker.getEvaluator() || worker.initialize();
 beforeEach(() => worker.cleanup());
@@ -26,7 +24,7 @@ beforeEach(() => worker.cleanup());
 suite('Build model with the evaluator', () => {
   test('Import a model that generates an error', async () => {
     const filepath =
-        resolve(__dirname, './fixtures/generateReferenceError.mjs');
+        resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
     let code = await bundleFile(filepath);
 
     const ev = async () => await evaluator.evaluate(code);

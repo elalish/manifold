@@ -12,32 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {readFile} from 'node:fs/promises';
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
+import {resolve} from 'node:path';
 import {beforeEach, expect, suite, test} from 'vitest';
+
+import {bundleFile} from '../lib/bundle.ts';
 import * as worker from '../lib/worker.ts';
-import {bundleFile, bundleCode} from '../lib/bundle.ts';
 
 let evaluator = worker.getEvaluator() || worker.initialize();
 beforeEach(() => worker.cleanup());
 
-suite('Import modules', () => {
-  test('when bundled from a file', async () => {
-    const entrypoint = resolve(__dirname, './fixtures/importFromCDN.mjs');
-    const bundle = await bundleFile(entrypoint);
-
+suite('Import remote modules from', () => {
+  test('esm.sh', async () => {
+    const entrypoint =
+        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+    const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
     const result = await evaluator.evaluate(bundle);
     expect(result.volume()).toBeGreaterThan(0);
   });
 
-  test('when bundled from a string', async () => {
-    const filepath = resolve(__dirname, './fixtures/importFromCDN.mjs');
-    const code = await readFile(filepath, 'utf-8');
+  test('jsDelivr', async () => {
+    const entrypoint =
+        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+    const bundle = await bundleFile(entrypoint, {jsCDN: 'jsDelivr'});
+    const result = await evaluator.evaluate(bundle);
+    expect(result.volume()).toBeGreaterThan(0);
+  });
 
-    const bundle = await bundleCode(code);
+  test('skypack', async () => {
+    const entrypoint =
+        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+    const bundle = await bundleFile(entrypoint, {jsCDN: 'skypack'});
     const result = await evaluator.evaluate(bundle);
     expect(result.volume()).toBeGreaterThan(0);
   });

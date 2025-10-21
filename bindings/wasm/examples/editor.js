@@ -541,7 +541,8 @@ async function run() {
   // FIXME pass other files in for import?
   const filename = currentFileElement.textContent
   const code = editor.getValue();
-  manifoldWorker.postMessage({type: 'evaluate', code, filename});
+  manifoldWorker.postMessage(
+      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr'});
 }
 
 function cancel() {

@@ -7,10 +7,9 @@ import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
 
-export const setWasmUrl =
-    (url: string) => {
-      esbuildWasmUrl = url;
-    }
+export const setWasmUrl = (url: string) => {
+  esbuildWasmUrl = url;
+};
 
 export class BundlerError extends Error {
   location?: esbuild.Location;
@@ -31,6 +30,7 @@ export class BundlerError extends Error {
   }
 
   get stack(): string|undefined {
+    if (!this.error.location) return undefined;
     const {file, line, column} = this.error.location!;
     return `${this.toString()}\n    at ${file}:${line}:${column}`;
   }
@@ -45,6 +45,18 @@ export const cdnUrlHelpers: {[key: string]: (specifier: string) => string} = {
   'jsDelivr': (specifier) => `https://cdn.jsdelivr.net/npm/${specifier}/+esm`,
   'skypack': (specifier) => `https://cdn.skypack.dev/${specifier}`
 };
+
+const cdnUrl = (specifier: string, jsCDN?: string) => {
+  if (!jsCDN) return specifier;
+  const helper = cdnUrlHelpers[jsCDN];
+  return helper ? helper(specifier) : `${jsCDN}${specifier}`;
+};
+
+export interface BundlerOptions {
+  jsCDN?: string;
+  fetchRemotePackages?: boolean;
+  filename?: string;
+}
 
 /**
  * This is a plugin for esbuild that has three functions:
@@ -61,8 +73,8 @@ export const cdnUrlHelpers: {[key: string]: (specifier: string) => string} = {
  *
  * @returns
  */
-export const esbuildManifoldPlugin = (jsCDN: string =
-                                          'jsDelivr'): esbuild.Plugin => ({
+export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
+                                         esbuild.Plugin => ({
   name: 'esbuild-manifold-plugin',
   async setup(build) {
     let manifoldCADExportPath: string|null = null;
@@ -79,10 +91,9 @@ export const esbuildManifoldPlugin = (jsCDN: string =
       // We only need to check against the local manifoldCAD context on disk if
       // we happen to be running in node.
       (async () => {
-        const {dirname, resolve} = await import('node:path');
-        const {fileURLToPath} = await import('node:url');
-        const __dirname = dirname(fileURLToPath(import.meta.url));
-        manifoldCADExportPath = resolve(__dirname, './manifoldCAD.ts');
+        const {resolve} = await import('node:path');
+        manifoldCADExportPath =
+            resolve(import.meta.dirname, './manifoldCAD.ts');
       })();
     }
 
@@ -100,7 +111,7 @@ export const esbuildManifoldPlugin = (jsCDN: string =
 
       // Is this a manifoldCAD context import?
       if (args.path.match(ManifoldCADExportMatch)) {
-        return {namespace: 'manifold-replace', path: args.path};
+        return {namespace: 'manifold-evaluator-context', path: args.path};
       }
 
       // Try esbuilds' resolver first.
@@ -114,71 +125,82 @@ export const esbuildManifoldPlugin = (jsCDN: string =
       if (result.errors.length === 0) {
         if (manifoldCADExportPath && manifoldCADExportPath === result.path) {
           // It resolved to our local manifoldCAD context.
-          return {namespace: 'manifold-replace', path: args.path};
+          return {namespace: 'manifold-evaluator-context', path: args.path};
         } else {
           return result;
         }
       }
 
-      // Built in resolver failed.  Let's try to get it from a CDN.
-      return {
-        // Fixme.  Cases for no CDN, or unknown CDN (i.e. prefix).
-        path: cdnUrlHelpers[jsCDN](args.path),
-        namespace: 'http-url',
-      };
-    });
-
-    // Resolve absolute urls.
-    build.onResolve({filter: /^https?:\/\//}, args => {
-      return {path: args.path, namespace: 'http-url'};
-    });
-
-    // Resolve relative http urls into absolute urls.
-    build.onResolve({filter: /.*/, namespace: 'http-url'}, args => {
-      const path = new URL(args.path, args.importer).toString();
-
-      // Is this a manifoldCAD context import from a remote package?
-      // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
-      if (path === cdnUrlHelpers[jsCDN](manifoldCADExportSpecifier)) {
-        const response = {path, namespace: 'manifold-replace'};
-        return response;
+      // Built in resolver failed.  Are we fetching remote packages?
+      if (options.fetchRemotePackages !== false && options.jsCDN) {
+        return {
+          path: cdnUrl(args.path, options.jsCDN),
+          namespace: 'http-url',
+        };
       }
 
-      return {path, namespace: 'http-url'};
+      // Okay fine.  I give up.
+      return null;
     });
 
     // Inject context.
     build.onLoad(
-        {filter: /.*/, namespace: 'manifold-replace'},
-        (): esbuild.OnLoadResult => ({
-          contents:
-              `export const {${manifoldCADExportNames}} = _manifold_context`,
-        }));
-
-    // Fetch urls.
-    // Fixme.  Should be possible to disable this.
-    build.onLoad(
-        {filter: /.*/, namespace: 'http-url'},
-        async(args): Promise<esbuild.OnLoadResult> => {
-          const response = await fetch(args.path);
-          if (response.ok) {
-            console.log(`Fetching ${args.path}.`);
-            return {contents: await response.text()};
-          } else {
-            return {errors: [{text: await response.text()}]};
-          }
+        {filter: /.*/, namespace: 'manifold-evaluator-context'},
+        (): esbuild.OnLoadResult => {
+          // This is a string replace.
+          const context = `{..._manifold_context, isManifoldCAD: () => true}`
+          return {
+            // Type hinting isn't necessary.  Only esbuild will see the swap,
+            // and it
+            // doesn't do type validation.
+            contents: `export const {${manifoldCADExportNames}} = ${context};`,
+          };
         });
+
+    // Unless disabled, handle HTTP/HTTPs urls.
+    if (options.fetchRemotePackages !== false) {
+      // Resolve absolute urls.
+      build.onResolve({filter: /^https?:\/\//}, args => {
+        return {path: args.path, namespace: 'http-url'};
+      });
+
+      // Resolve relative http urls into absolute urls.
+      build.onResolve({filter: /.*/, namespace: 'http-url'}, args => {
+        const path = new URL(args.path, args.importer).toString();
+
+        // Is this a manifoldCAD context import from a remote package?
+        // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
+        if (path === cdnUrl(manifoldCADExportSpecifier, options.jsCDN)) {
+          const response = {path, namespace: 'manifold-evaluator-context'};
+          return response;
+        }
+
+        return {path, namespace: 'http-url'};
+      });
+
+      // Fetch urls.
+      build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
+        const response = await fetch(args.path);
+        if (response.ok) {
+          console.log(`Fetching ${args.path}.`);
+          return {contents: await response.text()};
+        } else {
+          return {errors: [{text: await response.text()}]};
+        }
+      });
+    }
   },
 });
 
 let esbuild_initialized: boolean = false;
-const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
+const getEsbuildConfig =
+    async(options: BundlerOptions = {}): Promise<esbuild.BuildOptions> => {
   if (!esbuild_initialized) {
-    const options: esbuild.InitializeOptions = {worker: false};
+    const esbuildOptions: esbuild.InitializeOptions = {};
     if (!isNode() && esbuildWasmUrl) {
-      options.wasmURL = esbuildWasmUrl;
+      esbuildOptions.wasmURL = esbuildWasmUrl;
     }
-    await esbuild.initialize(options);
+    await esbuild.initialize(esbuildOptions);
     esbuild_initialized = true;
   }
 
@@ -194,7 +216,7 @@ const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
     format: 'cjs',
 
     plugins: [
-      esbuildManifoldPlugin(),
+      esbuildManifoldPlugin(options),
       textReplace({
         // FIXME how necessary is this?
         include: /./,
@@ -212,10 +234,11 @@ const getEsbuildConfig = async(): Promise<esbuild.BuildOptions> => {
   };
 };
 
-export const bundleFile = async(entrypoint: string): Promise<string> => {
+export const bundleFile = async(
+    entrypoint: string, options: BundlerOptions = {}): Promise<string> => {
   try {
     const built = await esbuild.build({
-      ...(await getEsbuildConfig()),
+      ...(await getEsbuildConfig(options)),
       entryPoints: [entrypoint],
     });
     return built.outputFiles![0].text;
@@ -229,11 +252,11 @@ export const bundleFile = async(entrypoint: string): Promise<string> => {
 };
 
 export const bundleCode =
-    async(code: string, filename?: string): Promise<string> => {
+    async(code: string, options: BundlerOptions = {}): Promise<string> => {
   try {
     const built = await esbuild.build({
-      ...(await getEsbuildConfig()),
-      stdin: {contents: code, sourcefile: filename}
+      ...(await getEsbuildConfig(options)),
+      stdin: {contents: code, sourcefile: options.filename},
     });
     return built.outputFiles![0].text;
   } catch (error) {

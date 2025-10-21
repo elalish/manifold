@@ -28,8 +28,8 @@
 import {Document} from '@gltf-transform/core';
 import * as glMatrix from 'gl-matrix';
 
-import {bundleCode, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
-import {Evaluator} from './evaluate.ts';
+import {bundleCode, BundlerError, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
+import {Evaluator, EvaluatorError} from './evaluate.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as scenebuilder from './scene-builder.ts';
@@ -60,7 +60,6 @@ export namespace MessageToWorker {
     type: 'initialize';
     manifoldWasmUrl?: string;
     esbuildWasmUrl?: string;
-    jsCDN?: string;
   }
 
   /**
@@ -81,6 +80,8 @@ export namespace MessageToWorker {
     code: string;
     filename?: string;
     bundle?: boolean;
+    jsCDN?: string;
+    fetchRemotePackages?: boolean
   }
 
   /**
@@ -215,8 +216,11 @@ export function cleanup(): void {
  * and assume that it has already been bundled.  An undefined
  * value will be treated by default as true.
  */
-interface evaluateOptions {
-  filename?: string, bundle?: boolean,
+export interface evaluateOptions {
+  filename?: string;
+  bundle?: boolean;
+  jsCDN?: string;
+  fetchRemotePackages?: boolean;
 }
 
 /**
@@ -237,18 +241,16 @@ export async function evaluate(
   // framerate.
   const globalDefaults = {} as GlobalDefaults;
   evaluator!.context.globalDefaults = globalDefaults;
-
   const t0 = performance.now();
 
-  const bundle = options.bundle === false ?
-      code :
-      await bundleCode(code, options.filename);
+  const {bundle, ...bundleOpt} = options;
+  const bundled = bundle === false ? code : await bundleCode(code, bundleOpt);
   const t1 = performance.now();
-  if (options.bundle !== false) {
+  if (bundle !== false) {
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
   }
 
-  const manifold = await evaluator!.evaluate(bundle);
+  const manifold = await evaluator!.evaluate(bundled);
   const t2 = performance.now();
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
@@ -314,6 +316,23 @@ const initializeWebWorker = (): void => {
     };
   };
 
+  const sendError = async (error: Error) => {
+    // Log the error / stack trace to the console.
+    if (error.stack &&
+        (error instanceof BundlerError || error instanceof EvaluatorError)) {
+      console.error(error.stack);
+    } else {
+      console.error(error);
+    }
+
+    self.postMessage({
+      type: 'error',
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    } as MessageFromWorker.Error);
+  };
+
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
       if (message.manifoldWasmUrl) setManifoldWasmUrl(message.manifoldWasmUrl);
@@ -323,15 +342,8 @@ const initializeWebWorker = (): void => {
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
 
-    } catch (error: any) {
-      console.error('Error initializing web worker', error);
-
-      self.postMessage({
-        type: 'error',
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      } as MessageFromWorker.Error);
+    } catch (error) {
+      sendError(error as Error);
     }
   };
 
@@ -339,36 +351,26 @@ const initializeWebWorker = (): void => {
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      const {bundle, filename} = message;
-      gltfdoc = await evaluate(message.code, {bundle, filename});
+      const {code, ...options} = message;
+      gltfdoc = await evaluate(message.code, options as evaluateOptions);
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
-    } catch (error: any) {
-      // Log the error / stack trace to the console.
-      console.error(
-          error.stack.startsWith(error.toString()) ? error.stack :
-                                                     error.toString());
-
-      self.postMessage({
-        type: 'error',
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      } as MessageFromWorker.Error);
+    } catch (error) {
+      sendError(error as Error);
     } finally {
       cleanup();
     }
   };
 
   const handleExport = async (message: MessageToWorker.Export) => {
-    const blobURL = await exportBlobURL(gltfdoc!, message.extension);
-    self.postMessage(
-        {type: 'blob', extension: message.extension, blobURL} as
-        MessageFromWorker.Blob);
+    self.postMessage({
+      type: 'blob',
+      extension: message.extension,
+      blobURL: await exportBlobURL(gltfdoc!, message.extension)
+    } as MessageFromWorker.Blob);
   };
 
   self.onmessage = async (e) => {
     const message = e.data as Message;
-
     if (message.type === 'initialize') {
       handleInitialize(message as MessageToWorker.Initialize);
     } else if (message.type === 'evaluate') {
