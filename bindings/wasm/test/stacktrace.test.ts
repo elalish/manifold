@@ -30,9 +30,11 @@ suite('Build a model with the worker', () => {
     await expect(ev()).rejects.toThrowError()
   });
 
-  test.skip('Exceptions should be wrapped', async () => {
+  test.skip(
+      'Exceptions should be wrapped',
+      async () => {
 
-  })
+      })
 });
 
 suite('Build a model without the worker', () => {
@@ -42,7 +44,9 @@ suite('Build a model without the worker', () => {
     await expect(imp()).rejects.toThrowError()
   });
 
-  test.skip('Exceptions should be native', async () => {
+  test.skip(
+      'Exceptions should be native',
+      async () => {
 
-  })
+      })
 });

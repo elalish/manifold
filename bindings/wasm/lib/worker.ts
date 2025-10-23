@@ -245,7 +245,8 @@ export async function evaluate(
   if (defaultExport instanceof manifoldCAD.Manifold) {
     // If it's a manifold object, go with that.
     manifold = defaultExport;
-  } else if (typeof defaultExport === 'function') {
+  }
+  else if (typeof defaultExport === 'function') {
     // If it's a function, run it.
     manifold = defaultExport();
   }
@@ -298,7 +299,7 @@ export const exportBlobURL =
  */
 const initializeWebWorker = (): void => {
   const interceptConsole = () => {
-    console.log("Intercepting console.log() in manifoldCAD worker.");
+    console.log('Intercepting console.log() in manifoldCAD worker.');
     if (self.console) {
       const oldLog = self.console.log;
       self.console.log = function(...args) {

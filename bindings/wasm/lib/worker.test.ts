@@ -14,6 +14,8 @@
 
 import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
+import * as fs from 'node:fs/promises';
+import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
@@ -24,16 +26,12 @@ import {readMesh, setupIO} from './gltf-io.ts';
 import {getManifoldModule} from './wasm.js';
 import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 
-import {resolve} from 'path';
-import * as fs from 'node:fs/promises';
-
 const io = setupIO(new WebIO());
 
 async function runExample(name: string) {
   const filename = resolve(
-    import.meta.dirname,
-    '../test/examples/',
-    name.toLowerCase().replaceAll(' ', '-') + '.mjs');
+      import.meta.dirname, '../test/examples/',
+      name.toLowerCase().replaceAll(' ', '-') + '.mjs');
 
   const module: ManifoldToplevel = await getManifoldModule();
   const code = await fs.readFile(filename, 'utf-8');

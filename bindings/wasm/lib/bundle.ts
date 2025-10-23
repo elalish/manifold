@@ -2,7 +2,8 @@
 import type {BuildFailure} from 'esbuild';
 // import textReplace from 'esbuild-plugin-text-replace';
 import * as esbuild from 'esbuild-wasm';
-import { BundlerError } from './error.ts';
+
+import {BundlerError} from './error.ts';
 import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;

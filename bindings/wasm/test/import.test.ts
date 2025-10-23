@@ -22,8 +22,7 @@ beforeEach(() => worker.cleanup());
 
 suite('Build model with the worker', () => {
   test('Import a model', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
+    const filepath = resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     let code = await bundleFile(filepath);
 
     const result = await worker.evaluate(code);
@@ -42,12 +41,12 @@ suite('Build model with the worker', () => {
 
 suite('Build model without the worker', () => {
   test('Import a model', async () => {
-    const {default:result} = await import('./fixtures/unitSphere.mjs');
+    const {default: result} = await import('./fixtures/unitSphere.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 
   test('Import a model with imports', async () => {
-    const {default:result} = await import('./fixtures/importUnitSphere.mjs');
+    const {default: result} = await import('./fixtures/importUnitSphere.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 });
