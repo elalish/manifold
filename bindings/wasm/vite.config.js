@@ -10,7 +10,8 @@ export default defineConfig({
       include: ['lib/**', 'test/**'],
       exclude: [
         'lib/*.js', 'lib/*.test.js', 'lib/node-http-import-hook.mjs',
-        'test/fixtures/**', 'examples/**', ...coverageConfigDefaults.exclude
+        'test/fixtures/**', 'test/examples/**', 'examples/**',
+        ...coverageConfigDefaults.exclude
       ],
       reporters: ['text', 'html']
     }

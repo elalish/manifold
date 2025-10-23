@@ -18,34 +18,31 @@ import {beforeEach, expect, suite, test} from 'vitest';
 import {bundleFile} from '../lib/bundle.ts';
 import * as worker from '../lib/worker.ts';
 
-let evaluator = worker.getEvaluator() || worker.initialize();
 beforeEach(() => worker.cleanup());
 
-suite('Build model with the evaluator', () => {
-  test('Import a model that generates an error', async () => {
+suite('Build a model with the worker', () => {
+  test('Exceptions should throw', async () => {
     const filepath =
         resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
     let code = await bundleFile(filepath);
 
-    const ev = async () => await evaluator.evaluate(code);
+    const ev = async () => await worker.evaluate(code);
     await expect(ev()).rejects.toThrowError()
   });
+
+  test.skip('Exceptions should be wrapped', async () => {
+
+  })
 });
 
-suite('Build model without the evaluator', () => {
-  test('Import a model that generates an error', async () => {
+suite('Build a model without the worker', () => {
+  test('Exceptions should throw', async () => {
     const imp = async () =>
         await import('./fixtures/generateReferenceError.mjs');
     await expect(imp()).rejects.toThrowError()
   });
 
-  test('Import a model that generates an error', async () => {
-    const imp = async () =>
-        await import('./fixtures/generateReferenceError.mjs');
-    try {
-      await imp()
-    } catch (e: any) {
-      console.log(e.stack)
-    }
-  });
+  test.skip('Exceptions should be native', async () => {
+
+  })
 });

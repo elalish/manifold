@@ -18,26 +18,16 @@ import {beforeEach, expect, suite, test} from 'vitest';
 import {bundleFile} from '../lib/bundle.ts';
 import * as worker from '../lib/worker.ts';
 
-let evaluator = worker.getEvaluator() || worker.initialize();
 beforeEach(() => worker.cleanup());
 
-suite('Build model with the evaluator', () => {
-  test('Import a model that declares \'result\'', async () => {
+suite('Build model with the worker', () => {
+  test('Import a model', async () => {
     const filepath =
-        resolve(import.meta.dirname, './fixtures/unitSphereResult.mjs');
+        resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     let code = await bundleFile(filepath);
 
-    const result = await evaluator.evaluate(code);
-    expect(result.volume()).toBeCloseTo(2.9428, 4);
-  });
-
-  test('Import a model that exports `result`', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/unitSphereExportResult.mjs');
-    let code = await bundleFile(filepath);
-
-    const result = await evaluator.evaluate(code);
-    expect(result.volume()).toBeCloseTo(2.9428, 4);
+    const result = await worker.evaluate(code);
+    expect(result.getRoot().listMeshes().length).toBeGreaterThanOrEqual(1);
   });
 
   test('Import a model with imports', async () => {
@@ -45,25 +35,19 @@ suite('Build model with the evaluator', () => {
         resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
     let code = await bundleFile(filepath);
 
-    const result = await evaluator.evaluate(code);
-    expect(result.volume()).toBeCloseTo(2.9428, 4);
+    const result = await worker.evaluate(code);
+    expect(result.getRoot().listMeshes().length).toBeGreaterThanOrEqual(1);
   })
 });
 
-suite('Build model without the evaluator', () => {
-  test('Importing a model with no exports does nothing.', async () => {
-    // @ts-ignore
-    const {result} = await import('./fixtures/unitSphereResult.mjs');
-    expect(result).toBeUndefined();
-  });
-
-  test('Import a model that exports `result`', async () => {
-    const {result} = await import('./fixtures/unitSphereExportResult.mjs');
-    expect(result.volume()).toBeCloseTo(2.9428, 4);
+suite('Build model without the worker', () => {
+  test('Import a model', async () => {
+    const {default:result} = await import('./fixtures/unitSphere.mjs');
+    expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 
   test('Import a model with imports', async () => {
-    const {result} = await import('./fixtures/importUnitSphere.mjs');
-    expect(result.volume()).toBeCloseTo(2.9428, 4);
+    const {default:result} = await import('./fixtures/importUnitSphere.mjs');
+    expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 });

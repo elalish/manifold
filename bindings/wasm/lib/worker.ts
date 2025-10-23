@@ -18,7 +18,7 @@
  * exporting the final scene as a GLTF-Transform Document or URL encoded
  * Blob.
  *
- * This is a polymorphic module that can be used directly as a JavaScript or
+ * This is an isomorphic module that can be used directly as a JavaScript or
  * TypeScript module.  It can be imported as a web worker, and defines
  * a set of interfaces for communication in that case.
  *
@@ -26,19 +26,18 @@
  */
 
 import {Document} from '@gltf-transform/core';
-import * as glMatrix from 'gl-matrix';
 
-import {bundleCode, BundlerError, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
-import {Evaluator, EvaluatorError} from './evaluate.ts';
+import {bundleCode, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
+import {BundlerError, EvaluatorError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
+import * as garbageCollector from './garbage-collector.ts';
 import * as scenebuilder from './scene-builder.ts';
-import {GlobalDefaults} from './scene-builder.ts';
-import {isWebWorker} from './util.ts';
+import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
 
-let evaluator: Evaluator|null = null;
 let exporters: Array<any>;
+const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 type MessageType =
     'initialize'|'evaluate'|'export'|'ready'|'done'|'error'|'log'|'blob'
@@ -158,57 +157,14 @@ function log(...args: any[]) {
 }
 
 /**
- * Set up the evaluator, as well as any objects the worker may require.
- *
- * This is where the scene builder meets the evaluator.
- * @returns The evaluator.
- */
-export function initialize(): Evaluator {
-  if (evaluator)
-    return evaluator;
-  else
-    evaluator = new Evaluator();
-
-  // Exporters.
-  // The end user can download either.
-  // GLB (Binary GLTF) is used to send the model from this worker
-  // to the viewer.
-  exporters = [new Export3MF(), new ExportGLTF()]
-
-  // Faster on modern browsers than Float32Array
-  glMatrix.glMatrix.setMatrixArrayType(Array);
-  evaluator.addContext({glMatrix});
-
-  // These are methods that generate Manifold
-  // or CrossSection objects.  Tell the evaluator to intercept
-  // the calls, and add any created objects to the clean up list.
-  evaluator.addContextMethodWithCleanup('show', scenebuilder.show)
-  evaluator.addContextMethodWithCleanup('only', scenebuilder.only)
-  evaluator.addContextMethodWithCleanup('setMaterial', scenebuilder.setMaterial)
-
-  // Add additional context.  These need no garbage collection.
-  evaluator.addContext({
-    GLTFNode: scenebuilder.GLTFNode,
-    setMorphStart: scenebuilder.setMorphStart,
-    setMorphEnd: scenebuilder.setMorphEnd
-  });
-
-  return evaluator;
-}
-
-export function getEvaluator(): Evaluator|null {
-  return evaluator;
-}
-
-/**
  * Clean up any state stored in the evaluator or scene builder.
  *
  * This includes any outstanding Manifold, Mesh or CrossSection objects,
  * even if referenced elsewhere.
  */
 export function cleanup(): void {
-  evaluator?.cleanup();
-  scenebuilder?.cleanup();
+  garbageCollector.cleanup();
+  scenebuilder.cleanup();
 }
 
 /**
@@ -231,26 +187,69 @@ export interface evaluateOptions {
  */
 export async function evaluate(
     code: string, options: evaluateOptions = {}): Promise<Document> {
-  if (!evaluator) initialize();
-
   // Global defaults can be populated by the script.  It's set per
   // evaluation, while the rest of evaluator context doesn't change from
   // run to run.
   // This can be used to set parameters elsewhere in ManifoldCAD.  For
   // example, the GLTF exporter will look for animation type and
   // framerate.
-  const globalDefaults = {} as GlobalDefaults;
-  evaluator!.context.globalDefaults = globalDefaults;
+  const globalDefaults = {} as scenebuilder.GlobalDefaults;
   const t0 = performance.now();
 
   const {bundle, ...bundleOpt} = options;
-  const bundled = bundle === false ? code : await bundleCode(code, bundleOpt);
+  // const bundled = bundle === false ? code : await bundleCode(code,
+  // bundleOpt);
+  const bundled = await bundleCode(code, bundleOpt);
+
+  // console.log(bundled.split('\n').map((l,i)=>`${i+1}: ${l}`).join('\n'))
+
   const t1 = performance.now();
   if (bundle !== false) {
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
   }
 
-  const manifold = await evaluator!.evaluate(bundled);
+  const manifoldCAD = await import('./manifoldCAD.ts');
+  manifoldCAD.resetToCircularDefaults();
+
+  const globals = {
+    ...manifoldCAD,
+    globalDefaults,
+    isManifoldCAD: () => true,
+
+    // While this project is built using ES modules, and we assume models and
+    // libraries are ES modules, code executed via `new Function()` or `eval` is
+    // treated as commonJS.
+    // CommonJS expects 'exports' to exist:
+    exports: {},
+    // This is where we expect results after running the script.
+    module: {exports: {default: null}},
+  };
+
+  try {
+    const evalFn = new AsyncFunction(
+        ...Object.keys(globals), '_manifold_cad_globals', bundled);
+    await evalFn(...Object.values(globals), manifoldCAD);
+  } catch (error: any) {
+    // "According to step 12 of
+    // https://tc39.es/ecma262/#sec-createdynamicfunction, the Function
+    // constructor always prefixes the source with additional 2 lines."
+    // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
+    const lineOffset = -2;
+
+    const newError = new EvaluatorError(error);
+    newError.manifoldStack = getSourceMappedStackTrace(code, error, lineOffset);
+    throw (newError);
+  }
+  const defaultExport: any = (globals.module.exports as any)?.default;
+  let manifold = null
+  if (defaultExport instanceof manifoldCAD.Manifold) {
+    // If it's a manifold object, go with that.
+    manifold = defaultExport;
+  } else if (typeof defaultExport === 'function') {
+    // If it's a function, run it.
+    manifold = defaultExport();
+  }
+
   const t2 = performance.now();
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
@@ -264,7 +263,7 @@ export async function evaluate(
   const doc = scenebuilder.hasGLTFNodes() ?
       scenebuilder.GLTFNodesToGLTFDoc(
           scenebuilder.getGLTFNodes(), globalDefaults) :
-      scenebuilder.manifoldToGLTFDoc(manifold, globalDefaults);
+      scenebuilder.manifoldToGLTFDoc(manifold!, globalDefaults);
 
   const t3 = performance.now();
   log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);
@@ -282,6 +281,7 @@ export async function evaluate(
 export const exportBlobURL =
     async(doc: Document, extension: string): Promise<string> => {
   const t0 = performance.now();
+  exporters = [new Export3MF(), new ExportGLTF()];
 
   const blob =
       await exporters.find(ex => ex.extensions.includes(extension)).asBlob(doc)
@@ -293,26 +293,28 @@ export const exportBlobURL =
   return blobURL;
 };
 
-/* v8 ignore start -- @preserve */
 /**
  * Set up message handlers and logging when run as a web worker.
  */
 const initializeWebWorker = (): void => {
-  if (self.console) {
-    const oldLog = self.console.log;
-    self.console.log = function(...args) {
-      let message = '';
-      for (const arg of args) {
-        if (arg == null) {
-          message += 'undefined';
-        } else if (typeof arg == 'object') {
-          message += JSON.stringify(arg, null, 4);
-        } else {
-          message += arg.toString();
+  const interceptConsole = () => {
+    console.log("Intercepting console.log() in manifoldCAD worker.");
+    if (self.console) {
+      const oldLog = self.console.log;
+      self.console.log = function(...args) {
+        let message = '';
+        for (const arg of args) {
+          if (arg == null) {
+            message += 'undefined';
+          } else if (typeof arg == 'object') {
+            message += JSON.stringify(arg, null, 4);
+          } else {
+            message += arg.toString();
+          }
         }
-      }
-      self.postMessage({type: 'log', message} as MessageFromWorker.Log);
-      oldLog(...args);
+        self.postMessage({type: 'log', message} as MessageFromWorker.Log);
+        oldLog(...args);
+      };
     };
   };
 
@@ -338,11 +340,12 @@ const initializeWebWorker = (): void => {
       if (message.manifoldWasmUrl) setManifoldWasmUrl(message.manifoldWasmUrl);
       if (message.esbuildWasmUrl) setEsbuildWasmUrl(message.esbuildWasmUrl);
 
-      initialize();
       await getManifoldModule();
       self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
-
+      console.log('Successfully initialized ManifoldCAD worker!');
+      interceptConsole();
     } catch (error) {
+      console.error(error);
       sendError(error as Error);
     }
   };
@@ -381,5 +384,3 @@ const initializeWebWorker = (): void => {
   }
 };
 if (isWebWorker()) initializeWebWorker();
-
-/* v8 ignore end -- @preserve */

@@ -1,39 +1,14 @@
-import {Plugin} from 'esbuild';
+// import {Plugin} from 'esbuild';
 import type {BuildFailure} from 'esbuild';
-import textReplace from 'esbuild-plugin-text-replace';
+// import textReplace from 'esbuild-plugin-text-replace';
 import * as esbuild from 'esbuild-wasm';
-
+import { BundlerError } from './error.ts';
 import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
 
 export const setWasmUrl = (url: string) => {
   esbuildWasmUrl = url;
-};
-
-export class BundlerError extends Error {
-  location?: esbuild.Location;
-  error: esbuild.Message;
-
-  constructor(failure: BuildFailure, options?: ErrorOptions) {
-    super(undefined, options);
-    this.cause = failure;
-    this.error = failure.errors[0];
-  }
-
-  get name(): string {
-    return 'BundlerError';
-  }
-
-  get message(): string {
-    return this.error.text;
-  }
-
-  get stack(): string|undefined {
-    if (!this.error.location) return undefined;
-    const {file, line, column} = this.error.location!;
-    return `${this.toString()}\n    at ${file}:${line}:${column}`;
-  }
 };
 
 /**
@@ -111,7 +86,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
       // Is this a manifoldCAD context import?
       if (args.path.match(ManifoldCADExportMatch)) {
-        return {namespace: 'manifold-evaluator-context', path: args.path};
+        return {namespace: 'manifold-cad-globals', path: args.path};
       }
 
       // Try esbuilds' resolver first.
@@ -125,7 +100,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       if (result.errors.length === 0) {
         if (manifoldCADExportPath && manifoldCADExportPath === result.path) {
           // It resolved to our local manifoldCAD context.
-          return {namespace: 'manifold-evaluator-context', path: args.path};
+          return {namespace: 'manifold-cad-globals', path: args.path};
         } else {
           return result;
         }
@@ -145,15 +120,16 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
     // Inject context.
     build.onLoad(
-        {filter: /.*/, namespace: 'manifold-evaluator-context'},
+        {filter: /.*/, namespace: 'manifold-cad-globals'},
         (): esbuild.OnLoadResult => {
           // This is a string replace.
-          const context = `{..._manifold_context, isManifoldCAD: () => true}`
+          const globals =
+              `{..._manifold_cad_globals, isManifoldCAD: () => true}`
           return {
             // Type hinting isn't necessary.  Only esbuild will see the swap,
             // and it
             // doesn't do type validation.
-            contents: `export const {${manifoldCADExportNames}} = ${context};`,
+            contents: `export const {${manifoldCADExportNames}} = ${globals};`,
           };
         });
 
@@ -171,7 +147,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         // Is this a manifoldCAD context import from a remote package?
         // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
         if (path === cdnUrl(manifoldCADExportSpecifier, options.jsCDN)) {
-          const response = {path, namespace: 'manifold-evaluator-context'};
+          const response = {path, namespace: 'manifold-cad-globals'};
           return response;
         }
 
@@ -217,6 +193,7 @@ const getEsbuildConfig =
 
     plugins: [
       esbuildManifoldPlugin(options),
+      /*
       textReplace({
         // FIXME how necessary is this?
         include: /./,
@@ -226,7 +203,12 @@ const getEsbuildConfig =
           [/^var\s+result\s/g, 'export var result '],
         ]
       }) as unknown as Plugin,
+       */
     ],
+    /*
+    footer: {
+      js: "return module.exports"
+    },*/
     // Some CDN imports will check import.meta.env.  This is only present when
     // generating an ESM bundle.  In other cases, it generates log noise, so
     // let's drop it down a log level.
@@ -256,7 +238,7 @@ export const bundleCode =
   try {
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
-      stdin: {contents: code, sourcefile: options.filename},
+      stdin: {contents: code, sourcefile: options.filename, loader: 'ts'},
     });
     return built.outputFiles![0].text;
   } catch (error) {

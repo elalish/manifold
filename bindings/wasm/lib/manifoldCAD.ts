@@ -26,42 +26,53 @@
  * @module manifoldCAD
  */
 
-import type * as encapsulatedTypes from '../manifold-encapsulated-types.d.ts';
-import type * as manifoldCADTypes from '../types/manifoldCAD.d.ts';
+import type {ManifoldToplevel} from '../manifold.d.ts';
 
-import {initialize} from './worker.ts';
+import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
+import * as scenebuilder from './scene-builder.ts';
+import {getManifoldModule} from './wasm.ts';
 
-const evaluator = initialize();
-const context = await evaluator.getFullContext();
+const manifoldWasm: ManifoldToplevel =
+    garbageCollectManifold(await getManifoldModule());
 
-export const Manifold: encapsulatedTypes.Manifold = context.Manifold;
-export const CrossSection: encapsulatedTypes.CrossSection =
-    context.CrossSection;
-export const Mesh: encapsulatedTypes.Mesh = context.Mesh;
+const {
+  Mesh,
+  Manifold,
+  CrossSection,
+  setMinCircularAngle,
+  setMinCircularEdgeLength,
+  setCircularSegments,
+  getCircularSegments,
+  resetToCircularDefaults,
+  triangulate
+} = manifoldWasm;
 
-export const triangulate: typeof encapsulatedTypes.triangulate =
-    context.triangulate;
-export const setMinCircularAngle: typeof encapsulatedTypes.setMinCircularAngle =
-    context.setMinCircularAngle;
-export const setMinCircularEdgeLength:
-    typeof encapsulatedTypes.setMinCircularEdgeLength =
-    context.setMinCircularEdgeLength;
-export const setCircularSegments: typeof encapsulatedTypes.setCircularSegments =
-    context.setCircularSegments;
-export const getCircularSegments: typeof encapsulatedTypes.getCircularSegments =
-    context.getCircularSegments;
-export const resetToCircularDefaults:
-    typeof encapsulatedTypes.resetToCircularDefaults =
-    context.resetToCircularDefaults;
+// These methods are not intrinsic to manifold itself, but provided by the scene
+// builder.
+const {setMorphStart, setMorphEnd, GLTFNode} = scenebuilder;
+const show = garbageCollectFunction(scenebuilder.show);
+const only = garbageCollectFunction(scenebuilder.only);
+const setMaterial = garbageCollectFunction(scenebuilder.setMaterial)
 
-export const show: typeof manifoldCADTypes.show = context.show;
-export const only: typeof manifoldCADTypes.only = context.only;
-export const setMaterial: typeof manifoldCADTypes.setMaterial =
-    context.setMaterial;
-export const setMorphStart: typeof manifoldCADTypes.setMorphStart =
-    context.setMorphStart;
-export const setMorphEnd: typeof manifoldCADTypes.setMorphEnd =
-    context.setMorphEnd;
-export const GLTFNode: manifoldCADTypes.GLTFNode = context.GLTFNode;
+// False whenever this module is imported directly.  The bundler will replace
+// this with a function that returns true.
+const isManifoldCAD = () => false;
 
-export const isManifoldCAD: typeof manifoldCADTypes.isManifoldCAD = () => false;
+export {
+  Mesh,
+  Manifold,
+  CrossSection,
+  setMinCircularAngle,
+  setMinCircularEdgeLength,
+  setCircularSegments,
+  getCircularSegments,
+  resetToCircularDefaults,
+  triangulate,
+  show,
+  only,
+  setMaterial,
+  setMorphStart,
+  setMorphEnd,
+  GLTFNode,
+  isManifoldCAD
+};

@@ -18,31 +18,39 @@ import {beforeEach, expect, suite, test} from 'vitest';
 import {bundleFile} from '../lib/bundle.ts';
 import * as worker from '../lib/worker.ts';
 
-let evaluator = worker.getEvaluator() || worker.initialize();
+import {getSceneVertexCount, VertexCountMethod} from '@gltf-transform/functions';
+import { Document } from '@gltf-transform/core';
+
+const countVertices = (doc:Document) => {
+  const scene = doc.getRoot().listScenes()[0];
+  if (!scene) return -1;
+  return getSceneVertexCount(scene, VertexCountMethod.UPLOAD_NAIVE);
+};
+
 beforeEach(() => worker.cleanup());
 
 suite('Import remote modules from', () => {
   test('esm.sh', async () => {
     const entrypoint =
-        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+        resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
-    const result = await evaluator.evaluate(bundle);
-    expect(result.volume()).toBeGreaterThan(0);
+    const result = await worker.evaluate(bundle);
+    expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('jsDelivr', async () => {
     const entrypoint =
-        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+        resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'jsDelivr'});
-    const result = await evaluator.evaluate(bundle);
-    expect(result.volume()).toBeGreaterThan(0);
+    const result = await worker.evaluate(bundle);
+    expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('skypack', async () => {
     const entrypoint =
-        resolve(import.meta.dirname, './fixtures/importFromCDN.mjs');
+        resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'skypack'});
-    const result = await evaluator.evaluate(bundle);
-    expect(result.volume()).toBeGreaterThan(0);
+    const result = await worker.evaluate(bundle);
+    expect(countVertices(result)).toBeGreaterThan(0);
   });
 });

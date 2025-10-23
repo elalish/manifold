@@ -22,7 +22,7 @@ import manifoldWasmUrl from '../manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
-const exampleFunctions = self.examples.functionBodies;
+const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
@@ -120,7 +120,7 @@ function switchTo(scriptName) {
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
-    const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
+    const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
     editor.setValue(code);
