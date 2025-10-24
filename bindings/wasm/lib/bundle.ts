@@ -184,8 +184,8 @@ const getEsbuildConfig =
       if (typeof esbuildWasmUrl !== 'string' || !esbuildWasmUrl) {
         throw new Error('No URL given for \'esbuild.wasm\'.');
       }
-      esbuildOptions.wasmURL = esbuildWasmUrl!  
-      esbuildOptions.worker = esbuildHasOwnWorker;
+      esbuildOptions.wasmURL = esbuildWasmUrl!;
+      esbuildOptions.worker = !(esbuildHasOwnWorker === false);
     }
     await esbuild.initialize(esbuildOptions);
     esbuild_initialized = true;
