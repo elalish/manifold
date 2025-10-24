@@ -179,13 +179,13 @@ let esbuild_initialized: boolean = false;
 const getEsbuildConfig =
     async(options: BundlerOptions = {}): Promise<esbuild.BuildOptions> => {
   if (!esbuild_initialized) {
-    const esbuildOptions:
-        esbuild.InitializeOptions = {worker: esbuildHasOwnWorker};
+    const esbuildOptions: esbuild.InitializeOptions = {};
     if (!isNode()) {
       if (typeof esbuildWasmUrl !== 'string' || !esbuildWasmUrl) {
         throw new Error('No URL given for \'esbuild.wasm\'.');
       }
-      esbuildOptions.wasmURL = esbuildWasmUrl!  // || bundledUrl;
+      esbuildOptions.wasmURL = esbuildWasmUrl!  
+      esbuildOptions.worker = esbuildHasOwnWorker;
     }
     await esbuild.initialize(esbuildOptions);
     esbuild_initialized = true;
