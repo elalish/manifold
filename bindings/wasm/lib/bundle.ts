@@ -7,10 +7,16 @@ import {BundlerError} from './error.ts';
 import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
+let esbuildHasOwnWorker: boolean = true;
 
 export const setWasmUrl = (url: string) => {
   esbuildWasmUrl = url;
 };
+
+export const setHasOwnWorker =
+    (x: boolean) => {
+      esbuildHasOwnWorker = x;
+    }
 
 /**
  * These content delivery networks provide NPM modules as ES modules,
@@ -173,9 +179,13 @@ let esbuild_initialized: boolean = false;
 const getEsbuildConfig =
     async(options: BundlerOptions = {}): Promise<esbuild.BuildOptions> => {
   if (!esbuild_initialized) {
-    const esbuildOptions: esbuild.InitializeOptions = {};
-    if (!isNode() && esbuildWasmUrl) {
-      esbuildOptions.wasmURL = esbuildWasmUrl;
+    const esbuildOptions:
+        esbuild.InitializeOptions = {worker: esbuildHasOwnWorker};
+    if (!isNode()) {
+      if (typeof esbuildWasmUrl !== 'string' || !esbuildWasmUrl) {
+        throw new Error('No URL given for \'esbuild.wasm\'.');
+      }
+      esbuildOptions.wasmURL = esbuildWasmUrl!  // || bundledUrl;
     }
     await esbuild.initialize(esbuildOptions);
     esbuild_initialized = true;
@@ -185,31 +195,13 @@ const getEsbuildConfig =
     // Create a bundle in memory.
     bundle: true,
     write: false,
-    treeShaking: false,  // FIXME ensure that 'result' and dependencies are not
-                         // shaken out.
     platform: 'node',
     sourcemap: 'inline',
     sourcesContent: false,  // We have the source handy already.
     format: 'cjs',
-
     plugins: [
       esbuildManifoldPlugin(options),
-      /*
-      textReplace({
-        // FIXME how necessary is this?
-        include: /./,
-        pattern: [
-          [/^const\s+result\s/g, 'export const result '],
-          [/^let\s+result\s/g, 'export let result '],
-          [/^var\s+result\s/g, 'export var result '],
-        ]
-      }) as unknown as Plugin,
-       */
     ],
-    /*
-    footer: {
-      js: "return module.exports"
-    },*/
     // Some CDN imports will check import.meta.env.  This is only present when
     // generating an ESM bundle.  In other cases, it generates log noise, so
     // let's drop it down a log level.

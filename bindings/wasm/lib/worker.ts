@@ -27,7 +27,7 @@
 
 import {Document} from '@gltf-transform/core';
 
-import {bundleCode, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
+import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
 import {BundlerError, EvaluatorError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
@@ -59,6 +59,7 @@ export namespace MessageToWorker {
     type: 'initialize';
     manifoldWasmUrl?: string;
     esbuildWasmUrl?: string;
+    esbuildHasOwnWorker?: boolean;
   }
 
   /**
@@ -234,11 +235,11 @@ export async function evaluate(
     // https://tc39.es/ecma262/#sec-createdynamicfunction, the Function
     // constructor always prefixes the source with additional 2 lines."
     // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
-    const lineOffset = -2;
+    const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
 
     const newError = new EvaluatorError(error);
-    newError.manifoldStack = getSourceMappedStackTrace(code, error, lineOffset);
-    throw (newError);
+    newError.manifoldStack = stacktrace;
+    throw newError;
   }
   const defaultExport: any = (globals.module.exports as any)?.default;
   let manifold = null
@@ -299,7 +300,7 @@ export const exportBlobURL =
  */
 const initializeWebWorker = (): void => {
   const interceptConsole = () => {
-    console.log('Intercepting console.log() in manifoldCAD worker.');
+    console.debug('Intercepting console.log() in manifoldCAD worker.');
     if (self.console) {
       const oldLog = self.console.log;
       self.console.log = function(...args) {
@@ -319,7 +320,7 @@ const initializeWebWorker = (): void => {
     };
   };
 
-  const sendError = async (error: Error) => {
+  const sendError = (error: Error) => {
     // Log the error / stack trace to the console.
     if (error.stack &&
         (error instanceof BundlerError || error instanceof EvaluatorError)) {
@@ -338,15 +339,17 @@ const initializeWebWorker = (): void => {
 
   const handleInitialize = async (message: MessageToWorker.Initialize) => {
     try {
+      console.debug('Initializing ManifoldCAD worker.');
       if (message.manifoldWasmUrl) setManifoldWasmUrl(message.manifoldWasmUrl);
       if (message.esbuildWasmUrl) setEsbuildWasmUrl(message.esbuildWasmUrl);
+      setHasOwnWorker(message.esbuildHasOwnWorker !== false);
 
       await getManifoldModule();
-      self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
-      console.log('Successfully initialized ManifoldCAD worker!');
       interceptConsole();
+
+      self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
+      console.debug('Successfully initialized ManifoldCAD worker!');
     } catch (error) {
-      console.error(error);
       sendError(error as Error);
     }
   };
@@ -360,17 +363,19 @@ const initializeWebWorker = (): void => {
       self.postMessage({type: 'done'} as MessageFromWorker.Done);
     } catch (error) {
       sendError(error as Error);
-    } finally {
-      cleanup();
     }
   };
 
   const handleExport = async (message: MessageToWorker.Export) => {
-    self.postMessage({
-      type: 'blob',
-      extension: message.extension,
-      blobURL: await exportBlobURL(gltfdoc!, message.extension)
-    } as MessageFromWorker.Blob);
+    try {
+      self.postMessage({
+        type: 'blob',
+        extension: message.extension,
+        blobURL: await exportBlobURL(gltfdoc!, message.extension)
+      } as MessageFromWorker.Blob);
+    } catch (error) {
+      sendError(error as Error);
+    }
   };
 
   self.onmessage = async (e) => {

@@ -43,7 +43,7 @@ export default defineConfig({
   })],
   build: {
     target: 'esnext',
-    sourcemap: true,
+    sourcemap: 'inline',
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),

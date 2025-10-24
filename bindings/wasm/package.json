@@ -7,7 +7,7 @@
     "manifold-cad": "./bin/manifold-cad"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ./esbuild.mjs",
     "clean": "tsc --build --clean",
     "format": "cd ../.. && ./scripts/format.sh",
     "docs": "npx typedoc",
@@ -58,11 +58,13 @@
     "lib/worker.d.ts",
     "lib/manifoldCAD.js",
     "lib/manifoldCAD.d.ts",
-    "types/manifoldCAD.d.ts"
+    "types/manifoldCAD.d.ts",
+    "dist/worker.bundled.js"
   ],
   "exports": {
     ".": "./manifold.js",
     "./manifold.wasm": "./manifold.wasm",
+    "./lib/worker.bundled.js": "./dist/worker.bundled.js",
     "./lib/*": "./lib/*",
     "./manifoldCAD": "./lib/manifoldCAD.js"
   },
@@ -97,6 +99,7 @@
     "@types/node": "^24.2.1",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
+    "esbuild": "^0.25.11",
     "typedoc": "^0.28.10",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
