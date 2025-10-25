@@ -39,8 +39,7 @@ export class BundlerError extends Error {
   }
 };
 
-// fixme runtime
-export class EvaluatorError extends Error {
+export class RuntimeError extends Error {
   manifoldStack?: string;
   cause: Error;
 

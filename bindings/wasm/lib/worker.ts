@@ -14,7 +14,7 @@
 
 /**
  * The worker is where everything comes together.
- * It handles instantiation of an evaluator, execution of a model and
+ * It handles worker communication, execution of a model and
  * exporting the final scene as a GLTF-Transform Document or URL encoded
  * Blob.
  *
@@ -28,7 +28,7 @@
 import {Document} from '@gltf-transform/core';
 
 import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
-import {BundlerError, EvaluatorError} from './error.ts';
+import {BundlerError, RuntimeError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as garbageCollector from './garbage-collector.ts';
@@ -154,7 +154,7 @@ function log(...args: any[]) {
 }
 
 /**
- * Clean up any state stored in the evaluator or scene builder.
+ * Clean up any state from the last run.
  *
  * This includes any outstanding Manifold, Mesh or CrossSection objects,
  * even if referenced elsewhere.
@@ -185,7 +185,7 @@ export interface evaluateOptions {
 export async function evaluate(
     code: string, options: evaluateOptions = {}): Promise<Document> {
   // Global defaults can be populated by the script.  It's set per
-  // evaluation, while the rest of evaluator context doesn't change from
+  // evaluation, while the rest of the context doesn't change from
   // run to run.
   // This can be used to set parameters elsewhere in ManifoldCAD.  For
   // example, the GLTF exporter will look for animation type and
@@ -239,7 +239,7 @@ export async function evaluate(
     // constructor always prefixes the source with additional 2 lines."
     // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
     const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
-    const newError = new EvaluatorError(error);
+    const newError = new RuntimeError(error);
     newError.manifoldStack = stacktrace;
     throw newError;
   }
@@ -315,7 +315,7 @@ const initializeWebWorker = (): void => {
   const sendError = (error: Error) => {
     // Log the error / stack trace to the console.
     if (error.stack &&
-        (error instanceof BundlerError || error instanceof EvaluatorError)) {
+        (error instanceof BundlerError || error instanceof RuntimeError)) {
       console.error(error.stack);
     } else {
       console.error(error);

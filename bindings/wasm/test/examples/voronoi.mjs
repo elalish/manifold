@@ -1,12 +1,12 @@
 // Generate an organic looking Voronoi pattern.
-//
-// If each point defines the centre of a bubble, a Voronoi graph is
-// what happens when each bubble has expands until it meets a
-// neighbouring bubble.
 
-// poison-disk-spacing generates random but evenly distributed points.
+// When run through manifoldcad.org or the `manifold-cad` CLI,
+// imported npm packages will automatically be retrieved from
+// a content delivery network (Such as jsDelivr or esm.sh) and
+// bundled with this script.
+// When imported directly into node, there is no bundling step.
+// These packages would have to be installed via npm.
 import PoissonDiskSampling from 'poisson-disk-sampling';
-// geom-voronoi converts a list of points into a Voronoi graph. 
 import {DVMesh} from '@thi.ng/geom-voronoi';
 
 const size = 100;    // Side length
@@ -15,6 +15,7 @@ const round = 3;     // Roundover radius
 const thickness = 1; // Thickness of the final object.
 const boundary = CrossSection.square([size, size]);
 
+// Generate random but evenly distributed points.
 // New points will be no closer than minDistance, but no farther
 // than maxDistance from each other.
 const sampler = new PoissonDiskSampling({
@@ -24,6 +25,9 @@ const sampler = new PoissonDiskSampling({
 });
 
 // Generate points until no more will fit.  Then create a Voronoi graph.
+// If each point defines the centre of a bubble, a Voronoi graph is
+// what happens when each bubble has expands until it meets a
+// neighbouring bubble.
 const mesh = new DVMesh(sampler.fill());
 
 // For each cell, create a 2D CrossSection object from the points
