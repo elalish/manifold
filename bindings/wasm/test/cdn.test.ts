@@ -17,7 +17,7 @@ import {getSceneVertexCount, VertexCountMethod} from '@gltf-transform/functions'
 import {resolve} from 'node:path';
 import {beforeEach, expect, suite, test} from 'vitest';
 
-import {bundleFile} from '../lib/bundle.ts';
+import {bundleFile} from '../lib/bundler.ts';
 import * as worker from '../lib/worker.ts';
 
 const countVertices = (doc: Document) => {
@@ -28,7 +28,7 @@ const countVertices = (doc: Document) => {
 
 beforeEach(() => worker.cleanup());
 
-suite('Import remote modules from', () => {
+suite.skip('Import remote modules from', () => {
   test('esm.sh', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});

@@ -1,6 +1,18 @@
-// import {Plugin} from 'esbuild';
+// Copyright 2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import type {BuildFailure} from 'esbuild';
-// import textReplace from 'esbuild-plugin-text-replace';
 import * as esbuild from 'esbuild-wasm';
 
 import {BundlerError} from './error.ts';
@@ -40,6 +52,13 @@ export interface BundlerOptions {
   filename?: string;
 }
 
+// Swallow informational logs in testing framework
+function log(...args: any[]) {
+  if (typeof self !== 'undefined' && self.console) {
+    self.console.log(...args);
+  }
+}
+
 /**
  * This is a plugin for esbuild that has three functions:
  *
@@ -52,8 +71,6 @@ export interface BundlerOptions {
  * module.  Inside the evaluator, imports are in the global namespace.  The
  * imported module will not be able to see the actual evaluator context.  Here,
  * we will swap it out for an object we will inject at evaluation time.
- *
- * @returns
  */
 export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
                                          esbuild.Plugin => ({
@@ -66,7 +83,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
       'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'Manifold',
       'CrossSection', 'triangulate', 'show', 'only', 'setMaterial',
-      'setMorphStart', 'setMorphEnd'
+      'setMorphStart', 'setMorphEnd', 'GLTFNode', 'isManifoldCAD'
     ];
 
     if (isNode()) {
@@ -165,7 +182,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
         const response = await fetch(args.path);
         if (response.ok) {
-          console.log(`Fetching ${args.path}.`);
+          log(`Fetching ${args.path}.`);
           return {contents: await response.text()};
         } else {
           return {errors: [{text: await response.text()}]};
@@ -181,11 +198,11 @@ const getEsbuildConfig =
   if (!esbuild_initialized) {
     const esbuildOptions: esbuild.InitializeOptions = {};
     if (!isNode()) {
-      if (typeof esbuildWasmUrl !== 'string' || !esbuildWasmUrl) {
+      if (!esbuildWasmUrl || typeof esbuildWasmUrl !== 'string') {
         throw new Error('No URL given for \'esbuild.wasm\'.');
       }
-      esbuildOptions.wasmURL = esbuildWasmUrl!;
-      esbuildOptions.worker = !(esbuildHasOwnWorker === false);
+      esbuildOptions.wasmURL = esbuildWasmUrl;
+      esbuildOptions.worker = esbuildHasOwnWorker === true;
     }
     await esbuild.initialize(esbuildOptions);
     esbuild_initialized = true;
@@ -195,10 +212,12 @@ const getEsbuildConfig =
     // Create a bundle in memory.
     bundle: true,
     write: false,
-    platform: 'node',
+    platform: 'neutral',
+    treeShaking: false,
     sourcemap: 'inline',
     sourcesContent: false,  // We have the source handy already.
     format: 'cjs',
+    logLevel: 'silent',
     plugins: [
       esbuildManifoldPlugin(options),
     ],
@@ -229,9 +248,14 @@ export const bundleFile = async(
 export const bundleCode =
     async(code: string, options: BundlerOptions = {}): Promise<string> => {
   try {
+    let resolveDir: string|undefined;
+    if (isNode() && options.filename) {
+      const {dirname} = await import('node:path');
+      resolveDir = dirname(options.filename);
+    }
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
-      stdin: {contents: code, sourcefile: options.filename, loader: 'ts'},
+      stdin: {contents: code, sourcefile: options.filename, resolveDir},
     });
     return built.outputFiles![0].text;
   } catch (error) {

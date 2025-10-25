@@ -15,7 +15,7 @@
 import {resolve} from 'node:path';
 import {beforeEach, expect, suite, test} from 'vitest';
 
-import {bundleFile} from '../lib/bundle.ts';
+import {bundleFile} from '../lib/bundler.ts';
 import * as worker from '../lib/worker.ts';
 
 beforeEach(() => worker.cleanup());

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * The worker is where the scene builder and evaluator come together.
+ * The worker is where everything comes together.
  * It handles instantiation of an evaluator, execution of a model and
  * exporting the final scene as a GLTF-Transform Document or URL encoded
  * Blob.
@@ -27,7 +27,7 @@
 
 import {Document} from '@gltf-transform/core';
 
-import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundle.ts';
+import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
 import {BundlerError, EvaluatorError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
@@ -50,7 +50,7 @@ export namespace MessageToWorker {
   /**
    * Initialize the web worker.
    * If this message is not sent, the worker will
-   * be instantiated when first evaluating a model.
+   * be initialized when first evaluating a model.
    *
    * The worker will respond with `MessageFromWorker.Ready`
    * or `MessageFromWorker.Error`.
@@ -71,15 +71,12 @@ export namespace MessageToWorker {
    * `filename` doesn't have much meaning at the moment, but it
    * is useful for ensuring effective error messages later.
    *
-   * If `bundle` is set to false, the worker will not bundle code,
-   * and assume that it has already been bundled.  An undefined
-   * value will be treated by default as true.
    */
   export interface Evaluate extends Message {
     type: 'evaluate';
     code: string;
     filename?: string;
-    bundle?: boolean;
+    doNotBundle?: boolean;
     jsCDN?: string;
     fetchRemotePackages?: boolean
   }
@@ -118,8 +115,7 @@ export namespace MessageFromWorker {
    * Discard it and re-instantiate.
    *
    * The stack trace format is platform dependant.  Errors
-   * caught by the evaluator should be formatted into something
-   * vaguely node-ish.
+   * should be formatted into something vaguely node-ish.
    */
   export interface Error extends Message {
     type: 'error';
@@ -175,7 +171,7 @@ export function cleanup(): void {
  */
 export interface evaluateOptions {
   filename?: string;
-  bundle?: boolean;
+  doNotBundle?: boolean;
   jsCDN?: string;
   fetchRemotePackages?: boolean;
 }
@@ -197,15 +193,12 @@ export async function evaluate(
   const globalDefaults = {} as scenebuilder.GlobalDefaults;
   const t0 = performance.now();
 
-  const {bundle, ...bundleOpt} = options;
-  // const bundled = bundle === false ? code : await bundleCode(code,
-  // bundleOpt);
-  const bundled = await bundleCode(code, bundleOpt);
-
-  // console.log(bundled.split('\n').map((l,i)=>`${i+1}: ${l}`).join('\n'))
+  const {doNotBundle, ...bundleOpt} = options;
+  const bundled =
+      doNotBundle === true ? code : await bundleCode(code, bundleOpt);
 
   const t1 = performance.now();
-  if (bundle !== false) {
+  if (doNotBundle !== true) {
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
   }
 
@@ -226,30 +219,29 @@ export async function evaluate(
     module: {exports: {default: null}},
   };
 
+  let manifold = null
   try {
     const evalFn = new AsyncFunction(
         ...Object.keys(globals), '_manifold_cad_globals', bundled);
     await evalFn(...Object.values(globals), manifoldCAD);
+
+    const defaultExport: any = (globals.module.exports as any)?.default;
+    if (defaultExport instanceof manifoldCAD.Manifold) {
+      // If it's a manifold object, go with that.
+      manifold = defaultExport;
+    } else if (typeof defaultExport === 'function') {
+      // If it's a function, run it.
+      manifold = await defaultExport();
+    }
   } catch (error: any) {
     // "According to step 12 of
     // https://tc39.es/ecma262/#sec-createdynamicfunction, the Function
     // constructor always prefixes the source with additional 2 lines."
     // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
     const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
-
     const newError = new EvaluatorError(error);
     newError.manifoldStack = stacktrace;
     throw newError;
-  }
-  const defaultExport: any = (globals.module.exports as any)?.default;
-  let manifold = null
-  if (defaultExport instanceof manifoldCAD.Manifold) {
-    // If it's a manifold object, go with that.
-    manifold = defaultExport;
-  }
-  else if (typeof defaultExport === 'function') {
-    // If it's a function, run it.
-    manifold = defaultExport();
   }
 
   const t2 = performance.now();
@@ -258,6 +250,7 @@ export async function evaluate(
   // If we don't actually have a model, complain.
   if (!manifold && !scenebuilder.hasGLTFNodes()) {
     throw new Error(
+        // FIXME
         'No output because "result" is undefined and no GLTF nodes were created.');
   }
 
