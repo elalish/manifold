@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {writeFile} from 'node:fs/promises';
+import {readFile, writeFile} from 'node:fs/promises';
 import {extname} from 'node:path';
 
 import {Command} from 'commander';
@@ -22,6 +22,7 @@ import {bundleFile} from '../lib/bundle.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
 import * as worker from '../lib/worker.js';
+import {BundlerError,EvaluatorError} from '../lib/error.js';
 
 const exporters = [
   new Export3MF(),
@@ -33,7 +34,12 @@ program.name('manifold-cad')
     .description('Compile a ManifoldCAD program into a mesh.')
     .argument('<infile.[js|ts]>', 'Input file')
     .argument('<outfile>', 'Output file')
-    .action(async(infile, outfile) => {
+    .option('--jscdn <string>', 'Fetch npm packages from a CDN', 'jsDelivr')
+
+    // True means '--bundle' is implied by default, and '--no-bundle'
+    // must be specified to disable bundling.
+    .option('--no-bundle', 'Do not bundle input file before building model', true)
+    .action(async(infile, outfile, options) => {
       // Choose an exporter.
       const exporter = exporters.find(ex => ex.extensions.map(ext => `.${ext}`).includes(extname(outfile)));
       if (!exporter) {
@@ -46,8 +52,13 @@ program.name('manifold-cad')
       }
 
       // Build the model.
-      const bundle = await bundleFile(infile);
-      const doc = await worker.evaluate(bundle, {bundle:false});
+      let bundle = '';
+      if (options.bundle) {
+        bundle = await bundleFile(infile, {jsCDN: options.jscdn});
+      } else {
+        bundle = await readFile(infile, 'utf-8');
+      }
+      const doc = await worker.evaluate(bundle, {doNotBundle:true});
 
       // Convert it and write it to disk.
       const binary = await exporter.asBlob(doc);

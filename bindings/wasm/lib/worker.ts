@@ -250,8 +250,7 @@ export async function evaluate(
   // If we don't actually have a model, complain.
   if (!manifold && !scenebuilder.hasGLTFNodes()) {
     throw new Error(
-        // FIXME
-        'No output because "result" is undefined and no GLTF nodes were created.');
+        'No output as no model was exported and no GLTF nodes were created.  Try \'export default result\'?');
   }
 
   // Create a gltf-transform document.
@@ -335,7 +334,7 @@ const initializeWebWorker = (): void => {
       console.debug('Initializing ManifoldCAD worker.');
       if (message.manifoldWasmUrl) setManifoldWasmUrl(message.manifoldWasmUrl);
       if (message.esbuildWasmUrl) setEsbuildWasmUrl(message.esbuildWasmUrl);
-      setHasOwnWorker(message.esbuildHasOwnWorker !== false);
+      setHasOwnWorker(message.esbuildHasOwnWorker === true);
 
       await getManifoldModule();
       interceptConsole();
