@@ -204,6 +204,7 @@ export async function evaluate(
 
   const manifoldCAD = await import('./manifoldCAD.ts');
   manifoldCAD.resetToCircularDefaults();
+  cleanup();
 
   const globals = {
     ...manifoldCAD,

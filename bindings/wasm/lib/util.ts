@@ -46,6 +46,9 @@ export const getSourceMappedStackTrace =
           0, stack.findIndex(call => call.methodName == 'evaluate'));
 
       stack = stack.map((frame: stackTraceParser.StackFrame) => {
+        if ((frame.lineNumber! + lineOffset) < 1) {
+          return frame;  // Line number is out of range.
+        }
         const {line: lineNumber, column, source: file} = originalPositionFor(
             tracer,
             {line: frame.lineNumber! + lineOffset, column: frame.column!});

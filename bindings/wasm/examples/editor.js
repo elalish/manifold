@@ -295,12 +295,6 @@ async function getManifoldCadDTS() {
   return `${global.replace(/^import.*$/gm, '')}`;
 }
 
-async function getGlMatrixDTS() {
-  const global =
-      await fetch('/gl-matrix.d.ts').then(response => response.text());
-  return `${global.replace(/^import.*$/gm, '')}`;
-}
-
 require.config({
   paths:
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
@@ -310,8 +304,6 @@ require(['vs/editor/editor.main'], async function() {
       await getManifoldDTS());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldCadDTS());
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getGlMatrixDTS());
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
