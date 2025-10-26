@@ -28,7 +28,7 @@ const countVertices = (doc: Document) => {
 
 beforeEach(() => worker.cleanup());
 
-suite.skip('Import remote modules from', () => {
+suite('Import remote modules from', () => {
   test('esm.sh', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
@@ -43,7 +43,7 @@ suite.skip('Import remote modules from', () => {
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
-  test('skypack', async () => {
+  test.skip('skypack', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'skypack'});
     const result = await worker.evaluate(bundle);
