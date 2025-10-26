@@ -530,11 +530,23 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
+
+  const files = {};
   // FIXME pass other files in for import?
+  for (const [name, contents] of exampleFunctions) {
+    files[`./${name}`] = contents;
+  }
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = nthKey(i);
+    if (!key || key === 'currentName' || key === 'safe') continue;
+    files[`./${key}`] = getScript(key)
+  }
+
   const filename = currentFileElement.textContent
   const code = editor.getValue();
   manifoldWorker.postMessage(
-      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr'});
+      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr', files});
 }
 
 function cancel() {

@@ -78,7 +78,8 @@ export namespace MessageToWorker {
     filename?: string;
     doNotBundle?: boolean;
     jsCDN?: string;
-    fetchRemotePackages?: boolean
+    fetchRemotePackages?: boolean;
+    files?: Record<string, string>;
   }
 
   /**

@@ -8,6 +8,8 @@ import scallop from '../test/examples/scallop.mjs?raw';
 import stretchyBracelet from '../test/examples/stretchy-bracelet.mjs?raw';
 import tetrahedronPuzzle from '../test/examples/tetrahedron-puzzle.mjs?raw';
 import torusKnot from '../test/examples/torus-knot.mjs?raw';
+import animatedGears from '../test/examples/animated-gears.mjs?raw';
+import involuteGearLibrary from '../test/examples/involute-gear-library.mjs?raw';
 import voronoi from '../test/examples/voronoi.mjs?raw';
 
 const examples = new Map();
@@ -21,6 +23,8 @@ examples.set('Torus Knot', torusKnot);
 examples.set('Menger Sponge', mengerSponge);
 examples.set('Stretchy Bracelet', stretchyBracelet);
 examples.set('Gyroid Module', gyroidModule);
+examples.set('Animated Gears', animatedGears);
+examples.set('Involute Gear Library', involuteGearLibrary);
 examples.set('Voronoi', voronoi);
 
 if (typeof self !== 'undefined') {

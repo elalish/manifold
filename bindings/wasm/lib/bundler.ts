@@ -50,6 +50,7 @@ export interface BundlerOptions {
   jsCDN?: string;
   fetchRemotePackages?: boolean;
   filename?: string;
+  files?: Record<string, string>;
 }
 
 // Swallow informational logs in testing framework
@@ -113,6 +114,11 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         return {namespace: 'manifold-cad-globals', path: args.path};
       }
 
+      // Is this a virtual file?
+      if (options.files && Object.keys(options.files).includes(args.path)) {
+        return {namespace: 'virtual-file', path: args.path};
+      }
+
       // Try esbuilds' resolver first.
       const result = await build.resolve(args.path, {
         resolveDir: args.resolveDir,
@@ -156,6 +162,12 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
             contents: `export const {${manifoldCADExportNames}} = ${globals};`,
           };
         });
+
+    // Virtual files.
+    build.onLoad(
+        {filter: /.*/, namespace: 'virtual-file'},
+        (args): esbuild.OnLoadResult =>
+            ({contents: (options.files!)[args.path]}));
 
     // Unless disabled, handle HTTP/HTTPs urls.
     if (options.fetchRemotePackages !== false) {
