@@ -107,3 +107,26 @@ declare function only(shape: CrossSection|Manifold): Manifold;
  * @returns boolean
  */
 declare function isManifoldCAD(): boolean
+
+
+/**
+ * Get a list of GLTF nodes that have been created in this model.
+ *
+ * This function only works in scripts directly evaluated by the manifoldCAD
+ * website or CLI. When called in an imported library it will always return an
+ * empty array, and nodes created in libraries will not be included in the
+ * result. This is intentional; libraries must not create geometry as a side
+ * effect.
+ *
+ * @returns An array of GLTFNodes.
+ */
+declare function getGLTFNodes(): Array<GLTFNode>;
+
+/**
+ * Clear the list of cached GLTF nodes.
+ *
+ * This function only works in scripts directly evaluated by the manifoldCAD
+ * website or CLI.  When called in an imported library it will have no
+ * effect.
+ */
+declare function resetGLTFNodes(): void;
