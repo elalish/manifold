@@ -81,10 +81,17 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     const manifoldCADExportSpecifier = 'manifold-3d/manifoldCAD'
     const ManifoldCADExportMatch = /^manifold-3d\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
+      // Manifold classes.
+      'Mesh', 'Manifold', 'CrossSection',
+      // Manifold methods.
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'Manifold',
-      'CrossSection', 'triangulate', 'show', 'only', 'setMaterial',
-      'setMorphStart', 'setMorphEnd', 'GLTFNode', 'isManifoldCAD'
+      'getCircularSegments', 'resetToCircularDefaults', 'triangulate',
+      // Scene builder exports.
+      'show', 'only', 'setMaterial', 'setMorphStart', 'setMorphEnd',
+      // GLTFNode and utilities.
+      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes',
+      // ManifoldCAD specific exports.
+      'isManifoldCAD'
     ];
 
     if (isNode()) {

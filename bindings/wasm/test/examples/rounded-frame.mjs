@@ -1,5 +1,6 @@
 // Demonstrates how at 90-degree intersections, the sphere and cylinder
 // facets match up perfectly, for any choice of global resolution
+
 // parameters.
 const {sphere, cylinder, union, cube} = Manifold;
 
@@ -35,5 +36,6 @@ outsideNode.manifold = outside;
 const insideNode = new GLTFNode();
 insideNode.manifold = inside;
 insideNode.material = {baseColorFactor: [0, 1, 1]};
-const nodes = [outsideNode, insideNode];
+
+const nodes = getGLTFNodes();
 export default nodes;

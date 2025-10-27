@@ -212,6 +212,11 @@ export async function evaluate(
     globalDefaults,
     isManifoldCAD: () => true,
 
+    // At the top level, track created GLTF nodes.
+    GLTFNode: scenebuilder.GLTFNodeTracked,
+    getGLTFNodes: scenebuilder.getGLTFNodes,
+    resetGLTFNodes: scenebuilder.resetGLTFNodes,
+
     // While this project is built using ES modules, and we assume models and
     // libraries are ES modules, code executed via `new Function()` or `eval` is
     // treated as commonJS.

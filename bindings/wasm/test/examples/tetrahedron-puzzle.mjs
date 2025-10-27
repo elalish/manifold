@@ -71,5 +71,5 @@ moving.rotation = (t) => [0, 0, 270 * 2 * (1 - t)];
 globalDefaults.animationLength = 10;  // seconds
 globalDefaults.animationMode = 'ping-pong';
 
-const nodes = [fixed, moving];
+const nodes = getGLTFNodes();
 export default nodes;

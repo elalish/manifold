@@ -75,6 +75,7 @@ export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
+  resetGLTFNodes();
 }
 
 export class GLTFNode {
@@ -98,6 +99,20 @@ export class GLTFNode {
     return this._parent;
   }
 }
+
+const nodes = new Array<GLTFNode>();
+export class GLTFNodeTracked extends GLTFNode {
+  constructor(parent?: GLTFNode) {
+    super(parent);
+    nodes.push(this);
+  }
+}
+export const getGLTFNodes = () => {
+  return nodes;
+};
+export const resetGLTFNodes = () => {
+  nodes.length = 0;
+};
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {

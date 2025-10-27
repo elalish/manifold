@@ -42,7 +42,6 @@ const gyroidModule = rhombicDodecahedron()
                           .intersect(gyroidOffset(-0.4))
                           .subtract(gyroidOffset(0.4));
 
-const nodes = [];
 if (m > 1) {
   for (let i = 0; i < m; ++i) {
     for (let j = i; j < m; ++j) {
@@ -55,10 +54,15 @@ if (m > 1) {
           baseColorFactor:
               [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
         };
-        nodes.push(node);
       }
     }
   }
 }
 
+// Get a list of GLTF nodes that have been created in this model.  This
+// function only works at the top level; in a library it will always return
+// an empty array, and nodes created in libraries will not be included in
+// the result. This is intentional; libraries must not create geometry as
+// a side effect.
+const nodes = getGLTFNodes();
 export default nodes;

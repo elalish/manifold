@@ -14,14 +14,14 @@
 
 /**
  * These are the objects and functions that are available to manifoldCAD
- * scripts.
+ * models.
  *
  * This is an isomorphic module.  When imported within manifoldCAD, the bundler
- * will swap it out for an identical module built from the evaluator context.
- * When imported as an ES module, it will implicitly instantiate a worker with
- * an evaluator, and export that context.  This allows modules to behave
- * identically when running on manifoldCAD.org, through the CLI, or through
- * nodejs.
+ * will swap it out for an identical module running in the worker context.
+ * When imported as an ES module, it will implicitly instantiate a manifold wasm
+ * module, and export it along with relevant scene-builder properties.
+ * This allows models to behave identically when running on manifoldCAD.org,
+ * through the CLI, or through nodejs.
  *
  * @module manifoldCAD
  */
@@ -49,10 +49,13 @@ const {
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
 // builder.
-const {setMorphStart, setMorphEnd, GLTFNode} = scenebuilder;
+const {setMorphStart, setMorphEnd} = scenebuilder;
 const show = garbageCollectFunction(scenebuilder.show);
 const only = garbageCollectFunction(scenebuilder.only);
-const setMaterial = garbageCollectFunction(scenebuilder.setMaterial)
+const setMaterial = garbageCollectFunction(scenebuilder.setMaterial);
+const {GLTFNode} = scenebuilder;
+const getGLTFNodes = () => [];
+const resetGLTFNodes = () => {};
 
 // False whenever this module is imported directly.  The bundler will replace
 // this with a function that returns true.
@@ -74,5 +77,7 @@ export {
   setMorphStart,
   setMorphEnd,
   GLTFNode,
+  getGLTFNodes,
+  resetGLTFNodes,
   isManifoldCAD
 };

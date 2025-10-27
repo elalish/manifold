@@ -1,6 +1,5 @@
 // Demonstrate using a library.
 
-import {GLTFNode} from 'manifold-3d/manifoldCAD';
 import {involuteGear2d} from './Involute Gear Library';
 
 const gear1teeth = 12;
@@ -21,5 +20,5 @@ const ratio = gear1teeth / gear2teeth;
 gear1.rotation = (t) => [0,0, t * speed]
 gear2.rotation = (t) => [0,0, -(t * speed * ratio) + (1/2 * 360/gear2teeth)]
 
-const gears = [gear1, gear2];
+const gears = getGLTFNodes();
 export default gears;
