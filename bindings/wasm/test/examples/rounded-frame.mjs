@@ -35,3 +35,5 @@ outsideNode.manifold = outside;
 const insideNode = new GLTFNode();
 insideNode.manifold = inside;
 insideNode.material = {baseColorFactor: [0, 1, 1]};
+export const nodes = [outsideNode, insideNode];
+export default nodes;

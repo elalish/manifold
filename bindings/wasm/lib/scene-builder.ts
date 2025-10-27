@@ -29,9 +29,9 @@
 
 import {Document, Material, Node} from '@gltf-transform/core';
 
-import {Manifold} from '../manifold-encapsulated-types';
-import {Vec3} from '../manifold-global-types';
-import type {GLTFMaterial} from '../types/manifoldCAD';
+import type {Vec3} from '../manifold-global-types.d.ts';
+import {Manifold} from '../manifold.js';
+import type {GLTFMaterial} from '../types/manifoldCAD.d.ts';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
@@ -65,8 +65,6 @@ const GLOBAL_DEFAULTS = {
 
 export const globalDefaults = {...GLOBAL_DEFAULTS};
 
-const nodes = new Array<GLTFNode>();
-
 /**
  * Reset and garbage collect the scene builder and any
  * encapsulated modules.
@@ -77,7 +75,6 @@ export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
-  nodes.length = 0;
 }
 
 export class GLTFNode {
@@ -91,12 +88,10 @@ export class GLTFNode {
 
   constructor(parent?: GLTFNode) {
     this._parent = parent;
-    nodes.push(this);
   }
   clone(parent?: GLTFNode) {
-    const copy = {...this};
-    copy._parent = parent;
-    nodes.push(copy);
+    const copy = new GLTFNode(parent ?? this.parent);
+    Object.assign(copy, this);
     return copy;
   }
   get parent() {
@@ -336,21 +331,26 @@ export function GLTFNodesToGLTFDoc(
 }
 
 /**
- * Does the scene builder have any GLTF nodes?
+ * Map various types to a flat array of GLTFNodes
  *
  * @group Management Functions
- * @returns A boolean value
+ * @param any An object or array of models.
+ * @returns An array of GLTFNodes.
  */
-export function hasGLTFNodes(): boolean {
-  return nodes.length > 0;
-}
+export async function anyToGLTFNodeList(
+    any: Manifold|GLTFNode|Array<Manifold|GLTFNode>): Promise<Array<GLTFNode>> {
+  // Lazy load manifoldCAD.
+  const manifoldCAD = await import('./manifoldCAD.ts');
+  if (Array.isArray(any)) {
+    return await any.map(anyToGLTFNodeList)
+        .reduce(async (acc, cur) => ([...(await acc), ...(await cur)]))
+  } else if (any instanceof manifoldCAD.GLTFNode || any instanceof GLTFNode) {
+    return [any as GLTFNode];
+  } else if (any instanceof manifoldCAD.Manifold) {
+    const node = new GLTFNode();
+    node.manifold = any as Manifold;
+    return [node];
+  }
 
-/**
- * Get GLTF Nodes from the scene builder.
- *
- * @group Management Functions
- * @returns An array of GLTF Nodes.
- */
-export function getGLTFNodes(): Array<GLTFNode> {
-  return nodes;
+  throw new Error('Cannot convert model to GLTFNode!');
 }

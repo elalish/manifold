@@ -20,3 +20,6 @@ const speed = 360; // degrees of rotation of gear1 over animationLength
 const ratio = gear1teeth / gear2teeth;
 gear1.rotation = (t) => [0,0, t * speed]
 gear2.rotation = (t) => [0,0, -(t * speed * ratio) + (1/2 * 360/gear2teeth)]
+
+export const gears = [gear1, gear2];
+export default gears;

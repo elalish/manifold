@@ -221,19 +221,15 @@ export async function evaluate(
     module: {exports: {default: null}},
   };
 
-  let manifold = null
+  let result: any = null;
   try {
     const evalFn = new AsyncFunction(
         ...Object.keys(globals), '_manifold_cad_globals', bundled);
     await evalFn(...Object.values(globals), manifoldCAD);
 
-    const defaultExport: any = (globals.module.exports as any)?.default;
-    if (defaultExport instanceof manifoldCAD.Manifold) {
-      // If it's a manifold object, go with that.
-      manifold = defaultExport;
-    } else if (typeof defaultExport === 'function') {
-      // If it's a function, run it.
-      manifold = await defaultExport();
+    result = (globals.module.exports as any)?.default;
+    if (typeof result === 'function') {
+      result = await result();
     }
   } catch (error: any) {
     // "According to step 12 of
@@ -250,17 +246,14 @@ export async function evaluate(
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
   // If we don't actually have a model, complain.
-  if (!manifold && !scenebuilder.hasGLTFNodes()) {
+  const nodes = await scenebuilder.anyToGLTFNodeList(result);
+  if (!nodes.length) {
     throw new Error(
-        'No output as no model was exported and no GLTF nodes were created.  Try \'export default result\'?');
+        'No output as no model was exported.  Try \'export default result\'?');
   }
 
   // Create a gltf-transform document.
-  const doc = scenebuilder.hasGLTFNodes() ?
-      scenebuilder.GLTFNodesToGLTFDoc(
-          scenebuilder.getGLTFNodes(), globalDefaults) :
-      scenebuilder.manifoldToGLTFDoc(manifold!, globalDefaults);
-
+  const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes, globalDefaults);
   const t3 = performance.now();
   log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);
 

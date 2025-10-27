@@ -60,3 +60,4 @@ node.material = {
   metallic: 0,
   attributes: ['COLOR_0']
 };
+export default node;

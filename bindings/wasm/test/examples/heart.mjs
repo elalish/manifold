@@ -49,3 +49,5 @@ node.scale = [scale, scale, scale];
 
 globalDefaults.animationLength = 5;  // seconds
 globalDefaults.animationMode = 'ping-pong';
+
+export default node;

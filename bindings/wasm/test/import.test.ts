@@ -167,11 +167,10 @@ suite('Without a worker, an import will', () => {
     expect(result.constructor.name).toBe('Manifold');
   });
 
-  test('Create GLTFNodes as a side-effect', async () => {
-    expect(scenebuilder.hasGLTFNodes()).toBeFalsy();
-    await import('./fixtures/unitSphereGLTF.mjs');
+  test('Not convert GLTFNode objects', async () => {
+    const {default: result} = await import('./fixtures/unitSphereGLTF.mjs');
 
-    expect(scenebuilder.hasGLTFNodes()).toBeTruthy();
+    expect(result.constructor.name).toBe('GLTFNode');
   });
 
   test('Build a model with local imports', async () => {

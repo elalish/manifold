@@ -49,3 +49,4 @@ const result = mengerSponge(3)
 const node = new GLTFNode();
 node.manifold = result;
 node.material = {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']};
+export default node;

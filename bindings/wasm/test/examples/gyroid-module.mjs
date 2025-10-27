@@ -42,6 +42,7 @@ const gyroidModule = rhombicDodecahedron()
                           .intersect(gyroidOffset(-0.4))
                           .subtract(gyroidOffset(0.4));
 
+const nodes = [];
 if (m > 1) {
   for (let i = 0; i < m; ++i) {
     for (let j = i; j < m; ++j) {
@@ -54,12 +55,10 @@ if (m > 1) {
           baseColorFactor:
               [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
         };
+        nodes.push(node);
       }
     }
   }
 }
 
-const result = gyroidModule.rotate([-45, 0, 90]).translate([
-  0, 0, size / Math.sqrt(2)
-]);
-export default result;
+export default nodes;
