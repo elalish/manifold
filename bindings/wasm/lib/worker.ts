@@ -246,13 +246,13 @@ export async function evaluate(
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
   // If we don't actually have a model, complain.
-  const nodes = await scenebuilder.anyToGLTFNodeList(result);
-  if (!nodes.length) {
+  if (!result) {
     throw new Error(
         'No output as no model was exported.  Try \'export default result\'?');
   }
 
   // Create a gltf-transform document.
+  const nodes = await scenebuilder.anyToGLTFNodeList(result);
   const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes, globalDefaults);
   const t3 = performance.now();
   log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);

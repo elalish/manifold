@@ -8,8 +8,10 @@ const {cube, sphere} = Manifold;
 const box = cube([100, 100, 100], true);
 const ball = sphere(60, 100);
 
-// You must export your model as default, or create at least one
-// GLTFNode - see Menger Sponge and Gyroid Module examples.
+// You must export your model as default.  It can be a Manifold object,
+// a GLTFNode, an array of Manifold or GLTFNode objects, or even a function
+// that returns one of those options.
+// See Menger Sponge, Gyroid Module and Involute Gear Library examples.
 const result = box.subtract(ball);
 export default result;
 

@@ -56,7 +56,7 @@ const tooth2d = (params) => {
   const halfTooth = hull(points)
     .rotate(-2*angularToothWidthAtBase)
     .rotate(-360/teeth * 1/4);
-  return hull([halfTooth,halfTooth.mirror([0,1]) ]);
+  return hull([halfTooth,halfTooth.mirror([0,1])]);
 };
 
 // Export this function.  ManifoldCAD will not call it directly,

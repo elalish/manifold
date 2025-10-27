@@ -345,7 +345,9 @@ export async function anyToGLTFNodeList(
     return await any.map(anyToGLTFNodeList)
         .reduce(async (acc, cur) => ([...(await acc), ...(await cur)]))
   } else if (any instanceof manifoldCAD.GLTFNode || any instanceof GLTFNode) {
-    return [any as GLTFNode];
+    const node = any as GLTFNode;
+    if (!node.parent) return [node];
+    return [await anyToGLTFNodeList(node.parent), node].flat();
   } else if (any instanceof manifoldCAD.Manifold) {
     const node = new GLTFNode();
     node.manifold = any as Manifold;
