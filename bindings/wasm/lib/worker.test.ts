@@ -1,4 +1,4 @@
-// Copyright 2022 The Manifold Authors.
+// Copyright 2022-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@
 
 import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
+import * as fs from 'node:fs/promises';
+import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
-import {examples} from '../examples/public/examples.js';
 import {Mesh} from '../manifold';
 import type {ManifoldToplevel} from '../manifold';
 
@@ -28,9 +29,13 @@ import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 const io = setupIO(new WebIO());
 
 async function runExample(name: string) {
+  const filename = resolve(
+      import.meta.dirname, '../test/examples/',
+      name.toLowerCase().replaceAll(' ', '-') + '.mjs');
+
   const module: ManifoldToplevel = await getManifoldModule();
-  const code = examples.functionBodies.get(name);
-  const doc = await evaluate(code);
+  const code = await fs.readFile(filename, 'utf-8');
+  const doc = await evaluate(code, {jsCDN: 'jsDelivr'});
   const glbURL = await exportBlobURL(doc, 'glb')
   cleanup();
   assert.ok(glbURL);

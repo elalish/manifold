@@ -15,6 +15,8 @@
 import type {ManifoldToplevel} from '../manifold.d.ts';
 import Module from '../manifold.js';
 
+import {isNode} from './util.ts';
+
 // Instantiate Manifold WASM
 let manifoldwasm: ManifoldToplevel|null = null;
 let wasmUrl: string|null = null;
@@ -35,8 +37,15 @@ export function setWasmUrl(url: string) {
  * @returns The newly created instance.
  */
 export async function instantiateManifold(): Promise<ManifoldToplevel> {
-  const options = wasmUrl ? {locateFile: () => wasmUrl!} : undefined;
-  const module = await Module(options);
+  let module: ManifoldToplevel|null = null;
+  if (!isNode()) {
+    if (typeof wasmUrl !== 'string' || !wasmUrl) {
+      throw new Error('No URL given for \'manifold.wasm\'.');
+    }
+    module = await Module({locateFile : () => wasmUrl!});
+  } else {
+    module = await Module();
+  }
   module.setup();
   return module;
 }

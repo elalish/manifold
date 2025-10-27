@@ -12,17 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {quat} from 'gl-matrix';
-
 import {Vec3} from '../manifold-global-types';
+
+const {cos, sin, PI} = Math;
+const TAU = PI * 2;
 
 type Vec4 = [number, number, number, number];
 
 export function euler2quat(rotation: Vec3): Vec4 {
-  const deg2rad = Math.PI / 180;
-  const q: Vec4 = [0, 0, 0, 1];
-  quat.rotateZ(q, q, deg2rad * rotation[2]);
-  quat.rotateY(q, q, deg2rad * rotation[1]);
-  quat.rotateX(q, q, deg2rad * rotation[0]);
+  // https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Source_code
+  const cr = cos(rotation[2] * 0.5 * TAU / 360);
+  const sr = sin(rotation[2] * 0.5 * TAU / 360);
+  const cp = cos(rotation[1] * 0.5 * TAU / 360);
+  const sp = sin(rotation[1] * 0.5 * TAU / 360);
+  const cy = cos(rotation[0] * 0.5 * TAU / 360);
+  const sy = sin(rotation[0] * 0.5 * TAU / 360);
+
+  const q: Vec4 = [0, 0, 0, 0];
+  q[3] = cr * cp * cy + sr * sp * sy;
+  q[2] = sr * cp * cy - cr * sp * sy;
+  q[1] = cr * sp * cy + sr * cp * sy;
+  q[0] = cr * cp * sy - sr * sp * cy;
+
   return q;
-}
+};

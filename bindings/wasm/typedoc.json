@@ -3,11 +3,14 @@
   "entryPoints": [
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
+    "lib/manifoldCAD.ts",
     "types/manifoldCAD.d.ts",
-    "lib/evaluate.ts",
     "lib/scene-builder.ts",
     "lib/worker.ts",
     "lib/manifold-gltf.ts",
+    "lib/bundler.ts",
+    "lib/error.ts",
+    "lib/garbage-collector.ts",
     "lib/util.ts"
   ],
   "sortEntryPoints": false,

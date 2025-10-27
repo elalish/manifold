@@ -13,11 +13,16 @@
 // limitations under the License.
 
 // '?worker' is vite convention to load a module as a web worker.
+// '?url' is vite convention to reference a static asset.
+// vite will package the asset and provide a proper URL.
+import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+
 import ManifoldWorker from '../lib/worker?worker';
+import manifoldWasmUrl from '../manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
-const exampleFunctions = self.examples.functionBodies;
+const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
@@ -115,7 +120,7 @@ function switchTo(scriptName) {
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
-    const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
+    const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
     editor.setValue(code);
@@ -290,12 +295,6 @@ async function getManifoldCadDTS() {
   return `${global.replace(/^import.*$/gm, '')}`;
 }
 
-async function getGlMatrixDTS() {
-  const global =
-      await fetch('/gl-matrix.d.ts').then(response => response.text());
-  return `${global.replace(/^import.*$/gm, '')}`;
-}
-
 require.config({
   paths:
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
@@ -305,8 +304,6 @@ require(['vs/editor/editor.main'], async function() {
       await getManifoldDTS());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldCadDTS());
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getGlMatrixDTS());
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
@@ -470,19 +467,29 @@ function createWorker() {
       manifoldInitialized = true;
 
     } else if (message?.type === 'error') {
+      // Clean up.
       setScript('safe', 'false');
       finishRun();
 
-      consoleElement.textContent += message.message + '\r\n';
+      // Show errors.  If the stack trace makes more sense, show that.
+      const errorText = `${message.name}: ${message.message}`;
+      if (message.stack && message.stack.startsWith(errorText)) {
+        consoleElement.textContent += message.stack + '\r\n';
+      } else {
+        consoleElement.textContent += errorText + '\r\n';
+      }
       consoleElement.scrollTop = consoleElement.scrollHeight;
+      mv.showPoster();
+      poster.textContent = 'Error';
+
+      // Clear models.
       if (output.glbURL) URL.revokeObjectURL(output.glbURL);
       if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
       output.glbURL = null;
       output.threeMFURL = null;
       threemfButton.disabled = true;
-      mv.showPoster();
-      poster.textContent = 'Error';
 
+      // Start all over again.
       createWorker();
 
     } else if (message?.type === 'log') {
@@ -511,7 +518,8 @@ function createWorker() {
     }
   };
 
-  manifoldWorker.postMessage({type: 'initialize'});
+  manifoldWorker.postMessage(
+      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
 }
 
 createWorker();
@@ -522,9 +530,23 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
-  const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
+
+  const files = {};
+  // FIXME pass other files in for import?
+  for (const [name, contents] of exampleFunctions) {
+    files[`./${name}`] = contents;
+  }
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = nthKey(i);
+    if (!key || key === 'currentName' || key === 'safe') continue;
+    files[`./${key}`] = getScript(key)
+  }
+
+  const filename = currentFileElement.textContent
+  const code = editor.getValue();
   manifoldWorker.postMessage(
-      {type: 'evaluate', code: output.outputFiles[0].text});
+      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr', files});
 }
 
 function cancel() {

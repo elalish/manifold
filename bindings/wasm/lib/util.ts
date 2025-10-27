@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as lexer from 'es-module-lexer';
+import {originalPositionFor, TraceMap} from '@jridgewell/trace-mapping';
+import convert from 'convert-source-map';
+import * as stackTraceParser from 'stacktrace-parser';
 
 /**
  * Are we in a web worker?
@@ -23,89 +25,51 @@ export const isWebWorker = (): boolean =>
     typeof self !== 'undefined' && typeof self.document == 'undefined';
 
 /**
- * Transform static imports into dynamic imports.
+ * Are we in Node?
  *
- * Static imports can only be used at the module level, and are typically
- * evaluated when bundling.  Dynamic imports will be evaluated at run time.
- *
- * This is a naive implementation.  Any imports beyond basic
- * static imports will be left untouched.  This includes static imports with
- * assertions, deferred imports and source imports.
- *
- * All heavy lifting is done by
- * [es-module-lexer](https://github.com/guybedford/es-module-lexer).
- *
- * @param code Javascript code potentially including static import statements.
- * @param remotePrefix Optionally, prefix remote packages with this string.
- *     I.e.: 'https://esm.run/'
- * @returns Transformed code containing dynamic imports.
+ * @returns A boolean.
  */
-export const transformStaticImportsToDynamic =
-    (code: string, remotePrefix?: string): string => {
-      let transformed = code;
+export const isNode = (): boolean =>
+    typeof process !== 'undefined' && !!process?.versions?.node;
 
-      const isLocal = (x: string) => x.match(/^(\/|\.\/|\.\.\/)/);
-      const isHttp = (x: string) => x.match(/^https?:\/\//);
-      const decomment = (x: string) =>
-          x.replaceAll(/\/\*[\s\S]*?\*\/|\/\/.*/gm, '');
-      lexer.initSync();
-
-      const [imports] = lexer.parse(transformed);
-      const staticImports = imports
-                                .filter(imp => imp.t === 1)  // Static imports.
-                                .filter(imp => imp.a === -1);  // No assertions.
-
-      // Work from back to front.
-      // This way we only change the positions of imports
-      // we have already transformed.
-      for (const imp of staticImports.reverse()) {
-        let specifier = code.slice(imp.s, imp.e);
-        if (remotePrefix && !isLocal(specifier) && !isHttp(specifier)) {
-          // This is a remote package, but apparently not a URL.
-          specifier = remotePrefix + specifier;
-        }
-
-        let assignee = code.slice(imp.ss, imp.se)
-                           .replace(/^import/, '')
-                           .replace(/from.+$/, '');
-        assignee = decomment(assignee).trim();
-
-        let dynamicImport = '';
-        if (assignee.match(/\{/)) {  // Is the assignee an object?
-          // Destructuring assignment.
-          // '{ foo as bar }' -> '{ foo: bar }'
-          // '{ foo, bar }' => '{ foo, bar }'
-          const assignments =
-              assignee.trim()
-                  .replace(/^{/, '')
-                  .replace(/}$/, '')
-                  .split(',')
-                  .map(x => x.split('as').map(x => x.trim()))
-                  .map(
-                      ([theirname, ourname]) =>
-                          `${theirname}${ourname ? ': ' + ourname : ''}`)
-                  .join(', ');
-          dynamicImport =
-              `const { ${assignments} } = await import('${specifier}')`;
-        } else {
-          // Single assignment.
-          if (assignee.match(/\*\s+as/)) {
-            // Return a named object.
-            const namespace = assignee.replace(/\*\s+as/, '').trim();
-            dynamicImport = `const ${namespace} = await import('${specifier}')`;
-
-          } else {
-            // Assign default export.
-            dynamicImport =
-                `const {default:${assignee}} = await import('${specifier}')`;
-          }
-        }
-
-        // Replace the import.
-        const pre = transformed.substring(0, imp.ss);
-        const post = transformed.substring(imp.se);
-        transformed = pre + dynamicImport + post;
+export const getSourceMappedStackTrace =
+    (code: string, error: Error, lineOffset: number = 0): string|undefined => {
+      const converter = convert.fromSource(code);
+      if (!converter || !error.stack) {
+        // No inline source map.  We can't do anything.
+        return error.stack
       }
 
-      return transformed;
-    };
+      const tracer = new TraceMap(converter!.toObject());
+      let stack = stackTraceParser.parse(error.stack);
+      stack = stack.slice(
+          0, stack.findIndex(call => call.methodName == 'evaluate'));
+
+      stack = stack.map((frame: stackTraceParser.StackFrame) => {
+        if ((frame.lineNumber! + lineOffset) < 1) {
+          return frame;  // Line number is out of range.
+        }
+        const {line: lineNumber, column, source: file} = originalPositionFor(
+            tracer,
+            {line: frame.lineNumber! + lineOffset, column: frame.column!});
+        // Because the evaluator uses a Function constructor, the method name at
+        // top level of the manifoldCAD script will be 'anonymous'.  Ignoring
+        // that makes the stack more readable at the potential cost of confusion
+        // if a manifoldCAD user is also constructing new Functions within their
+        // model.
+        const methodName =
+            (frame.methodName != 'anonymous') ? frame.methodName : '';
+        return {...frame, lineNumber, column, file, methodName};
+      });
+
+      return [
+        error.toString(), ...stack.map(frame => {
+          const location = `${frame.file}:${frame.lineNumber}:${frame.column}`;
+          if (frame.methodName) {
+            return `    at ${frame.methodName} (${location})`;
+          } else {
+            return `    at ${location}`;
+          }
+        })
+      ].reduce((acc, cur) => `${acc}\n${cur}`);
+    }

@@ -134,18 +134,18 @@ jobs:
         cd build/test
         node ./manifold_test.js
     - name: Test package
+      if: matrix.parallelization == 'OFF'
       run: |
         cd bindings/wasm
         npm ci
         npm run build
         npm test
-    - name: Test examples
+    - name: Build examples
       if: matrix.parallelization == 'OFF'
       run: |
         cd bindings/wasm/examples
         npm ci
         npm run build
-        npm test
         cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v4
