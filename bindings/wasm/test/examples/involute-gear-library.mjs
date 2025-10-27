@@ -51,7 +51,7 @@ const tooth2d = (params) => {
   const toothWidthAtPitchCircle = sqrt(pitchRadius**2-baseRadius**2);
   const angleAtPitchCircle = toothWidthAtPitchCircle / baseRadius;
   const diffAngle = angleAtPitchCircle - atan(angleAtPitchCircle);
-  const angularToothWidthAtBase = (TAU/teeth) + 2*diffAngle;
+  const angularToothWidthAtBase = (TAU/teeth) + diffAngle;
 
   const halfTooth = hull(points)
     .rotate(-2*angularToothWidthAtBase)
