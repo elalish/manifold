@@ -38,6 +38,8 @@ jobs:
     - name: Deploy Javascript Docs to Github Pages
       run: |
         cd bindings/wasm
+        cp ../../public/manifold.js .
+        cp ../../public/manifold.wasm .
         npm install
         npm run docs
         mv ./docs ../../public/jsdocs
