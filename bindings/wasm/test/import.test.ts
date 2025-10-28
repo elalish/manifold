@@ -91,7 +91,34 @@ suite('From a string, the worker will', () => {
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
-  test('make isManifoldCAD() return true', async () => {
+  test('Have a specific error when missing gl-matrix', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/glMatrixNoImport.mjs');
+    const code = await readFile(filename, 'utf-8');
+    const ev = async () => await worker.evaluate(code, {filename});
+    await expect(ev()).rejects.toThrowError(
+        /ManifoldCAD no longer includes gl-matrix directly/);
+  });
+
+  test('Throw when no geometry is exported', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/noGeometryExport.mjs');
+    const code = await readFile(filename, 'utf-8');
+    const ev = async () => await worker.evaluate(code, {filename});
+    await expect(ev()).rejects.toThrowError(/no model was exported/);
+  });
+
+  test('Throw when GLTF nodes are created but not exported', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/unitSphereGLTFNoExport.mjs');
+    const code = await readFile(filename, 'utf-8');
+    const ev = async () => await worker.evaluate(code, {filename});
+    await expect(ev()).rejects.toThrowError(
+        /GLTF Nodes were created, but not exported/);
+    await expect(ev()).rejects.not.toThrowError(/no model was exported/);
+  });
+
+  test('Make isManifoldCAD() return true', async () => {
     const filename =
         resolve(import.meta.dirname, './fixtures/isManifoldCAD.mjs');
     const code = await readFile(filename, 'utf-8');
@@ -146,7 +173,34 @@ suite('From the filesystem, the worker will', () => {
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
-  test('make isManifoldCAD() return true', async () => {
+  test('Have a specific error when missing gl-matrix', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/glMatrixNoImport.mjs');
+    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
+    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    await expect(ev()).rejects.toThrowError(
+        /ManifoldCAD no longer includes gl-matrix directly/);
+  });
+
+  test('Throw when no geometry is exported', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/noGeometryExport.mjs');
+    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
+    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    await expect(ev()).rejects.toThrowError(/no model was exported/);
+  });
+
+  test('Throw when GLTF nodes are created but not exported', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/unitSphereGLTFNoExport.mjs');
+    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
+    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    await expect(ev()).rejects.toThrowError(
+        /GLTF Nodes were created, but not exported/);
+    await expect(ev()).rejects.not.toThrowError(/no model was exported/);
+  });
+
+  test('Make isManifoldCAD() return true', async () => {
     const filename =
         resolve(import.meta.dirname, './fixtures/isManifoldCAD.mjs');
     const bundle = await bundleFile(filename);
@@ -195,7 +249,32 @@ suite('Without a worker, an import will', () => {
     await expect(ev()).rejects.toThrowError();
   });
 
-  test('make isManifoldCAD() return false', async () => {
+  test('Not have a distinct message about gl-matrix', async () => {
+    const ev = async () => await import('./fixtures/glMatrixNoImport.mjs');
+    await expect(ev()).rejects.toThrowError();
+    await expect(ev()).rejects.not.toThrowError(
+        /ManifoldCAD no longer includes gl-matrix directly/);
+  });
+
+  test('Not throw when no geometry is exported', async () => {
+    const ev = async () => {
+      const {default: result} = await import('./fixtures/noGeometryExport.mjs');
+      return result;
+    };
+    await expect(ev()).resolves.toBeFalsy();
+  });
+
+  test('Not throw when GLTF nodes are not exported', async () => {
+    const ev = async () => {
+      //@ts-ignore
+      const {default: result} =
+          await import('./fixtures/unitSphereGLTFNoExport.mjs');
+      return result;
+    };
+    await expect(ev()).resolves.toBeFalsy();
+  });
+
+  test('Make isManifoldCAD() return false', async () => {
     const {isManifoldCADReturns, default: result} =
         await import('./fixtures/isManifoldCAD.mjs');
     expect(isManifoldCADReturns).toBeFalsy();

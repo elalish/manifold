@@ -43,8 +43,8 @@ export class RuntimeError extends Error {
   manifoldStack?: string;
   cause: Error;
 
-  constructor(cause: Error, options?: ErrorOptions) {
-    super(cause.message, options);
+  constructor(cause: Error, message?: string, options?: ErrorOptions) {
+    super(message ?? cause.message, options);
     this.cause = cause;
   }
 
@@ -58,9 +58,5 @@ export class RuntimeError extends Error {
 
   get stack(): string|undefined {
     return this.manifoldStack;
-  }
-
-  toString() {
-    return this.cause.toString();
   }
 }
