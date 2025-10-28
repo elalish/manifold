@@ -111,7 +111,6 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // https://github.com/evanw/esbuild/issues/2198#issuecomment-1104566397
       if (args.pluginData === skipResolve) return null;
 
-
       // Skip a few cases handled elsewhere.
       if (args.namespace === 'http-url') return null;
       if (args.path.match(/^https?:\/\//)) return null;
@@ -126,8 +125,6 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       if (options.files && Object.keys(options.files).includes(args.path)) {
         return {namespace: 'virtual-file', path: args.path};
       }
-
-
 
       // Try esbuilds' resolver first.
       const result = await build.resolve(args.path, {
@@ -287,7 +284,12 @@ export const bundleCode =
     }
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
-      stdin: {contents: code, sourcefile: options.filename, resolveDir},
+      stdin: {
+        contents: code,
+        sourcefile: options.filename,
+        resolveDir,
+        loader: 'ts',
+      }
     });
     return built.outputFiles![0].text;
   } catch (error) {
