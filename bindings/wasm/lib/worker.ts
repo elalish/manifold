@@ -249,7 +249,7 @@ export async function evaluate(
       newError = new RuntimeError(
           error,
           'ManifoldCAD no longer includes gl-matrix directly.  ' +
-              'Import it by adding `import * as glMatrix from \'glMatrix\';` ' +
+              'Import it by adding `import * as glMatrix from \'gl-matrix\';` ' +
               'to the top of your model.');
     } else {
       newError = new RuntimeError(error);
@@ -270,7 +270,11 @@ export async function evaluate(
           'to the end of your model.');
     }
     throw new Error(
-        'No output as no model was exported.  Try `export default result`?');
+        'No output as no model was exported.  Add a default export ' +
+        '(e.g.: `export default result;`) to the bottom of your model.  ' +
+        'The default export must be a `Manifold` or `GLTFNode` object, ' +
+        'an array of `Manifold` or `GLTFNode` objects, ' +
+        'or a function that returns any of the above.');
   }
 
   // Create a gltf-transform document.
