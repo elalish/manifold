@@ -15,7 +15,7 @@ $CLANG_FORMAT -i bindings/wasm/lib/*.ts &
 $CLANG_FORMAT -i bindings/wasm/examples/*.{js,ts,html} &
 $CLANG_FORMAT -i bindings/wasm/examples/public/*.{js,ts} &
 $CLANG_FORMAT -i bindings/wasm/test/*.ts &
-$CLANG_FORMAT -i bindings/wasm/test/fixtures/*.mjs &
+$CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
 $CLANG_FORMAT -i bindings/wasm/types/*.ts &
 $CLANG_FORMAT -i src/*.{h,cpp} &
 $CLANG_FORMAT -i src/*/*.cpp &

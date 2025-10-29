@@ -229,8 +229,9 @@ export async function evaluate(
   let result: any = null;
   try {
     const evalFn = new AsyncFunction(
-        ...Object.keys(globals), '_manifold_cad_globals', bundled);
-    await evalFn(...Object.values(globals), manifoldCAD);
+        ...Object.keys(globals), '_manifold_cad_globals',
+        '_manifold_cad_top_level', bundled);
+    await evalFn(...Object.values(globals), manifoldCAD, globals);
 
     result = (globals.module.exports as any)?.default;
     if (typeof result === 'function') {
@@ -242,7 +243,17 @@ export async function evaluate(
     // constructor always prefixes the source with additional 2 lines."
     // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
     const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
-    const newError = new RuntimeError(error);
+    let newError: RuntimeError|null = null;
+
+    if (error.message.match(/glMatrix/)) {
+      newError = new RuntimeError(
+          error,
+          'ManifoldCAD no longer includes gl-matrix directly.  ' +
+              'Import it by adding `import * as glMatrix from \'gl-matrix\';` ' +
+              'to the top of your model.');
+    } else {
+      newError = new RuntimeError(error);
+    }
     newError.manifoldStack = stacktrace;
     throw newError;
   }
@@ -251,9 +262,19 @@ export async function evaluate(
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
   // If we don't actually have a model, complain.
-  if (!result) {
+  if (!result || (Array.isArray(result) && !result.length)) {
+    if (scenebuilder.getGLTFNodes().length) {
+      throw new Error(
+          'GLTF Nodes were created, but not exported.  ' +
+          'Add `const nodes = getGLTFNodes();` and `export default nodes;` ' +
+          'to the end of your model.');
+    }
     throw new Error(
-        'No output as no model was exported.  Try \'export default result\'?');
+        'No output as no model was exported.  Add a default export ' +
+        '(e.g.: `export default result;`) to the bottom of your model.  ' +
+        'The default export must be a `Manifold` or `GLTFNode` object, ' +
+        'an array of `Manifold` or `GLTFNode` objects, ' +
+        'or a function that returns any of the above.');
   }
 
   // Create a gltf-transform document.

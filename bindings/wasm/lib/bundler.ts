@@ -112,13 +112,13 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       if (args.pluginData === skipResolve) return null;
 
       // Skip a few cases handled elsewhere.
-      if (args.kind === 'entry-point') return null;
       if (args.namespace === 'http-url') return null;
       if (args.path.match(/^https?:\/\//)) return null;
 
       // Is this a manifoldCAD context import?
+      const pluginData = {toplevel: args.importer === options.filename};
       if (args.path.match(ManifoldCADExportMatch)) {
-        return {namespace: 'manifold-cad-globals', path: args.path};
+        return {namespace: 'manifold-cad-globals', path: args.path, pluginData};
       }
 
       // Is this a virtual file?
@@ -137,10 +137,13 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       if (result.errors.length === 0) {
         if (manifoldCADExportPath && manifoldCADExportPath === result.path) {
           // It resolved to our local manifoldCAD context.
-          return {namespace: 'manifold-cad-globals', path: args.path};
-        } else {
-          return result;
+          return {
+            namespace: 'manifold-cad-globals',
+            path: args.path,
+            pluginData
+          };
         }
+        return result;
       }
 
       // Built in resolver failed.  Are we fetching remote packages?
@@ -158,14 +161,17 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     // Inject context.
     build.onLoad(
         {filter: /.*/, namespace: 'manifold-cad-globals'},
-        (): esbuild.OnLoadResult => {
+        (args): esbuild.OnLoadResult => {
           // This is a string replace.
-          const globals =
-              `{..._manifold_cad_globals, isManifoldCAD: () => true}`
+
+          let globals = `{..._manifold_cad_globals, isManifoldCAD: () => true}`;
+          if (args?.pluginData?.toplevel) {
+            globals = `{..._manifold_cad_top_level}`;
+          }
+
           return {
             // Type hinting isn't necessary.  Only esbuild will see the swap,
-            // and it
-            // doesn't do type validation.
+            // and it doesn't do type validation.
             contents: `export const {${manifoldCADExportNames}} = ${globals};`,
           };
         });
@@ -190,7 +196,11 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         // Is this a manifoldCAD context import from a remote package?
         // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
         if (path === cdnUrl(manifoldCADExportSpecifier, options.jsCDN)) {
-          const response = {path, namespace: 'manifold-cad-globals'};
+          const response = {
+            path,
+            namespace: 'manifold-cad-globals',
+            pluginData: {toplevel: false}
+          };
           return response;
         }
 
@@ -251,7 +261,7 @@ export const bundleFile = async(
     entrypoint: string, options: BundlerOptions = {}): Promise<string> => {
   try {
     const built = await esbuild.build({
-      ...(await getEsbuildConfig(options)),
+      ...(await getEsbuildConfig({...options, filename: entrypoint})),
       entryPoints: [entrypoint],
     });
     return built.outputFiles![0].text;
@@ -274,7 +284,12 @@ export const bundleCode =
     }
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
-      stdin: {contents: code, sourcefile: options.filename, resolveDir},
+      stdin: {
+        contents: code,
+        sourcefile: options.filename,
+        resolveDir,
+        loader: 'ts',
+      }
     });
     return built.outputFiles![0].text;
   } catch (error) {
