@@ -118,6 +118,14 @@ suite('From a string, the worker will', () => {
     await expect(ev()).rejects.not.toThrowError(/no model was exported/);
   });
 
+  test('Accept TypeScript syntax', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/typeScriptSphere.ts');
+    const code = await readFile(filename, 'utf-8');
+    const result = await worker.evaluate(code, {filename});
+    expect(countVertices(result)).toBeGreaterThan(0);
+  });
+
   test('Make isManifoldCAD() return true', async () => {
     const filename =
         resolve(import.meta.dirname, './fixtures/isManifoldCAD.mjs');
@@ -198,6 +206,14 @@ suite('From the filesystem, the worker will', () => {
     await expect(ev()).rejects.toThrowError(
         /GLTF Nodes were created, but not exported/);
     await expect(ev()).rejects.not.toThrowError(/no model was exported/);
+  });
+
+  test('Accept TypeScript syntax', async () => {
+    const filename =
+        resolve(import.meta.dirname, './fixtures/typeScriptSphere.ts');
+    const bundle = await bundleFile(filename);
+    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Make isManifoldCAD() return true', async () => {
