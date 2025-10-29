@@ -136,7 +136,7 @@ struct EdgeOld2New {
 };
 
 struct ColliderInfo {
-  Collider Collider;
+  Collider MyCollider;
   std::vector<EdgeOld2New> EdgeOld2NewVec;
 };
 
@@ -227,6 +227,33 @@ bool isPointProjectionOnSegment(const vec2& p, const vec2& p1, const vec2& p2,
   return (t >= 0.0 - EPSILON) && (t <= 1.0 + EPSILON);
 };
 
+/// @brief Distance from a point to a segment
+/// @param p Point
+/// @param p1 Edge start point
+/// @param p2 Edge end point
+/// @return length, parameter value of closest point
+double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2) {
+  if (length(p2 - p1) < EPSILON) {
+    return length(p1 - p);
+  }
+
+  vec2 d = p2 - p1;
+
+  double t = dot(p - p1, d) / dot(d, d);
+
+  vec2 closestPoint;
+
+  if (t < 0) {
+    closestPoint = p1;
+  } else if (t > 1) {
+    closestPoint = p2;
+  } else {
+    closestPoint = p1 + t * d;
+  }
+
+  return length(closestPoint - p);
+}
+
 // Check if line segment intersect with a circle
 bool isIntersectCircleSegment(const vec2& p1, const vec2& p2,
                               const vec2& center, double radius) {
@@ -260,33 +287,6 @@ std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
 }  // namespace
 
 namespace {
-
-/// @brief Distance from a point to a segment
-/// @param p Point
-/// @param p1 Edge start point
-/// @param p2 Edge end point
-/// @return length, parameter value of closest point
-double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2) {
-  if (length(p2 - p1) < EPSILON) {
-    return length(p1 - p);
-  }
-
-  vec2 d = p2 - p1;
-
-  double t = dot(p - p1, d) / dot(d, d);
-
-  vec2 closestPoint;
-
-  if (t < 0) {
-    closestPoint = p1;
-  } else if (t > 1) {
-    closestPoint = p2;
-  } else {
-    closestPoint = p1 + t * d;
-  }
-
-  return length(closestPoint - p);
-}
 
 // Calculate line segment intersections with a circle
 std::pair<int, std::array<vec2, 2>> intersectCircleSegment(const vec2& p1,
@@ -416,8 +416,6 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
             e2Points[2] + e2CurNormal * radius,
         };
 
-    double t = 0, u = 0;
-
     const auto& [isIntersected, t, u] = intersectSegmentSegment(
         offsetE1[0], offsetE1[1], offsetE2[0], offsetE2[1]);
 
@@ -486,8 +484,6 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
 
       const vec2 point = e2Points[i + 1];
       if (isInsideRect(point) || isInsideEndpointCircles(point)) {
-        std::array<vec2, 2> centers;
-
         if (distancePointSegment(point, p1, p2) < EPSILON) continue;
 
         const auto& [count, centers] =
@@ -843,7 +839,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
       };
       auto recorder = MakeSimpleRecorder(recordCollision);
 
-      colliderInfo.Collider.Collisions(
+      colliderInfo.MyCollider.Collisions(
           manifold::Vec<manifold::Box>({box}).cview(), recorder);
 
 #ifdef MANIFOLD_DEBUG
@@ -958,7 +954,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
           };
           auto recorder = MakeSimpleRecorder(recordCollision);
 
-          colliderInfo.Collider.Collisions(
+          colliderInfo.MyCollider.Collisions(
               manifold::Vec<manifold::Box>({box}).cview(), recorder);
 
           bool eraseFlag = false;

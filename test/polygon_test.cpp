@@ -78,7 +78,7 @@ class PolygonTestFixture : public testing::Test {
   std::string name;
 
   explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri, const std::string &name)
+                              int expectedNumTri, const std::string& name)
       : polys(polys),
         epsilon(epsilon),
         expectedNumTri(expectedNumTri),
@@ -87,7 +87,9 @@ class PolygonTestFixture : public testing::Test {
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-void RegisterPolygonTestsFile(const std::string& filename) {
+template <typename TestFixture>
+void RegisterPolygonTestsFile(const std::string& suitename,
+                              const std::string& filename) {
   auto f = std::ifstream(filename);
   EXPECT_TRUE(f.is_open());
 
@@ -118,9 +120,9 @@ void RegisterPolygonTestsFile(const std::string& filename) {
       }
     }
     testing::RegisterTest(
-        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
-          return new PolygonTestFixture(polys, epsilon, expectedNumTri);
+        suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> TestFixture* {
+          return new TestFixture(polys, epsilon, expectedNumTri, name);
         });
   }
   f.close();
@@ -144,8 +146,8 @@ void RegisterPolygonTests() {
 }
 
 struct FilletResult {
-  FilletResult(const std::vector<CrossSection> &crossSections,
-               const std::string &name)
+  FilletResult(const std::vector<CrossSection>& crossSections,
+               const std::string& name)
       : name(name), crossSections(crossSections){};
 
   std::string name;
@@ -163,16 +165,16 @@ class FilletTestFixture : public PolygonTestFixture {
     TestFillet(polys, expectedNumTri, epsilon);
   }
 
-  void TestFillet(const Polygons &polys, int expectedNumTri,
+  void TestFillet(const Polygons& polys, int expectedNumTri,
                   double epsilon = -1.0);
 
  private:
   static std::unique_ptr<std::vector<FilletResult>,
-                         void (*)(std::vector<FilletResult> *)>
+                         void (*)(std::vector<FilletResult>*)>
       result;
 };
 
-void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
+void FilletTestFixture::TestFillet(const Polygons& polys, int expectedNumTri,
                                    double epsilon) {
   // const double radius = 0.7;
 
@@ -218,7 +220,7 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
 
     EXPECT_TRUE(rc.Area() < manifold::CrossSection(polys).Area());
 
-    auto toRad = [](const vec2 &v) -> double { return atan2(v.y, v.x); };
+    auto toRad = [](const vec2& v) -> double { return atan2(v.y, v.x); };
 
     auto normalizeAngle = [](double angle) -> double {
       while (angle < 0) angle += 2 * M_PI;
@@ -226,10 +228,10 @@ void FilletTestFixture::TestFillet(const Polygons &polys, int expectedNumTri,
       return angle;
     };
 
-    for (const auto &crossSection : r) {
+    for (const auto& crossSection : r) {
       auto polygon = crossSection.ToPolygons();
-      for (const auto &loop : polygon) {
-        const auto &cs = CrossSection(loop);
+      for (const auto& loop : polygon) {
+        const auto& cs = CrossSection(loop);
 
         bool isCCW = cs.Area() > 0;
 
@@ -279,8 +281,8 @@ void RegisterFilletTests() {
 #endif
 }
 
-void Save(const std::string &filename,
-          const std::vector<FilletResult> &result) {
+void Save(const std::string& filename,
+          const std::vector<FilletResult>& result) {
   // Open a file stream for writing.
   std::ofstream outFile(filename);
 
@@ -291,18 +293,18 @@ void Save(const std::string &filename,
   }
 
   // Write each test case to the file.
-  for (const auto &test : result) {
+  for (const auto& test : result) {
     // Write the header for the test.
     outFile << test.name << " " << test.crossSections.size() << "\n";
 
     // Write each CrossSection within the test.
-    for (const auto &crossSection : test.crossSections) {
+    for (const auto& crossSection : test.crossSections) {
       const auto polygons = crossSection.ToPolygons();
 
       outFile << polygons.size() << "\n";
-      for (const auto &loop : polygons) {
+      for (const auto& loop : polygons) {
         outFile << loop.size() << "\n";
-        for (const auto &point : loop) {
+        for (const auto& point : loop) {
           outFile << point.x << " " << point.y << "\n";
         }
       }
@@ -314,13 +316,12 @@ void Save(const std::string &filename,
             << filename << std::endl;
 }
 
-std::unique_ptr<std::vector<FilletResult>,
-                void (*)(std::vector<FilletResult> *)>
+std::unique_ptr<std::vector<FilletResult>, void (*)(std::vector<FilletResult>*)>
     FilletTestFixture::result =
         std::unique_ptr<std::vector<FilletResult>,
-                        void (*)(std::vector<FilletResult> *)>(
+                        void (*)(std::vector<FilletResult>*)>(
             new std::vector<FilletResult>(),
-            [](std::vector<FilletResult> *v) -> void {
+            [](std::vector<FilletResult>* v) -> void {
               Save("result.txt", *v);
 
               delete v;
