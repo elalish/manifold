@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {CrossSection, Manifold, Mat4, Vec2, Vec3} from '../manifold';
+import type {CrossSection, Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
+import type {Mat4, Vec2, Vec3} from '../manifold-global-types.d.ts';
 
-declare class GLTFNode {
+export type {MeshOptions} from '../manifold-encapsulated-types.d.ts';
+export type {Box, ErrorStatus, FillRule, JoinType, Mat3, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness} from '../manifold-global-types.d.ts';
+export type {Mat4, Vec2, Vec3};
+export {CrossSection, Manifold, Mesh};
+
+export declare class GLTFNode {
   manifold?: Manifold;
   translation?: Vec3|((t: number) => Vec3);
   rotation?: Vec3|((t: number) => Vec3);
@@ -25,10 +31,10 @@ declare class GLTFNode {
   clone(parent?: GLTFNode): GLTFNode;
 }
 
-type Attribute = 'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|
+export type Attribute = 'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|
     'COLOR_0'|'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
 
-declare class GLTFMaterial {
+export declare class GLTFMaterial {
   attributes?: Attribute[];
   roughness?: number;
   metallic?: number;
@@ -38,7 +44,7 @@ declare class GLTFMaterial {
   name?: string;
 }
 
-declare const globalDefaults: {
+export declare const globalDefaults: {
   roughness: number,
   metallic: number,
   baseColorFactor: [number, number, number],
@@ -55,7 +61,7 @@ declare const globalDefaults: {
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */
-declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
+export declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
     Manifold;
 
 /**
@@ -67,7 +73,7 @@ declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the first animation frame.
  */
-declare function setMorphStart(
+export declare function setMorphStart(
     manifold: Manifold, func: (v: Vec3) => void): void;
 
 /**
@@ -79,7 +85,8 @@ declare function setMorphStart(
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the last animation frame.
  */
-declare function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void;
+export declare function setMorphEnd(
+    manifold: Manifold, func: (v: Vec3) => void): void;
 
 /**
  * Wrap any shape object with this method to display it and any copies in
@@ -89,7 +96,7 @@ declare function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void;
  *
  * @param shape The object to show - returned for chaining.
  */
-declare function show(shape: CrossSection|Manifold): Manifold;
+export declare function show(shape: CrossSection|Manifold): Manifold;
 
 /**
  * Wrap any shape object with this method to display it and any copies as the
@@ -99,14 +106,14 @@ declare function show(shape: CrossSection|Manifold): Manifold;
  *
  * @param shape The object to show - returned for chaining.
  */
-declare function only(shape: CrossSection|Manifold): Manifold;
+export declare function only(shape: CrossSection|Manifold): Manifold;
 
 /**
  * Is this module running in manifoldCAD evaluator?
  *
  * @returns boolean
  */
-declare function isManifoldCAD(): boolean
+export declare function isManifoldCAD(): boolean
 
 
 /**
@@ -120,7 +127,7 @@ declare function isManifoldCAD(): boolean
  *
  * @returns An array of GLTFNodes.
  */
-declare function getGLTFNodes(): Array<GLTFNode>;
+export declare function getGLTFNodes(): Array<GLTFNode>;
 
 /**
  * Clear the list of cached GLTF nodes.
@@ -129,4 +136,4 @@ declare function getGLTFNodes(): Array<GLTFNode>;
  * website or CLI.  When called in an imported library it will have no
  * effect.
  */
-declare function resetGLTFNodes(): void;
+export declare function resetGLTFNodes(): void;

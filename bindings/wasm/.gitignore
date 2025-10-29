@@ -4,5 +4,6 @@ manifold-3d-*.tgz
 lib/*.js
 lib/*.js.map
 lib/*.d.ts
+lib/*.d.ts.map
 dist/
 coverage/

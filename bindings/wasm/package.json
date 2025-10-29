@@ -7,7 +7,7 @@
     "manifold-cad": "./bin/manifold-cad"
   },
   "scripts": {
-    "build": "tsc && node ./esbuild.mjs",
+    "build": "tsc && node ./esbuild.mjs && api-extractor run",
     "clean": "tsc --build --clean",
     "format": "cd ../.. && ./scripts/format.sh",
     "docs": "npx typedoc",
@@ -58,6 +58,7 @@
     "lib/manifoldCAD.js",
     "lib/manifoldCAD.d.ts",
     "types/manifoldCAD.d.ts",
+    "dist/manifoldCAD.d.ts",
     "dist/worker.bundled.js"
   ],
   "exports": {
@@ -65,7 +66,8 @@
     "./manifold.wasm": "./manifold.wasm",
     "./lib/worker.bundled.js": "./dist/worker.bundled.js",
     "./lib/*": "./lib/*",
-    "./manifoldCAD": "./lib/manifoldCAD.js"
+    "./manifoldCAD": "./lib/manifoldCAD.js",
+    "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts"
   },
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -94,6 +96,7 @@
   },
   "homepage": "https://github.com/elalish/manifold#readme",
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.53.3",
     "@types/convert-source-map": "^2.0.3",
     "@types/node": "^24.2.1",
     "@vitest/coverage-v8": "^3.2.4",
