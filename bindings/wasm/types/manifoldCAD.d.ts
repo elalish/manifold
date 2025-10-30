@@ -15,7 +15,7 @@
 import type {CrossSection, Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
 import type {Mat4, Vec2, Vec3} from '../manifold-global-types.d.ts';
 
-export type {MeshOptions} from '../manifold-encapsulated-types.d.ts';
+export type {getCircularSegments, MeshOptions, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength, triangulate} from '../manifold-encapsulated-types.d.ts';
 export type {Box, ErrorStatus, FillRule, JoinType, Mat3, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness} from '../manifold-global-types.d.ts';
 export type {Mat4, Vec2, Vec3};
 export {CrossSection, Manifold, Mesh};

@@ -47,6 +47,9 @@
       },
       "tsdoc-malformed-inline-tag": {
         "logLevel": "none"
+      },
+      "tsdoc-undefined-tag": {
+        "logLevel": "none"
       }
     }
   }
