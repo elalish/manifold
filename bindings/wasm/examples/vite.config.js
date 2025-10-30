@@ -41,7 +41,13 @@ export default defineConfig({
       }
     ],
   })],
-  resolve: {alias: {path: 'rollup-plugin-node-polyfills/polyfills/path'}},
+  resolve: {
+    alias: {
+      path: resolve(
+          __dirname,
+          './node_modules/rollup-plugin-node-polyfills/polyfills/path.js')
+    }
+  },
   build: {
     target: 'esnext',
     sourcemap: 'inline',
