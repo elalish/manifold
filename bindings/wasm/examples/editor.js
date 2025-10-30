@@ -263,36 +263,10 @@ function initializeRun() {
 // Editor ------------------------------------------------------------
 let tsWorker = undefined;
 
-async function getManifoldDTS() {
-  const global = await fetch('/manifold-global-types.d.ts')
-                     .then(response => response.text());
-
-  const encapsulated = await fetch('/manifold-encapsulated-types.d.ts')
-                           .then(response => response.text());
-
-  return `
-${global.replaceAll('export', '')}
-${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
-declare interface ManifoldToplevel {
-  CrossSection: typeof T.CrossSection;
-  Manifold: typeof T.Manifold;
-  Mesh: typeof T.Mesh;
-  triangulate: typeof T.triangulate;
-  setMinCircularAngle: typeof T.setMinCircularAngle;
-  setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
-  setCircularSegments: typeof T.setCircularSegments;
-  getCircularSegments: typeof T.getCircularSegments;
-  resetToCircularDefaults: typeof T.resetToCircularDefaults;
-  setup: () => void;
-}
-declare const module: ManifoldToplevel;
-`;
-}
-
 async function getManifoldCadDTS() {
   const global =
       await fetch('/manifoldCAD.d.ts').then(response => response.text());
-  return `${global.replace(/^import.*$/gm, '')}`;
+  return `${global.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '')}`;
 }
 
 require.config({
@@ -300,10 +274,12 @@ require.config({
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
 });
 require(['vs/editor/editor.main'], async function() {
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getManifoldDTS());
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getManifoldCadDTS());
+  const manifoldCadDTS = await getManifoldCadDTS();
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
+  const wrapped =
+      `declare module 'manifold-3d/manifoldCAD' {\n${manifoldCadDTS}\n};`
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(wrapped);
+
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});

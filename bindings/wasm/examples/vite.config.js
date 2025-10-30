@@ -17,7 +17,7 @@ export default defineConfig({
   plugins: [viteStaticCopy({
     targets: [
       {
-        src: '../types/manifoldCAD.d.ts',
+        src: '../dist/manifoldCAD.d.ts',
         dest: './',  // Targets are relative to 'dist'.
       },
       // If 'dist/manifold-encapsulated-types.d.ts' and
