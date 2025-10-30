@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// '?worker' is vite convention to load a module as a web worker.
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
+// '?worker' is vite convention to load a module as a web worker.
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 import ManifoldWorker from '../lib/worker?worker';
 import manifoldWasmUrl from '../manifold.wasm?url';
@@ -261,7 +265,6 @@ function initializeRun() {
 }
 
 // Editor ------------------------------------------------------------
-let tsWorker = undefined;
 
 async function getManifoldCadDTS() {
   const global =
@@ -269,23 +272,37 @@ async function getManifoldCadDTS() {
   return `${global.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '')}`;
 }
 
-require.config({
-  paths:
-      {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
-});
-require(['vs/editor/editor.main'], async function() {
+async function createEditor() {
+  self.MonacoEnvironment = {
+    getWorker: (_, label) => {
+      if (label === 'typescript' || label === 'javascript') {
+        return new tsWorker();
+      } else {
+        return new editorWorker();
+      }
+    }
+  };
+
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    value: '',
+    language: 'typescript',
+    automaticLayout: true,
+  });
+  editor.getModel().updateOptions({tabSize: 2});
+
+  // Add known types.
   const manifoldCadDTS = await getManifoldCadDTS();
   monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
   const wrapped =
       `declare module 'manifold-3d/manifoldCAD' {\n${manifoldCadDTS}\n};`
   monaco.languages.typescript.typescriptDefaults.addExtraLib(wrapped);
 
-  editor = monaco.editor.create(
-      document.getElementById('editor'),
-      {language: 'typescript', automaticLayout: true});
-  const w = await monaco.languages.typescript.getTypeScriptWorker();
-  tsWorker = await w(editor.getModel().uri);
-  editor.getModel().updateOptions({tabSize: 2});
+  // Initialize auto typing on monaco editor.
+  const autoTypings = await AutoTypings.create(editor, {
+    sourceCache: new LocalStorageCache(),
+    onError: e => {console.error(e)},
+    onUpdate: (update, text) => {console.log(text)},
+  })
 
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
@@ -347,7 +364,9 @@ require(['vs/editor/editor.main'], async function() {
   window.onresize = () => {
     editor.layout({});
   };
-});
+};
+
+createEditor();
 
 // Animation ------------------------------------------------------------
 const mv = document.querySelector('model-viewer');
