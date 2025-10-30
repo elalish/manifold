@@ -104,6 +104,27 @@ function nthKey(n) {
   }
 }
 
+function getAllScripts() {
+  const files = {};
+  for (const [name, contents] of exampleFunctions) {
+    files[name] = contents;
+  }
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = nthKey(i);
+    if (!key || key === 'currentName' || key === 'safe') continue;
+    files[key] = getScript(key)
+  }
+  return files;
+}
+
+function getModelForScript(filename) {
+  const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
+  const model = monaco.editor.getModel(uri) ||
+      monaco.editor.createModel('', 'typescript', uri);
+  return model;
+}
+
 function saveCurrent() {
   if (editor) {
     const currentName = currentFileElement.textContent;
@@ -127,7 +148,13 @@ function switchTo(scriptName) {
     const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
-    editor.setValue(code);
+    const model = getModelForScript(scriptName);
+    editor.setModel(model);
+
+    // Either editor.setValue() or model.setValue() will trigger
+    // onDidChangeModelContent.  This will cause some UI updates, but will also
+    // get monaco-editor-auto-typings to update types.
+    model.setValue(code);
   }
 }
 
@@ -269,7 +296,7 @@ function initializeRun() {
 async function getManifoldCadDTS() {
   const global =
       await fetch('/manifoldCAD.d.ts').then(response => response.text());
-  return `${global.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '')}`;
+  return global.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '');
 }
 
 async function createEditor() {
@@ -284,24 +311,33 @@ async function createEditor() {
   };
 
   editor = monaco.editor.create(document.getElementById('editor'), {
-    value: '',
     language: 'typescript',
     automaticLayout: true,
   });
   editor.getModel().updateOptions({tabSize: 2});
 
-  // Add known types.
+  // Make sure some types are always available.
   const manifoldCadDTS = await getManifoldCadDTS();
   monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
-  const wrapped =
-      `declare module 'manifold-3d/manifoldCAD' {\n${manifoldCadDTS}\n};`
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(wrapped);
+  const wrap = (module, content) =>
+      `declare module '${module}' {\n${content}\n};`
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      wrap('manifold-3d/manifoldCAD', manifoldCadDTS));
+
+  // Load up all scripts so that monaco can check types of multi-file models.
+  for (const [filename, content] of Object.entries(getAllScripts())) {
+    getModelForScript(filename).setValue(content);
+  }
 
   // Initialize auto typing on monaco editor.
+  self.window.typecache = new LocalStorageCache();
   const autoTypings = await AutoTypings.create(editor, {
-    sourceCache: new LocalStorageCache(),
+    sourceCache: self.window.typecache,
     onError: e => {console.error(e)},
-    onUpdate: (update, text) => {console.log(text)},
+    onUpdate: (update, text) => {console.debug(text)},
+    onUpdateVersions: (versions) => {
+      console.debug(versions)
+    }
   })
 
   for (const [name] of exampleFunctions) {
@@ -525,20 +561,11 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
-
   const files = {};
-  // FIXME pass other files in for import?
-  for (const [name, contents] of exampleFunctions) {
-    files[`./${name}`] = contents;
+  for (const [filename, contents] of Object.entries(getAllScripts())) {
+    files[`./${filename}`] = contents;
   }
-
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const key = nthKey(i);
-    if (!key || key === 'currentName' || key === 'safe') continue;
-    files[`./${key}`] = getScript(key)
-  }
-
-  const filename = currentFileElement.textContent
+  const filename = currentFileElement.textContent;
   const code = editor.getValue();
   manifoldWorker.postMessage(
       {type: 'evaluate', code, filename, jsCDN: 'jsDelivr', files});
