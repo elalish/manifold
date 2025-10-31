@@ -19,16 +19,15 @@ import {BundlerError} from './error.ts';
 import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
-let esbuildHasOwnWorker: boolean = true;
+let esbuildHasOwnWorker: boolean = false;
 
 export const setWasmUrl = (url: string) => {
   esbuildWasmUrl = url;
 };
 
-export const setHasOwnWorker =
-    (x: boolean) => {
-      esbuildHasOwnWorker = x;
-    }
+export const setHasOwnWorker = (x: boolean) => {
+  esbuildHasOwnWorker = x;
+};
 
 /**
  * These content delivery networks provide NPM modules as ES modules,
@@ -96,11 +95,15 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
     if (isNode()) {
       // We only need to check against the local manifoldCAD context on disk if
-      // we happen to be running in node.
+      // we happen to be running in node.  Truthfully, this is really only
+      // necessary in development.  End users will almost always import
+      // `manifold-3d/manifoldCAD` instead of `some/path/to/manifoldCAD`.
       (async () => {
-        const {resolve} = await import('node:path');
-        manifoldCADExportPath =
-            resolve(import.meta.dirname, './manifoldCAD.ts');
+        const {resolve, dirname} = await import('node:path');
+        const {fileURLToPath} = await import('node:url');
+        const dir = __dirname ?? import.meta?.dirname ??
+            dirname(fileURLToPath(import.meta.url));
+        manifoldCADExportPath = resolve(dir, './manifoldCAD.ts');
       })();
     }
 

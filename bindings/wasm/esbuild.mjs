@@ -9,6 +9,6 @@ await esbuild.build({
   sourcemap: 'inline',
   sourcesContent: true,
   external: [
-    'node:path', 'module',
+    'node:path', 'node:url', 'module',
   ]
 });
