@@ -41,9 +41,16 @@ export default defineConfig({
       }
     ],
   })],
+  resolve: {
+    alias: {
+      path: resolve(
+          __dirname,
+          './node_modules/rollup-plugin-node-polyfills/polyfills/path.js')
+    }
+  },
   build: {
     target: 'esnext',
-    sourcemap: 'inline',
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),
