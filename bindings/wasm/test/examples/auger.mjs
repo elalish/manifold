@@ -3,6 +3,7 @@ const beadRadius = 2;
 const height = 40;
 const twist = 90;
 
+import {CrossSection, Manifold, setMinCircularEdgeLength} from 'manifold-3d/manifoldCAD';
 const {revolve, sphere, union, extrude} = Manifold;
 const {circle} = CrossSection;
 setMinCircularEdgeLength(0.1);

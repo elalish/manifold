@@ -58,16 +58,23 @@
     "lib/manifoldCAD.js",
     "lib/manifoldCAD.d.ts",
     "types/manifoldCAD.d.ts",
+    "types/globalDefaults.d.ts",
     "dist/manifoldCAD.d.ts",
     "dist/worker.bundled.js"
   ],
   "exports": {
-    ".": "./manifold.js",
-    "./manifold.wasm": "./manifold.wasm",
-    "./lib/worker.bundled.js": "./dist/worker.bundled.js",
+    "./manifoldCAD": {
+      "import": "./lib/manifoldCAD.js",
+      "types": "./dist/manifoldCAD.d.ts"
+    },
+    "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts",
+    "./lib/worker.bundled.js": {
+      "import": "./dist/worker.bundled.js",
+      "types": "./lib/worker.js"
+    },
     "./lib/*": "./lib/*",
-    "./manifoldCAD": "./lib/manifoldCAD.js",
-    "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts"
+    "./manifold.wasm": "./manifold.wasm",
+    ".": "./manifold.js"
   },
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",

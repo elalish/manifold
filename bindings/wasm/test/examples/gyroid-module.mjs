@@ -2,6 +2,8 @@
 // https://www.thingiverse.com/thing:25477. This sample demonstrates the
 // use of a Signed Distance Function (SDF) to create smooth, complex
 // manifolds.
+
+import {Manifold, GLTFNode, getGLTFNodes} from 'manifold-3d/manifoldCAD';
 import {vec3} from 'gl-matrix';
 
 // number of modules along pyramid edge (use 1 for print orientation)

@@ -1,6 +1,7 @@
 // Demonstrate using a library.
 
 import {involuteGear2d} from './Involute Gear Library';
+import {GLTFNode, getGLTFNodes} from 'manifold-3d/manifoldCAD';
 
 const gear1teeth = 12;
 const gear2teeth = 15;

@@ -1,7 +1,11 @@
 // Demonstrates how at 90-degree intersections, the sphere and cylinder
 // facets match up perfectly, for any choice of global resolution
-
 // parameters.
+
+import {
+  Manifold, GLTFNode, getGLTFNodes,
+  setMinCircularAngle, setMinCircularEdgeLength
+} from 'manifold-3d/manifoldCAD';
 const {sphere, cylinder, union, cube} = Manifold;
 
 function roundedFrame(edgeLength, radius, circularSegments = 0) {

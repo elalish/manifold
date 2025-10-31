@@ -3,6 +3,9 @@
 // https://www.thingiverse.com/thing:6190
 // It also demonstrates the use of setMorph to animate a warping function.
 
+import {Manifold, GLTFNode, setMorphStart} from 'manifold-3d/manifoldCAD';
+
+
 const func = (v) => {
   const x2 = v[0] * v[0];
   const y2 = v[1] * v[1];
