@@ -7,7 +7,7 @@ await esbuild.build({
   format: 'esm',
   target: 'esnext',
   sourcemap: 'inline',
-  sourcesContent: true,
+  sourcesContent: false,
   external: [
     'node:path', 'node:url', 'module',
   ]

@@ -19,7 +19,6 @@ import {resolve} from 'node:path';
 import {afterEach, beforeEach, expect, suite, test, vi} from 'vitest';
 
 import {bundleFile} from '../lib/bundler.ts';
-import * as scenebuilder from '../lib/scene-builder';
 import * as worker from '../lib/worker.ts';
 
 const countVertices = (doc: Document) => {
@@ -83,12 +82,13 @@ suite('From a string, the worker will', () => {
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
-  test('Build even if missing a top-level manifoldCAD import', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
+  test('Fails if missing a top-level manifoldCAD import', async () => {
+    const filename = resolve(
+        import.meta.dirname, './fixtures/unitSphereNoManifoldImport.mjs');
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
-    expect(countVertices(result)).toBeGreaterThan(0);
+    const ev = async () => await worker.evaluate(code, {filename});
+    await expect(ev()).rejects.toThrowError(
+        /Import it by adding.*manifold-3d\/manifoldCAD/);
   });
 
   test('Have a specific error when missing gl-matrix', async () => {
@@ -166,12 +166,13 @@ suite('From the filesystem, the worker will', () => {
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
-  test('Build even if missing a top-level manifoldCAD import', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
+  test('Fail if missing a top-level manifoldCAD import', async () => {
+    const filename = resolve(
+        import.meta.dirname, './fixtures/unitSphereNoManifoldImport.mjs');
     const bundle = await bundleFile(filename);
     const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
-    await expect(ev()).resolves.toBeInstanceOf(Document);
+    await expect(ev()).rejects.toThrowError(
+        /Import it by adding.*manifold-3d\/manifoldCAD/);
   });
 
   test('Bundle npm imports from a CDN', async () => {

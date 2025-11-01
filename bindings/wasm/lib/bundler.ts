@@ -119,7 +119,10 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       if (args.path.match(/^https?:\/\//)) return null;
 
       // Is this a manifoldCAD context import?
-      const pluginData = {toplevel: args.importer === options.filename};
+      const pluginData = {
+        toplevel:
+            args.importer === options.filename || args.importer === '<stdin>'
+      };
       if (args.path.match(ManifoldCADExportMatch)) {
         return {namespace: 'manifold-cad-globals', path: args.path, pluginData};
       }
@@ -166,12 +169,9 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         {filter: /.*/, namespace: 'manifold-cad-globals'},
         (args): esbuild.OnLoadResult => {
           // This is a string replace.
-
-          let globals = `{..._manifold_cad_globals, isManifoldCAD: () => true}`;
-          if (args?.pluginData?.toplevel) {
-            globals = `{..._manifold_cad_top_level}`;
-          }
-
+          const globals = args.pluginData?.toplevel ?
+              '_manifold_cad_top_level' :
+              '_manifold_cad_library';
           return {
             // Type hinting isn't necessary.  Only esbuild will see the swap,
             // and it doesn't do type validation.

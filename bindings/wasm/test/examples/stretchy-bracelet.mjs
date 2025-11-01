@@ -1,5 +1,7 @@
 // Recreates Stretchy Bracelet by Emmett Lalish:
 // https://www.thingiverse.com/thing:13505
+
+import {Manifold} from 'manifold-3d/manifoldCAD';
 import {vec2} from 'gl-matrix';
 
 function base(

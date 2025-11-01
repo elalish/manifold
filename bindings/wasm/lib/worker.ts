@@ -185,13 +185,6 @@ export interface evaluateOptions {
  */
 export async function evaluate(
     code: string, options: evaluateOptions = {}): Promise<Document> {
-  // Global defaults can be populated by the script.  It's set per
-  // evaluation, while the rest of the context doesn't change from
-  // run to run.
-  // This can be used to set parameters elsewhere in ManifoldCAD.  For
-  // example, the GLTF exporter will look for animation type and
-  // framerate.
-  const globalDefaults = {} as scenebuilder.GlobalDefaults;
   const t0 = performance.now();
 
   const {doNotBundle, ...bundleOpt} = options;
@@ -207,15 +200,36 @@ export async function evaluate(
   manifoldCAD.resetToCircularDefaults();
   cleanup();
 
-  const globals = {
+  // Customize `manifold-3d/manifoldCAD`.
+  // Let models know that they are running inside this worker.
+  const manifoldImport = {
     ...manifoldCAD,
-    globalDefaults,
     isManifoldCAD: () => true,
+  }
 
-    // At the top level, track created GLTF nodes.
+  // If a top level script imports manifoldCAD, track GLTF nodes.
+  // Libraries are expected to manage this on their own; if a
+  // library somehow doesn't export a GLTF node, it must not
+  // show up here.
+  const toplevelImport = {
+    ...manifoldImport,
     GLTFNode: scenebuilder.GLTFNodeTracked,
     getGLTFNodes: scenebuilder.getGLTFNodes,
     resetGLTFNodes: scenebuilder.resetGLTFNodes,
+  };
+
+  // Set up global variables exposed to the model without an import.
+  const globalDefaults = {} as scenebuilder.GlobalDefaults;
+  const globals = {
+    // Global defaults can be populated by the script.
+    // This can be used to set parameters elsewhere in ManifoldCAD.  For
+    // example, the GLTF exporter will look for animation type and
+    // framerate.
+    globalDefaults,
+
+    // The bundler will swap these objects in when needed.
+    _manifold_cad_top_level: toplevelImport,
+    _manifold_cad_library: manifoldImport,
 
     // While this project is built using ES modules, and we assume models and
     // libraries are ES modules, code executed via `new Function()` or `eval` is
@@ -228,12 +242,13 @@ export async function evaluate(
 
   let result: any = null;
   try {
-    const evalFn = new AsyncFunction(
-        ...Object.keys(globals), '_manifold_cad_globals',
-        '_manifold_cad_top_level', bundled);
-    await evalFn(...Object.values(globals), manifoldCAD, globals);
+    const evalFn = new AsyncFunction(...Object.keys(globals), bundled);
+    await evalFn(...Object.values(globals));
 
-    result = (globals.module.exports as any)?.default;
+    result = globals.module?.exports?.default;
+    // If the default export is a function, execute it.  This way libraries can
+    // preview their results when run as a top level script, without incurring
+    // that overhead when imported into another model.
     if (typeof result === 'function') {
       result = await result();
     }
@@ -245,7 +260,16 @@ export async function evaluate(
     const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
     let newError: RuntimeError|null = null;
 
-    if (error.message.match(/glMatrix/)) {
+    const missing =
+        Object.keys(toplevelImport).find((x: string) => error.message.match(x));
+    if (error.name === 'ReferenceError' && missing) {
+      newError = new RuntimeError(
+          error,
+          error.message + '.  Import it by adding \`' +
+              `import {${missing}} from 'manifold-3d/manifoldCAD';` +
+              '\` to the top of your model.');
+    } else if (
+        error.name === 'ReferenceError' && error.message.match(/glMatrix/)) {
       newError = new RuntimeError(
           error,
           'ManifoldCAD no longer includes gl-matrix directly.  ' +

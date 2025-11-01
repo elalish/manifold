@@ -44,16 +44,6 @@ export declare class GLTFMaterial {
   name?: string;
 }
 
-export declare const globalDefaults: {
-  roughness: number,
-  metallic: number,
-  baseColorFactor: [number, number, number],
-  alpha: number,
-  unlit: boolean,
-  animationLength: number,
-  animationMode: 'loop'|'ping-pong';
-}
-
 /**
  * Returns a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
@@ -61,8 +51,8 @@ export declare const globalDefaults: {
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */
-export declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
-    Manifold;
+export declare function setMaterial(
+    manifold: Manifold, material: GLTFMaterial): Manifold;
 
 /**
  * Apply a morphing animation to the input manifold. Specify the start

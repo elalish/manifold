@@ -20,6 +20,10 @@ export default defineConfig({
         src: '../dist/manifoldCAD.d.ts',
         dest: './',  // Targets are relative to 'dist'.
       },
+      {
+        src: '../types/globalDefaults.d.ts',
+        dest: './',
+      },
       // If 'dist/manifold-encapsulated-types.d.ts' and
       // 'dist/manifold-global-types.d.ts' are missing, the web editor can't
       // load them, and type validation won't work for our core modules.

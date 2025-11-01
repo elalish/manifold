@@ -4,6 +4,8 @@
 // assemblies. Based on the screw puzzle by George Hart:
 // https://www.thingiverse.com/thing:186372
 
+import {Manifold, GLTFNode, getGLTFNodes, setMaterial} from 'manifold-3d/manifoldCAD';
+
 const edgeLength = 50;  // Length of each edge of the overall tetrahedron.
 const gap = 0.2;  // Spacing between the two halves to allow sliding.
 const nDivisions = 50;  // Divisions (both ways) in the screw surface.

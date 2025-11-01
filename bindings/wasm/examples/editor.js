@@ -293,10 +293,10 @@ function initializeRun() {
 
 // Editor ------------------------------------------------------------
 
-async function getManifoldCadDTS() {
-  const global =
-      await fetch('/manifoldCAD.d.ts').then(response => response.text());
-  return global.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '');
+async function getDTS(url) {
+  const response = await fetch(url);
+  const text = await response.text();
+  return text.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '');
 }
 
 async function createEditor() {
@@ -316,13 +316,17 @@ async function createEditor() {
   });
   editor.getModel().updateOptions({tabSize: 2});
 
-  // Make sure some types are always available.
-  const manifoldCadDTS = await getManifoldCadDTS();
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
+  // Make sure `manifold-3d/manifoldCAD` types are available for import.
   const wrap = (module, content) =>
       `declare module '${module}' {\n${content}\n};`
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      wrap('manifold-3d/manifoldCAD', manifoldCadDTS));
+  const manifoldCadDTS =
+      wrap('manifold-3d/manifoldCAD', await getDTS('/manifoldCAD.d.ts'));
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
+
+  // Types for the globalDefaults object.  This is available as a global to top
+  // level scripts, and shared across the scene builder.
+  const globalDefaultsDTS = await getDTS('/globalDefaults.d.ts');
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(globalDefaultsDTS);
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {
@@ -331,14 +335,14 @@ async function createEditor() {
 
   // Initialize auto typing on monaco editor.
   self.window.typecache = new LocalStorageCache();
-  const autoTypings = await AutoTypings.create(editor, {
+  await AutoTypings.create(editor, {
     sourceCache: self.window.typecache,
     onError: e => {console.error(e)},
     onUpdate: (update, text) => {console.debug(text)},
     onUpdateVersions: (versions) => {
       console.debug(versions)
     }
-  })
+  });
 
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);

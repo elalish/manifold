@@ -2,6 +2,8 @@
 // smooth() and refine(), see more details at:
 // https://elalish.blogspot.com/2022/03/smoothing-triangle-meshes.html
 
+import {Manifold, Mesh, GLTFNode} from 'manifold-3d/manifoldCAD';
+
 const height = 10;
 const radius = 30;
 const offset = 20;
