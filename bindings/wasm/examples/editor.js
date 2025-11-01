@@ -122,6 +122,7 @@ function getModelForScript(filename) {
   const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
   const model = monaco.editor.getModel(uri) ||
       monaco.editor.createModel('', 'typescript', uri);
+  model.updateOptions({tabSize: 2});
   return model;
 }
 
@@ -314,7 +315,6 @@ async function createEditor() {
     language: 'typescript',
     automaticLayout: true,
   });
-  editor.getModel().updateOptions({tabSize: 2});
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
   const wrap = (module, content) =>
