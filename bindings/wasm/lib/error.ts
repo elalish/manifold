@@ -17,11 +17,18 @@ import type {BuildFailure, Location, Message} from 'esbuild';
 export class BundlerError extends Error {
   location?: Location;
   error: Message;
+  manifoldStack?: string;
 
   constructor(failure: BuildFailure, options?: ErrorOptions) {
     super(undefined, options);
     this.cause = failure;
     this.error = failure.errors[0];
+
+    if (this.error.location) {
+      const {file, line, column} = this.error.location!;
+      this.manifoldStack =
+          `${this.toString()}\n    at ${file}:${line}:${column}`;
+    }
   }
 
   get name(): string {
@@ -44,9 +51,5 @@ export class RuntimeError extends Error {
 
   get name(): string {
     return this.cause.name;
-  }
-
-  get message(): string {
-    return this.cause.message;
   }
 }

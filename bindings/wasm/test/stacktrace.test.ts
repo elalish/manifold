@@ -17,7 +17,7 @@ import * as stackTraceParser from 'stacktrace-parser';
 import {beforeEach, expect, suite, test} from 'vitest';
 
 import {bundleFile} from '../lib/bundler.ts';
-import {RuntimeError} from '../lib/error.ts';
+import {BundlerError, RuntimeError} from '../lib/error.ts';
 import {parseStackTrace} from '../lib/util.ts';
 import * as worker from '../lib/worker.ts';
 
@@ -71,7 +71,7 @@ suite('Build a model with the worker', () => {
     await expect(ev()).rejects.toThrowError()
   });
 
-  test('Exceptions should be wrapped', async () => {
+  test('Runtime exceptions should be wrapped', async () => {
     const filepath =
         resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
     let code = await bundleFile(filepath);
@@ -107,12 +107,37 @@ suite('Build a model with the worker', () => {
     } catch (e) {
       error = e as RuntimeError;
     }
+    expect(error!.message).toMatch(/fail/);
     const [frame, ...rest] = stackTraceParser.parse(error!.manifoldStack!);
     expect(frame.lineNumber).toBe(5);
     expect(frame.column).toBe(7);
     expect(frame.methodName).toBe('dostuff');
     expect(frame.file).toMatch(/exportReferenceError\.mjs$/);
     expect(rest.length).toEqual(2);
+  });
+
+  test('Bundler exceptions should be wrapped', async () => {
+    const filepath =
+        resolve(import.meta.dirname, './fixtures/bundlerError.mjs');
+    const ev = async () => await bundleFile(filepath);
+    await expect(ev()).rejects.toThrowError(BundlerError);
+  });
+
+  test('Bundler exceptions should have accurate stack traces.', async () => {
+    const filepath =
+        resolve(import.meta.dirname, './fixtures/bundlerError.mjs');
+    let error: RuntimeError|null = null;
+    try {
+      await bundleFile(filepath);
+    } catch (e) {
+      error = e as RuntimeError;
+    }
+    console.log(BundlerError)
+    const [frame, ...rest] = stackTraceParser.parse(error!.manifoldStack!);
+    expect(frame.lineNumber).toBe(1);
+    expect(frame.column).toBe(21);
+    expect(frame.file).toMatch(/bundlerError\.mjs$/);
+    expect(rest.length).toEqual(0);
   });
 });
 
