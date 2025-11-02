@@ -55,6 +55,11 @@ option(
 )
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
+option(
+  MANIFOLD_PYBIND_SHARED_MANIFOLD
+  "Link Python bindings to shared Mainfold library"
+  OFF
+)
 # MANIFOLD_CBIND is only available when MANIFOLD_CROSS_SECTION is enabled
 cmake_dependent_option(
   MANIFOLD_CBIND
