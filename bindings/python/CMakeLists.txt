@@ -39,7 +39,11 @@ if(MANIFOLD_PYBIND_STUBGEN)
   )
 endif()
 
-target_link_libraries(manifold3d PRIVATE manifold)
+if(MANIFOLD_PYBIND_SHARED_MANIFOLD)
+  target_link_libraries(manifold3d PUBLIC manifold)
+else()
+  target_link_libraries(manifold3d PRIVATE manifold)
+endif()
 target_compile_options(
   manifold3d
   PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d

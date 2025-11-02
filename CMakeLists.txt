@@ -55,6 +55,11 @@ option(
 )
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
+option(
+  MANIFOLD_PYBIND_SHARED_MANIFOLD
+  "Link Python bindings to shared Mainfold library"
+  OFF
+)
 # MANIFOLD_CBIND is only available when MANIFOLD_CROSS_SECTION is enabled
 cmake_dependent_option(
   MANIFOLD_CBIND
@@ -114,6 +119,16 @@ endif()
 
 if(TRACY_ENABLE)
   option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
+endif()
+
+if(MANIFOLD_PYBIND)
+  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    OUTPUT_VARIABLE nanobind_ROOT
+  )
+  find_package(nanobind CONFIG REQUIRED)
 endif()
 
 if(EMSCRIPTEN)
