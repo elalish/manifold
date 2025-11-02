@@ -4,5 +4,5 @@ export const dostuff =
     () => {
       fail();
     }
-// Fail on load/import.
-export default dostuff();
+// Export as a function that will fail on demand, rather than on load.
+export default dostuff;

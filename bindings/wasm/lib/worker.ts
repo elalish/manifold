@@ -28,7 +28,7 @@
 import {Document} from '@gltf-transform/core';
 
 import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
-import {BundlerError, RuntimeError} from './error.ts';
+import {RuntimeError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as garbageCollector from './garbage-collector.ts';
@@ -359,18 +359,13 @@ const initializeWebWorker = (): void => {
 
   const sendError = (error: Error) => {
     // Log the error / stack trace to the console.
-    if (error.stack &&
-        (error instanceof BundlerError || error instanceof RuntimeError)) {
-      console.error(error.stack);
-    } else {
-      console.error(error);
-    }
+    console.error(error);
 
     self.postMessage({
       type: 'error',
       name: error.name,
       message: error.message,
-      stack: error.stack
+      stack: (error as any).manifoldStack ?? error.stack
     } as MessageFromWorker.Error);
   };
 
