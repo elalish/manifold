@@ -31,12 +31,6 @@ export class BundlerError extends Error {
   get message(): string {
     return this.error.text;
   }
-
-  get stack(): string|undefined {
-    if (!this.error.location) return undefined;
-    const {file, line, column} = this.error.location!;
-    return `${this.toString()}\n    at ${file}:${line}:${column}`;
-  }
 };
 
 export class RuntimeError extends Error {
@@ -54,9 +48,5 @@ export class RuntimeError extends Error {
 
   get message(): string {
     return this.cause.message;
-  }
-
-  get stack(): string|undefined {
-    return this.manifoldStack;
   }
 }

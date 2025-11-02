@@ -14,7 +14,6 @@
 
 import {originalPositionFor, TraceMap} from '@jridgewell/trace-mapping';
 import convert from 'convert-source-map';
-import * as stackTraceParser from 'stacktrace-parser';
 
 /**
  * Are we in a web worker?
@@ -32,6 +31,53 @@ export const isWebWorker = (): boolean =>
 export const isNode = (): boolean =>
     typeof process !== 'undefined' && !!process?.versions?.node;
 
+const parseV8StackTrace = (stack: string) =>
+    stack.split('\n').filter(frame => frame.match(/<anonymous>/)).map(frame => {
+      const matches = frame.matchAll(/:([0-9]+):([0-9]+)\)$/g).next().value;
+      const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
+      const methodName = frame.match(/^\s+at\s([^\s]+)/)![1];
+      return {
+        line,
+        column,
+        // In Node or Chrome, a function constructor shows as 'eval'.
+        methodName: methodName === 'eval' ? null : methodName
+      };
+    });
+
+const parseSpiderMonkeyStackTrace = (stack: string) =>
+    stack.split('\n')
+        .filter(frame => frame.match(/AsyncFunction/))
+        .map(frame => {
+          const matches =
+              frame.matchAll(/AsyncFunction:([0-9]+):([0-9]+)/g).next().value;
+          const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
+          const methodName = frame.match(/^[^@]+/)![0];
+          return {
+            line,
+            column,
+            // In Firefox, a function constructor shows as 'anonymous'.
+            methodName: methodName === 'anonymous' ? null : methodName
+          };
+        });
+
+/**
+ * Attempt to parse a stack trace from a dynamically created function.
+ *
+ *  This makes the stack trace more readable at the potential cost of confusion
+ * if a manifoldCAD user is also constructing new Functions within their model.
+ */
+export const parseStackTrace =
+    (stack: string) => {
+      if (stack.match(/^\s+at\s/gm)) {
+        // V8 -- Chrome, NodeJS
+        return parseV8StackTrace(stack);
+      } else if (stack.match(/^([^@]+)@/gm)) {
+        // SpiderMonkey -- Firefox
+        return parseSpiderMonkeyStackTrace(stack);
+      } else
+        return [];
+    }
+
 export const getSourceMappedStackTrace =
     (code: string, error: Error, lineOffset: number = 0): string|undefined => {
       const converter = convert.fromSource(code);
@@ -39,32 +85,26 @@ export const getSourceMappedStackTrace =
         // No inline source map.  We can't do anything.
         return error.stack
       }
-
+      const parsed = parseStackTrace(error.stack);
+      if (!parsed.length) {
+        // We can't parse this.  Chances are, it's someone in Safari.
+        return error.stack
+      }
       const tracer = new TraceMap(converter!.toObject());
-      let stack = stackTraceParser.parse(error.stack);
-      stack = stack.slice(
-          0, stack.findIndex(call => call.methodName == 'evaluate'));
-
-      stack = stack.map((frame: stackTraceParser.StackFrame) => {
-        if ((frame.lineNumber! + lineOffset) < 1) {
+      const stack = parsed.map(frame => {
+        if ((frame.line! + lineOffset) < 1) {
           return frame;  // Line number is out of range.
         }
-        const {line: lineNumber, column, source: file} = originalPositionFor(
-            tracer,
-            {line: frame.lineNumber! + lineOffset, column: frame.column!});
-        // Because the evaluator uses a Function constructor, the method name at
-        // top level of the manifoldCAD script will be 'anonymous'.  Ignoring
-        // that makes the stack more readable at the potential cost of confusion
-        // if a manifoldCAD user is also constructing new Functions within their
-        // model.
-        const methodName =
-            (frame.methodName != 'anonymous') ? frame.methodName : '';
-        return {...frame, lineNumber, column, file, methodName};
+        const {line, column, source: file} = originalPositionFor(
+            tracer, {line: frame.line! + lineOffset, column: frame.column!});
+        const {methodName} = frame;
+        // column numbers should be 1 indexed.  Results are 0 indexed.
+        return {line, column: column! + 1, file, methodName};
       });
 
       return [
-        error.toString(), ...stack.map(frame => {
-          const location = `${frame.file}:${frame.lineNumber}:${frame.column}`;
+        error.toString(), ...stack.map((frame: any) => {
+          const location = `${frame.file}:${frame.line}:${frame.column}`;
           if (frame.methodName) {
             return `    at ${frame.methodName} (${location})`;
           } else {
