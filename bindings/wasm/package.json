@@ -7,7 +7,8 @@
     "manifold-cad": "./bin/manifold-cad"
   },
   "scripts": {
-    "build": "tsc && node ./esbuild.mjs && api-extractor run",
+    "build": "tsc && node ./esbuild.mjs && npm run build:api-extractor",
+    "build:api-extractor": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
     "clean": "tsc --build --clean",
     "format": "cd ../.. && ./scripts/format.sh",
     "docs": "npx typedoc",
@@ -60,6 +61,7 @@
     "types/manifoldCAD.d.ts",
     "types/globalDefaults.d.ts",
     "dist/manifoldCAD.d.ts",
+    "dist/manifoldCADGlobals.d.ts",
     "dist/worker.bundled.js"
   ],
   "exports": {

@@ -3,17 +3,36 @@
   "entryPoints": [
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
-    "lib/manifoldCAD.ts",
     "types/manifoldCAD.d.ts",
-    "lib/scene-builder.ts",
+    "types/manifoldCADGlobals.d.ts",
     "lib/worker.ts",
-    "lib/manifold-gltf.ts",
+    "lib/animation.ts",
     "lib/bundler.ts",
+    "lib/debug.ts",
     "lib/error.ts",
     "lib/garbage-collector.ts",
-    "lib/util.ts"
+    "lib/gltf-node.ts",
+    "lib/level-of-detail.ts",
+    "lib/material.ts",
+    "lib/math.ts",
+    "lib/scene-builder.ts",
+    "lib/util.ts",
+    "lib/wasm.ts",
+    "lib/manifold-gltf.ts"
   ],
+  "navigationLinks": {
+    "manifoldCAD.org": "https://manifoldCAD.org",
+    "C++ Documentation": "https://manifoldcad.org/docs/html/",
+    "Algorithm Description": "https://github.com/elalish/manifold/wiki/Manifold-Library",
+    "Blog Posts": "https://elalish.blogspot.com/search/label/Manifold",
+    "Web Examples": "https://manifoldcad.org/model-viewer.html",
+    "GitHub": "https://github.com/elalish/manifold"
+  },
+  "useFirstParagraphOfCommentAsSummary": true,
+  "groupReferencesByType": true,
   "sortEntryPoints": false,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
   "projectDocuments": ["documents/*.md"],
   "out": "docs"
 }

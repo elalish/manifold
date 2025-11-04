@@ -17,12 +17,71 @@ import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node}
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
+import {GLTFNode} from './gltf-node.ts';
 import {euler2quat} from './math.ts';
-import {globalDefaults, GLTFNode} from './scene-builder.ts';
 
-const FPS = 30;
+/**
+ * @inline
+ */
+export type AnimationMode = 'loop'|'ping-pong';
 
-interface Morph {
+let animationMode: AnimationMode = 'loop';
+let animationDuration: number = 1;
+let animationFPS: number = 30;
+
+/**
+ * Set the animation repeat mode.
+ *
+ * @param mode 'loop' or 'ping-pong'
+ * @group Global Settings
+ */
+export const setAnimationMode = (mode: AnimationMode): void => {
+  animationMode = mode
+};
+
+/**
+ * Get the current animation repeat mode.
+ * @group Global Settings
+ */
+export const getAnimationMode = (): AnimationMode => animationMode;
+
+/**
+ * Set the duration of the animation, in seconds.
+ *
+ * @param duration in seconds.
+ * @group Global Settings
+ */
+export const setAnimationDuration = (duration: number): void => {
+  animationDuration = duration;
+};
+
+/**
+ * Get the current duruation of the animation, in seconds.
+ * @group Global Settings
+ */
+export const getAnimationDuration = (): number => animationDuration;
+
+/**
+ * Set the animation frame rate.
+ *
+ * @param fps in frames per second.
+ * @group Global Settings
+ */
+export const setAnimationFPS = (fps: number): void => {
+  animationFPS = fps;
+};
+
+/**
+ * Get the current animation frame rate.
+ * @group Global Settings
+ */
+export const getAnimationFPS = (): number => animationFPS;
+
+/**
+ *
+ * @internal
+ */
+export interface Morph {
   start?: (v: Vec3) => void;
   end?: (v: Vec3) => void;
 }
@@ -38,6 +97,10 @@ export function cleanup() {
   manifold2morph.clear();
 }
 
+/**
+ *
+ * @internal
+ */
 export function addMotion(
     doc: Document, type: 'translation'|'rotation'|'scale', node: GLTFNode,
     out: Node): Vec3|null {
@@ -55,9 +118,8 @@ export function addMotion(
   for (let i = 0; i < nFrames; ++i) {
     const x = i / (nFrames - 1);
     const m = motion(
-        globalDefaults.animationMode !== 'ping-pong' ?
-            x :
-            (1 - Math.cos(x * 2 * Math.PI)) / 2);
+        animationMode !== 'ping-pong' ? x :
+                                        (1 - Math.cos(x * 2 * Math.PI)) / 2);
     frames.set(nEl === 4 ? euler2quat(m) : m, nEl * i);
   }
 
@@ -80,6 +142,10 @@ export function addMotion(
   return motion(0);
 }
 
+/**
+ *
+ * @internal
+ */
 export function setMorph(doc: Document, node: Node, manifold: Manifold) {
   if (manifold2morph.has(manifold)) {
     const channel = doc.createAnimationChannel()
@@ -91,8 +157,16 @@ export function setMorph(doc: Document, node: Node, manifold: Manifold) {
   }
 }
 
+/**
+ *
+ * @internal
+ */
 export const getMorph = (manifold: Manifold) => manifold2morph.get(manifold)
 
+/**
+ *
+ * @internal
+ */
 export function morphStart(manifoldMesh: Mesh, morph?: Morph):
     number[] {
       const inputPositions: number[] = [];
@@ -117,6 +191,10 @@ export function morphStart(manifoldMesh: Mesh, morph?: Morph):
       return inputPositions;
     }
 
+/**
+ *
+ * @internal
+ */
 export function morphEnd(
     doc: Document, manifoldMesh: Mesh, mesh: GLTFMesh, inputPositions: number[],
     morph?: Morph) {
@@ -193,19 +271,21 @@ export const setMorphEnd =
       }
     };
 
-
+/**
+ *
+ * @internal
+ */
 export function addAnimationToDoc(doc: Document) {
   animation = doc.createAnimation('');
   hasAnimation = false;
-  const nFrames = Math.round(globalDefaults.animationLength * FPS) + 1;
+  const nFrames = Math.round(animationDuration * animationFPS) + 1;
   const times = new Float32Array(nFrames);
   const weights = new Float32Array(nFrames);
   for (let i = 0; i < nFrames; ++i) {
     const x = i / (nFrames - 1);
-    times[i] = x * globalDefaults.animationLength;
-    weights[i] = globalDefaults.animationMode !== 'ping-pong' ?
-        x :
-        (1 - Math.cos(x * 2 * Math.PI)) / 2;
+    times[i] = x * animationDuration;
+    weights[i] =
+        animationMode !== 'ping-pong' ? x : (1 - Math.cos(x * 2 * Math.PI)) / 2;
   }
   timesAccessor = doc.createAccessor('animation times')
                       .setBuffer(doc.createBuffer())
@@ -222,6 +302,10 @@ export function addAnimationToDoc(doc: Document) {
   animation.addSampler(weightsSampler);
 }
 
+/**
+ *
+ * @internal
+ */
 export function cleanupAnimationInDoc() {
   if (!hasAnimation) {
     timesAccessor.dispose();

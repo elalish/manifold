@@ -65,18 +65,19 @@ const parseSpiderMonkeyStackTrace = (stack: string) =>
  *
  *  This makes the stack trace more readable at the potential cost of confusion
  * if a manifoldCAD user is also constructing new Functions within their model.
+ *
+ * @internal
  */
-export const parseStackTrace =
-    (stack: string) => {
-      if (stack.match(/^\s+at\s/gm)) {
-        // V8 -- Chrome, NodeJS
-        return parseV8StackTrace(stack);
-      } else if (stack.match(/^([^@]+)@/gm)) {
-        // SpiderMonkey -- Firefox
-        return parseSpiderMonkeyStackTrace(stack);
-      } else
-        return [];
-    }
+export const parseStackTrace = (stack: string) => {
+  if (stack.match(/^\s+at\s/gm)) {
+    // V8 -- Chrome, NodeJS
+    return parseV8StackTrace(stack);
+  } else if (stack.match(/^([^@]+)@/gm)) {
+    // SpiderMonkey -- Firefox
+    return parseSpiderMonkeyStackTrace(stack);
+  } else
+    return [];
+};
 
 export const getSourceMappedStackTrace =
     (code: string, error: Error, lineOffset: number = 0): string|undefined => {

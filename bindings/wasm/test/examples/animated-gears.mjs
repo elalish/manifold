@@ -15,7 +15,7 @@ gear2.manifold = involuteGear2d({teeth:gear2teeth}).extrude(1);
 gear2.translation = [-gear2teeth/2,0,-0.5]
 gear2.material = {baseColorFactor: [1, 0, 1]};
 
-globalDefaults.animationLength = 10;  // GLTF animation length in seconds
+setAnimationDuration(10); // GLTF animation length in seconds
 const speed = 360; // degrees of rotation of gear1 over animationLength
 const ratio = gear1teeth / gear2teeth;
 gear1.rotation = (t) => [0,0, t * speed]

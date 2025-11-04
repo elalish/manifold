@@ -3,8 +3,7 @@
 // parameters.
 
 import {
-  Manifold, GLTFNode, getGLTFNodes,
-  setMinCircularAngle, setMinCircularEdgeLength
+  Manifold, GLTFNode, getGLTFNodes
 } from 'manifold-3d/manifoldCAD';
 const {sphere, cylinder, union, cube} = Manifold;
 

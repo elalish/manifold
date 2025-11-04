@@ -70,8 +70,8 @@ moving.translation = (t) => {
 };
 moving.rotation = (t) => [0, 0, 270 * 2 * (1 - t)];
 
-globalDefaults.animationLength = 10;  // seconds
-globalDefaults.animationMode = 'ping-pong';
+setAnimationDuration(10); // seconds
+setAnimationMode('ping-pong');
 
 const nodes = getGLTFNodes();
 export default nodes;

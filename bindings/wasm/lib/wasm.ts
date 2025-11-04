@@ -51,11 +51,23 @@ export async function instantiateManifold(): Promise<ManifoldToplevel> {
 }
 
 /**
- * Instantiate or get a global Manifold WASM instance.
+ * Instantiate or get the global Manifold WASM instance.
  *
  * @returns A manifold instance.
  */
 export async function getManifoldModule(): Promise<ManifoldToplevel> {
   if (!manifoldwasm) manifoldwasm = await instantiateManifold();
+  return manifoldwasm;
+}
+
+/**
+ * Get the global Manifold WASM instance synchronously.
+ *
+ * @returns A manifold instance.
+ */
+export function getManifoldModuleSync(): ManifoldToplevel {
+  if (!manifoldwasm) {
+    throw new Error('Manifold wasm module has not been instantiated yet.');
+  }
   return manifoldwasm;
 }

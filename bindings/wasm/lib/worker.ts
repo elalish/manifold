@@ -22,16 +22,19 @@
  * TypeScript module.  It can be imported as a web worker, and defines
  * a set of interfaces for communication in that case.
  *
- * @module worker
+ * @packageDocumentation
  */
 
 import {Document} from '@gltf-transform/core';
 
+import * as animation from './animation.ts';
 import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
 import {RuntimeError} from './error.ts';
 import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as garbageCollector from './garbage-collector.ts';
+import * as gltfNode from './gltf-node.ts'
+import * as levelOfDetail from './level-of-detail.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
@@ -39,8 +42,8 @@ import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
 let exporters: Array<any>;
 const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
-type MessageType =
-    'initialize'|'evaluate'|'export'|'ready'|'done'|'error'|'log'|'blob'
+export type MessageType =
+    'initialize'|'evaluate'|'export'|'ready'|'done'|'error'|'log'|'blob';
 
 export interface Message {
   type: MessageType;
@@ -163,6 +166,8 @@ function log(...args: any[]) {
 export function cleanup(): void {
   garbageCollector.cleanup();
   scenebuilder.cleanup();
+  levelOfDetail.cleanup();
+  gltfNode.cleanup();
 }
 
 /**
@@ -185,6 +190,7 @@ export interface evaluateOptions {
  */
 export async function evaluate(
     code: string, options: evaluateOptions = {}): Promise<Document> {
+  await cleanup();
   const t0 = performance.now();
 
   const {doNotBundle, ...bundleOpt} = options;
@@ -196,12 +202,9 @@ export async function evaluate(
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
   }
 
-  const manifoldCAD = await import('./manifoldCAD.ts');
-  manifoldCAD.resetToCircularDefaults();
-  cleanup();
-
   // Customize `manifold-3d/manifoldCAD`.
   // Let models know that they are running inside this worker.
+  const manifoldCAD = await import('./manifoldCAD.ts');
   const manifoldImport = {
     ...manifoldCAD,
     isManifoldCAD: () => true,
@@ -213,19 +216,22 @@ export async function evaluate(
   // show up here.
   const toplevelImport = {
     ...manifoldImport,
-    GLTFNode: scenebuilder.GLTFNodeTracked,
-    getGLTFNodes: scenebuilder.getGLTFNodes,
-    resetGLTFNodes: scenebuilder.resetGLTFNodes,
+    GLTFNode: gltfNode.GLTFNodeTracked,
+    getGLTFNodes: gltfNode.getGLTFNodes,
+    resetGLTFNodes: gltfNode.resetGLTFNodes,
   };
 
   // Set up global variables exposed to the model without an import.
-  const globalDefaults = {} as scenebuilder.GlobalDefaults;
   const globals = {
-    // Global defaults can be populated by the script.
-    // This can be used to set parameters elsewhere in ManifoldCAD.  For
-    // example, the GLTF exporter will look for animation type and
-    // framerate.
-    globalDefaults,
+    // These accessors are only available to top level scripts.
+    // See ../lib/manifoldCADGlobals.d.ts
+    setCircularSegments: levelOfDetail.setCircularSegments,
+    setMinCircularAngle: levelOfDetail.setMinCircularAngle,
+    setMinCircularEdgeLength: levelOfDetail.setMinCircularEdgeLength,
+    resetToCircularDefaults: levelOfDetail.resetToCircularDefaults,
+    setAnimationDuration: animation.setAnimationDuration,
+    setAnimationFPS: animation.setAnimationFPS,
+    setAnimationMode: animation.setAnimationMode,
 
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,
@@ -287,7 +293,7 @@ export async function evaluate(
 
   // If we don't actually have a model, complain.
   if (!result || (Array.isArray(result) && !result.length)) {
-    if (scenebuilder.getGLTFNodes().length) {
+    if (gltfNode.getGLTFNodes().length) {
       throw new Error(
           'GLTF Nodes were created, but not exported.  ' +
           'Add `const nodes = getGLTFNodes();` and `export default nodes;` ' +
@@ -302,8 +308,8 @@ export async function evaluate(
   }
 
   // Create a gltf-transform document.
-  const nodes = await scenebuilder.anyToGLTFNodeList(result);
-  const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes, globalDefaults);
+  const nodes = await gltfNode.anyToGLTFNodeList(result);
+  const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes);
   const t3 = performance.now();
   log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);
 
@@ -360,6 +366,9 @@ const initializeWebWorker = (): void => {
   const sendError = (error: Error) => {
     // Log the error / stack trace to the console.
     console.error(error);
+    if (error.cause) console.error('Caused by:', error.cause);
+    if ((error as RuntimeError).manifoldStack)
+      console.error('manifoldStack:', (error as RuntimeError).manifoldStack);
 
     self.postMessage({
       type: 'error',

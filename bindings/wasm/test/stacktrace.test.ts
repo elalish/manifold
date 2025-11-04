@@ -132,7 +132,6 @@ suite('Build a model with the worker', () => {
     } catch (e) {
       error = e as RuntimeError;
     }
-    console.log(BundlerError)
     const [frame, ...rest] = stackTraceParser.parse(error!.manifoldStack!);
     expect(frame.lineNumber).toBe(1);
     expect(frame.column).toBe(21);

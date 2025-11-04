@@ -21,7 +21,7 @@ export default defineConfig({
         dest: './',  // Targets are relative to 'dist'.
       },
       {
-        src: '../types/globalDefaults.d.ts',
+        src: '../dist/manifoldCADGlobals.d.ts',
         dest: './',
       },
       // If 'dist/manifold-encapsulated-types.d.ts' and

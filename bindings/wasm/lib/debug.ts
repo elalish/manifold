@@ -15,9 +15,9 @@
 import {Document} from '@gltf-transform/core';
 
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
-import type {GLTFMaterial} from '../types/manifoldCAD';
 
 import {Properties, writeMesh} from './gltf-io.ts';
+import {GLTFMaterial} from './gltf-node.ts';
 import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
 
 // Debug setup to show source meshes
@@ -25,20 +25,23 @@ let ghost = false;
 const shown = new Map<number, Mesh>();
 const singles = new Map<number, Mesh>();
 
-export const SHOW = {
+const SHOW = {
   baseColorFactor: [1, 0, 0],
   alpha: 0.25,
   roughness: 1,
   metallic: 0
 } as GLTFMaterial;
 
-export const GHOST = {
+const GHOST = {
   baseColorFactor: [0.5, 0.5, 0.5],
   alpha: 0.25,
   roughness: 1,
   metallic: 0
 } as GLTFMaterial;
 
+/**
+ * @internal
+ */
 export function cleanup() {
   ghost = false;
   shown.clear();
@@ -61,6 +64,7 @@ const getDebugMeshByID = (id: number):
  *     Any other mesh will have the GHOST material, while
  *     this one gets it's natural material.
  *
+ * @internal
  * @param id The `originalID` of the mesh.
  */
 const getDebugMaterialByID = (id: number):
@@ -81,6 +85,7 @@ const getDebugMaterialByID = (id: number):
  * Everything gets rendered in the GHOST material, while the flagged
  * mesh is added as a debug node.
  *
+ * @internal
  * @param id The `originalID` of the mesh.
  */
 export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
@@ -99,7 +104,7 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
  * result.
  *
  * @group Modelling Functions
- * @param shape The object to show - returned for chaining.
+ * @param manifold The object to show - returned for chaining.
  */
 export const show = (manifold: Manifold) => {
   return debug(manifold, shown);
@@ -112,20 +117,24 @@ export const show = (manifold: Manifold) => {
  * of the result. Multiple objects marked `only()` will all be shown.
  *
  * @group Modelling Functions
- * @param shape The object to show - returned for chaining.
+ * @param manifold The object to show - returned for chaining.
  */
 export const only = (manifold: Manifold) => {
   ghost = true;
   return debug(manifold, singles);
 };
 
+/**
+ *
+ * @internal
+ */
 export const getDebugGLTFMesh =
     (doc: Document, manifoldMesh: Mesh, id2properties: Map<number, Properties>,
      backupMaterial: GLTFMaterial = {}) => {
       const debugNodes = [];
 
       for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
-        const debugMesh = getDebugMeshByID(id)
+        const debugMesh = getDebugMeshByID(id);
         if (!debugMesh) {
           continue;
         }
@@ -138,7 +147,7 @@ export const getDebugGLTFMesh =
         const debugNode = doc.createNode('debug')
                               .setMesh(writeMesh(doc, debugMesh, id2properties))
                               .setMatrix(manifoldMesh.transform(run));
-        debugNodes.push(debugNode)
+        debugNodes.push(debugNode);
       }
-      return debugNodes
-    }
+      return debugNodes;
+    };
