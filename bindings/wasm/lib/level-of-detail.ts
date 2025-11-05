@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {getManifoldModuleSync} from './wasm';
+import {getManifoldModuleSync} from './wasm.ts';
 
 /**
  * Control detail level for the
@@ -29,8 +29,8 @@ import {getManifoldModuleSync} from './wasm';
  * @packageDocumentation
  */
 
-let minCircularAngle: number = 10;
-let minCircularEdgeLength: number = 1;
+let minCircularAngle: number = 10.0;
+let minCircularEdgeLength: number = 1.0;
 
 /**
  * Set an angle constraint when calculating the number of segments in a circle.
@@ -44,7 +44,7 @@ let minCircularEdgeLength: number = 1;
  */
 export const setMinCircularAngle = (angle: number) => {
   minCircularAngle = angle;
-  getManifoldModuleSync().setMinCircularAngle(angle);
+  getManifoldModuleSync()?.setMinCircularAngle(angle);
 };
 
 /**
@@ -58,7 +58,7 @@ export const setMinCircularAngle = (angle: number) => {
  */
 export const setMinCircularEdgeLength = (length: number) => {
   minCircularEdgeLength = length;
-  getManifoldModuleSync().setMinCircularEdgeLength(length);
+  getManifoldModuleSync()?.setMinCircularEdgeLength(length);
 };
 
 /**
@@ -71,7 +71,7 @@ export const setMinCircularEdgeLength = (length: number) => {
  * @group Global Settings
  */
 export const setCircularSegments = (segments: number) =>
-    getManifoldModuleSync().setCircularSegments(segments);
+    getManifoldModuleSync()?.setCircularSegments(segments);
 
 /**
  * Reset the circular construction parameters to their defaults if
@@ -80,9 +80,9 @@ export const setCircularSegments = (segments: number) =>
  * @group Global Settings
  */
 export const resetToCircularDefaults = () => {
+  getManifoldModuleSync()?.resetToCircularDefaults();
   minCircularAngle = 10;
   minCircularEdgeLength = 1;
-  getManifoldModuleSync().resetToCircularDefaults();
 };
 
 /**
@@ -113,7 +113,7 @@ export const getMinCircularEdgeLength = () => minCircularEdgeLength;
  * @group Global Settings
  */
 export const getCircularSegments = (radius: number) =>
-    getManifoldModuleSync().getCircularSegments(radius);
+    getManifoldModuleSync()?.getCircularSegments(radius);
 
 export const cleanup = () => {
   resetToCircularDefaults();

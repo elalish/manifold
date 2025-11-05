@@ -95,6 +95,9 @@ let hasAnimation: boolean;
 
 export function cleanup() {
   manifold2morph.clear();
+  animationMode = 'loop';
+  animationDuration = 1;
+  animationFPS = 30;
 }
 
 /**

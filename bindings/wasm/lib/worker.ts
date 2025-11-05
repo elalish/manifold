@@ -190,7 +190,7 @@ export interface evaluateOptions {
  */
 export async function evaluate(
     code: string, options: evaluateOptions = {}): Promise<Document> {
-  await cleanup();
+  cleanup();
   const t0 = performance.now();
 
   const {doNotBundle, ...bundleOpt} = options;
