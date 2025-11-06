@@ -12,48 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/**
- * These are the objects and functions that are available to manifoldCAD
- * models.
- *
- * This is an isomorphic module.  When imported within manifoldCAD, the bundler
- * will swap it out for an identical module running in the worker context.
- * When imported as an ES module, it will implicitly instantiate a manifold wasm
- * module, and export it along with relevant scene-builder properties.
- * This allows models to behave identically when running on manifoldCAD.org,
- * through the CLI, or through nodejs.
- *
- * @module manifoldCAD
- */
-
 import type {ManifoldToplevel} from '../manifold.d.ts';
 
+import * as debug from './debug.ts';
 import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
-import * as scenebuilder from './scene-builder.ts';
+import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
+
+export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
+export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
+export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
 const manifoldWasm: ManifoldToplevel =
     garbageCollectManifold(await getManifoldModule());
 
-const {
-  Mesh,
-  Manifold,
-  CrossSection,
-  setMinCircularAngle,
-  setMinCircularEdgeLength,
-  setCircularSegments,
-  getCircularSegments,
-  resetToCircularDefaults,
-  triangulate
-} = manifoldWasm;
+const {Mesh, Manifold, CrossSection, triangulate} = manifoldWasm;
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
 // builder.
-const {setMorphStart, setMorphEnd} = scenebuilder;
-const show = garbageCollectFunction(scenebuilder.show);
-const only = garbageCollectFunction(scenebuilder.only);
-const setMaterial = garbageCollectFunction(scenebuilder.setMaterial);
-const {GLTFNode} = scenebuilder;
+const show = garbageCollectFunction(debug.show);
+const only = garbageCollectFunction(debug.only);
+const setMaterial = garbageCollectFunction(material.setMaterial);
 const getGLTFNodes = () => [];
 const resetGLTFNodes = () => {};
 
@@ -65,18 +44,10 @@ export {
   Mesh,
   Manifold,
   CrossSection,
-  setMinCircularAngle,
-  setMinCircularEdgeLength,
-  setCircularSegments,
-  getCircularSegments,
-  resetToCircularDefaults,
   triangulate,
   show,
   only,
   setMaterial,
-  setMorphStart,
-  setMorphEnd,
-  GLTFNode,
   getGLTFNodes,
   resetGLTFNodes,
   isManifoldCAD

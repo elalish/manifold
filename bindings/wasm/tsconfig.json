@@ -24,6 +24,10 @@
   "include": [
     "./lib/*.ts"
   ],
+  "files": [
+    "./types/manifoldCAD.d.ts",
+    "./types/manifoldCADGlobals.d.ts"
+  ],
   "exclude": []
 }
 

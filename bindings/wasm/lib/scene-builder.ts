@@ -24,46 +24,25 @@
  * used to export complete scenes and generally manage the state of the scene
  * builder.
  *
- * @module scene-builder
+ * @packageDocumentation
  */
 
 import {Document, Material, Node} from '@gltf-transform/core';
 
-import type {Vec3} from '../manifold-global-types.d.ts';
 import {Manifold} from '../manifold.js';
-import type {GLTFMaterial} from '../types/manifoldCAD.d.ts';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
+import {GLTFMaterial, GLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
-export {setMorphEnd, setMorphStart} from './animation.ts';
+export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';
+export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
+export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
-
-export interface GlobalDefaults {
-  roughness: number;
-  metallic: number;
-  baseColorFactor: [number, number, number];
-  alpha: number;
-  unlit: boolean;
-  animationLength: number;
-  animationMode: 'loop'|'ping-pong';
-}
-
-const GLOBAL_DEFAULTS = {
-  roughness: 0.2,
-  metallic: 1,
-  baseColorFactor: [1, 1, 0] as [number, number, number],
-  alpha: 1,
-  unlit: false,
-  animationLength: 1,
-  animationMode: 'loop'
-};
-
-export const globalDefaults = {...GLOBAL_DEFAULTS};
 
 /**
  * Reset and garbage collect the scene builder and any
@@ -75,44 +54,7 @@ export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
-  resetGLTFNodes();
 }
-
-export class GLTFNode {
-  private _parent?: GLTFNode;
-  manifold?: Manifold;
-  translation?: Vec3|((t: number) => Vec3);
-  rotation?: Vec3|((t: number) => Vec3);
-  scale?: Vec3|((t: number) => Vec3);
-  material?: GLTFMaterial;
-  name?: string;
-
-  constructor(parent?: GLTFNode) {
-    this._parent = parent;
-  }
-  clone(parent?: GLTFNode) {
-    const copy = new GLTFNode(parent ?? this.parent);
-    Object.assign(copy, this);
-    return copy;
-  }
-  get parent() {
-    return this._parent;
-  }
-}
-
-const nodes = new Array<GLTFNode>();
-export class GLTFNodeTracked extends GLTFNode {
-  constructor(parent?: GLTFNode) {
-    super(parent);
-    nodes.push(this);
-  }
-}
-export const getGLTFNodes = () => {
-  return nodes;
-};
-export const resetGLTFNodes = () => {
-  nodes.length = 0;
-};
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
@@ -263,11 +205,6 @@ function createNodeFromCache(
   return node;
 }
 
-function parseOptions(defaults: GlobalDefaults) {
-  Object.assign(globalDefaults, GLOBAL_DEFAULTS);
-  Object.assign(globalDefaults, defaults);
-}
-
 function createWrapper(doc: Document) {
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
@@ -283,14 +220,12 @@ function createWrapper(doc: Document) {
  *
  * @group Management Functions
  * @param manifold The Manifold object
- * @param defaults Parameters potentially set by a ManifoldCAD script
  * @returns An in-memory GLTF-Transform Document
  */
-export function manifoldToGLTFDoc(
-    manifold: Manifold, defaults: GlobalDefaults) {
+export function manifoldToGLTFDoc(manifold: Manifold) {
   const node = new GLTFNode();
   node.manifold = manifold;
-  return GLTFNodesToGLTFDoc([node], defaults)
+  return GLTFNodesToGLTFDoc([node])
 }
 
 /**
@@ -298,13 +233,9 @@ export function manifoldToGLTFDoc(
  *
  * @group Management Functions
  * @param nodes A list of GLTF Nodes
- * @param defaults Parameters potentially set by a ManifoldCAD script
  * @returns An in-memory GLTF-Transform Document
  */
-export function GLTFNodesToGLTFDoc(
-    nodes: Array<GLTFNode>, defaults: GlobalDefaults) {
-  parseOptions(defaults)
-
+export function GLTFNodesToGLTFDoc(nodes: Array<GLTFNode>) {
   if (nodes.length == 0) {
     throw new TypeError('nodes[] must contain at least one GLTFNode.')
   }
@@ -343,33 +274,4 @@ export function GLTFNodesToGLTFDoc(
 
   cleanupAnimationInDoc();
   return doc;
-}
-
-/**
- * Map various types to a flat array of GLTFNodes
- *
- * @group Management Functions
- * @param any An object or array of models.
- * @returns An array of GLTFNodes.
- */
-export async function anyToGLTFNodeList(
-    any: Manifold|GLTFNode|Array<Manifold|GLTFNode>): Promise<Array<GLTFNode>> {
-  // Lazy load manifoldCAD.
-  const manifoldCAD = await import('./manifoldCAD.ts');
-  if (Array.isArray(any)) {
-    return await any.map(anyToGLTFNodeList)
-        .reduce(
-            async (acc, cur) => ([...(await acc), ...(await cur)]),
-            new Promise(resolve => resolve([])))
-  } else if (any instanceof manifoldCAD.GLTFNode || any instanceof GLTFNode) {
-    const node = any as GLTFNode;
-    if (!node.parent) return [node];
-    return [await anyToGLTFNodeList(node.parent), node].flat();
-  } else if (any instanceof manifoldCAD.Manifold) {
-    const node = new GLTFNode();
-    node.manifold = any as Manifold;
-    return [node];
-  }
-
-  throw new Error('Cannot convert model to GLTFNode!');
 }

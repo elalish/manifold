@@ -61,7 +61,6 @@ function log(...args: any[]) {
 
 /**
  * This is a plugin for esbuild that has three functions:
- *
  *   * It resolves NPM packages to urls served by various CDNs.
  *   * It fetches imports from http/https urls.
  *   * It provides evaluation context to npm packages.
@@ -229,10 +228,7 @@ const getEsbuildConfig =
     async(options: BundlerOptions = {}): Promise<esbuild.BuildOptions> => {
   if (!esbuild_initialized) {
     const esbuildOptions: esbuild.InitializeOptions = {};
-    if (!isNode()) {
-      if (!esbuildWasmUrl || typeof esbuildWasmUrl !== 'string') {
-        throw new Error('No URL given for \'esbuild.wasm\'.');
-      }
+    if (typeof esbuildWasmUrl === 'string' && esbuildWasmUrl) {
       esbuildOptions.wasmURL = esbuildWasmUrl;
       esbuildOptions.worker = esbuildHasOwnWorker === true;
     }

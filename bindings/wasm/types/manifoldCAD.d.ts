@@ -12,91 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {CrossSection, Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
-import type {Mat4, Vec2, Vec3} from '../manifold-global-types.d.ts';
-
-export type {getCircularSegments, MeshOptions, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength, triangulate} from '../manifold-encapsulated-types.d.ts';
-export type {Box, ErrorStatus, FillRule, JoinType, Mat3, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness} from '../manifold-global-types.d.ts';
-export type {Mat4, Vec2, Vec3};
-export {CrossSection, Manifold, Mesh};
-
-export declare class GLTFNode {
-  manifold?: Manifold;
-  translation?: Vec3|((t: number) => Vec3);
-  rotation?: Vec3|((t: number) => Vec3);
-  scale?: Vec3|((t: number) => Vec3);
-  material?: GLTFMaterial;
-  name?: string;
-  constructor(parent?: GLTFNode);
-  clone(parent?: GLTFNode): GLTFNode;
-}
-
-export type Attribute = 'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|
-    'COLOR_0'|'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
-
-export declare class GLTFMaterial {
-  attributes?: Attribute[];
-  roughness?: number;
-  metallic?: number;
-  baseColorFactor?: [number, number, number];
-  alpha?: number;
-  unlit?: boolean;
-  name?: string;
-}
-
 /**
- * Returns a shallow copy of the input manifold with the given material
- * properties applied. They will be carried along through operations.
+ * These are the objects and functions that are available to all manifoldCAD
+ * models.
  *
- * @param manifold The input object.
- * @param material A set of material properties to apply to this manifold.
+ * This is an isomorphic module.  When imported within manifoldCAD, the bundler
+ * will swap it out for an identical module running in the worker context.
+ * When imported as an ES module, it will implicitly instantiate a manifold wasm
+ * module, and export it along with relevant scene-builder properties.
+ * This allows models to behave identically when running on manifoldCAD.org,
+ * through the CLI, or through nodejs.
+ *
+ * It can be imported as `manifold-3d/manifoldCAD`.
+ *
+ * @packageDocumentation
+ * @module manifold-3d/manifoldCAD
  */
-export declare function setMaterial(
-    manifold: Manifold, material: GLTFMaterial): Manifold;
 
-/**
- * Apply a morphing animation to the input manifold. Specify the start
- * function which will be applied to the vertex positions of the first frame and
- * linearly interpolated across the length of the overall animation. This
- * animation will only be shown if this manifold is used directly on a GLTFNode.
- *
- * @param manifold The object to add morphing animation to.
- * @param func A warping function to apply to the first animation frame.
- */
-export declare function setMorphStart(
-    manifold: Manifold, func: (v: Vec3) => void): void;
-
-/**
- * Apply a morphing animation to the input manifold. Specify the end
- * function which will be applied to the vertex positions of the last frame and
- * linearly interpolated across the length of the overall animation. This
- * animation will only be shown if this manifold is used directly on a GLTFNode.
- *
- * @param manifold The object to add morphing animation to.
- * @param func A warping function to apply to the last animation frame.
- */
-export declare function setMorphEnd(
-    manifold: Manifold, func: (v: Vec3) => void): void;
-
-/**
- * Wrap any shape object with this method to display it and any copies in
- * transparent red. This is particularly useful for debugging subtract() as it
- * will allow you find the object even if it doesn't currently intersect the
- * result.
- *
- * @param shape The object to show - returned for chaining.
- */
-export declare function show(shape: CrossSection|Manifold): Manifold;
-
-/**
- * Wrap any shape object with this method to display it and any copies as the
- * result, while ghosting out the final result in transparent gray. Helpful for
- * debugging as it allows you to see objects that may be hidden in the interior
- * of the result. Multiple objects marked only() will all be shown.
- *
- * @param shape The object to show - returned for chaining.
- */
-export declare function only(shape: CrossSection|Manifold): Manifold;
+export {AnimationMode, getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation.d.ts';
+export {only, show} from '../lib/debug.ts';
+export {getGLTFNodes, GLTFAttribute, GLTFMaterial, GLTFNode, resetGLTFNodes} from '../lib/gltf-node.d.ts';
+export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail.d.ts'
+export {setMaterial} from '../lib/material.d.ts';
+export {CrossSection, Manifold, Mesh, MeshOptions, triangulate} from '../manifold-encapsulated-types.d.ts';
+export {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from '../manifold-global-types.d.ts';
 
 /**
  * Is this module running in manifoldCAD evaluator?
@@ -104,26 +43,3 @@ export declare function only(shape: CrossSection|Manifold): Manifold;
  * @returns boolean
  */
 export declare function isManifoldCAD(): boolean
-
-
-/**
- * Get a list of GLTF nodes that have been created in this model.
- *
- * This function only works in scripts directly evaluated by the manifoldCAD
- * website or CLI. When called in an imported library it will always return an
- * empty array, and nodes created in libraries will not be included in the
- * result. This is intentional; libraries must not create geometry as a side
- * effect.
- *
- * @returns An array of GLTFNodes.
- */
-export declare function getGLTFNodes(): Array<GLTFNode>;
-
-/**
- * Clear the list of cached GLTF nodes.
- *
- * This function only works in scripts directly evaluated by the manifoldCAD
- * website or CLI.  When called in an imported library it will have no
- * effect.
- */
-export declare function resetGLTFNodes(): void;

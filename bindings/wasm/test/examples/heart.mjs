@@ -50,7 +50,7 @@ const node = new GLTFNode();
 node.manifold = ball;
 node.scale = [scale, scale, scale];
 
-globalDefaults.animationLength = 5;  // seconds
-globalDefaults.animationMode = 'ping-pong';
+setAnimationDuration(5); // seconds
+setAnimationMode('ping-pong');
 
 export default node;

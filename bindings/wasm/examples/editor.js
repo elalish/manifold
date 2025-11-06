@@ -323,10 +323,9 @@ async function createEditor() {
       wrap('manifold-3d/manifoldCAD', await getDTS('/manifoldCAD.d.ts'));
   monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
 
-  // Types for the globalDefaults object.  This is available as a global to top
-  // level scripts, and shared across the scene builder.
-  const globalDefaultsDTS = await getDTS('/globalDefaults.d.ts');
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(globalDefaultsDTS);
+  // Types for the global namespace.
+  const globalsDTS = await getDTS('/manifoldCADGlobals.d.ts');
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(globalsDTS);
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {

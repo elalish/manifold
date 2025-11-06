@@ -17,7 +17,7 @@ import {Vec3} from '../manifold-global-types';
 const {cos, sin, PI} = Math;
 const TAU = PI * 2;
 
-type Vec4 = [number, number, number, number];
+export type Vec4 = [number, number, number, number];
 
 export function euler2quat(rotation: Vec3): Vec4 {
   // https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Source_code

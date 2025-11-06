@@ -16,9 +16,16 @@ import {Document, Material} from '@gltf-transform/core';
 import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
 
 import {Manifold} from '../manifold-encapsulated-types';
-import type {GLTFMaterial} from '../types/manifoldCAD';
 
-import {globalDefaults, GLTFNode} from './scene-builder.ts'
+import {GLTFMaterial, GLTFNode} from './gltf-node.ts';
+
+const defaultMaterial = {
+  roughness: 0.2,
+  metallic: 1,
+  baseColorFactor: [1, 1, 0] as [number, number, number],
+  alpha: 1,
+  unlit: false,
+};
 
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
@@ -29,7 +36,7 @@ export function cleanup() {
 }
 
 /**
- * Returns a shallow copy of the input manifold with the given material
+ * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
  *
  * @group Modelling Functions
@@ -43,48 +50,57 @@ export const setMaterial =
       return out;
     };
 
-export const getMaterialByID = (id: number):
-    GLTFMaterial|undefined => {
-      return id2material.get(id);
-    }
+/**
+ * @internal
+ */
+export const getMaterialByID = (id: number): GLTFMaterial|undefined => {
+  return id2material.get(id);
+};
 
-export function getBackupMaterial(node?: GLTFNode):
-    GLTFMaterial {
-      if (node == null) {
-        return {};
-      }
-      if (node.material == null) {
-        node.material = getBackupMaterial(node.parent);
-      }
-      return node.material;
-    }
+/**
+ *
+ * @internal
+ */
+export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
+  if (node == null) {
+    return {};
+  }
+  if (node.material == null) {
+    node.material = getBackupMaterial(node.parent);
+  }
+  return node.material;
+}
 
-function makeDefaultMaterial(doc: Document, matIn: GLTFMaterial = {}):
-    Material {
-      const defaults = {...globalDefaults};
-      Object.assign(defaults, matIn);
-      const {roughness, metallic, baseColorFactor, alpha, unlit} = defaults;
+function makeDefaultMaterial(
+    doc: Document, matIn: GLTFMaterial = {}): Material {
+  const {roughness, metallic, baseColorFactor, alpha, unlit} = {
+    ...defaultMaterial,
+    ...matIn
+  };
+  const material = doc.createMaterial(matIn.name ?? '');
 
-      const material = doc.createMaterial(matIn.name ?? '');
+  if (unlit) {
+    const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
+    material.setExtension('KHR_materials_unlit', unlit);
+  }
 
-      if (unlit) {
-        const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
-        material.setExtension('KHR_materials_unlit', unlit);
-      }
+  if (alpha < 1) {
+    material.setAlphaMode(Material.AlphaMode.BLEND).setDoubleSided(true);
+  }
 
-      if (alpha < 1) {
-        material.setAlphaMode(Material.AlphaMode.BLEND).setDoubleSided(true);
-      }
+  return material.setRoughnessFactor(roughness)
+      .setMetallicFactor(metallic)
+      .setBaseColorFactor([...baseColorFactor, alpha]);
+}
 
-      return material.setRoughnessFactor(roughness)
-          .setMetallicFactor(metallic)
-          .setBaseColorFactor([...baseColorFactor, alpha]);
-    }
-
-export function getCachedMaterial(doc: Document, matDef: GLTFMaterial):
-    Material {
-      if (!materialCache.has(matDef)) {
-        materialCache.set(matDef, makeDefaultMaterial(doc, matDef));
-      }
-      return materialCache.get(matDef)!;
-    }
+/**
+ *
+ * @internal
+ */
+export function getCachedMaterial(
+    doc: Document, matDef: GLTFMaterial): Material {
+  if (!materialCache.has(matDef)) {
+    materialCache.set(matDef, makeDefaultMaterial(doc, matDef));
+  }
+  return materialCache.get(matDef)!;
+}
