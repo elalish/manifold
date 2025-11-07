@@ -181,8 +181,11 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     // Virtual files.
     build.onLoad(
         {filter: /.*/, namespace: 'virtual-file'},
-        (args): esbuild.OnLoadResult =>
-            ({contents: (options.files!)[args.path]}));
+        (args): esbuild.OnLoadResult => {
+          let loader: esbuild.Loader = 'ts';
+          if (args.path.match(/\.js$/)) loader = 'js';
+          return {contents: (options.files!)[args.path], loader};
+        });
 
     // Unless disabled, handle HTTP/HTTPs urls.
     if (options.fetchRemotePackages !== false) {
