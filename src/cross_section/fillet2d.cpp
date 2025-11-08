@@ -586,11 +586,6 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
         e2Points[2] + e2CurNormal * radius,
     };
 
-    if (length(e2Points[1] - vec2(5, -1)) < EPSILON &&
-        length(e2Points[2] - vec2(2.6, 0)) < EPSILON) {
-      int i = 0;
-    }
-
     const auto& [count, centers] =
         intersectCircleSegment(offsetE2[0], offsetE2[1], e1Points[1], radius);
 
@@ -880,10 +875,6 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         }
 #endif
 
-        if (e1i == 0 && e2i == 5) {
-          int i = 0;
-        }
-
         const uint8_t EEMASK = 1, PEMASK = 1 << 1, PPMASK = 1 << 2;
 
         std::vector<GeomTangentPair> r1;
@@ -998,7 +989,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
                e2Nexti = (e2i + 1) % e2Loop.size();
 
         for (auto it = r1.begin(); it != r1.end(); it++) {
-          size_t i, j;
+          size_t i = 0, j = 0;
 
           for (auto k = 0; k != 2; k++) {
             switch (it->States[k]) {
