@@ -788,6 +788,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
   resultOutputFile << radius << std::endl;
   std::vector<vec2> removedCircleCenter;
+  std::vector<vec2> resultCircleCenter;
 
   // Multi loops in single polygon
   for (size_t e1Loopi = 0; e1Loopi != loops.size(); e1Loopi++) {
@@ -1056,18 +1057,22 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
           }
         }
 
-        resultOutputFile << removedCircleCenter.size() << std::endl;
-        for (const auto& e : removedCircleCenter) {
-          resultOutputFile << e.x << " " << e.y << std::endl;
-        }
-
-        resultOutputFile << filletCircles.size() << std::endl;
         for (const auto& e : filletCircles) {
-          resultOutputFile << e.CircleCenter.x << " " << e.CircleCenter.y
-                           << std::endl;
+          resultCircleCenter.push_back(e.CircleCenter);
         }
       }
     }
+  }
+
+  resultOutputFile << removedCircleCenter.size() << std::endl;
+  for (const auto& e : removedCircleCenter) {
+    resultOutputFile << e.x << " " << e.y << std::endl;
+  }
+
+  resultOutputFile << resultCircleCenter.size() << std::endl;
+
+  for (const auto& e : resultCircleCenter) {
+    resultOutputFile << e.x << " " << e.y << std::endl;
   }
 
 #ifdef MANIFOLD_DEBUG
