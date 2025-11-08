@@ -87,7 +87,6 @@ class PolygonTestFixture : public testing::Test {
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-template <typename TestFixture>
 void RegisterPolygonTestsFile(const std::string& suitename,
                               const std::string& filename) {
   auto f = std::ifstream(filename);
@@ -121,8 +120,8 @@ void RegisterPolygonTestsFile(const std::string& suitename,
     }
     testing::RegisterTest(
         suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> TestFixture* {
-          return new TestFixture(polys, epsilon, expectedNumTri, name);
+        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
+          return new PolygonTestFixture(polys, epsilon, expectedNumTri, name);
         });
   }
   f.close();
@@ -140,42 +139,15 @@ void RegisterPolygonTests() {
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
   for (auto f : files)
-    RegisterPolygonTestsFile<PolygonTestFixture>("Polygon",
-                                                 dir + "/polygons/" + f);
+    RegisterPolygonTestsFile("Polygon", dir + "/polygons/" + f);
 #endif
 }
 
-struct FilletResult {
-  FilletResult(const std::vector<CrossSection>& crossSections,
-               const std::string& name)
-      : name(name), crossSections(crossSections){};
+namespace {
 
-  std::string name;
+using namespace manifold;
 
-  std::vector<CrossSection> crossSections;
-};
-
-class FilletTestFixture : public PolygonTestFixture {
- public:
-  using PolygonTestFixture::PolygonTestFixture;
-
-  void TestBody() override {
-    // result->emplace_back(FilletResult({CrossSection(polys)}, name));
-
-    TestFillet(polys, expectedNumTri, epsilon);
-  }
-
-  void TestFillet(const Polygons& polys, int expectedNumTri,
-                  double epsilon = -1.0);
-
- private:
-  static std::unique_ptr<std::vector<FilletResult>,
-                         void (*)(std::vector<FilletResult>*)>
-      result;
-};
-
-void FilletTestFixture::TestFillet(const Polygons& polys, int expectedNumTri,
-                                   double epsilon) {
+void TestFillet(const Polygons& polys, double epsilon = -1.0) {
   // const double radius = 0.7;
 
   const int inputCircularSegments = 20;
@@ -258,10 +230,15 @@ void FilletTestFixture::TestFillet(const Polygons& polys, int expectedNumTri,
 
       EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
     }
-
-    result->emplace_back(FilletResult(r, name + "_" + std::to_string(radius)));
   }
 }
+
+class FilletTestFixture : public PolygonTestFixture {
+ public:
+  void TestBody() override { TestFillet(polys, epsilon); }
+};
+
+}  // namespace
 
 void RegisterFilletTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
@@ -276,53 +253,6 @@ void RegisterFilletTests() {
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
   for (auto f : files)
-    RegisterPolygonTestsFile<FilletTestFixture>("Polygon.Fillet",
-                                                dir + "/polygons/" + f);
+    RegisterPolygonTestsFile("Polygon.Fillet", dir + "/polygons/" + f);
 #endif
 }
-
-void Save(const std::string& filename,
-          const std::vector<FilletResult>& result) {
-  // Open a file stream for writing.
-  std::ofstream outFile(filename);
-
-  if (!outFile.is_open()) {
-    std::cerr << "Error: Could not open file " << filename << " for writing."
-              << std::endl;
-    return;
-  }
-
-  // Write each test case to the file.
-  for (const auto& test : result) {
-    // Write the header for the test.
-    outFile << test.name << " " << test.crossSections.size() << "\n";
-
-    // Write each CrossSection within the test.
-    for (const auto& crossSection : test.crossSections) {
-      const auto polygons = crossSection.ToPolygons();
-
-      outFile << polygons.size() << "\n";
-      for (const auto& loop : polygons) {
-        outFile << loop.size() << "\n";
-        for (const auto& point : loop) {
-          outFile << point.x << " " << point.y << "\n";
-        }
-      }
-    }
-  }
-
-  outFile.close();
-  std::cout << "Successfully saved " << result.size() << " tests to "
-            << filename << std::endl;
-}
-
-std::unique_ptr<std::vector<FilletResult>, void (*)(std::vector<FilletResult>*)>
-    FilletTestFixture::result =
-        std::unique_ptr<std::vector<FilletResult>,
-                        void (*)(std::vector<FilletResult>*)>(
-            new std::vector<FilletResult>(),
-            [](std::vector<FilletResult>* v) -> void {
-              Save("result.txt", *v);
-
-              delete v;
-            });
