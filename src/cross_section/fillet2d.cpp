@@ -1292,7 +1292,15 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   ColliderInfo colliderInfo = BuildCollider(polygons);
 
-  if (caseIndex == 0) SavePolygons("input.txt", polygons);
+  if (caseIndex == 0) SavePolygons("Testing/Fillet/input.txt", polygons);
+
+  resultOutputFile.open("Testing/Fillet/" + std::to_string(caseIndex) + ".txt");
+  if (!resultOutputFile.is_open()) {
+    std::cerr << "Error: Could not open file "
+              << std::to_string(caseIndex) + ".txt"
+              << " for writing." << std::endl;
+    throw std::exception();
+  }
   caseIndex++;
 
   Loops loops;
@@ -1315,8 +1323,6 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
     }
   }
 #endif
-
-  resultOutputFile.open(std::to_string(caseIndex) + ".txt");
 
   // Calc all arc that bridge 2 edge
   auto arcConnection = CalculateFilletArc(loops, colliderInfo, radius);

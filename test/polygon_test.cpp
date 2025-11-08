@@ -70,83 +70,6 @@ void TestPoly(const Polygons& polys, int expectedNumTri,
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 }
 
-class PolygonTestFixture : public testing::Test {
- public:
-  Polygons polys;
-  double epsilon;
-  int expectedNumTri;
-  std::string name;
-
-  explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri, const std::string& name)
-      : polys(polys),
-        epsilon(epsilon),
-        expectedNumTri(expectedNumTri),
-        name(name) {}
-
-  void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
-};
-
-void RegisterPolygonTestsFile(const std::string& suitename,
-                              const std::string& filename) {
-  auto f = std::ifstream(filename);
-  EXPECT_TRUE(f.is_open());
-
-  // for each test:
-  //   test name, expectedNumTri, epsilon, num polygons
-  //   for each polygon:
-  //     num points
-  //     for each vertex:
-  //       x coord, y coord
-  //
-  // note that we should not have commas in the file
-
-  std::string name;
-  double epsilon, x, y;
-  int expectedNumTri, numPolys, numPoints;
-
-  while (1) {
-    f >> name;
-    if (f.eof()) break;
-    f >> expectedNumTri >> epsilon >> numPolys;
-    Polygons polys;
-    for (int i = 0; i < numPolys; i++) {
-      polys.emplace_back();
-      f >> numPoints;
-      for (int j = 0; j < numPoints; j++) {
-        f >> x >> y;
-        polys.back().emplace_back(x, y);
-      }
-    }
-    testing::RegisterTest(
-        suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
-          return new PolygonTestFixture(polys, epsilon, expectedNumTri, name);
-        });
-  }
-  f.close();
-}
-}  // namespace
-
-void RegisterPolygonTests() {
-  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
-                         "zebra3.txt"};
-
-#ifdef __EMSCRIPTEN__
-  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
-#else
-  std::string file = __FILE__;
-  auto end = std::min(file.rfind('\\'), file.rfind('/'));
-  std::string dir = file.substr(0, end);
-  for (auto f : files)
-    RegisterPolygonTestsFile("Polygon", dir + "/polygons/" + f);
-#endif
-}
-
-namespace {
-
-using namespace manifold;
-
 void TestFillet(const Polygons& polys, double epsilon = -1.0) {
   // const double radius = 0.7;
 
@@ -233,12 +156,98 @@ void TestFillet(const Polygons& polys, double epsilon = -1.0) {
   }
 }
 
-class FilletTestFixture : public PolygonTestFixture {
+}  // namespace
+
+class PolygonTestFixture : public testing::Test {
  public:
-  void TestBody() override { TestFillet(polys, epsilon); }
+  Polygons polys;
+  double epsilon;
+  int expectedNumTri;
+  std::string name;
+
+  explicit PolygonTestFixture(Polygons polys, double epsilon,
+                              int expectedNumTri, const std::string& name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
+  void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-}  // namespace
+class FilletTestFixture : public testing::Test {
+ public:
+  Polygons polys;
+  double epsilon;
+  int expectedNumTri;
+  std::string name;
+
+  explicit FilletTestFixture(Polygons polys, double epsilon, int expectedNumTri,
+                             const std::string& name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
+  void TestBody() { TestFillet(polys, epsilon); }
+};
+
+template <typename TestFixture>
+void RegisterPolygonTestsFile(const std::string& suitename,
+                              const std::string& filename) {
+  auto f = std::ifstream(filename);
+  EXPECT_TRUE(f.is_open());
+
+  // for each test:
+  //   test name, expectedNumTri, epsilon, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double epsilon, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> epsilon >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
+    testing::RegisterTest(
+        suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> TestFixture* {
+          return new TestFixture(polys, epsilon, expectedNumTri, name);
+        });
+  }
+  f.close();
+}
+
+void RegisterPolygonTests() {
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
+#else
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files)
+    RegisterPolygonTestsFile<PolygonTestFixture>("Polygon",
+                                                 dir + "/polygons/" + f);
+#endif
+}
 
 void RegisterFilletTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
@@ -253,6 +262,7 @@ void RegisterFilletTests() {
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
   for (auto f : files)
-    RegisterPolygonTestsFile("Polygon.Fillet", dir + "/polygons/" + f);
+    RegisterPolygonTestsFile<FilletTestFixture>("Polygon.Fillet",
+                                                dir + "/polygons/" + f);
 #endif
 }
