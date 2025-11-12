@@ -28,13 +28,15 @@
  */
 
 import {Document, Material, Node} from '@gltf-transform/core';
+import {moveToDocument, unpartition} from '@gltf-transform/functions';
 
 import {Manifold} from '../manifold.js';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
-import {GLTFMaterial, GLTFNode} from './gltf-node.ts';
+import {BaseGLTFNode, GLTFMaterial, GLTFNode, NonManifoldGLTFNode} from './gltf-node.ts';
+import {cleanup as cleanupImportGLTF} from './import-gltf.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
@@ -54,6 +56,7 @@ export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
+  cleanupImportGLTF();
 }
 
 // Swallow informational logs in testing framework
@@ -63,25 +66,28 @@ function log(...args: any[]) {
   }
 }
 
+function applyTransformation(
+    doc: Document, sourceNode: BaseGLTFNode, targetNode: Node) {
+  // Animation Motion
+  const pos = addMotion(doc, 'translation', sourceNode, targetNode);
+  if (pos != null) {
+    targetNode.setTranslation(pos);
+  }
+
+  const rot = addMotion(doc, 'rotation', sourceNode, targetNode);
+  if (rot != null) {
+    targetNode.setRotation(euler2quat(rot));
+  }
+
+  const scale = addMotion(doc, 'scale', sourceNode, targetNode);
+  if (scale != null) {
+    targetNode.setScale(scale);
+  }
+}
+
 function createGLTFnode(doc: Document, node: GLTFNode): Node {
   const out = doc.createNode(node.name);
-
-  // Animation Motion
-  const pos = addMotion(doc, 'translation', node, out);
-  if (pos != null) {
-    out.setTranslation(pos);
-  }
-
-  const rot = addMotion(doc, 'rotation', node, out);
-  if (rot != null) {
-    out.setRotation(euler2quat(rot));
-  }
-
-  const scale = addMotion(doc, 'scale', node, out);
-  if (scale != null) {
-    out.setScale(scale);
-  }
-
+  applyTransformation(doc, node, out);
   return out;
 }
 
@@ -166,10 +172,20 @@ function cloneNodeNewMaterial(
   newMesh.setExtras({clonedFrom: oldMesh});
 }
 
+function copyNodeToDocument(doc: Document, nodeDef: NonManifoldGLTFNode): Node {
+  const sourceNode = nodeDef.gltfTransformNode!;
+  const sourceDoc = nodeDef.gltfDocument!;
+  const map = moveToDocument(doc, sourceDoc, [sourceNode]);
+  const targetNode = map.get(sourceNode) as Node;
+  applyTransformation(doc, nodeDef, targetNode);
+  return targetNode;
+}
+
 function createNodeFromCache(
     doc: Document, nodeDef: GLTFNode,
     manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
   const node = createGLTFnode(doc, nodeDef);
+
   const {manifold} = nodeDef;
   if (manifold) {
     // Animation Morph
@@ -207,6 +223,7 @@ function createNodeFromCache(
 
 function createWrapper(doc: Document) {
   const halfRoot2 = Math.sqrt(2) / 2;
+  // GLTF has a defined scale of 1:1 metre.
   const mm2m = 1 / 1000;
   const wrapper = doc.createNode('wrapper')
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
@@ -222,10 +239,10 @@ function createWrapper(doc: Document) {
  * @param manifold The Manifold object
  * @returns An in-memory GLTF-Transform Document
  */
-export function manifoldToGLTFDoc(manifold: Manifold) {
+export async function manifoldToGLTFDoc(manifold: Manifold) {
   const node = new GLTFNode();
   node.manifold = manifold;
-  return GLTFNodesToGLTFDoc([node])
+  return await GLTFNodesToGLTFDoc([node])
 }
 
 /**
@@ -235,7 +252,7 @@ export function manifoldToGLTFDoc(manifold: Manifold) {
  * @param nodes A list of GLTF Nodes
  * @returns An in-memory GLTF-Transform Document
  */
-export function GLTFNodesToGLTFDoc(nodes: Array<GLTFNode>) {
+export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   if (nodes.length == 0) {
     throw new TypeError('nodes[] must contain at least one GLTFNode.')
   }
@@ -245,15 +262,23 @@ export function GLTFNodesToGLTFDoc(nodes: Array<GLTFNode>) {
 
   addAnimationToDoc(doc);
 
-  const node2gltf = new Map<GLTFNode, Node>();
+  const node2gltf = new Map<BaseGLTFNode, Node>();
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
   let leafNodes = 0;
+  let nonManifoldNodes = 0;
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of nodes) {
-    node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
-    if (nodeDef.manifold) {
-      ++leafNodes;
+    if (nodeDef instanceof NonManifoldGLTFNode) {
+      node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
+      ++nonManifoldNodes;
+    } else {
+      node2gltf.set(
+          nodeDef,
+          createNodeFromCache(doc, nodeDef as GLTFNode, manifold2node));
+      if ((nodeDef as GLTFNode).manifold) {
+        ++leafNodes;
+      }
     }
   }
 
@@ -269,9 +294,15 @@ export function GLTFNodesToGLTFDoc(nodes: Array<GLTFNode>) {
     }
   }
 
-  log('Total glTF nodes: ', nodes.length,
-      ', Total mesh references: ', leafNodes);
+  log(`Total glTF nodes: ${nodes.length}`);
+  if (leafNodes) {
+    log(`Total mesh references: ${leafNodes}`);
+  }
+  if (nonManifoldNodes) {
+    log(`Total non-manifold (imported) nodes: ${nonManifoldNodes}`);
+  }
 
   cleanupAnimationInDoc();
+  await doc.transform(unpartition());
   return doc;
 }

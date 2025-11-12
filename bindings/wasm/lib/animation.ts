@@ -17,7 +17,7 @@ import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node}
 import {Manifold, Mesh} from '../manifold-encapsulated-types';
 import {Vec3} from '../manifold-global-types';
 
-import {GLTFNode} from './gltf-node.ts';
+import {BaseGLTFNode} from './gltf-node.ts';
 import {euler2quat} from './math.ts';
 
 /**
@@ -105,7 +105,7 @@ export function cleanup() {
  * @internal
  */
 export function addMotion(
-    doc: Document, type: 'translation'|'rotation'|'scale', node: GLTFNode,
+    doc: Document, type: 'translation'|'rotation'|'scale', node: BaseGLTFNode,
     out: Node): Vec3|null {
   const motion = node[type];
   if (motion == null) {
