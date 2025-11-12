@@ -28,11 +28,19 @@ import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 
 const io = setupIO(new WebIO());
 
-async function runExample(name: string) {
-  const filename = resolve(
-      import.meta.dirname, '../test/examples/',
-      name.toLowerCase().replaceAll(' ', '-') + '.mjs');
+async function resolveExample(name: string) {
+  const cwd = resolve(import.meta.dirname, '../test/examples/');
+  const pattern = name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}';
+  const globMatches = fs.glob(pattern, {cwd})
+  const firstMatch = (await globMatches.next()).value;
+  if (!firstMatch) {
+    throw new Error(`Could not find example '${name}' in '${cwd}'.`);
+  }
+  return resolve(cwd, firstMatch);
+}
 
+async function runExample(name: string) {
+  const filename = await resolveExample(name);
   const module: ManifoldToplevel = await getManifoldModule();
   const code = await fs.readFile(filename, 'utf-8');
   const doc = await evaluate(code, {jsCDN: 'jsDelivr'});
