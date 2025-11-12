@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type {Document as GLTFDocument, Node as GLTFTransformNode} from '@gltf-transform/core';
+
 import type {Manifold} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
@@ -29,26 +31,37 @@ export class GLTFMaterial {
   name?: string;
 }
 
-export class GLTFNode {
-  private _parent?: GLTFNode;
-  manifold?: Manifold;
+export abstract class BaseGLTFNode {
+  private _parent?: BaseGLTFNode;
+  name?: string;
+
   translation?: Vec3|((t: number) => Vec3);
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
-  material?: GLTFMaterial;
-  name?: string;
 
-  constructor(parent?: GLTFNode) {
+  constructor(parent?: BaseGLTFNode) {
     this._parent = parent;
   }
+
+  get parent() {
+    return this._parent;
+  }
+}
+
+export class GLTFNode extends BaseGLTFNode {
+  manifold?: Manifold;
+  material?: GLTFMaterial;
+
   clone(parent?: GLTFNode) {
     const copy = new GLTFNode(parent ?? this.parent);
     Object.assign(copy, this);
     return copy;
   }
-  get parent() {
-    return this._parent;
-  }
+}
+
+export class NonManifoldGLTFNode extends BaseGLTFNode {
+  gltfTransformNode?: GLTFTransformNode;
+  gltfDocument?: GLTFDocument;
 }
 
 const nodes = new Array<GLTFNode>();
@@ -101,14 +114,15 @@ export const cleanup = () => {
  * @returns An array of GLTFNodes.
  */
 export async function anyToGLTFNodeList(
-    any: Manifold|GLTFNode|Array<Manifold|GLTFNode>): Promise<Array<GLTFNode>> {
+    any: Manifold|BaseGLTFNode|
+    Array<Manifold|BaseGLTFNode>): Promise<Array<BaseGLTFNode>> {
   if (Array.isArray(any)) {
     return await any.map(anyToGLTFNodeList)
         .reduce(
             async (acc, cur) => ([...(await acc), ...(await cur)]),
             new Promise(resolve => resolve([])))
-  } else if (any instanceof GLTFNode) {
-    const node = any as GLTFNode;
+  } else if (any instanceof BaseGLTFNode) {
+    const node = any as BaseGLTFNode;
     if (!node.parent) return [node];
     return [await anyToGLTFNodeList(node.parent), node].flat();
   } else if (any.constructor.name === 'Manifold') {

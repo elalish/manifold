@@ -34,6 +34,7 @@ import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as garbageCollector from './garbage-collector.ts';
 import * as gltfNode from './gltf-node.ts'
+import * as importGLTF from './import-gltf.ts';
 import * as levelOfDetail from './level-of-detail.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
@@ -232,6 +233,7 @@ export async function evaluate(
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,
+    fetchAsGLTFNode: importGLTF.fetchAsGLTFNode,
 
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,
@@ -306,7 +308,7 @@ export async function evaluate(
 
   // Create a gltf-transform document.
   const nodes = await gltfNode.anyToGLTFNodeList(result);
-  const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes);
+  const doc = await scenebuilder.GLTFNodesToGLTFDoc(nodes);
   const t2 = performance.now();
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 

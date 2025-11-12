@@ -88,6 +88,8 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       'show', 'only', 'setMaterial', 'setMorphStart', 'setMorphEnd',
       // GLTFNode and utilities.
       'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes',
+      // Import
+      'fetchAsGLTFNode',
       // ManifoldCAD specific exports.
       'isManifoldCAD'
     ];

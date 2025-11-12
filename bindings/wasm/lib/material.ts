@@ -66,7 +66,7 @@ export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
     return {};
   }
   if (node.material == null) {
-    node.material = getBackupMaterial(node.parent);
+    node.material = getBackupMaterial((node.parent as GLTFNode));
   }
   return node.material;
 }
