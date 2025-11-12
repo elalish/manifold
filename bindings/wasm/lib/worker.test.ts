@@ -14,6 +14,7 @@
 
 import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
+import {glob} from 'glob';
 import * as fs from 'node:fs/promises';
 import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
@@ -29,14 +30,15 @@ import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 const io = setupIO(new WebIO());
 
 async function resolveExample(name: string) {
-  const cwd = resolve(import.meta.dirname, '../test/examples/');
-  const pattern = name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}';
-  const globMatches = fs.glob(pattern, {cwd})
-  const firstMatch = (await globMatches.next()).value;
-  if (!firstMatch) {
-    throw new Error(`Could not find example '${name}' in '${cwd}'.`);
+  const [filepath] =
+      await glob(name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}', {
+        cwd: resolve(import.meta.dirname, '../test/examples/'),
+        withFileTypes: true
+      });
+  if (!filepath) {
+    throw new Error(`Could not find example '${name}'.`);
   }
-  return resolve(cwd, firstMatch);
+  return filepath.fullpath()
 }
 
 async function runExample(name: string) {
