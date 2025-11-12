@@ -1,5 +1,5 @@
-import animatedGears from '../test/examples/animated-gears.mjs?raw';
 import auger from '../test/examples/auger.mjs?raw';
+import gearBearing from '../test/examples/gear-bearing.mjs?raw';
 import gyroidModule from '../test/examples/gyroid-module.mjs?raw';
 import heart from '../test/examples/heart.mjs?raw';
 import intro from '../test/examples/intro.mjs?raw';
@@ -23,8 +23,8 @@ examples.set('Torus Knot', torusKnot);
 examples.set('Menger Sponge', mengerSponge);
 examples.set('Stretchy Bracelet', stretchyBracelet);
 examples.set('Gyroid Module', gyroidModule);
-examples.set('Animated Gears', animatedGears);
-examples.set('Involute Gear Library', involuteGearLibrary);
+examples.set('Gear Bearing', gearBearing);
+examples.set('involute-gear-library', involuteGearLibrary);
 examples.set('Voronoi', voronoi);
 
 if (typeof self !== 'undefined') {
