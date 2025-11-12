@@ -111,10 +111,11 @@
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "esbuild": "^0.25.11",
+    "glob": "^11.0.3",
+    "stacktrace-parser": "^0.1.11",
     "typedoc": "^0.28.10",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "stacktrace-parser": "^0.1.11"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.2.0",

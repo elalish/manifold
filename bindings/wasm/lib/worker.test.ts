@@ -14,6 +14,7 @@
 
 import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
+import {glob} from 'glob';
 import * as fs from 'node:fs/promises';
 import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
@@ -28,14 +29,23 @@ import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 
 const io = setupIO(new WebIO());
 
-async function runExample(name: string) {
-  const filename = resolve(
-      import.meta.dirname, '../test/examples/',
-      name.toLowerCase().replaceAll(' ', '-') + '.mjs');
+async function resolveExample(name: string) {
+  const [filepath] =
+      await glob(name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}', {
+        cwd: resolve(import.meta.dirname, '../test/examples/'),
+        withFileTypes: true
+      });
+  if (!filepath) {
+    throw new Error(`Could not find example '${name}'.`);
+  }
+  return filepath.fullpath()
+}
 
+async function runExample(name: string) {
+  const filename = await resolveExample(name);
   const module: ManifoldToplevel = await getManifoldModule();
   const code = await fs.readFile(filename, 'utf-8');
-  const doc = await evaluate(code, {jsCDN: 'jsDelivr'});
+  const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
   const glbURL = await exportBlobURL(doc, 'glb')
   cleanup();
   assert.ok(glbURL);
@@ -131,5 +141,28 @@ suite('Examples', () => {
     expect(result?.genus).to.equal(15, 'Genus');
     expect(result?.volume).to.be.closeTo(4175, 1, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(5645, 1, 'Surface Area');
+  });
+
+  test('Involute Gear Library', async () => {
+    const result = await runExample('Involute Gear Library');
+    expect(result?.genus).to.equal(0, 'Genus');
+    expect(result?.volume).to.be.closeTo(2185, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(1667, 1, 'Surface Area');
+  });
+
+  test('Gear Bearing', async () => {
+    const result = await runExample('Gear Bearing');
+    expect(result?.genus).to.equal(1, 'Genus');
+    expect(result?.volume).to.be.closeTo(9074, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(7009, 1, 'Surface Area');
+  });
+
+  test('Voronoi', async () => {
+    const result = await runExample('Voronoi');
+    // This model is non-deterministic.
+    // These values must be very conservative.
+    expect(result?.genus).to.be.lessThan(-25, 'Genus');
+    expect(result?.volume).to.be.greaterThan(5000, 'Volume');
+    expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
   });
 });
