@@ -334,7 +334,7 @@ async function createEditor() {
 
   // Initialize auto typing on monaco editor.
   self.window.typecache = new LocalStorageCache();
-  await AutoTypings.create(editor, {
+  const autoTypings = await AutoTypings.create(editor, {
     sourceCache: self.window.typecache,
     onError: e => {console.error(e)},
     onUpdate: (update, text) => {console.debug(text)},
@@ -387,17 +387,31 @@ async function createEditor() {
   }
 
   editor.onDidChangeModelContent(e => {
-    runButton.disabled = false;
+    // monaco-editor-auto-typings loaded types.  Do nothing.
+    if (autoTypings.isResolving && e.changes.isFlush) {
+      return;
+    }
+
+    // The user switched models.
     if (switching) {
       switching = false;
       editor.setScrollTop(0);
+      runButton.disabled = false;
       return;
     }
+
+    // The user edited an example.
+    // Copy it into a new script.
     if (isExample) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
+      runButton.disabled = false;
+      return;
     }
+
+    // And if we're here, the user made an edit.
+    runButton.disabled = false;
   });
 
   window.onresize = () => {
