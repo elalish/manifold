@@ -113,7 +113,7 @@ export const getMinCircularEdgeLength = () => minCircularEdgeLength;
  * @group Global Settings
  */
 export const getCircularSegments = (radius: number) =>
-    getManifoldModuleSync()?.getCircularSegments(radius);
+    getManifoldModuleSync()?.getCircularSegments(radius)!;
 
 export const cleanup = () => {
   resetToCircularDefaults();

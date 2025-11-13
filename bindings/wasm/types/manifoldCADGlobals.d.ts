@@ -16,7 +16,7 @@
  * These objects and functions are specific to top-level scripts
  * running within manifoldCAD.
  *
- * They are only accessable as global objects by a top level script evaluated by
+ * They are only accessible as global objects by a top level script evaluated by
  * the worker.  Libraries will not have access to them.
  *
  * These functions will not be present at all when a model is imported as an ES
