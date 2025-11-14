@@ -1,6 +1,6 @@
 [project]
 name = "manifold3d"
-version = "3.3.0"
+version = "3.3.1"
 authors = [
   { name="Emmett Lalish", email="elalish@gmail.com" },
 ]
@@ -61,7 +61,7 @@ skip = ["*-win32", "*_i686", "pp*", "*-musllinux*"]
 before-all = "git clone --depth 1 --branch v2021.10.0 https://github.com/oneapi-src/oneTBB.git"
 [tool.cibuildwheel.config-settings]
 "cmake.define.FETCHCONTENT_SOURCE_DIR_TBB" = "./oneTBB"
-"cmake.define.FETCHCONTENT_UPDATES_DISCONNECTED" = "ON"
+"cmake.define.MANIFOLD_DOWNLOADS" = "OFF"
 
 [tool.cibuildwheel.macos]
 environment = "MACOSX_DEPLOYMENT_TARGET=10.14"

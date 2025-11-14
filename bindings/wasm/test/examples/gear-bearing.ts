@@ -8,18 +8,20 @@ import {spurGear} from './involute-gear-library';
 
 const {round, min, cos, tan, sqrt, PI} = Math;
 
-const diameter = 51.7;
-const thickness = 15;
-const clearance = 0.15;
+// Customizable parameters
+const diameter = 51.7;   // mm
+const thickness = 15;    // mm
+const clearance = 0.15;  // mm
 const planets = 5;
 const planetTeeth = 7;
-const sunTeeth = 9;
-const pressureDeg = 45;
-const holeWidth = 6.7;
-setMinCircularAngle(2);
-setMinCircularEdgeLength(0.5);
-
+const sunTeeth = 9;      // approximate
+const pressureDeg = 45;  // degrees
 const depthRatio = 0.5;
+const holeWidth = 6.7;          // mm
+setMinCircularAngle(2);         // degrees
+setMinCircularEdgeLength(0.5);  // mm
+
+// Calculations
 const m = round(planets);
 const np = round(planetTeeth);
 const k1 = round(2 / m * (sunTeeth + np));
