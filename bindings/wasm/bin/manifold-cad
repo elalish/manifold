@@ -18,11 +18,10 @@ import {extname} from 'node:path';
 
 import {Command} from 'commander';
 
-import {bundleFile} from '../lib/bundle.js';
+import {bundleFile} from '../lib/bundler.js';
 import {Export3MF} from '../lib/export-3mf.js';
 import {ExportGLTF} from '../lib/export-gltf.js';
 import * as worker from '../lib/worker.js';
-import {BundlerError,EvaluatorError} from '../lib/error.js';
 
 const exporters = [
   new Export3MF(),
