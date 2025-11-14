@@ -7,3 +7,4 @@ lib/*.d.ts
 lib/*.d.ts.map
 dist/
 coverage/
+test/results

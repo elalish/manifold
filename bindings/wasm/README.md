@@ -34,7 +34,7 @@ Please see our usage [examples](https://github.com/elalish/manifold/tree/master/
 
 ## Command Line Interface
 
-ManifoldCAD now has a [command line interface](./bin/manifold-cad).  It can be run directly as `./bin/manifold-cad`, or via npx: `npx manifold-cad`.
+ManifoldCAD has a [command line interface](./bin/manifold-cad).  It can be run directly as `./bin/manifold-cad`.  It can also be run via `npx`.  If Manifold is not already present, use `npx manifold-3d manifold-cad` or `npx manifold-3d`.  If Manifold is already installed, `npx manifold-cad` will suffice.
 
 ```
 Usage: manifold-cad [options] <infile.js> <outfile>

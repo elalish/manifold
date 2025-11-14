@@ -100,7 +100,8 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       (async () => {
         const {resolve, dirname} = await import('node:path');
         const {fileURLToPath} = await import('node:url');
-        const dir = __dirname ?? import.meta?.dirname ??
+        const dir = ('string' == typeof __dirname && __dirname) ||
+            ('string' == typeof import.meta?.dirname && import.meta.dirname) ||
             dirname(fileURLToPath(import.meta.url));
         manifoldCADExportPath = resolve(dir, './manifoldCAD.ts');
       })();
