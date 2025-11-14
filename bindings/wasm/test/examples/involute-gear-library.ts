@@ -66,6 +66,10 @@ export function gear2D(teeth: number, {
   const backlashDeg = clearance / (pitchRadius * cos(pressureRad)) * 180 / PI;
   const halfThickDeg = 90 / teeth - backlashDeg / 2;
 
+  if (halfThickDeg <= 0) {
+    throw new Error('Clearance is too large for the circular pitch.');
+  }
+
   const pitchPoint =
       involute(baseRadius, involuteIntersectRad(baseRadius, pitchRadius));
   const pitchDeg = atan2(pitchPoint[1], pitchPoint[0]) * 180 / PI;
