@@ -66,7 +66,7 @@ ringNode.material = {
 const sunNode = new GLTFNode(shift);
 sunNode.manifold = sun;
 sunNode.rotation =
-    (t) => [0, 0, (np + 1) * 180 * m / ns + (t * 360) * (ns + np) * 2 / ns]
+    (t) => [0, 0, (np + 1) * 180 / ns + (t * 360) * (ns + np) * 2 / ns]
 sunNode.material = {
   baseColorFactor: [0.7, 0.7, 0.7]
 };
