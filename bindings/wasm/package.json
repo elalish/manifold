@@ -1,6 +1,6 @@
 {
   "name": "manifold-3d",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
   "bin": {
