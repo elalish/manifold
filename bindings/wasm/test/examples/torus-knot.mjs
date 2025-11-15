@@ -4,7 +4,7 @@
 // an example of using the warp() method, thus avoiding any direct
 // handling of triangles.
 
-import {Manifold, CrossSection, getCircularSegments} from 'manifold-3d/manifoldCAD';
+import {CrossSection, getCircularSegments, Manifold} from 'manifold-3d/manifoldCAD';
 
 // The number of times the thread passes through the donut hole.
 const p = 1;
@@ -22,11 +22,8 @@ const circularSegments = -1;
 // Number of segments along the length of the knot. Default makes roughly
 // square facets.
 const linearSegments = -1;
-
 // These default values recreate Matlab Knot by Emmett Lalish:
 // https://www.thingiverse.com/thing:7080
-
-import {vec3} from 'gl-matrix';
 
 function gcd(a, b) {
   return b == 0 ? a : gcd(b, a % b);
@@ -35,28 +32,35 @@ function gcd(a, b) {
 const kLoops = gcd(p, q);
 const pk = p / kLoops;
 const qk = q / kLoops;
-const n = circularSegments > 2 ? circularSegments :
-                                 getCircularSegments(threadRadius);
-const m = linearSegments > 2 ? linearSegments :
-                               n * qk * majorRadius / threadRadius;
+const n =
+    circularSegments > 2 ? circularSegments : getCircularSegments(threadRadius);
+const m =
+    linearSegments > 2 ? linearSegments : n * qk * majorRadius / threadRadius;
 
 const offset = 2
 const circle = CrossSection.circle(1, n).translate([offset, 0]);
+
+function rotate2D(point, angleRad) {
+  const cosA = Math.cos(angleRad);
+  const sinA = Math.sin(angleRad);
+  return [point[0] * cosA - point[1] * sinA, point[0] * sinA + point[1] * cosA];
+}
 
 const func = (v) => {
   const psi = qk * Math.atan2(v[0], v[1]);
   const theta = psi * pk / qk;
   const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
   const phi = Math.atan2(x1 - offset, v[2]);
-  vec3.set(
-      v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
-  const center = vec3.fromValues(0, 0, 0);
+  let p3 = [threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi)];
   const r = majorRadius + minorRadius * Math.cos(theta);
-  vec3.rotateX(v, v, center, -Math.atan2(pk * minorRadius, qk * r));
-  v[0] += minorRadius;
-  vec3.rotateY(v, v, center, theta);
-  v[0] += majorRadius;
-  vec3.rotateZ(v, v, center, psi);
+  let p2 = rotate2D([p3[1], p3[2]], -Math.atan2(pk * minorRadius, qk * r));
+  p3 = [p3[0] + minorRadius, p2[0], p2[1]];
+  p2 = rotate2D([p3[0], p3[2]], -theta);
+  p3 = [p2[0] + majorRadius, p3[1], p2[1]];
+  p2 = rotate2D([p3[0], p3[1]], psi);
+  v[0] = p2[0];
+  v[1] = p2[1];
+  v[2] = p3[2];
 };
 
 const result = Manifold.revolve(circle, m).warp(func);

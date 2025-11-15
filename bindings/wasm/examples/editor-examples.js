@@ -1,6 +1,6 @@
 import auger from '../test/examples/auger.mjs?raw';
 import gearBearing from '../test/examples/gear-bearing.ts?raw';
-import gyroidModule from '../test/examples/gyroid-module.mjs?raw';
+import gyroidModule from '../test/examples/gyroid-module.ts?raw';
 import heart from '../test/examples/heart.mjs?raw';
 import intro from '../test/examples/intro.mjs?raw';
 import involuteGearLibrary from '../test/examples/involute-gear-library.ts?raw';

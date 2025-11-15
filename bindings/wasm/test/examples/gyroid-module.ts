@@ -3,8 +3,7 @@
 // use of a Signed Distance Function (SDF) to create smooth, complex
 // manifolds.
 
-import {Manifold, GLTFNode, getGLTFNodes} from 'manifold-3d/manifoldCAD';
-import {vec3} from 'gl-matrix';
+import {Box, getGLTFNodes, GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
 
 // number of modules along pyramid edge (use 1 for print orientation)
 const m = 4;
@@ -26,23 +25,21 @@ function gyroid(p) {
 function gyroidOffset(level) {
   const period = 2 * pi;
   const box = {
-    min: vec3.fromValues(-period, -period, -period),
-    max: vec3.fromValues(period, period, period)
-  };
-  return Manifold.levelSet(gyroid, box, period / n, level)
-      .scale(size / period);
+    min: [-period, -period, -period],
+    max: [period, period, period]
+  } as Box;
+  return Manifold.levelSet(gyroid, box, period / n, level).scale(size / period);
 };
 
 function rhombicDodecahedron() {
   const box = Manifold.cube([1, 1, 2], true).scale(size * Math.sqrt(2));
-  const result =
-      box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
+  const result = box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
   return result.intersect(box.rotate([0, 0, 45]));
 }
 
 const gyroidModule = rhombicDodecahedron()
-                          .intersect(gyroidOffset(-0.4))
-                          .subtract(gyroidOffset(0.4));
+                         .intersect(gyroidOffset(-0.4))
+                         .subtract(gyroidOffset(0.4));
 
 if (m > 1) {
   for (let i = 0; i < m; ++i) {
@@ -50,11 +47,9 @@ if (m > 1) {
       for (let k = j; k < m; ++k) {
         const node = new GLTFNode();
         node.manifold = gyroidModule;
-        node.translation =
-            [(k + i - j) * size, (k - i) * size, (-j) * size];
+        node.translation = [(k + i - j) * size, (k - i) * size, (-j) * size];
         node.material = {
-          baseColorFactor:
-              [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
+          baseColorFactor: [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
         };
       }
     }

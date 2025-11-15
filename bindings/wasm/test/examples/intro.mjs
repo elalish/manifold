@@ -27,11 +27,9 @@ export default result;
 // This means it will work equally well offline once loaded.
 // Consider installing it (icon in the search bar) for easy access.
 
-// See the script drop-down above ("Intro") for usage examples. The
-// gl-matrix package from npm is automatically imported for convenience -
-// its API is available in the top-level glMatrix object.
+// See the script drop-down above ("Intro") for usage examples.
 
 // Use GLTFNode for disjoint manifolds rather than compose(), as this will
 // keep them better organized in the GLB. This will also allow you to
-// specify material properties, and even vertex colors via
+// specify animation, material properties, and even vertex colors via
 // setProperties(). See Tetrahedron Puzzle example.
