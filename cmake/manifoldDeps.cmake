@@ -72,7 +72,7 @@ if(MANIFOLD_PAR)
     FetchContent_Declare(
       TBB
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-      GIT_TAG v2022.0.0
+      GIT_TAG v2022.3.0
       GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(TBB)

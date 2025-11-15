@@ -58,7 +58,7 @@ musllinux-x86_64-image = "musllinux_1_2"
 skip = ["*-win32", "*_i686", "pp*", "*-musllinux*"]
 
 # only clone TBB once
-before-all = "git clone --depth 1 --branch v2021.10.0 https://github.com/oneapi-src/oneTBB.git"
+before-all = "git clone --depth 1 --branch v2022.3.0 https://github.com/oneapi-src/oneTBB.git"
 [tool.cibuildwheel.config-settings]
 "cmake.define.FETCHCONTENT_SOURCE_DIR_TBB" = "./oneTBB"
 "cmake.define.MANIFOLD_USE_BUILTIN_TBB" = "ON"
