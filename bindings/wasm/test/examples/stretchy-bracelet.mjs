@@ -2,11 +2,16 @@
 // https://www.thingiverse.com/thing:13505
 
 import {Manifold} from 'manifold-3d/manifoldCAD';
-import {vec2} from 'gl-matrix';
+
+function rotate2D(point, angleRad) {
+  const cosA = Math.cos(angleRad);
+  const sinA = Math.sin(angleRad);
+  return [point[0] * cosA - point[1] * sinA, point[0] * sinA + point[1] * cosA];
+}
 
 function base(
-    width, radius, decorRadius, twistRadius, nDecor, innerRadius,
-    outerRadius, cut, nCut, nDivision) {
+    width, radius, decorRadius, twistRadius, nDecor, innerRadius, outerRadius,
+    cut, nCut, nDivision) {
   let b = Manifold.cylinder(width, radius + twistRadius / 2);
   const circle = [];
   const dPhiDeg = 180 / nDivision;
@@ -24,18 +29,16 @@ function base(
   const stretch = [];
   const dPhiRad = 2 * Math.PI / nCut;
 
-  const o = vec2.fromValues(0, 0);
-  const p0 = vec2.fromValues(outerRadius, 0);
-  const p1 = vec2.fromValues(innerRadius, -cut);
-  const p2 = vec2.fromValues(innerRadius, cut);
+  const p0 = [outerRadius, 0];
+  const p1 = [innerRadius, -cut];
+  const p2 = [innerRadius, cut];
   for (let i = 0; i < nCut; ++i) {
-    stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
-    stretch.push(vec2.rotate([0, 0], p1, o, dPhiRad * i));
-    stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
-    stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
+    stretch.push(rotate2D(p0, dPhiRad * i));
+    stretch.push(rotate2D(p1, dPhiRad * i));
+    stretch.push(rotate2D(p2, dPhiRad * i));
+    stretch.push(rotate2D(p0, dPhiRad * i));
   }
-  const result =
-      Manifold.intersection(Manifold.extrude(stretch, width), b);
+  const result = Manifold.intersection(Manifold.extrude(stretch, width), b);
   return result;
 }
 
@@ -56,8 +59,7 @@ function stretchyBracelet(
           cut - adjThickness, nCut, nDivision),
       base(
           width, radius - thickness, decorRadius, twistRadius, nDecor,
-          innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
-          nDivision));
+          innerRadius, outerRadius + 3 * adjThickness, cut, nCut, nDivision));
 }
 
 const result = stretchyBracelet();
