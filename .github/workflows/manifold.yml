@@ -133,13 +133,30 @@ jobs:
       run: |
         cd build/test
         node ./manifold_test.js
-    - name: Test package
+    - name: Run unit tests
       if: matrix.parallelization == 'OFF'
       run: |
         cd bindings/wasm
         npm ci
         npm run build
         npm test
+    - name: Isolated npm smoke test
+      if: matrix.parallelization == 'OFF'
+      run: |
+        set -ev -o pipefail
+        cd bindings/wasm
+        wasmpath=$(pwd)
+        npmtestpath=../npmtest
+        # Create an npm package.
+        npm ci && npm pack
+        # Install it in an empty directory.
+        mkdir -p ${npmtestpath} && cd ${npmtestpath}
+        npm install ${wasmpath}/manifold-3d*.tgz
+        cp ${wasmpath}/test/fixtures/npm/* .
+        # Positive case smoke test.
+        npx manifold-cad ./unitSphere.mjs ./unitSphere.glb && echo "Positive smoke test succeeded"
+        # Negative case smoke test.
+        npx manifold-cad ./unitSphereNoManifoldImport.mjs ./unitSphereNoManifoldImport.glb || echo "Negative smoke test failed as expected"
     - name: Build examples
       if: matrix.parallelization == 'OFF'
       run: |
