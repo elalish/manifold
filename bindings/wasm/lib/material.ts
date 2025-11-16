@@ -65,7 +65,6 @@ export const setMaterialByID = (id: number, material: GLTFMaterial) => {
 };
 
 /**
- *
  * @internal
  */
 export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {

@@ -51,10 +51,27 @@ export const fetchAsGLTFNodeList = async (url: string) => {
   });
 };
 
-export const importModel = async (url: string) => {
+/**
+ * Import a model for display.
+ *
+ * @group Modelling Functions
+ * @param url
+ * @returns
+ */
+export const importModel = async(url: string): Promise<NonManifoldGLTFNode> => {
   const [firstNode] = await fetchAsGLTFNodeList(url);
   return firstNode;
 };
+
+/**
+ * @internal
+ */
+export const getPropertiesByID = (runID: number) => id2properties.get(runID);
+
+/**
+ * @internal
+ */
+export const getDocumentByID = (runID: number) => id2document.get(runID);
 
 /**
  * Convert a single gltf-transform node to a Manifold object.
