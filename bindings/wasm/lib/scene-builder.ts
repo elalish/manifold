@@ -173,8 +173,8 @@ function cloneNodeNewMaterial(
 }
 
 function copyNodeToDocument(doc: Document, nodeDef: NonManifoldGLTFNode): Node {
-  const sourceNode = nodeDef.gltfTransformNode!;
-  const sourceDoc = nodeDef.gltfDocument!;
+  const sourceNode = nodeDef.node!;
+  const sourceDoc = nodeDef.document!;
   const map = moveToDocument(doc, sourceDoc, [sourceNode]);
   const targetNode = map.get(sourceNode) as Node;
   applyTransformation(doc, nodeDef, targetNode);
