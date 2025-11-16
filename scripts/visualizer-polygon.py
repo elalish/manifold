@@ -4,52 +4,49 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import math
+import os
 from typing import List, Dict, Any
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib.patches import Circle
 
 def patchify(polys):
-    """Returns a matplotlib patch representing the polygon with holes.
-    
-    polys is an iterable (i.e list) of polygons, each polygon is a numpy array 
-    of shape (2, N), where N is the number of points in each polygon.
-    The first polygon is assumed to be the exterior polygon and the rest are holes.
-    The first and last points of each polygon may or may not be the same.
-    
-    This is inspired by https://sgillies.net/2010/04/06/painting-punctured-polygons-with-matplotlib.html
-    """
-    
-    def reorder(poly, cw=True):
-        """Reorders the polygon to run clockwise or counter-clockwise according to the value of cw.
-        It calculates whether a polygon is cw or ccw by summing (x2-x1)*(y2+y1) for all edges 
-        of the polygon, see https://stackoverflow.com/a/1165943/898213.
-        """
-        # Close polygon if not closed
-        if not np.allclose(poly[:, 0], poly[:, -1]):
-            poly = np.c_[poly, poly[:, 0]]
-        
-        direction = ((poly[0] - np.roll(poly[0], 1)) * (poly[1] + np.roll(poly[1], 1))).sum() < 0
-        if direction == cw:
-            return poly
+    """Returns a PathPatch that uses even-odd filling for multiple loops."""
+
+    vertices = []
+    codes = []
+
+    for poly in polys:
+        arr = np.asarray(poly, dtype=float)
+
+        if arr.ndim == 1 or arr.size == 0:
+            continue
+
+        # Accept either shape (2, N) or (N, 2)
+        if arr.shape[0] == 2 and arr.shape[1] != 2:
+            arr = arr.T
+        elif arr.shape[1] != 2:
+            continue
+
+        if arr.shape[0] < 2:
+            continue
+
+        if not np.allclose(arr[0], arr[-1]):
+            arr = np.vstack([arr, arr[0]])
+
+        vertices.extend(arr.tolist())
+        if arr.shape[0] == 2:
+            codes.extend([Path.MOVETO, Path.CLOSEPOLY])
         else:
-            return poly[:, ::-1]
-    
-    def ring_coding(n):
-        """Returns a list of len(n) of this format: 
-        [MOVETO, LINETO, LINETO, ..., LINETO, LINETO, CLOSEPOLY]
-        """
-        codes = [Path.LINETO] * n
-        codes[0] = Path.MOVETO
-        codes[-1] = Path.CLOSEPOLY
-        return codes
-    
-    # First polygon (exterior) should be CCW, holes should be CW
-    ccw = [True] + ([False] * (len(polys) - 1))
-    polys = [reorder(poly, c) for poly, c in zip(polys, ccw)]
-    codes = np.concatenate([ring_coding(p.shape[1]) for p in polys])
-    vertices = np.concatenate(polys, axis=1)
-    return PathPatch(Path(vertices.T, codes))
+            codes.extend([Path.MOVETO] + [Path.LINETO] * (arr.shape[0] - 2) + [Path.CLOSEPOLY])
+
+    if not vertices:
+        return None
+
+    path = Path(vertices, codes)
+    patch = PathPatch(path)
+    return patch
 
 def plot_polygon(ax, loops_list, label, color, closed=True, linestyle='-', marker='o', markersize=5, linewidth=1.5, show_indices=False, index_offset=0.2, fill_polygon=False, fill_alpha=0.3):
     """
@@ -57,8 +54,8 @@ def plot_polygon(ax, loops_list, label, color, closed=True, linestyle='-', marke
     
     Parameters:
     - ax: matplotlib axes object
-    - loops_list: list of loops, where each loop is a list of points [(x1,y1), (x2,y2), ...]
-                  First loop is the outer boundary, subsequent loops are holes
+    - loops_list: list of simple loops (outer boundaries and/or holes), each loop is
+                  a list of points [(x1,y1), (x2,y2), ...]
     - label: label for the legend
     - color: color for the polygon
     - closed: whether to close each loop
@@ -76,22 +73,20 @@ def plot_polygon(ax, loops_list, label, color, closed=True, linestyle='-', marke
     
     # Fill the polygon with holes if requested
     if fill_polygon:
-        # Convert loops to the format expected by patchify (numpy arrays of shape (2, N))
         polys = []
         for loop in loops_list:
             if not loop:
                 continue
-            loop_array = np.array(loop).T  # Convert [(x1,y1), (x2,y2), ...] to [[x1,x2,...], [y1,y2,...]]
-            polys.append(loop_array)
-        
-        if polys:
-            # Create and add the filled patch
-            patch = patchify(polys)
+            polys.append(np.array(loop, dtype=float))
+
+        patch = patchify(polys)
+        if patch is not None:
             patch.set_facecolor(color)
             patch.set_alpha(fill_alpha)
-            # Use the main label for the filled patch if it's the primary representation
-            patch.set_label(label) 
+            patch.set_edgecolor('none')
+            patch.set_label(label)
             ax.add_patch(patch)
+            label = None  # Avoid duplicate legend entries when drawing outlines
     
     # Track global index for continuous numbering across all loops
     global_index = 0
@@ -168,6 +163,56 @@ def plot_polygon(ax, loops_list, label, color, closed=True, linestyle='-', marke
                         bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', boxstyle='round,pad=0.1'))
                 
                 global_index += 1
+
+
+def update_bounds(bounds: Dict[str, float], loops_list):
+    """Expand bounds with a list of loops (simple polygons)."""
+    if not loops_list:
+        return
+
+    for loop in loops_list:
+        if not loop:
+            continue
+        arr = np.asarray(loop, dtype=float)
+        if arr.ndim != 2 or arr.shape[1] != 2:
+            continue
+
+        bounds['min_x'] = min(bounds['min_x'], np.min(arr[:, 0]))
+        bounds['max_x'] = max(bounds['max_x'], np.max(arr[:, 0]))
+        bounds['min_y'] = min(bounds['min_y'], np.min(arr[:, 1]))
+        bounds['max_y'] = max(bounds['max_y'], np.max(arr[:, 1]))
+
+
+def update_bounds_with_points(bounds: Dict[str, float], points):
+    if not points:
+        return
+
+    arr = np.asarray(points, dtype=float)
+    if arr.ndim != 2 or arr.shape[1] != 2:
+        return
+
+    bounds['min_x'] = min(bounds['min_x'], np.min(arr[:, 0]))
+    bounds['max_x'] = max(bounds['max_x'], np.max(arr[:, 0]))
+    bounds['min_y'] = min(bounds['min_y'], np.min(arr[:, 1]))
+    bounds['max_y'] = max(bounds['max_y'], np.max(arr[:, 1]))
+
+
+def compute_axis_limits(bounds: Dict[str, float], padding_ratio: float = 0.05):
+    if (not math.isfinite(bounds['min_x']) or not math.isfinite(bounds['max_x']) or
+            not math.isfinite(bounds['min_y']) or not math.isfinite(bounds['max_y'])):
+        return None
+
+    width = bounds['max_x'] - bounds['min_x']
+    height = bounds['max_y'] - bounds['min_y']
+    span = max(width, height, 1.0)
+    padding = span * padding_ratio
+
+    return (
+        bounds['min_x'] - padding,
+        bounds['max_x'] + padding,
+        bounds['min_y'] - padding,
+        bounds['max_y'] + padding,
+    )
 
 
 def read_input_file(filename: str) -> List[Dict[str, Any]]:
@@ -367,6 +412,18 @@ def plot_circles(ax, centers: List[List[float]], radius: float, **kwargs):
         ax.add_patch(circle)
 
 
+def plot_circle_centers(ax, centers: List[List[float]], color: str, label: str, marker: str):
+    if not centers:
+        return
+
+    centers_arr = np.asarray(centers, dtype=float)
+    if centers_arr.ndim != 2 or centers_arr.shape[1] != 2:
+        return
+
+    ax.scatter(centers_arr[:, 0], centers_arr[:, 1], color=color, label=label,
+               marker=marker, s=30, edgecolor='black', linewidth=0.5, zorder=4)
+
+
 if __name__ == "__main__":
     input_file = "Testing/Fillet/input.txt" # Hardcoded as per request
     max_file_index = 10      # Hardcoded scan from 0 to 10
@@ -397,6 +454,27 @@ if __name__ == "__main__":
 
     print(f"\nFound {len(results_to_plot)} valid result files. Creating combined plot...")
 
+    bounds = {
+        'min_x': math.inf,
+        'max_x': -math.inf,
+        'min_y': math.inf,
+        'max_y': -math.inf,
+    }
+
+    if input_data and input_data[0]["polygons"]:
+        for cross_section in input_data[0]["polygons"]:
+            update_bounds(bounds, cross_section)
+
+    for _, _, removed_circles, fillet_circles, result_data in results_to_plot:
+        if result_data and result_data[0].get("polygons"):
+            for cross_section in result_data[0]["polygons"]:
+                update_bounds(bounds, cross_section)
+
+        update_bounds_with_points(bounds, removed_circles)
+        update_bounds_with_points(bounds, fillet_circles)
+
+    axis_limits = compute_axis_limits(bounds)
+
     # --- Calculate Grid Size ---
     num_plots = len(results_to_plot)
     cols = 4  # You can adjust this for a different layout (e.g., 3 or 5)
@@ -410,6 +488,7 @@ if __name__ == "__main__":
     
     # Flatten the 2D array of axes into a 1D list for easy iteration
     flat_axes = axes.flatten()
+    result_cmap = plt.get_cmap('tab10')
 
     # --- Process Each Result File into a subplot ---
     for plot_index, (result_file, radius, removed_circles, fillet_circles, result_data) in enumerate(results_to_plot):
@@ -420,6 +499,10 @@ if __name__ == "__main__":
 
         ax.grid(True, linestyle=':', alpha=0.7)
         ax.set_aspect('equal', adjustable='box')
+
+        if axis_limits:
+            ax.set_xlim(axis_limits[0], axis_limits[1])
+            ax.set_ylim(axis_limits[2], axis_limits[3])
 
         # --- Plot Input (on every subplot) ---
         if input_data and input_data[0]["polygons"]:
@@ -432,16 +515,19 @@ if __name__ == "__main__":
         if result_data and result_data[0]["polygons"]:
             all_result_cross_sections = result_data[0]["polygons"]
             for i, cross_section in enumerate(all_result_cross_sections):
-                plot_polygon(ax, cross_section, label=f"Result Polygon (CS {i})", color='purple', 
+                color = result_cmap(i % result_cmap.N)
+                plot_polygon(ax, cross_section, label=f"Result Polygon (CS {i})", color=color, 
                              linestyle='-', marker='o', markersize=5, linewidth=2, 
-                             show_indices=True, fill_polygon=False)
+                              show_indices=True, fill_polygon=False)
 
         # --- Plot Circles ---
-        plot_circles(ax, removed_circles, radius, color='red', label='Removed Circle', linestyle='--')
-        plot_circles(ax, fillet_circles, radius, color='green', label='Fillet Circle', linestyle=':')
+        plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
+        plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
+        plot_circle_centers(ax, removed_circles, color='red', label='Removed center', marker='x')
+        plot_circle_centers(ax, fillet_circles, color='green', label='Fillet center', marker='o')
 
         # --- Subplot Finalization ---
-        ax.set_title(f"{result_file} (r={radius})")
+        ax.set_title(f"{os.path.basename(result_file)} (r={radius:.3f})")
         ax.set_xlabel("X Coordinate")
         ax.set_ylabel("Y Coordinate")
 
