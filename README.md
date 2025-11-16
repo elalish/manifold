@@ -22,8 +22,8 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Babylon.js](https://doc.babylonjs.com/features/featuresDeepDive/mesh/mergeMeshes#merging-meshes-with-constructive-solid-geometry) | [trimesh](https://trimesh.org/) | [Gypsum](https://github.com/playkostudios/gypsum) |
 | [Valence 3D](https://apps.apple.com/us/app/valence-3d/id6450967410?mt=8&platform=ipad) | [bitbybit.dev](https://bitbybit.dev) | [PythonOpenSCAD](https://github.com/owebeeone/pythonopenscad) |
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
-| [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) |  [Cadova](https://github.com/tomasf/Cadova)  |
-|  [BREP.io](https://github.com/mmiscool/BREP)  |
+| [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
+| [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  |
 ### Bindings & Packages
 
 Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
