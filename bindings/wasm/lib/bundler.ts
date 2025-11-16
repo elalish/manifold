@@ -89,7 +89,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // GLTFNode and utilities.
       'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes',
       // Import
-      'fetchAsGLTFNode',
+      'importModel',
       // ManifoldCAD specific exports.
       'isManifoldCAD'
     ];

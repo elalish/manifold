@@ -12,81 +12,124 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// import type {Manifold} from '../manifold.d.ts';
-
-// import { getManifoldModule } from './wasm.ts';
-import {Document, WebIO} from '@gltf-transform/core';
+import type * as GLTFTransform from '@gltf-transform/core'
+import {WebIO} from '@gltf-transform/core';
 import {clearNodeTransform} from '@gltf-transform/functions';
 
-import {setupIO} from './gltf-io.ts';
+import {Vec3} from '../manifold-global-types';
+
+import {Properties, readMesh, setupIO} from './gltf-io.ts';
 import {NonManifoldGLTFNode} from './gltf-node.ts';
+import {setMaterialByID} from './material.ts';
+import {getManifoldModuleSync} from './wasm.ts';
 
-// const manifoldModule = await getManifoldModule();
-// const {Manifold, Mesh} = manifoldModule;
-
-// Set up gltf-transform
-
-// Map of OriginalID to glTF material and attributes
-// const id2properties = new Map<number, Properties>();
-
-const importedDocuments = new Set<Document>()
+const documents = new Set<GLTFTransform.Document>();
+const id2node = new Map<number, GLTFTransform.Node>();
+const id2properties = new Map<number, Properties>();
+const id2document = new Map<number, GLTFTransform.Document>();
 
 export const extensions: Array<string> = ['glb', 'gltf'];
 
 export const cleanup = () => {
-  importedDocuments.clear()
+  documents.clear();
+  id2document.clear();
+  id2node.clear();
+  id2properties.clear();
 };
 
-export const fetchAsGLTFNode = async (url: string) => {
+export const fetchAsGLTFNodeList = async (url: string) => {
   const io = setupIO(new WebIO());
-
   const doc = await io.read(url);
-  importedDocuments.add(doc);
+  documents.add(doc);
   const docNodes = doc.getRoot().listNodes() ?? [];
   return docNodes!.map(docNode => {
     const node = new NonManifoldGLTFNode();
-    node.gltfTransformNode = clearNodeTransform(docNode);
-    node.gltfDocument = doc;
+    node.node = clearNodeTransform(docNode);
+    node.document = doc;
+    node.name = docNode.getName();
     return node;
   });
 };
-/*
-export const fetchAsManifold = async (url: string) => {
-  const manifolds = Array<Manifold>();
-  const docIn = await io.read(url);
-  await docIn.transform(flatten());
 
-  const nodes = docIn.getRoot().listNodes();
-  const ids = Array<number>();
-  for (const node of nodes) {
-    clearNodeTransform(node);
-    const gltfMesh = node.getMesh();
-    if (gltfMesh == null) continue;
-    const tmp = readMesh(gltfMesh);
-    if (tmp == null) continue;
+export const importModel = async (url: string) => {
+  const [firstNode] = await fetchAsGLTFNodeList(url);
+  return firstNode;
+};
 
-    const numID = tmp.runProperties.length;
-    const firstID = Manifold.reserveIDs(numID);
-    tmp.mesh.runOriginalID = new Uint32Array(numID);
-    for (let i = 0; i < numID; ++i) {
-      tmp.mesh.runOriginalID[i] = firstID + i;
-      ids.push(firstID + i);
-      id2properties.set(firstID + i, tmp.runProperties[i]);
-    }
+/**
+ * Convert a single gltf-transform node to a Manifold object.
+ *
+ * If a node has no mesh, the mesh has no geometry, or the mesh is not manifold,
+ * the result will be `null`.  Other errors will be re-thrown for the caller to
+ * handle.
+ *
+ * Each primitive in a gltf-transform mesh may have its own material and
+ * attributes.  Those primitives become runs once translated into Manifold.
+ * Each run may have a different material attached.  ManifoldCAD can manage this
+ * case, although there is not a user-facing way to quickly assign materials to
+ * parts of a model.  This function will index the original materials
+ * (properties) to be copied into an exported GLTF document.  It will also set
+ * ManifoldCAD materials (a subset of GLTF materials) as a fallback.
+ *
+ * @param document The gltf-transform document containing the node.
+ * @param node The node to convert.
+ * @returns A Manifold object if possible, `null` if not.
+ */
+export function gltfMeshToManifold(
+    document: GLTFTransform.Document, node: GLTFTransform.Node) {
+  const {Manifold, Mesh} = getManifoldModuleSync()!;
 
-    manifolds.push(new Manifold(new Mesh(tmp.mesh)));
+  const gltfmesh = node.getMesh();
+  if (!gltfmesh) return null;
+  const {mesh, runProperties} = readMesh(gltfmesh)!;
+
+  // Get a a reserved ID from manifold for each run.
+  const numID = runProperties.length;
+  const firstID = Manifold.reserveIDs(numID);
+  mesh.runOriginalID = new Uint32Array(numID);
+
+  // Iterate through each primitive.
+  for (let primitiveID = 0; primitiveID < numID; ++primitiveID) {
+    // Set the manifold runID.  This will be parsed by `new Mesh()`.
+    const runID = firstID + primitiveID;
+    mesh.runOriginalID[primitiveID] = runID;
+    const properties = runProperties[primitiveID]
+
+    // Save these for later lookup.
+    id2document.set(runID, document);
+    id2node.set(runID, node);
+    id2properties.set(runID, properties);
+
+    // Import what we can as a manifoldCAD material.
+    // This is really a fallback.  Ideally, we will copy the material
+    // from the source document into the destination.
+    const {attributes, material} = properties;
+    setMaterialByID(runID, {
+      // 'POSITION' is always present as an attribute; we don't need to
+      // specify it.
+      attributes: attributes.filter(x => x !== 'POSITION'),
+      alpha: material.getAlpha(),
+      baseColorFactor: material.getBaseColorFactor() as any as Vec3,
+      metallic: material.getMetallicFactor(),
+      roughness: material.getRoughnessFactor(),
+      name: material.getName(),
+    });
   }
-  // pull in materials, TODO: replace with transfer() when available
-  //const startIdx = doc.getRoot().listMaterials().length;
-  //mergeDocuments(doc, docIn);
-  //doc.getRoot().listScenes().forEach((s) => s.dispose());
-  //doc.getRoot().listBuffers().forEach((s) => s.dispose());
-  //doc.getRoot().listAccessors().forEach((s) => s.dispose());
-  //for (const [i, id] of ids.entries()) {
-  //  const material = doc.getRoot().listMaterials()[startIdx + i];
-  //  id2properties.get(id)!.material = material;
-  //}
 
-  return Manifold.union(manifolds);
-}
-  */
+  const manifoldMesh = new Mesh(mesh);
+  try {
+    const manifold = new Manifold(manifoldMesh);
+    if (manifold && !manifold.isEmpty()) {
+      return manifold;
+    }
+  } catch (e) {
+    if ((e as any)?.name === 'ManifoldError' ||
+        (e as any)?.code === 'NotManifold') {
+      console.log(`Skipping non-manifold import`);
+    } else {
+      throw e;
+    }
+  }
+
+  return null;
+};

@@ -12,6 +12,7 @@
     "lib/error.ts",
     "lib/garbage-collector.ts",
     "lib/gltf-node.ts",
+    "lib/import-gltf.ts",
     "lib/level-of-detail.ts",
     "lib/material.ts",
     "lib/math.ts",

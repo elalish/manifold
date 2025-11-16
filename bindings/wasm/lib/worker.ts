@@ -233,7 +233,7 @@ export async function evaluate(
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,
-    fetchAsGLTFNode: importGLTF.fetchAsGLTFNode,
+    importModel: importGLTF.importModel,
 
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,

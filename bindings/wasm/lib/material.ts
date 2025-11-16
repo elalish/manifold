@@ -58,6 +58,13 @@ export const getMaterialByID = (id: number): GLTFMaterial|undefined => {
 };
 
 /**
+ * @internal
+ */
+export const setMaterialByID = (id: number, material: GLTFMaterial) => {
+  id2material.set(id, material);
+};
+
+/**
  *
  * @internal
  */
