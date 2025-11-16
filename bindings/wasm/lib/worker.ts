@@ -34,7 +34,6 @@ import {Export3MF} from './export-3mf.ts';
 import {ExportGLTF} from './export-gltf.ts';
 import * as garbageCollector from './garbage-collector.ts';
 import * as gltfNode from './gltf-node.ts'
-import * as importGLTF from './import-gltf.ts';
 import * as levelOfDetail from './level-of-detail.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
@@ -233,7 +232,6 @@ export async function evaluate(
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,
-    importModel: importGLTF.importModel,
 
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,

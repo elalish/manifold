@@ -29,10 +29,21 @@
     "Web Examples": "https://manifoldcad.org/model-viewer.html",
     "GitHub": "https://github.com/elalish/manifold"
   },
+  "externalSymbolLinkMappings": {
+    "@gltf-transform/core": {
+      "Accessor": "https://gltf-transform.dev/modules/core/classes/Accessor",
+      "Document": "https://gltf-transform.dev/modules/core/classes/Document",
+      "Extension": "https://gltf-transform.dev/modules/core/classes/Extension",
+      "ExtensionProperty": "https://gltf-transform.dev/modules/core/classes/ExtensionProperty",
+      "Node": "https://gltf-transform.dev/modules/core/classes/Node",
+      "*": "https://gltf-transform.dev/"
+    }
+  },
   "useFirstParagraphOfCommentAsSummary": true,
   "groupReferencesByType": true,
   "sortEntryPoints": false,
   "excludeInternal": true,
+  "excludeExternals": true,
   "categorizeByGroup": true,
   "projectDocuments": ["documents/*.md"],
   "out": "docs"

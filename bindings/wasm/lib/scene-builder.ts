@@ -28,7 +28,7 @@
  */
 
 import {Document, Material, Node} from '@gltf-transform/core';
-import {moveToDocument, unpartition} from '@gltf-transform/functions';
+import {copyToDocument, createDefaultPropertyResolver, unpartition} from '@gltf-transform/functions';
 
 import {Manifold} from '../manifold.js';
 
@@ -36,10 +36,11 @@ import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimat
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
 import {BaseGLTFNode, GLTFMaterial, GLTFNode, NonManifoldGLTFNode} from './gltf-node.ts';
-import {cleanup as cleanupImportGLTF} from './import-gltf.ts';
+import {cleanup as cleanupImportGLTF, getDocumentByID, getPropertiesByID} from './import-gltf.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
+export {importModel} from '../lib/import-gltf.ts';
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';
 export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
@@ -118,11 +119,22 @@ function addMesh(
   // Material
   const id2properties = new Map<number, Properties>();
   for (const id of manifoldMesh.runOriginalID!) {
-    const material = getMaterialByID(id) || backupMaterial;
-    id2properties.set(id, {
-      material: getCachedMaterial(doc, material),
-      attributes: ['POSITION', ...material.attributes ?? []]
-    });
+    const properties = getPropertiesByID(id);
+    const sourceDoc = getDocumentByID(id);
+    if (properties && sourceDoc) {
+      const propertyResolver = createDefaultPropertyResolver(doc, sourceDoc);
+      const {attributes, material} = properties;
+      const map = copyToDocument(doc, sourceDoc, [material], propertyResolver);
+      const targetMaterial = map.get(material) as Material;
+
+      id2properties.set(id, {material: targetMaterial, attributes})
+    } else {
+      const material = getMaterialByID(id) || backupMaterial;
+      id2properties.set(id, {
+        material: getCachedMaterial(doc, material),
+        attributes: ['POSITION', ...material.attributes ?? []]
+      });
+    }
   }
 
   // Animation Morph
@@ -175,7 +187,7 @@ function cloneNodeNewMaterial(
 function copyNodeToDocument(doc: Document, nodeDef: NonManifoldGLTFNode): Node {
   const sourceNode = nodeDef.node!;
   const sourceDoc = nodeDef.document!;
-  const map = moveToDocument(doc, sourceDoc, [sourceNode]);
+  const map = copyToDocument(doc, sourceDoc, [sourceNode]);
   const targetNode = map.get(sourceNode) as Node;
   applyTransformation(doc, nodeDef, targetNode);
   return targetNode;
