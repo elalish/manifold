@@ -1,0 +1,34 @@
+[project]
+name = "manifold3d"
+version = "@MANIFOLD_VERSION@"
+authors = [
+  { name="Emmett Lalish", email="elalish@gmail.com" },
+]
+description = "Library for geometric robustness"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = [
+    "LICENSE"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+    "Programming Language :: C++",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+requires-python = ">=3.8"
+
+dependencies = [
+    "numpy; python_version<'3.12'",
+    "numpy>=1.26.0b1; python_version>='3.12'"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/elalish/manifold"
+"Bug Tracker" = "https://github.com/elalish/manifold/issues"
+
+[build-system]
+requires = [
+    "setuptools",
+]
+build-backend = "setuptools.build_meta"
