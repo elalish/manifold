@@ -407,7 +407,7 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
   const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur),
              e2CurNormal = getEdgeNormal(e2CCW, e2Cur);
   {
-    // Edge - Edge
+    // Edge - Edge E-E
     // Offset two edge by radius and calculate intersection to get tangent
     // circle center
 
@@ -469,7 +469,7 @@ std::vector<GeomTangentPair> processPillShapeIntersect(
       return false;
     };
 
-    // Edge - Point
+    // Edge - Point E-P
     // Offset e1 and test if intersect with circle center at e2's endpoints, and
     // get tangent circle center
     const vec2 e1CurNormal = getEdgeNormal(e1CCW, e1Cur);
@@ -579,7 +579,7 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
   };
 
   {
-    // Point - Edge
+    // Point - Edge P-E
     // Offset e2 and test if intersect with circle center at e1's endpoints, and
     // get tangent circle center
 
@@ -632,7 +632,7 @@ std::vector<GeomTangentPair> processPieShapeIntersect(
     }
   }
 
-  // Point - Point
+  // Point - Point P-P
   // Get two circles which passed both point, and check if they valid.
 
   double startRad = toRad(e1CurNormal), endRad = toRad(e1NextNormal);
@@ -874,6 +874,13 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
              (e2i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
+        std::array<size_t, 4> vBreakPoint{0, 0, 0, 0};
+
+        if (e1Loopi == vBreakPoint[0] && e1i == vBreakPoint[1] &&
+            e2Loopi == vBreakPoint[2] && e2Loopi == vBreakPoint[3]) {
+          int i = 0;
+        }
+
 #ifdef MANIFOLD_DEBUG
         if (ManifoldParams().verbose) {
           std::cout << "-----------" << std::endl
@@ -974,21 +981,34 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               // TODO: Intersected, this can be used to optimize speed for
               // pre-detect all intersected point and avoid double processed
             } else if (distance < radius) {
-#ifdef MANIFOLD_DEBUG
-              if (ManifoldParams().verbose) {
-                std::cout << "Remove" << arc.CircleCenter << std::endl;
-              }
-#endif
               eraseFlag = true;
               break;
             }
           }
 
           if (eraseFlag) {
+#ifdef MANIFOLD_DEBUG
+            if (ManifoldParams().verbose) {
+              std::cout << "vRemove " << it->CircleCenter << std::endl;
+              std::cout << "std::array<size_t, 4> vBreakPoint{" << e1Loopi
+                        << ", " << e1i << ", " << e2Loopi << ", " << e2i
+                        << "}; " << std::endl;
+            }
+#endif
             removedCircleCenter.push_back(it->CircleCenter);
             it = filletCircles.erase(it);
-          } else
+          } else {
+#ifdef MANIFOLD_DEBUG
+            if (ManifoldParams().verbose) {
+              std::cout << "vAdd " << it->CircleCenter << std::endl;
+              std::cout << "std::array<size_t, 4> vBreakPoint{" << e1Loopi
+                        << ", " << e1i << ", " << e2Loopi << ", " << e2i
+                        << "}; " << std::endl;
+            }
+#endif
+
             it++;
+          }
         }
 
         // NOTE: Map local adjacent status to certain edge index
@@ -1250,7 +1270,7 @@ void SavePolygons(const std::string& filename, const Polygons& polygons) {
     return;
   }
 
-  outFile << filename << " " << 1 << "\n";
+  outFile << filename << " " << "\n";
   outFile << polygons.size() << "\n";
 
   for (const auto& loop : polygons) {
@@ -1302,8 +1322,8 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   resultOutputFile.open("Testing/Fillet/" + std::to_string(caseIndex) + ".txt");
   if (!resultOutputFile.is_open()) {
     std::cerr << "Error: Could not open file "
-              << std::to_string(caseIndex) + ".txt"
-              << " for writing." << std::endl;
+              << std::to_string(caseIndex) + ".txt" << " for writing."
+              << std::endl;
     throw std::exception();
   }
   caseIndex++;
