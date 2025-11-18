@@ -30,8 +30,7 @@ import {Document} from '@gltf-transform/core';
 import * as animation from './animation.ts';
 import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
 import {RuntimeError} from './error.ts';
-import {Export3MF} from './export-3mf.ts';
-import {ExportGLTF} from './export-gltf.ts';
+import * as exportModel from './export-model.ts';
 import * as garbageCollector from './garbage-collector.ts';
 import * as gltfNode from './gltf-node.ts'
 import * as levelOfDetail from './level-of-detail.ts';
@@ -39,7 +38,6 @@ import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
 
-let exporters: Array<any>;
 const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 export type MessageType =
@@ -323,10 +321,8 @@ export async function evaluate(
 export const exportBlobURL =
     async(doc: Document, extension: string): Promise<string> => {
   const t0 = performance.now();
-  exporters = [new Export3MF(), new ExportGLTF()];
 
-  const blob =
-      await exporters.find(ex => ex.extensions.includes(extension)).asBlob(doc)
+  const blob = await exportModel.asBlob(doc, extension);
   const blobURL = URL.createObjectURL(blob);
 
   const t1 = performance.now();

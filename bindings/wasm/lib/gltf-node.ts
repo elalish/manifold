@@ -25,8 +25,7 @@ import type * as GLTFTransform from '@gltf-transform/core';
 import type {Manifold} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
-import {gltfMeshToManifold} from './import-gltf.ts';
-import {getManifoldModuleSync} from './wasm.ts';
+import {gltfNodeToManifold} from './import-model.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -48,6 +47,9 @@ export abstract class BaseGLTFNode {
   _parent?: BaseGLTFNode;
   name?: string;
 
+  // Internally, gltf-transform stores transformations as separate translation,
+  // rotation and scale vectors.  It can convert those vectors to and from a
+  // transformation matrix as needed.
   translation?: Vec3|((t: number) => Vec3);
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
@@ -70,8 +72,7 @@ export class GLTFNode extends BaseGLTFNode {
 
   clone(newParent?: BaseGLTFNode) {
     const copy = new GLTFNode(newParent ?? this.parent);
-    copy.manifold = this.manifold;
-    copy.material = this.material;
+    Object.assign(copy, this);
     return copy;
   }
 }
@@ -84,6 +85,12 @@ export class GLTFNodeTracked extends GLTFNode {
   constructor(parent?: BaseGLTFNode) {
     super(parent);
     nodes.push(this);
+  }
+
+  clone(newParent?: BaseGLTFNode) {
+    const copy = new GLTFNodeTracked(newParent ?? this.parent);
+    Object.assign(copy, this);
+    return copy;
   }
 }
 
@@ -102,37 +109,37 @@ export class GLTFNodeTracked extends GLTFNode {
  * when exported.
  */
 export class NonManifoldGLTFNode extends BaseGLTFNode {
-  node?: GLTFTransform.Node;
-  document?: GLTFTransform.Document;
+  node: GLTFTransform.Node;
+  document: GLTFTransform.Document;
+
+  constructor(
+      document: GLTFTransform.Document, node: GLTFTransform.Node,
+      parent?: BaseGLTFNode) {
+    super(parent);
+    this.document = document;
+    this.node = node;
+  }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy = new NonManifoldGLTFNode(newParent ?? this.parent);
-    copy.document = this.document;
-    copy.node = this.node
+    const copy = new NonManifoldGLTFNode(
+        this.document, this.node, newParent ?? this.parent);
+    Object.assign(copy, this);
     return copy;
   }
 
   /**
-   * Attempt to convert this node into a Manifold object.  The original imported
-   * model may consist of an entire tree of nodes, each of which may or may not
-   * be manifold.  This method will convert each child node, and then union the
-   * results together.  If a node has no mesh, the mesh has no geometry, or the
-   * mesh is not manifold, that node will be silently excluded.  Other errors
-   * will be re-thrown for the caller to handle.
+   * Attempt to convert this node into a Manifold object.
+   *
+   * The original imported model may consist of an entire tree of nodes, each of
+   * which may or may not be manifold.  This method will convert each child
+   * node, and then union the results together.  If a node has no mesh, the mesh
+   * has no geometry, or the mesh is not manifold, that node will be silently
+   * excluded.  Other errors will be re-thrown for the caller to handle.
    *
    * @returns A valid Manifold object.
    */
   makeManifold(): Manifold {
-    if (!this.document) throw new Error('Node has no gltf-transform document.');
-    if (!this.node) throw new Error('Node has no gltf-transform node.');
-
-    const converted: Array<Manifold> = [];
-    this.node.traverse(child => {
-      const manifold = gltfMeshToManifold(this.document!, child);
-      if (manifold) converted.push(manifold);
-    });
-
-    return getManifoldModuleSync()!.Manifold.union(converted);
+    return gltfNodeToManifold(this.document, this.node);
   };
 }
 
