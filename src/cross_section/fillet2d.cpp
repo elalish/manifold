@@ -215,7 +215,7 @@ bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
   double startRad = normalizeAngle(toRad(pre)),
          endRad = normalizeAngle(toRad(next));
 
-  return isCCW ^ isAngleInSector(rad, startRad, endRad);
+  return isCCW & isAngleInSector(rad, startRad, endRad);
 };
 
 // Projection point to line and check if it's on the line segment
@@ -874,10 +874,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
              (e2i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
-        std::array<size_t, 4> vBreakPoint{0, 0, 0, 0};
+        std::array<size_t, 4> vBreakPoint{1, 0, 1, 5};
 
         if (e1Loopi == vBreakPoint[0] && e1i == vBreakPoint[1] &&
-            e2Loopi == vBreakPoint[2] && e2Loopi == vBreakPoint[3]) {
+            e2Loopi == vBreakPoint[2] && e2i == vBreakPoint[3]) {
           int i = 0;
         }
 
@@ -1270,7 +1270,8 @@ void SavePolygons(const std::string& filename, const Polygons& polygons) {
     return;
   }
 
-  outFile << filename << " " << "\n";
+  outFile << filename << " "
+          << "\n";
   outFile << polygons.size() << "\n";
 
   for (const auto& loop : polygons) {
@@ -1322,8 +1323,8 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   resultOutputFile.open("Testing/Fillet/" + std::to_string(caseIndex) + ".txt");
   if (!resultOutputFile.is_open()) {
     std::cerr << "Error: Could not open file "
-              << std::to_string(caseIndex) + ".txt" << " for writing."
-              << std::endl;
+              << std::to_string(caseIndex) + ".txt"
+              << " for writing." << std::endl;
     throw std::exception();
   }
   caseIndex++;
