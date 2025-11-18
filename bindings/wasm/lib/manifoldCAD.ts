@@ -21,7 +21,7 @@ import {getManifoldModule} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
-export {importModel} from './import-gltf.ts';
+export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
 const manifoldWasm: ManifoldToplevel =

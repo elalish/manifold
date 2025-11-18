@@ -12,30 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, WebIO} from '@gltf-transform/core';
+import * as GLTFTransform from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
 import {setupIO} from './gltf-io.ts';
 
+const binaryFormat = {
+  extension: 'glb',
+  mimetype: 'model/gltf-binary'
+};
+
+const jsonFormat = {
+  extension: 'gltf',
+  mimetype: 'model/gltf+json'
+};
+
+export const supportedFormats = [binaryFormat, jsonFormat];
+
 /**
- * Object to convert GLTF documents.
+ * Convert a GLTF-Transform document to a blob.
  *
+ * @param doc The GLTF document to convert.
+ * @returns A blob containing the converted model.
  */
-export class ExportGLTF {
-  extensions: Array<string> = ['glb', 'gltf'];
+export async function asBlob(doc: GLTFTransform.Document) {
+  const io = setupIO(new GLTFTransform.WebIO());
+  io.registerExtensions(KHRONOS_EXTENSIONS);
 
-  /**
-   * Convert a GLTF-Transform document to a blob.
-   *
-   * @param doc The GLTF document to convert.
-   * @returns A blob containing the converted model.
-   */
-  async asBlob(doc: Document) {
-    const io = setupIO(new WebIO());
-    io.registerExtensions(KHRONOS_EXTENSIONS);
-
-    const glb = await io.writeBinary(doc);
-    return new Blob(
-        [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
-  }
+  const glb = await io.writeBinary(doc);
+  return new Blob(
+      [glb as Uint8Array<ArrayBuffer>], {type: binaryFormat.mimetype});
 }

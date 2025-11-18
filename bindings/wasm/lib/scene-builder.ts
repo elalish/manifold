@@ -36,11 +36,10 @@ import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimat
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
 import {BaseGLTFNode, GLTFMaterial, GLTFNode, NonManifoldGLTFNode} from './gltf-node.ts';
-import {cleanup as cleanupImportGLTF, getDocumentByID, getPropertiesByID} from './import-gltf.ts';
+import {cleanup as cleanupImport, getDocumentByID, getPropertiesByID} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
-export {importModel} from '../lib/import-gltf.ts';
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';
 export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
@@ -57,7 +56,7 @@ export function cleanup() {
   cleanupAnimation();
   cleanupDebug();
   cleanupMaterial();
-  cleanupImportGLTF();
+  cleanupImport();
 }
 
 // Swallow informational logs in testing framework
@@ -122,19 +121,22 @@ function addMesh(
     const properties = getPropertiesByID(id);
     const sourceDoc = getDocumentByID(id);
     if (properties && sourceDoc) {
+      // This manifold object was imported, or at least has properties that were
+      // imported.  Copy those over.
       const propertyResolver = createDefaultPropertyResolver(doc, sourceDoc);
       const {attributes, material} = properties;
       const map = copyToDocument(doc, sourceDoc, [material], propertyResolver);
       const targetMaterial = map.get(material) as Material;
-
-      id2properties.set(id, {material: targetMaterial, attributes})
-    } else {
-      const material = getMaterialByID(id) || backupMaterial;
-      id2properties.set(id, {
-        material: getCachedMaterial(doc, material),
-        attributes: ['POSITION', ...material.attributes ?? []]
-      });
+      id2properties.set(id, {material: targetMaterial, attributes});
+      continue;
     }
+
+    // This manifold object was not imported.
+    const material = getMaterialByID(id) || backupMaterial;
+    id2properties.set(id, {
+      material: getCachedMaterial(doc, material),
+      attributes: ['POSITION', ...material.attributes ?? []]
+    });
   }
 
   // Animation Morph
