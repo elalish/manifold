@@ -154,6 +154,9 @@
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             (python3.withPackages (ps: with ps; [
+              # wheel build
+              pip
+
               # test dependencies
               trimesh
               numpy

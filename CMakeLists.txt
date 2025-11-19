@@ -55,14 +55,6 @@ option(
 )
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
-# MANIFOLD_WHEEL is only available when MANIFOLD_PYBIND is enabled
-cmake_dependent_option(
-  MANIFOLD_WHEEL
-  "Build python wheel"
-  ON
-  MANIFOLD_PYBIND
-  OFF
-)
 # MANIFOLD_CBIND is only available when MANIFOLD_CROSS_SECTION is enabled
 cmake_dependent_option(
   MANIFOLD_CBIND
@@ -234,7 +226,7 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(${PROJECT_SOURCE_DIR}/cmake/manifoldDeps.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/configHelper.cmake)
 
-if(MANIFOLD_WHEEL)
+if(MANIFOLD_PYBIND)
   configure_file("LICENSE" "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/LICENSE" COPYONLY)
   configure_file("README.md" "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/README.md" COPYONLY)
 endif()
