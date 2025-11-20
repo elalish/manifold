@@ -20,7 +20,7 @@ import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
-export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
+export {GLTFAttribute, GLTFMaterial, GLTFNode, NonManifoldGLTFNode} from './gltf-node.ts';
 export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
