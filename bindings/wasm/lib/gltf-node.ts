@@ -17,6 +17,19 @@
  * Manifold object. This can range from assembling models to animation to even
  * including non-manifold objects from other sources.
  *
+ * ManifoldCAD uses the `GLTFNode` class to manage objects that will be exported
+ * into a gltf-transform document.
+ *
+ * It's important to note that gltf-transform *also* has a `Node` class,
+ * representing objects that are *already* part of a gltf-transform document.
+ * That class can mostly be seen in import and export related code.
+ *
+ * This leads to the confusing case where, `NonManifoldGLTFNode` is both.  It is
+ * a manifoldCAD node that contains an imported gltf-transform `Node`.  It
+ * specifies how that gltf-transform node will be scaled, rotated and translated
+ * when it is eventually copied into a new gltf-transform document at export
+ * time.
+ *
  * @packageDocumentation
  */
 
@@ -25,7 +38,7 @@ import type * as GLTFTransform from '@gltf-transform/core';
 import type {Manifold} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
-import {gltfNodeToManifold} from './import-model.ts';
+import {gltfNodeToManifold, hasGeometry, isNonManifold} from './import-model.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -43,6 +56,10 @@ export class GLTFMaterial {
   name?: string;
 }
 
+/**
+ * The abstract class from which other classes inherit.  Common methods and
+ * properties live here.
+ */
 export abstract class BaseGLTFNode {
   _parent?: BaseGLTFNode;
   name?: string;
@@ -111,6 +128,9 @@ export class GLTFNodeTracked extends GLTFNode {
 export class NonManifoldGLTFNode extends BaseGLTFNode {
   node: GLTFTransform.Node;
   document: GLTFTransform.Document;
+  _nonManifold: boolean|null = null;
+  _hasGeometry: boolean|null = null;
+  uri?: string;
 
   constructor(
       document: GLTFTransform.Document, node: GLTFTransform.Node,
@@ -140,7 +160,27 @@ export class NonManifoldGLTFNode extends BaseGLTFNode {
    */
   makeManifold(): Manifold {
     return gltfNodeToManifold(this.document, this.node);
-  };
+  }
+
+  /**
+   * Does this node contain non-manifold geometry?
+   */
+  isNonManifold() {
+    if (this._nonManifold === null) {
+      this._nonManifold = isNonManifold(this.document, this.node);
+    }
+    return this._nonManifold;
+  }
+
+  /**
+   * Does this node contain any meshes at all?
+   */
+  hasGeometry(): boolean {
+    if (this._hasGeometry === null) {
+      this._hasGeometry = hasGeometry(this.document, this.node);
+    }
+    return this._hasGeometry;
+  }
 }
 
 /**
@@ -186,7 +226,7 @@ export async function anyToGLTFNodeList(
     return await any.map(anyToGLTFNodeList)
         .reduce(
             async (acc, cur) => ([...(await acc), ...(await cur)]),
-            new Promise(resolve => resolve([])))
+            new Promise(resolve => resolve([])));
   } else if (any instanceof BaseGLTFNode) {
     const node = any as BaseGLTFNode;
     if (!node.parent) return [node];

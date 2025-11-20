@@ -87,7 +87,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Scene builder exports.
       'show', 'only', 'setMaterial', 'setMorphStart', 'setMorphEnd',
       // GLTFNode and utilities.
-      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes',
+      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes', 'NonManifoldGLTFNode',
       // Import
       'importModel', 'importManifold',
       // ManifoldCAD specific exports.

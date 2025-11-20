@@ -25,8 +25,8 @@
 import type * as GLTFTransform from '@gltf-transform/core';
 import {clearNodeTransform} from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold-encapsulated-types';
-import type {Vec3} from '../manifold-global-types';
+import type {Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
+import type {Vec3} from '../manifold-global-types.d.ts';
 
 import {Properties, readMesh} from './gltf-io.ts';
 import {NonManifoldGLTFNode} from './gltf-node.ts';
@@ -46,13 +46,16 @@ export interface Importer {
 
 const importers: Array<Importer> = [importGLTF];
 
-const id2node = new Map<number, GLTFTransform.Node>();
+const id2mesh = new Map<number, GLTFTransform.Mesh>();
+const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
+const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
+const doc2uri = new Map<GLTFTransform.Document, string>();
 const id2properties = new Map<number, Properties>();
-const id2document = new Map<number, GLTFTransform.Document>();
 
 export const cleanup = () => {
-  id2document.clear();
-  id2node.clear();
+  id2mesh.clear();
+  mesh2node.clear();
+  node2doc.clear();
   id2properties.clear();
 };
 
@@ -64,7 +67,13 @@ export const getPropertiesByID = (runID: number) => id2properties.get(runID);
 /**
  * @internal
  */
-export const getDocumentByID = (runID: number) => id2document.get(runID);
+export const getDocumentByID = (runID: number) => {
+  const mesh = id2mesh.get(runID);
+  if (!mesh) return null;
+  const node = mesh2node.get(mesh);
+  if (!node) return null;
+  return node2doc.get(node);
+};
 
 export function getImporterByExtension(extension: string) {
   const hasExtension =
@@ -88,6 +97,7 @@ export function getImporterByExtension(extension: string) {
 }
 
 /**
+ * Import a model, for display only.
  *
  * @group Modelling Functions
  * @param uri
@@ -96,6 +106,7 @@ export function getImporterByExtension(extension: string) {
 export async function importModel(uri: string): Promise<NonManifoldGLTFNode> {
   const importer = importers[0];
   const sourceDoc = await importer.fetchModel(uri);
+  doc2uri.set(sourceDoc, uri);
 
   const [sourceNode] = sourceDoc.getRoot().listNodes();
   if (!sourceNode) {
@@ -105,10 +116,18 @@ export async function importModel(uri: string): Promise<NonManifoldGLTFNode> {
 
   const targetNode = new NonManifoldGLTFNode(sourceDoc, sourceNode);
   targetNode.name = sourceNode.getName();
+  targetNode.uri = uri;
   return targetNode;
 }
 
 /**
+ * Import a model, and convert it to a Manifold object for manipulation.
+ *
+ * The original imported model may consist of an entire tree of nodes, each of
+ * which may or may not be manifold.  This method will convert each child node,
+ * and then union the results together.  If a child node has no mesh, the mesh
+ * has no geometry, or the mesh is not manifold, that child node will be
+ * silently excluded.
  *
  * @group Modelling Functions
  * @param uri
@@ -117,7 +136,7 @@ export async function importModel(uri: string): Promise<NonManifoldGLTFNode> {
 export async function importManifold(uri: string): Promise<Manifold> {
   const sourceNode = await importModel(uri);
   try {
-    return sourceNode.makeManifold();
+    return gltfNodeToManifold(sourceNode.document, sourceNode.node);
   } catch (e) {
     const newError = new Error(
         `Model imported from \`${uri}\` contains no manifold geometry.`);
@@ -137,28 +156,130 @@ export async function importManifold(uri: string): Promise<Manifold> {
  *
  * Other errors will be re-thrown for the caller to handle.
  *
+ * @group Conversion Functions
  * @returns A valid Manifold object.
  */
 export function gltfNodeToManifold(
-    document: GLTFTransform.Document, node: GLTFTransform.Node): Manifold {
-  const converted: Array<Manifold> = [];
-  node.traverse(child => {
-    const manifold = gltfMeshToManifold(document, child);
-    if (manifold) converted.push(manifold);
-  });
-  if (!converted.length) {
-    throw new Error(`Model contains no manifold geometry.`);
+    document: GLTFTransform.Document, node?: GLTFTransform.Node): Manifold {
+  const meshes = gltfNodeToMeshes(document, node);
+  if (!meshes.length) {
+    throw new Error(`Model contains no meshes!`);
   }
-
-  return getManifoldModuleSync()!.Manifold.union(converted);
+  return meshesToManifold(meshes);
 };
 
 /**
- * Convert a single gltf-transform node to a Manifold object.
+ * Does this gltf-transform node contain any geometry?
  *
- * If a node has no mesh, the mesh has no geometry, or the mesh is not manifold,
- * the result will be `null`.  Other errors will be re-thrown for the caller to
- * handle.
+ * @group Utility Functions
+ * @returns boolean
+ */
+export function hasGeometry(
+    document: GLTFTransform.Document, node?: GLTFTransform.Node): boolean {
+  const meshes = gltfNodeToMeshes(document, node);
+  return meshes.length > 0;
+};
+
+/**
+ * Does this gltf-transform node contain any non-manifold geometry?
+ *
+ * @group Utility Functions
+ * @returns boolean
+ */
+export function isNonManifold(
+    document: GLTFTransform.Document, node?: GLTFTransform.Node): boolean {
+  const meshes = gltfNodeToMeshes(document, node);
+  for (const mesh of meshes) {
+    const manifold = tryToMakeManifold(mesh);
+    if (!manifold || manifold.isEmpty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Extract meshes from a gltf-transform node (and its children), or from all
+ * nodes in a document, and convert them to Mesh objects.  Meshless nodes will
+ * be silently skipped.
+ *
+ * @group Utility Functions
+ * @param document
+ * @param node Optionally, traverse the children of this node.
+ * @returns
+ */
+export function gltfNodeToMeshes(
+    document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
+  const getChildren = (root: GLTFTransform.Node) => {
+    const children: Array<GLTFTransform.Node> = [];
+    root.traverse(child => children.push(child));
+    return children;
+  };
+  const children: Array<GLTFTransform.Node> =
+      node ? getChildren(node) : document.getRoot().listNodes();
+
+  return children
+      .map(child => {
+        const gltfmesh = child.getMesh();
+        if (!gltfmesh) return null;
+
+        node2doc.set(child, document);
+        mesh2node.set(gltfmesh, child);
+
+        return gltfMeshToMesh(gltfmesh);
+      })
+      .filter(mesh => !!mesh);
+}
+
+/**
+ * Convert a Mesh into a Manifold.  Returns null if the result is not manifold
+ * or is empty.  All other exceptions will be re-thrown.
+ *
+ * @group Utility Functions
+ * @param mesh
+ */
+const tryToMakeManifold = (mesh: Mesh) => {
+  const {Manifold} = getManifoldModuleSync()!;
+  try {
+    const manifold = new Manifold(mesh);
+    if (manifold && !manifold.isEmpty()) {
+      return manifold;
+    }
+  } catch (e) {
+    if ((e as any)?.name === 'ManifoldError' ||
+        (e as any)?.code === 'NotManifold') {
+    } else {
+      throw e;
+    }
+  }
+  return null;
+};
+
+/**
+ * Given a list of Mesh objects, attempt to convert them individually into
+ * Manifold objects, and return the union.  Non-manifold Meshes will be silently
+ * skipped.
+ *
+ * @group Utility Functions
+ * @param meshes
+ * @returns
+ */
+export function meshesToManifold(meshes: Array<Mesh>): Manifold {
+  const {Manifold} = getManifoldModuleSync()!;
+
+  const manifolds = meshes.map(mesh => tryToMakeManifold(mesh))
+                        .filter(manifold => !!manifold)
+                        .filter(manifold => !manifold.isEmpty());
+
+  if (!manifolds?.length) {
+    throw new Error(`Model contains no manifold geometry.`);
+  }
+
+  return Manifold.union(manifolds);
+}
+
+/**
+ * Convert a single gltf-transform Mesh to a Mesh object.
  *
  * Each primitive in a gltf-transform mesh may have its own material and
  * attributes.  Those primitives become runs once translated into Manifold.
@@ -168,16 +289,13 @@ export function gltfNodeToManifold(
  * (properties) to be copied into an exported GLTF document.  It will also set
  * ManifoldCAD materials (a subset of GLTF materials) as a fallback.
  *
- * @param document The gltf-transform document containing the node.
- * @param node The node to convert.
- * @returns A Manifold object if possible, `null` if not.
+ * @group Utility Functions
+ * @param gltfmesh The gltf-transform mesh.
+ * @returns A Mesh object if possible, `null` if not.
  */
-export function gltfMeshToManifold(
-    document: GLTFTransform.Document, node: GLTFTransform.Node) {
+export function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
   const {Manifold, Mesh} = getManifoldModuleSync()!;
 
-  const gltfmesh = node.getMesh();
-  if (!gltfmesh) return null;
   const {mesh, runProperties} = readMesh(gltfmesh)!;
 
   // Get a a reserved ID from manifold for each run.
@@ -193,8 +311,7 @@ export function gltfMeshToManifold(
     const properties = runProperties[primitiveID]
 
     // Save these for later lookup.
-    id2document.set(runID, document);
-    id2node.set(runID, node);
+    id2mesh.set(runID, gltfmesh)
     id2properties.set(runID, properties);
 
     // Import what we can as a manifoldCAD material.
@@ -212,20 +329,5 @@ export function gltfMeshToManifold(
     });
   }
 
-  const manifoldMesh = new Mesh(mesh);
-  try {
-    const manifold = new Manifold(manifoldMesh);
-    if (manifold && !manifold.isEmpty()) {
-      return manifold;
-    }
-  } catch (e) {
-    if ((e as any)?.name === 'ManifoldError' ||
-        (e as any)?.code === 'NotManifold') {
-      console.log(`Skipping non-manifold import`);
-    } else {
-      throw e;
-    }
-  }
-
-  return null;
-};
+  return new Mesh(mesh);
+}
