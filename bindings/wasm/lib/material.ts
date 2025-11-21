@@ -58,7 +58,13 @@ export const getMaterialByID = (id: number): GLTFMaterial|undefined => {
 };
 
 /**
- *
+ * @internal
+ */
+export const setMaterialByID = (id: number, material: GLTFMaterial) => {
+  id2material.set(id, material);
+};
+
+/**
  * @internal
  */
 export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
@@ -66,7 +72,7 @@ export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
     return {};
   }
   if (node.material == null) {
-    node.material = getBackupMaterial(node.parent);
+    node.material = getBackupMaterial((node.parent as GLTFNode));
   }
   return node.material;
 }
