@@ -11,6 +11,15 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib.patches import Circle
 
+# --- Zoom View Implementation ---
+# Configuration for the zoom view
+ZOOM_CONFIG = {
+    'enabled': True,
+    'center': [1.4473534971475601,9.7624685168266296],  # User to update this [x, y]
+    'size': 0.00001
+}
+
+
 def patchify(polys):
     """Returns a PathPatch that uses even-odd filling for multiple loops."""
 
@@ -389,7 +398,7 @@ def read_circles_and_results(filename: str) -> (float, List[List[float]], List[L
         return radius, removed_circles, fillet_circles, polygon_data
 
     except FileNotFoundError:
-        print(f"Error: The file '{filename}' was not found.")
+        # print(f"Error: The file '{filename}' was not found.")
         return None, [], [], []
     except (ValueError, IndexError) as e:
         print(f"Error parsing result file at line {line_idx + 1}: {e}. The file might be malformed.")
@@ -446,7 +455,8 @@ if __name__ == "__main__":
         if radius is not None:
             results_to_plot.append((result_file, radius, removed, fillet, res_data))
         else:
-            print(f"Skipping {result_file} (could not be read or radius not found).")
+            # print(f"Skipping {result_file} (could not be read or radius not found).")
+            break
             
     if not results_to_plot:
         print("No valid result files found to plot. Exiting.")
@@ -557,3 +567,74 @@ if __name__ == "__main__":
     plt.close(fig)
 
     print("\nAll result files processed.")
+
+    if ZOOM_CONFIG['enabled']:
+        print("\nGenerating zoom view...")
+        
+        # Create a new figure for the zoom view
+        fig_zoom, axes_zoom = plt.subplots(rows, cols, figsize=(cols * 7, rows * 7), squeeze=False)
+        flat_axes_zoom = axes_zoom.flatten()
+        
+        zoom_half_size = ZOOM_CONFIG['size'] / 2.0
+        center_x, center_y = ZOOM_CONFIG['center']
+        zoom_xlim = (center_x - zoom_half_size, center_x + zoom_half_size)
+        zoom_ylim = (center_y - zoom_half_size, center_y + zoom_half_size)
+
+        for plot_index, (result_file, radius, removed_circles, fillet_circles, result_data) in enumerate(results_to_plot):
+            ax = flat_axes_zoom[plot_index]
+            
+            ax.grid(True, linestyle=':', alpha=0.7)
+            ax.set_aspect('equal', adjustable='box')
+            
+            # Set zoom limits
+            ax.set_xlim(zoom_xlim)
+            ax.set_ylim(zoom_ylim)
+
+            # --- Plot Input (on every subplot) ---
+            if input_data and input_data[0]["polygons"]:
+                input_polys = input_data[0]["polygons"][0]
+                plot_polygon(ax, input_polys, label="Input Polygon", color='blue', 
+                             linestyle='--', marker='.', markersize=4, linewidth=1, 
+                             show_indices=False, fill_polygon=True, fill_alpha=0.1)
+
+            # --- Plot Result ---
+            if result_data and result_data[0]["polygons"]:
+                all_result_cross_sections = result_data[0]["polygons"]
+                for i, cross_section in enumerate(all_result_cross_sections):
+                    color = result_cmap(i % result_cmap.N)
+                    plot_polygon(ax, cross_section, label=f"Result Polygon (CS {i})", color=color, 
+                                 linestyle='-', marker='o', markersize=5, linewidth=2, 
+                                  show_indices=True, fill_polygon=False)
+
+            # --- Plot Circles ---
+            plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
+            plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
+            plot_circle_centers(ax, removed_circles, color='red', label='Removed center', marker='x')
+            plot_circle_centers(ax, fillet_circles, color='green', label='Fillet center', marker='o')
+
+            # --- Subplot Finalization ---
+            ax.set_title(f"{os.path.basename(result_file)} (r={radius:.3f})")
+            ax.set_xlabel("X Coordinate")
+            ax.set_ylabel("Y Coordinate")
+
+            # De-duplicate legend entries for this subplot
+            handles, labels = ax.get_legend_handles_labels()
+            if handles:
+                by_label = dict(zip(labels, handles))
+                ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize='x-small')
+
+        # --- Turn off any unused subplots ---
+        for i in range(num_plots, rows * cols):
+            flat_axes_zoom[i].axis('off')
+
+        fig_zoom.suptitle(f"Zoomed View (Center: {center_x}, {center_y}, Size: {ZOOM_CONFIG['size']})", fontsize=20)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        
+        save_name_zoom = "all_results_zoom.png"
+        try:
+            fig_zoom.savefig(save_name_zoom)
+            print(f"Successfully saved zoomed plot to {save_name_zoom}")
+        except Exception as e:
+            print(f"Error saving zoomed plot {save_name_zoom}: {e}")
+        
+        plt.close(fig_zoom)

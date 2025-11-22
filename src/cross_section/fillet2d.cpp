@@ -155,8 +155,8 @@ double toRad(const vec2& v) { return atan2(v.y, v.x); }
 
 // Normalize angle to [0, 2*PI)
 double normalizeAngle(double angle) {
-  while (angle < 0) angle += 2 * M_PI;
-  while (angle >= 2 * M_PI) angle -= 2 * M_PI;
+  while (angle < 0) angle += 2.0 * M_PI;
+  while (angle >= 2.0 * M_PI) angle -= 2.0 * M_PI;
   return angle;
 }
 
@@ -214,6 +214,9 @@ bool isCircleLocalValid(const std::array<vec2, 3>& points, bool isCCW,
 
   double preRad = normalizeAngle(toRad(pre)),
          nextRad = normalizeAngle(toRad(next));
+
+  // If non-convex, fast fail.
+  if (isCCW == (nextRad < preRad)) return false;
 
   return (isCCW == isAngleInSector(rad, nextRad, preRad));
 };
@@ -273,7 +276,7 @@ std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
 
   double totalRad = normalizeAngle(arc.RadValues[1] - arc.RadValues[0]);
 
-  double dPhi = 2 * M_PI / circularSegments;
+  double dPhi = 2.0 * M_PI / circularSegments;
   int seg = int(totalRad / dPhi) + 1;
   for (int i = 0; i != seg + 1; ++i) {
     double current = arc.RadValues[0] + dPhi * i;
@@ -786,7 +789,9 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
   std::vector<std::vector<GeomTangentPair>> arcInfoVec(
       loopElementCount, std::vector<GeomTangentPair>());
 
-  resultOutputFile << radius << std::endl;
+  resultOutputFile << std::setprecision(
+                          std::numeric_limits<double>::max_digits10)
+                   << radius << std::endl;
   std::vector<vec2> removedCircleCenter;
   std::vector<vec2> resultCircleCenter;
 
@@ -874,7 +879,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
              (e2i == (e1i + e1Loop.size() - 1) % e1Loop.size())))
           continue;
 
-        std::array<size_t, 4> vBreakPoint{2, 3, 2, 0};
+        std::array<size_t, 4> vBreakPoint{0, 0, 0, 2};
 
         if (e1Loopi == vBreakPoint[0] && e1i == vBreakPoint[1] &&
             e2Loopi == vBreakPoint[2] && e2i == vBreakPoint[3]) {
@@ -1273,6 +1278,7 @@ void SavePolygons(const std::string& filename, const Polygons& polygons) {
   outFile << filename << " "
           << "\n";
   outFile << polygons.size() << "\n";
+  outFile << std::setprecision(std::numeric_limits<double>::max_digits10);
 
   for (const auto& loop : polygons) {
     outFile << loop.size() << "\n";
