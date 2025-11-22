@@ -40,7 +40,7 @@ set(
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
-option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" ON)
+option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" OFF)
 option(
   MANIFOLD_DOWNLOADS
   "Allow Manifold build to download missing dependencies"
