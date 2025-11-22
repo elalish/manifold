@@ -113,6 +113,7 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
+- `MANIFOLD_STRICT=[<OFF>, ON]`: Treat compile warnings as fatal build errors.
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
