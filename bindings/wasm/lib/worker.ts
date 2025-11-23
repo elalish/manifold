@@ -288,9 +288,6 @@ export async function evaluate(
     throw newError;
   }
 
-  const t2 = performance.now();
-  log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
-
   // If we don't actually have a model, complain.
   if (!result || (Array.isArray(result) && !result.length)) {
     if (gltfNode.getGLTFNodes().length) {
@@ -310,8 +307,8 @@ export async function evaluate(
   // Create a gltf-transform document.
   const nodes = await gltfNode.anyToGLTFNodeList(result);
   const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes);
-  const t3 = performance.now();
-  log(`Creating GLTF Document took ${((t3 - t2) / 1000).toFixed(2)} seconds`);
+  const t2 = performance.now();
+  log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
   return doc;
 }
