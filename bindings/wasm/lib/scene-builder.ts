@@ -186,7 +186,8 @@ function cloneNodeNewMaterial(
   newMesh.setExtras({clonedFrom: oldMesh});
 }
 
-function copyNodeToDocument(doc: Document, nodeDef: VisualizationGLTFNode): Node {
+function copyNodeToDocument(
+    doc: Document, nodeDef: VisualizationGLTFNode): Node {
   const sourceNode = nodeDef.node!;
   const sourceDoc = nodeDef.document!;
   const map = copyToDocument(doc, sourceDoc, [sourceNode]);

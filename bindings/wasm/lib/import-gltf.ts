@@ -14,8 +14,8 @@
 
 import * as GLTFTransform from '@gltf-transform/core';
 
-import { isNode } from './util.ts';
-import { EXTManifold } from './manifold-gltf.ts';
+import {EXTManifold} from './manifold-gltf.ts';
+import {isNode} from './util.ts';
 
 const binaryFormat = {
   extension: 'glb',
@@ -31,14 +31,15 @@ export const supportedFormats = [binaryFormat, jsonFormat];
 
 let _io: GLTFTransform.PlatformIO|null = null;
 
-const getIO = ():GLTFTransform.PlatformIO => {
+const getIO = (): GLTFTransform.PlatformIO => {
   if (!_io) {
-    _io = isNode() ? (new GLTFTransform.NodeIO(fetch)).setAllowNetwork(true) : new GLTFTransform.WebIO();
+    _io = isNode() ? (new GLTFTransform.NodeIO(fetch)).setAllowNetwork(true) :
+                     new GLTFTransform.WebIO();
     _io.registerExtensions([EXTManifold]);
   }
 
   return _io;
-}
+};
 
 export const fetchModel = async (url: string) => {
   return await getIO().read(url);

@@ -116,9 +116,10 @@ export async function importModel(uri: string): Promise<VisualizationGLTFNode> {
   // glTF has a defined scale of 1:1 metre.
   // manifoldCAD has a defined scale of 1:1 mm.
   const scale = sourceNode.getScale();
-  sourceNode.setScale([scale[0]*1000, scale[1]*1000, scale[2]*1000]);
+  sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
 
-  // Apply any transforms from ancester nodes, leaving this node in the overal scene coordinate space.
+  // Apply any transforms from ancester nodes, leaving this node in the overal
+  // scene coordinate space.
   clearNodeParent(sourceNode);
 
   // Wrap it for visualization.
