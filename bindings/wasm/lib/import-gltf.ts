@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {WebIO} from '@gltf-transform/core';
+import * as GLTFTransform from '@gltf-transform/core';
 
-import {setupIO} from './gltf-io.ts';
+import { isNode } from './util.ts';
+import { EXTManifold } from './manifold-gltf.ts';
 
 const binaryFormat = {
   extension: 'glb',
@@ -28,7 +29,17 @@ const jsonFormat = {
 
 export const supportedFormats = [binaryFormat, jsonFormat];
 
+let _io: GLTFTransform.PlatformIO|null = null;
+
+const getIO = ():GLTFTransform.PlatformIO => {
+  if (!_io) {
+    _io = isNode() ? (new GLTFTransform.NodeIO(fetch)).setAllowNetwork(true) : new GLTFTransform.WebIO();
+    _io.registerExtensions([EXTManifold]);
+  }
+
+  return _io;
+}
+
 export const fetchModel = async (url: string) => {
-  const io = setupIO(new WebIO());
-  return await io.read(url);
+  return await getIO().read(url);
 };

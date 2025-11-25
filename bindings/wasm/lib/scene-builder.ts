@@ -35,7 +35,7 @@ import {Manifold} from '../manifold.js';
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
-import {BaseGLTFNode, GLTFMaterial, GLTFNode, NonManifoldGLTFNode} from './gltf-node.ts';
+import {BaseGLTFNode, GLTFMaterial, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupImport, getDocumentByID, getPropertiesByID} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
@@ -186,7 +186,7 @@ function cloneNodeNewMaterial(
   newMesh.setExtras({clonedFrom: oldMesh});
 }
 
-function copyNodeToDocument(doc: Document, nodeDef: NonManifoldGLTFNode): Node {
+function copyNodeToDocument(doc: Document, nodeDef: VisualizationGLTFNode): Node {
   const sourceNode = nodeDef.node!;
   const sourceDoc = nodeDef.document!;
   const map = copyToDocument(doc, sourceDoc, [sourceNode]);
@@ -283,7 +283,7 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of nodes) {
-    if (nodeDef instanceof NonManifoldGLTFNode) {
+    if (nodeDef instanceof VisualizationGLTFNode) {
       node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
       ++nonManifoldNodes;
     } else {

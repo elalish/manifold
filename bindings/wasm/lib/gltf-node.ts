@@ -38,8 +38,6 @@ import type * as GLTFTransform from '@gltf-transform/core';
 import type {Manifold} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
-import {gltfNodeToManifold, hasGeometry, isNonManifold} from './import-model.ts';
-
 const nodes = new Array<BaseGLTFNode>();
 
 export type GLTFAttribute =
@@ -125,11 +123,9 @@ export class GLTFNodeTracked extends GLTFNode {
  * GLTF objects meeting the `manifold-gltf` extension will still be manifold
  * when exported.
  */
-export class NonManifoldGLTFNode extends BaseGLTFNode {
+export class VisualizationGLTFNode extends BaseGLTFNode {
   node: GLTFTransform.Node;
   document: GLTFTransform.Document;
-  _nonManifold: boolean|null = null;
-  _hasGeometry: boolean|null = null;
   uri?: string;
 
   constructor(
@@ -141,45 +137,10 @@ export class NonManifoldGLTFNode extends BaseGLTFNode {
   }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy = new NonManifoldGLTFNode(
+    const copy = new VisualizationGLTFNode(
         this.document, this.node, newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
-  }
-
-  /**
-   * Attempt to convert this node into a Manifold object.
-   *
-   * The original imported model may consist of an entire tree of nodes, each of
-   * which may or may not be manifold.  This method will convert each child
-   * node, and then union the results together.  If a node has no mesh, the mesh
-   * has no geometry, or the mesh is not manifold, that node will be silently
-   * excluded.  Other errors will be re-thrown for the caller to handle.
-   *
-   * @returns A valid Manifold object.
-   */
-  makeManifold(): Manifold {
-    return gltfNodeToManifold(this.document, this.node);
-  }
-
-  /**
-   * Does this node contain non-manifold geometry?
-   */
-  isNonManifold() {
-    if (this._nonManifold === null) {
-      this._nonManifold = isNonManifold(this.document, this.node);
-    }
-    return this._nonManifold;
-  }
-
-  /**
-   * Does this node contain any meshes at all?
-   */
-  hasGeometry(): boolean {
-    if (this._hasGeometry === null) {
-      this._hasGeometry = hasGeometry(this.document, this.node);
-    }
-    return this._hasGeometry;
   }
 }
 
