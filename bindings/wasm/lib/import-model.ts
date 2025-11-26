@@ -132,12 +132,15 @@ export async function importModel(uri: string): Promise<VisualizationGLTFNode> {
  *
  * @group Modelling Functions
  * @param uri
+ * @param tolerance Tolerance for mesh simplification.  Any edge smaller than
+ *     tolerance may be collapsed.
  * @returns
  */
-export async function importManifold(uri: string): Promise<Manifold> {
+export async function importManifold(
+    uri: string, tolerance?: number): Promise<Manifold> {
   const sourceNode = await importModel(uri);
   try {
-    return gltfNodeToManifold(sourceNode.document, sourceNode.node);
+    return gltfNodeToManifold(sourceNode.document, sourceNode.node, tolerance);
   } catch (e) {
     const newError = new Error(
         `Model imported from \`${uri}\` contains no manifold geometry.`);
@@ -161,12 +164,13 @@ export async function importManifold(uri: string): Promise<Manifold> {
  * @returns A valid Manifold object.
  */
 function gltfNodeToManifold(
-    document: GLTFTransform.Document, node?: GLTFTransform.Node): Manifold {
+    document: GLTFTransform.Document, node?: GLTFTransform.Node,
+    tolerance?: number): Manifold {
   const meshes = gltfNodeToMeshes(document, node);
   if (!meshes.length) {
     throw new Error(`Model contains no meshes!`);
   }
-  return meshesToManifold(meshes);
+  return meshesToManifold(meshes, tolerance);
 };
 
 /**
@@ -235,11 +239,12 @@ const tryToMakeManifold = (mesh: Mesh) => {
  * @param meshes
  * @returns
  */
-function meshesToManifold(meshes: Array<Mesh>): Manifold {
+function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
 
   const manifolds = [];
   for (const mesh of meshes) {
+    if (tolerance) mesh.tolerance = tolerance;
     const manifold = tryToMakeManifold(mesh);
     if (manifold) manifolds.push(manifold);
   }
@@ -281,14 +286,13 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
     // Set the manifold runID.  This will be parsed by `new Mesh()`.
     const runID = firstID + primitiveID;
     mesh.runOriginalID[primitiveID] = runID;
-    const properties = runProperties[primitiveID]
+    const {attributes, material} = runProperties[primitiveID]
 
     // Save these for later lookup.
     id2mesh.set(runID, gltfmesh)
 
     // Import what we can as a manifoldCAD material.
     // We'll leave the original material attached for export.
-    const {attributes, material} = properties;
     setMaterialByID(runID, {
       // 'POSITION' is always present; we don't need to specify it.
       attributes: attributes.filter(x => x !== 'POSITION'),
