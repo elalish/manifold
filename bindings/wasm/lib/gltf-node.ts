@@ -52,6 +52,8 @@ export class GLTFMaterial {
   alpha?: number;
   unlit?: boolean;
   name?: string;
+  sourceMaterial?: GLTFTransform.Material;
+  sourceRunID?: number;
 }
 
 /**

@@ -28,7 +28,7 @@
  */
 
 import {Document, Material, Node} from '@gltf-transform/core';
-import {copyToDocument, createDefaultPropertyResolver, unpartition} from '@gltf-transform/functions';
+import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
 import {Manifold} from '../manifold.js';
 
@@ -36,7 +36,7 @@ import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimat
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {Properties, writeMesh} from './gltf-io.ts';
 import {BaseGLTFNode, GLTFMaterial, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
-import {cleanup as cleanupImport, getDocumentByID, getPropertiesByID} from './import-model.ts';
+import {cleanup as cleanupImport} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
@@ -118,19 +118,6 @@ function addMesh(
   // Material
   const id2properties = new Map<number, Properties>();
   for (const id of manifoldMesh.runOriginalID!) {
-    const properties = getPropertiesByID(id);
-    const sourceDoc = getDocumentByID(id);
-    if (properties && sourceDoc) {
-      // This manifold object was imported, or at least has properties that were
-      // imported.  Copy those over.
-      const propertyResolver = createDefaultPropertyResolver(doc, sourceDoc);
-      const {attributes, material} = properties;
-      const map = copyToDocument(doc, sourceDoc, [material], propertyResolver);
-      const targetMaterial = map.get(material) as Material;
-      id2properties.set(id, {material: targetMaterial, attributes});
-      continue;
-    }
-
     // This manifold object was not imported.
     const material = getMaterialByID(id) || backupMaterial;
     id2properties.set(id, {
@@ -280,13 +267,13 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   const node2gltf = new Map<BaseGLTFNode, Node>();
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
   let leafNodes = 0;
-  let nonManifoldNodes = 0;
+  let visualizationNodes = 0;
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of nodes) {
     if (nodeDef instanceof VisualizationGLTFNode) {
       node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
-      ++nonManifoldNodes;
+      ++visualizationNodes;
     } else {
       node2gltf.set(
           nodeDef,
@@ -313,8 +300,8 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   if (leafNodes) {
     log(`Total mesh references: ${leafNodes}`);
   }
-  if (nonManifoldNodes) {
-    log(`Total non-manifold (imported) nodes: ${nonManifoldNodes}`);
+  if (visualizationNodes) {
+    log(`Total visualization-only (imported) nodes: ${visualizationNodes}`);
   }
 
   cleanupAnimationInDoc();

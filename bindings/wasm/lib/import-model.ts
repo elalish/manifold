@@ -28,7 +28,7 @@ import {clearNodeParent} from '@gltf-transform/functions';
 import type {Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
-import {Properties, readMesh} from './gltf-io.ts';
+import {readMesh} from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import * as importGLTF from './import-gltf.ts';
 import {setMaterialByID} from './material.ts';
@@ -49,20 +49,12 @@ const importers: Array<Importer> = [importGLTF];
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
 const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
-const doc2uri = new Map<GLTFTransform.Document, string>();
-const id2properties = new Map<number, Properties>();
 
 export const cleanup = () => {
   id2mesh.clear();
   mesh2node.clear();
   node2doc.clear();
-  id2properties.clear();
 };
-
-/**
- * @internal
- */
-export const getPropertiesByID = (runID: number) => id2properties.get(runID);
 
 /**
  * @internal
@@ -106,7 +98,6 @@ export function getImporterByExtension(extension: string) {
 export async function importModel(uri: string): Promise<VisualizationGLTFNode> {
   const importer = importers[0];
   const sourceDoc = await importer.fetchModel(uri);
-  doc2uri.set(sourceDoc, uri);
 
   const [sourceNode] = sourceDoc.getRoot().listNodes();
   if (!sourceNode) {
@@ -247,9 +238,11 @@ const tryToMakeManifold = (mesh: Mesh) => {
 function meshesToManifold(meshes: Array<Mesh>): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
 
-  const manifolds = meshes.map(mesh => tryToMakeManifold(mesh))
-                        .filter(manifold => !!manifold)
-                        .filter(manifold => !manifold.isEmpty());
+  const manifolds = [];
+  for (const mesh of meshes) {
+    const manifold = tryToMakeManifold(mesh);
+    if (manifold) manifolds.push(manifold);
+  }
 
   if (!manifolds?.length) {
     throw new Error(`Model contains no manifold geometry.`);
@@ -292,11 +285,9 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
 
     // Save these for later lookup.
     id2mesh.set(runID, gltfmesh)
-    id2properties.set(runID, properties);
 
     // Import what we can as a manifoldCAD material.
-    // This is really a fallback.  Ideally, we will copy the material
-    // from the source document into the destination.
+    // We'll leave the original material attached for export.
     const {attributes, material} = properties;
     setMaterialByID(runID, {
       // 'POSITION' is always present; we don't need to specify it.
@@ -306,6 +297,10 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
       metallic: material.getMetallicFactor(),
       roughness: material.getRoughnessFactor(),
       name: material.getName(),
+
+      // Make sure we can find this source material later.
+      sourceMaterial: material,
+      sourceRunID: runID,
     });
   }
 
