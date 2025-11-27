@@ -14,7 +14,7 @@ from matplotlib.patches import Circle
 # --- Zoom View Implementation ---
 # Configuration for the zoom view
 ZOOM_CONFIG = {
-    'enabled': True,
+    'enabled': False,
     'center': [1.4473534971475601,9.7624685168266296],  # User to update this [x, y]
     'size': 0.00001
 }

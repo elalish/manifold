@@ -73,7 +73,7 @@ void TestPoly(const Polygons& polys, int expectedNumTri,
 void TestFillet(const Polygons& polys, double epsilon = -1.0) {
   const int inputCircularSegments = 20;
 
-  // manifold::ManifoldParams().verbose = true;
+  manifold::ManifoldParams().verbose = true;
   std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
   auto input = CrossSection(polys);
   auto bbox = input.Bounds().Size();
@@ -82,8 +82,8 @@ void TestFillet(const Polygons& polys, double epsilon = -1.0) {
 
   std::vector<double> radiusVec;
   if (true) {
-    std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
-    // std::array<double, 1> multipliers{1E-4};
+    // std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
+    std::array<double, 1> multipliers{1E-3};
     for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
       double mmin = *it * min, mmax = *it * max;
       if (std::abs(mmin - mmax) < 1E-6) {
@@ -100,6 +100,8 @@ void TestFillet(const Polygons& polys, double epsilon = -1.0) {
   } else {
     radiusVec.push_back(0.7);
   }
+
+  std::sort(radiusVec.begin(), radiusVec.end());
 
   for (auto it = radiusVec.begin(); it != radiusVec.end(); it++) {
     const double radius = *it;
