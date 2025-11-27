@@ -244,9 +244,15 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
 
   const manifolds = [];
   for (const mesh of meshes) {
-    if (tolerance) mesh.tolerance = tolerance;
-    const manifold = tryToMakeManifold(mesh);
-    if (manifold) manifolds.push(manifold);
+    let manifold = tryToMakeManifold(mesh);
+    if (!manifold && tolerance) {
+      mesh.tolerance = tolerance;
+      mesh.merge();
+      manifold = tryToMakeManifold(mesh);
+    }
+    if (manifold) {
+      manifolds.push(manifold);
+    }
   }
 
   if (!manifolds?.length) {
