@@ -280,9 +280,9 @@ jobs:
       matrix:
         parallelization: [OFF, ON]
         shared: [OFF, ON]
-        # macos-13: intel
+        # macos-15-intel: intel
         # macos-latest: arm
-        os: [macos-13, macos-latest]
+        os: [macos-15-intel, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
     - name: Install common dependencies
