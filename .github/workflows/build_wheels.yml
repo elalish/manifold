@@ -11,14 +11,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-13: x86-64
-        # macos-14: arm64
-        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-14, macos-13]
+        # macos-14-intel: x86-64
+        # macos-15: arm64
+        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-14-intel, macos-15]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
-      - if: matrix.os == 'macos-14'
+      - if: matrix.os == 'macos-15'
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Build wheels
