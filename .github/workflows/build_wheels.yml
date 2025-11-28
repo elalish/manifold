@@ -11,9 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-14-intel: x86-64
+        # macos-15-intel: x86-64
         # macos-15: arm64
-        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-14-intel, macos-15]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-15-intel, macos-15]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
