@@ -344,7 +344,8 @@ Module.setup = function() {
       runOriginalID,
       faceID,
       halfedgeTangent,
-      runTransform
+      runTransform,
+      tolerance = 0
     } = {}) {
       this.numProp = numProp;
       this.triVerts = triVerts;
@@ -356,6 +357,7 @@ Module.setup = function() {
       this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
       this.runTransform = runTransform;
+      this.tolerance = tolerance;
     }
 
     get numTri() {

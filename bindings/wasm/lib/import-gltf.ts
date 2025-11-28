@@ -1,4 +1,4 @@
-// Copyright 2023-2025 The Manifold Authors.
+// Copyright 2024-25 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import * as GLTFTransform from '@gltf-transform/core';
-import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {setupIO} from './gltf-io.ts';
+import {EXTManifold} from './manifold-gltf.ts';
+import {isNode} from './util.ts';
 
 const binaryFormat = {
   extension: 'glb',
@@ -29,17 +29,18 @@ const jsonFormat = {
 
 export const supportedFormats = [binaryFormat, jsonFormat];
 
-/**
- * Convert a GLTF-Transform document to a blob.
- *
- * @param doc The GLTF document to convert.
- * @returns A blob containing the converted model.
- */
-export async function asBlob(doc: GLTFTransform.Document) {
-  const io = setupIO(new GLTFTransform.WebIO());
-  io.registerExtensions(KHRONOS_EXTENSIONS);
+let _io: GLTFTransform.PlatformIO|null = null;
 
-  const glb = await io.writeBinary(doc);
-  return new Blob(
-      [glb as Uint8Array<ArrayBuffer>], {type: binaryFormat.mimetype});
-}
+const getIO = (): GLTFTransform.PlatformIO => {
+  if (!_io) {
+    _io = isNode() ? (new GLTFTransform.NodeIO(fetch)).setAllowNetwork(true) :
+                     new GLTFTransform.WebIO();
+    _io.registerExtensions([EXTManifold]);
+  }
+
+  return _io;
+};
+
+export const fetchModel = async (url: string) => {
+  return await getIO().read(url);
+};

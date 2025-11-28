@@ -44,6 +44,7 @@ val MeshGL2JS(const MeshGL& mesh) {
   meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
                                                    mesh.runTransform.data()))
                                  .call<val>("slice"));
+  meshJS.set("tolerance", mesh.tolerance);
 
   return meshJS;
 }
@@ -79,6 +80,9 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["runTransform"] != val::undefined()) {
     out.runTransform =
         convertJSArrayToNumberVector<float>(mesh["runTransform"]);
+  }
+  if (mesh["tolerance"] != val::undefined()) {
+    out.tolerance = mesh["tolerance"].as<float>();
   }
   return out;
 }
