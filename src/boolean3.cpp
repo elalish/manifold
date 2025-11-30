@@ -74,44 +74,45 @@ inline bool Shadows(double p, double q, double dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-inline std::pair<int, vec2> Shadow01(
-    const int p0, const int q1, VecView<const vec3> vertPosP,
-    VecView<const vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
-    const double expandP, VecView<const vec3> normal, const bool reverse) {
-  const int q1s = halfedgeQ[q1].startVert;
-  const int q1e = halfedgeQ[q1].endVert;
-  const double p0x = vertPosP[p0].x;
-  const double q1sx = vertPosQ[q1s].x;
-  const double q1ex = vertPosQ[q1e].x;
-  int s01 = reverse ? Shadows(q1sx, p0x, expandP * normal[q1s].x) -
-                          Shadows(q1ex, p0x, expandP * normal[q1e].x)
-                    : Shadows(p0x, q1ex, expandP * normal[p0].x) -
-                          Shadows(p0x, q1sx, expandP * normal[p0].x);
+inline std::pair<int, vec2> Shadow01(const int p0, const int q1,
+                                     const Manifold::Impl& inP,
+                                     const Manifold::Impl& inQ,
+                                     const double expandP,
+                                     VecView<const vec3> normal,
+                                     const bool forward) {
+  const int q1s = inQ.halfedge_[q1].startVert;
+  const int q1e = inQ.halfedge_[q1].endVert;
+  const double p0x = inP.vertPos_[p0].x;
+  const double q1sx = inQ.vertPos_[q1s].x;
+  const double q1ex = inQ.vertPos_[q1e].x;
+  int s01 = forward ? Shadows(p0x, q1ex, expandP * normal[p0].x) -
+                          Shadows(p0x, q1sx, expandP * normal[p0].x)
+                    : Shadows(q1sx, p0x, expandP * normal[q1s].x) -
+                          Shadows(q1ex, p0x, expandP * normal[q1e].x);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
-    yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
-    if (reverse) {
-      vec3 diff = vertPosQ[q1s] - vertPosP[p0];
+    yz01 =
+        Interpolate(inQ.vertPos_[q1s], inQ.vertPos_[q1e], inP.vertPos_[p0].x);
+    if (forward) {
+      if (!Shadows(inP.vertPos_[p0].y, yz01[0], expandP * normal[p0].y))
+        s01 = 0;
+    } else {
+      vec3 diff = inQ.vertPos_[q1s] - inP.vertPos_[p0];
       const double start2 = la::dot(diff, diff);
-      diff = vertPosQ[q1e] - vertPosP[p0];
+      diff = inQ.vertPos_[q1e] - inP.vertPos_[p0];
       const double end2 = la::dot(diff, diff);
       const double dir = start2 < end2 ? normal[q1s].y : normal[q1e].y;
-      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
-    } else {
-      if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normal[p0].y)) s01 = 0;
+      if (!Shadows(yz01[0], inP.vertPos_[p0].y, expandP * dir)) s01 = 0;
     }
   }
   return std::make_pair(s01, yz01);
 }
 
 struct Kernel11 {
-  VecView<const vec3> vertPosP;
-  VecView<const vec3> vertPosQ;
-  VecView<const Halfedge> halfedgeP;
-  VecView<const Halfedge> halfedgeQ;
+  const Manifold::Impl& inP;
+  const Manifold::Impl& inQ;
   const double expandP;
-  VecView<const vec3> normalP;
 
   std::pair<int, vec4> operator()(int p1, int q1) {
     vec4 xyzz11 = vec4(NAN);
@@ -125,32 +126,32 @@ struct Kernel11 {
     bool shadows = false;
     s11 = 0;
 
-    const int p0[2] = {halfedgeP[p1].startVert, halfedgeP[p1].endVert};
+    const int p0[2] = {inP.halfedge_[p1].startVert, inP.halfedge_[p1].endVert};
     for (int i : {0, 1}) {
-      const auto [s01, yz01] = Shadow01(p0[i], q1, vertPosP, vertPosQ,
-                                        halfedgeQ, expandP, normalP, false);
+      const auto [s01, yz01] =
+          Shadow01(p0[i], q1, inP, inQ, expandP, inP.vertNormal_, true);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
-          pRL[k] = vertPosP[p0[i]];
+          pRL[k] = inP.vertPos_[p0[i]];
           qRL[k] = vec3(pRL[k].x, yz01.x, yz01.y);
           ++k;
         }
       }
     }
 
-    const int q0[2] = {halfedgeQ[q1].startVert, halfedgeQ[q1].endVert};
+    const int q0[2] = {inQ.halfedge_[q1].startVert, inQ.halfedge_[q1].endVert};
     for (int i : {0, 1}) {
-      const auto [s10, yz10] = Shadow01(q0[i], p1, vertPosQ, vertPosP,
-                                        halfedgeP, expandP, normalP, true);
+      const auto [s10, yz10] =
+          Shadow01(q0[i], p1, inQ, inP, expandP, inP.vertNormal_, false);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
         if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
           shadows = s10 != 0;
-          qRL[k] = vertPosQ[q0[i]];
+          qRL[k] = inQ.vertPos_[q0[i]];
           pRL[k] = vec3(qRL[k].x, yz10.x, yz10.y);
           ++k;
         }
@@ -163,13 +164,14 @@ struct Kernel11 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
-      const int p1s = halfedgeP[p1].startVert;
-      const int p1e = halfedgeP[p1].endVert;
-      vec3 diff = vertPosP[p1s] - vec3(xyzz11);
+      const int p1s = inP.halfedge_[p1].startVert;
+      const int p1e = inP.halfedge_[p1].endVert;
+      vec3 diff = inP.vertPos_[p1s] - vec3(xyzz11);
       const double start2 = la::dot(diff, diff);
-      diff = vertPosP[p1e] - vec3(xyzz11);
+      diff = inP.vertPos_[p1e] - vec3(xyzz11);
       const double end2 = la::dot(diff, diff);
-      const double dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+      const double dir =
+          start2 < end2 ? inP.vertNormal_[p1s].z : inP.vertNormal_[p1e].z;
 
       if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
     }
@@ -179,9 +181,8 @@ struct Kernel11 {
 };
 
 struct Kernel02 {
-  VecView<const vec3> vertPosP;
-  VecView<const Halfedge> halfedgeQ;
-  VecView<const vec3> vertPosQ;
+  const Manifold::Impl& inP;
+  const Manifold::Impl& inQ;
   const double expandP;
   VecView<const vec3> vertNormalP;
   const bool forward;
@@ -200,15 +201,15 @@ struct Kernel02 {
     double minMetric = std::numeric_limits<double>::infinity();
     s02 = 0;
 
-    const vec3 posP = vertPosP[p0];
+    const vec3 posP = inP.vertPos_[p0];
     for (const int i : {0, 1, 2}) {
       const int q1 = 3 * q2 + i;
-      const Halfedge edge = halfedgeQ[q1];
+      const Halfedge edge = inQ.halfedge_[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
 
       if (!forward) {
-        const int qVert = halfedgeQ[q1F].startVert;
-        const vec3 diff = posP - vertPosQ[qVert];
+        const int qVert = inQ.halfedge_[q1F].startVert;
+        const vec3 diff = posP - inQ.vertPos_[qVert];
         const double metric = la::dot(diff, diff);
         if (metric < minMetric) {
           minMetric = metric;
@@ -216,8 +217,8 @@ struct Kernel02 {
         }
       }
 
-      const auto syz01 = Shadow01(p0, q1F, vertPosP, vertPosQ, halfedgeQ,
-                                  expandP, vertNormalP, !forward);
+      const auto syz01 =
+          Shadow01(p0, q1F, inP, inQ, expandP, vertNormalP, forward);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -234,7 +235,7 @@ struct Kernel02 {
       z02 = NAN;
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
-      vec3 vertPos = vertPosP[p0];
+      vec3 vertPos = inP.vertPos_[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
@@ -380,10 +381,8 @@ Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
-               expandP,    inP.vertNormal_, forward};
-  Kernel11 k11{inP.vertPos_,  inQ.vertPos_, inP.halfedge_,
-               inQ.halfedge_, expandP,      inP.vertNormal_};
+  Kernel02 k02{a, b, expandP, inP.vertNormal_, forward};
+  Kernel11 k11{inP, inQ, expandP};
 
   Kernel12 k12{a, b, forward, k02, k11};
   Kernel12Recorder recorder{k12, forward, {}};
@@ -460,8 +459,7 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (int c : components) verts.push_back(c);
 
   Vec<int> w03(a.NumVert(), 0);
-  Kernel02 k02{a.vertPos_, b.halfedge_,     b.vertPos_,
-               expandP,    inP.vertNormal_, forward};
+  Kernel02 k02{a, b, expandP, inP.vertNormal_, forward};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (!forward ? -1 : 1);
