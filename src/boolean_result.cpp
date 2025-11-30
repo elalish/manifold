@@ -743,14 +743,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const bool invertQ = op == OpType::Subtract;
 
   // Convert winding numbers to inclusion values based on operation type.
-  Vec<int> i12(x12_.size());
-  Vec<int> i21(x21_.size());
+  Vec<int> i12(xv12_.x12.size());
+  Vec<int> i21(xv21_.x12.size());
   Vec<int> i03(w03_.size());
   Vec<int> i30(w30_.size());
 
-  transform(x12_.begin(), x12_.end(), i12.begin(),
+  transform(xv12_.x12.begin(), xv12_.x12.end(), i12.begin(),
             [c3](int v) { return c3 * v; });
-  transform(x21_.begin(), x21_.end(), i21.begin(),
+  transform(xv21_.x12.begin(), xv21_.x12.end(), i21.begin(),
             [c3](int v) { return c3 * v; });
   transform(w03_.begin(), w03_.end(), i03.begin(),
             [c1, c3](int v) { return c1 + c3 * v; });
@@ -767,15 +767,15 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
-  Vec<int> v12R(v12_.size());
-  if (v12_.size() > 0) {
+  Vec<int> v12R(xv12_.v12.size());
+  if (xv12_.v12.size() > 0) {
     exclusive_scan(i12.begin(), i12.end(), v12R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
   const int n12 = numVertR - nPv - nQv;
 
-  Vec<int> v21R(v21_.size());
-  if (v21_.size() > 0) {
+  Vec<int> v21R(xv21_.v12.size());
+  if (xv21_.v12.size() > 0) {
     exclusive_scan(i21.begin(), i21.end(), v21R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
@@ -798,9 +798,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
              DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
   for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(),
-             DuplicateVerts({outR.vertPos_, i12, v12R, v12_}));
+             DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
   for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(),
-             DuplicateVerts({outR.vertPos_, i21, v21R, v21_}));
+             DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -818,9 +818,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // This key is the face index of <P, Q>
   concurrent_map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
-  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true, 0);
-  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false,
-                  p1q2_.size());
+  AddNewEdgeVerts(edgesP, edgesNew, xv12_.p1q2, i12, v12R, inP_.halfedge_, true,
+                  0);
+  AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
+                  false, xv12_.p1q2.size());
 
   v12R.clear();
   v21R.clear();
@@ -828,8 +829,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) =
-      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
+  std::tie(faceEdge, facePQ2R) = SizeOutput(
+      outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2, invertQ);
 
   i12.clear();
   i21.clear();
