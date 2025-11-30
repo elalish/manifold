@@ -249,9 +249,8 @@ struct Kernel02 {
 };
 
 struct Kernel12 {
-  VecView<const Halfedge> halfedgesP;
-  VecView<const Halfedge> halfedgesQ;
-  VecView<const vec3> vertPosP;
+  const Manifold::Impl& inP;
+  const Manifold::Impl& inQ;
   const bool forward;
   Kernel02 k02;
   Kernel11 k11;
@@ -269,7 +268,7 @@ struct Kernel12 {
     bool shadows = false;
     x12 = 0;
 
-    const Halfedge edge = halfedgesP[p1];
+    const Halfedge edge = inP.halfedge_[p1];
 
     for (int vert : {edge.startVert, edge.endVert}) {
       const auto [s, z] = k02(vert, q2);
@@ -277,7 +276,7 @@ struct Kernel12 {
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
         if (k < 2 && (k == 0 || (s != 0) != shadows)) {
           shadows = s != 0;
-          xzyLR0[k] = vertPosP[vert];
+          xzyLR0[k] = inP.vertPos_[vert];
           std::swap(xzyLR0[k].y, xzyLR0[k].z);
           xzyLR1[k] = xzyLR0[k];
           xzyLR1[k][1] = z;
@@ -288,7 +287,7 @@ struct Kernel12 {
 
     for (const int i : {0, 1, 2}) {
       const int q1 = 3 * q2 + i;
-      const Halfedge edge = halfedgesQ[q1];
+      const Halfedge edge = inQ.halfedge_[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const auto [s, xyzz] = forward ? k11(p1, q1F) : k11(q1F, p1);
       if (std::isfinite(xyzz[0])) {
@@ -319,22 +318,16 @@ struct Kernel12 {
   }
 };
 
-struct Kernel12Tmp {
-  Vec<std::array<int, 2>> p1q2_;
-  Vec<int> x12_;
-  Vec<vec3> v12_;
-};
-
 struct Kernel12Recorder {
-  using Local = Kernel12Tmp;
+  using Local = Intersections;
   Kernel12& k12;
   bool forward;
 
 #if MANIFOLD_PAR == 1
-  tbb::combinable<Kernel12Tmp> store;
+  tbb::combinable<Intersections> store;
   Local& local() { return store.local(); }
 #else
-  Kernel12Tmp localStore;
+  Intersections localStore;
   Local& local() { return localStore; }
 #endif
 
@@ -342,36 +335,36 @@ struct Kernel12Recorder {
     const auto [x12, v12] = k12(queryIdx, leafIdx);
     if (std::isfinite(v12[0])) {
       if (forward)
-        tmp.p1q2_.push_back({queryIdx, leafIdx});
+        tmp.p1q2.push_back({queryIdx, leafIdx});
       else
-        tmp.p1q2_.push_back({leafIdx, queryIdx});
-      tmp.x12_.push_back(x12);
-      tmp.v12_.push_back(v12);
+        tmp.p1q2.push_back({leafIdx, queryIdx});
+      tmp.x12.push_back(x12);
+      tmp.v12.push_back(v12);
     }
   }
 
-  Kernel12Tmp get() {
+  Intersections get() {
 #if MANIFOLD_PAR == 1
-    Kernel12Tmp result;
-    std::vector<Kernel12Tmp> tmps;
+    Intersections result;
+    std::vector<Intersections> tmps;
     store.combine_each(
-        [&](Kernel12Tmp& data) { tmps.emplace_back(std::move(data)); });
+        [&](Intersections& data) { tmps.emplace_back(std::move(data)); });
     std::vector<size_t> sizes;
     size_t total_size = 0;
     for (const auto& tmp : tmps) {
       sizes.push_back(total_size);
-      total_size += tmp.x12_.size();
+      total_size += tmp.x12.size();
     }
-    result.p1q2_.resize(total_size);
-    result.x12_.resize(total_size);
-    result.v12_.resize(total_size);
+    result.p1q2.resize(total_size);
+    result.x12.resize(total_size);
+    result.v12.resize(total_size);
     for_each_n(ExecutionPolicy::Seq, countAt(0), tmps.size(), [&](size_t i) {
-      std::copy(tmps[i].p1q2_.begin(), tmps[i].p1q2_.end(),
-                result.p1q2_.begin() + sizes[i]);
-      std::copy(tmps[i].x12_.begin(), tmps[i].x12_.end(),
-                result.x12_.begin() + sizes[i]);
-      std::copy(tmps[i].v12_.begin(), tmps[i].v12_.end(),
-                result.v12_.begin() + sizes[i]);
+      std::copy(tmps[i].p1q2.begin(), tmps[i].p1q2.end(),
+                result.p1q2.begin() + sizes[i]);
+      std::copy(tmps[i].x12.begin(), tmps[i].x12.end(),
+                result.x12.begin() + sizes[i]);
+      std::copy(tmps[i].v12.begin(), tmps[i].v12.end(),
+                result.v12.begin() + sizes[i]);
     });
     return result;
 #else
@@ -380,10 +373,8 @@ struct Kernel12Recorder {
   }
 };
 
-std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
-                                            const Manifold::Impl& inQ,
-                                            Vec<std::array<int, 2>>& p1q2,
-                                            double expandP, bool forward) {
+Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                          double expandP, bool forward) {
   ZoneScoped;
   // a: 1 (edge), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
@@ -394,7 +385,7 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   Kernel11 k11{inP.vertPos_,  inQ.vertPos_, inP.halfedge_,
                inQ.halfedge_, expandP,      inP.vertNormal_};
 
-  Kernel12 k12{a.halfedge_, b.halfedge_, a.vertPos_, forward, k02, k11};
+  Kernel12 k12{a, b, forward, k02, k11};
   Kernel12Recorder recorder{k12, forward, {}};
   auto f = [&a](int i) {
     return a.halfedge_[i].IsForward()
@@ -405,10 +396,8 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
   b.collider_.Collisions<false, decltype(f), Kernel12Recorder>(
       f, a.halfedge_.size(), recorder);
 
-  Kernel12Tmp result = recorder.get();
-  p1q2 = std::move(result.p1q2_);
-  auto x12 = std::move(result.x12_);
-  auto v12 = std::move(result.v12_);
+  Intersections result = recorder.get();
+  auto& p1q2 = result.p1q2;
   // sort p1q2 according to edges
   Vec<size_t> i12(p1q2.size());
   sequence(i12.begin(), i12.end());
@@ -420,9 +409,9 @@ std::tuple<Vec<int>, Vec<vec3>> Intersect12(const Manifold::Impl& inP,
             p1q2[a][1 - index] < p1q2[b][1 - index]);
   });
   Permute(p1q2, i12);
-  Permute(x12, i12);
-  Permute(v12, i12);
-  return std::make_tuple(x12, v12);
+  Permute(result.x12, i12);
+  Permute(result.v12, i12);
+  return result;
 };
 
 Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
@@ -518,21 +507,21 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  std::tie(x12_, v12_) = Intersect12(inP, inQ, p1q2_, expandP_, true);
-  PRINT("x12 size = " << x12_.size());
+  xv12_ = Intersect12(inP, inQ, expandP_, true);
+  PRINT("x12 size = " << xv12_.x12.size());
 
-  std::tie(x21_, v21_) = Intersect12(inP, inQ, p2q1_, expandP_, false);
-  PRINT("x21 size = " << x21_.size());
+  xv21_ = Intersect12(inP, inQ, expandP_, false);
+  PRINT("x21 size = " << xv21_.x12.size());
 
-  if (x12_.size() > INT_MAX_SZ || x21_.size() > INT_MAX_SZ) {
+  if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
     return;
   }
 
   // Compute winding numbers of all vertices using flood fill
   // Vertices on the same connected component have the same winding number
-  w03_ = Winding03(inP, inQ, p1q2_, expandP_, true);
-  w30_ = Winding03(inP, inQ, p2q1_, expandP_, false);
+  w03_ = Winding03(inP, inQ, xv12_.p1q2, expandP_, true);
+  w30_ = Winding03(inP, inQ, xv21_.p1q2, expandP_, false);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
