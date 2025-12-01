@@ -126,12 +126,12 @@ export class GLTFNodeTracked extends GLTFNode {
  * when exported.
  */
 export class VisualizationGLTFNode extends BaseGLTFNode {
-  node: GLTFTransform.Node;
+  node?: GLTFTransform.Node;
   document: GLTFTransform.Document;
   uri?: string;
 
   constructor(
-      document: GLTFTransform.Document, node: GLTFTransform.Node,
+      document: GLTFTransform.Document, node?: GLTFTransform.Node,
       parent?: BaseGLTFNode) {
     super(parent);
     this.document = document;

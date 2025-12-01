@@ -175,10 +175,21 @@ function cloneNodeNewMaterial(
 
 function copyNodeToDocument(
     doc: Document, nodeDef: VisualizationGLTFNode): Node {
-  const sourceNode = nodeDef.node!;
   const sourceDoc = nodeDef.document!;
-  const map = copyToDocument(doc, sourceDoc, [sourceNode]);
-  const targetNode = map.get(sourceNode) as Node;
+  let targetNode: Node|null = null;
+  if (nodeDef.node) {
+    const sourceNode = nodeDef.node!;
+    const map = copyToDocument(doc, sourceDoc, [sourceNode]);
+    targetNode = map.get(sourceNode) as Node;
+  } else {
+    targetNode = doc.createNode();
+    const sourceNodes = sourceDoc.getRoot().listNodes()
+    const map = copyToDocument(doc, sourceDoc, sourceNodes);
+    for (const sourceNode of sourceNodes) {
+      if (sourceNode.getParentNode()) continue;
+      targetNode.addChild(map.get(sourceNode) as Node);
+    }
+  }
   applyTransformation(doc, nodeDef, targetNode);
   return targetNode;
 }

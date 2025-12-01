@@ -20,7 +20,7 @@ import {Command} from 'commander';
 
 import {bundleFile} from '../lib/bundler.js';
 import * as worker from '../lib/worker.js';
-import { getExporterByExtension } from '../lib/export-model.js';
+import * as exportModel from '../lib/export-model.js';
 
 const program = new Command();
 
@@ -35,7 +35,7 @@ program.name('manifold-cad')
     .option('--no-bundle', 'Do not bundle input file before building model', true)
     .action(async(infile, outfile, options) => {
       // Choose an exporter.  It will throw if we cannot match the extension.
-      const exporter = getExporterByExtension(extname(outfile));
+      exportModel.getExporterByExtension(extname(outfile));
 
       // Build the model.
       let bundle = '';
@@ -47,8 +47,7 @@ program.name('manifold-cad')
       const doc = await worker.evaluate(bundle, {doNotBundle:true});
 
       // Convert it and write it to disk.
-      const binary = await exporter.asBlob(doc);
-      await writeFile(outfile, binary.stream());
+      await exportModel.writeFile(outfile, doc);
     });
 
 program.parseAsync(process.argv);

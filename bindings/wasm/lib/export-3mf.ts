@@ -25,7 +25,7 @@ const supportedFormat = {
   mimetype: 'model/3mf'
 };
 
-export const supportedFormats = [supportedFormat];
+export const exportFormats = [supportedFormat];
 
 interface Mesh3MF {
   id: string;
@@ -78,7 +78,9 @@ const defaultHeader: Header = {
  * @param doc The GLTF document to convert.
  * @returns A blob containing the converted model.
  */
-export async function asBlob(doc: GLTFTransform.Document, header: Header = {}) {
+export async function toArrayBuffer(
+    doc: GLTFTransform.Document,
+    header: Header = {}): Promise<Uint8Array<ArrayBufferLike>> {
   const to3mf = {
     meshes: [],
     components: [],
@@ -194,6 +196,11 @@ export async function asBlob(doc: GLTFTransform.Document, header: Header = {}) {
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
   files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
+  return zipFile;
+};
+
+export async function toBlob(doc: GLTFTransform.Document, header: Header = {}) {
+  const buffer: Uint8Array<ArrayBufferLike> = await toArrayBuffer(doc, header);
   return new Blob(
-      [zipFile as Uint8Array<ArrayBuffer>], {type: supportedFormat.mimetype});
+      [buffer as Uint8Array<ArrayBuffer>], {type: supportedFormat.mimetype});
 }
