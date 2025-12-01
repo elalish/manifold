@@ -32,7 +32,7 @@
 export {AnimationMode, getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation.d.ts';
 export {only, show} from '../lib/debug.ts';
 export {BaseGLTFNode, getGLTFNodes, GLTFAttribute, GLTFMaterial, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node.d.ts';
-export {importManifold, importModel} from '../lib/import-model.ts';
+export {importManifold, importModel, ImportOptions} from '../lib/import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail.d.ts'
 export {setMaterial} from '../lib/material.d.ts';
 export {CrossSection, Manifold, Mesh, MeshOptions, triangulate} from '../manifold-encapsulated-types.d.ts';

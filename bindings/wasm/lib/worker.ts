@@ -322,7 +322,7 @@ export const exportBlobURL =
     async(doc: Document, extension: string): Promise<string> => {
   const t0 = performance.now();
 
-  const blob = await exportModel.asBlob(doc, extension);
+  const blob = await exportModel.toBlob(doc, extension);
   const blobURL = URL.createObjectURL(blob);
 
   const t1 = performance.now();

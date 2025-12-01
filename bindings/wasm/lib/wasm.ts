@@ -35,7 +35,6 @@ export function setWasmUrl(url: string) {
  * @returns The newly created instance.
  */
 export async function instantiateManifold(): Promise<ManifoldToplevel> {
-  console.log('Instatiate manifoldwasm')
   let module: ManifoldToplevel|null = null;
   if (typeof wasmUrl === 'string' && !!wasmUrl) {
     module = await Module({locateFile : () => wasmUrl!});
