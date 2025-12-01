@@ -17,7 +17,6 @@
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
-#include "manifold/polygon.h"
 #include "test.h"
 
 using namespace manifold;
