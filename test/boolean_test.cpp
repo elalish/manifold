@@ -276,6 +276,39 @@ TEST(Boolean, Perturb) {
   EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0);
 }
 
+TEST(Boolean, Perturb2) {
+  Manifold cube = Manifold::Cube(vec3(2), true);
+  MeshGL cubeGL = cube.GetMeshGL();
+
+  // Rotate so that nothing is axis-aligned
+  Manifold result = cube.Rotate(5, 10, 15);
+
+  // X-coordinate is the triVert index - this polygon is otherwise ignored.
+  Polygons triPoly = {{{0, 0}, {1, 0}, {2, 1}}};
+  const Manifold prism = Manifold::Extrude(triPoly, 1);
+
+  for (int tri = 0; tri < cubeGL.NumTri(); ++tri) {
+    Manifold prism1 = prism.Warp([&cubeGL, tri](vec3& v) {
+      const int i = v[0];
+      // Bottom surface meets the cube triangle exactly; the top expands.
+      const double f = v[2] == 0 ? 1 : 2;
+      for (const int j : {0, 1, 2}) {
+        v[j] = f * cubeGL.vertProperties[3 * cubeGL.triVerts[3 * tri + i] + j];
+      }
+    });
+    // All verts should be floating-point identical to one of 16 positions: the
+    // 8 starting result cube verts, or exactly double these coordinates.
+    result += prism1.Rotate(5, 10, 15);
+  }
+  // The result should be a double-sized cube, 4 units to a side.
+  // If symbolic perturbation fails, the number of verts and the surface area
+  // will increase, indicating cracks and internal geometry.
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 8);
+  EXPECT_FLOAT_EQ(result.Volume(), 64.0);
+  EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
   MeshGL cylinderGL = cylinder.GetMeshGL();
