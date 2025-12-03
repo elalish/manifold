@@ -327,8 +327,8 @@ bool isVectorInSector(vec2 v, vec2 start, vec2 end, bool ccw) {
 }
 
 struct IntersectResult {
-  int Count;
-  std::array<vec2, 2> Points;
+  int Count = 0;
+  std::array<vec2, 2> Points{vec2(), vec2()};
 };
 
 IntersectResult intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
