@@ -414,19 +414,16 @@ IntersectResult intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End,
   double dSquare = length2(c1 - c2);
   double d = std::sqrt(dSquare);
 
-  if (d < EPSILON) return IntersectResult{0, {}};
+  if (d < EPSILON || d > 2 * r + EPSILON) return IntersectResult{0, {}};
 
-  if (d > r + EPSILON || d < r - EPSILON || d < EPSILON)
-    return IntersectResult{0, {}};
-
-  double a = (r + dSquare) / (2 * d);
-  double arg = r - a * a;
+  double a = d / 2.0;
+  double arg = r * r - a * a;
   if (arg < -EPSILON) arg = 0;
   if (arg < 0) arg = 0;
 
   double h = std::sqrt(arg);
 
-  vec2 p2 = c1 + (c2 - c1) * (a / d);
+  vec2 p2 = c1 + (c2 - c1) * 0.5;
   vec2 offset = vec2{c2.y - c1.y, c1.x - c2.x} * (h / d);
 
   IntersectResult result;
@@ -693,7 +690,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         // Skip self
         if (e1Loopi == e2Loopi && e2i == e1i) continue;
 
-        std::array<size_t, 4> vBreakPoint{0, 2, 0, 3};
+        std::array<size_t, 4> vBreakPoint{0, 4, 0, 6};
 
         if (e1Loopi == vBreakPoint[0] && e1i == vBreakPoint[1] &&
             e2Loopi == vBreakPoint[2] && e2i == vBreakPoint[3]) {
