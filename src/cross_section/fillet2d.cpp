@@ -308,25 +308,25 @@ bool isConvex(const std::array<vec2, 3>& e, const bool CCW) {
   return val > EPSILON;
 }
 
-bool IsVectorInSector(vec2 v, vec2 start, vec2 end, bool ccw) {
-  double cp_start_end = cross(start, end);
-  double cp_start_v = cross(start, v);
-  double cp_v_end = cross(v, end);
+bool isVectorInSector(vec2 v, vec2 start, vec2 end, bool ccw) {
+  double crossStartEnd = cross(start, end);
+  double crossStartV = cross(start, v);
+  double crossVEnd = cross(v, end);
 
   if (length2(v - start) < EPSILON || length2(v - end) < EPSILON) return true;
 
   if (ccw) {
-    if (cp_start_end >= -EPSILON) {
-      return cp_start_v >= -EPSILON && cp_v_end >= -EPSILON;
+    if (crossStartEnd >= -EPSILON) {
+      return crossStartV >= -EPSILON && crossVEnd >= -EPSILON;
     } else {
-      return cp_start_v >= -EPSILON || cp_v_end >= -EPSILON;
+      return crossStartV >= -EPSILON || crossVEnd >= -EPSILON;
     }
   } else {
-    return IsVectorInSector(v, end, start, true);
+    return isVectorInSector(v, end, start, true);
   }
 }
 
-vec2 IntersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
+vec2 intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
   vec2 r = p2 - p1;
   vec2 s = p4 - p3;
   double rxs = cross(r, s);
@@ -345,24 +345,34 @@ vec2 IntersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
   return {NAN, NAN};
 }
 
-int IntersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 n_start,
-                        vec2 n_end, bool is_ccw, std::vector<vec2>& out) {
-  vec2 seg_v = p2 - p1;
-  double seg_len_sq = length2(seg_v);
-  if (seg_len_sq < MIN_LEN_SQ) return 0;
+/// @brief Calculate intersection point of segment and arc
+/// @param p1 Start Point of Segment
+/// @param p2 End Point of Segment
+/// @param c Center of Arc
+/// @param r Radius of Arc
+/// @param nStart Start Direction of Arc
+/// @param nEnd End Direction of Arc
+/// @param isCCW Is Start to End CCW?
+/// @param out
+/// @return
+int intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 arcStart,
+                        vec2 arcEnd, bool isArcCCW, std::vector<vec2>& out) {
+  vec2 v = p2 - p1;
+  double lenSquare = length2(v);
+  if (lenSquare < MIN_LEN_SQ) return 0;
 
   vec2 L = p1 - c;
-  double a = seg_len_sq;
-  double b = 2.0 * dot(L, seg_v);
+  double a = lenSquare;
+  double b = 2.0 * dot(L, v);
   double cc = dot(L, L) - r * r;
 
   if (std::abs(a) < EPSILON) {
     if (std::abs(b) > EPSILON) {
       double t = -cc / b;
       if (t >= -EPSILON && t <= 1.0 + EPSILON) {
-        vec2 p = p1 + seg_v * t;
+        vec2 p = p1 + v * t;
         vec2 v = p - c;
-        if (IsVectorInSector(v, n_start, n_end, is_ccw)) out.push_back(p);
+        if (isVectorInSector(v, arcStart, arcEnd, isArcCCW)) out.push_back(p);
       }
     }
     return out.size();
@@ -372,28 +382,28 @@ int IntersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 n_start,
   if (disc < -EPSILON) return 0;
   if (disc < 0) disc = 0;
 
-  double sqrt_disc = std::sqrt(disc);
-  double t1 = (-b - sqrt_disc) / (2 * a);
-  double t2 = (-b + sqrt_disc) / (2 * a);
+  double discSqrt = std::sqrt(disc);
+  double t1 = (-b - discSqrt) / (2 * a);
+  double t2 = (-b + discSqrt) / (2 * a);
 
-  auto check_and_add = [&](double t) {
+  auto checkAdd = [&](double t) {
     if (t < -EPSILON || t > 1.0 + EPSILON) return;
-    vec2 p = p1 + seg_v * t;
+    vec2 p = p1 + v * t;
     vec2 v = p - c;
-    if (IsVectorInSector(v, n_start, n_end, is_ccw)) {
+    if (isVectorInSector(v, arcStart, arcEnd, isArcCCW)) {
       out.push_back(p);
     }
   };
 
-  check_and_add(t1);
-  if (disc > EPSILON) check_and_add(t2);
+  checkAdd(t1);
+  if (disc > EPSILON) checkAdd(t2);
 
   return out.size();
 }
 
-int IntersectArcArc(vec2 c1, vec2 n_start1, vec2 n_end1, bool ccw1, vec2 c2,
-                    vec2 n_start2, vec2 n_end2, bool ccw2, double r,
-                    std::vector<vec2>& out) {
+int intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End, bool isArc1CCW,
+                    vec2 c2, vec2 arc2Start, vec2 arc2End, bool isArc2CCW,
+                    double r, std::vector<vec2>& out) {
   double d2 = length2(c1 - c2);
   double d = std::sqrt(d2);
 
@@ -411,17 +421,17 @@ int IntersectArcArc(vec2 c1, vec2 n_start1, vec2 n_end1, bool ccw1, vec2 c2,
   vec2 p2 = c1 + (c2 - c1) * (a / d);
   vec2 offset = vec2{c2.y - c1.y, c1.x - c2.x} * (h / d);
 
-  auto check_and_add = [&](vec2 p) {
+  auto checkAdd = [&](vec2 p) {
     vec2 v1 = p - c1;
     vec2 v2 = p - c2;
-    if (IsVectorInSector(v1, n_start1, n_end1, ccw1) &&
-        IsVectorInSector(v2, n_start2, n_end2, ccw2)) {
+    if (isVectorInSector(v1, arc1Start, arc1End, isArc1CCW) &&
+        isVectorInSector(v2, arc2Start, arc2End, isArc2CCW)) {
       out.push_back(p);
     }
   };
 
-  check_and_add(p2 + offset);
-  if (h > EPSILON) check_and_add(p2 - offset);
+  checkAdd(p2 + offset);
+  if (h > EPSILON) checkAdd(p2 - offset);
 
   return out.size();
 }
@@ -444,61 +454,63 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
   std::vector<GeomTangentPair> result;
 
   vec2 intersect =
-      IntersectSegments(offsetE1[0], offsetE1[1], offsetE2[0], offsetE2[1]);
+      intersectSegments(offsetE1[0], offsetE1[1], offsetE2[0], offsetE2[1]);
 
   if (intersect.x != NAN && intersect.y != NAN) {
     double e1T = 0, e2T = 0;
     isPointProjectionOnSegment(intersect, e1Points[0], e1Points[1], e1T);
     isPointProjectionOnSegment(intersect, e2Points[0], e2Points[1], e2T);
 
-    if (e1T != 0 && e2T != 0) {
+    if (e1T > EPSILON && e2T > EPSILON) {
       result.emplace_back(GeomTangentPair{{}, {e1T, e2T}, intersect, {}});
     }
   }
 
-  if (e1Convex) {
+  if (!e1Convex) {
     std::vector<vec2> out;
-    int size = IntersectSegmentArc(
+    int size = intersectSegmentArc(
         offsetE2[0], offsetE2[1], e1Points[1], radius, e1Normal,
-        getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]), e1CCW, out);
+        getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]), !e1CCW, out);
 
     for (int i = 0; i != size; i++) {
       double e2T = 0;
       isPointProjectionOnSegment(out[i], e2Points[0], e2Points[1], e2T);
 
-      if (e2T != 0) {
+      if (e2T > EPSILON) {
         result.emplace_back(GeomTangentPair{{}, {1, e2T}, out[i], {}});
       }
     }
   }
 
-  if (e2Convex) {
+  if (!e2Convex) {
     std::vector<vec2> out;
-    int size = IntersectSegmentArc(
+    int size = intersectSegmentArc(
         offsetE1[0], offsetE1[1], e2Points[1], radius, e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), e2CCW, out);
+        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, out);
 
     for (int i = 0; i != size; i++) {
       double e1T = 0;
       isPointProjectionOnSegment(out[i], e1Points[0], e1Points[1], e1T);
 
-      if (e1T != 0) {
+      if (e1T > EPSILON) {
         result.emplace_back(GeomTangentPair{{}, {e1T, 1}, out[i], {}});
       }
     }
   }
 
-  if (e1Convex && e2Convex) {
+  if (!e1Convex && !e2Convex) {
     std::vector<vec2> out;
-    int size = IntersectArcArc(
+    int size = intersectArcArc(
         e1Points[1], e1Normal, getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]),
-        e1CCW, e2Points[1], e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), e2CCW, radius, out);
+        !e1CCW, e2Points[1], e2Normal,
+        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, radius, out);
 
     for (int i = 0; i != size; i++) {
       result.emplace_back(GeomTangentPair{{}, {1, 1}, out[i], {}});
     }
   }
+
+  return result;
 }
 
 }  // namespace
@@ -649,8 +661,8 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 #ifdef MANIFOLD_DEBUG
       if (ManifoldParams().verbose) {
         std::cout << std::endl
-                  << "Now " << p1i << "->" << (e1i + 1) % e1Loop.size() << " "
-                  << potentialEdges.size() << std::endl;
+                  << "Now " << e1Points[0] << " -> " << e1Points[1]
+                  << " Collider Size:" << potentialEdges.size() << std::endl;
       }
 #endif
 
@@ -673,7 +685,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         // Skip self
         if (e1Loopi == e2Loopi && e2i == e1i) continue;
 
-        std::array<size_t, 4> vBreakPoint{0, 3, 0, 4};
+        std::array<size_t, 4> vBreakPoint{0, 2, 0, 3};
 
         if (e1Loopi == vBreakPoint[0] && e1i == vBreakPoint[1] &&
             e2Loopi == vBreakPoint[2] && e2i == vBreakPoint[3]) {
@@ -683,7 +695,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 #ifdef MANIFOLD_DEBUG
         if (ManifoldParams().verbose) {
           std::cout << "-----------" << std::endl
-                    << e2Points[1] << " " << e2Points[2] << std::endl;
+                    << e2Points[0] << " -> " << e2Points[1] << std::endl;
         }
 #endif
 
