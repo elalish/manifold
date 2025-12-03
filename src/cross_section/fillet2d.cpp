@@ -326,12 +326,17 @@ bool isVectorInSector(vec2 v, vec2 start, vec2 end, bool ccw) {
   }
 }
 
-vec2 intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
+struct IntersectResult {
+  int Count;
+  std::array<vec2, 2> Points;
+};
+
+IntersectResult intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
   vec2 r = p2 - p1;
   vec2 s = p4 - p3;
   double rxs = cross(r, s);
 
-  if (std::abs(rxs) < EPSILON) return {NAN, NAN};
+  if (std::abs(rxs) < EPSILON) return IntersectResult{0, {}};
 
   vec2 qp = p3 - p1;
   double t = cross(qp, s) / rxs;
@@ -339,10 +344,10 @@ vec2 intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
 
   if (t >= -EPSILON && t <= 1.0 + EPSILON && u >= -EPSILON &&
       u <= 1.0 + EPSILON) {
-    return p1 + r * t;
+    return IntersectResult{1, {p1 + r * t, vec2()}};
   }
 
-  return {NAN, NAN};
+  return IntersectResult{0, {}};
 }
 
 /// @brief Calculate intersection point of segment and arc
@@ -350,21 +355,22 @@ vec2 intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
 /// @param p2 End Point of Segment
 /// @param c Center of Arc
 /// @param r Radius of Arc
-/// @param nStart Start Direction of Arc
-/// @param nEnd End Direction of Arc
-/// @param isCCW Is Start to End CCW?
-/// @param out
+/// @param arcStart Start Direction of Arc
+/// @param arcEnd End Direction of Arc
+/// @param isArcCCW Is Start to End CCW?
 /// @return
-int intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 arcStart,
-                        vec2 arcEnd, bool isArcCCW, std::vector<vec2>& out) {
+IntersectResult intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r,
+                                    vec2 arcStart, vec2 arcEnd, bool isArcCCW) {
   vec2 v = p2 - p1;
   double lenSquare = length2(v);
-  if (lenSquare < MIN_LEN_SQ) return 0;
+  if (lenSquare < MIN_LEN_SQ) IntersectResult{0, {}};
 
   vec2 L = p1 - c;
   double a = lenSquare;
   double b = 2.0 * dot(L, v);
   double cc = dot(L, L) - r * r;
+
+  IntersectResult result;
 
   if (std::abs(a) < EPSILON) {
     if (std::abs(b) > EPSILON) {
@@ -372,14 +378,15 @@ int intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 arcStart,
       if (t >= -EPSILON && t <= 1.0 + EPSILON) {
         vec2 p = p1 + v * t;
         vec2 v = p - c;
-        if (isVectorInSector(v, arcStart, arcEnd, isArcCCW)) out.push_back(p);
+        if (isVectorInSector(v, arcStart, arcEnd, isArcCCW))
+          result.Points[result.Count++] = p;
       }
     }
-    return out.size();
+    return result;
   }
 
   double disc = b * b - 4 * a * cc;
-  if (disc < -EPSILON) return 0;
+  if (disc < -EPSILON) IntersectResult{0, {}};
   if (disc < 0) disc = 0;
 
   double discSqrt = std::sqrt(disc);
@@ -391,27 +398,28 @@ int intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r, vec2 arcStart,
     vec2 p = p1 + v * t;
     vec2 v = p - c;
     if (isVectorInSector(v, arcStart, arcEnd, isArcCCW)) {
-      out.push_back(p);
+      result.Points[result.Count++] = p;
     }
   };
 
   checkAdd(t1);
   if (disc > EPSILON) checkAdd(t2);
 
-  return out.size();
+  return result;
 }
 
-int intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End, bool isArc1CCW,
-                    vec2 c2, vec2 arc2Start, vec2 arc2End, bool isArc2CCW,
-                    double r, std::vector<vec2>& out) {
-  double d2 = length2(c1 - c2);
-  double d = std::sqrt(d2);
+IntersectResult intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End,
+                                bool isArc1CCW, vec2 c2, vec2 arc2Start,
+                                vec2 arc2End, bool isArc2CCW, double r) {
+  double dSquare = length2(c1 - c2);
+  double d = std::sqrt(dSquare);
 
-  if (d < EPSILON) return 0;
+  if (d < EPSILON) return IntersectResult{0, {}};
 
-  if (d > r + EPSILON || d < r - EPSILON || d < EPSILON) return 0;
+  if (d > r + EPSILON || d < r - EPSILON || d < EPSILON)
+    return IntersectResult{0, {}};
 
-  double a = (r + d2) / (2 * d);
+  double a = (r + dSquare) / (2 * d);
   double arg = r - a * a;
   if (arg < -EPSILON) arg = 0;
   if (arg < 0) arg = 0;
@@ -421,19 +429,21 @@ int intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End, bool isArc1CCW,
   vec2 p2 = c1 + (c2 - c1) * (a / d);
   vec2 offset = vec2{c2.y - c1.y, c1.x - c2.x} * (h / d);
 
+  IntersectResult result;
+
   auto checkAdd = [&](vec2 p) {
     vec2 v1 = p - c1;
     vec2 v2 = p - c2;
     if (isVectorInSector(v1, arc1Start, arc1End, isArc1CCW) &&
         isVectorInSector(v2, arc2Start, arc2End, isArc2CCW)) {
-      out.push_back(p);
+      result.Points[result.Count++] = p;
     }
   };
 
   checkAdd(p2 + offset);
   if (h > EPSILON) checkAdd(p2 - offset);
 
-  return out.size();
+  return result;
 }
 
 std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
@@ -453,60 +463,57 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
 
   std::vector<GeomTangentPair> result;
 
-  vec2 intersect =
+  IntersectResult EE =
       intersectSegments(offsetE1[0], offsetE1[1], offsetE2[0], offsetE2[1]);
 
-  if (intersect.x != NAN && intersect.y != NAN) {
+  if (EE.Count) {
     double e1T = 0, e2T = 0;
-    isPointProjectionOnSegment(intersect, e1Points[0], e1Points[1], e1T);
-    isPointProjectionOnSegment(intersect, e2Points[0], e2Points[1], e2T);
+    isPointProjectionOnSegment(EE.Points[0], e1Points[0], e1Points[1], e1T);
+    isPointProjectionOnSegment(EE.Points[0], e2Points[0], e2Points[1], e2T);
 
     if (e1T > EPSILON && e2T > EPSILON) {
-      result.emplace_back(GeomTangentPair{{}, {e1T, e2T}, intersect, {}});
+      result.emplace_back(GeomTangentPair{{}, {e1T, e2T}, EE.Points[0], {}});
     }
   }
 
   if (!e1Convex) {
-    std::vector<vec2> out;
-    int size = intersectSegmentArc(
+    IntersectResult VE = intersectSegmentArc(
         offsetE2[0], offsetE2[1], e1Points[1], radius, e1Normal,
-        getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]), !e1CCW, out);
+        getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]), !e1CCW);
 
-    for (int i = 0; i != size; i++) {
+    for (int i = 0; i != VE.Count; i++) {
       double e2T = 0;
-      isPointProjectionOnSegment(out[i], e2Points[0], e2Points[1], e2T);
+      isPointProjectionOnSegment(VE.Points[i], e2Points[0], e2Points[1], e2T);
 
       if (e2T > EPSILON) {
-        result.emplace_back(GeomTangentPair{{}, {1, e2T}, out[i], {}});
+        result.emplace_back(GeomTangentPair{{}, {1, e2T}, VE.Points[i], {}});
       }
     }
   }
 
   if (!e2Convex) {
-    std::vector<vec2> out;
-    int size = intersectSegmentArc(
+    IntersectResult EV = intersectSegmentArc(
         offsetE1[0], offsetE1[1], e2Points[1], radius, e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, out);
+        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW);
 
-    for (int i = 0; i != size; i++) {
+    for (int i = 0; i != EV.Count; i++) {
       double e1T = 0;
-      isPointProjectionOnSegment(out[i], e1Points[0], e1Points[1], e1T);
+      isPointProjectionOnSegment(EV.Points[i], e1Points[0], e1Points[1], e1T);
 
       if (e1T > EPSILON) {
-        result.emplace_back(GeomTangentPair{{}, {e1T, 1}, out[i], {}});
+        result.emplace_back(GeomTangentPair{{}, {e1T, 1}, EV.Points[i], {}});
       }
     }
   }
 
   if (!e1Convex && !e2Convex) {
-    std::vector<vec2> out;
-    int size = intersectArcArc(
+    IntersectResult VV = intersectArcArc(
         e1Points[1], e1Normal, getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]),
         !e1CCW, e2Points[1], e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, radius, out);
+        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, radius);
 
-    for (int i = 0; i != size; i++) {
-      result.emplace_back(GeomTangentPair{{}, {1, 1}, out[i], {}});
+    for (int i = 0; i != VV.Count; i++) {
+      result.emplace_back(GeomTangentPair{{}, {1, 1}, VV.Points[i], {}});
     }
   }
 
