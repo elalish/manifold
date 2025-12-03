@@ -454,7 +454,9 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
        e2Convex = isConvex(e2Points, e2CCW);
 
   vec2 e1Normal = getEdgeNormal(e1CCW, e1Points[1] - e1Points[0]),
-       e2Normal = getEdgeNormal(e2CCW, e2Points[1] - e2Points[0]);
+       e1NextNormal = getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]),
+       e2Normal = getEdgeNormal(e2CCW, e2Points[1] - e2Points[0]),
+       e2NextNormal = getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]);
 
   std::array<vec2, 2> offsetE1{e1Points[0] + e1Normal * radius,
                                e1Points[1] + e1Normal * radius},
@@ -477,9 +479,9 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
   }
 
   if (!e1Convex) {
-    IntersectResult VE = intersectSegmentArc(
-        offsetE2[0], offsetE2[1], e1Points[1], radius, e1Normal,
-        getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]), !e1CCW);
+    IntersectResult VE =
+        intersectSegmentArc(offsetE2[0], offsetE2[1], e1Points[1], radius,
+                            e1Normal, e1NextNormal, !e1CCW);
 
     for (int i = 0; i != VE.Count; i++) {
       double e2T = 0;
@@ -492,9 +494,9 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
   }
 
   if (!e2Convex) {
-    IntersectResult EV = intersectSegmentArc(
-        offsetE1[0], offsetE1[1], e2Points[1], radius, e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW);
+    IntersectResult EV =
+        intersectSegmentArc(offsetE1[0], offsetE1[1], e2Points[1], radius,
+                            e2Normal, e2NextNormal, !e2CCW);
 
     for (int i = 0; i != EV.Count; i++) {
       double e1T = 0;
@@ -507,10 +509,9 @@ std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
   }
 
   if (!e1Convex && !e2Convex) {
-    IntersectResult VV = intersectArcArc(
-        e1Points[1], e1Normal, getEdgeNormal(e1CCW, e1Points[2] - e1Points[1]),
-        !e1CCW, e2Points[1], e2Normal,
-        getEdgeNormal(e2CCW, e2Points[2] - e2Points[1]), !e2CCW, radius);
+    IntersectResult VV =
+        intersectArcArc(e1Points[1], e1Normal, e1NextNormal, !e1CCW,
+                        e2Points[1], e2Normal, e2NextNormal, !e2CCW, radius);
 
     for (int i = 0; i != VV.Count; i++) {
       result.emplace_back(GeomTangentPair{{}, {1, 1}, VV.Points[i], {}});
@@ -704,6 +705,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
           std::cout << "-----------" << std::endl
                     << e2Points[0] << " -> " << e2Points[1] << std::endl;
         }
+
+        std::cout << "std::array<size_t, 4> vBreakPoint{" << e1Loopi << ", "
+                  << e1i << ", " << e2Loopi << ", " << e2i << "}; "
+                  << std::endl;
 #endif
 
         const uint8_t EEMASK = 1, PEMASK = 1 << 1, PPMASK = 1 << 2;
