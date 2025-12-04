@@ -96,7 +96,6 @@ struct GeomTangentPair {
   std::array<double, 2> RadValues;
 };
 
-//
 struct TopoConnectionPair {
   TopoConnectionPair(const GeomTangentPair& geomPair, size_t Edge1Index,
                      size_t Edge1LoopIndex, size_t Edge2Index,
@@ -653,6 +652,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         }
       }
 
+      // TODO:  Add flag to avoid double process
       // Potential fillet edge pair with e1
       std::vector<EdgeOld2New> potentialEdges;
       auto recordCollision = [&](int, int edge) {
@@ -719,7 +719,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
         std::vector<GeomTangentPair> filletCircles;
 
-        // Calculate fillet intersection center
+        // NOTE: Calculate fillet intersection center
         filletCircles =
             Intersect(e1Points, isE1LoopCCW, e2Points, isE2LoopCCW, radius);
 
@@ -797,39 +797,73 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         {
           for (auto it = filletCircles.begin(); it != filletCircles.end();
                it++) {
+            vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                                it->ParameterValues[0]),
+                 p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
+                                                it->ParameterValues[1]);
+
+            it->RadValues = getRadPair(p1, p2, it->CircleCenter);
+
             auto connectPair = TopoConnectionPair(*it, e1i, e1Loopi, e2i,
                                                   e2Loopi, circleIndex++);
+            auto add = [&](TopoConnectionPair pair, size_t index) {
+              // Ensure Arc start and end direction fit the Loop direction.
+              auto check = [&](const TopoConnectionPair& pair) -> bool {
+                if (e1Loopi == e2Loopi) {
+                  vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                                      pair.ParameterValues[0]),
+                       p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
+                                                      pair.ParameterValues[1]);
 
-            // bool arcCCW =
-            //     normalizeAngle(it->RadValues[1] - it->RadValues[0]) < M_PI;
+                  vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
+                  if (isE1LoopCCW) {
+                    return la::cross(n1, n2) < EPSILON;
+                  } else {
+                    return la::cross(n1, n2) > EPSILON;
+                  }
+                }
 
-            // size_t index = 0;
-            // TopoConnectionPair pair = connectPair;
+                return false;
+              };
 
-            // if (arcCCW == isE1LoopCCW) {
-            //   index = loopOffset[e1Loopi] + i;
-            // } else {
-            //   index = loopOffset[e2Loopi] + j;
-            //   pair = pair.Swap();
-            // }
-            // auto compare = [](const std::array<double, 2>& arr1,
-            //                   const std::array<double, 2>& arr2) -> bool {
-            //   return std::abs(arr1[0] - arr2[0]) < EPSILON &&
-            //          std::abs(arr1[1] - arr2[1]) < EPSILON;
-            // };
-            // auto itt = std::find_if(
-            //     arcConnection[index].begin(), arcConnection[index].end(),
-            //     [pair, compare](const TopoConnectionPair& ele) -> bool {
-            //       return ele.EdgeIndex == pair.EdgeIndex &&
-            //              ele.LoopIndex == pair.LoopIndex &&
-            //              ele.CircleCenter == pair.CircleCenter &&
-            //              compare(ele.RadValues, pair.RadValues) &&
-            //              compare(ele.ParameterValues, pair.ParameterValues);
-            //     });
+              if (check(pair)) pair = pair.Swap();
 
-            // if (itt == arcConnection[index].end()) {
-            //   arcConnection[index].push_back(pair);
-            // }
+              auto order = [&](const TopoConnectionPair& a,
+                               const TopoConnectionPair& b) {
+                if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON)
+                  return true;
+                if (a.ParameterValues[0] > b.ParameterValues[0] + EPSILON)
+                  return false;
+
+                bool aEnd = std::abs(a.ParameterValues[0] - 1.0) < EPSILON;
+                bool bEnd = std::abs(b.ParameterValues[0] - 1.0) < EPSILON;
+
+                if (aEnd && bEnd) {
+                  auto n1 = a.CircleCenter - e1Points[1];
+                  auto n2 = b.CircleCenter - e1Points[1];
+                  double det = la::cross(n1, n2);
+
+                  return isE1LoopCCW ? (det < EPSILON) : (det > EPSILON);
+                }
+
+                return false;
+              };
+
+              auto itt = std::find_if(
+                  arcConnection[index].begin(), arcConnection[index].end(),
+                  [&](const TopoConnectionPair& ele) -> bool {
+                    return order(ele, pair);
+                  });
+
+              arcConnection[index].insert(itt, pair);
+            };
+
+            add(connectPair, loopOffset[e1Loopi] + e1i);
+
+            if (e1Loopi != e2Loopi) {
+              auto swappedPair = connectPair.Swap();
+              add(connectPair, loopOffset[e2Loopi] + e2i);
+            }
           }
         }
 
