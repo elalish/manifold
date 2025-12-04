@@ -36,6 +36,8 @@
   "exports": {
     "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts",
     "./manifold.wasm": "./manifold.wasm",
+    "./manifold-encapsulated-types": "./manifold-encapsulated-types.d.ts",
+    "./manifold-global-types": "./manifold-global-types.d.ts",
     "./manifoldCAD": {
       "import": {
         "types": "./dist/manifoldCAD.d.ts",
