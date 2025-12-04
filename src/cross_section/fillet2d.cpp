@@ -806,7 +806,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
             auto connectPair = TopoConnectionPair(*it, e1i, e1Loopi, e2i,
                                                   e2Loopi, circleIndex++);
-            auto add = [&](TopoConnectionPair pair, size_t index) {
+            auto add = [&](TopoConnectionPair pair) {
               // Ensure Arc start and end direction fit the Loop direction.
               auto check = [&](const TopoConnectionPair& pair) -> bool {
                 if (e1Loopi == e2Loopi) {
@@ -827,6 +827,8 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               };
 
               if (check(pair)) pair = pair.Swap();
+
+              size_t index = loopOffset[pair.LoopIndex[0]] + pair.EdgeIndex[0];
 
               auto order = [&](const TopoConnectionPair& a,
                                const TopoConnectionPair& b) {
@@ -852,17 +854,17 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
               auto itt = std::find_if(
                   arcConnection[index].begin(), arcConnection[index].end(),
                   [&](const TopoConnectionPair& ele) -> bool {
-                    return order(ele, pair);
+                    return order(pair, ele);
                   });
 
               arcConnection[index].insert(itt, pair);
             };
 
-            add(connectPair, loopOffset[e1Loopi] + e1i);
+            add(connectPair);
 
             if (e1Loopi != e2Loopi) {
               auto swappedPair = connectPair.Swap();
-              add(connectPair, loopOffset[e2Loopi] + e2i);
+              add(connectPair);
             }
           }
         }
