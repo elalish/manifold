@@ -18,89 +18,126 @@
  * ManifoldCAD uses [gltf-transform](https://gltf-transform.dev/) internally to
  * represent scenes. Exporters must accept in-memory gltf-transform Documents.
  *
+ * Exporters and importers can each accept one or more type of file.
+ * Each format must have a defined extension and mime type.  In the case of
+ * duplicates, order is not guaranteed. While an implementation may support both
+ * import and export of a format, this is not required.  At the time of writing,
+ * manifoldCAD supports both import and export of glTF, but only exports 3mf.
+ *
  * @packageDocumentation
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
 
+import {UnsupportedFormatError} from './error.ts';
 import * as export3MF from './export-3mf.ts';
 import * as gltfIO from './gltf-io.ts';
-import {isNode} from './util.ts';
+import {findExtension, findMimeType, isNode} from './util.ts';
 
-export interface Format {
+/**
+ * @inline
+ */
+interface Format {
   extension: string;
   mimetype: string;
 }
 
 export interface Exporter {
   exportFormats: Array<Format>;
-  toBlob: (doc: GLTFTransform.Document) => Promise<Blob>;
   toArrayBuffer:
       (doc: GLTFTransform.Document) => Promise<Uint8Array<ArrayBufferLike>>;
-
-  writeFile?: (filename: string, doc: GLTFTransform.Document) => Promise<void>;
 }
 
 /**
  * @inline
  */
-export interface ExportOptions {
+interface ExportOptions {
+  /**
+   * Use `mimetype` to determine the format of the imported model, rather than
+   * inferring it.
+   */
   mimetype?: string;
 }
 
-const exporters: Array<Exporter> = [gltfIO, export3MF];
+const exporters: Array<Exporter> = [];
+register(gltfIO);
+register(export3MF);
 
-export function getExporterByExtension(extension: string) {
-  const hasExtension =
-      (format: Format) => [format.extension, `.${format.extension}`].includes(
-          extension);
-  const exporter = exporters.find(ex => ex.exportFormats.find(hasExtension));
-
-  if (!exporter) {
-    const extensionList =
-        exporters.flatMap(ex => ex.exportFormats.map(f => f.extension))
-            .map(ext => `\`.${ext}\``)
-            .reduceRight(
-                (prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
-    throw new Error(
-        `Cannot import \`${extension}\`.  ` +
-        `Format must be one of ${extensionList}`);
-  }
-  return exporter;
+function getFormat(identifier: string): Format {
+  const formats = exporters.flatMap(ex => ex.exportFormats);
+  const format = (findMimeType(identifier, formats) ??
+                  findExtension(identifier, formats)) as Format;
+  if (!format) throw new UnsupportedFormatError(identifier, formats);
+  return format;
 }
 
-export function getExporterByMimeType(mimetype: string) {
-  const hasMimetype = (format: Format) => format.mimetype === mimetype;
-  const exporter = exporters.find(ex => ex.exportFormats.find(hasMimetype));
-
-  if (!exporter) {
-    const mimetypeList =
-        exporters.flatMap(ex => ex.exportFormats.map(f => f.mimetype))
-            .reduceRight(
-                (prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
-    throw new Error(
-        `Cannot export \`${mimetype}\`.  ` +
-        `Format must be one of ${mimetypeList}`);
-  }
-  return exporter;
+function getExporter(identifier: Format|string) {
+  const format =
+      typeof identifier === 'string' ? getFormat(identifier) : identifier;
+  return exporters.find(ex => ex.exportFormats.includes(format))!;
 }
 
 /**
- * Convert an in-memory GLTF document to a binary blob.
+ * Returns true if a given extension or mimetype can be exported.
+ *
+ * @param filetype
+ * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
+ *     than return false.
+ * @group Management Functions
+ */
+export function supports(filetype: string, throwOnFailure: false): boolean {
+  if (throwOnFailure) return !!getFormat(filetype);
+
+  try {
+    return !!getFormat(filetype);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Register an exporter.
+ *
+ * Supported formats will be inferred.
+ * @group Management Functions
+ * @param exporter
+ */
+export function register(exporter: Exporter) {
+  exporters.push(exporter);
+}
+
+/**
+ * Convert an in-memory GLTF document to a binary Blob.
  *
  * @param doc The GLTF document.
- * @param extension The target file extension.
+ * @param identifier The target format extension or mimetype.
  * @returns A URL encoded blob.
+ * @group Low Level Functions
  */
 export async function toBlob(
-    doc: GLTFTransform.Document, extension: string): Promise<Blob> {
-  return await getExporterByExtension(extension).toBlob(doc);
+    doc: GLTFTransform.Document, identifier: string): Promise<Blob> {
+  const format = getFormat(identifier);
+  const buffer = await getExporter(identifier).toArrayBuffer(doc);
+  return new Blob([buffer as Uint8Array<ArrayBuffer>], {type: format.mimetype});
+}
+
+/**
+ * Convert an in-memory GLTF document to an ArrayBuffer.
+ *
+ * @param doc The GLTF document.
+ * @param identifier The target format extension or mimetype.
+ * @returns A URL encoded blob.
+ * @group Low Level Functions
+ */
+export async function toArrayBuffer(
+    doc: GLTFTransform.Document,
+    identifier: string): Promise<Uint8Array<ArrayBufferLike>> {
+  return await getExporter(identifier).toArrayBuffer(doc);
 }
 
 /**
  * Write a model to disk.
- *
- * If the matching exporter has a `writeFile()` method, delegate to it.
+ * @group Low Level Functions
  */
 export async function writeFile(
     filename: string, doc: GLTFTransform.Document,
@@ -110,14 +147,7 @@ export async function writeFile(
   }
   const fs = await import('node:fs/promises');
 
-  const [ext] = filename.match(/(\.[^\.]+)$/)!;
-  const exporter = options.mimetype ? getExporterByMimeType(options.mimetype) :
-                                      getExporterByExtension(ext);
-
-  if (typeof exporter.writeFile === 'function' && isNode()) {
-    return exporter.writeFile(filename, doc)
-  }
-
-  const blob = await exporter.toBlob(doc);
-  return await fs.writeFile(filename, await blob.bytes());
+  const exporter = getExporter(options.mimetype ?? filename);
+  const buffer = await exporter.toArrayBuffer(doc);
+  return await fs.writeFile(filename, buffer);
 }

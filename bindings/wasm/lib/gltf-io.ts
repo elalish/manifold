@@ -13,24 +13,19 @@
 // limitations under the License.
 
 import * as GLTFTransform from '@gltf-transform/core';
+import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
 import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
-import {isNode} from './util.ts';
 
 const binaryFormat = {
   extension: 'glb',
   mimetype: 'model/gltf-binary'
 };
 
-const jsonFormat = {
-  extension: 'gltf',
-  mimetype: 'model/gltf+json'
-};
-
-export const importFormats = [binaryFormat, jsonFormat];
-export const exportFormats = [binaryFormat, jsonFormat];
+export const importFormats = [binaryFormat];
+export const exportFormats = [binaryFormat];
 
 export const attributeDefs = {
   'POSITION': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
@@ -447,37 +442,16 @@ let _io: GLTFTransform.PlatformIO|null = null;
  */
 const getIO = (): GLTFTransform.PlatformIO => {
   if (!_io) {
-    _io = isNode() ? (new GLTFTransform.NodeIO(fetch)).setAllowNetwork(true) :
-                     new GLTFTransform.WebIO();
-    _io.registerExtensions([EXTManifold]);
+    _io = new GLTFTransform.WebIO();
+    _io.registerExtensions([EXTManifold, ...KHRONOS_EXTENSIONS]);
   }
 
   return _io;
 };
 
-/**
- * Convert a GLTF-Transform document to a blob.
- *
- * @param doc The GLTF document to convert.
- * @returns A blob containing the converted model.
- */
-export async function toBlob(doc: GLTFTransform.Document) {
-  const glb = await getIO().writeBinary(doc);
-  return new Blob(
-      [glb as Uint8Array<ArrayBuffer>], {type: binaryFormat.mimetype});
-}
-
 export async function toArrayBuffer(doc: GLTFTransform.Document):
     Promise<Uint8Array<ArrayBufferLike>> {
-  return await getIO().writeBinary(doc);
-}
-
-export async function fetchModel(url: string) {
-  return await getIO().read(url);
-};
-
-export async function fromBlob(blob: Blob) {
-  return await getIO().readBinary(await blob.bytes());
+  return await getIO().writeBinary(doc) as Uint8Array<ArrayBufferLike>;
 }
 
 export async function fromArrayBuffer(buffer: Uint8Array<ArrayBufferLike>) {

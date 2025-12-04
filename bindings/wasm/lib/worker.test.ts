@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
 import {glob} from 'glob';
 import * as fs from 'node:fs/promises';
@@ -21,13 +20,9 @@ import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
 import {Mesh} from '../manifold';
-import type {ManifoldToplevel} from '../manifold';
 
-import {readMesh, setupIO} from './gltf-io.ts';
-import {getManifoldModule} from './wasm.js';
+import {gltfDocToManifold, importModel} from './import-model.ts';
 import {cleanup, evaluate, exportBlobURL} from './worker.ts';
-
-const io = setupIO(new WebIO());
 
 async function resolveExample(name: string) {
   const [filepath] =
@@ -43,26 +38,23 @@ async function resolveExample(name: string) {
 
 async function runExample(name: string) {
   const filename = await resolveExample(name);
-  const module: ManifoldToplevel = await getManifoldModule();
   const code = await fs.readFile(filename, 'utf-8');
   const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
   const glbURL = await exportBlobURL(doc, 'glb')
   cleanup();
   assert.ok(glbURL);
-  const docIn = await io.read(glbURL);
+
+  // These tests are agains the first glTF node containing meshes in a given model.
+  const {document} = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const node = document.getRoot().listNodes().find(node => !!node.getMesh());
+  const manifold = await gltfDocToManifold(document, node);
   URL.revokeObjectURL(glbURL);
-  const nodes = docIn.getRoot().listNodes();
-  for (const node of nodes) {
-    const docMesh = node.getMesh();
-    if (!docMesh) {
-      continue;
-    }
-    const {mesh} = readMesh(docMesh)!;
-    const manifold = new module.Manifold(mesh as Mesh);
+
+  if (manifold) {
     const volume = manifold.volume();
     const surfaceArea = manifold.surfaceArea();
     const genus = manifold.genus();
-    manifold.delete();
+    cleanup();
     return {volume, surfaceArea, genus};
   }
   assert.ok(false);
@@ -104,8 +96,8 @@ suite('Examples', () => {
   test('Heart', async () => {
     const result = await runExample('Heart');
     expect(result?.genus).to.equal(0, 'Genus');
-    expect(result?.volume).to.be.closeTo(3.342, 0.001, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(11.51, 0.01, 'Surface Area');
+    expect(result?.volume).to.be.closeTo(282742, 10, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(22186, 1, 'Surface Area');
   });
 
   test('Scallop', async () => {

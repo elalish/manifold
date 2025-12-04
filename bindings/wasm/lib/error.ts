@@ -53,3 +53,19 @@ export class RuntimeError extends Error {
     return this.cause.name;
   }
 }
+
+export class UnsupportedFormatError extends Error {
+  constructor(
+      identifier: string,
+      supported: Array<{mimetype: string, extension: string}>) {
+    const typeList =
+        supported
+            .map(entry => {`\`${entry.mimetype}\` (\'.${entry.extension}\.)`})
+            .reduceRight(
+                (prev, cur, index, arr) => cur +
+                    ((index > 0 || arr.length < 2) ? ', or ' : ', ') + prev);
+    super(
+        `Unsupported format \`${identifier}\`.  ` +
+        `Must be one of ${typeList}`);
+  }
+}

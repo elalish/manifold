@@ -113,4 +113,26 @@ export const getSourceMappedStackTrace =
           }
         })
       ].reduce((acc, cur) => `${acc}\n${cur}`);
-    }
+    };
+
+export const findExtension =
+    (extension: string, list: Array<{extension: string}>) => {
+      let match = list.find(entry => entry.extension === extension);
+      if (match) return match;
+      match = list.find(entry => `.${entry.extension}` === extension);
+      if (match) return match;
+
+      // Do we have a filename instead of just an extension?
+      const fileExt = extension.match(/(\.[^\.]+)$/);
+      if (!fileExt) return null;
+
+      const [ext] = fileExt;
+      match = list.find(entry => entry.extension === ext);
+      if (match) return match;
+      match = list.find(entry => `.${entry.extension}` === ext);
+      return match;
+    };
+
+export const findMimeType =
+    (mimetype: string, list: Array<{mimetype: string}>) =>
+        list.find(entry => entry.mimetype === mimetype);
