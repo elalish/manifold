@@ -216,15 +216,6 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2) {
   return length(closestPoint - p);
 }
 
-// Check if line segment intersect with a circle
-bool isIntersectCircleSegment(const vec2& p1, const vec2& p2,
-                              const vec2& center, double radius) {
-  if (length(p2 - p1) < EPSILON)
-    return length2(p1 - center) < (radius + EPSILON) * (radius + EPSILON);
-
-  return distancePointSegment(center, p1, p2) < (radius + EPSILON);
-};
-
 std::vector<vec2> discreteArcToPoint(TopoConnectionPair arc, double radius,
                                      int circularSegments) {
   std::vector<vec2> pts;
@@ -312,132 +303,48 @@ IntersectResult intersectSegments(vec2 p1, vec2 p2, vec2 p3, vec2 p4) {
 /// @return
 IntersectResult intersectSegmentArc(vec2 p1, vec2 p2, vec2 c, double r,
                                     vec2 arcStart, vec2 arcEnd, bool isArcCCW) {
-  if (true) {
-    vec2 v = p2 - p1;
+  vec2 v = p2 - p1;
+  double lenSq = dot(v, v);
 
-    double lenSquare = length2(v);
+  if (lenSq < MIN_LEN_SQ) return IntersectResult{0, {}};
 
-    if (lenSquare < MIN_LEN_SQ) IntersectResult{0, {}};
+  double t = dot(c - p1, v) / lenSq;
 
-    vec2 L = p1 - c;
+  vec2 p = p1 + v * t;
 
-    double a = lenSquare;
+  vec2 distVec = c - p;
+  double distSq = dot(distVec, distVec);
 
-    double b = 2.0 * dot(L, v);
+  IntersectResult result;
+  result.Count = 0;
 
-    double cc = dot(L, L) - r * r;
-
-    IntersectResult result;
-
-    if (std::abs(a) < EPSILON) {
-      if (std::abs(b) > EPSILON) {
-        double t = -cc / b;
-
-        if (t >= -EPSILON && t <= 1.0 + EPSILON) {
-          vec2 p = p1 + v * t;
-
-          vec2 v = p - c;
-
-          if (isVectorInSector(v, arcStart, arcEnd, isArcCCW))
-
-            result.Points[result.Count++] = p;
-        }
-      }
-
-      return result;
-    }
-
-    double disc = b * b - 4 * a * cc;
-
-    if (disc < -EPSILON) IntersectResult{0, {}};
-
-    if (disc < 0) disc = 0;
-
-    double discSqrt = std::sqrt(disc);
-
-    double t1 = (-b - discSqrt) / (2 * a);
-
-    double t2 = (-b + discSqrt) / (2 * a);
-
-    auto checkAdd = [&](double t) {
-      if (t < -EPSILON || t > 1.0 + EPSILON) return;
-
-      vec2 p = p1 + v * t;
-
-      vec2 v = p - c;
-
-      if (isVectorInSector(v, arcStart, arcEnd, isArcCCW)) {
-        result.Points[result.Count++] = p;
-      }
-    };
-
-    checkAdd(t1);
-
-    if (disc > EPSILON) checkAdd(t2);
-
-    return result;
-  } else {
-    vec2 v = p2 - p1;
-    double lenSq = dot(v, v);
-
-    // Handle degenerate segment
-    if (lenSq < MIN_LEN_SQ) return IntersectResult{0, {}};
-
-    // 1. Project Center (c) onto the line (p1->p2)
-    // t_proj is the parameterized distance along the line where the center
-    // projects t_proj = dot(c - p1, v) / dot(v, v)
-    double t = dot(c - p1, v) / lenSq;
-
-    // 2. Find the closest point on the INFINITE line to the center
-    vec2 p = p1 + v * t;
-
-    // 3. Calculate distance squared from center to that closest point
-    vec2 distVec = c - p;
-    double distSq = dot(distVec, distVec);
-
-    IntersectResult result;
-    result.Count = 0;
-
-    // 4. Check intersection
-    // If distance to line > radius, no intersection
-    if (distSq > r * r + EPSILON) {
-      return result;
-    }
-
-    // 5. Calculate offset using Pythagoras: offset = sqrt(r^2 - dist^2)
-    // We clamp to 0 to handle cases where distSq is slightly > r*r due to float
-    // noise
-    double offset = std::sqrt(std::max(0.0, r * r - distSq));
-
-    // Convert offset distance to parametric space t
-    // The length of vector v is sqrt(lenSq), so t_offset = offset / length(v)
-    double tOffset = offset / std::sqrt(lenSq);
-
-    // 6. Calculate the two intersection t values
-    double t1 = t - tOffset;
-    double t2 = t + tOffset;
-
-    // Helper to validate and add points
-    auto checkAdd = [&](double t) {
-      if (t >= -EPSILON && t <= 1.0 + EPSILON) {
-        vec2 p = p1 + v * t;
-        // Re-check sector with vector from center
-        vec2 radiusVec = p - c;
-        if (isVectorInSector(radiusVec, arcStart, arcEnd, isArcCCW)) {
-          result.Points[result.Count++] = p;
-        }
-      }
-    };
-
-    checkAdd(t1);
-
-    // Avoid double adding if the line is tangent (t1 == t2)
-    if (std::abs(t1 - t2) > EPSILON) {
-      checkAdd(t2);
-    }
-
+  if (distSq > r * r + EPSILON) {
     return result;
   }
+
+  double offset = std::sqrt(std::max(0.0, r * r - distSq));
+  double tOffset = offset / std::sqrt(lenSq);
+
+  double t1 = t - tOffset;
+  double t2 = t + tOffset;
+
+  auto checkAdd = [&](double t) {
+    if (t >= -EPSILON && t <= 1.0 + EPSILON) {
+      vec2 p = p1 + v * t;
+      vec2 radiusVec = p - c;
+      if (isVectorInSector(radiusVec, arcStart, arcEnd, isArcCCW)) {
+        result.Points[result.Count++] = p;
+      }
+    }
+  };
+
+  checkAdd(t1);
+
+  if (std::abs(t1 - t2) > EPSILON) {
+    checkAdd(t2);
+  }
+
+  return result;
 }
 
 IntersectResult intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End,
@@ -1073,9 +980,11 @@ std::vector<CrossSection> Tracing(
   if (radius < EPSILON) invert = true;
 
   for (size_t i = 0; i != loops.size(); i++) {
-    if (loopFlag[i] == 0 && (invert ^ (!loops[i].isCCW)))
-      hole = hole.Boolean(CrossSection(Polygons{loops[i].Loop}),
-                          manifold::OpType::Add);
+    if (loopFlag[i] == 0 && (invert ^ (!loops[i].isCCW))) {
+      SimplePolygon loop = loops[i].Loop;
+      std::reverse(loop.begin(), loop.end());
+      hole = hole.Boolean(CrossSection(Polygons{loop}), manifold::OpType::Add);
+    }
   }
 
   std::vector<CrossSection> result;
