@@ -879,77 +879,61 @@ std::vector<CrossSection> Tracing(
   Polygons resultLoops;
 
   while (true) {
-    SimplePolygon tracingLoop{};
-
-    // Tracing to construct result
-    EdgeLoopPair current, end;
-
     // NOTE: Find first fillet arc to start tracing
-    // to avoid start from a edge that can't fit the circle be skipped in the
-    // result.
-    auto it = arcConnection.begin();
-    for (; it != arcConnection.end(); it++) {
-      if (!it->empty()) {
-        TopoConnectionPair arc = *it->begin();
+    // To avoid start from a edge that can't fit the circle.
+    const auto firstNonEmpty =
+        std::find_if(arcConnection.begin(), arcConnection.end(),
+                     [](const auto& c) { return !c.empty(); });
 
-        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
-        tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
+    if (firstNonEmpty == arcConnection.end()) break;
 
-        current = EdgeLoopPair{arc.EdgeIndex[1], arc.LoopIndex[1],
-                               arc.ParameterValues[1]};
-        end = EdgeLoopPair{arc.EdgeIndex[0], arc.LoopIndex[0],
-                           arc.ParameterValues[0]};
+    const auto startIt = firstNonEmpty->begin();
 
-        loopFlag[arc.LoopIndex[0]] = 1;
-        loopFlag[arc.LoopIndex[1]] = 1;
+    SimplePolygon tracingLoop{};
+    const auto startPts =
+        discreteArcToPoint(*startIt, radius, circularSegments);
+    tracingLoop.insert(tracingLoop.end(), startPts.begin(), startPts.end());
 
-        break;
-      }
-    }
+    loopFlag[startIt->LoopIndex[0]] = 1;
+    loopFlag[startIt->LoopIndex[1]] = 1;
 
-    if (it == arcConnection.end()) break;
+    EdgeLoopPair current{startIt->EdgeIndex[1], startIt->LoopIndex[1],
+                         startIt->ParameterValues[1]};
 
     while (true) {
       // Trace to find next arc on current edge
+      auto& currentEdge = arcConnection[getEdgePosition(current)];
 
-      const double EPS = EPSILON;
+      auto it = std::find_if(currentEdge.begin(), currentEdge.end(),
+                             [current](const TopoConnectionPair& ele) -> bool {
+                               return ele.ParameterValues[0] + EPSILON >
+                                      current.ParameterValue;
+                             });
 
-      auto it = std::find_if(
-          arcConnection[getEdgePosition(current)].begin(),
-          arcConnection[getEdgePosition(current)].end(),
-          [current, EPS](const TopoConnectionPair& ele) -> bool {
-            return ele.ParameterValues[0] + EPSILON > current.ParameterValue;
-          });
-
-      if (it == arcConnection[getEdgePosition(current)].end()) {
-        // Not found, just go to next edge
-
+      // Not found, just go to next edge
+      if (it == currentEdge.end()) {
         const auto& loop = loops[current.LoopIndex];
         tracingLoop.push_back(loop[(current.EdgeIndex + 1) % loop.size()]);
 
         current.EdgeIndex = (current.EdgeIndex + 1) % loop.size();
         current.ParameterValue = 0;
-      } else {
-        // Found next circle fillet
 
-        TopoConnectionPair arc = *it;
-
-        arcConnection[getEdgePosition(current)].erase(it);
-
-        if (EdgeLoopPair{arc.EdgeIndex[0], arc.LoopIndex[0],
-                         arc.ParameterValues[0]} == end) {
-          break;
-        }
-
-        const auto pts = discreteArcToPoint(arc, radius, circularSegments);
-        tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
-
-        current.EdgeIndex = arc.EdgeIndex[1];
-        current.LoopIndex = arc.LoopIndex[1];
-        current.ParameterValue = arc.ParameterValues[1];
-
-        loopFlag[arc.LoopIndex[1]] = 1;
+        continue;
       }
+
+      // Found next circle fillet
+      TopoConnectionPair arc = *it;
+      currentEdge.erase(it);
+
+      if (it == startIt) {
+        break;
+      }
+
+      const auto pts = discreteArcToPoint(arc, radius, circularSegments);
+      tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
+
+      current = {arc.EdgeIndex[1], arc.LoopIndex[1], arc.ParameterValues[1]};
+      loopFlag[arc.LoopIndex[1]] = 1;
     }
     resultLoops.push_back(tracingLoop);
   }
