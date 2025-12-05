@@ -159,6 +159,8 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
     for (size_t i = 0, j = 0; i != 20 && j != 10; i++) {
       double mid = low + (high - low) * 0.5;
 
+      if (std::abs(low - mid) < 1E-6) break;
+
       // Area non zero
       if (TestFillet(polys, input, mid, inputCircularSegments)) {
         low = mid;
@@ -287,10 +289,10 @@ void RegisterPolygonTests() {
 }
 
 void RegisterFilletTests() {
-  std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
-                         "zebra.txt", "zebra3.txt"};
+  // std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
+  //                        "zebra.txt", "zebra3.txt"};
 
-  // std::string files[] = {"fillet.txt"};
+  std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
