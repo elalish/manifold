@@ -20,7 +20,8 @@
  * gltf-transform Documents.
  *
  * The high level functions `importModel()` and `importManifold()` will import
- * models as display-only and full manifold objects respectively.  These functions are available in manifoldCAD.
+ * models as display-only and full manifold objects respectively.  These
+ * functions are available in manifoldCAD.
  *
  * @packageDocumentation
  */
@@ -373,8 +374,7 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  *
  * @internal
  */
-function meshesToManifold(
-    meshes: Array<Mesh>, tolerance?: number): Manifold {
+function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
 
   const manifolds = [];

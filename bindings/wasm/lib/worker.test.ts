@@ -44,7 +44,8 @@ async function runExample(name: string) {
   cleanup();
   assert.ok(glbURL);
 
-  // These tests are agains the first glTF node containing meshes in a given model.
+  // These tests are agains the first glTF node containing meshes in a given
+  // model.
   const {document} = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
   const node = document.getRoot().listNodes().find(node => !!node.getMesh());
   const manifold = await gltfDocToManifold(document, node);
