@@ -737,68 +737,58 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
             it->RadValues = getRadPair(p1, p2, it->CircleCenter);
 
-            auto connectPair = TopoConnectionPair(*it, e1i, e1Loopi, e2i,
-                                                  e2Loopi, circleIndex++);
-            auto add = [&](TopoConnectionPair pair) {
-              // Ensure Arc start and end direction fit the Loop direction.
-              auto check = [&](const TopoConnectionPair& pair) -> bool {
-                if (e1Loopi == e2Loopi) {
-                  vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
-                                                      pair.ParameterValues[0]),
-                       p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
-                                                      pair.ParameterValues[1]);
+            auto pair = TopoConnectionPair(*it, e1i, e1Loopi, e2i, e2Loopi,
+                                           circleIndex++);
 
-                  vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
-                  if (!invert) {
-                    return la::cross(n1, n2) < EPSILON;
-                  } else {
-                    return la::cross(n1, n2) > EPSILON;
-                  }
-                }
+            // Ensure Arc start and end direction fit the Loop direction.
+            auto check = [&](const TopoConnectionPair& pair) -> bool {
+              vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                                  pair.ParameterValues[0]),
+                   p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
+                                                  pair.ParameterValues[1]);
 
-                return false;
-              };
+              vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
+              if (!invert) {
+                return la::cross(n1, n2) < EPSILON;
+              } else {
+                return la::cross(n1, n2) > EPSILON;
+              }
 
-              if (check(pair)) pair = pair.Swap();
-
-              size_t index = loopOffset[pair.LoopIndex[0]] + pair.EdgeIndex[0];
-
-              auto order = [&](const TopoConnectionPair& a,
-                               const TopoConnectionPair& b) {
-                if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON)
-                  return true;
-                if (a.ParameterValues[0] > b.ParameterValues[0] + EPSILON)
-                  return false;
-
-                bool aEnd = std::abs(a.ParameterValues[0] - 1.0) < EPSILON;
-                bool bEnd = std::abs(b.ParameterValues[0] - 1.0) < EPSILON;
-
-                if (aEnd && bEnd) {
-                  auto n1 = a.CircleCenter - e1Points[1];
-                  auto n2 = b.CircleCenter - e1Points[1];
-                  double det = la::cross(n1, n2);
-
-                  return !invert ? (det < EPSILON) : (det > EPSILON);
-                }
-
-                return false;
-              };
-
-              auto itt = std::find_if(
-                  arcConnection[index].begin(), arcConnection[index].end(),
-                  [&](const TopoConnectionPair& ele) -> bool {
-                    return order(pair, ele);
-                  });
-
-              arcConnection[index].insert(itt, pair);
+              return false;
             };
 
-            add(connectPair);
+            if (check(pair)) pair = pair.Swap();
 
-            if (e1Loopi != e2Loopi) {
-              auto swappedPair = connectPair.Swap();
-              add(connectPair);
-            }
+            size_t index = loopOffset[pair.LoopIndex[0]] + pair.EdgeIndex[0];
+
+            auto order = [&](const TopoConnectionPair& a,
+                             const TopoConnectionPair& b) {
+              if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON)
+                return true;
+              if (a.ParameterValues[0] > b.ParameterValues[0] + EPSILON)
+                return false;
+
+              bool aEnd = std::abs(a.ParameterValues[0] - 1.0) < EPSILON;
+              bool bEnd = std::abs(b.ParameterValues[0] - 1.0) < EPSILON;
+
+              if (aEnd && bEnd) {
+                auto n1 = a.CircleCenter - e1Points[1];
+                auto n2 = b.CircleCenter - e1Points[1];
+                double det = la::cross(n1, n2);
+
+                return !invert ? (det < EPSILON) : (det > EPSILON);
+              }
+
+              return false;
+            };
+
+            auto itt = std::find_if(arcConnection[index].begin(),
+                                    arcConnection[index].end(),
+                                    [&](const TopoConnectionPair& ele) -> bool {
+                                      return order(pair, ele);
+                                    });
+
+            arcConnection[index].insert(itt, pair);
           }
         }
 
@@ -882,7 +872,7 @@ std::vector<CrossSection> Tracing(
 
   std::vector<uint8_t> loopFlag(loops.size(), 0);
 
-  manifold::Polygons resultLoops;
+  Polygons resultLoops;
 
   while (true) {
     SimplePolygon tracingLoop{};
@@ -918,12 +908,12 @@ std::vector<CrossSection> Tracing(
     while (true) {
       // Trace to find next arc on current edge
 
-      const double EPSILON = 1e-6;
+      const double EPS = EPSILON;
 
       auto it = std::find_if(
           arcConnection[getEdgePosition(current)].begin(),
           arcConnection[getEdgePosition(current)].end(),
-          [current, EPSILON](const TopoConnectionPair& ele) -> bool {
+          [current, EPS](const TopoConnectionPair& ele) -> bool {
             return ele.ParameterValues[0] + EPSILON > current.ParameterValue;
           });
 
@@ -966,12 +956,10 @@ std::vector<CrossSection> Tracing(
   }
 
   CrossSection hole;
-  bool invert = false;
-  if (radius < EPSILON) invert = true;
 
   for (size_t i = 0; i != loops.size(); i++) {
     if (loopFlag[i] == 0 &&
-        (invert ^ (CrossSection(Polygons{loops[i]}).Area() > EPSILON))) {
+        (CrossSection(Polygons{loops[i]}).Area() > EPSILON)) {
       SimplePolygon loop = loops[i];
       std::reverse(loop.begin(), loop.end());
       hole = hole.Boolean(CrossSection(Polygons{loop}), manifold::OpType::Add);
