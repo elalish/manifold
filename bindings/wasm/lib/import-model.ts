@@ -53,9 +53,8 @@ export interface Importer {
 
 /**
  * @inline
-
  */
-interface ImportOptions {
+export interface ImportOptions {
   /**
    * Use `mimetype` to determine the format of the imported model, rather than
    * inferring it.
