@@ -70,103 +70,127 @@ void TestPoly(const Polygons& polys, int expectedNumTri,
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 }
 
-void TestFillet(const Polygons& polys, double epsilon = -1.0) {
-  const int inputCircularSegments = 20;
+bool TestFillet(const Polygons& polys, CrossSection input, double radius,
+                int inputCircularSegments) {
+  const int circularSegments = inputCircularSegments > 2
+                                   ? inputCircularSegments
+                                   : Quality::GetCircularSegments(radius);
 
-  manifold::ManifoldParams().verbose = true;
-  std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
-  auto input = CrossSection(polys);
-  auto bbox = input.Bounds().Size();
+  auto r = input.Fillet(radius, circularSegments);
+  auto rc = manifold::CrossSection::Compose(r);
 
-  double min = std::min(bbox.x, bbox.y), max = std::max(bbox.x, bbox.y);
+#ifdef MANIFOLD_DEBUG
+  std::cout << "[==========] Testing radius: " << radius << std::endl;
+#endif
 
-  std::vector<double> radiusVec;
+  EXPECT_TRUE((manifold::CrossSection(polys).Area() == 0) ||
+              (rc.Area() < manifold::CrossSection(polys).Area()));
+
+  auto toRad = [](const vec2& v) -> double { return atan2(v.y, v.x); };
+
+  auto normalizeAngle = [](double angle) -> double {
+    while (angle < 0) angle += 2.0 * M_PI;
+    while (angle >= 2.0 * M_PI) angle -= 2.0 * M_PI;
+    return angle;
+  };
+
+  for (const auto& crossSection : r) {
+    auto polygon = crossSection.ToPolygons();
+    for (const auto& loop : polygon) {
+      const auto& cs = CrossSection(loop);
+
+      bool isCCW = cs.Area() > 0;
+
+      for (size_t i = 0; i != loop.size(); i++) {
+        vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
+             p3 = loop[(i + 2) % loop.size()];
+
+        vec2 e1 = p2 - p1, e2 = p3 - p2;
+
+        // Check angle between edge
+        double angle = normalizeAngle(toRad(e2) - toRad(e1));
+
+        const double dPhi = 2.0 * M_PI / circularSegments;
+
+        // Is the threshold too low?
+        // Specify to Polygon.Fillet.CoincidentHole4
+        EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.1));
+      }
+    }
+  }
+
+  // Use the result run again, check the result is almost same.
+  // Check idempotent
   if (true) {
-    // std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
-    std::array<double, 1> multipliers{1E-3};
-    for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
-      double mmin = *it * min, mmax = *it * max;
-      if (std::abs(mmin - mmax) < 1E-6) {
-        radiusVec.push_back(mmin);
-        // radiusVec.push_back(-1.0 * mmin);
-      } else {
-        radiusVec.push_back(min);
-        // radiusVec.push_back(max);
+    auto rr = rc.Fillet(radius, circularSegments);
+    auto rrc = manifold::CrossSection::Compose(rr);
 
-        // radiusVec.push_back(-1.0 * mmin);
-        // radiusVec.push_back(-1.0 * mmax);
-      }
-    }
+    EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
+  }
+
+  return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
+};
+
+void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
+  manifold::ManifoldParams().verbose = false;
+  std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
+
+  const int inputCircularSegments = 20;
+  const CrossSection input = CrossSection(polys);
+
+#ifdef MANIFOLD_DEBUG
+  if (false) {
+    double radius = 0.5;
+    TestFillet(polys, input, radius, inputCircularSegments);
   } else {
-    radiusVec.push_back(0.7);
-  }
+#endif
 
-  std::sort(radiusVec.begin(), radiusVec.end());
+    const vec2 bbox = input.Bounds().Size();
+    const double min = std::min(bbox.x, bbox.y);
 
-  for (auto it = radiusVec.begin(); it != radiusVec.end(); it++) {
-    const double radius = *it;
+    // Testing Positive Radius
 
-    const int circularSegments = inputCircularSegments > 2
-                                     ? inputCircularSegments
-                                     : Quality::GetCircularSegments(radius);
+    double low = 1E-6, high = 0.8 * min;
 
-    auto r = input.Fillet(radius, circularSegments);
-    auto rc = manifold::CrossSection::Compose(r);
+    TestFillet(polys, input, low, inputCircularSegments);
 
-    auto rrrr = rc.Area();
-    auto rrrrrr = manifold::CrossSection(polys).Area();
+    // Maximum attempt 20 times
+    // Early stop if 10 case result non zero.
+    for (size_t i = 0, j = 0; i != 20 && j != 10; i++) {
+      double mid = low + (high - low) * 0.5;
 
-    EXPECT_TRUE((manifold::CrossSection(polys).Area() == 0) ||
-                (rc.Area() < manifold::CrossSection(polys).Area()));
-
-    auto toRad = [](const vec2& v) -> double { return atan2(v.y, v.x); };
-
-    auto normalizeAngle = [](double angle) -> double {
-      while (angle < 0) angle += 2.0 * M_PI;
-      while (angle >= 2.0 * M_PI) angle -= 2.0 * M_PI;
-      return angle;
-    };
-
-    for (const auto& crossSection : r) {
-      auto polygon = crossSection.ToPolygons();
-      for (const auto& loop : polygon) {
-        const auto& cs = CrossSection(loop);
-
-        bool isCCW = cs.Area() > 0;
-
-        for (size_t i = 0; i != loop.size(); i++) {
-          vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
-               p3 = loop[(i + 2) % loop.size()];
-
-          vec2 e1 = p2 - p1, e2 = p3 - p2;
-
-          // Check angle between edge
-          double angle = normalizeAngle(toRad(e2) - toRad(e1));
-
-          const double dPhi = 2.0 * M_PI / circularSegments;
-          if (angle > M_PI || angle < (dPhi + dPhi * 0.01)) {
-          } else {
-            std::cout << angle << std::endl;
-            std::cout << dPhi + dPhi * 0.01 << std::endl;
-
-            std::cout << p2 << std::endl;
-          }
-
-          // Is the threshold too low?
-          // Specify to Polygon.Fillet.CoincidentHole4
-          EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.1));
-        }
+      // Area non zero
+      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+        low = mid;
+        j++;
+      } else {
+        high = mid;
       }
     }
 
-    // Check idempotent
-    if (false) {
-      auto rr = rc.Fillet(radius, circularSegments);
-      auto rrc = manifold::CrossSection::Compose(rr);
+    // Testing Negative Radius
 
-      EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
+    low = -1E-6, high = -0.8 * min;
+
+    TestFillet(polys, input, low, inputCircularSegments);
+
+    // Maximum attempt 20 times
+    // Early stop if 10 case result non zero.
+    for (size_t i = 0, j = 0; i != 20 && j != 10; i++) {
+      double mid = low + (high - low) * 0.5;
+
+      // Area non zero
+      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+        high = mid;
+        j++;
+      } else {
+        low = mid;
+      }
     }
+
+#ifdef MANIFOLD_DEBUG
   }
+#endif
 }
 
 }  // namespace
@@ -202,7 +226,7 @@ class FilletTestFixture : public testing::Test {
         expectedNumTri(expectedNumTri),
         name(name) {}
 
-  void TestBody() { TestFillet(polys, epsilon); }
+  void TestBody() { BuildFillet(polys, epsilon); }
 };
 
 template <typename TestFixture>
