@@ -378,6 +378,9 @@ IntersectResult intersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End,
   return result;
 }
 
+// Calculate the fillet circle center
+// The distance from edge or vertex to circle center is offset radius.
+// So this can be calculated by intersect of Edge and Arc.
 std::vector<GeomTangentPair> Intersect(const std::array<vec2, 3>& e1Points,
                                        const std::array<vec2, 3>& e2Points,
                                        const double radius, const bool invert) {
@@ -860,7 +863,8 @@ std::vector<CrossSection> Tracing(
     double ParameterValue;
 
     bool operator==(const EdgeLoopPair& o) {
-      return (EdgeIndex == o.EdgeIndex) && (LoopIndex == o.LoopIndex);
+      return (EdgeIndex == o.EdgeIndex) && (LoopIndex == o.LoopIndex) &&
+             (ParameterValue == o.ParameterValue);
     }
 
     bool operator!=(const EdgeLoopPair& o) { return !(*this == o); }
@@ -880,7 +884,9 @@ std::vector<CrossSection> Tracing(
     // Tracing to construct result
     EdgeLoopPair current, end;
 
-    // Find first fillet arc to start
+    // NOTE: Find first fillet arc to start tracing
+    // to avoid start from a edge that can't fit the circle be skipped in the
+    // result.
     auto it = arcConnection.begin();
     for (; it != arcConnection.end(); it++) {
       if (!it->empty()) {
@@ -896,8 +902,6 @@ std::vector<CrossSection> Tracing(
 
         loopFlag[arc.LoopIndex[0]] = 1;
         loopFlag[arc.LoopIndex[1]] = 1;
-
-        it->erase(it->begin());
 
         break;
       }
@@ -918,29 +922,24 @@ std::vector<CrossSection> Tracing(
           });
 
       if (it == arcConnection[getEdgePosition(current)].end()) {
-        // Not found, just add vertex
-        // FIXME: shouldn't add vertex directly, should search for next edge
-        // with fillet arc
-
-        if (current == end) {
-          break;
-        }
+        // Not found, just go to next edge
 
         const auto& loop = loops[current.LoopIndex];
         tracingLoop.push_back(loop[(current.EdgeIndex + 1) % loop.size()]);
 
         current.EdgeIndex = (current.EdgeIndex + 1) % loop.size();
         current.ParameterValue = 0;
-
       } else {
         // Found next circle fillet
 
-        if (current == end && it->ParameterValues[0] > end.ParameterValue) {
+        TopoConnectionPair arc = *it;
+
+        arcConnection[getEdgePosition(current)].erase(it);
+
+        if (EdgeLoopPair{arc.EdgeIndex[0], arc.LoopIndex[0],
+                         arc.ParameterValues[0]} == end) {
           break;
         }
-
-        TopoConnectionPair arc = *it;
-        arcConnection[getEdgePosition(current)].erase(it);
 
         const auto pts = discreteArcToPoint(arc, radius, circularSegments);
         tracingLoop.insert(tracingLoop.end(), pts.begin(), pts.end());
