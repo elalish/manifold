@@ -283,22 +283,39 @@ TEST(Boolean, Perturb2) {
   // Rotate so that nothing is axis-aligned
   Manifold result = cube.Rotate(5, 10, 15);
 
-  // X-coordinate is the triVert index - this polygon is otherwise ignored.
-  Polygons triPoly = {{{0, 0}, {1, 0}, {2, 1}}};
-  const Manifold prism = Manifold::Extrude(triPoly, 1);
-
   for (int tri = 0; tri < cubeGL.NumTri(); ++tri) {
-    Manifold prism1 = prism.Warp([&cubeGL, tri](vec3& v) {
-      const int i = v[0];
-      // Bottom surface meets the cube triangle exactly; the top expands.
-      const double f = v[2] == 0 ? 1 : 2;
-      for (const int j : {0, 1, 2}) {
-        v[j] = f * cubeGL.vertProperties[3 * cubeGL.triVerts[3 * tri + i] + j];
+    MeshGL prism;
+    prism.numProp = 3;
+    prism.triVerts = {4, 2, 0, 1, 3, 5};
+    for (const int v0 : {0, 1, 2}) {
+      const int v1 = (v0 + 1) % 3;
+      const int vIn0 = cubeGL.triVerts[3 * tri + v0];
+      const int vIn1 = cubeGL.triVerts[3 * tri + v1];
+      if (vIn1 > vIn0) {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
+      } else {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v0 + 1);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
       }
-    });
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(2 * cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+    }
     // All verts should be floating-point identical to one of 16 positions: the
     // 8 starting result cube verts, or exactly double these coordinates.
-    result += prism1.Rotate(5, 10, 15);
+    result += Manifold(prism).Rotate(5, 10, 15);
   }
   // The result should be a double-sized cube, 4 units to a side.
   // If symbolic perturbation fails, the number of verts and the surface area

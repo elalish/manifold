@@ -486,10 +486,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // that intersect, and record the direction the edge is passing through the
   // triangle.
   xv12_ = Intersect12(inP, inQ, expandP_, true);
-  PRINT("x12 size = " << xv12_.x12.size());
-
   xv21_ = Intersect12(inP, inQ, expandP_, false);
-  PRINT("x21 size = " << xv21_.x12.size());
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
