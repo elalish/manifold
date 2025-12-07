@@ -276,6 +276,27 @@ TEST(Boolean, Perturb) {
   EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0);
 }
 
+TEST(Boolean, Perturb1) {
+  const Manifold big = Manifold::Extrude(
+      {{{0, 2}, {2, 0}, {4, 2}, {2, 4}}, {{1, 2}, {2, 3}, {3, 2}, {2, 1}}},
+      1.0);
+  const Manifold little =
+      Manifold::Extrude({{{2, 1}, {3, 2}, {2, 3}, {1, 2}}}, 1.0)
+          .Translate({0, 0, 1});
+  const Manifold punchHole =
+      Manifold::Extrude({{{1, 2}, {2, 2}, {2, 3}}}, 1.0).Translate({0, 0, 1});
+  const Manifold result = (big + little) - punchHole;
+
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 24);
+  EXPECT_FLOAT_EQ(result.Volume(), 7.5);
+  EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("perturb1.glb", result.GetMeshGL(), {});
+#endif
+}
+
 TEST(Boolean, Perturb2) {
   Manifold cube = Manifold::Cube(vec3(2), true);
   MeshGL cubeGL = cube.GetMeshGL();
