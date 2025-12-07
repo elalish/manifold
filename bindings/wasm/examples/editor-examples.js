@@ -2,6 +2,7 @@ import auger from '../test/examples/auger.mjs?raw';
 import gearBearing from '../test/examples/gear-bearing.ts?raw';
 import gyroidModule from '../test/examples/gyroid-module.ts?raw';
 import heart from '../test/examples/heart.mjs?raw';
+import importManifold from '../test/examples/import-manifold.ts?raw';
 import intro from '../test/examples/intro.mjs?raw';
 import involuteGearLibrary from '../test/examples/involute-gear-library.ts?raw';
 import mengerSponge from '../test/examples/menger-sponge.mjs?raw';
@@ -26,6 +27,7 @@ examples.set('Gyroid Module', gyroidModule);
 examples.set('Gear Bearing', gearBearing);
 examples.set('involute-gear-library', involuteGearLibrary);
 examples.set('Voronoi', voronoi);
+examples.set('Import Manifold', importManifold);
 
 if (typeof self !== 'undefined') {
   self.examples = examples;
