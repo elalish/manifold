@@ -560,9 +560,6 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
                                          e1Loop[(e1i + 1) % e1Loop.size()],
                                          e1Loop[(e1i + 2) % e1Loop.size()]};
       const vec2 e1 = e1Points[1] - e1Points[0];
-      const bool p2IsConvex = cross(e1, e1Points[2] - e1Points[1]) >= EPSILON;
-
-      const vec2 normal = getEdgeNormal(e1, invert);
 
       // Create BBox
       manifold::Box box(toVec3(e1Points[0]), toVec3(e1Points[1]));
@@ -570,8 +567,9 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         // See
         // https://docs.google.com/presentation/d/1P-3oxmjmEw_Av0rq7q7symoL5VB5DSWpRvqoa3LK7Pg/edit?usp=sharing
 
-        vec2 normalOffsetP1 = e1Points[0] + normal * 2.0 * radius,
-             normalOffsetP2 = e1Points[1] + normal * 2.0 * radius;
+        const vec2 normal = getEdgeNormal(e1, invert),
+                   normalOffsetP1 = e1Points[0] + normal * 2.0 * radius,
+                   normalOffsetP2 = e1Points[1] + normal * 2.0 * radius;
 
         box.Union(toVec3(normalOffsetP1));
         box.Union(toVec3(normalOffsetP2));
@@ -580,10 +578,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         box.Union(toVec3(e1Points[0] - e1n * radius + normal * radius));
         box.Union(toVec3(e1Points[1] + e1n * radius + normal * radius));
 
-        if (!p2IsConvex) {
-          const vec2 pnext = e1Loop[(p2i + 1) % e1Loop.size()],
-                     enext = pnext - e1Points[1], enextn = normalize(enext),
-                     normalnext = normalize(vec2(-enext.y, enext.x));
+        if (!isConvex(e1Points)) {
+          const vec2 enext = e1Points[2] - e1Points[1],
+                     enextn = normalize(enext),
+                     normalnext = getEdgeNormal(enext, invert);
 
           box.Union(toVec3(e1Points[1] + normalnext * 2.0 * radius));
           box.Union(
@@ -764,6 +762,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
             size_t index = loopOffset[pair.LoopIndex[0]] + pair.EdgeIndex[0];
 
+            // Sort by ParameterValue, if on the end then sort by rotate degree
             auto order = [&](const TopoConnectionPair& a,
                              const TopoConnectionPair& b) {
               if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON)
@@ -1022,6 +1021,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   ColliderInfo colliderInfo = BuildCollider(polygons);
 
+#ifdef MANIFOLD_DEBUG
   if (caseIndex == 0) SavePolygons("Testing/Fillet/input.txt", polygons);
 
   resultOutputFile.open("Testing/Fillet/" + std::to_string(caseIndex) + ".txt");
@@ -1033,7 +1033,6 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   }
   caseIndex++;
 
-#ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose) {
     for (size_t i = 0; i != polygons.size(); i++) {
       std::cout << "------ Loop " << i << " START" << std::endl;
@@ -1058,8 +1057,8 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   if (ManifoldParams().verbose) {
     SaveCrossSection(resultOutputFile, result);
   }
-#endif
   resultOutputFile.close();
+#endif
 
   return result;
 }
