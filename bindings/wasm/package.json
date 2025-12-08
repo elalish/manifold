@@ -46,6 +46,7 @@
     },
     "./manifold-encapsulated-types.d.ts": "./manifold-encapsulated-types.d.ts",
     "./manifold-global-types.d.ts": "./manifold-global-types.d.ts",
+    "./manifoldCAD.js": "./lib/manifoldCAD.js",
     "./manifoldCAD": {
       "import": {
         "types": "./dist/manifoldCAD.d.ts",
