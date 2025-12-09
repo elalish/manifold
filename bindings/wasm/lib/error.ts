@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {BuildFailure, Location, Message} from 'esbuild';
+import type {BuildFailure, Location, Message} from 'esbuild-wasm';
 
 export class BundlerError extends Error {
   location?: Location;
@@ -25,7 +25,10 @@ export class BundlerError extends Error {
     this.error = failure.errors[0];
 
     if (this.error.location) {
-      const {file, line, column} = this.error.location!;
+      let {file, line, column} = this.error.location!;
+      // FIXME Given that we insert metadata into each file, we need to run this
+      // through sourcemap.
+      line--;
       this.manifoldStack =
           `${this.toString()}\n    at ${file}:${line}:${column}`;
     }
@@ -58,12 +61,13 @@ export class UnsupportedFormatError extends Error {
   constructor(
       identifier: string,
       supported: Array<{mimetype: string, extension: string}>) {
+    console.log(JSON.stringify(supported, null, 2))
     const typeList =
         supported
-            .map(entry => {`\`${entry.mimetype}\` (\'.${entry.extension}\.)`})
+            .map(entry => `\`${entry.mimetype}\` (\`.${entry.extension}\`)`)
             .reduceRight(
                 (prev, cur, index, arr) => cur +
-                    ((index > 0 || arr.length < 2) ? ', or ' : ', ') + prev);
+                    ((index > 0 || arr.length <= 2) ? ', or ' : ', ') + prev);
     super(
         `Unsupported format \`${identifier}\`.  ` +
         `Must be one of ${typeList}`);

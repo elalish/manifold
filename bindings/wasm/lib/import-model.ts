@@ -146,7 +146,7 @@ export function register(importer: Importer) {
  * @returns
  */
 export async function importModel(
-    source: string|Blob,
+    source: string|Blob|URL,
     options: ImportOptions = {}): Promise<VisualizationGLTFNode> {
   const sourceDoc = await readModel(source, options);
 
@@ -187,7 +187,7 @@ export async function importModel(
  * @group Modelling Functions
  */
 export async function importManifold(
-    source: string|Blob, options: ImportOptions = {}): Promise<Manifold> {
+    source: string|Blob|URL, options: ImportOptions = {}): Promise<Manifold> {
   const {document, node} = await importModel(source, options);
   try {
     return gltfDocToManifold(document, node, options.tolerance);
@@ -205,36 +205,43 @@ export async function importManifold(
  * @group Low Level Functions
  **/
 export async function readModel(
-    source: string|Blob,
+    source: string|Blob|URL,
     options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   if (source instanceof Blob) {
     // Binary blob.
     return await fromBlob(source, options);
   }
 
-  if ('string' === typeof source) {
-    if (source.startsWith('data:') || source.startsWith('blob:')) {
+  let path: string|null = null;
+  if (source instanceof URL) {
+    path = source.href;
+  } else if ('string' === typeof source) {
+    path = source;
+  }
+
+  if (path) {
+    if (path.startsWith('data:') || path.startsWith('blob:')) {
       // Fetch can probably handle this.
-      return await fetchModel(source, options);
+      return await fetchModel(path, options);
 
-    } else if (/^https?:\/\//.test(source)) {
+    } else if (/^https?:\/\//.test(path)) {
       // Absolute URL.
-      return await fetchModel(source, options);
+      return await fetchModel(path, options);
 
-    } else if (source.startsWith('file:')) {
+    } else if (path.startsWith('file:')) {
       // File URL.
-      return readFile(source, options);
+      return readFile(path, options);
 
     } else {
       // Relative URL.
       if (isNode()) {
         // In node, assume it's relative to the current working directory.
         // That may not be the same as relative to the source file.
-        return await readFile(source, options);
+        return await readFile(path, options);
 
       } else {
         // In the browser, it's relative to the current URL.
-        return await fetchModel(source, options);
+        return await fetchModel(path, options);
       }
     }
   }
@@ -288,7 +295,11 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
   }
   const importer = getImporter(options.mimetype ?? filename);
   const fs = await import('node:fs/promises');
-  const buffer = await fs.readFile(filename);
+  const {fileURLToPath} = await import('node:url');
+
+  const path =
+      filename.startsWith('file:') ? fileURLToPath(filename) : filename;
+  const buffer = await fs.readFile(path);
   return await importer.fromArrayBuffer(buffer);
 }
 

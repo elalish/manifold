@@ -158,4 +158,13 @@ suite('Examples', () => {
     expect(result?.volume).to.be.greaterThan(5000, 'Volume');
     expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
   });
+
+  test('Import Manifold', async () => {
+    const result = await runExample('Import Manifold');
+    expect(result?.genus).to.equal(3, 'Genus');
+    // There are a 1e9 cubic millimeters in a cubic metre.
+    // They add up fast.
+    expect(result?.volume).to.be.closeTo(2.10e15, 1e13, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(1.67e11, 1e9, 'Surface Area');
+  });
 });

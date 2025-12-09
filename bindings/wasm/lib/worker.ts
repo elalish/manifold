@@ -81,6 +81,7 @@ export namespace MessageToWorker {
     jsCDN?: string;
     fetchRemotePackages?: boolean;
     files?: Record<string, string>;
+    baseUrl?: string;
   }
 
   /**
@@ -178,6 +179,7 @@ export interface evaluateOptions {
   doNotBundle?: boolean;
   jsCDN?: string;
   fetchRemotePackages?: boolean;
+  baseUrl?: string;
 }
 
 /**
@@ -234,6 +236,10 @@ export async function evaluate(
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,
     _manifold_cad_library: manifoldImport,
+
+    // Bundled code may be referencing files by relative paths.
+    // Set runtime value of import.meta.main
+    _manifold_runtime_url: options.baseUrl ?? null,
 
     // While this project is built using ES modules, and we assume models and
     // libraries are ES modules, code executed via `new Function()` or `eval` is
