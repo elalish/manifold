@@ -23,14 +23,14 @@ const csg = async () => {
   // paths that works inside manifoldCAD.  It also works in node.js (after v21)
   // and most modern browsers, albeit with slightly different results.
   //
-  // On disk, `import.meta.url` is the absolute url of the source file. Included
-  // files can reference assets by relative paths, and we'll still be able to
-  // find them.
+  // On disk, `import.meta.url` is the absolute url of the file containing the
+  // reference.  For example, `new URL('./model.glb', import.meta.url)` will
+  // resolve to a file named `model.glb` in the same directory as the file
+  // asking for it.
   //
-  // In a browser as there is no filesystem.  By default, `import.meta.main`
-  // will be set to the location of the browser.  On manifoldCAD.org, this means
-  // that relative URLs are resolved using `https://manifoldcad.org/` as the
-  // base URL.
+  // In a browser as there is no filesystem.  By default, `import.meta.url`
+  // will be set to the tab URL.  On manifoldCAD.org, this means that relative
+  // URLs are resolved using `https://manifoldcad.org/` as the base URL.
   const moon =
       await importManifold(new URL('./models/moon.glb', import.meta.url));
   const space =
@@ -47,7 +47,6 @@ const csg = async () => {
   const arranged = geometry.reduce((acc: Manifold, cur: Manifold) => {
     // Place accumulated product to the left (x-), with the right side at x=0.
     // The left side of the current object will be on the right, after a gap.
-    // They will not overlap, so `compose()` is preferable over `union()`.
     //
     // The end result will not be centred in model space.  That's fine as
     // the model viewer will centre it for display.
