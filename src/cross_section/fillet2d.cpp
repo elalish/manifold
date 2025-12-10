@@ -550,6 +550,10 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         e2Points{e2Loop[e2i], e2Loop[(e2i + 1) % e2Loop.size()],
                  e2Loop[(e2i + 2) % e2Loop.size()]};
 
+    // FIXME: why still need this????
+    // Skip self
+    if (e1Loopi == e2Loopi && e2i == e1i) continue;
+
 #ifdef MANIFOLD_DEBUG
     if (ManifoldParams().verbose) {
       std::cout << std::endl
@@ -695,27 +699,21 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     }
   }
 
-  for (size_t i = 0; i != adjacentList.size(); i++) {
-    std::cout << i << " ";
-    for (size_t j = 0; j != adjacentList[i].size(); j++) {
-      std::cout << adjacentList[i][j] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << std::endl;
-  std::cout << std::endl;
-
   auto findNewIdx = [&](size_t loopIndex, size_t edgeIndex,
                         double param) -> size_t {
     size_t oldIdx = loopOffsetVec[loopIndex] + edgeIndex;
 
     bool end = std::abs(param - 1.0) < EPSILON;
-    if (end)
-      return (prefixEdgeCount[oldIdx] + perEdgeCount[oldIdx]) % newEdgeCount;
+    if (end) {
+      if (edgeIndex + 1 == loops[loopIndex].size())
+        return prefixEdgeCount[oldIdx];
+      else
+        return prefixEdgeCount[oldIdx] + perEdgeCount[oldIdx];
+    }
 
     auto& vec = paramVec[oldIdx];
 
-    return prefixEdgeCount[oldIdx] +
+    return prefixEdgeCount[oldIdx] + 1 +
            std::distance(vec.begin(), std::find(vec.begin(), vec.end(), param));
   };
 
@@ -746,22 +744,24 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
     return false;
   };
+
   size_t idx = 0;
   for (auto it = globalFilletCircles.begin(); it != globalFilletCircles.end();
        it++) {
     idx++;
-    if (idx == 7) {
-      size_t i = 0;
-    }
 
     auto pair = *it;
     if (check(pair)) pair = pair.Swap();
 
-    size_t idx0 = findNewIdx(pair.LoopIndex[0], pair.EdgeIndex[0],
-                             pair.ParameterValues[0]),
-           idx1 = findNewIdx(pair.LoopIndex[1], pair.EdgeIndex[1],
-                             pair.ParameterValues[1]);
-    adjacentList[idx0].push_back(idx1);
+    if (pair.EdgeIndex[0] == 0 && pair.EdgeIndex[1] == 1) {
+      size_t i = 0;
+    }
+
+    size_t fromIdx = findNewIdx(pair.LoopIndex[0], pair.EdgeIndex[0],
+                                pair.ParameterValues[0]),
+           toIdx = findNewIdx(pair.LoopIndex[1], pair.EdgeIndex[1],
+                              pair.ParameterValues[1]);
+    adjacentList[fromIdx].push_back(toIdx);
   }
 
   // Helper function to find cycles in the adjacentList
