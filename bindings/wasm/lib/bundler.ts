@@ -14,7 +14,6 @@
 
 import resolve from '@jridgewell/resolve-uri';
 import * as esbuild from 'esbuild-wasm';
-import getRelativePath from 'get-relative-path';
 import MagicString from 'magic-string';
 
 import {BundlerError} from './error.ts';
@@ -63,13 +62,9 @@ function log(...args: any[]) {
 }
 
 const insertMetaData =
-    (text: string, sourceUrl?: string, baseUrl?: string) => {
+    (text: string, sourceUrl?: string) => {
       if (sourceUrl) {
         const st = new MagicString(text);
-        if (baseUrl) {
-          const rel = getRelativePath(baseUrl, sourceUrl);
-          console.log({baseUrl, sourceUrl, rel});
-        }
         st.prepend(`const _import_meta_url=_manifold_runtime_url ?? '${
             sourceUrl}';\n`);
 
@@ -180,7 +175,6 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
           resolveDir: args.resolveDir.endsWith('/') ? args.resolveDir :
                                                       `${args.resolveDir}/`
         };
-        console.log(args, result)
         return result;
       }
 
@@ -255,9 +249,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         (args): esbuild.OnLoadResult => {
           const text = (options.files!)[args.path];
 
-          const contents = insertMetaData(
-              text, `file://${args.path}`,
-              `file://${args.pluginData?.resolveDir}`);
+          const contents = insertMetaData(text, `file://${args.path}`);
           const loader = (args.path.match(/\.js$/)) ? 'js' : 'ts';
           return {contents, loader};
         });
@@ -268,12 +260,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
           const fs = await import('node:fs/promises');
           const text = await fs.readFile(args.path, 'utf8');
 
-          // console.log(args)
-
-
-          const contents = insertMetaData(
-              text, `file://${args.path}`,
-              `file://${options?.resolveDir ?? args.pluginData?.resolveDir}`);
+          const contents = insertMetaData(text, `file://${args.path}`);
           const loader = (args.path.match(/\.js$/)) ? 'js' : 'ts';
           return {contents, loader};
         });
@@ -321,12 +308,6 @@ const getEsbuildConfig =
 export const bundleFile = async(
     entrypoint: string, options: BundlerOptions = {}): Promise<string> => {
   try {
-    if (!options.resolveDir && isNode()) {
-      // const {dirname, resolve} = await import('node:path');
-      options.resolveDir =
-          process.cwd() + '/';  // dirname(resolve(entrypoint)) + '/';
-    }
-    console.log({options})
     const built = await esbuild.build({
       ...(await getEsbuildConfig({...options, filename: entrypoint})),
       entryPoints: [entrypoint],
@@ -349,12 +330,10 @@ export const bundleCode =
       const {dirname} = await import('node:path');
       resolveDir = options.resolveDir ?? dirname(options.filename);
     }
-    // console.log({options})
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
       stdin: {
-        contents: insertMetaData(
-            code, `file://${options.filename}`, `file://${resolveDir}`),
+        contents: insertMetaData(code, `file://${options.filename}`),
         sourcefile: options.filename,
         resolveDir,
         loader: 'ts',
