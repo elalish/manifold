@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <vector>
 
@@ -73,8 +74,7 @@ struct GeomTangentPair {
 struct TopoConnectionPair {
   TopoConnectionPair(const GeomTangentPair& geomPair, size_t Edge1Index,
                      size_t Edge1LoopIndex, size_t Edge2Index,
-                     size_t Edge2LoopIndex, size_t index)
-      : Index(index) {
+                     size_t Edge2LoopIndex) {
     CircleCenter = geomPair.CircleCenter;
     ParameterValues = geomPair.ParameterValues;
     RadValues = geomPair.RadValues;
@@ -82,8 +82,6 @@ struct TopoConnectionPair {
     EdgeIndex = std::array<size_t, 2>{Edge1Index, Edge2Index};
     LoopIndex = std::array<size_t, 2>{Edge1LoopIndex, Edge2LoopIndex};
   }
-
-  size_t Index;
 
   vec2 CircleCenter;
   std::array<double, 2> ParameterValues;
@@ -527,16 +525,17 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     const Polygons& loops, const std::vector<size_t>& loopOffsetVec,
     const size_t edgeCount, const std::vector<EdgePair>& intersectEdgePair,
     double radius, bool invert) {
-  size_t circleIndex = 0;
-
   std::vector<std::vector<TopoConnectionPair>> arcConnection(
       edgeCount, std::vector<TopoConnectionPair>());
 
   resultOutputFile << std::setprecision(
                           std::numeric_limits<double>::max_digits10)
                    << radius << std::endl;
+
   std::vector<vec2> removedCircleCenter;
   std::vector<vec2> resultCircleCenter;
+
+  std::vector<TopoConnectionPair> globalFilletCircles;
 
   for (auto it = intersectEdgePair.begin(); it != intersectEdgePair.end();
        it++) {
@@ -544,6 +543,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
                  e2Loopi = it->LoopIndex[1], e2i = it->EdgeIndex[1];
 
     const auto &e1Loop = loops[e1Loopi], e2Loop = loops[e2Loopi];
+
     const std::array<vec2, 3> e1Points{e1Loop[e1i],
                                        e1Loop[(e1i + 1) % e1Loop.size()],
                                        e1Loop[(e1i + 2) % e1Loop.size()]},
@@ -554,13 +554,13 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     if (ManifoldParams().verbose) {
       std::cout << std::endl
                 << "Now " << e1Points[0] << " -> " << e1Points[1] << std::endl;
+
+      std::cout << "-----------" << std::endl
+                << e2Points[0] << " -> " << e2Points[1] << std::endl;
+
+      std::cout << "std::array<size_t, 4> vBreakPoint{" << e1Loopi << ", "
+                << e1i << ", " << e2Loopi << ", " << e2i << "}; " << std::endl;
     }
-#endif
-
-    // Skip self
-    if (e1Loopi == e2Loopi && e2i == e1i) continue;
-
-#ifdef MANIFOLD_DEBUG
 
     std::array<size_t, 4> vBreakPoint{0, 1, 1, 1};
 
@@ -569,86 +569,75 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
       int i = 0;
     }
 
-    if (ManifoldParams().verbose) {
-      std::cout << "-----------" << std::endl
-                << e2Points[0] << " -> " << e2Points[1] << std::endl;
-
-      std::cout << "std::array<size_t, 4> vBreakPoint{" << e1Loopi << ", "
-                << e1i << ", " << e2Loopi << ", " << e2i << "}; " << std::endl;
-    }
 #endif
 
     std::vector<GeomTangentPair> filletCircles;
 
     // NOTE: Calculate fillet intersection center
     filletCircles = Intersect(e1Points, e2Points, radius, invert);
-
     // TODO: use the intersection result to remove global collision.
 
     // NOTE: Map GeomTangentPair to TopoConnectionPair for Topo Building
-    {
-      for (auto it = filletCircles.begin(); it != filletCircles.end(); it++) {
+    for (auto it = filletCircles.begin(); it != filletCircles.end(); it++) {
+      vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                          it->ParameterValues[0]),
+           p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
+                                          it->ParameterValues[1]);
+
+      it->RadValues = getRadPair(p1, p2, it->CircleCenter);
+
+      auto pair = TopoConnectionPair(*it, e1i, e1Loopi, e2i, e2Loopi);
+
+      globalFilletCircles.push_back(pair);
+
+      // Ensure Arc start and end direction fit the Loop direction.
+      auto check = [&](const TopoConnectionPair& pair) -> bool {
         vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
-                                            it->ParameterValues[0]),
+                                            pair.ParameterValues[0]),
              p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
-                                            it->ParameterValues[1]);
+                                            pair.ParameterValues[1]);
 
-        it->RadValues = getRadPair(p1, p2, it->CircleCenter);
+        vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
+        if (!invert) {
+          return la::cross(n1, n2) < EPSILON;
+        } else {
+          return la::cross(n1, n2) > EPSILON;
+        }
 
-        auto pair =
-            TopoConnectionPair(*it, e1i, e1Loopi, e2i, e2Loopi, circleIndex++);
+        return false;
+      };
 
-        // Ensure Arc start and end direction fit the Loop direction.
-        auto check = [&](const TopoConnectionPair& pair) -> bool {
-          vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
-                                              pair.ParameterValues[0]),
-               p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
-                                              pair.ParameterValues[1]);
+      if (check(pair)) pair = pair.Swap();
 
-          vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
-          if (!invert) {
-            return la::cross(n1, n2) < EPSILON;
-          } else {
-            return la::cross(n1, n2) > EPSILON;
-          }
+      size_t index = loopOffsetVec[pair.LoopIndex[0]] + pair.EdgeIndex[0];
 
-          return false;
-        };
+      // Sort by ParameterValue, if on the end then sort by rotate degree
+      auto order = [&](const TopoConnectionPair& a,
+                       const TopoConnectionPair& b) {
+        if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON) return true;
+        if (a.ParameterValues[0] > b.ParameterValues[0] + EPSILON) return false;
 
-        if (check(pair)) pair = pair.Swap();
+        bool aEnd = std::abs(a.ParameterValues[0] - 1.0) < EPSILON;
+        bool bEnd = std::abs(b.ParameterValues[0] - 1.0) < EPSILON;
 
-        size_t index = loopOffsetVec[pair.LoopIndex[0]] + pair.EdgeIndex[0];
+        if (aEnd && bEnd) {
+          auto n1 = a.CircleCenter - e1Points[1];
+          auto n2 = b.CircleCenter - e1Points[1];
+          double det = la::cross(n1, n2);
 
-        // Sort by ParameterValue, if on the end then sort by rotate degree
-        auto order = [&](const TopoConnectionPair& a,
-                         const TopoConnectionPair& b) {
-          if (a.ParameterValues[0] < b.ParameterValues[0] - EPSILON)
-            return true;
-          if (a.ParameterValues[0] > b.ParameterValues[0] + EPSILON)
-            return false;
+          return !invert ? (det < EPSILON) : (det > EPSILON);
+        }
 
-          bool aEnd = std::abs(a.ParameterValues[0] - 1.0) < EPSILON;
-          bool bEnd = std::abs(b.ParameterValues[0] - 1.0) < EPSILON;
+        return false;
+      };
 
-          if (aEnd && bEnd) {
-            auto n1 = a.CircleCenter - e1Points[1];
-            auto n2 = b.CircleCenter - e1Points[1];
-            double det = la::cross(n1, n2);
+      auto itt =
+          std::find_if(arcConnection[index].begin(), arcConnection[index].end(),
+                       [&](const TopoConnectionPair& ele) -> bool {
+                         return order(pair, ele);
+                       });
 
-            return !invert ? (det < EPSILON) : (det > EPSILON);
-          }
-
-          return false;
-        };
-
-        auto itt = std::find_if(arcConnection[index].begin(),
-                                arcConnection[index].end(),
-                                [&](const TopoConnectionPair& ele) -> bool {
-                                  return order(pair, ele);
-                                });
-
-        arcConnection[index].insert(itt, pair);
-      }
+      arcConnection[index].insert(itt, pair);
     }
 
 #ifdef MANIFOLD_DEBUG
@@ -660,8 +649,197 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 #endif
   }
 
+  std::vector<std::set<double>> paramVec(edgeCount);
+  std::vector<size_t> perEdgeCount(edgeCount, 1);
+
+  for (auto it = globalFilletCircles.begin(); it != globalFilletCircles.end();
+       it++) {
+    size_t index0 = loopOffsetVec[it->LoopIndex[0]] + it->EdgeIndex[0],
+           index1 = loopOffsetVec[it->LoopIndex[1]] + it->EdgeIndex[1];
+
+    bool end0 = std::abs(it->ParameterValues[0] - 1.0) < EPSILON,
+         end1 = std::abs(it->ParameterValues[1] - 1.0) < EPSILON;
+
+    if (!end0) {
+      perEdgeCount[index0]++;
+
+      paramVec[index0].insert(it->ParameterValues[0]);
+    }
+    if (!end1) {
+      perEdgeCount[index1]++;
+      paramVec[index1].insert(it->ParameterValues[1]);
+    }
+  }
+
+  std::vector<size_t> prefixEdgeCount(edgeCount);
+  manifold::exclusive_scan(perEdgeCount.begin(), perEdgeCount.end(),
+                           prefixEdgeCount.begin());
+
+  const size_t newEdgeCount = prefixEdgeCount.back() + perEdgeCount.back();
+
+  std::vector<std::vector<size_t>> adjacentList(newEdgeCount);
+
+  for (size_t i = 0; i != loops.size(); i++) {
+    for (size_t j = 0; j != loops[i].size(); j++) {
+      size_t oldIdx = loopOffsetVec[i] + j;
+      size_t newEdgeSize = perEdgeCount[oldIdx];
+
+      for (size_t k = 0; k != newEdgeSize; k++) {
+        size_t newIdx = (prefixEdgeCount[oldIdx] + k);
+
+        if (j + 1 == loops[i].size() && k + 1 == newEdgeSize)
+          adjacentList[newIdx].push_back(loopOffsetVec[i]);
+        else
+          adjacentList[newIdx].push_back(newIdx + 1);
+      }
+    }
+  }
+
+  for (size_t i = 0; i != adjacentList.size(); i++) {
+    std::cout << i << " ";
+    for (size_t j = 0; j != adjacentList[i].size(); j++) {
+      std::cout << adjacentList[i][j] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+
+  auto findNewIdx = [&](size_t loopIndex, size_t edgeIndex,
+                        double param) -> size_t {
+    size_t oldIdx = loopOffsetVec[loopIndex] + edgeIndex;
+
+    bool end = std::abs(param - 1.0) < EPSILON;
+    if (end)
+      return (prefixEdgeCount[oldIdx] + perEdgeCount[oldIdx]) % newEdgeCount;
+
+    auto& vec = paramVec[oldIdx];
+
+    return prefixEdgeCount[oldIdx] +
+           std::distance(vec.begin(), std::find(vec.begin(), vec.end(), param));
+  };
+
+  // Ensure Arc start and end direction fit the Loop direction.
+  auto check = [&](const TopoConnectionPair& pair) -> bool {
+    const auto &e1Loop = loops[pair.LoopIndex[0]],
+               e2Loop = loops[pair.LoopIndex[1]];
+
+    size_t e1i = pair.EdgeIndex[0], e2i = pair.EdgeIndex[1];
+
+    const std::array<vec2, 3> e1Points{e1Loop[e1i],
+                                       e1Loop[(e1i + 1) % e1Loop.size()],
+                                       e1Loop[(e1i + 2) % e1Loop.size()]},
+        e2Points{e2Loop[e2i], e2Loop[(e2i + 1) % e2Loop.size()],
+                 e2Loop[(e2i + 2) % e2Loop.size()]};
+
+    vec2 p1 = getPointOnEdgeByParameter(e1Points[0], e1Points[1],
+                                        pair.ParameterValues[0]),
+         p2 = getPointOnEdgeByParameter(e2Points[0], e2Points[1],
+                                        pair.ParameterValues[1]);
+
+    vec2 n1 = p1 - pair.CircleCenter, n2 = p2 - pair.CircleCenter;
+    if (!invert) {
+      return la::cross(n1, n2) < EPSILON;
+    } else {
+      return la::cross(n1, n2) > EPSILON;
+    }
+
+    return false;
+  };
+  size_t idx = 0;
+  for (auto it = globalFilletCircles.begin(); it != globalFilletCircles.end();
+       it++) {
+    idx++;
+    if (idx == 7) {
+      size_t i = 0;
+    }
+
+    auto pair = *it;
+    if (check(pair)) pair = pair.Swap();
+
+    size_t idx0 = findNewIdx(pair.LoopIndex[0], pair.EdgeIndex[0],
+                             pair.ParameterValues[0]),
+           idx1 = findNewIdx(pair.LoopIndex[1], pair.EdgeIndex[1],
+                             pair.ParameterValues[1]);
+    adjacentList[idx0].push_back(idx1);
+  }
+
+  // Helper function to find cycles in the adjacentList
+  auto getCycles = [&](const std::vector<std::vector<size_t>>& adj) {
+    size_t n = adj.size();
+    std::vector<std::vector<size_t>> cycles;
+
+    // 0: Unvisited, 1: Visiting (in stack), 2: Visited
+    std::vector<int> state(n, 0);
+    std::vector<size_t> parent(n, 0);
+    std::vector<size_t> edgeIter(n, 0);  // Tracks progress for each node
+    std::vector<size_t> stack;
+
+    stack.reserve(n);
+
+    for (size_t i = 0; i < n; ++i) {
+      if (state[i] != 0) continue;
+
+      stack.push_back(i);
+      state[i] = 1;
+
+      while (!stack.empty()) {
+        size_t u = stack.back();
+
+        if (edgeIter[u] < adj[u].size()) {
+          size_t v = adj[u][edgeIter[u]];
+          edgeIter[u]++;
+
+          if (state[v] == 1) {
+            // Found a cycle! Reconstruct path from u back to v
+            std::vector<size_t> currentCycle;
+            size_t curr = u;
+            while (curr != v) {
+              currentCycle.push_back(curr);
+              curr = parent[curr];
+            }
+            currentCycle.push_back(v);
+
+            // Reverse to get correct direction (v -> ... -> u)
+            std::reverse(currentCycle.begin(), currentCycle.end());
+            cycles.push_back(std::move(currentCycle));
+          } else if (state[v] == 0) {
+            state[v] = 1;
+            parent[v] = u;
+            stack.push_back(v);
+            continue;  // "Recurse" immediately
+          }
+        } else {
+          // Finished processing u
+          state[u] = 2;
+          stack.pop_back();
+        }
+      }
+    }
+    return cycles;
+  };
+
+  for (size_t i = 0; i != adjacentList.size(); i++) {
+    std::cout << i << " ";
+    for (size_t j = 0; j != adjacentList[i].size(); j++) {
+      std::cout << adjacentList[i][j] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+
+  std::vector<std::vector<size_t>> resultCycles = getCycles(adjacentList);
+
+  for (size_t i = 0; i != resultCycles.size(); i++) {
+    for (size_t j = 0; j != resultCycles[i].size(); j++) {
+      std::cout << resultCycles[i][j] << " ";
+    }
+    std::cout << std::endl;
+  }
+
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose) {
+  if (true && ManifoldParams().verbose) {
     resultOutputFile << removedCircleCenter.size() << std::endl;
     for (const auto& e : removedCircleCenter) {
       resultOutputFile << e.x << " " << e.y << std::endl;
@@ -676,8 +854,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     for (size_t i = 0; i != arcConnection.size(); i++) {
       std::cout << i << " " << arcConnection[i].size();
       for (size_t j = 0; j != arcConnection[i].size(); j++) {
-        std::cout << "\t Index:" << arcConnection[i][j].Index << " ["
-                  << arcConnection[i][j].LoopIndex[0] << ", "
+        std::cout << "\t  [" << arcConnection[i][j].LoopIndex[0] << ", "
                   << arcConnection[i][j].EdgeIndex[0] << "] ["
                   << arcConnection[i][j].LoopIndex[1] << ", "
                   << arcConnection[i][j].EdgeIndex[1] << "] \t Param # "
