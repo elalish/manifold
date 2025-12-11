@@ -93,18 +93,28 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     let manifoldCADExportPath: string|null = null;
     const manifoldCADExportSpecifier = 'manifold-3d/manifoldCAD'
     const ManifoldCADExportMatch = /^manifold-3d\/manifoldCAD(.ts|.js)?$/
-    const manifoldCADExportNames = [ // FIXME update this list.
+    const manifoldCADExportNames = [
       // Manifold classes.
       'Mesh', 'Manifold', 'CrossSection',
       // Manifold methods.
-      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'getCircularSegments', 'resetToCircularDefaults', 'triangulate',
+      'triangulate',
+
       // Scene builder exports.
-      'show', 'only', 'setMaterial', 'setMorphStart', 'setMorphEnd',
+      'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
-      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes', 'VisualizationGLTFNode',
+      'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
       // Import
       'importModel', 'importManifold',
+      // Getters for global properties
+      'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
+      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
+      // Setters for global properties.
+      // These will only be defined for top level scripts
+      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+      'resetToCircularDefaults', 'setMorphStart', 'setMorphEnd',
+      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
+      'resetGLTFNodes',
+
       // ManifoldCAD specific exports.
       'isManifoldCAD'
     ];
