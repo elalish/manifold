@@ -62,8 +62,8 @@ export interface ImportOptions {
    */
   mimetype?: string;
   /**
-   * Tolerance for mesh simplification.  Any edge smaller than tolerance may be
-   * collapsed.
+   * When an imported model is not manifold, try closing gaps smaller than
+   * tolerance in an effort to make it manifold.
    */
   tolerance?: number;
 }

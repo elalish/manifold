@@ -112,12 +112,12 @@ export class GLTFNodeTracked extends GLTFNode {
 }
 
 /**
- * Position an imported model for later export.
- * _Non-manifold_ is over stating the case; _not-necessarily-manifold_ may be a
- * better description. At any rate, these nodes contain models that will be
- * exported into the final GLTF document.  They have not been converted into
- * Manifold objects, and cannot be modified -- only transformed (rotation,
- * scale, translation) and displayed.
+ * Include an imported model for visualization purposes.
+ *
+ * These nodes contain models that will be exported into the final GLTF
+ * document.  They have not been converted into Manifold objects and cannot be
+ * modified. They can only be transformed (rotation, scale, translation) or
+ * displayed.
  *
  * This is useful for viewing ManifoldCAD models in the context of a larger
  * assembly.
@@ -172,6 +172,9 @@ export const resetGLTFNodes = () => {
   nodes.length = 0;
 };
 
+/**
+ * @internal
+ */
 export const cleanup = () => {
   resetGLTFNodes();
 };
