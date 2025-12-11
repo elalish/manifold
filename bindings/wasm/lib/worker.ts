@@ -238,7 +238,7 @@ export async function evaluate(
     _manifold_cad_library: manifoldImport,
 
     // Bundled code may be referencing files by relative paths.
-    // Set runtime value of import.meta.main
+    // Set runtime value of import.meta.url
     _manifold_runtime_url: options.baseUrl ?? null,
 
     // While this project is built using ES modules, and we assume models and
