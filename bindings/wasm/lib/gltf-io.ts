@@ -450,10 +450,10 @@ const getIO = (): GLTFTransform.PlatformIO => {
 };
 
 export async function toArrayBuffer(doc: GLTFTransform.Document):
-    Promise<Uint8Array<ArrayBufferLike>> {
-  return await getIO().writeBinary(doc) as Uint8Array<ArrayBufferLike>;
+    Promise<ArrayBuffer> {
+  return (await getIO().writeBinary(doc)).buffer as ArrayBuffer;
 }
 
-export async function fromArrayBuffer(buffer: Uint8Array<ArrayBufferLike>) {
-  return await getIO().readBinary(buffer);
+export async function fromArrayBuffer(buffer: ArrayBuffer) {
+  return await getIO().readBinary(new Uint8Array(buffer));
 }

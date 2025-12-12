@@ -79,8 +79,7 @@ const defaultHeader: Header = {
  * @returns A blob containing the converted model.
  */
 export async function toArrayBuffer(
-    doc: GLTFTransform.Document,
-    header: Header = {}): Promise<Uint8Array<ArrayBufferLike>> {
+    doc: GLTFTransform.Document, header: Header = {}): Promise<ArrayBuffer> {
   const to3mf = {
     meshes: [],
     components: [],
@@ -196,11 +195,11 @@ export async function toArrayBuffer(
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
   files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
-  return zipFile;
+  return zipFile.buffer as ArrayBuffer;
 };
 
 export async function toBlob(doc: GLTFTransform.Document, header: Header = {}) {
-  const buffer: Uint8Array<ArrayBufferLike> = await toArrayBuffer(doc, header);
-  return new Blob(
-      [buffer as Uint8Array<ArrayBuffer>], {type: supportedFormat.mimetype});
+  const buffer =
+      new Uint8Array(await toArrayBuffer(doc, header) as ArrayBuffer);
+  return new Blob([buffer], {type: supportedFormat.mimetype});
 }

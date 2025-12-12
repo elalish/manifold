@@ -48,8 +48,7 @@ interface Format {
 
 export interface Importer {
   importFormats: Array<Format>;
-  fromArrayBuffer:
-      (buffer: Uint8Array<ArrayBufferLike>) => Promise<GLTFTransform.Document>;
+  fromArrayBuffer: (buffer: ArrayBuffer) => Promise<GLTFTransform.Document>;
 }
 
 /**
@@ -259,7 +258,7 @@ export async function fetchModel(
   const importer = getImporter(options.mimetype ?? uri);
   const response = await fetch(uri);
   const blob = await response.blob();
-  return await importer.fromArrayBuffer(await blob.bytes());
+  return await importer.fromArrayBuffer(await blob.arrayBuffer());
 }
 
 /**
@@ -270,7 +269,7 @@ export async function fetchModel(
 export async function fromBlob(
     blob: Blob, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? blob.type);
-  return await importer.fromArrayBuffer(await blob.bytes());
+  return await importer.fromArrayBuffer(await blob.arrayBuffer());
 }
 
 /**
@@ -279,8 +278,7 @@ export async function fromBlob(
  * @group Low Level Functions
  **/
 export async function fromArrayBuffer(
-    buffer: Uint8Array<ArrayBufferLike>,
-    identifier: string): Promise<GLTFTransform.Document> {
+    buffer: ArrayBuffer, identifier: string): Promise<GLTFTransform.Document> {
   const importer = getImporter(identifier);
   return await importer.fromArrayBuffer(buffer);
 }
@@ -299,7 +297,7 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
 
   const path =
       filename.startsWith('file:') ? fileURLToPath(filename) : filename;
-  const buffer = await fs.readFile(path);
+  const buffer = (await fs.readFile(path)).buffer as ArrayBuffer;
   return await importer.fromArrayBuffer(buffer);
 }
 
