@@ -44,8 +44,7 @@ interface Format {
 
 export interface Exporter {
   exportFormats: Array<Format>;
-  toArrayBuffer:
-      (doc: GLTFTransform.Document) => Promise<Uint8Array<ArrayBufferLike>>;
+  toArrayBuffer: (doc: GLTFTransform.Document) => Promise<ArrayBuffer>;
 }
 
 /**
@@ -118,7 +117,7 @@ export async function toBlob(
     doc: GLTFTransform.Document, identifier: string): Promise<Blob> {
   const format = getFormat(identifier);
   const buffer = await getExporter(identifier).toArrayBuffer(doc);
-  return new Blob([buffer as Uint8Array<ArrayBuffer>], {type: format.mimetype});
+  return new Blob([buffer], {type: format.mimetype});
 }
 
 /**
@@ -130,8 +129,7 @@ export async function toBlob(
  * @group Low Level Functions
  */
 export async function toArrayBuffer(
-    doc: GLTFTransform.Document,
-    identifier: string): Promise<Uint8Array<ArrayBufferLike>> {
+    doc: GLTFTransform.Document, identifier: string): Promise<ArrayBuffer> {
   return await getExporter(identifier).toArrayBuffer(doc);
 }
 
@@ -149,5 +147,5 @@ export async function writeFile(
 
   const exporter = getExporter(options.mimetype ?? filename);
   const buffer = await exporter.toArrayBuffer(doc);
-  return await fs.writeFile(filename, buffer);
+  return await fs.writeFile(filename, new Uint8Array(buffer));
 }
