@@ -32,21 +32,21 @@ suite('Import remote modules from', () => {
   test('esm.sh', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
-    const result = await worker.evaluate(bundle);
+    const result = await worker.evaluate(bundle, {doNotBundle: true});
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('jsDelivr', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'jsDelivr'});
-    const result = await worker.evaluate(bundle);
+    const result = await worker.evaluate(bundle, {doNotBundle: true});
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test.skip('skypack', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'skypack'});
-    const result = await worker.evaluate(bundle);
+    const result = await worker.evaluate(bundle, {doNotBundle: true});
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 });

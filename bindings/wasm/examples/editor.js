@@ -584,8 +584,14 @@ async function run() {
   }
   const filename = currentFileElement.textContent;
   const code = editor.getValue();
-  manifoldWorker.postMessage(
-      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr', files});
+  manifoldWorker.postMessage({
+    type: 'evaluate',
+    code,
+    filename,
+    files,
+    jsCDN: 'jsDelivr',
+    baseUrl: window.location.href
+  });
 }
 
 function cancel() {

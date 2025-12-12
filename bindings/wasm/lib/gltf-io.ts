@@ -12,21 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gltf-transform/core';
+import * as GLTFTransform from '@gltf-transform/core';
+import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
 import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 
+const binaryFormat = {
+  extension: 'glb',
+  mimetype: 'model/gltf-binary'
+};
+
+export const importFormats = [binaryFormat];
+export const exportFormats = [binaryFormat];
+
 export const attributeDefs = {
-  'POSITION': {type: Accessor.Type.VEC3, components: 3},
-  'NORMAL': {type: Accessor.Type.VEC3, components: 3},
-  'TANGENT': {type: Accessor.Type.VEC4, components: 4},
-  'TEXCOORD_0': {type: Accessor.Type.VEC2, components: 2},
-  'TEXCOORD_1': {type: Accessor.Type.VEC2, components: 2},
-  'COLOR_0': {type: Accessor.Type.VEC3, components: 3},
-  'JOINTS_0': {type: Accessor.Type.VEC4, components: 4},
-  'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
+  'POSITION': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
+  'NORMAL': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
+  'TANGENT': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
+  'TEXCOORD_0': {type: GLTFTransform.Accessor.Type.VEC2, components: 2},
+  'TEXCOORD_1': {type: GLTFTransform.Accessor.Type.VEC2, components: 2},
+  'COLOR_0': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
+  'JOINTS_0': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
+  'WEIGHTS_0': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
   'SKIP_1': {type: null, components: 1},
   'SKIP_2': {type: null, components: 2},
   'SKIP_3': {type: null, components: 3},
@@ -36,7 +45,7 @@ export const attributeDefs = {
 export type Attribute = keyof(typeof attributeDefs);
 
 export interface Properties {
-  material: Material;
+  material: GLTFTransform.Material;
   attributes: Attribute[];
 }
 
@@ -44,7 +53,7 @@ export interface Properties {
  * Call this first to register the manifold extension so that readMesh and
  * writeMesh will work.
  */
-export function setupIO(io: WebIO) {
+export function setupIO(io: GLTFTransform.WebIO) {
   return io.registerExtensions([EXTManifold]);
 }
 
@@ -68,7 +77,8 @@ export function setupIO(io: WebIO) {
  *     attributes are the intersection of the attributes present on the
  *     primitive and those requested in the attributes input.
  */
-export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
+export function readMesh(
+    mesh: GLTFTransform.Mesh, attributes: Attribute[] = []):
     {mesh: MeshOptions, runProperties: Properties[]}|null {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
@@ -210,8 +220,8 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
  * @returns The glTF Mesh to add to the Document.
  */
 export function writeMesh(
-    doc: Document, manifoldMesh: ManifoldMesh,
-    id2properties: Map<number, Properties>): Mesh {
+    doc: GLTFTransform.Document, manifoldMesh: ManifoldMesh,
+    id2properties: Map<number, Properties>): GLTFTransform.Mesh {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
@@ -221,7 +231,7 @@ export function writeMesh(
   const mesh = doc.createMesh();
   const runIndex = Array<number>();
   const attributeUnion = Array<Attribute>();
-  const primitive2attributes = new Map<Primitive, Attribute[]>();
+  const primitive2attributes = new Map<GLTFTransform.Primitive, Attribute[]>();
   const numRun = manifoldMesh.runIndex.length - 1;
   let lastID = -1;
   for (let run = 0; run < numRun; ++run) {
@@ -234,7 +244,7 @@ export function writeMesh(
 
     const indices = doc.createAccessor('primitive indices of ID ' + id)
                         .setBuffer(buffer)
-                        .setType(Accessor.Type.SCALAR)
+                        .setType(GLTFTransform.Accessor.Type.SCALAR)
                         .setArray(new Uint32Array(1));
     const primitive = doc.createPrimitive().setIndices(indices);
 
@@ -318,7 +328,7 @@ export function writeMesh(
 
   const indices = doc.createAccessor('manifold indices')
                       .setBuffer(buffer)
-                      .setType(Accessor.Type.SCALAR)
+                      .setType(GLTFTransform.Accessor.Type.SCALAR)
                       .setArray(manifoldMesh.triVerts);
   manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(runIndex);
@@ -342,11 +352,11 @@ export function writeMesh(
   if (ind.length > 0) {
     const indicesAccessor = doc.createAccessor('merge from')
                                 .setBuffer(buffer)
-                                .setType(Accessor.Type.SCALAR)
+                                .setType(GLTFTransform.Accessor.Type.SCALAR)
                                 .setArray(new Uint32Array(ind));
     const valuesAccessor = doc.createAccessor('merge to')
                                .setBuffer(buffer)
-                               .setType(Accessor.Type.SCALAR)
+                               .setType(GLTFTransform.Accessor.Type.SCALAR)
                                .setArray(new Uint32Array(val));
     manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
   }
@@ -358,7 +368,7 @@ export function writeMesh(
  * Helper function to dispose of a Mesh, useful when replacing an existing Mesh
  * with one from writeMesh.
  */
-export function disposeMesh(mesh: Mesh) {
+export function disposeMesh(mesh: GLTFTransform.Mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
   for (const primitive of primitives) {
@@ -385,7 +395,7 @@ export function disposeMesh(mesh: Mesh) {
  * @param texture The texture to update
  * @param uri The location of the image to download
  */
-export async function loadTexture(texture: Texture, uri: string) {
+export async function loadTexture(texture: GLTFTransform.Texture, uri: string) {
   const response = await fetch(uri);
   const blob = await response.blob();
   texture.setMimeType(blob.type);
@@ -393,7 +403,7 @@ export async function loadTexture(texture: Texture, uri: string) {
 }
 
 function writeProperties(
-    vertProperties: number[], accessor: Accessor, numProp: number,
+    vertProperties: number[], accessor: GLTFTransform.Accessor, numProp: number,
     offset: number) {
   const array = accessor.getArray()!;
   const size = accessor.getElementSize();
@@ -406,7 +416,8 @@ function writeProperties(
 }
 
 function readPrimitive(
-    primitive: Primitive, numProp: number, attributes: Attribute[]) {
+    primitive: GLTFTransform.Primitive, numProp: number,
+    attributes: Attribute[]) {
   const vertProperties: number[] = [];
   let offset = 0;
   for (const attribute of attributes) {
@@ -422,4 +433,27 @@ function readPrimitive(
     offset += size;
   }
   return vertProperties;
+}
+
+let _io: GLTFTransform.PlatformIO|null = null;
+
+/**
+ * Return an appropriate PlatformIO object.
+ */
+const getIO = (): GLTFTransform.PlatformIO => {
+  if (!_io) {
+    _io = new GLTFTransform.WebIO();
+    _io.registerExtensions([EXTManifold, ...KHRONOS_EXTENSIONS]);
+  }
+
+  return _io;
+};
+
+export async function toArrayBuffer(doc: GLTFTransform.Document):
+    Promise<Uint8Array<ArrayBufferLike>> {
+  return await getIO().writeBinary(doc) as Uint8Array<ArrayBufferLike>;
+}
+
+export async function fromArrayBuffer(buffer: Uint8Array<ArrayBufferLike>) {
+  return await getIO().readBinary(buffer);
 }

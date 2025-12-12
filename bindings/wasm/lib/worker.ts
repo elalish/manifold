@@ -30,8 +30,7 @@ import {Document} from '@gltf-transform/core';
 import * as animation from './animation.ts';
 import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
 import {RuntimeError} from './error.ts';
-import {Export3MF} from './export-3mf.ts';
-import {ExportGLTF} from './export-gltf.ts';
+import * as exportModel from './export-model.ts';
 import * as garbageCollector from './garbage-collector.ts';
 import * as gltfNode from './gltf-node.ts'
 import * as levelOfDetail from './level-of-detail.ts';
@@ -39,7 +38,6 @@ import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
 
-let exporters: Array<any>;
 const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 export type MessageType =
@@ -83,6 +81,7 @@ export namespace MessageToWorker {
     jsCDN?: string;
     fetchRemotePackages?: boolean;
     files?: Record<string, string>;
+    baseUrl?: string;
   }
 
   /**
@@ -180,6 +179,7 @@ export interface evaluateOptions {
   doNotBundle?: boolean;
   jsCDN?: string;
   fetchRemotePackages?: boolean;
+  baseUrl?: string;
 }
 
 /**
@@ -236,6 +236,10 @@ export async function evaluate(
     // The bundler will swap these objects in when needed.
     _manifold_cad_top_level: toplevelImport,
     _manifold_cad_library: manifoldImport,
+
+    // Bundled code may be referencing files by relative paths.
+    // Set runtime value of import.meta.url
+    _manifold_runtime_url: options.baseUrl ?? null,
 
     // While this project is built using ES modules, and we assume models and
     // libraries are ES modules, code executed via `new Function()` or `eval` is
@@ -306,7 +310,7 @@ export async function evaluate(
 
   // Create a gltf-transform document.
   const nodes = await gltfNode.anyToGLTFNodeList(result);
-  const doc = scenebuilder.GLTFNodesToGLTFDoc(nodes);
+  const doc = await scenebuilder.GLTFNodesToGLTFDoc(nodes);
   const t2 = performance.now();
   log(`Manifold took ${((t2 - t1) / 1000).toFixed(2)} seconds`);
 
@@ -323,10 +327,8 @@ export async function evaluate(
 export const exportBlobURL =
     async(doc: Document, extension: string): Promise<string> => {
   const t0 = performance.now();
-  exporters = [new Export3MF(), new ExportGLTF()];
 
-  const blob =
-      await exporters.find(ex => ex.extensions.includes(extension)).asBlob(doc)
+  const blob = await exportModel.toBlob(doc, extension);
   const blobURL = URL.createObjectURL(blob);
 
   const t1 = performance.now();

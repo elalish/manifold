@@ -13,20 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {readFile, writeFile} from 'node:fs/promises';
-import {extname} from 'node:path';
-
+import {readFile} from 'node:fs/promises';
 import {Command} from 'commander';
 
 import {bundleFile} from '../lib/bundler.js';
-import {Export3MF} from '../lib/export-3mf.js';
-import {ExportGLTF} from '../lib/export-gltf.js';
 import * as worker from '../lib/worker.js';
+import * as exportModel from '../lib/export-model.js';
+import { UnsupportedFormatError } from '../lib/error.js';
 
-const exporters = [
-  new Export3MF(),
-  new ExportGLTF()
-];
 const program = new Command();
 
 program.name('manifold-cad')
@@ -39,16 +33,8 @@ program.name('manifold-cad')
     // must be specified to disable bundling.
     .option('--no-bundle', 'Do not bundle input file before building model', true)
     .action(async(infile, outfile, options) => {
-      // Choose an exporter.
-      const exporter = exporters.find(ex => ex.extensions.map(ext => `.${ext}`).includes(extname(outfile)));
-      if (!exporter) {
-        const extensions = exporters
-            .reduce((acc, cur) => ([... acc.extensions, ... cur.extensions ]))
-            .map(ext => `.${ext}`)
-            .reduceRight((prev, cur, index) => cur + (index ? ', or ' : ', ') + prev);
-        console.error(`Output file must be one of ${extensions}`);
-        process.exit(1);
-      }
+      // Choose an exporter.  It will throw if we cannot match the extension.
+      exportModel.supports(outfile, true);
 
       // Build the model.
       let bundle = '';
@@ -60,8 +46,7 @@ program.name('manifold-cad')
       const doc = await worker.evaluate(bundle, {doNotBundle:true});
 
       // Convert it and write it to disk.
-      const binary = await exporter.asBlob(doc);
-      await writeFile(outfile, binary.stream());
+      await exportModel.writeFile(outfile, doc);
     });
 
 program.parseAsync(process.argv);
