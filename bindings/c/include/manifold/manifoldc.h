@@ -437,7 +437,6 @@ size_t manifold_meshgl_size();
 size_t manifold_meshgl64_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
-size_t manifold_curvature_size();
 size_t manifold_triangulation_size();
 
 // allocation
