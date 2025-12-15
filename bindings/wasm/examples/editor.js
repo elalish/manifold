@@ -398,7 +398,7 @@ async function createEditor() {
 
     // The user edited an example.
     // Copy it into a new script.
-    if (isExample && exampleFunctions.get(scriptName) != editor.getValue()) {
+    if (isExample && exampleFunctions.get(currentName) != editor.getValue()) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
