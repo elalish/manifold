@@ -375,9 +375,9 @@ void manifold_reset_to_circular_defaults();
 
 // Manifold Mesh Extraction
 
-int manifold_meshgl_num_prop(ManifoldMeshGL* m);
-int manifold_meshgl_num_vert(ManifoldMeshGL* m);
-int manifold_meshgl_num_tri(ManifoldMeshGL* m);
+size_t manifold_meshgl_num_prop(ManifoldMeshGL* m);
+size_t manifold_meshgl_num_vert(ManifoldMeshGL* m);
+size_t manifold_meshgl_num_tri(ManifoldMeshGL* m);
 size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL* m);
 size_t manifold_meshgl_tri_length(ManifoldMeshGL* m);
 size_t manifold_meshgl_merge_length(ManifoldMeshGL* m);
