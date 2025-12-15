@@ -304,7 +304,7 @@ TEST(Boolean, Perturb2) {
   // Rotate so that nothing is axis-aligned
   Manifold result = cube.Rotate(5, 10, 15);
 
-  for (int tri = 0; tri < cubeGL.NumTri(); ++tri) {
+  for (size_t tri = 0; tri < cubeGL.NumTri(); ++tri) {
     MeshGL prism;
     prism.numProp = 3;
     prism.triVerts = {4, 2, 0, 1, 3, 5};
