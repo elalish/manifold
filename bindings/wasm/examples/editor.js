@@ -294,12 +294,6 @@ function initializeRun() {
 
 // Editor ------------------------------------------------------------
 
-async function getDTS(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-  return text.replace(/^export \{ }.*$/gm, '').replace(/^export /gm, '');
-}
-
 async function createEditor() {
   self.MonacoEnvironment = {
     getWorker: (_, label) => {
@@ -316,16 +310,23 @@ async function createEditor() {
     automaticLayout: true,
   });
 
-  // Make sure `manifold-3d/manifoldCAD` types are available for import.
-  const wrap = (module, content) =>
-      `declare module '${module}' {\n${content}\n};`
-  const manifoldCadDTS =
-      wrap('manifold-3d/manifoldCAD', await getDTS('/manifoldCAD.d.ts'));
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(manifoldCadDTS);
+  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+    module: monaco.languages.typescript.ScriptTarget.ESNext,
+    moduleResolution: monaco.languages.typescript.ScriptTarget.NodeNext,
+    allowNonTsExtensions: true,
+  });
 
-  // Types for the global namespace.
-  const globalsDTS = await getDTS('/manifoldCADGlobals.d.ts');
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(globalsDTS);
+  // Make sure `manifold-3d/manifoldCAD` types are available for import.
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await (await fetch('/manifoldCAD.d.ts')).text(),
+      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+
+  // Types in the global namespace for top-level scripts.
+  // This could be improved in the future.  API-Extractor intentionally doesn't
+  // global variables, so another tool may be a better fit.
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      (await (await fetch('/manifoldCADGlobals.d.ts')).text())
+          .replace(/^export /gm, ''));
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {
