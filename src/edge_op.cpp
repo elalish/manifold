@@ -736,7 +736,7 @@ void Manifold::Impl::SplitPinchedVerts() {
 
   auto nbEdges = halfedge_.size();
   // FIXME: non-deterministic
-#if FALSE //MANIFOLD_PAR == 1
+#if FALSE  // MANIFOLD_PAR == 1
   if (nbEdges > 1e4) {
     std::mutex mutex;
     std::vector<size_t> pinched;
