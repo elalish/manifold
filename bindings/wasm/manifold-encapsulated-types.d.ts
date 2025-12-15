@@ -1062,6 +1062,7 @@ export interface MeshOptions {
   runTransform?: Float32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
+  tolerance?: number;
 }
 
 /**
@@ -1148,6 +1149,14 @@ export class Mesh {
    * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
    */
   halfedgeTangent: Float32Array;
+
+  /**
+   * Tolerance for mesh simplification. When creating a Manifold, the tolerance
+   * used will be the maximum of this and a baseline tolerance from the size of
+   * the bounding box. Any edge shorter than tolerance may be collapsed.
+   * Tolerance may be enlarged when floating point error accumulates.
+   */
+  tolerance: number;
 
   /**
    * Number of triangles

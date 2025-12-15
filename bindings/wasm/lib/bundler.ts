@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {BuildFailure} from 'esbuild';
+import resolve from '@jridgewell/resolve-uri';
 import * as esbuild from 'esbuild-wasm';
+import MagicString from 'magic-string';
 
 import {BundlerError} from './error.ts';
 import {isNode} from './util.ts';
@@ -50,6 +51,7 @@ export interface BundlerOptions {
   fetchRemotePackages?: boolean;
   filename?: string;
   files?: Record<string, string>;
+  resolveDir?: string;
 }
 
 // Swallow informational logs in testing framework
@@ -58,6 +60,19 @@ function log(...args: any[]) {
     self.console.log(...args);
   }
 }
+
+const insertMetaData =
+    (text: string, sourceUrl?: string) => {
+      if (sourceUrl) {
+        const st = new MagicString(text);
+        st.prepend(`const _import_meta_url=_manifold_runtime_url ?? '${
+            sourceUrl}';\n`);
+
+        const map = st.generateMap({hires: true});
+        return `${st.toString()}\n//# sourceMappingURL=${map.toUrl()}`;
+      };
+      return text;
+    }
 
 /**
  * This is a plugin for esbuild that has three functions:
@@ -82,12 +97,24 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Manifold classes.
       'Mesh', 'Manifold', 'CrossSection',
       // Manifold methods.
-      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'getCircularSegments', 'resetToCircularDefaults', 'triangulate',
+      'triangulate',
+
       // Scene builder exports.
-      'show', 'only', 'setMaterial', 'setMorphStart', 'setMorphEnd',
+      'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
-      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes',
+      'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
+      // Import
+      'importModel', 'importManifold',
+      // Getters for global properties
+      'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
+      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
+      // Setters for global properties.
+      // These will only be defined for top level scripts
+      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+      'resetToCircularDefaults', 'setMorphStart', 'setMorphEnd',
+      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
+      'resetGLTFNodes',
+
       // ManifoldCAD specific exports.
       'isManifoldCAD'
     ];
@@ -107,27 +134,32 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       })();
     }
 
-    const skipResolve = {};
+    let entrypoint: string|null = null;
     // Try to resolve local files.  If we can't, blindly resolve them to a CDN.
     build.onResolve({filter: /.*/}, async (args) => {
-      // skipResolve used to avoid loops.
-      // https://github.com/evanw/esbuild/issues/2198#issuecomment-1104566397
-      if (args.pluginData === skipResolve) return null;
+      // Avoid loops.
+      if (args.pluginData !== undefined) return null;
 
       // Skip a few cases handled elsewhere.
       if (args.namespace === 'http-url') return null;
       if (args.path.match(/^https?:\/\//)) return null;
 
+      if (!entrypoint && args.kind === 'entry-point') {
+        entrypoint = resolve(args.path, args.resolveDir + '/');
+      }
+
       // Is this a manifoldCAD context import?
+      // FIXME resolve path here too.
       const pluginData = {
-        toplevel:
-            args.importer === options.filename || args.importer === '<stdin>'
+        toplevel: args.importer === entrypoint ||
+            args.importer === options.filename || args.importer === '<stdin>',
       };
       if (args.path.match(ManifoldCADExportMatch)) {
         return {namespace: 'manifold-cad-globals', path: args.path, pluginData};
       }
 
       // Is this a virtual file?
+      // FIXME Resolve paths!
       if (options.files && Object.keys(options.files).includes(args.path)) {
         return {namespace: 'virtual-file', path: args.path};
       }
@@ -136,7 +168,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       const result = await build.resolve(args.path, {
         resolveDir: args.resolveDir,
         kind: 'import-statement',
-        pluginData: skipResolve
+        pluginData: {resolveDir: options.resolveDir}
       });
 
       // We found a local file!
@@ -149,6 +181,10 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
             pluginData
           };
         }
+        result.pluginData = {
+          resolveDir: args.resolveDir.endsWith('/') ? args.resolveDir :
+                                                      `${args.resolveDir}/`
+        };
         return result;
       }
 
@@ -164,7 +200,8 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       return null;
     });
 
-    // Inject context.
+    // Instead of loading manifoldCAD.ts, insert an instantiated copy.
+    // The global variables enabling this are set by the worker.
     build.onLoad(
         {filter: /.*/, namespace: 'manifold-cad-globals'},
         (args): esbuild.OnLoadResult => {
@@ -177,15 +214,6 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
             // and it doesn't do type validation.
             contents: `export const {${manifoldCADExportNames}} = ${globals};`,
           };
-        });
-
-    // Virtual files.
-    build.onLoad(
-        {filter: /.*/, namespace: 'virtual-file'},
-        (args): esbuild.OnLoadResult => {
-          let loader: esbuild.Loader = 'ts';
-          if (args.path.match(/\.js$/)) loader = 'js';
-          return {contents: (options.files!)[args.path], loader};
         });
 
     // Unless disabled, handle HTTP/HTTPs urls.
@@ -224,6 +252,28 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         }
       });
     }
+
+    // Virtual files.
+    build.onLoad(
+        {filter: /.*/, namespace: 'virtual-file'},
+        (args): esbuild.OnLoadResult => {
+          const text = (options.files!)[args.path];
+
+          const contents = insertMetaData(text, `file://${args.path}`);
+          const loader = (args.path.match(/\.js$/)) ? 'js' : 'ts';
+          return {contents, loader};
+        });
+
+    // Finally, local files.
+    build.onLoad(
+        {filter: /.(ts|js)$/}, async(args): Promise<esbuild.OnLoadResult> => {
+          const fs = await import('node:fs/promises');
+          const text = await fs.readFile(args.path, 'utf8');
+
+          const contents = insertMetaData(text, `file://${args.path}`);
+          const loader = (args.path.match(/\.js$/)) ? 'js' : 'ts';
+          return {contents, loader};
+        });
   },
 });
 
@@ -256,7 +306,12 @@ const getEsbuildConfig =
     // Some CDN imports will check import.meta.env.  This is only present when
     // generating an ESM bundle.  In other cases, it generates log noise, so
     // let's drop it down a log level.
-    logOverride: {'empty-import-meta': 'info'}
+    logOverride: {'empty-import-meta': 'info'},
+
+    // Define some paths so we can find resources by relative URL.
+    define: {
+      'import.meta.url': '_import_meta_url',
+    }
   };
 };
 
@@ -270,7 +325,7 @@ export const bundleFile = async(
     return built.outputFiles![0].text;
   } catch (error) {
     if ((error as any).errors?.length) {
-      throw new BundlerError(error as BuildFailure);
+      throw new BundlerError(error as esbuild.BuildFailure);
     } else {
       throw error;
     }
@@ -283,12 +338,12 @@ export const bundleCode =
     let resolveDir: string|undefined;
     if (isNode() && options.filename) {
       const {dirname} = await import('node:path');
-      resolveDir = dirname(options.filename);
+      resolveDir = options.resolveDir ?? dirname(options.filename);
     }
     const built = await esbuild.build({
       ...(await getEsbuildConfig(options)),
       stdin: {
-        contents: code,
+        contents: insertMetaData(code, `file://${options.filename}`),
         sourcefile: options.filename,
         resolveDir,
         loader: 'ts',
@@ -297,7 +352,7 @@ export const bundleCode =
     return built.outputFiles![0].text;
   } catch (error) {
     if ((error as any).errors?.length) {
-      throw new BundlerError(error as BuildFailure);
+      throw new BundlerError(error as esbuild.BuildFailure);
     } else {
       throw error;
     }

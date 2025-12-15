@@ -387,11 +387,6 @@ async function createEditor() {
   }
 
   editor.onDidChangeModelContent(e => {
-    // monaco-editor-auto-typings loaded types.  Do nothing.
-    if (autoTypings.isResolving && e.changes.isFlush) {
-      return;
-    }
-
     // The user switched models.
     if (switching) {
       switching = false;
@@ -402,11 +397,16 @@ async function createEditor() {
 
     // The user edited an example.
     // Copy it into a new script.
-    if (isExample) {
+    if (isExample && exampleFunctions.get(scriptName) != editor.getValue()) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
       runButton.disabled = false;
+      return;
+    }
+
+    // monaco-editor-auto-typings loaded types.  Do nothing.
+    if (autoTypings.isResolving && e.changes.isFlush) {
       return;
     }
 
@@ -584,8 +584,14 @@ async function run() {
   }
   const filename = currentFileElement.textContent;
   const code = editor.getValue();
-  manifoldWorker.postMessage(
-      {type: 'evaluate', code, filename, jsCDN: 'jsDelivr', files});
+  manifoldWorker.postMessage({
+    type: 'evaluate',
+    code,
+    filename,
+    files,
+    jsCDN: 'jsDelivr',
+    baseUrl: window.location.href
+  });
 }
 
 function cancel() {

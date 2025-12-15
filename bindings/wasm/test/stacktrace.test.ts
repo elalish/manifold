@@ -67,7 +67,7 @@ suite('Build a model with the worker', () => {
     const filepath =
         resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
     let code = await bundleFile(filepath);
-    const ev = async () => await worker.evaluate(code);
+    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
     await expect(ev()).rejects.toThrowError()
   });
 
@@ -75,7 +75,7 @@ suite('Build a model with the worker', () => {
     const filepath =
         resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
     let code = await bundleFile(filepath);
-    const ev = async () => await worker.evaluate(code);
+    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
     await expect(ev()).rejects.toThrowError(RuntimeError);
   });
 
@@ -85,7 +85,7 @@ suite('Build a model with the worker', () => {
     let code = await bundleFile(filepath);
     let error: RuntimeError|null = null;
     try {
-      await worker.evaluate(code);
+      await worker.evaluate(code, {doNotBundle: true});
     } catch (e) {
       error = e as RuntimeError;
     }
@@ -103,7 +103,7 @@ suite('Build a model with the worker', () => {
     let code = await bundleFile(filepath);
     let error: RuntimeError|null = null;
     try {
-      await worker.evaluate(code);
+      await worker.evaluate(code, {doNotBundle: true});
     } catch (e) {
       error = e as RuntimeError;
     }
