@@ -200,6 +200,12 @@ struct EdgePos {
   int vert;
   int collisionId;
   bool isStart;
+
+  bool operator<(const EdgePos& other) const {
+    return edgePos < other.edgePos ||
+           // we also sort by collisionId to make things deterministic
+           (edgePos == other.edgePos && collisionId < other.collisionId);
+  }
 };
 
 // thread sanitizer doesn't really know how to check when there are too many
@@ -291,13 +297,8 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
                                [](EdgePos x) { return x.isStart; });
   DEBUG_ASSERT(static_cast<size_t>(middle - edgePos.begin()) == nEdges,
                topologyErr, "Non-manifold edge!");
-  auto cmp = [](EdgePos a, EdgePos b) {
-    return a.edgePos < b.edgePos ||
-           // we also sort by collisionId to make things deterministic
-           (a.edgePos == b.edgePos && a.collisionId < b.collisionId);
-  };
-  std::stable_sort(edgePos.begin(), middle, cmp);
-  std::stable_sort(middle, edgePos.end(), cmp);
+  std::stable_sort(edgePos.begin(), middle);
+  std::stable_sort(middle, edgePos.end());
   std::vector<Halfedge> edges;
   for (size_t i = 0; i < nEdges; ++i)
     edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1});
@@ -322,7 +323,8 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
 
   for (auto& value : edgesP) {
     const int edgeP = value.first;
-    std::vector<EdgePos>& edgePosP = value.second;
+    std::vector<EdgePos> edgePosP = value.second;
+    std::stable_sort(edgePosP.begin(), edgePosP.end());
 
     const Halfedge& halfedge = halfedgeP[edgeP];
     wholeHalfedgeP[edgeP] = false;
@@ -397,6 +399,7 @@ void AppendNewEdges(
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
+    std::stable_sort(edgePos.begin(), edgePos.end());
 
     Box bbox;
     for (auto edge : edgePos) {
