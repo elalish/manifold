@@ -35,7 +35,7 @@ namespace {
 
 inline double withSign(bool pos, double v) { return pos ? v : -v; }
 
-vec2 Interpolate(vec3 aL, vec3 aR, double x) {
+inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
   const double dxL = x - aL.x;
   const double dxR = x - aR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
@@ -372,8 +372,7 @@ Intersections Intersect12_(const Manifold::Impl& inP,
                      a.vertPos_[a.halfedge_[i].endVert])
                : Box();
   };
-  b.collider_.Collisions<false, decltype(f), decltype(recorder)>(
-      f, a.halfedge_.size(), recorder);
+  b.collider_.Collisions<false>(f, a.halfedge_.size(), recorder);
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
