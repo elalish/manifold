@@ -908,10 +908,8 @@ struct vec<T, 3> {
   LINALG_CONSTEXPR14 T& operator[](int i) {
     return i == 0 ? x : i == 1 ? y : z;
   }
-  constexpr const vec<T, 2>& xy() const {
-    return *reinterpret_cast<const vec<T, 2>*>(this);
-  }
-  vec<T, 2>& xy() { return *reinterpret_cast<vec<T, 2>*>(this); }
+  constexpr vec<T, 2> xy() const { return vec<T, 2>(x, y); }
+  constexpr vec<T, 2> yz() const { return vec<T, 2>(y, z); }
 
   template <class U, class = detail::conv_t<vec, U>>
   constexpr vec(const U& u) : vec(converter<vec, U>{}(u)) {}
@@ -946,14 +944,8 @@ struct vec<T, 4> {
   LINALG_CONSTEXPR14 T& operator[](int i) {
     return i == 0 ? x : i == 1 ? y : i == 2 ? z : w;
   }
-  constexpr const vec<T, 2>& xy() const {
-    return *reinterpret_cast<const vec<T, 2>*>(this);
-  }
-  constexpr const vec<T, 3>& xyz() const {
-    return *reinterpret_cast<const vec<T, 3>*>(this);
-  }
-  vec<T, 2>& xy() { return *reinterpret_cast<vec<T, 2>*>(this); }
-  vec<T, 3>& xyz() { return *reinterpret_cast<vec<T, 3>*>(this); }
+  constexpr vec<T, 2> xy() const { return vec<T, 2>(x, y); }
+  constexpr vec<T, 3> xyz() const { return vec<T, 3>(x, y, z); }
 
   template <class U, class = detail::conv_t<vec, U>>
   constexpr vec(const U& u) : vec(converter<vec, U>{}(u)) {}
