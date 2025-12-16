@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <unordered_map>
+#include <unordered_set>
 
 #include "impl.h"
 #include "parallel.h"
@@ -735,8 +736,7 @@ void Manifold::Impl::SplitPinchedVerts() {
   ZoneScoped;
 
   auto nbEdges = halfedge_.size();
-  // FIXME: non-deterministic
-#if FALSE  // MANIFOLD_PAR == 1
+#if MANIFOLD_PAR == 1
   if (nbEdges > 1e4) {
     std::mutex mutex;
     std::vector<size_t> pinched;
@@ -745,7 +745,7 @@ void Manifold::Impl::SplitPinchedVerts() {
     // The idea here is to identify cycles of halfedges that can be iterated
     // through using ForVert. Pinched verts are vertices where there are
     // multiple cycles associated with the vertex. Each cycle is identified with
-    // the largest halfedge index within the cycle, and when there are multiple
+    // the smallest halfedge index within the cycle, and when there are multiple
     // cycles associated with the same starting vertex but with different ids,
     // it means we have a pinched vertex. This check is done by using a single
     // atomic cas operation, the expected case is either invalid id (the vertex
@@ -772,16 +772,18 @@ void Manifold::Impl::SplitPinchedVerts() {
             local[i] = true;
             const int vert = halfedge_[i].startVert;
             if (vert == -1) continue;
-            size_t largest = i;
-            ForVert(i, [&local, &largest](int current) {
+            size_t smallest = i;
+            ForVert(i, [&local, &smallest](int current) {
               local[current] = true;
-              largest = std::max(largest, static_cast<size_t>(current));
+              smallest = std::min(smallest, static_cast<size_t>(current));
             });
-            size_t expected = std::numeric_limits<size_t>::max();
-            if (!largestEdge[vert].compare_exchange_strong(expected, largest) &&
-                expected != largest) {
+            size_t got = std::numeric_limits<size_t>::max();
+            if (!largestEdge[vert].compare_exchange_strong(got, smallest) &&
+                got != smallest) {
               // we know that there is another loop...
-              pinchedLocal.push_back(largest);
+              // put all to pinched
+              pinchedLocal.push_back(smallest);
+              pinchedLocal.push_back(got);
             }
           }
           if (!pinchedLocal.empty()) {
@@ -792,13 +794,17 @@ void Manifold::Impl::SplitPinchedVerts() {
         });
 
     manifold::stable_sort(pinched.begin(), pinched.end());
-    std::vector<bool> halfedgeProcessed(nbEdges, false);
+    pinched.resize(std::distance(
+        pinched.begin(), manifold::unique(pinched.begin(), pinched.end())));
+    std::unordered_set<int> processedVerts;
     for (size_t i : pinched) {
-      if (halfedgeProcessed[i]) continue;
+      if (processedVerts.find(halfedge_[i].startVert) == processedVerts.end()) {
+        processedVerts.insert(halfedge_[i].startVert);
+        continue;
+      }
       vertPos_.push_back(vertPos_[halfedge_[i].startVert]);
       const int vert = NumVert() - 1;
-      ForVert(i, [this, vert, &halfedgeProcessed](int current) {
-        halfedgeProcessed[current] = true;
+      ForVert(i, [this, vert](int current) {
         halfedge_[current].startVert = vert;
         halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
       });
@@ -815,14 +821,17 @@ void Manifold::Impl::SplitPinchedVerts() {
       if (vertProcessed[vert]) {
         vertPos_.push_back(vertPos_[vert]);
         vert = NumVert() - 1;
+        ForVert(i, [this, &halfedgeProcessed, vert](int current) {
+          halfedgeProcessed[current] = true;
+          halfedge_[current].startVert = vert;
+          halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
+        });
       } else {
         vertProcessed[vert] = true;
+        ForVert(i, [this, &halfedgeProcessed, vert](int current) {
+          halfedgeProcessed[current] = true;
+        });
       }
-      ForVert(i, [this, &halfedgeProcessed, vert](int current) {
-        halfedgeProcessed[current] = true;
-        halfedge_[current].startVert = vert;
-        halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
-      });
     }
   }
 }
