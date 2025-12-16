@@ -471,9 +471,7 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
   int ntri = mgl1.NumTri();
   for (int t = 0; t < ntri; t++) {
     for (int i = 0; i < 3; i++) {
-      EXPECT_EQ(mgl1.triVerts[3 * t + i], mgl2.triVerts[3 * t + i]);
-      // early return to avoid spam
-      if (mgl1.triVerts[3 * t + i] != mgl2.triVerts[3 * t + i]) return;
+      ASSERT_EQ(mgl1.triVerts[3 * t + i], mgl2.triVerts[3 * t + i]);
     }
   }
 
@@ -481,12 +479,8 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
   int nvert = mgl1.NumVert();
   for (int v = 0; v < nvert; v++) {
     for (int p = 0; p < nprop; p++) {
-      EXPECT_EQ(mgl1.vertProperties[v * nprop + p],
+      ASSERT_EQ(mgl1.vertProperties[v * nprop + p],
                 mgl2.vertProperties[v * nprop + p]);
-      // early return to avoid spam
-      if (mgl1.vertProperties[v * nprop + p] !=
-          mgl2.vertProperties[v * nprop + p])
-        return;
     }
   }
 }

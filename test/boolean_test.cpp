@@ -276,6 +276,77 @@ TEST(Boolean, Perturb) {
   EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0);
 }
 
+TEST(Boolean, Perturb1) {
+  const Manifold big = Manifold::Extrude(
+      {{{0, 2}, {2, 0}, {4, 2}, {2, 4}}, {{1, 2}, {2, 3}, {3, 2}, {2, 1}}},
+      1.0);
+  const Manifold little =
+      Manifold::Extrude({{{2, 1}, {3, 2}, {2, 3}, {1, 2}}}, 1.0)
+          .Translate({0, 0, 1});
+  const Manifold punchHole =
+      Manifold::Extrude({{{1, 2}, {2, 2}, {2, 3}}}, 1.0).Translate({0, 0, 1});
+  const Manifold result = (big + little) - punchHole;
+
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 24);
+  EXPECT_FLOAT_EQ(result.Volume(), 7.5);
+  EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("perturb1.glb", result.GetMeshGL(), {});
+#endif
+}
+
+TEST(Boolean, Perturb2) {
+  Manifold cube = Manifold::Cube(vec3(2), true);
+  MeshGL cubeGL = cube.GetMeshGL();
+
+  // Rotate so that nothing is axis-aligned
+  Manifold result = cube.Rotate(5, 10, 15);
+
+  for (size_t tri = 0; tri < cubeGL.NumTri(); ++tri) {
+    MeshGL prism;
+    prism.numProp = 3;
+    prism.triVerts = {4, 2, 0, 1, 3, 5};
+    for (const int v0 : {0, 1, 2}) {
+      const int v1 = (v0 + 1) % 3;
+      const int vIn0 = cubeGL.triVerts[3 * tri + v0];
+      const int vIn1 = cubeGL.triVerts[3 * tri + v1];
+      if (vIn1 > vIn0) {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
+      } else {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v0 + 1);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
+      }
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(2 * cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+    }
+    // All verts should be floating-point identical to one of 16 positions: the
+    // 8 starting result cube verts, or exactly double these coordinates.
+    result += Manifold(prism).Rotate(5, 10, 15);
+  }
+  // The result should be a double-sized cube, 4 units to a side.
+  // If symbolic perturbation fails, the number of verts and the surface area
+  // will increase, indicating cracks and internal geometry.
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 8);
+  EXPECT_FLOAT_EQ(result.Volume(), 64.0);
+  EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
   MeshGL cylinderGL = cylinder.GetMeshGL();
@@ -494,7 +565,7 @@ TEST(Boolean, BatchBoolean) {
   Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
                                         OpType::Add);
 
-  ExpectMeshes(add, {{150, 296}});
+  ExpectMeshes(add, {{152, 300}});
   EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
   EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
 

@@ -339,6 +339,7 @@ struct Manifold::Impl {
   void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
   void GatherFaces(const Vec<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
+  void ReorderHalfedges();
 
   // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,

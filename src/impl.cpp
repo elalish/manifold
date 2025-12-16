@@ -708,18 +708,15 @@ void Manifold::Impl::CalculateNormals() {
       }
 
       ivec3 triVerts;
-      for (int i : {0, 1, 2}) {
-        int v = halfedge_[3 * face + i].startVert;
+      for (const int i : {0, 1, 2}) {
+        const int v = halfedge_[3 * face + i].startVert;
         triVerts[i] = v;
         atomicMin(3 * face + i, v);
       }
 
-      vec3 edge[3];
-      for (int i : {0, 1, 2}) {
-        const int j = (i + 1) % 3;
-        edge[i] = la::normalize(vertPos_[triVerts[j]] - vertPos_[triVerts[i]]);
-      }
-      triNormal = la::normalize(la::cross(edge[0], edge[1]));
+      const vec3 edge0 = vertPos_[triVerts[1]] - vertPos_[triVerts[0]];
+      const vec3 edge1 = vertPos_[triVerts[2]] - vertPos_[triVerts[1]];
+      triNormal = la::normalize(la::cross(edge0, edge1));
       if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
     });
   } else {

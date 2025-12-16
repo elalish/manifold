@@ -77,32 +77,30 @@ inline bool Shadows(double p, double q, double dir) {
 inline std::pair<int, vec2> Shadow01(const int a0, const int b1,
                                      const Manifold::Impl& inA,
                                      const Manifold::Impl& inB,
-                                     const double expandP,
-                                     VecView<const vec3> normalP,
-                                     const bool forward) {
+                                     const double expandP, const bool forward) {
   const int b1s = inB.halfedge_[b1].startVert;
   const int b1e = inB.halfedge_[b1].endVert;
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
   const double b1ex = inB.vertPos_[b1e].x;
-  int s01 = forward ? Shadows(a0x, b1ex, expandP * normalP[a0].x) -
-                          Shadows(a0x, b1sx, expandP * normalP[a0].x)
-                    : Shadows(b1sx, a0x, expandP * normalP[b1s].x) -
-                          Shadows(b1ex, a0x, expandP * normalP[b1e].x);
+  const double a0xp = inA.vertNormal_[a0].x;
+  const double b1sxp = inB.vertNormal_[b1s].x;
+  const double b1exp = inB.vertNormal_[b1e].x;
+  int s01 = forward ? Shadows(a0x, b1ex, expandP * a0xp - b1exp) -
+                          Shadows(a0x, b1sx, expandP * a0xp - b1sxp)
+                    : Shadows(b1sx, a0x, expandP * b1sxp - a0xp) -
+                          Shadows(b1ex, a0x, expandP * b1exp - a0xp);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
     yz01 =
         Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], inA.vertPos_[a0].x);
+    const int b1pair = inB.halfedge_[b1].pairedHalfedge;
+    const double dir =
+        inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
     if (forward) {
-      if (!Shadows(inA.vertPos_[a0].y, yz01[0], expandP * normalP[a0].y))
-        s01 = 0;
+      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir)) s01 = 0;
     } else {
-      vec3 diff = inB.vertPos_[b1s] - inA.vertPos_[a0];
-      const double start2 = la::dot(diff, diff);
-      diff = inB.vertPos_[b1e] - inA.vertPos_[a0];
-      const double end2 = la::dot(diff, diff);
-      const double dir = start2 < end2 ? normalP[b1s].y : normalP[b1e].y;
       if (!Shadows(yz01[0], inA.vertPos_[a0].y, expandP * dir)) s01 = 0;
     }
   }
@@ -128,8 +126,7 @@ struct Kernel11 {
 
     const int p0[2] = {inP.halfedge_[p1].startVert, inP.halfedge_[p1].endVert};
     for (int i : {0, 1}) {
-      const auto [s01, yz01] =
-          Shadow01(p0[i], q1, inP, inQ, expandP, inP.vertNormal_, true);
+      const auto [s01, yz01] = Shadow01(p0[i], q1, inP, inQ, expandP, true);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -144,8 +141,7 @@ struct Kernel11 {
 
     const int q0[2] = {inQ.halfedge_[q1].startVert, inQ.halfedge_[q1].endVert};
     for (int i : {0, 1}) {
-      const auto [s10, yz10] =
-          Shadow01(q0[i], p1, inQ, inP, expandP, inP.vertNormal_, false);
+      const auto [s10, yz10] = Shadow01(q0[i], p1, inQ, inP, expandP, false);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -164,16 +160,13 @@ struct Kernel11 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
-      const int p1s = inP.halfedge_[p1].startVert;
-      const int p1e = inP.halfedge_[p1].endVert;
-      vec3 diff = inP.vertPos_[p1s] - vec3(xyzz11);
-      const double start2 = la::dot(diff, diff);
-      diff = inP.vertPos_[p1e] - vec3(xyzz11);
-      const double end2 = la::dot(diff, diff);
-      const double dir =
-          start2 < end2 ? inP.vertNormal_[p1s].z : inP.vertNormal_[p1e].z;
-
-      if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
+      const int p1pair = inP.halfedge_[p1].pairedHalfedge;
+      const double dirP =
+          inP.faceNormal_[p1 / 3].z + inP.faceNormal_[p1pair / 3].z;
+      const int q1pair = inQ.halfedge_[q1].pairedHalfedge;
+      const double dirQ =
+          inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
+      if (!Shadows(xyzz11.z, xyzz11.w, expandP * dirP - dirQ)) s11 = 0;
     }
 
     return std::make_pair(s11, xyzz11);
@@ -184,7 +177,6 @@ struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
   const double expandP;
-  VecView<const vec3> vertNormalP;
   const bool forward;
 
   std::pair<int, double> operator()(int a0, int b2) {
@@ -197,27 +189,13 @@ struct Kernel02 {
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows = false;
-    int closestVert = -1;
-    double minMetric = std::numeric_limits<double>::infinity();
-    s02 = 0;
 
     for (const int i : {0, 1, 2}) {
       const int b1 = 3 * b2 + i;
       const Halfedge edgeB = inB.halfedge_[b1];
       const int b1F = edgeB.IsForward() ? b1 : edgeB.pairedHalfedge;
 
-      if (!forward) {
-        const int vertB = inB.halfedge_[b1F].startVert;
-        const vec3 diff = inA.vertPos_[a0] - inB.vertPos_[vertB];
-        const double metric = la::dot(diff, diff);
-        if (metric < minMetric) {
-          minMetric = metric;
-          closestVert = vertB;
-        }
-      }
-
-      const auto syz01 =
-          Shadow01(a0, b1F, inA, inB, expandP, vertNormalP, forward);
+      const auto syz01 = Shadow01(a0, b1F, inA, inB, expandP, forward);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -237,11 +215,10 @@ struct Kernel02 {
       vec3 vertPosA = inA.vertPos_[a0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y)[1];
       if (forward) {
-        if (!Shadows(vertPosA.z, z02, expandP * vertNormalP[a0].z)) s02 = 0;
+        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z)) s02 = 0;
       } else {
         // DEBUG_ASSERT(closestVert != -1, topologyErr, "No closest vert");
-        if (!Shadows(z02, vertPosA.z, expandP * vertNormalP[closestVert].z))
-          s02 = 0;
+        if (!Shadows(z02, vertPosA.z, expandP * inB.faceNormal_[b2].z)) s02 = 0;
       }
     }
     return std::make_pair(s02, z02);
@@ -380,7 +357,7 @@ Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  Kernel02 k02{a, b, expandP, inP.vertNormal_, forward};
+  Kernel02 k02{a, b, expandP, forward};
   Kernel11 k11{inP, inQ, expandP};
 
   Kernel12 k12{a, b, forward, k02, k11};
@@ -459,7 +436,7 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (int c : components) verts.push_back(c);
 
   Vec<int> w03(a.NumVert(), 0);
-  Kernel02 k02{a, b, expandP, inP.vertNormal_, forward};
+  Kernel02 k02{a, b, expandP, forward};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);
@@ -484,8 +461,11 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add ? 1.0 : -1.0) {
   // Symbolic perturbation:
-  // Union -> expand inP
-  // Difference, Intersection -> contract inP
+  // Union -> expand inP, expand inQ
+  // Difference, Intersection -> contract inP, expand inQ
+  // Technically Intersection should contract inQ, but doing it this way makes
+  // Split faster and any suboptimal cases seem pretty rare.
+
   constexpr size_t INT_MAX_SZ =
       static_cast<size_t>(std::numeric_limits<int>::max());
 
@@ -506,10 +486,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // that intersect, and record the direction the edge is passing through the
   // triangle.
   xv12_ = Intersect12(inP, inQ, expandP_, true);
-  PRINT("x12 size = " << xv12_.x12.size());
-
   xv21_ = Intersect12(inP, inQ, expandP_, false);
-  PRINT("x21 size = " << xv21_.x12.size());
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;

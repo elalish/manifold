@@ -477,6 +477,41 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
                           old.halfedgeTangent_, faceNew2Old, faceOld2New}));
 }
 
+void Manifold::Impl::ReorderHalfedges() {
+  ZoneScoped;
+  // halfedges in the same face are added in non-deterministic order, so we have
+  // to reorder them for determinism
+
+  // step 1: reorder within the same face, such that the halfedge with the
+  // smallest starting vertex is placed first
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+           countAt(halfedge_.size() / 3), [this](size_t tri) {
+             std::array<Halfedge, 3> face = {halfedge_[tri * 3],
+                                             halfedge_[tri * 3 + 1],
+                                             halfedge_[tri * 3 + 2]};
+             if (face[0].startVert < 0) return;
+             int index = 0;
+             for (int i : {1, 2})
+               if (face[i].startVert < face[index].startVert) index = i;
+             for (int i : {0, 1, 2})
+               halfedge_[tri * 3 + i] = face[(index + i) % 3];
+           });
+  // step 2: fix paired halfedge
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+           countAt(halfedge_.size() / 3), [this](size_t tri) {
+             for (int i : {0, 1, 2}) {
+               Halfedge& curr = halfedge_[tri * 3 + i];
+               if (curr.startVert < 0) return;
+               int oppositeFace = curr.pairedHalfedge / 3;
+               int index = -1;
+               for (int j : {0, 1, 2})
+                 if (curr.startVert == halfedge_[oppositeFace * 3 + j].endVert)
+                   index = j;
+               curr.pairedHalfedge = oppositeFace * 3 + index;
+             }
+           });
+}
+
 /**
  * Updates the mergeFromVert and mergeToVert vectors in order to create a
  * manifold solid. If the MeshGL is already manifold, no change will occur and
