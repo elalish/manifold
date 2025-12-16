@@ -675,7 +675,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   assemble.Start();
 #endif
 
-  DEBUG_ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
+  DEBUG_ASSERT(expandP_ == (op == OpType::Add), logicErr,
                "Result op type not compatible with constructor op type.");
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;

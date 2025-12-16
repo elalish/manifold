@@ -61,7 +61,7 @@ class Boolean3 {
 
  private:
   const Manifold::Impl &inP_, &inQ_;
-  const double expandP_;
+  const bool expandP_;
   Intersections xv12_, xv21_;
   Vec<int> w03_, w30_;
   bool valid = true;
