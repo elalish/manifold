@@ -73,3 +73,5 @@ export class UnsupportedFormatError extends Error {
         `Must be one of ${typeList}`);
   }
 }
+
+export class ImportError extends Error {}
