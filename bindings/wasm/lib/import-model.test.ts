@@ -33,23 +33,49 @@ suite('supports()', () => {
 
   test('returns false for a known bad mimetype', () => {
     expect(importer.supports('model/not-a-real-3d-format')).to.be.false;
-  })
+  });
 
   test('returns false for a known bad mimetype', () => {
     expect(importer.supports('.not-a-real-3d-format')).to.be.false;
-  })
+  });
 
   test('Throws on demand', () => {
     expect(() => importer.supports('model/not-a-real-3d-format', true))
         .to.throw();
-  })
+  });
 });
 
 suite('importModel()', () => {
-  test('import a model without EXT_mesh_manifold', async () => {
+  test('imports a model with EXT_mesh_manifold', async () => {
+    const model = await importer.importManifold(new URL(
+        '../test/fixtures/models/boxExtMeshManifold.glb', import.meta.url));
+    expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('imports a model without EXT_mesh_manifold', async () => {
     const model = await importer.importManifold(
         new URL('../test/fixtures/models/box.glb', import.meta.url));
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('throws when model is not manifold', async () => {
+    const fn = async () => await importer.importManifold(
+        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url));
+    await expect(fn).rejects.toThrowError();
+  });
+
+  test('succeeds when tolerance permits a non-manifold model', async () => {
+    const model = await importer.importManifold(
+        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
+        {tolerance: 0.005});
+    expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('throws when tolerance is insufficient', async () => {
+    const fn = async () => await importer.importManifold(
+        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
+        {tolerance: 0.001});
+    await expect(fn).rejects.toThrowError();
   });
 
   test('import a model by file URL', async () => {

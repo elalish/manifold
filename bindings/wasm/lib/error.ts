@@ -61,7 +61,6 @@ export class UnsupportedFormatError extends Error {
   constructor(
       identifier: string,
       supported: Array<{mimetype: string, extension: string}>) {
-    console.log(JSON.stringify(supported, null, 2))
     const typeList =
         supported
             .map(entry => `\`${entry.mimetype}\` (\`.${entry.extension}\`)`)
