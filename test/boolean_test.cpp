@@ -347,6 +347,42 @@ TEST(Boolean, Perturb2) {
   EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
 }
 
+TEST(Boolean, Perturb3) {
+  // Create a nasty gear pattern with many rotated cubes that creates
+  // antiparallel slivers (triangles with normals ~180 degrees apart)
+  // https://github.com/BrunoLevy/thingiCSG/blob/main/DATABASE/Basic/nasty_gear_1.scad
+
+  const int N = 50;  // Number of rotations for the gear pattern
+  const double alpha = 360.0 / N;
+
+  // Create outer gear - many rotated cubes unioned together
+  std::vector<Manifold> outerCubes;
+  for (int i = 0; i < N; i++) {
+    outerCubes.push_back(
+        Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
+  }
+  Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  Manifold outerGear = gear.Scale({2, 2, 1});
+
+  // Subtract inner from outer to create the nasty gear with slivers
+  Manifold nastyGear = outerGear - gear;
+
+  // The gear should be valid and manifold
+  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(nastyGear.IsEmpty());
+  EXPECT_EQ(nastyGear.Genus(), 1);
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
+  EXPECT_NEAR(nastyGear.SurfaceArea(), 27.46, 1e-2);
+
+  // These should be eliminated after simplification
+  nastyGear = nastyGear.AsOriginal().Simplify(0.0000000001);
+  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(nastyGear.IsEmpty());
+  EXPECT_EQ(nastyGear.Genus(), 1);
+  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
+  EXPECT_NEAR(nastyGear.SurfaceArea(), 27.46, 1e-2);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
   MeshGL cylinderGL = cylinder.GetMeshGL();
