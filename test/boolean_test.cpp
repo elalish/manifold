@@ -216,6 +216,19 @@ TEST(Boolean, MixedNumProp) {
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
 }
 
+TEST(Boolean, PropsMismatch) {
+  Manifold ma = Manifold::Cylinder(1, 1);
+  Manifold mb =
+      Manifold::Cube()
+          .Translate({50, 0, 0})
+          .SetProperties(1, [](double* newProp, vec3 pos, const double* _) {
+            newProp[0] = pos.x;
+          });
+
+  Manifold result = ma + mb;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
 TEST(Boolean, UnionDifference) {
   Manifold block = Manifold::Cube({1, 1, 1}, true) - Manifold::Cylinder(1, 0.5);
   Manifold result = block + block.Translate({0, 0, 1});
