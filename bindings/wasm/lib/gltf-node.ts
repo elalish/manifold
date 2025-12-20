@@ -44,7 +44,7 @@ export type GLTFAttribute =
     'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|'COLOR_0'|
     'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
 
-export class GLTFMaterial {
+export interface GLTFMaterial {
   attributes?: GLTFAttribute[];
   roughness?: number;
   metallic?: number;
