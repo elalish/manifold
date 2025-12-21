@@ -231,13 +231,15 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         const int nextVert = vertIndices[i];
         const int nextEdge = edgeIndices[i];
         const int nextProp = propVertIndices[i];
+        const bool hasProp = node->pImpl_->NumProp() > 0;
         transform(node->pImpl_->halfedge_.begin(),
                   node->pImpl_->halfedge_.end(),
                   combined.halfedge_.begin() + edgeIndices[i],
-                  [nextVert, nextEdge, nextProp](Halfedge edge) {
+                  [nextVert, nextEdge, nextProp, hasProp](Halfedge edge) {
                     edge.startVert += nextVert;
                     edge.endVert += nextVert;
                     edge.pairedHalfedge += nextEdge;
+                    if (!hasProp) edge.propVert = 0;
                     edge.propVert += nextProp;
                     return edge;
                   });

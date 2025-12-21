@@ -31,7 +31,7 @@ import type * as GLTFTransform from '@gltf-transform/core';
 import type {Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
 import type {Vec3} from '../manifold-global-types.d.ts';
 
-import {UnsupportedFormatError} from './error.ts';
+import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import {setMaterialByID} from './material.ts';
@@ -118,7 +118,8 @@ function getImporter(identifier: Format|string) {
  *     than return false.
  * @group Management Functions
  */
-export function supports(filetype: string, throwOnFailure: false): boolean {
+export function supports(
+    filetype: string, throwOnFailure: boolean = false): boolean {
   if (throwOnFailure) return !!getFormat(filetype);
 
   try {
@@ -145,22 +146,13 @@ export function register(importer: Importer) {
  * @returns
  */
 export async function importModel(
-    source: string|Blob|URL,
+    source: string|Blob|URL|ArrayBuffer,
     options: ImportOptions = {}): Promise<VisualizationGLTFNode> {
   const sourceDoc = await readModel(source, options);
-
   const sourceNodes = sourceDoc.getRoot().listNodes();
   if (!sourceNodes.length) {
-    throw new Error(`Model imported from \`${source}\` contains no nodes.`);
-  }
-
-  // Find top level nodes and correct their scale.
-  for (const sourceNode of sourceNodes) {
-    if (sourceNode.getParentNode()) continue;
-    // glTF has a defined scale of 1:1 metre.
-    // manifoldCAD has a defined scale of 1:1 mm.
-    const scale = sourceNode.getScale();
-    sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
+    throw new ImportError(
+        `Model imported from \`${source}\` contains no nodes.`);
   }
 
   const targetNode = new VisualizationGLTFNode(sourceDoc);
@@ -186,15 +178,19 @@ export async function importModel(
  * @group Modelling Functions
  */
 export async function importManifold(
-    source: string|Blob|URL, options: ImportOptions = {}): Promise<Manifold> {
+    source: string|Blob|URL|ArrayBuffer,
+    options: ImportOptions = {}): Promise<Manifold> {
   const {document, node} = await importModel(source, options);
   try {
     return gltfDocToManifold(document, node, options.tolerance);
   } catch (e) {
-    const newError = new Error(
-        `Model imported from \`${source}\` contains no manifold geometry.`);
-    newError.cause = e;
-    throw newError;
+    if (e instanceof ImportError) {
+      const newError = new Error(
+          `Model imported from \`${source}\` contains no manifold geometry.`);
+      newError.cause = e;
+      throw newError;
+    }
+    throw e;
   }
 }
 
@@ -204,11 +200,13 @@ export async function importManifold(
  * @group Low Level Functions
  **/
 export async function readModel(
-    source: string|Blob|URL,
+    source: string|Blob|URL|ArrayBuffer,
     options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   if (source instanceof Blob) {
-    // Binary blob.
     return await fromBlob(source, options);
+  }
+  if (source instanceof ArrayBuffer) {
+    return await fromArrayBuffer(source, options.mimetype!);
   }
 
   let path: string|null = null;
@@ -245,7 +243,7 @@ export async function readModel(
     }
   }
 
-  throw new Error(`Could not import model \`${source}\`.`);
+  throw new ImportError(`Could not import model \`${source}\`.`);
 }
 
 /**
@@ -258,7 +256,8 @@ export async function fetchModel(
   const importer = getImporter(options.mimetype ?? uri);
   const response = await fetch(uri);
   const blob = await response.blob();
-  return await importer.fromArrayBuffer(await blob.arrayBuffer());
+  return importTransform(
+      await importer.fromArrayBuffer(await blob.arrayBuffer()));
 }
 
 /**
@@ -268,8 +267,12 @@ export async function fetchModel(
  **/
 export async function fromBlob(
     blob: Blob, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
+  if (!blob.type && !options.mimetype) {
+    throw new ImportError('Could not infer format of Blob');
+  }
   const importer = getImporter(options.mimetype ?? blob.type);
-  return await importer.fromArrayBuffer(await blob.arrayBuffer());
+  return importTransform(
+      await importer.fromArrayBuffer(await blob.arrayBuffer()));
 }
 
 /**
@@ -279,8 +282,12 @@ export async function fromBlob(
  **/
 export async function fromArrayBuffer(
     buffer: ArrayBuffer, identifier: string): Promise<GLTFTransform.Document> {
+  if (!identifier) {
+    throw new ImportError(
+        'Must specify a mime type when reading an ArrayBuffer');
+  }
   const importer = getImporter(identifier);
-  return await importer.fromArrayBuffer(buffer);
+  return importTransform(await importer.fromArrayBuffer(buffer));
 }
 
 /**
@@ -289,7 +296,7 @@ export async function fromArrayBuffer(
  **/
 export async function readFile(filename: string, options: ImportOptions = {}) {
   if (!isNode()) {
-    throw new Error('Must have a filesystem to read files.');
+    throw new ImportError('Must have a filesystem to read files.');
   }
   const importer = getImporter(options.mimetype ?? filename);
   const fs = await import('node:fs/promises');
@@ -298,7 +305,26 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
   const path =
       filename.startsWith('file:') ? fileURLToPath(filename) : filename;
   const buffer = (await fs.readFile(path)).buffer as ArrayBuffer;
-  return await importer.fromArrayBuffer(buffer);
+  return importTransform(await importer.fromArrayBuffer(buffer));
+}
+
+/**
+ * Scale and transform imported geometry.
+ *
+ * glTF has a defined scale of 1:1 metre.
+ * manifoldCAD has a defined scale of 1:1 mm.
+ *
+ * @internal
+ */
+function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
+  // Find top level nodes and correct their scale.
+  for (const sourceNode of doc.getRoot().listNodes()) {
+    if (sourceNode.getParentNode()) continue;
+
+    const scale = sourceNode.getScale();
+    sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
+  }
+  return doc;
 }
 
 /**
@@ -319,7 +345,7 @@ export function gltfDocToManifold(
     tolerance?: number): Manifold {
   const meshes = gltfNodeToMeshes(document, node);
   if (!meshes.length) {
-    throw new Error(`Model contains no meshes!`);
+    throw new ImportError(`Model contains no meshes!`);
   }
   return meshesToManifold(meshes, tolerance);
 };
@@ -416,7 +442,7 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   }
 
   if (!manifolds?.length) {
-    throw new Error(`Model contains no manifold geometry.`);
+    throw new ImportError(`Model contains no manifold geometry.`);
   }
 
   return Manifold.union(manifolds);
