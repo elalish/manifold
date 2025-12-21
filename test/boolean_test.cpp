@@ -161,21 +161,28 @@ TEST(Boolean, Simplify) {
   EXPECT_EQ(result2.NumTri(), 20);
 }
 
-TEST(Boolean, DISABLED_SimplifyCracks) {
+TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
       Manifold::Cylinder(2, 50, 50, 180)
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
   Manifold cube = Manifold::Cube(vec3(100, 2, 50));
-  Manifold refined = (cylinder + cube).RefineToLength(0.13071895424836602);
+  Manifold refined = (cylinder + cube).RefineToLength(1);
   Manifold deformed =
       refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
   Manifold simplified = deformed.Simplify(0.005);
 
   // If Simplify adds cracks, volume decreases and surface area increases
-  EXPECT_NEAR(simplified.Volume(), 17848, 1);
-  EXPECT_NEAR(simplified.SurfaceArea(), 20930, 1);
+  EXPECT_EQ(deformed.Genus(), 0);
+  EXPECT_EQ(simplified.Genus(), 0);
+  EXPECT_NEAR(simplified.Volume(), deformed.Volume(), 10);
+  EXPECT_NEAR(simplified.SurfaceArea(), deformed.SurfaceArea(), 1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cracks.glb", simplified.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, NoRetainedVerts) {

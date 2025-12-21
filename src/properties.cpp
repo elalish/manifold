@@ -91,25 +91,6 @@ struct CheckHalfedges {
     return good;
   }
 };
-
-struct CheckCCW {
-  VecView<const Halfedge> halfedges;
-  VecView<const vec3> vertPos;
-  VecView<const vec3> triNormal;
-  const double tol;
-
-  bool operator()(size_t face) const {
-    if (halfedges[3 * face].pairedHalfedge < 0) return true;
-
-    const mat2x3 projection = GetAxisAlignedProjection(triNormal[face]);
-    vec2 v[3];
-    for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-
-    const int ccw = CCW(v[0], v[1], v[2], std::abs(tol));
-    return tol > 0 ? ccw >= 0 : ccw == 0;
-  }
-};
 }  // namespace
 
 namespace manifold {
@@ -214,8 +195,26 @@ bool Manifold::Impl::IsSelfIntersecting() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(countAt(0_uz), countAt(NumTri()),
-                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * epsilon_}));
+  return all_of(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
+    if (halfedge_[3 * face].pairedHalfedge < 0) return true;
+
+    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
+    vec2 v[3];
+    double max = -std::numeric_limits<double>::infinity();
+    double min = std::numeric_limits<double>::infinity();
+    for (int i : {0, 1, 2}) {
+      const vec3 p = vertPos_[halfedge_[3 * face + i].startVert];
+      v[i] = projection * p;
+      const double d = la::dot(p, faceNormal_[face]);
+      if (!std::isfinite(d)) return true;
+      max = std::max(max, d);
+      min = std::min(min, d);
+    }
+    if (max - min > 2 * tolerance_) return false;
+
+    const int ccw = CCW(v[0], v[1], v[2], epsilon_ * 2);
+    return ccw >= 0;
+  });
 }
 
 /**
@@ -223,9 +222,17 @@ bool Manifold::Impl::MatchesTriNormals() const {
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return count_if(
-      countAt(0_uz), countAt(NumTri()),
-      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * epsilon_ / 2}));
+  return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
+    if (halfedge_[3 * face].pairedHalfedge < 0) return true;
+
+    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
+    vec2 v[3];
+    for (int i : {0, 1, 2})
+      v[i] = projection * vertPos_[halfedge_[3 * face + i].startVert];
+
+    const int ccw = CCW(v[0], v[1], v[2], epsilon_ / 2);
+    return ccw == 0;
+  });
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
