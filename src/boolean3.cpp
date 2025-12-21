@@ -219,7 +219,6 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z)) s02 = 0;
       } else {
-        // DEBUG_ASSERT(closestVert != -1, topologyErr, "No closest vert");
         if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z)))
           s02 = 0;
       }
