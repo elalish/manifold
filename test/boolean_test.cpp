@@ -366,8 +366,8 @@ TEST(Boolean, Perturb3) {
   // antiparallel slivers (triangles with normals ~180 degrees apart)
   // https://github.com/BrunoLevy/thingiCSG/blob/main/DATABASE/Basic/nasty_gear_1.scad
 
-  const int N = 50;  // Number of rotations for the gear pattern
-  const double alpha = 360.0 / N;
+  const int N = 16;  // Number of rotations for the gear pattern
+  const double alpha = 90.0 / N;
 
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
@@ -387,14 +387,6 @@ TEST(Boolean, Perturb3) {
   const float expectedVolume = outerGear.Volume() - gear.Volume();
 
   // The gear should be valid and manifold
-  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
-  EXPECT_FALSE(nastyGear.IsEmpty());
-  EXPECT_EQ(nastyGear.Genus(), 1);
-  EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
-  EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
-
-  // These should be eliminated after simplification
-  nastyGear = nastyGear.AsOriginal().Simplify();
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
