@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/utils.h"
+#include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -357,30 +358,40 @@ TEST(Boolean, Perturb3) {
 
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
+  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
   for (int i = 0; i < N; i++) {
-    outerCubes.push_back(
-        Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, alpha * i));
+    outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
   Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
   Manifold outerGear = gear.Scale({2, 2, 1});
 
+  const float topArea = CrossSection(gear.Project()).Area();
+  const float sideArea = gear.SurfaceArea() - 2 * topArea;
+
   // Subtract inner from outer to create the nasty gear with slivers
   Manifold nastyGear = outerGear - gear;
+  const float expectedArea = 3 * sideArea + 6 * topArea;
+  const float expectedVolume = outerGear.Volume() - gear.Volume();
 
   // The gear should be valid and manifold
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
-  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
-  EXPECT_NEAR(nastyGear.SurfaceArea(), 27.46, 1e-2);
+  EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
+  EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
   // These should be eliminated after simplification
-  nastyGear = nastyGear.AsOriginal().Simplify(0.0000000001);
+  nastyGear = nastyGear.AsOriginal().Simplify();
   EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(nastyGear.IsEmpty());
   EXPECT_EQ(nastyGear.Genus(), 1);
-  EXPECT_NEAR(nastyGear.Volume(), outerGear.Volume() - gear.Volume(), 1e-5);
-  EXPECT_NEAR(nastyGear.SurfaceArea(), 27.46, 1e-2);
+  EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
+  EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("nastyGear.glb", nastyGear.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, Coplanar) {
