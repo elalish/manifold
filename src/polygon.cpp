@@ -14,9 +14,9 @@
 
 #include "manifold/polygon.h"
 
-#include <functional>
 #include <map>
 #include <set>
+#include <unordered_set>
 
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
@@ -282,6 +282,8 @@ class EarClip {
   std::multiset<VertItr, MinCost> earsQueue_;
   // The output triangulation.
   std::vector<ivec3> triangles_;
+  // halfedges
+  std::unordered_set<ivec2> edges;
   // Bounding box of the entire set of polygons
   Rect bBox_;
   // Working epsilon: max of float error and input value.
@@ -522,6 +524,12 @@ class EarClip {
   // from it, but it is still linked to them.
   static bool Clipped(VertItr v) { return v->right->left != v; }
 
+  // check if clipping the ear will cause topology issue
+  bool ValidEar(VertItrC v) {
+    if (v->left->left == v->right) return true;
+    return edges.find({v->left->mesh_idx, v->right->mesh_idx}) == edges.end();
+  }
+
   // Apply func to each un-clipped vert in a polygon and return an un-clipped
   // vert.
   template <typename F>
@@ -559,8 +567,9 @@ class EarClip {
         ear->right->mesh_idx != ear->left->mesh_idx) {
       // Filter out topological degenerates, which can form in bad
       // triangulations of polygons with holes, due to vert duplication.
-      triangles_.push_back(
-          {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
+      ivec3 tri = {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx};
+      triangles_.push_back(tri);
+      for (int i : {0, 1, 2}) edges.insert({tri[i], tri[Next3(i)]});
     } else {
       PRINT("Topological degenerate!");
     }
@@ -574,6 +583,9 @@ class EarClip {
       return;
     }
     if (ear->left == ear->right) {
+      return;
+    }
+    if (!ValidEar(ear)) {
       return;
     }
     if (ear->IsShort(epsilon_) ||
@@ -839,7 +851,14 @@ class EarClip {
     Dump(v);
 
     while (numTri > 0) {
-      const qItr ear = earsQueue_.begin();
+      qItr ear = earsQueue_.begin();
+      // skip invalid ears
+      while (ear != earsQueue_.end() && !ValidEar(*ear)) {
+        PRINT("invalid ear: ");
+        (*ear)->PrintVert();
+        ear++;
+      }
+
       if (ear != earsQueue_.end()) {
         v = *ear;
         // Cost should always be negative, generally < -epsilon.
@@ -847,6 +866,18 @@ class EarClip {
         earsQueue_.erase(ear);
       } else {
         PRINT("No ear found!");
+
+        // not entirely sure if this loop is needed
+        if (!ValidEar(v)) {
+          PRINT("searching for valid ear...");
+          VertItrC vv = v->right;
+          while (vv != v && !ValidEar(vv)) vv = vv->right;
+          // maybe we should return and say that the result is topologically
+          // invalid?
+          if (v == vv) PRINT("search failed...");
+          v = vv;
+        }
+        v->PrintVert();
       }
 
       ClipEar(v);
