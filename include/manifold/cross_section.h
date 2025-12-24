@@ -21,6 +21,10 @@
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
 
+#ifdef MANIFOLD_DEBUG
+class FilletTestFixture;
+#endif
+
 namespace manifold {
 
 /** @addtogroup Optional
@@ -174,11 +178,28 @@ class CrossSection {
   static CrossSection Hull(const Polygons polys);
   ///@}
 
+  /** @name Fillet
+   */
+  ///@{
+  std::vector<CrossSection> Fillet(double radius,
+                                   int circularSegments = 0) const;
+
+#ifdef MANIFOLD_DEBUG
+  friend std::ostream& operator<<(std::ostream& stream,
+                                  const CrossSection& crossSection);
+  friend class FilletTestFixture;
+#endif
+  ///@}
+
  private:
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };
+
+std::ostream& operator<<(std::ostream& stream,
+                         const CrossSection& crossSection);
 /** @} */
+
 }  // namespace manifold
