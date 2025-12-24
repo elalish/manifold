@@ -37,6 +37,12 @@ struct MeshSize {
   int numPropVert = numVert;
 };
 
+struct ManifoldParamGuard {
+  manifold::ExecutionParams params;
+  ManifoldParamGuard() { params = ManifoldParams(); }
+  ~ManifoldParamGuard() { ManifoldParams() = params; }
+};
+
 Polygons SquareHole(double xOffset = 0.0);
 MeshGL Csaszar();
 Manifold Gyroid();
