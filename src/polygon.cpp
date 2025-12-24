@@ -45,71 +45,39 @@ struct PolyEdge {
   int startVert, endVert;
 };
 
-std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx& polys) {
-  std::vector<PolyEdge> halfedges;
-  for (const auto& poly : polys) {
-    for (size_t i = 1; i < poly.size(); ++i) {
-      halfedges.push_back({poly[i - 1].idx, poly[i].idx});
-    }
-    halfedges.push_back({poly.back().idx, poly[0].idx});
-  }
-  return halfedges;
-}
-
-std::vector<PolyEdge> Triangles2Edges(const std::vector<ivec3>& triangles) {
-  std::vector<PolyEdge> halfedges;
-  halfedges.reserve(triangles.size() * 3);
-  for (const ivec3& tri : triangles) {
-    halfedges.push_back({tri[0], tri[1]});
-    halfedges.push_back({tri[1], tri[2]});
-    halfedges.push_back({tri[2], tri[0]});
-  }
-  return halfedges;
-}
-
-void CheckTopology(const std::vector<PolyEdge>& halfedges) {
-  DEBUG_ASSERT(halfedges.size() % 2 == 0, topologyErr,
-               "Odd number of halfedges.");
-  size_t n_edges = halfedges.size() / 2;
-  std::vector<PolyEdge> forward(halfedges.size()), backward(halfedges.size());
-
-  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](PolyEdge e) { return e.endVert > e.startVert; });
-  DEBUG_ASSERT(
-      static_cast<size_t>(std::distance(forward.begin(), end)) == n_edges,
-      topologyErr, "Half of halfedges should be forward.");
-  forward.resize(n_edges);
-
-  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](PolyEdge e) { return e.endVert < e.startVert; });
-  DEBUG_ASSERT(
-      static_cast<size_t>(std::distance(backward.begin(), end)) == n_edges,
-      topologyErr, "Half of halfedges should be backward.");
-  backward.resize(n_edges);
-
-  std::for_each(backward.begin(), backward.end(),
-                [](PolyEdge& e) { std::swap(e.startVert, e.endVert); });
-  auto cmp = [](const PolyEdge& a, const PolyEdge& b) {
-    return a.startVert < b.startVert ||
-           (a.startVert == b.startVert && a.endVert < b.endVert);
-  };
-  std::stable_sort(forward.begin(), forward.end(), cmp);
-  std::stable_sort(backward.begin(), backward.end(), cmp);
-  for (size_t i = 0; i < n_edges; ++i) {
-    DEBUG_ASSERT(forward[i].startVert == backward[i].startVert &&
-                     forward[i].endVert == backward[i].endVert,
-                 topologyErr, "Not manifold.");
-  }
-}
-
 void CheckTopology(const std::vector<ivec3>& triangles,
                    const PolygonsIdx& polys) {
-  std::vector<PolyEdge> halfedges = Triangles2Edges(triangles);
-  std::vector<PolyEdge> openEdges = Polygons2Edges(polys);
-  for (PolyEdge e : openEdges) {
-    halfedges.push_back({e.endVert, e.startVert});
+  std::unordered_map<ivec2, uint8_t> stats;
+  auto addEdge = [&stats](int start, int end) {
+    DEBUG_ASSERT(start >= 0 && end >= 0 && start != end, topologyErr,
+                 "Invalid edge");
+    ivec2 key = {start, end};
+    bool forward = start < end;
+    int offset = forward ? 1 : 0;
+    if (!forward) std::swap(key.x, key.y);
+    auto iter = stats.find(key);
+    uint8_t oldStat = iter == stats.end() ? 0 : iter->second;
+    DEBUG_ASSERT((oldStat & (1 << offset)) != (1 << offset), topologyErr,
+                 "Duplicated edge");
+    uint8_t newStat = oldStat | (1 << offset);
+    if (iter == stats.end())
+      stats.insert({key, newStat});
+    else
+      iter->second = newStat;
+  };
+
+  for (const auto& tri : triangles)
+    for (size_t i : {0, 1, 2}) addEdge(tri[i], tri[Next3(i)]);
+
+  // reverse edge
+  for (const auto& poly : polys) {
+    for (size_t i = 1; i < poly.size(); ++i)
+      addEdge(poly[i].idx, poly[i - 1].idx);
+    addEdge(poly[0].idx, poly.back().idx);
   }
-  CheckTopology(halfedges);
+
+  for (const auto [key, stat] : stats)
+    DEBUG_ASSERT(stat == 3, topologyErr, "Missing edge");
 }
 
 void CheckGeometry(const std::vector<ivec3>& triangles,
@@ -251,6 +219,9 @@ class EarClip {
     size_t numVert = 0;
     for (const SimplePolygonIdx& poly : polys) {
       numVert += poly.size();
+      for (size_t i = 1; i < poly.size(); ++i)
+        edges.insert({poly[i].idx, poly[i - 1].idx});
+      edges.insert({poly[0].idx, poly.back().idx});
     }
     polygon_.reserve(numVert + 2 * polys.size());
 
