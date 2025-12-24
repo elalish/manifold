@@ -1135,7 +1135,9 @@ TEST(Manifold, MergeRefine) {
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }
+#endif
 
+#ifdef MANIFOLD_DEBUG
 TEST(Manifold, TriangulationNonManifold) {
   ManifoldParamGuard guard;
   ManifoldParams().intermediateChecks = false;
