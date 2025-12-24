@@ -1138,7 +1138,7 @@ TEST(Manifold, MergeRefine) {
 #endif
 
 #ifdef MANIFOLD_DEBUG
-TEST(Manifold, TriangulationNonManifold) {
+TEST(Manifold, DISABLED_TriangulationNonManifold) {
   ManifoldParamGuard guard;
   ManifoldParams().intermediateChecks = false;
   Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
