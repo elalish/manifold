@@ -298,9 +298,6 @@ TEST(Samples, Sponge4) {
 #endif
 
 TEST(Samples, CondensedMatter16) {
-  // FIXME: Triangulation can be invalid
-  bool old = ManifoldParams().processOverlaps;
-  ManifoldParams().processOverlaps = true;
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
   Manifold cm2 = CondensedMatter(16);
@@ -309,13 +306,12 @@ TEST(Samples, CondensedMatter16) {
   if (options.exportModels)
     ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
 #endif
-  ManifoldParams().processOverlaps = old;
 }
 
 #ifndef __EMSCRIPTEN__
 TEST(Samples, CondensedMatter64) {
   // FIXME: Triangulation can be invalid
-  bool old = ManifoldParams().processOverlaps;
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
@@ -326,6 +322,5 @@ TEST(Samples, CondensedMatter64) {
   if (options.exportModels)
     ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
 #endif
-  ManifoldParams().processOverlaps = old;
 }
 #endif
