@@ -1138,9 +1138,9 @@ TEST(Manifold, MergeRefine) {
 #endif
 
 #ifdef MANIFOLD_DEBUG
-TEST(Manifold, DISABLED_TriangulationNonManifold) {
+TEST(Manifold, OpenscadCrash) {
   ManifoldParamGuard guard;
-  ManifoldParams().intermediateChecks = false;
+  ManifoldParams().processOverlaps = true;
   Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
   // m is not empty
   EXPECT_EQ(m.IsEmpty(), false);
