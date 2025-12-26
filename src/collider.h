@@ -157,7 +157,8 @@ struct CreateRadixTree {
   }
 };
 
-template <typename F, const bool selfCollision, const bool hasTransform, typename Recorder>
+template <typename F, const bool selfCollision, const bool hasTransform,
+          typename Recorder>
 struct FindCollision {
   F& f;
   VecView<const Box> nodeBBox_;
@@ -169,8 +170,7 @@ struct FindCollision {
 
   inline int RecordCollision(int node, const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
-    if (hasTransform)
-      box = box.Transform(transform);
+    if (hasTransform) box = box.Transform(transform);
     bool overlaps = box.DoesOverlap(f(queryIdx));
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
@@ -302,46 +302,49 @@ class Collider {
   // If thread local storage is not needed, use SimpleRecorder.
   template <const bool selfCollision = false, typename T, typename Recorder>
   void Collisions(const VecView<const T>& queriesIn, Recorder& recorder,
-                  std::optional<mat3x4> transform,
-                  bool parallel = true) const {
+                  std::optional<mat3x4> transform, bool parallel = true) const {
     ZoneScoped;
     using collider_internal::FindCollision;
     if (internalChildren_.empty()) return;
     auto f = [queriesIn](const int i) { return queriesIn[i]; };
     if (transform) {
-      for_each_n(parallel ? autoPolicy(queriesIn.size(),
-                                      collider_internal::kSequentialThreshold)
-                          : ExecutionPolicy::Seq,
-                countAt(0), queriesIn.size(),
-                FindCollision<decltype(f), selfCollision, true, Recorder>{
-                    f, nodeBBox_, internalChildren_, recorder, transform.value()});
+      for_each_n(
+          parallel ? autoPolicy(queriesIn.size(),
+                                collider_internal::kSequentialThreshold)
+                   : ExecutionPolicy::Seq,
+          countAt(0), queriesIn.size(),
+          FindCollision<decltype(f), selfCollision, true, Recorder>{
+              f, nodeBBox_, internalChildren_, recorder, transform.value()});
     } else {
       for_each_n(parallel ? autoPolicy(queriesIn.size(),
-                                      collider_internal::kSequentialThreshold)
+                                       collider_internal::kSequentialThreshold)
                           : ExecutionPolicy::Seq,
-                countAt(0), queriesIn.size(),
-                FindCollision<decltype(f), selfCollision, false, Recorder>{
-                    f, nodeBBox_, internalChildren_, recorder, la::identity});
+                 countAt(0), queriesIn.size(),
+                 FindCollision<decltype(f), selfCollision, false, Recorder>{
+                     f, nodeBBox_, internalChildren_, recorder, la::identity});
     }
   }
 
   template <const bool selfCollision = false, typename F, typename Recorder>
-  void Collisions(F f, int n, Recorder& recorder, std::optional<mat3x4> transform, bool parallel = true) const {
+  void Collisions(F f, int n, Recorder& recorder,
+                  std::optional<mat3x4> transform, bool parallel = true) const {
     ZoneScoped;
     using collider_internal::FindCollision;
     if (internalChildren_.empty()) return;
     if (transform) {
-      for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                          : ExecutionPolicy::Seq,
-                countAt(0), n,
-                FindCollision<decltype(f), selfCollision, true, Recorder>{
-                    f, nodeBBox_, internalChildren_, recorder, transform.value()});
+      for_each_n(
+          parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
+                   : ExecutionPolicy::Seq,
+          countAt(0), n,
+          FindCollision<decltype(f), selfCollision, true, Recorder>{
+              f, nodeBBox_, internalChildren_, recorder, transform.value()});
     } else {
-      for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                          : ExecutionPolicy::Seq,
-                countAt(0), n,
-                FindCollision<decltype(f), selfCollision, false, Recorder>{
-                    f, nodeBBox_, internalChildren_, recorder, la::identity});
+      for_each_n(parallel
+                     ? autoPolicy(n, collider_internal::kSequentialThreshold)
+                     : ExecutionPolicy::Seq,
+                 countAt(0), n,
+                 FindCollision<decltype(f), selfCollision, false, Recorder>{
+                     f, nodeBBox_, internalChildren_, recorder, la::identity});
     }
   }
 

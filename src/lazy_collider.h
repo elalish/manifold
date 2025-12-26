@@ -72,7 +72,8 @@ class LazyCollider {
     const Built& built = EnsureBuilt();
 
     Adapter<selfCollision, Recorder> adapter{&recorder};
-    built.collider->Collisions<false>(queries, adapter, built.transform, parallel);
+    built.collider->Collisions<false>(queries, adapter, built.transform,
+                                      parallel);
   }
 
   template <const bool selfCollision = false, typename F, typename Recorder>
