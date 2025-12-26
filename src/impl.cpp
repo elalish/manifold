@@ -492,8 +492,32 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
           halfedge_[NextHalfedge(pair0)].endVert ==
               halfedge_[NextHalfedge(pair1)].endVert) {
         h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
-        // Reorder so that remaining edges pair up
-        if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
+        if (i + numEdge != k) {
+          // Reorder so that remaining edges pair up, while preserving relative
+          // order between the edges (triangle id order)
+          // cannot directly use move and move_backward because we need to keep
+          // removed halfedges in-place
+          int dir = i + numEdge < k ? 1 : -1;
+          int a = k;
+          int b = k + dir;
+          auto isRemoved = [this, &ids](int x) {
+            return halfedge_[ids[x]].pairedHalfedge == kRemovedHalfedge;
+          };
+          auto inRange = [&a, dir, i, numEdge]() {
+            return (dir > 0 ? a >= i + numEdge : a <= i + numEdge);
+          };
+          while (1) {
+            do {
+              a -= dir;
+            } while (inRange() && isRemoved(a));
+            if (!inRange()) break;
+            do {
+              b -= dir;
+            } while (isRemoved(b) && b != k);
+            ids[b] = ids[a];
+          }
+          ids[i + numEdge] = pair1;
+        }
         break;
       }
       ++k;
