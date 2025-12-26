@@ -548,18 +548,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   });
 }
 
-/**
- * Does a full recalculation of the face bounding boxes, including updating
- * the collider, but does not resort the faces.
- */
-void Manifold::Impl::Update() {
-  CalculateBBox();
-  Vec<Box> faceBox;
-  Vec<uint32_t> faceMorton;
-  GetFaceBoxMorton(faceBox, faceMorton);
-  collider_.UpdateBoxes(faceBox);
-}
-
 void Manifold::Impl::MakeEmpty(Error status) {
   bBox_ = Box();
   vertPos_.clear();
@@ -568,6 +556,7 @@ void Manifold::Impl::MakeEmpty(Error status) {
   faceNormal_.clear();
   halfedgeTangent_.clear();
   meshRelation_ = MeshRelationD();
+  collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
   status_ = status;
 }
 
@@ -584,7 +573,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  Update();
+  CalculateBBox();
   faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
   Finish();
@@ -605,7 +594,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.MakeEmpty(Error::NonFiniteVertex);
     return result;
   }
-  result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
@@ -645,15 +633,28 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
                FlipTris({result.halfedge_}));
   }
 
-  // This optimization does a cheap collider update if the transform is
-  // axis-aligned.
-  if (!result.collider_.Transform(transform_)) result.Update();
-
   result.CalculateBBox();
   // Scale epsilon by the norm of the 3x3 portion of the transform.
   result.epsilon_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited epsilon loss and translational epsilon loss.
   result.SetEpsilon(result.epsilon_);
+
+  const bool canDeferCollider = LazyCollider::IsAxisAligned(transform_);
+  if (LazyCollider::IsAxisAligned(transform_)) {
+    result.collider_ = std::make_shared<LazyCollider>(collider_, transform_);
+  } else if (!result.IsEmpty()) {
+    Vec<Box> faceBox;
+    Vec<uint32_t> faceMorton;
+    result.GetFaceBoxMorton(faceBox, faceMorton);
+    result.SortFaces(faceBox, faceMorton);
+
+    LazyCollider::LeafData leafData;
+    leafData.leafBox = std::move(faceBox);
+    leafData.leafMorton = std::move(faceMorton);
+    result.collider_ = std::make_shared<LazyCollider>(std::move(leafData));
+  } else {
+    result.collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+  }
   return result;
 }
 

@@ -274,7 +274,7 @@ Polygons Manifold::Impl::Slice(double height) const {
   };
 
   auto recorder = MakeSimpleRecorder(recordCollision);
-  collider_.Collisions<false>(query.cview(), recorder, false);
+  collider_->Collisions<false>(query.cview(), recorder, false);
 
   Polygons polys;
   while (!tris.empty()) {
