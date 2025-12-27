@@ -35,6 +35,7 @@ class LazyCollider {
 
   struct Base {
     std::shared_ptr<const LazyCollider> base;
+    std::optional<Vec<Box>> updatedLeafBox;
     mat3x4 transform;
   };
 
@@ -43,6 +44,8 @@ class LazyCollider {
   LazyCollider(LeafData&& leafData);
   LazyCollider(std::shared_ptr<const LazyCollider> base,
                const mat3x4& transform);
+  LazyCollider(std::shared_ptr<const LazyCollider> base,
+               std::optional<Vec<Box>> updatedLeafBox);
   LazyCollider(const LazyCollider& other);
   LazyCollider(LazyCollider&& other) noexcept;
   LazyCollider& operator=(const LazyCollider& other);
@@ -66,21 +69,12 @@ class LazyCollider {
     }
   };
 
-  template <const bool selfCollision = false, typename T, typename Recorder>
-  void Collisions(const VecView<const T>& queries, Recorder& recorder,
-                  bool parallel = true) const {
-    const Built& built = EnsureBuilt();
-
-    Adapter<selfCollision, Recorder> adapter{&recorder};
-    built.collider->Collisions<false>(queries, adapter, built.transform,
-                                      parallel);
-  }
-
-  template <const bool selfCollision = false, typename F, typename Recorder>
-  void Collisions(F f, int n, Recorder& recorder, bool parallel = true) const {
+  template <const bool selfCollision = false, typename Recorder,
+            typename... Args>
+  void Collisions(Recorder& recorder, Args... args) const {
     const Built& built = EnsureBuilt();
     Adapter<selfCollision, Recorder> adapter{&recorder};
-    built.collider->Collisions<false>(f, n, adapter, built.transform, parallel);
+    built.collider->Collisions<false>(adapter, built.transform, args...);
   }
 
   static bool IsAxisAligned(const mat3x4& transform);

@@ -371,7 +371,7 @@ Intersections Intersect12_(const Manifold::Impl& inP,
                      a.vertPos_[a.halfedge_[i].endVert])
                : Box();
   };
-  b.collider_->Collisions<false>(f, a.halfedge_.size(), recorder);
+  b.collider_->Collisions<false>(recorder, f, a.halfedge_.size());
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
@@ -454,8 +454,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&](int i) { return a.vertPos_[verts[i]]; };
-  b.collider_->Collisions<false, decltype(f), decltype(recorder)>(
-      f, verts.size(), recorder);
+  b.collider_->Collisions<false>(recorder, f, verts.size());
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
            [&](size_t i) {

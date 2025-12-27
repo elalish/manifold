@@ -291,43 +291,9 @@ class Collider {
                    {nodeBBox_, counter, nodeParent_, internalChildren_}));
   }
 
-  // This function iterates over queriesIn and calls recorder.record(queryIdx,
-  // leafIdx, local) for each collision it found.
-  // If selfCollisionl is true, it will skip the case where queryIdx == leafIdx.
-  // The recorder should provide a local() method that returns a Recorder::Local
-  // type, representing thread local storage. By default, recorder.record can
-  // run in parallel and the thread local storage can be combined at the end.
-  // If parallel is false, the function will run in sequential mode.
-  //
-  // If thread local storage is not needed, use SimpleRecorder.
-  template <const bool selfCollision = false, typename T, typename Recorder>
-  void Collisions(const VecView<const T>& queriesIn, Recorder& recorder,
-                  std::optional<mat3x4> transform, bool parallel = true) const {
-    ZoneScoped;
-    using collider_internal::FindCollision;
-    if (internalChildren_.empty()) return;
-    auto f = [queriesIn](const int i) { return queriesIn[i]; };
-    if (transform) {
-      for_each_n(
-          parallel ? autoPolicy(queriesIn.size(),
-                                collider_internal::kSequentialThreshold)
-                   : ExecutionPolicy::Seq,
-          countAt(0), queriesIn.size(),
-          FindCollision<decltype(f), selfCollision, true, Recorder>{
-              f, nodeBBox_, internalChildren_, recorder, transform.value()});
-    } else {
-      for_each_n(parallel ? autoPolicy(queriesIn.size(),
-                                       collider_internal::kSequentialThreshold)
-                          : ExecutionPolicy::Seq,
-                 countAt(0), queriesIn.size(),
-                 FindCollision<decltype(f), selfCollision, false, Recorder>{
-                     f, nodeBBox_, internalChildren_, recorder, la::identity});
-    }
-  }
-
   template <const bool selfCollision = false, typename F, typename Recorder>
-  void Collisions(F f, int n, Recorder& recorder,
-                  std::optional<mat3x4> transform, bool parallel = true) const {
+  void Collisions(Recorder& recorder, std::optional<mat3x4> transform, F f,
+                  int n, bool parallel = true) const {
     ZoneScoped;
     using collider_internal::FindCollision;
     if (internalChildren_.empty()) return;
@@ -346,6 +312,24 @@ class Collider {
                  FindCollision<decltype(f), selfCollision, false, Recorder>{
                      f, nodeBBox_, internalChildren_, recorder, la::identity});
     }
+  }
+
+  // This function iterates over queriesIn and calls recorder.record(queryIdx,
+  // leafIdx, local) for each collision it found.
+  // If selfCollisionl is true, it will skip the case where queryIdx == leafIdx.
+  // The recorder should provide a local() method that returns a Recorder::Local
+  // type, representing thread local storage. By default, recorder.record can
+  // run in parallel and the thread local storage can be combined at the end.
+  // If parallel is false, the function will run in sequential mode.
+  //
+  // If thread local storage is not needed, use SimpleRecorder.
+  template <const bool selfCollision = false, typename T, typename Recorder>
+  void Collisions(Recorder& recorder, std::optional<mat3x4> transform,
+                  const VecView<const T>& queriesIn,
+                  bool parallel = true) const {
+    auto f = [queriesIn](const int i) { return queriesIn[i]; };
+    Collisions<selfCollision>(recorder, transform, f, queriesIn.size(),
+                              parallel);
   }
 
   static uint32_t MortonCode(vec3 position, Box bBox) {

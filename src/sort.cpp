@@ -159,7 +159,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     return uf.unite(openVerts[a], openVerts[b]);
   };
   auto recorder = MakeSimpleRecorder(f);
-  collider.Collisions<true>(vertBox.cview(), recorder, std::nullopt, false);
+  collider.Collisions<true>(recorder, std::nullopt, vertBox.cview(), false);
 
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     uf.unite(static_cast<int>(mesh.mergeFromVert[i]),

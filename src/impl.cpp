@@ -639,19 +639,14 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   // Maximum of inherited epsilon loss and translational epsilon loss.
   result.SetEpsilon(result.epsilon_);
 
-  const bool canDeferCollider = LazyCollider::IsAxisAligned(transform_);
   if (LazyCollider::IsAxisAligned(transform_)) {
     result.collider_ = std::make_shared<LazyCollider>(collider_, transform_);
   } else if (!result.IsEmpty()) {
     Vec<Box> faceBox;
     Vec<uint32_t> faceMorton;
     result.GetFaceBoxMorton(faceBox, faceMorton);
-    result.SortFaces(faceBox, faceMorton);
-
-    LazyCollider::LeafData leafData;
-    leafData.leafBox = std::move(faceBox);
-    leafData.leafMorton = std::move(faceMorton);
-    result.collider_ = std::make_shared<LazyCollider>(std::move(leafData));
+    result.collider_ =
+        std::make_shared<LazyCollider>(collider_, std::move(faceBox));
   } else {
     result.collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
   }

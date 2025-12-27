@@ -23,14 +23,29 @@ LazyCollider::LazyCollider(std::shared_ptr<const LazyCollider> base,
                            const mat3x4& transform) {
   DEBUG_ASSERT(base != nullptr, logicErr, "invalid base ptr");
   mat3x4 composed = transform;
-  while (base) {
-    std::lock_guard<std::mutex> lock(base->mutex_);
-    if (!base->base_) break;
+  // attempt to unwrap one level, if the base is also a transformed collider
+  // we do not unwrap if the base has updatedLeafBox
+  std::lock_guard<std::mutex> lock(base->mutex_);
+  if (base->base_ && !base->base_->updatedLeafBox.has_value()) {
     composed = composed * Mat4(base->base_->transform);
     base = base->base_->base;
   }
+  base_ = Base{base, std::nullopt, composed};
+}
 
-  base_ = {base, composed};
+LazyCollider::LazyCollider(std::shared_ptr<const LazyCollider> base,
+                           std::optional<Vec<Box>> updatedLeafBox) {
+  DEBUG_ASSERT(base != nullptr, logicErr, "invalid base ptr");
+  // attempt to unwrap base
+  // there are two cases:
+  // 1. base contains updatedLeafBox, which means that its points to the root
+  // 2. base is a transformed node, which either points to the root or points to
+  //    a node with updatedLeafBox, which is case 1
+  // For case 2, the max depth is 2, and in any case we ignore transforms
+  std::lock_guard<std::mutex> lock(base->mutex_);
+  if (base->base_) base = base->base_->base;
+  if (base->base_) base = base->base_->base;
+  base_ = Base{base, std::move(updatedLeafBox), la::identity};
 }
 
 LazyCollider::LazyCollider(const LazyCollider& other) {
@@ -87,10 +102,20 @@ const LazyCollider::Built& LazyCollider::EnsureBuilt() const {
 
   if (base_) {
     const Built& baseBuilt = base_->base->EnsureBuilt();
-    mat3x4 composed =
-        base_->transform * Mat4(baseBuilt.transform.value_or(la::identity));
-    built_ = {baseBuilt.collider, composed};
+    // no need to propagate transform from built, we already computed the
+    // composed transform in the constructor
+    built_ = {baseBuilt.collider, base_->transform};
+    auto leafBox = std::move(base_->updatedLeafBox);
     base_ = std::nullopt;
+    if (leafBox) {
+      // need a unique collider, it may be possible that the base reference to
+      // the collider was dropped when we reset the base_ pointer
+      if (!built_->collider.unique())
+        built_->collider = std::make_shared<Collider>(*built_->collider);
+      built_->collider->UpdateBoxes(leafBox.value());
+      // note that after updating the boxes, we don't need transform
+      built_->transform = std::nullopt;
+    }
   } else {
     DEBUG_ASSERT(leafData_.has_value(), logicErr, "uninitialized collider");
     built_ = {
