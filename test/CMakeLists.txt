@@ -52,8 +52,9 @@ if(EMSCRIPTEN)
     PRIVATE
       -sASSERTIONS=1
       --bind
-      --preload-file
-      ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons
+      # https://cmake.org/cmake/help/latest/command/target_link_options.html#option-de-duplication
+      "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/models@/models"
+      "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/polygons@/polygons"
   )
 endif()
 

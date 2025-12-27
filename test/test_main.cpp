@@ -495,10 +495,14 @@ MeshGL ReadMesh(const std::string& filename) {
 
 #ifdef MANIFOLD_DEBUG
 Manifold ReadTestOBJ(const std::string& filename) {
+#ifdef __EMSCRIPTEN__
+  std::string obj = "/models/" + filename;
+#else
   std::filesystem::path file(__FILE__);
   std::filesystem::path obj = file.parent_path();
   obj.append("models");
   obj.append(filename);
+#endif
   std::ifstream f;
   f.open(obj);
   Manifold a = Manifold::ReadOBJ(f);
