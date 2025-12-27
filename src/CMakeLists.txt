@@ -21,6 +21,7 @@ set(
   edge_op.cpp
   face_op.cpp
   impl.cpp
+  lazy_collider.cpp
   manifold.cpp
   polygon.cpp
   properties.cpp
@@ -43,6 +44,7 @@ set(
   hashtable.h
   impl.h
   iters.h
+  lazy_collider.h
   mesh_fixes.h
   parallel.h
   quickhull.h
