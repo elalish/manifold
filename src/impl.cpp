@@ -594,14 +594,19 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.MakeEmpty(Error::NonFiniteVertex);
     return result;
   }
+  const bool invert = la::determinant(mat3(transform_)) < 0;
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
-  result.halfedge_ = halfedge_;
-  result.halfedgeTangent_.resize(halfedgeTangent_.size());
+  result.halfedge_ = halfedge_.Share();
+  if (halfedgeTangent_.size() > 0) {
+    result.halfedgeTangent_ = LazyTangents::FromTransform(
+        halfedgeTangent_, mat3(transform_), invert, halfedge_.SharedPtr());
+    result.halfedgeTangent_.begin();
+  }
 
   result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
@@ -620,15 +625,8 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
             TransformNormals({normalTransform}));
 
-  const bool invert = la::determinant(mat3(transform_)) < 0;
-
-  if (halfedgeTangent_.size() > 0) {
-    for_each_n(policy, countAt(0), halfedgeTangent_.size(),
-               TransformTangents({result.halfedgeTangent_, 0, mat3(transform_),
-                                  invert, halfedgeTangent_, halfedge_}));
-  }
-
   if (invert) {
+    result.halfedge_.MakeUnique();
     for_each_n(policy, countAt(0), result.NumTri(),
                FlipTris({result.halfedge_}));
   }

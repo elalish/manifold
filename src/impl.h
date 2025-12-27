@@ -16,6 +16,7 @@
 #include <map>
 
 #include "lazy_collider.h"
+#include "lazy_tangents.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "shared.h"
@@ -46,13 +47,13 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
-  Vec<Halfedge> halfedge_;
+  SharedVec<Halfedge> halfedge_;
   Vec<double> properties_;
   // Note that vertNormal_ is not precise due to the use of an approximated acos
   // function
   Vec<vec3> vertNormal_;
   Vec<vec3> faceNormal_;
-  Vec<vec4> halfedgeTangent_;
+  LazyTangents halfedgeTangent_;
   MeshRelationD meshRelation_;
   std::shared_ptr<LazyCollider> collider_ = std::make_shared<LazyCollider>();
 

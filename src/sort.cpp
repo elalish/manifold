@@ -432,8 +432,11 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
     Permute(meshRelation_.triRef, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  Vec<Halfedge> oldHalfedge(std::move(halfedge_));
-  Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
+  Vec<Halfedge> oldHalfedge;
+  halfedge_.swap(oldHalfedge);
+  Vec<vec4> oldHalfedgeTangent;
+  halfedgeTangent_.swap(oldHalfedgeTangent);
+
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
   scatter(countAt(0_uz), countAt(numTri), faceNew2Old.begin(),

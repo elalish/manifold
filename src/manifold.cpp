@@ -807,7 +807,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
     if (minSmoothness == 0) {
       const int numProp = pImpl->numProp_;
       Vec<double> properties = pImpl->properties_;
-      Vec<Halfedge> halfedge = pImpl->halfedge_;
+      auto halfedge = pImpl->halfedge_;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals

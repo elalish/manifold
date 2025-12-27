@@ -22,6 +22,7 @@ set(
   face_op.cpp
   impl.cpp
   lazy_collider.cpp
+  lazy_tangents.cpp
   manifold.cpp
   polygon.cpp
   properties.cpp
@@ -45,6 +46,7 @@ set(
   impl.h
   iters.h
   lazy_collider.h
+  lazy_tangents.h
   mesh_fixes.h
   parallel.h
   quickhull.h
