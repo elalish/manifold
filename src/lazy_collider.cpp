@@ -110,7 +110,7 @@ const LazyCollider::Built& LazyCollider::EnsureBuilt() const {
     if (leafBox) {
       // need a unique collider, it may be possible that the base reference to
       // the collider was dropped when we reset the base_ pointer
-      if (!built_->collider.unique())
+      if (built_->collider.use_count() != 1)
         built_->collider = std::make_shared<Collider>(*built_->collider);
       built_->collider->UpdateBoxes(leafBox.value());
       // note that after updating the boxes, we don't need transform
