@@ -54,27 +54,11 @@ class LazyCollider {
 
   bool IsBuilt() const;
 
-  template <const bool selfCollision, typename Recorder>
-  struct Adapter {
-    using Local = typename Recorder::Local;
-    Recorder* recorder;
-
-    Local& local() { return recorder->local(); }
-
-    void record(int queryIdx, int leafIdx, Local& local) {
-      if constexpr (selfCollision) {
-        if (leafIdx == queryIdx) return;
-      }
-      recorder->record(queryIdx, leafIdx, local);
-    }
-  };
-
   template <const bool selfCollision = false, typename Recorder,
             typename... Args>
   void Collisions(Recorder& recorder, Args... args) const {
     const Built& built = EnsureBuilt();
-    Adapter<selfCollision, Recorder> adapter{&recorder};
-    built.collider->Collisions<false>(adapter, built.transform, args...);
+    built.collider->Collisions<false>(recorder, built.transform, args...);
   }
 
   static bool IsAxisAligned(const mat3x4& transform);
