@@ -204,6 +204,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.epsilon_ = epsilon;
   combined.tolerance_ = tolerance;
   combined.vertPos_.resize_nofill(numVert);
+  combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
   combined.faceNormal_.resize_nofill(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
@@ -261,6 +262,9 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         if (node->transform_ == mat3x4(la::identity)) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
+          copy(node->pImpl_->vertNormal_.begin(),
+               node->pImpl_->vertNormal_.end(),
+               combined.vertNormal_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),
                node->pImpl_->faceNormal_.end(),
                combined.faceNormal_.begin() + triIndices[i]);
@@ -274,11 +278,16 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
               });
           mat3 normalTransform =
               la::inverse(la::transpose(mat3(node->transform_)));
+          auto vertNormalBegin =
+              TransformIterator(node->pImpl_->vertNormal_.begin(),
+                                TransformNormals({normalTransform}));
           auto faceNormalBegin =
               TransformIterator(node->pImpl_->faceNormal_.begin(),
                                 TransformNormals({normalTransform}));
           copy_n(vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
+          copy_n(vertNormalBegin, node->pImpl_->vertNormal_.size(),
+                 combined.vertNormal_.begin() + vertIndices[i]);
           copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 

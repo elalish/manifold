@@ -653,14 +653,14 @@ TEST(Manifold, MeshRelationRefinePrecision) {
 
 TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder = Manifold::Cylinder(2, 1);
-  ASSERT_GE(cylinder.OriginalID(), 0);
+  EXPECT_GE(cylinder.OriginalID(), 0);
   MeshGL inGL = cylinder.GetMeshGL();
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
 
-  ASSERT_EQ(inGL.runOriginalID.size(), 1);
-  ASSERT_EQ(outGL.runOriginalID.size(), 1);
-  ASSERT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
+  EXPECT_EQ(inGL.runOriginalID.size(), 1);
+  EXPECT_EQ(outGL.runOriginalID.size(), 1);
+  EXPECT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
 
   RelatedGL(cylinder2, {inGL});
 }
@@ -781,14 +781,14 @@ TEST(Manifold, PinchedVert) {
 
 TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
-  ASSERT_GE(cube.OriginalID(), 0);
+  EXPECT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  ASSERT_EQ(NumUnique(inGL.faceID), 6);
+  EXPECT_EQ(NumUnique(inGL.faceID), 6);
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);
   const MeshGL outGL = cube2.GetMeshGL();
-  ASSERT_EQ(NumUnique(outGL.faceID), 2);
+  EXPECT_EQ(NumUnique(outGL.faceID), 2);
 }
 
 TEST(Manifold, MirrorUnion) {

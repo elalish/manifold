@@ -242,11 +242,6 @@ void Manifold::Impl::Finish() {
   DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||
                    meshRelation_.triRef.size() == 0,
                logicErr, "Mesh Relation doesn't fit!");
-  DEBUG_ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0,
-               logicErr,
-               "faceNormal size = " + std::to_string(faceNormal_.size()) +
-                   ", NumTri = " + std::to_string(NumTri()));
-  CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 
   DEBUG_ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");

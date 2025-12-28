@@ -248,7 +248,6 @@ struct Manifold::Impl {
     // we need to split pinched verts before calculating vertex normals, because
     // the algorithm doesn't work with pinched verts
     CleanupTopology();
-    CalculateNormals();
 
     DedupePropVerts();
     MarkCoplanar();
@@ -294,7 +293,7 @@ struct Manifold::Impl {
   void MarkCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(bool keepFaceID = false);
+  void InitializeOriginal(bool keepFaceID = true);
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateNormals();

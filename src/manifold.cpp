@@ -538,7 +538,6 @@ Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->MarkCoplanar();
-  newImpl->InitializeOriginal(true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 

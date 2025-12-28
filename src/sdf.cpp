@@ -528,8 +528,10 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->CreateHalfedges(triVerts);
   pImpl_->CleanupTopology();
   pImpl_->RemoveUnreferencedVerts();
-  pImpl_->Finish();
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->Finish();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }

@@ -209,8 +209,10 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   vertPos_ = vertPos;
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
-  Finish();
   InitializeOriginal();
+  CalculateBBox();
+  SetEpsilon();
+  Finish();
   MarkCoplanar();
 }
 
@@ -250,24 +252,26 @@ void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
 void Manifold::Impl::MarkCoplanar() {
   ZoneScoped;
   const int numTri = NumTri();
+  faceNormal_.resize(numTri);
   struct TriPriority {
     double area2;
     int tri;
   };
   Vec<TriPriority> triPriority(numTri);
-  for_each_n(autoPolicy(numTri), countAt(0), numTri,
-             [&triPriority, this](int tri) {
-               meshRelation_.triRef[tri].coplanarID = -1;
-               if (halfedge_[3 * tri].startVert < 0) {
-                 triPriority[tri] = {0, tri};
-                 return;
-               }
-               const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
-               triPriority[tri] = {
-                   length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
-                                 vertPos_[halfedge_[3 * tri + 1].endVert] - v)),
-                   tri};
-             });
+  for_each_n(
+      autoPolicy(numTri), countAt(0), numTri, [&triPriority, this](int tri) {
+        meshRelation_.triRef[tri].coplanarID = -1;
+        if (halfedge_[3 * tri].startVert < 0) {
+          triPriority[tri] = {0, tri};
+          return;
+        }
+        const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+        const vec3 n = cross(vertPos_[halfedge_[3 * tri].endVert] - v,
+                             vertPos_[halfedge_[3 * tri + 1].endVert] - v);
+        faceNormal_[tri] = normalize(n);
+        if (std::isnan(faceNormal_[tri].x)) faceNormal_[tri] = vec3(0, 0, 1);
+        triPriority[tri] = {length2(n), tri};
+      });
 
   stable_sort(triPriority.begin(), triPriority.end(),
               [](auto a, auto b) { return a.area2 > b.area2; });
@@ -305,6 +309,7 @@ void Manifold::Impl::MarkCoplanar() {
       }
     }
   }
+  CalculateNormals();
 }
 
 /**
@@ -698,31 +703,9 @@ void Manifold::Impl::CalculateNormals() {
     while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
       if (old < value) break;
   };
-  if (faceNormal_.size() != NumTri()) {
-    faceNormal_.resize(NumTri());
-    for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
-      vec3& triNormal = faceNormal_[face];
-      if (halfedge_[3 * face].startVert < 0) {
-        triNormal = vec3(0, 0, 1);
-        return;
-      }
 
-      ivec3 triVerts;
-      for (const int i : {0, 1, 2}) {
-        const int v = halfedge_[3 * face + i].startVert;
-        triVerts[i] = v;
-        atomicMin(3 * face + i, v);
-      }
-
-      const vec3 edge0 = vertPos_[triVerts[1]] - vertPos_[triVerts[0]];
-      const vec3 edge1 = vertPos_[triVerts[2]] - vertPos_[triVerts[1]];
-      triNormal = la::normalize(la::cross(edge0, edge1));
-      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
-    });
-  } else {
-    for_each_n(policy, countAt(0), halfedge_.size(),
-               [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
-  }
+  for_each_n(policy, countAt(0), halfedge_.size(),
+             [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
 
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
     int firstEdge = vertHalfedgeMap[vert].load();

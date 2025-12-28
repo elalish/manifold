@@ -619,10 +619,11 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   Vec<ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
   vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
   Vec<TriRef> triRef(triVerts.size());
+  Vec<vec3> faceNormal(triVerts.size());
   for_each_n(
       policy, countAt(0), numTri,
       [this, &triVerts, &triRef, &vertBary, &subTris, &edgeOffset, &half2Edge,
-       &triOffset, &interiorOffset, &faceHalfedges](int tri) {
+       &triOffset, &interiorOffset, &faceHalfedges, &faceNormal](int tri) {
         const ivec4 halfedges = faceHalfedges[tri];
         if (halfedges[0] < 0) return;
         ivec4 tri3;
@@ -642,8 +643,10 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         Vec<ivec3> newTris = subTris[tri].Reindex(tri3, edgeOffsets, edgeFwd,
                                                   interiorOffset[tri]);
         copy(newTris.begin(), newTris.end(), triVerts.begin() + triOffset[tri]);
-        auto start = triRef.begin() + triOffset[tri];
-        fill(start, start + newTris.size(), meshRelation_.triRef[tri]);
+        auto startRef = triRef.begin() + triOffset[tri];
+        fill(startRef, startRef + newTris.size(), meshRelation_.triRef[tri]);
+        auto startN = faceNormal.begin() + triOffset[tri];
+        fill(startN, startN + newTris.size(), faceNormal_[tri]);
 
         const ivec4 idx = subTris[tri].idx;
         const ivec4 vIdx = halfedges[3] >= 0 || idx[1] == Next3(idx[0])
@@ -663,7 +666,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                                          bary[rIdx[2]], bary[rIdx[3]]}});
                   });
       });
-  meshRelation_.triRef = triRef;
+  std::swap(meshRelation_.triRef, triRef);
+  std::swap(faceNormal_, faceNormal);
 
   Vec<vec3> newVertPos(vertBary.size());
   for_each_n(policy, countAt(0), vertBary.size(),
@@ -685,8 +689,6 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                }
              });
   vertPos_ = newVertPos;
-
-  faceNormal_.clear();
 
   if (numProp_ > 0) {
     const int numPropVert = NumPropVert();

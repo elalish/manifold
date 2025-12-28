@@ -883,6 +883,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   outR.Finish();
+  outR.CalculateNormals();
   outR.IncrementMeshIDs();
 
 #ifdef MANIFOLD_DEBUG

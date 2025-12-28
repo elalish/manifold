@@ -202,9 +202,12 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
                v = radius * la::normalize(v);
                if (std::isnan(v.x)) v = vec3(0.0);
              });
-  pImpl_->Finish();
   // Ignore preceding octahedron.
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->Finish();
+  pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -296,8 +299,10 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->Finish();
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->Finish();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
@@ -439,8 +444,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->Finish();
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->Finish();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
@@ -497,9 +504,12 @@ std::vector<Manifold> Manifold::Decompose() const {
                 [i, &vertLabel](int v) { return vertLabel[v] == i; }) -
         vertNew2Old.begin();
     impl->vertPos_.resize(nVert);
+    impl->vertNormal_.resize(nVert);
     vertNew2Old.resize(nVert);
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
            impl->vertPos_.begin());
+    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
+           impl->vertNormal_.begin());
 
     Vec<int> faceNew2Old(NumTri());
     const auto& halfedge = pImpl_->halfedge_;
