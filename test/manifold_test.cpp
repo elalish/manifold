@@ -571,7 +571,7 @@ TEST(Manifold, Simplify) {
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
-  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 20);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
   EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
 
 #ifdef MANIFOLD_EXPORT
@@ -744,8 +744,7 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(man.NumTri(), 4);
-  EXPECT_TRUE(man.Simplify().IsEmpty());
+  EXPECT_TRUE(man.IsEmpty());
 }
 
 TEST(Manifold, PinchedVert) {

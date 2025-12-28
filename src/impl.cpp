@@ -296,7 +296,9 @@ void Manifold::Impl::MarkCoplanar() {
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (std::abs(dot(v - base, normal)) < tolerance_) {
-        meshRelation_.triRef[h / 3].coplanarID = tp.tri;
+        const size_t tri = h / 3;
+        meshRelation_.triRef[tri].coplanarID = tp.tri;
+        faceNormal_[tri] = normal;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
