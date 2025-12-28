@@ -204,6 +204,7 @@ namespace manifold {
 void Manifold::Impl::CleanupTopology() {
   if (!halfedge_.size()) return;
   DEBUG_ASSERT(IsManifold(), logicErr, "polygon mesh is not manifold!");
+  halfedge_.MakeUnique();
 
   // In the case of a very bad triangulation, it is possible to create pinched
   // verts. They must be removed before edge collapse.
@@ -235,6 +236,7 @@ void Manifold::Impl::CleanupTopology() {
  */
 void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   if (!halfedge_.size()) return;
+  halfedge_.MakeUnique();
 
   CleanupTopology();
   CollapseShortEdges(firstNewVert);
@@ -244,6 +246,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
 
 void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   if (!halfedge_.size()) return;
+  halfedge_.MakeUnique();
 
   CleanupTopology();
   CollapseShortEdges(firstNewVert);

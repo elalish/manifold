@@ -316,6 +316,7 @@ void Manifold::Impl::DedupePropVerts() {
   const size_t numProp = NumProp();
   if (numProp == 0) return;
 
+  halfedge_.MakeUnique();
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              [&vert2vert, numProp, this](const int edgeIdx) {
@@ -402,7 +403,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
-  halfedge_.clear(true);
+  halfedge_ = SharedVec<Halfedge>();
   halfedge_.resize_nofill(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
 
@@ -575,6 +576,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
 void Manifold::Impl::MakeEmpty(Error status) {
   bBox_ = Box();
   vertPos_.clear();
+  halfedge_.MakeUnique();
   halfedge_.clear();
   vertNormal_.clear();
   faceNormal_.clear();
@@ -653,6 +655,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
 
   if (invert) {
+    result.halfedge_.MakeUnique();
     for_each_n(policy, countAt(0), result.NumTri(),
                FlipTris({result.halfedge_}));
   }

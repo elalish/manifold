@@ -66,7 +66,7 @@ struct DuplicateVerts {
 
 template <bool atomic>
 struct CountVerts {
-  VecView<Halfedge> halfedges;
+  const VecView<Halfedge> halfedges;
   VecView<int> count;
   VecView<const int> inclusion;
 
@@ -220,7 +220,7 @@ void AddNewEdgeVerts(
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const Vec<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
@@ -317,9 +317,9 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  SharedVec<Halfedge>& halfedgeR = outR.halfedge_;
   const Vec<vec3>& vertPosP = inP.vertPos_;
-  const Vec<Halfedge>& halfedgeP = inP.halfedge_;
+  const VecView<const Halfedge> halfedgeP = inP.halfedge_;
 
   for (auto& value : edgesP) {
     const int edgeP = value.first;
@@ -392,7 +392,7 @@ void AppendNewEdges(
     Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  SharedVec<Halfedge>& halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
   for (auto& value : edgesNew) {

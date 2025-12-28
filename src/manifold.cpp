@@ -807,13 +807,13 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
     if (minSmoothness == 0) {
       const int numProp = pImpl->numProp_;
       Vec<double> properties = pImpl->properties_;
-      Vec<Halfedge> halfedge = pImpl->halfedge_;
+      Vec<Halfedge> halfedge = pImpl->halfedge_.vec();
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
       pImpl->numProp_ = numProp;
       pImpl->properties_.swap(properties);
-      pImpl->halfedge_.swap(halfedge);
+      pImpl->halfedge_ = std::move(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }
@@ -834,6 +834,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  */
 Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->halfedge_.MakeUnique();
   if (n > 1) {
     pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
   }
@@ -853,6 +854,7 @@ Manifold Manifold::Refine(int n) const {
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->halfedge_.MakeUnique();
   pImpl->Refine([length](vec3 edge, vec4, vec4) {
     return static_cast<int>(la::length(edge) / length);
   });
@@ -874,6 +876,7 @@ Manifold Manifold::RefineToLength(double length) const {
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->halfedge_.MakeUnique();
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
         [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {

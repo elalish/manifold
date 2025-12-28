@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "parallel.h"
 #include "utils.h"
 #include "vec.h"
@@ -171,7 +173,7 @@ struct TmpEdge {
   }
 };
 
-Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
+Vec<TmpEdge> inline CreateTmpEdges(const VecView<const Halfedge>& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
              [&edges, &halfedge](const int idx) {
@@ -208,4 +210,71 @@ inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
                 << ", coplanarID: " << ref.coplanarID;
 }
 #endif
+
+template <typename T>
+class SharedVec {
+ public:
+  SharedVec() : data_(std::make_shared<Vec<T>>()) {}
+  explicit SharedVec(const Vec<T>& vec)
+      : data_(std::make_shared<Vec<T>>(vec)) {}
+  SharedVec(const SharedVec& other) : data_(other.data_) {}
+  SharedVec& operator=(const SharedVec& other) {
+    if (this == &other) return *this;
+    data_ = other.data_;
+    return *this;
+  }
+  SharedVec& operator=(const Vec<T>& vec) {
+    data_ = std::make_shared<Vec<T>>(vec);
+    return *this;
+  }
+  SharedVec& operator=(Vec<T>&& vec) {
+    data_ = std::make_shared<Vec<T>>(std::move(vec));
+    return *this;
+  }
+  SharedVec(SharedVec&&) noexcept = default;
+  SharedVec& operator=(SharedVec&&) noexcept = default;
+
+  size_t size() const { return data_->size(); }
+  bool empty() const { return data_->empty(); }
+
+  T& operator[](size_t idx) { return (*data_)[idx]; }
+  const T& operator[](size_t idx) const { return (*data_)[idx]; }
+
+  auto begin() { return data_->begin(); }
+  auto end() { return data_->end(); }
+  auto begin() const { return data_->begin(); }
+  auto end() const { return data_->end(); }
+  auto cbegin() const { return data_->cbegin(); }
+  auto cend() const { return data_->cend(); }
+
+  void clear(bool shrink = true) { data_->clear(shrink); }
+  void resize_nofill(size_t n) { data_->resize_nofill(n); }
+  void resize(size_t n, T val = T()) { data_->resize(n, val); }
+  void push_back(const T& val) { data_->push_back(val); }
+  void extend(size_t n) { data_->extend(n); }
+  void reserve(size_t n) { data_->reserve(n); }
+  void swap(Vec<T>& other) { data_->swap(other); }
+  void swap(SharedVec& other) { data_.swap(other.data_); }
+  void shrink_to_fit() { data_->shrink_to_fit(); }
+
+  operator VecView<T>() { return data_->view(); }
+  operator VecView<T>() const { return data_->view(); }
+  operator VecView<const T>() const { return data_->view(); }
+
+  Vec<T>& vec() { return *data_; }
+  const Vec<T>& vec() const { return *data_; }
+
+  std::shared_ptr<Vec<T>> SharedPtr() { return data_; }
+  std::shared_ptr<const Vec<T>> SharedPtr() const { return data_; }
+
+  void MakeUnique() {
+    if (data_.use_count() > 1) data_ = std::make_shared<Vec<T>>(data_->view());
+  }
+
+  Vec<T> AsVec() const { return Vec<T>(data_->view()); }
+
+ private:
+  std::shared_ptr<Vec<T>> data_;
+};
+
 }  // namespace manifold

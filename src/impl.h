@@ -46,7 +46,7 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
-  Vec<Halfedge> halfedge_;
+  SharedVec<Halfedge> halfedge_;
   Vec<double> properties_;
   // Note that vertNormal_ is not precise due to the use of an approximated acos
   // function

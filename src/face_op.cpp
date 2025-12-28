@@ -68,7 +68,7 @@ std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
  * Add the vertex position projection to the indexed polygons.
  */
 PolygonsIdx ProjectPolygons(const std::vector<std::vector<int>>& polys,
-                            const Vec<Halfedge>& halfedge,
+                            const VecView<const Halfedge>& halfedge,
                             const Vec<vec3>& vertPos, mat2x3 projection) {
   PolygonsIdx polygons;
   for (const auto& poly : polys) {

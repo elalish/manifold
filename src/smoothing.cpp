@@ -436,6 +436,7 @@ void Manifold::Impl::SharpenTangent(int halfedge, double smoothness) {
 void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   if (IsEmpty()) return;
   if (normalIdx < 0) return;
+  halfedge_.MakeUnique();
 
   const int oldNumProp = NumProp();
 
@@ -972,6 +973,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
 void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
                             bool keepInterior) {
   if (IsEmpty()) return;
+  // should not copy everything... only vertPos, halfedgeTangent and halfedge
+  // may need to be copied
   Manifold::Impl old = *this;
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   if (vertBary.size() == 0) return;

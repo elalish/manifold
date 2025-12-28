@@ -201,6 +201,7 @@ void Manifold::Impl::Finish() {
     return;
   }
 
+  halfedge_.MakeUnique();
   SortVerts();
   LazyCollider::LeafData leafData;
   GetFaceBoxMorton(leafData.leafBox, leafData.leafMorton);
@@ -432,7 +433,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
     Permute(meshRelation_.triRef, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  Vec<Halfedge> oldHalfedge(std::move(halfedge_));
+  Vec<Halfedge> oldHalfedge;
+  halfedge_.swap(oldHalfedge);
   Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);

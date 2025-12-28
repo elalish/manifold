@@ -479,6 +479,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
     std::function<int(vec3, vec4, vec4)> edgeDivisions, bool keepInterior) {
+  halfedge_.MakeUnique();
   Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
   const int numVert = NumVert();
   const int numEdge = edges.size();
