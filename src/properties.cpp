@@ -160,14 +160,15 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
+  const VecView<const Halfedge> halfedge = halfedge_;
 
   std::atomic<bool> intersecting(false);
 
   auto f = [&](int tri0, int tri1) {
     std::array<vec3, 3> triVerts0, triVerts1;
     for (int i : {0, 1, 2}) {
-      triVerts0[i] = vertPos_[halfedge_[3 * tri0 + i].startVert];
-      triVerts1[i] = vertPos_[halfedge_[3 * tri1 + i].startVert];
+      triVerts0[i] = vertPos_[halfedge[3 * tri0 + i].startVert];
+      triVerts1[i] = vertPos_[halfedge[3 * tri1 + i].startVert];
     }
     // if triangles tri0 and tri1 share a vertex, return true to skip the
     // check. we relax the sharing criteria a bit to allow for at most
@@ -231,19 +232,20 @@ int Manifold::Impl::NumDegenerateTris() const {
 double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
   if (IsEmpty()) return 0;
+  const VecView<const Halfedge> halfedge = halfedge_;
 
-  auto Volume = [this](size_t tri) {
-    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
-    vec3 crossP = la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
-                            vertPos_[halfedge_[3 * tri + 2].startVert] - v);
+  auto Volume = [this, halfedge](size_t tri) {
+    const vec3 v = vertPos_[halfedge[3 * tri].startVert];
+    vec3 crossP = la::cross(vertPos_[halfedge[3 * tri + 1].startVert] - v,
+                            vertPos_[halfedge[3 * tri + 2].startVert] - v);
     return la::dot(crossP, v) / 6.0;
   };
 
-  auto Area = [this](size_t tri) {
-    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+  auto Area = [this, halfedge](size_t tri) {
+    const vec3 v = vertPos_[halfedge[3 * tri].startVert];
     return la::length(
-               la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
-                         vertPos_[halfedge_[3 * tri + 2].startVert] - v)) /
+               la::cross(vertPos_[halfedge[3 * tri + 1].startVert] - v,
+                         vertPos_[halfedge[3 * tri + 2].startVert] - v)) /
            2.0;
   };
 
@@ -264,6 +266,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
+  const VecView<const Halfedge> halfedge = halfedge_;
   Vec<double> vertMeanCurvature(NumVert(), 0);
   Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
   Vec<double> vertArea(NumVert(), 0);
@@ -289,7 +292,7 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<uint8_t> counters(NumPropVert(), 0);
   for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
     for (const int i : {0, 1, 2}) {
-      const Halfedge& edge = halfedge_[3 * tri + i];
+      const Halfedge& edge = halfedge[3 * tri + i];
       const int vert = edge.startVert;
       const int propVert = edge.propVert;
 
@@ -386,12 +389,14 @@ struct MinDistanceRecorder {
 #endif
 
   void record(int triOther, int tri, double& minDistance) {
+    const VecView<const Halfedge> selfHalfedge = self.halfedge_;
+    const VecView<const Halfedge> otherHalfedge = other.halfedge_;
     std::array<vec3, 3> p;
     std::array<vec3, 3> q;
 
     for (const int j : {0, 1, 2}) {
-      p[j] = self.vertPos_[self.halfedge_[3 * tri + j].startVert];
-      q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+      p[j] = self.vertPos_[selfHalfedge[3 * tri + j].startVert];
+      q[j] = other.vertPos_[otherHalfedge[3 * triOther + j].startVert];
     }
     minDistance = std::min(minDistance, DistanceTriangleTriangleSquared(p, q));
   }

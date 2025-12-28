@@ -79,9 +79,10 @@ inline bool Shadows(double p, double q, double dir) {
 template <bool expandP, bool forward>
 inline std::pair<int, vec2> Shadow01(const int a0, const int b1,
                                      const Manifold::Impl& inA,
-                                     const Manifold::Impl& inB) {
-  const int b1s = inB.halfedge_[b1].startVert;
-  const int b1e = inB.halfedge_[b1].endVert;
+                                     const Manifold::Impl& inB,
+                                     const VecView<const Halfedge> halfedgeB) {
+  const int b1s = halfedgeB[b1].startVert;
+  const int b1e = halfedgeB[b1].endVert;
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
   const double b1ex = inB.vertPos_[b1e].x;
@@ -97,7 +98,7 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1,
   if (s01 != 0) {
     yz01 =
         Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], inA.vertPos_[a0].x);
-    const int b1pair = inB.halfedge_[b1].pairedHalfedge;
+    const int b1pair = halfedgeB[b1].pairedHalfedge;
     const double dir =
         inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
     if (forward) {
@@ -114,6 +115,8 @@ template <bool expandP>
 struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
+  const VecView<const Halfedge> halfedgeP;
+  const VecView<const Halfedge> halfedgeQ;
 
   std::pair<int, vec4> operator()(int p1, int q1) {
     vec4 xyzz11 = vec4(NAN);
@@ -127,9 +130,9 @@ struct Kernel11 {
     bool shadows = false;
     s11 = 0;
 
-    const int p0[2] = {inP.halfedge_[p1].startVert, inP.halfedge_[p1].endVert};
+    const int p0[2] = {halfedgeP[p1].startVert, halfedgeP[p1].endVert};
     for (int i : {0, 1}) {
-      const auto [s01, yz01] = Shadow01<expandP, true>(p0[i], q1, inP, inQ);
+      const auto [s01, yz01] = Shadow01<expandP, true>(p0[i], q1, inP, inQ, halfedgeQ);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -142,9 +145,9 @@ struct Kernel11 {
       }
     }
 
-    const int q0[2] = {inQ.halfedge_[q1].startVert, inQ.halfedge_[q1].endVert};
+    const int q0[2] = {halfedgeQ[q1].startVert, halfedgeQ[q1].endVert};
     for (int i : {0, 1}) {
-      const auto [s10, yz10] = Shadow01<expandP, false>(q0[i], p1, inQ, inP);
+      const auto [s10, yz10] = Shadow01<expandP, false>(q0[i], p1, inQ, inP, halfedgeP);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -163,10 +166,10 @@ struct Kernel11 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
-      const int p1pair = inP.halfedge_[p1].pairedHalfedge;
+      const int p1pair = halfedgeP[p1].pairedHalfedge;
       const double dirP =
           inP.faceNormal_[p1 / 3].z + inP.faceNormal_[p1pair / 3].z;
-      const int q1pair = inQ.halfedge_[q1].pairedHalfedge;
+      const int q1pair = halfedgeQ[q1].pairedHalfedge;
       const double dirQ =
           inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
       if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ)) s11 = 0;
@@ -180,6 +183,7 @@ template <bool expandP, bool forward>
 struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
+  const VecView<const Halfedge> halfedgeB;
 
   std::pair<int, double> operator()(int a0, int b2) {
     int s02 = 0;
@@ -194,10 +198,10 @@ struct Kernel02 {
 
     for (const int i : {0, 1, 2}) {
       const int b1 = 3 * b2 + i;
-      const Halfedge edgeB = inB.halfedge_[b1];
+      const Halfedge edgeB = halfedgeB[b1];
       const int b1F = edgeB.IsForward() ? b1 : edgeB.pairedHalfedge;
 
-      const auto syz01 = Shadow01<expandP, forward>(a0, b1F, inA, inB);
+      const auto syz01 = Shadow01<expandP, forward>(a0, b1F, inA, inB, halfedgeB);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -231,13 +235,15 @@ template <bool expandP, bool forward>
 struct Kernel12 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
+  // compromise for performance...
+  const VecView<const Halfedge> halfedgeA;
+  const VecView<const Halfedge> halfedgeB;
   Kernel02<expandP, forward> k02;
   Kernel11<expandP> k11;
 
   std::pair<int, vec3> operator()(int a1, int b2) {
     int x12 = 0;
     vec3 v12 = vec3(NAN);
-
     // For xzyLR-[k], k==0 is the left and k==1 is the right.
     int k = 0;
     vec3 xzyLR0[2];
@@ -247,7 +253,7 @@ struct Kernel12 {
     bool shadows = false;
     x12 = 0;
 
-    const Halfedge edgeA = inA.halfedge_[a1];
+    const Halfedge edgeA = halfedgeA[a1];
 
     for (int vertA : {edgeA.startVert, edgeA.endVert}) {
       const auto [s, z] = k02(vertA, b2);
@@ -266,7 +272,7 @@ struct Kernel12 {
 
     for (const int i : {0, 1, 2}) {
       const int b1 = 3 * b2 + i;
-      const Halfedge edgeB = inB.halfedge_[b1];
+      const Halfedge edgeB = halfedgeB[b1];
       const int b1F = edgeB.IsForward() ? b1 : edgeB.pairedHalfedge;
       const auto [s, xyzz] = forward ? k11(a1, b1F) : k11(b1F, a1);
       if (std::isfinite(xyzz[0])) {
@@ -360,18 +366,19 @@ Intersections Intersect12_(const Manifold::Impl& inP,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  Kernel02<expandP, forward> k02{a, b};
-  Kernel11<expandP> k11{inP, inQ};
+  Kernel02<expandP, forward> k02{a, b, b.halfedge_};
+  Kernel11<expandP> k11{inP, inQ, inP.halfedge_, inQ.halfedge_};
 
-  Kernel12<expandP, forward> k12{a, b, k02, k11};
+  Kernel12<expandP, forward> k12{a, b, a.halfedge_, b.halfedge_, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
-  auto f = [&a](int i) {
-    return a.halfedge_[i].IsForward()
-               ? Box(a.vertPos_[a.halfedge_[i].startVert],
-                     a.vertPos_[a.halfedge_[i].endVert])
+  const VecView<const Halfedge> halfedgeA = a.halfedge_;
+  auto f = [&](int i) {
+    return halfedgeA[i].IsForward()
+               ? Box(a.vertPos_[halfedgeA[i].startVert],
+                     a.vertPos_[halfedgeA[i].endVert])
                : Box();
   };
-  b.collider_->Collisions<false>(recorder, f, a.halfedge_.size());
+  b.collider_->Collisions<false>(recorder, f, halfedgeA.size());
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
@@ -407,13 +414,14 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // a: 0 (vert), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
+  const VecView<const Halfedge> halfedgeA = a.halfedge_;
   Vec<int> brokenHalfedges;
   int index = forward ? 0 : 1;
 
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
            countAt(a.halfedge_.size()), [&](int edge) {
-             const Halfedge& he = a.halfedge_[edge];
+             const Halfedge& he = halfedgeA[edge];
              if (!he.IsForward()) return;
              // check if the edge is broken
              auto it = std::lower_bound(
@@ -447,7 +455,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (int c : components) verts.push_back(c);
 
   Vec<int> w03(a.NumVert(), 0);
-  Kernel02<expandP, forward> k02{a, b};
+  Kernel02<expandP, forward> k02{a, b, b.halfedge_};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);

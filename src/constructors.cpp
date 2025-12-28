@@ -502,7 +502,7 @@ std::vector<Manifold> Manifold::Decompose() const {
            impl->vertPos_.begin());
 
     Vec<int> faceNew2Old(NumTri());
-    const auto& halfedge = pImpl_->halfedge_;
+    const VecView<const Halfedge> halfedge = pImpl_->halfedge_;
     const int nFace =
         copy_if(countAt(0_uz), countAt(NumTri()), faceNew2Old.begin(),
                 [i, &vertLabel, &halfedge](int face) {

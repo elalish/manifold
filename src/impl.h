@@ -269,9 +269,10 @@ struct Manifold::Impl {
 
   template <typename F>
   inline void ForVert(int halfedge, F func) {
+    const VecView<const Halfedge> halfedgeView = halfedge_;
     int current = halfedge;
     do {
-      current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      current = NextHalfedge(halfedgeView[current].pairedHalfedge);
       func(current);
     } while (current != halfedge);
   }
@@ -280,10 +281,12 @@ struct Manifold::Impl {
   void ForVert(
       int halfedge, std::function<T(int halfedge)> transform,
       std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
+    const VecView<const Halfedge> halfedgeView = halfedge_;
     T here = transform(halfedge);
     int current = halfedge;
     do {
-      const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
+      const int nextHalfedge =
+          NextHalfedge(halfedgeView[current].pairedHalfedge);
       T next = transform(nextHalfedge);
       binaryOp(current, here, next);
       here = next;
@@ -359,8 +362,6 @@ struct Manifold::Impl {
                          std::vector<int>& edgeSwapStack,
                          std::vector<int>& edges);
   void RemoveIfFolded(int edge);
-  void PairUp(int edge0, int edge1);
-  void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
   void CollapseTri(const ivec3& triEdge);
   void SplitPinchedVerts();

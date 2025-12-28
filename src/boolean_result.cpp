@@ -317,7 +317,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  SharedVec<Halfedge>& halfedgeR = outR.halfedge_;
+  VecView<Halfedge> halfedgeR = outR.halfedge_;
   const Vec<vec3>& vertPosP = inP.vertPos_;
   const VecView<const Halfedge> halfedgeP = inP.halfedge_;
 
@@ -392,7 +392,7 @@ void AppendNewEdges(
     Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  SharedVec<Halfedge>& halfedgeR = outR.halfedge_;
+  VecView<Halfedge> halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
   for (auto& value : edgesNew) {
@@ -584,22 +584,25 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   std::vector<int> propMissIdx[2];
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
+  VecView<Halfedge> halfedgeR = outR.halfedge_;
+  const VecView<const Halfedge> halfedgeP = inP.halfedge_;
+  const VecView<const Halfedge> halfedgeQ = inQ.halfedge_;
 
   outR.properties_.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
     // Skip collapsed triangles
-    if (outR.halfedge_[3 * tri].startVert < 0) continue;
+    if (halfedgeR[3 * tri].startVert < 0) continue;
 
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
     const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto& properties = PQ ? inP.properties_ : inQ.properties_;
-    const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
+    const VecView<const Halfedge>& halfedge = PQ ? halfedgeP : halfedgeQ;
 
     for (const int i : {0, 1, 2}) {
-      const int vert = outR.halfedge_[3 * tri + i].startVert;
+      const int vert = halfedgeR[3 * tri + i].startVert;
       const vec3& uvw = bary[3 * tri + i];
 
       ivec4 key(PQ, idMissProp, -1, -1);
@@ -630,7 +633,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         // only key.x/key.z matters
         auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
-          outR.halfedge_[3 * tri + i].propVert = entry;
+          halfedgeR[3 * tri + i].propVert = entry;
           continue;
         }
         entry = idx;
@@ -640,7 +643,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.halfedge_[3 * tri + i].propVert = b.second;
+            halfedgeR[3 * tri + i].propVert = b.second;
             break;
           }
         }
@@ -648,7 +651,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
-      outR.halfedge_[3 * tri + i].propVert = idx++;
+      halfedgeR[3 * tri + i].propVert = idx++;
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           vec3 oldProps;

@@ -217,14 +217,15 @@ void Manifold::Impl::Finish() {
                "Not an even number of faces after sorting faces!");
 
 #ifdef MANIFOLD_DEBUG
+  const VecView<const Halfedge> halfedge = halfedge_;
   if (ManifoldParams().intermediateChecks) {
     auto MaxOrMinus = [](int a, int b) {
       return std::min(a, b) < 0 ? -1 : std::max(a, b);
     };
     int face = 0;
     Halfedge extrema = {0, 0, 0};
-    for (size_t i = 0; i < halfedge_.size(); i++) {
-      Halfedge e = halfedge_[i];
+    for (size_t i = 0; i < halfedge.size(); i++) {
+      Halfedge e = halfedge[i];
       if (!e.IsForward()) std::swap(e.startVert, e.endVert);
       extrema.startVert = std::min(extrema.startVert, e.startVert);
       extrema.endVert = std::min(extrema.endVert, e.endVert);
@@ -369,12 +370,13 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
   // faceBox should be initialized
   faceBox.resize(NumTri(), Box());
   faceMorton.resize_nofill(NumTri());
+  const VecView<const Halfedge> halfedge = halfedge_;
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [this, &faceBox, &faceMorton](const int face) {
+             [this, &faceBox, &faceMorton, halfedge](const int face) {
                // Removed tris are marked by all halfedges having pairedHalfedge
                // = -1, and this will sort them to the end (the Morton code only
                // uses the first 30 of 32 bits).
-               if (halfedge_[3 * face].pairedHalfedge < 0) {
+               if (halfedge[3 * face].pairedHalfedge < 0) {
                  faceMorton[face] = kNoCode;
                  return;
                }
@@ -382,7 +384,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                vec3 center(0.0);
 
                for (const int i : {0, 1, 2}) {
-                 const vec3 pos = vertPos_[halfedge_[3 * face + i].startVert];
+                 const vec3 pos = vertPos_[halfedge[3 * face + i].startVert];
                  center += pos;
                  faceBox[face].Union(pos);
                }
@@ -489,30 +491,31 @@ void Manifold::Impl::ReorderHalfedges() {
   // halfedges in the same face are added in non-deterministic order, so we have
   // to reorder them for determinism
 
+  VecView<Halfedge> halfedge = halfedge_;
   // step 1: reorder within the same face, such that the halfedge with the
   // smallest starting vertex is placed first
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
-           countAt(halfedge_.size() / 3), [this](size_t tri) {
-             std::array<Halfedge, 3> face = {halfedge_[tri * 3],
-                                             halfedge_[tri * 3 + 1],
-                                             halfedge_[tri * 3 + 2]};
+           countAt(halfedge_.size() / 3), [&halfedge](size_t tri) {
+             std::array<Halfedge, 3> face = {halfedge[tri * 3],
+                                             halfedge[tri * 3 + 1],
+                                             halfedge[tri * 3 + 2]};
              if (face[0].startVert < 0) return;
              int index = 0;
              for (int i : {1, 2})
                if (face[i].startVert < face[index].startVert) index = i;
              for (int i : {0, 1, 2})
-               halfedge_[tri * 3 + i] = face[(index + i) % 3];
+               halfedge[tri * 3 + i] = face[(index + i) % 3];
            });
   // step 2: fix paired halfedge
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
-           countAt(halfedge_.size() / 3), [this](size_t tri) {
+           countAt(halfedge_.size() / 3), [&halfedge](size_t tri) {
              for (int i : {0, 1, 2}) {
-               Halfedge& curr = halfedge_[tri * 3 + i];
+               Halfedge& curr = halfedge[tri * 3 + i];
                if (curr.startVert < 0) return;
                int oppositeFace = curr.pairedHalfedge / 3;
                int index = -1;
                for (int j : {0, 1, 2})
-                 if (curr.startVert == halfedge_[oppositeFace * 3 + j].endVert)
+                 if (curr.startVert == halfedge[oppositeFace * 3 + j].endVert)
                    index = j;
                curr.pairedHalfedge = oppositeFace * 3 + index;
              }

@@ -106,6 +106,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   Vec<ivec3> triProp;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
+  const VecView<const Halfedge> halfedge = halfedge_;
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
                          int face) {
     const int firstEdge = faceEdge[face];
@@ -117,11 +118,11 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
     if (numEdge == 3) {  // Single triangle
       ivec3 triEdge(firstEdge, firstEdge + 1, firstEdge + 2);
-      ivec3 tri(halfedge_[firstEdge].startVert,
-                halfedge_[firstEdge + 1].startVert,
-                halfedge_[firstEdge + 2].startVert);
-      ivec3 ends(halfedge_[firstEdge].endVert, halfedge_[firstEdge + 1].endVert,
-                 halfedge_[firstEdge + 2].endVert);
+      ivec3 tri(halfedge[firstEdge].startVert,
+                halfedge[firstEdge + 1].startVert,
+                halfedge[firstEdge + 2].startVert);
+      ivec3 ends(halfedge[firstEdge].endVert, halfedge[firstEdge + 1].endVert,
+                 halfedge[firstEdge + 2].endVert);
       if (ends[0] == tri[2]) {
         std::swap(triEdge[1], triEdge[2]);
         std::swap(tri[1], tri[2]);
@@ -133,10 +134,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
       const mat2x3 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, this](const ivec3 tri) {
-        return CCW(projection * this->vertPos_[halfedge_[tri[0]].startVert],
-                   projection * this->vertPos_[halfedge_[tri[1]].startVert],
-                   projection * this->vertPos_[halfedge_[tri[2]].startVert],
+      auto triCCW = [&projection, this, halfedge](const ivec3 tri) {
+        return CCW(projection * this->vertPos_[halfedge[tri[0]].startVert],
+                   projection * this->vertPos_[halfedge[tri[1]].startVert],
+                   projection * this->vertPos_[halfedge[tri[2]].startVert],
                    epsilon_) >= 0;
       };
 
@@ -153,10 +154,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       if (!(triCCW(tris[0][0]) && triCCW(tris[0][1]))) {
         choice = 1;
       } else if (triCCW(tris[1][0]) && triCCW(tris[1][1])) {
-        vec3 diag0 = vertPos_[halfedge_[quad[0]].startVert] -
-                     vertPos_[halfedge_[quad[2]].startVert];
-        vec3 diag1 = vertPos_[halfedge_[quad[1]].startVert] -
-                     vertPos_[halfedge_[quad[3]].startVert];
+        vec3 diag0 = vertPos_[halfedge[quad[0]].startVert] -
+                     vertPos_[halfedge[quad[2]].startVert];
+        vec3 diag1 = vertPos_[halfedge[quad[1]].startVert] -
+                     vertPos_[halfedge[quad[3]].startVert];
         if (la::length2(diag0) > la::length2(diag1)) {
           choice = 1;
         }
@@ -213,8 +214,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       processFace, [&](size_t face) { return std::move(results[face]); },
       [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
         for (const int i : {0, 1, 2}) {
-          triVerts[triCount[face]][i] = halfedge_[tri[i]].startVert;
-          triProp[triCount[face]][i] = halfedge_[tri[i]].propVert;
+          triVerts[triCount[face]][i] = halfedge[tri[i]].startVert;
+          triProp[triCount[face]][i] = halfedge[tri[i]].propVert;
         }
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
@@ -234,8 +235,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         ivec3 verts;
         ivec3 props;
         for (const int i : {0, 1, 2}) {
-          verts[i] = halfedge_[tri[i]].startVert;
-          props[i] = halfedge_[tri[i]].propVert;
+          verts[i] = halfedge[tri[i]].startVert;
+          props[i] = halfedge[tri[i]].propVert;
         }
         triVerts.push_back(verts);
         triProp.push_back(props);
@@ -257,13 +258,14 @@ Polygons Manifold::Impl::Slice(double height) const {
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
   query.push_back(plane);
+  const VecView<const Halfedge> halfedge = halfedge_;
 
   std::unordered_set<int> tris;
   auto recordCollision = [&](int, int tri) {
     double min = std::numeric_limits<double>::infinity();
     double max = -std::numeric_limits<double>::infinity();
     for (const int j : {0, 1, 2}) {
-      const double z = vertPos_[halfedge_[3 * tri + j].startVert].z;
+      const double z = vertPos_[halfedge[3 * tri + j].startVert].z;
       min = std::min(min, z);
       max = std::max(max, z);
     }
@@ -283,8 +285,8 @@ Polygons Manifold::Impl::Slice(double height) const {
 
     int k = 0;
     for (const int j : {0, 1, 2}) {
-      if (vertPos_[halfedge_[3 * startTri + j].startVert].z > height &&
-          vertPos_[halfedge_[3 * startTri + Next3(j)].startVert].z <= height) {
+      if (vertPos_[halfedge[3 * startTri + j].startVert].z > height &&
+          vertPos_[halfedge[3 * startTri + Next3(j)].startVert].z <= height) {
         k = Next3(j);
         break;
       }
@@ -293,11 +295,11 @@ Polygons Manifold::Impl::Slice(double height) const {
     int tri = startTri;
     do {
       tris.erase(tris.find(tri));
-      if (vertPos_[halfedge_[3 * tri + k].endVert].z <= height) {
+      if (vertPos_[halfedge[3 * tri + k].endVert].z <= height) {
         k = Next3(k);
       }
 
-      Halfedge up = halfedge_[3 * tri + k];
+      Halfedge up = halfedge[3 * tri + k];
       const vec3 below = vertPos_[up.startVert];
       const vec3 above = vertPos_[up.endVert];
       const double a = (height - below.z) / (above.z - below.z);
@@ -316,14 +318,15 @@ Polygons Manifold::Impl::Slice(double height) const {
 
 Polygons Manifold::Impl::Project() const {
   const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
+  const VecView<const Halfedge> halfedge = halfedge_;
   Vec<Halfedge> cusps(NumEdge());
   cusps.resize(
       copy_if(
           halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
           [&](Halfedge edge) {
-            return faceNormal_[halfedge_[edge.pairedHalfedge].pairedHalfedge /
+            return faceNormal_[halfedge[edge.pairedHalfedge].pairedHalfedge /
                                3]
-                           .z >= 0 &&
+                          .z >= 0 &&
                    faceNormal_[edge.pairedHalfedge / 3].z < 0;
           }) -
       cusps.begin());

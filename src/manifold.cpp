@@ -104,6 +104,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   };
 
   auto meshIDtransform = impl.meshRelation_.meshIDtransform;
+  const VecView<const Halfedge> halfedge = impl.halfedge_;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
     const int oldTri = triNew2Old[tri];
@@ -112,7 +113,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
     out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.coplanarID;
     for (const int i : {0, 1, 2})
-      out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
+      out.triVerts[3 * tri + i] = halfedge[3 * oldTri + i].startVert;
 
     if (meshID != lastID) {
       manifold::Manifold::Impl::Relation rel;
@@ -149,7 +150,7 @@ MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
       for (const int i : {0, 1, 2}) {
-        const int prop = impl.halfedge_[3 * triNew2Old[tri] + i].propVert;
+        const int prop = halfedge[3 * triNew2Old[tri] + i].propVert;
         const int vert = out.triVerts[3 * tri + i];
 
         auto& bin = vertPropPair[vert];
@@ -697,11 +698,12 @@ Manifold Manifold::SetProperties(
     pImpl->properties_.clear();
   } else {
     pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
+    const VecView<const Halfedge> halfedge = pImpl->halfedge_;
     for_each_n(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), NumTri(), [&](int tri) {
           for (int i : {0, 1, 2}) {
-            const Halfedge& edge = pImpl->halfedge_[3 * tri + i];
+            const Halfedge& edge = halfedge[3 * tri + i];
             const int vert = edge.startVert;
             const int propVert = edge.propVert;
             if (propFunc == nullptr) {

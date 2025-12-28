@@ -237,9 +237,6 @@ class SharedVec {
   size_t size() const { return data_->size(); }
   bool empty() const { return data_->empty(); }
 
-  T& operator[](size_t idx) { return (*data_)[idx]; }
-  const T& operator[](size_t idx) const { return (*data_)[idx]; }
-
   auto begin() { return data_->begin(); }
   auto end() { return data_->end(); }
   auto begin() const { return data_->begin(); }
@@ -264,14 +261,9 @@ class SharedVec {
   Vec<T>& vec() { return *data_; }
   const Vec<T>& vec() const { return *data_; }
 
-  std::shared_ptr<Vec<T>> SharedPtr() { return data_; }
-  std::shared_ptr<const Vec<T>> SharedPtr() const { return data_; }
-
   void MakeUnique() {
     if (data_.use_count() > 1) data_ = std::make_shared<Vec<T>>(data_->view());
   }
-
-  Vec<T> AsVec() const { return Vec<T>(data_->view()); }
 
  private:
   std::shared_ptr<Vec<T>> data_;
