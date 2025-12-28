@@ -115,7 +115,7 @@ struct InterpTri {
       cosTheta = -cosTheta;
     }
 
-    if (cosTheta > 1.0 - std::numeric_limits<double>::epsilon()) {
+    if (std::abs(cosTheta) > 1.0 - std::numeric_limits<double>::epsilon()) {
       return la::lerp(x, z, a);  // for numerical stability
     } else {
       double angle = std::acos(cosTheta);
