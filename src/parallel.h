@@ -70,28 +70,38 @@ using manifold::kSeqThreshold;
 // https://duvanenko.tech.blog/2018/01/14/parallel-merge/
 // https://github.com/DragonSpit/ParallelAlgorithms
 // note that the ranges are now [p, r) to fit our convention.
+// also the implementation in the reference is not stable,
+// and we now changed it to stable.
 template <typename SrcIter, typename DestIter, typename Comp>
 void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
               size_t r2, size_t p3, Comp comp) {
   size_t length1 = r1 - p1;
   size_t length2 = r2 - p2;
-  if (length1 < length2) {
-    std::swap(p1, p2);
-    std::swap(r1, r2);
-    std::swap(length1, length2);
+  if (length1 == 0) {
+    manifold::copy(src + p2, src + r2, dest + p3);
+    return;
   }
-  if (length1 == 0) return;
+  if (length2 == 0) {
+    manifold::copy(src + p1, src + r1, dest + p3);
+    return;
+  }
   if (length1 + length2 <= kSeqThreshold) {
     std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
   } else {
-    size_t q1 = p1 + length1 / 2;
-    size_t q2 =
-        std::distance(src, std::lower_bound(src + p2, src + r2, src[q1], comp));
+    size_t q1, q2;
+    if (length1 > length2) {
+      q1 = p1 + length1 / 2;
+      auto end = std::lower_bound(src + p2, src + r2, src[q1], comp);
+      q2 = std::distance(src, end);
+    } else {
+      q2 = p2 + length2 / 2;
+      auto end = std::lower_bound(src + p1, src + r1, src[q2], comp);
+      q1 = std::distance(src, end);
+    }
     size_t q3 = p3 + (q1 - p1) + (q2 - p2);
-    dest[q3] = src[q1];
     tbb::parallel_invoke(
         [=] { mergeRec(src, dest, p1, q1, p2, q2, p3, comp); },
-        [=] { mergeRec(src, dest, q1 + 1, r1, q2, r2, q3 + 1, comp); });
+        [=] { mergeRec(src, dest, q1, r1, q2, r2, q3, comp); });
   }
 }
 

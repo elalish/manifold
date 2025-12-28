@@ -499,8 +499,32 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
           halfedge_[NextHalfedge(pair0)].endVert ==
               halfedge_[NextHalfedge(pair1)].endVert) {
         h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
-        // Reorder so that remaining edges pair up
-        if (k != i + numEdge) std::swap(ids[i + numEdge], ids[k]);
+        if (i + numEdge != k) {
+          // Reorder so that remaining edges pair up, while preserving relative
+          // order between the edges (triangle id order)
+          // cannot directly use move and move_backward because we need to keep
+          // removed halfedges in-place
+          int dir = i + numEdge < k ? 1 : -1;
+          int a = k;
+          int b = k + dir;
+          auto isRemoved = [this, &ids](int x) {
+            return halfedge_[ids[x]].pairedHalfedge == kRemovedHalfedge;
+          };
+          auto inRange = [&a, dir, i, numEdge]() {
+            return (dir > 0 ? a >= i + numEdge : a <= i + numEdge);
+          };
+          while (1) {
+            do {
+              a -= dir;
+            } while (inRange() && isRemoved(a));
+            if (!inRange()) break;
+            do {
+              b -= dir;
+            } while (isRemoved(b) && b != k);
+            ids[b] = ids[a];
+          }
+          ids[i + numEdge] = pair1;
+        }
         break;
       }
       ++k;
@@ -555,18 +579,6 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   });
 }
 
-/**
- * Does a full recalculation of the face bounding boxes, including updating
- * the collider, but does not resort the faces.
- */
-void Manifold::Impl::Update() {
-  CalculateBBox();
-  Vec<Box> faceBox;
-  Vec<uint32_t> faceMorton;
-  GetFaceBoxMorton(faceBox, faceMorton);
-  collider_.UpdateBoxes(faceBox);
-}
-
 void Manifold::Impl::MakeEmpty(Error status) {
   bBox_ = Box();
   vertPos_.clear();
@@ -575,6 +587,7 @@ void Manifold::Impl::MakeEmpty(Error status) {
   faceNormal_.clear();
   halfedgeTangent_.clear();
   meshRelation_ = MeshRelationD();
+  collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
   status_ = status;
 }
 
@@ -591,7 +604,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  Update();
+  CalculateBBox();
   faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
   Finish();
@@ -612,7 +625,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     result.MakeEmpty(Error::NonFiniteVertex);
     return result;
   }
-  result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
@@ -652,15 +664,23 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
                FlipTris({result.halfedge_}));
   }
 
-  // This optimization does a cheap collider update if the transform is
-  // axis-aligned.
-  if (!result.collider_.Transform(transform_)) result.Update();
-
   result.CalculateBBox();
   // Scale epsilon by the norm of the 3x3 portion of the transform.
   result.epsilon_ *= SpectralNorm(mat3(transform_));
   // Maximum of inherited epsilon loss and translational epsilon loss.
   result.SetEpsilon(result.epsilon_);
+
+  if (LazyCollider::IsAxisAligned(transform_)) {
+    result.collider_ = std::make_shared<LazyCollider>(collider_, transform_);
+  } else if (!result.IsEmpty()) {
+    Vec<Box> faceBox;
+    Vec<uint32_t> faceMorton;
+    result.GetFaceBoxMorton(faceBox, faceMorton);
+    result.collider_ =
+        std::make_shared<LazyCollider>(collider_, std::move(faceBox));
+  } else {
+    result.collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+  }
   return result;
 }
 

@@ -159,7 +159,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     return uf.unite(openVerts[a], openVerts[b]);
   };
   auto recorder = MakeSimpleRecorder(f);
-  collider.Collisions<true>(vertBox.cview(), recorder, false);
+  collider.Collisions<true>(recorder, std::nullopt, vertBox.cview(), false);
 
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     uf.unite(static_cast<int>(mesh.mergeFromVert[i]),
@@ -188,7 +188,10 @@ namespace manifold {
  * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
 void Manifold::Impl::Finish() {
-  if (halfedge_.size() == 0) return;
+  if (halfedge_.size() == 0) {
+    collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+    return;
+  }
 
   CalculateBBox();
   SetEpsilon(epsilon_);
@@ -199,11 +202,14 @@ void Manifold::Impl::Finish() {
   }
 
   SortVerts();
-  Vec<Box> faceBox;
-  Vec<uint32_t> faceMorton;
-  GetFaceBoxMorton(faceBox, faceMorton);
-  SortFaces(faceBox, faceMorton);
-  if (halfedge_.size() == 0) return;
+  LazyCollider::LeafData leafData;
+  GetFaceBoxMorton(leafData.leafBox, leafData.leafMorton);
+  SortFaces(leafData.leafBox, leafData.leafMorton);
+  if (halfedge_.size() == 0) {
+    collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+    return;
+  }
+  collider_ = std::make_shared<LazyCollider>(std::move(leafData));
   CompactProps();
 
   DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
@@ -242,7 +248,6 @@ void Manifold::Impl::Finish() {
   DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||
                    meshRelation_.triRef.size() == 0,
                logicErr, "Mesh Relation doesn't fit!");
-  collider_ = Collider(faceBox, faceMorton);
 
   DEBUG_ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
 }

@@ -185,7 +185,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   };
 
   auto recorder = MakeSimpleRecorder(f);
-  collider_.Collisions<true>(faceBox.cview(), recorder);
+  collider_->Collisions<true>(recorder, faceBox.cview());
 
   return intersecting.load();
 }
@@ -423,8 +423,7 @@ double Manifold::Impl::MinGap(const Manifold::Impl& other,
             });
 
   MinDistanceRecorder recorder{*this, other};
-  collider_.Collisions<false, Box, MinDistanceRecorder>(faceBoxOther.cview(),
-                                                        recorder, false);
+  collider_->Collisions<false>(recorder, faceBoxOther.cview(), false);
   double minDistanceSquared =
       std::min(recorder.get(), searchLength * searchLength);
   return sqrt(minDistanceSquared);

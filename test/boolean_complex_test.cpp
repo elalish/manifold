@@ -228,6 +228,7 @@ TEST(BooleanComplex, Subtract) {
 }
 
 TEST(BooleanComplex, Close) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
   const double r = 10;
@@ -244,8 +245,6 @@ TEST(BooleanComplex, Close) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
 #endif
-
-  ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
@@ -290,6 +289,7 @@ TEST(BooleanComplex, Spiral) {
 
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(BooleanComplex, Sweep) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
   // generate the minimum equivalent positive angle
@@ -523,8 +523,6 @@ TEST(BooleanComplex, Sweep) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
 #endif
-
-  ManifoldParams().processOverlaps = false;
 }
 #endif
 
@@ -1476,6 +1474,7 @@ MeshGL mgl_1() {
 }
 
 TEST(BooleanComplex, Ring) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
   Manifold arg0 = Manifold(mgl_0());
   Manifold arg1 = Manifold(mgl_1());
@@ -1483,17 +1482,16 @@ TEST(BooleanComplex, Ring) {
   EXPECT_EQ(arg0.Status(), Manifold::Error::NoError);
   EXPECT_EQ(arg1.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().processOverlaps = false;
 }
 
 #ifdef MANIFOLD_EXPORT
 TEST(BooleanComplex, SelfIntersect) {
+  ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("self_intersectA.glb");
   Manifold m2 = ReadMesh("self_intersectB.glb");
   Manifold res = m1 + m2;
   res.GetMeshGL();  // test crash
-  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7081) {
@@ -1504,21 +1502,21 @@ TEST(BooleanComplex, GenericTwinBooleanTest7081) {
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7863) {
+  ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
   Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
-  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, Havocglass8Bool) {
+  ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
   Manifold m1 = ReadMesh("Havocglass8_left.glb");
   Manifold m2 = ReadMesh("Havocglass8_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
-  manifold::ManifoldParams().processOverlaps = false;
 }
 
 TEST(BooleanComplex, CraycloudBool) {
@@ -1626,23 +1624,21 @@ TEST(BooleanComplex, SimpleOffset) {
 #endif
 
 #ifdef MANIFOLD_DEBUG
-TEST(BooleanComplex, DISABLED_OffsetTriangulationFailure) {
-  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+TEST(BooleanComplex, OffsetTriangulationFailure) {
+  ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold a = ReadTestOBJ("Offset1.obj");
   Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
-TEST(BooleanComplex, DISABLED_OffsetSelfIntersect) {
-  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+TEST(BooleanComplex, OffsetSelfIntersect) {
+  ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold a = ReadTestOBJ("Offset3.obj");
   Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 #endif
