@@ -191,6 +191,8 @@ TEST(SDF, SineSurface) {
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
   EXPECT_EQ(smoothed.Genus(), 38);
+  EXPECT_NEAR(smoothed.Volume(), 107.4, 0.1);
+  EXPECT_NEAR(smoothed.SurfaceArea(), 394.7, 0.1);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
