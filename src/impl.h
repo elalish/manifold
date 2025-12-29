@@ -250,7 +250,7 @@ struct Manifold::Impl {
     CleanupTopology();
 
     DedupePropVerts();
-    MarkCoplanar();
+    SetNormalsAndCoplanar();
 
     RemoveDegenerates();
     RemoveUnreferencedVerts();
@@ -290,7 +290,7 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void MarkCoplanar();
+  void SetNormalsAndCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal();

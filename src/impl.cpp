@@ -213,7 +213,7 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   CalculateBBox();
   SetEpsilon();
   SortGeometry();
-  MarkCoplanar();
+  SetNormalsAndCoplanar();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -248,7 +248,7 @@ void Manifold::Impl::InitializeOriginal() {
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::MarkCoplanar() {
+void Manifold::Impl::SetNormalsAndCoplanar() {
   ZoneScoped;
   const int numTri = NumTri();
   faceNormal_.resize(numTri);
@@ -605,7 +605,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   }
   SetEpsilon();
   SortGeometry();
-  MarkCoplanar();
+  SetNormalsAndCoplanar();
   meshRelation_.originalID = -1;
 }
 

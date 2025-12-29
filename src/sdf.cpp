@@ -532,7 +532,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->MarkCoplanar();
+  pImpl_->SetNormalsAndCoplanar();
   return Manifold(pImpl_);
 }
 }  // namespace manifold
