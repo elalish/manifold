@@ -882,6 +882,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   sort.Start();
 #endif
 
+  outR.CalculateBBox();
   outR.Finish();
   outR.CalculateNormals();
   outR.IncrementMeshIDs();

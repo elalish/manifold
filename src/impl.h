@@ -293,7 +293,7 @@ struct Manifold::Impl {
   void MarkCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(bool keepFaceID = true);
+  void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateNormals();

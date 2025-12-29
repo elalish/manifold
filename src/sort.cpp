@@ -193,8 +193,6 @@ void Manifold::Impl::Finish() {
     return;
   }
 
-  CalculateBBox();
-  SetEpsilon(epsilon_);
   if (!bBox_.IsFinite()) {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);

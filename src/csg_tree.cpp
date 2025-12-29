@@ -162,6 +162,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   ZoneScoped;
   double epsilon = -1;
   double tolerance = -1;
+  Box bbox;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
@@ -186,6 +187,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
     epsilon = std::max(epsilon, nodeEpsilon);
     tolerance = std::max(tolerance, node->pImpl_->tolerance_);
+    bbox = bbox.Union(node->pImpl_->bBox_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -203,6 +205,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   Manifold::Impl combined;
   combined.epsilon_ = epsilon;
   combined.tolerance_ = tolerance;
+  combined.bBox_ = bbox;
   combined.vertPos_.resize_nofill(numVert);
   combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);

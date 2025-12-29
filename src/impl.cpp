@@ -235,15 +235,14 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   });
 }
 
-void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
+void Manifold::Impl::InitializeOriginal() {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, keepFaceID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1,
-                              keepFaceID ? triRef[tri].coplanarID : tri};
+             [meshID, &triRef](const int tri) {
+               triRef[tri] = {meshID, meshID, -1, triRef[tri].coplanarID};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
@@ -604,8 +603,6 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  CalculateBBox();
-  faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
   Finish();
   MarkCoplanar();
