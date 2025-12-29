@@ -181,19 +181,16 @@ else()
   if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     list(APPEND MANIFOLD_FLAGS -fno-omit-frame-pointer)
   endif()
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # disable fp math optimizations, e.g. FMA for supported architectures, as
-    # this changes floating-point results
-    # clang defaults to -ffp-contract=off so we don't have to set that
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag(-ffp-contract=off HAS_FP_CONTRACT)
-    check_cxx_compiler_flag(-fexcess-precision=standard HAS_FP_PRECISION)
-    if(HAS_FP_CONTRACT)
-      list(APPEND MANIFOLD_FLAGS -ffp-contract=off)
-    endif()
-    if(HAS_FP_PRECISION)
-      list(APPEND MANIFOLD_FLAGS -fexcess-precision=standard)
-    endif()
+  # disable fp math optimizations, e.g. FMA for supported architectures, as
+  # this changes floating-point results
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag(-ffp-contract=off HAS_FP_CONTRACT)
+  check_cxx_compiler_flag(-fexcess-precision=standard HAS_FP_PRECISION)
+  if(HAS_FP_CONTRACT)
+    list(APPEND MANIFOLD_FLAGS -ffp-contract=off)
+  endif()
+  if(HAS_FP_PRECISION)
+    list(APPEND MANIFOLD_FLAGS -fexcess-precision=standard)
   endif()
   if(CODE_COVERAGE)
     list(
