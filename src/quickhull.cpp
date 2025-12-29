@@ -854,7 +854,7 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
-  Finish();
+  SortGeometry();
   MarkCoplanar();
 }
 

@@ -187,15 +187,9 @@ namespace manifold {
  * rest of the internal data structures. This function also removes the verts
  * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
-void Manifold::Impl::Finish() {
+void Manifold::Impl::SortGeometry() {
   if (halfedge_.size() == 0) {
     collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
-    return;
-  }
-
-  if (!bBox_.IsFinite()) {
-    // Decimated out of existence - early out.
-    MakeEmpty(Error::NoError);
     return;
   }
 

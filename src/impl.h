@@ -254,7 +254,7 @@ struct Manifold::Impl {
 
     RemoveDegenerates();
     RemoveUnreferencedVerts();
-    Finish();
+    SortGeometry();
 
     if (!IsFinite()) {
       MakeEmpty(Error::NonFiniteVertex);
@@ -296,7 +296,7 @@ struct Manifold::Impl {
   void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
-  void CalculateNormals();
+  void CalculateVertNormals();
   void IncrementMeshIDs();
 
   void MakeEmpty(Error status);
@@ -329,7 +329,7 @@ struct Manifold::Impl {
   double MinGap(const Impl& other, double searchLength) const;
 
   // sort.cpp
-  void Finish();
+  void SortGeometry();
   void SortVerts();
   void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
   void CompactProps();

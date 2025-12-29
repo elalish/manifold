@@ -328,7 +328,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   // required to remove parts that are smaller than the tolerance
   combined.RemoveDegenerates();
-  combined.Finish();
+  combined.SortGeometry();
   combined.IncrementMeshIDs();
   return ImplToLeaf(std::move(combined));
 }

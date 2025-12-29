@@ -206,7 +206,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
   pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
-  pImpl_->Finish();
+  pImpl_->SortGeometry();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
@@ -302,7 +302,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
-  pImpl_->Finish();
+  pImpl_->SortGeometry();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
@@ -447,7 +447,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
-  pImpl_->Finish();
+  pImpl_->SortGeometry();
   pImpl_->MarkCoplanar();
   return Manifold(pImpl_);
 }
@@ -526,7 +526,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     impl->GatherFaces(*pImpl_, faceNew2Old);
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
     impl->CalculateBBox();
-    impl->Finish();
+    impl->SortGeometry();
 
     meshes.push_back(Manifold(impl));
   }

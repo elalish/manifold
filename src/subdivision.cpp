@@ -666,8 +666,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                                          bary[rIdx[2]], bary[rIdx[3]]}});
                   });
       });
-  std::swap(meshRelation_.triRef, triRef);
-  std::swap(faceNormal_, faceNormal);
+  meshRelation_.triRef = std::move(triRef);
+  faceNormal_ = std::move(faceNormal);
 
   Vec<vec3> newVertPos(vertBary.size());
   for_each_n(policy, countAt(0), vertBary.size(),

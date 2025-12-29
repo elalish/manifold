@@ -458,7 +458,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
     impl->tolerance_ = tolerance;
     impl->MarkCoplanar();
     impl->SimplifyTopology();
-    impl->Finish();
+    impl->SortGeometry();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
@@ -483,7 +483,7 @@ Manifold Manifold::Simplify(double tolerance) const {
     impl->MarkCoplanar();
   }
   impl->SimplifyTopology();
-  impl->Finish();
+  impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);
 }

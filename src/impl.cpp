@@ -212,7 +212,7 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   InitializeOriginal();
   CalculateBBox();
   SetEpsilon();
-  Finish();
+  SortGeometry();
   MarkCoplanar();
 }
 
@@ -310,7 +310,7 @@ void Manifold::Impl::MarkCoplanar() {
       }
     }
   }
-  CalculateNormals();
+  CalculateVertNormals();
 }
 
 /**
@@ -604,7 +604,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     return;
   }
   SetEpsilon();
-  Finish();
+  SortGeometry();
   MarkCoplanar();
   meshRelation_.originalID = -1;
 }
@@ -695,18 +695,13 @@ void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
 }
 
 /**
- * If face normals are already present, this function uses them to compute
- * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
- * the face normals. Face normals are only calculated when needed because
- * nearly degenerate faces will accrue rounding error, while the Boolean can
- * retain their original normal, which is more accurate and can help with
- * merging coplanar faces.
- *
- * If the face normals have been invalidated by an operation like Warp(),
- * ensure you do faceNormal_.resize(0) before calling this function to force
- * recalculation.
+ * This function uses the face normals to compute
+ * vertex normals (angle-weighted pseudo-normals). Face normals should only be
+ * calculated when needed because nearly degenerate faces will accrue rounding
+ * error, while the Boolean can retain their original normal, which is more
+ * accurate and can help with merging coplanar faces.
  */
-void Manifold::Impl::CalculateNormals() {
+void Manifold::Impl::CalculateVertNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri());

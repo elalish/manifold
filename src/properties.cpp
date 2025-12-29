@@ -340,6 +340,11 @@ void Manifold::Impl::CalculateBBox() {
                        if (std::isnan(b.x)) return a;
                        return la::max(a, b);
                      });
+
+  if (!bBox_.IsFinite()) {
+    // Decimated out of existence - early out.
+    MakeEmpty(Error::NoError);
+  }
 }
 
 /**
