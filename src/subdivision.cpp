@@ -556,7 +556,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
           tmp[i] += la::max(Added(hIdx), Added(halfedge_[hIdx].pairedHalfedge));
         });
-    edgeAdded.swap(tmp);
+    edgeAdded = std::move(tmp);
   }
 
   Vec<int> edgeOffset(numEdge);

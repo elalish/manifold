@@ -825,7 +825,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         }
       });
 
-  halfedgeTangent_.swap(tangent);
+  halfedgeTangent_ = std::move(tangent);
   DistributeTangents(fixedHalfedge);
 }
 
@@ -864,7 +864,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
                              vertNormal[halfedge_[edgeIdx].startVert], edgeIdx);
              });
 
-  halfedgeTangent_.swap(tangent);
+  halfedgeTangent_ = std::move(tangent);
 
   // Add sharpened edges around faces, just on the face side.
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -985,6 +985,8 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   SortGeometry();
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     SetNormalsAndCoplanar();
+  } else {
+    CalculateVertNormals();
   }
   meshRelation_.originalID = -1;
 }

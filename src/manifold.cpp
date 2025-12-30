@@ -811,8 +811,8 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
       pImpl->numProp_ = numProp;
-      pImpl->properties_.swap(properties);
-      pImpl->halfedge_.swap(halfedge);
+      pImpl->properties_ = std::move(properties);
+      pImpl->halfedge_ = std::move(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }
