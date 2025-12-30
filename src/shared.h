@@ -171,7 +171,7 @@ struct TmpEdge {
   }
 };
 
-Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
+Vec<TmpEdge> inline CreateTmpEdges(const VecView<const Halfedge>& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
              [&edges, &halfedge](const int idx) {
