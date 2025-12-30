@@ -187,17 +187,9 @@ namespace manifold {
  * rest of the internal data structures. This function also removes the verts
  * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
-void Manifold::Impl::Finish() {
+void Manifold::Impl::SortGeometry() {
   if (halfedge_.size() == 0) {
     collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
-    return;
-  }
-
-  CalculateBBox();
-  SetEpsilon(epsilon_);
-  if (!bBox_.IsFinite()) {
-    // Decimated out of existence - early out.
-    MakeEmpty(Error::NoError);
     return;
   }
 
@@ -248,11 +240,6 @@ void Manifold::Impl::Finish() {
   DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||
                    meshRelation_.triRef.size() == 0,
                logicErr, "Mesh Relation doesn't fit!");
-  DEBUG_ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0,
-               logicErr,
-               "faceNormal size = " + std::to_string(faceNormal_.size()) +
-                   ", NumTri = " + std::to_string(NumTri()));
-  CalculateNormals();
 
   DEBUG_ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
 }

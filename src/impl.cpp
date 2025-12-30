@@ -209,9 +209,11 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   vertPos_ = vertPos;
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
-  Finish();
   InitializeOriginal();
-  MarkCoplanar();
+  CalculateBBox();
+  SetEpsilon();
+  SortGeometry();
+  SetNormalsAndCoplanar();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -233,41 +235,42 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   });
 }
 
-void Manifold::Impl::InitializeOriginal(bool keepFaceID) {
+void Manifold::Impl::InitializeOriginal() {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, keepFaceID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1,
-                              keepFaceID ? triRef[tri].coplanarID : tri};
+             [meshID, &triRef](const int tri) {
+               triRef[tri] = {meshID, meshID, -1, triRef[tri].coplanarID};
              });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
-void Manifold::Impl::MarkCoplanar() {
+void Manifold::Impl::SetNormalsAndCoplanar() {
   ZoneScoped;
   const int numTri = NumTri();
+  faceNormal_.resize(numTri);
   struct TriPriority {
     double area2;
     int tri;
   };
   Vec<TriPriority> triPriority(numTri);
-  for_each_n(autoPolicy(numTri), countAt(0), numTri,
-             [&triPriority, this](int tri) {
-               meshRelation_.triRef[tri].coplanarID = -1;
-               if (halfedge_[3 * tri].startVert < 0) {
-                 triPriority[tri] = {0, tri};
-                 return;
-               }
-               const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
-               triPriority[tri] = {
-                   length2(cross(vertPos_[halfedge_[3 * tri].endVert] - v,
-                                 vertPos_[halfedge_[3 * tri + 1].endVert] - v)),
-                   tri};
-             });
+  for_each_n(
+      autoPolicy(numTri), countAt(0), numTri, [&triPriority, this](int tri) {
+        meshRelation_.triRef[tri].coplanarID = -1;
+        if (halfedge_[3 * tri].startVert < 0) {
+          triPriority[tri] = {0, tri};
+          return;
+        }
+        const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+        const vec3 n = cross(vertPos_[halfedge_[3 * tri].endVert] - v,
+                             vertPos_[halfedge_[3 * tri + 1].endVert] - v);
+        faceNormal_[tri] = normalize(n);
+        if (std::isnan(faceNormal_[tri].x)) faceNormal_[tri] = vec3(0, 0, 1);
+        triPriority[tri] = {length2(n), tri};
+      });
 
   stable_sort(triPriority.begin(), triPriority.end(),
               [](auto a, auto b) { return a.area2 > b.area2; });
@@ -292,7 +295,9 @@ void Manifold::Impl::MarkCoplanar() {
 
       const vec3 v = vertPos_[halfedge_[h].endVert];
       if (std::abs(dot(v - base, normal)) < tolerance_) {
-        meshRelation_.triRef[h / 3].coplanarID = tp.tri;
+        const size_t tri = h / 3;
+        meshRelation_.triRef[tri].coplanarID = tp.tri;
+        faceNormal_[tri] = normal;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
@@ -305,6 +310,7 @@ void Manifold::Impl::MarkCoplanar() {
       }
     }
   }
+  CalculateVertNormals();
 }
 
 /**
@@ -597,11 +603,9 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  CalculateBBox();
-  faceNormal_.clear();  // force recalculation of triNormal
   SetEpsilon();
-  Finish();
-  MarkCoplanar();
+  SortGeometry();
+  SetNormalsAndCoplanar();
   meshRelation_.originalID = -1;
 }
 
@@ -691,18 +695,13 @@ void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
 }
 
 /**
- * If face normals are already present, this function uses them to compute
- * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
- * the face normals. Face normals are only calculated when needed because
- * nearly degenerate faces will accrue rounding error, while the Boolean can
- * retain their original normal, which is more accurate and can help with
- * merging coplanar faces.
- *
- * If the face normals have been invalidated by an operation like Warp(),
- * ensure you do faceNormal_.resize(0) before calling this function to force
- * recalculation.
+ * This function uses the face normals to compute
+ * vertex normals (angle-weighted pseudo-normals). Face normals should only be
+ * calculated when needed because nearly degenerate faces will accrue rounding
+ * error, while the Boolean can retain their original normal, which is more
+ * accurate and can help with merging coplanar faces.
  */
-void Manifold::Impl::CalculateNormals() {
+void Manifold::Impl::CalculateVertNormals() {
   ZoneScoped;
   vertNormal_.resize(NumVert());
   auto policy = autoPolicy(NumTri());
@@ -718,31 +717,9 @@ void Manifold::Impl::CalculateNormals() {
     while (!vertHalfedgeMap[vert].compare_exchange_strong(old, value))
       if (old < value) break;
   };
-  if (faceNormal_.size() != NumTri()) {
-    faceNormal_.resize(NumTri());
-    for_each_n(policy, countAt(0), NumTri(), [&](const int face) {
-      vec3& triNormal = faceNormal_[face];
-      if (halfedge_[3 * face].startVert < 0) {
-        triNormal = vec3(0, 0, 1);
-        return;
-      }
 
-      ivec3 triVerts;
-      for (const int i : {0, 1, 2}) {
-        const int v = halfedge_[3 * face + i].startVert;
-        triVerts[i] = v;
-        atomicMin(3 * face + i, v);
-      }
-
-      const vec3 edge0 = vertPos_[triVerts[1]] - vertPos_[triVerts[0]];
-      const vec3 edge1 = vertPos_[triVerts[2]] - vertPos_[triVerts[1]];
-      triNormal = la::normalize(la::cross(edge0, edge1));
-      if (std::isnan(triNormal.x)) triNormal = vec3(0, 0, 1);
-    });
-  } else {
-    for_each_n(policy, countAt(0), halfedge_.size(),
-               [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
-  }
+  for_each_n(policy, countAt(0), halfedge_.size(),
+             [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
 
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
     int firstEdge = vertHalfedgeMap[vert].load();

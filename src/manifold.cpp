@@ -456,9 +456,9 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
-    impl->MarkCoplanar();
+    impl->SetNormalsAndCoplanar();
     impl->SimplifyTopology();
-    impl->Finish();
+    impl->SortGeometry();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
     // equal to epsilon.
@@ -480,10 +480,10 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (tolerance == 0) tolerance = oldTolerance;
   if (tolerance > oldTolerance) {
     impl->tolerance_ = tolerance;
-    impl->MarkCoplanar();
+    impl->SetNormalsAndCoplanar();
   }
   impl->SimplifyTopology();
-  impl->Finish();
+  impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);
 }
@@ -537,8 +537,7 @@ Manifold Manifold::AsOriginal() const {
   }
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
-  newImpl->MarkCoplanar();
-  newImpl->InitializeOriginal(true);
+  newImpl->SetNormalsAndCoplanar();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
@@ -812,8 +811,8 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
       pImpl->CreateTangents(0);
       // Reset the properties to the original values, removing temporary normals
       pImpl->numProp_ = numProp;
-      pImpl->properties_.swap(properties);
-      pImpl->halfedge_.swap(halfedge);
+      pImpl->properties_ = std::move(properties);
+      pImpl->halfedge_ = std::move(halfedge);
     } else {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }

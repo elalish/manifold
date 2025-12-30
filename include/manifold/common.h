@@ -21,7 +21,6 @@
 #endif
 
 #include "linalg.h"
-#include "optional_assert.h"
 
 namespace manifold {
 /** @addtogroup Math

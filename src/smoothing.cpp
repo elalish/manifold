@@ -115,7 +115,7 @@ struct InterpTri {
       cosTheta = -cosTheta;
     }
 
-    if (cosTheta > 1.0 - std::numeric_limits<double>::epsilon()) {
+    if (std::abs(cosTheta) > 1.0 - std::numeric_limits<double>::epsilon()) {
       return la::lerp(x, z, a);  // for numerical stability
     } else {
       double angle = std::acos(cosTheta);
@@ -825,7 +825,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         }
       });
 
-  halfedgeTangent_.swap(tangent);
+  halfedgeTangent_ = std::move(tangent);
   DistributeTangents(fixedHalfedge);
 }
 
@@ -864,7 +864,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
                              vertNormal[halfedge_[edgeIdx].startVert], edgeIdx);
              });
 
-  halfedgeTangent_.swap(tangent);
+  halfedgeTangent_ = std::move(tangent);
 
   // Add sharpened edges around faces, just on the face side.
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -982,9 +982,11 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   }
 
   halfedgeTangent_.clear();
-  Finish();
+  SortGeometry();
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    MarkCoplanar();
+    SetNormalsAndCoplanar();
+  } else {
+    CalculateVertNormals();
   }
   meshRelation_.originalID = -1;
 }
