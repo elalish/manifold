@@ -240,6 +240,8 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   CollapseShortEdges(firstNewVert);
   CollapseColinearEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
+  // Merging verts causes their normals to change
+  CalculateVertNormals();
 }
 
 void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
@@ -248,6 +250,8 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   CleanupTopology();
   CollapseShortEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
+  // Merging verts causes their normals to change
+  CalculateVertNormals();
 }
 
 void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
