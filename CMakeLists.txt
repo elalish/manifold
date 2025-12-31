@@ -158,6 +158,7 @@ else()
     -Wno-unknown-warning-option
     -Wno-unused
     -Wno-shorten-64-to-32
+    -Wno-alloc-size-larger-than
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

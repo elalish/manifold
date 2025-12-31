@@ -193,6 +193,7 @@ void Manifold::Impl::SortGeometry() {
     return;
   }
 
+  halfedge_.MakeUnique();
   SortVerts();
   LazyCollider::LeafData leafData;
   GetFaceBoxMorton(leafData.leafBox, leafData.leafMorton);
