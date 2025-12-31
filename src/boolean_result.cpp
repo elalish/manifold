@@ -192,7 +192,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   inclusive_scan(sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
-  return std::make_tuple(faceEdge, facePQ2R);
+  return std::make_tuple(std::move(faceEdge), std::move(facePQ2R));
 }
 
 struct EdgePos {
@@ -284,7 +284,8 @@ void AddNewEdgeVerts(
   for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
-std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
+template <typename F>
+void PairUp(std::vector<EdgePos>& edgePos, F f) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -299,10 +300,8 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
                topologyErr, "Non-manifold edge!");
   std::stable_sort(edgePos.begin(), middle);
   std::stable_sort(middle, edgePos.end());
-  std::vector<Halfedge> edges;
   for (size_t i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1});
-  return edges;
+    f(Halfedge{edgePos[i].vert, edgePos[i + nEdges].vert, -1});
 }
 
 void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
@@ -355,9 +354,6 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
       ++edgePos.vert;
     }
 
-    // sort edges into start/end pairs along length
-    std::vector<Halfedge> edges = PairUp(edgePosP);
-
     // add halfedges to result
     const int faceLeftP = edgeP / 3;
     const int faceLeft = faceP2R[faceLeftP];
@@ -370,7 +366,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
     const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP, -1};
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
 
-    for (Halfedge e : edges) {
+    PairUp(edgePosP, [&](Halfedge e) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
@@ -382,7 +378,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
-    }
+    });
   }
 }
 
@@ -414,15 +410,12 @@ void AppendNewEdges(
       edge.edgePos = vertPosR[edge.vert][i];
     }
 
-    // sort edges into start/end pairs along length.
-    std::vector<Halfedge> edges = PairUp(edgePos);
-
     // add halfedges to result
     const int faceLeft = facePQ2R[faceP];
     const int faceRight = facePQ2R[numFaceP + faceQ];
     const TriRef forwardRef = {0, -1, faceP, -1};
     const TriRef backwardRef = {1, -1, faceQ, -1};
-    for (Halfedge e : edges) {
+    PairUp(edgePos, [&](Halfedge e) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
@@ -434,7 +427,7 @@ void AppendNewEdges(
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
-    }
+    });
   }
 }
 

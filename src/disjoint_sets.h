@@ -26,10 +26,14 @@
 #include <unordered_map>
 #include <vector>
 
+#include "parallel.h"
+
 class DisjointSets {
  public:
   DisjointSets(uint32_t size) : mData(size) {
-    for (uint32_t i = 0; i < size; ++i) mData[i] = (uint32_t)i;
+    using namespace manifold;
+    for_each(autoPolicy(size), countAt(0), countAt(size),
+             [this](uint32_t i) { mData[i] = i; });
   }
 
   uint32_t find(uint32_t id) const {
