@@ -40,7 +40,7 @@ bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
 struct DuplicateEdge {
   const Halfedge* sortedHalfedge;
 
-  bool operator()(int edge) {
+  inline bool operator()(int edge) {
     const Halfedge& halfedge = sortedHalfedge[edge];
     const Halfedge& nextHalfedge = sortedHalfedge[edge + 1];
     return halfedge.startVert == nextHalfedge.startVert &&
@@ -54,7 +54,7 @@ struct ShortEdge {
   const double epsilon;
   const int firstNewVert;
 
-  bool operator()(int edge) const {
+  inline bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
     if (half.pairedHalfedge < 0 ||
         (half.startVert < firstNewVert && half.endVert < firstNewVert))
@@ -70,7 +70,7 @@ struct FlagEdge {
   VecView<const TriRef> triRef;
   const int firstNewVert;
 
-  bool operator()(int edge) const {
+  inline bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
     if (half.pairedHalfedge < 0 || half.startVert < firstNewVert) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
@@ -103,7 +103,7 @@ struct SwappableEdge {
   const double tolerance;
   const int firstNewVert;
 
-  bool operator()(int edge) const {
+  inline bool operator()(int edge) const {
     const Halfedge& half = halfedge[edge];
     if (half.pairedHalfedge < 0) return false;
     if (half.startVert < firstNewVert && half.endVert < firstNewVert &&
@@ -134,9 +134,9 @@ struct SwappableEdge {
 
 struct FlagStore {
 #if MANIFOLD_PAR == 1
-  tbb::combinable<std::vector<size_t>> store;
+  tbb::combinable<Vec<size_t>> store;
 #endif
-  std::vector<size_t> s;
+  Vec<size_t> s;
 
   template <typename Pred, typename F>
   void run_seq(size_t n, Pred pred, F f) {
@@ -156,16 +156,15 @@ struct FlagStore {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
                       [&store, &pred](const auto& r) {
                         auto& local = store.local();
-                        for (auto i = r.begin(); i < r.end(); ++i) {
+                        for (auto i = r.begin(); i < r.end(); i++)
                           if (pred(i)) local.push_back(i);
-                        }
                       });
 
-    std::vector<std::vector<size_t>> stores;
-    std::vector<size_t> result;
+    std::vector<Vec<size_t>> stores;
+    Vec<size_t> result;
     store.combine_each(
         [&](auto& data) { stores.emplace_back(std::move(data)); });
-    std::vector<size_t> sizes;
+    Vec<size_t> sizes;
     size_t total_size = 0;
     for (const auto& tmp : stores) {
       sizes.push_back(total_size);
@@ -263,7 +262,7 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
 
-  std::vector<int> scratchBuffer;
+  Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
   // Short edges get to skip several checks and hence remove more classes of
   // degenerate triangles than flagged edges do, but this could in theory lead
@@ -287,7 +286,7 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
   FlagStore s;
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
-  std::vector<int> scratchBuffer;
+  Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
   while (1) {
     ZoneScopedN("CollapseFlaggedEdge");
@@ -319,12 +318,12 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   FlagStore s;
   size_t numFlagged = 0;
   const size_t nbEdges = halfedge_.size();
-  std::vector<int> scratchBuffer;
+  Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
   SwappableEdge se{halfedge_, vertPos_, faceNormal_, tolerance_, firstNewVert};
-  std::vector<int> edgeSwapStack;
-  std::vector<int> visited(halfedge_.size(), -1);
+  Vec<int> edgeSwapStack;
+  Vec<int> visited(halfedge_.size(), -1);
   int tag = 0;
   s.run(nbEdges, se, [&](size_t i) {
     numFlagged++;
@@ -519,7 +518,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
+bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
   const Halfedge toRemove = halfedge_[edge];
@@ -629,9 +628,9 @@ bool Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
-                                       std::vector<int>& visited,
-                                       std::vector<int>& edgeSwapStack,
-                                       std::vector<int>& edges) {
+                                       Vec<int>& visited,
+                                       Vec<int>& edgeSwapStack,
+                                       Vec<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
   if (edge < 0) return;
@@ -722,8 +721,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     } else {
       visited[edge] = tag;
       visited[pair] = tag;
-      edgeSwapStack.insert(edgeSwapStack.end(), {tri1edge[1], tri1edge[0],
-                                                 tri0edge[1], tri0edge[0]});
+      for (auto edge : {tri1edge[1], tri1edge[0], tri0edge[1], tri0edge[0]})
+        edgeSwapStack.push_back(edge);
     }
     return;
   } else if (CCW(v[0], v[3], v[2], tolerance_) <= 0 ||
@@ -734,9 +733,9 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
   SwapEdge();
   visited[edge] = tag;
   visited[pair] = tag;
-  edgeSwapStack.insert(edgeSwapStack.end(),
-                       {halfedge_[tri1edge[0]].pairedHalfedge,
-                        halfedge_[tri0edge[1]].pairedHalfedge});
+  for (auto edge : {halfedge_[tri1edge[0]].pairedHalfedge,
+                    halfedge_[tri0edge[1]].pairedHalfedge})
+    edgeSwapStack.push_back(edge);
 }
 
 void Manifold::Impl::SplitPinchedVerts() {

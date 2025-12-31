@@ -353,10 +353,9 @@ struct Manifold::Impl {
   void CollapseColinearEdges(int firstNewVert = 0);
   void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  bool CollapseEdge(int edge, std::vector<int>& edges);
-  void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
-                         std::vector<int>& edgeSwapStack,
-                         std::vector<int>& edges);
+  bool CollapseEdge(int edge, Vec<int>& edges);
+  void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
+                         Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
