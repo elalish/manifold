@@ -35,6 +35,12 @@ struct Empty {};
 template <typename T, bool shared = false>
 class Vec;
 
+// Shareable vector that forbids structural update when shared.
+// Note that if you do `Vec<T>& vec = sharedVec`, this will perform a copy,
+// so please do `SharedVec<T>& vec = shareVec` instead.
+//
+// The copy constructor and copy assignment operator will share the
+// underlying vector.
 template <typename T>
 using SharedVec = Vec<T, true>;
 
@@ -67,6 +73,8 @@ class Vec : public VecView<T> {
     resize(size, val);
   }
 
+  // manually specialized because copy constructor and copy assignment operators
+  // cannot be template methods
   inline Vec(const Vec<T, true>& vec) : VecView<T>() {
     // initialized with operator=
     if constexpr (shared) count_ = nullptr;
@@ -261,6 +269,8 @@ class Vec : public VecView<T> {
 
   inline size_t capacity() const { return capacity_; }
 
+  // Makes the SharedVec unique, so mutation operations are allowed.
+  // Note that this does nothing if the vector is already unique.
   void MakeUnique() {
     if constexpr (shared) {
       if (count_->load() > 1) {
@@ -272,6 +282,9 @@ class Vec : public VecView<T> {
  private:
   size_t capacity_ = 0;
 
+  // Normally empty structs have size 1 (1 byte) to ensure every field has a
+  // unique address, but in c++20 no_unique_address can avoid this and the field
+  // takes no space.
 #if __cplusplus >= 202002L
   [[no_unique_address]]
 #endif
