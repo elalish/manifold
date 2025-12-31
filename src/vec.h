@@ -321,6 +321,8 @@ class Vec : public VecView<T> {
   }
 
   static_assert(std::is_trivially_destructible<T>::value);
+  // This is required so we can access private fields between shared and
+  // non-shared vectors.
   friend Vec<T, !shared>;
 
   static void free_async(T* ptr, size_t size) {
