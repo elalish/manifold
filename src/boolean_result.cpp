@@ -663,6 +663,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
 namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
+  ZoneScoped;
 #ifdef MANIFOLD_DEBUG
   Timer assemble;
   assemble.Start();

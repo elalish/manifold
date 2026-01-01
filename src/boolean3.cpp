@@ -479,6 +479,7 @@ namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add) {
+  ZoneScoped;
   // Symbolic perturbation:
   // Union -> expand inP, expand inQ
   // Difference, Intersection -> contract inP, expand inQ

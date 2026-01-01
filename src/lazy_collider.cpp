@@ -17,7 +17,8 @@
 namespace manifold {
 LazyCollider::LazyCollider() = default;
 
-LazyCollider::LazyCollider(LeafData&& leafData) : leafData_{leafData} {}
+LazyCollider::LazyCollider(LeafData&& leafData)
+    : leafData_(std::move(leafData)) {}
 
 LazyCollider::LazyCollider(std::shared_ptr<const LazyCollider> base,
                            const mat3x4& transform) {
