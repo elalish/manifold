@@ -756,6 +756,7 @@ void Manifold::Impl::CalculateVertNormals() {
  * instances of these meshes.
  */
 void Manifold::Impl::IncrementMeshIDs() {
+  ZoneScoped;
   HashTable<uint32_t> meshIDold2new(meshRelation_.meshIDtransform.size() * 2);
   // Update keys of the transform map
   std::map<int, Relation> oldTransforms;

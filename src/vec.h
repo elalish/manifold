@@ -19,6 +19,18 @@
 #define TracyAllocS(ptr, size, n) (void)0
 #define TracyFreeS(ptr, n) (void)0
 #endif
+
+#if __has_include(<tracy/Tracy.hpp>)
+#include <tracy/Tracy.hpp>
+#else
+#define FrameMarkStart(x)
+#define FrameMarkEnd(x)
+// putting ZoneScoped in a function will instrument the function execution when
+// TRACY_ENABLE is set, which allows the profiler to record more accurate
+// timing.
+#define ZoneScoped
+#define ZoneScopedN(name)
+#endif
 #include <vector>
 
 #include "manifold/vec_view.h"
@@ -63,12 +75,14 @@ class Vec : public VecView<T> {
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
   inline Vec(size_t size) : VecView<T>() {
+    ZoneScopedN("Vec(size)");
     if constexpr (shared) count_ = new std::atomic<int>(1);
     reserve(size);
     this->size_ = size;
   }
 
   inline Vec(size_t size, T val) : VecView<T>() {
+    ZoneScopedN("Vec(size, val)");
     if constexpr (shared) count_ = new std::atomic<int>(1);
     resize(size, val);
   }
@@ -76,12 +90,14 @@ class Vec : public VecView<T> {
   // manually specialized because copy constructor and copy assignment operators
   // cannot be template methods
   inline Vec(const Vec<T, true>& vec) : VecView<T>() {
+    ZoneScopedN("Vec(const vec&)");
     // initialized with operator=
     if constexpr (shared) count_ = nullptr;
     *this = Vec(vec.view());
   }
 
   inline Vec(const Vec<T, false>& vec) : VecView<T>() {
+    ZoneScopedN("Vec(const vec&)");
     // initialized with operator=
     if constexpr (shared) count_ = nullptr;
     *this = Vec(vec.view());
@@ -101,6 +117,7 @@ class Vec : public VecView<T> {
   }
 
   inline Vec(const VecView<const T>& vec) : VecView<T>() {
+    ZoneScopedN("Vec(const VecView&)");
     if constexpr (shared) this->count_ = new std::atomic<int>(1);
     this->size_ = vec.size();
     this->capacity_ = this->size_;
@@ -122,6 +139,7 @@ class Vec : public VecView<T> {
   ~Vec() { dealloc(); }
 
   Vec& operator=(const Vec& other) {
+    ZoneScopedN("Vec operator=(other)");
     if (&other == this) return *this;
     dealloc();
     if constexpr (shared) {
@@ -144,6 +162,7 @@ class Vec : public VecView<T> {
   }
 
   inline Vec<T, shared>& operator=(const Vec<T, !shared>& other) {
+    ZoneScopedN("Vec operator=(other)");
     dealloc();
     if constexpr (shared) this->count_ = new std::atomic<int>(1);
     this->size_ = other.size_;

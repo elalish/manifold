@@ -528,6 +528,7 @@ struct CsgStackFrame {
 };
 
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
+  ZoneScoped;
   if (cache_ != nullptr) return cache_;
 
   // Note: We do need a pointer here to avoid vector pointers from being
