@@ -39,7 +39,7 @@ class LazyCollider {
     mat3x4 transform;
   };
 
-  static LazyCollider Empty() { return LazyCollider(LeafData{{}, {}}); }
+  static LazyCollider Empty() { return LazyCollider(LeafData()); }
   LazyCollider();
   LazyCollider(LeafData&& leafData);
   LazyCollider(std::shared_ptr<const LazyCollider> base,

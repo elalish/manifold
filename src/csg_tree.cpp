@@ -105,7 +105,8 @@ std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
-  return std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(impl));
+  return std::make_shared<CsgLeafNode>(
+      std::make_shared<Manifold::Impl>(std::move(impl)));
 }
 
 std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
