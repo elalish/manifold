@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Exceptions, and where to find them.
+ *
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
+ */
+
 import type {BuildFailure, Location, Message} from 'esbuild-wasm';
 
 export class BundlerError extends Error {

@@ -19,10 +19,8 @@ import {Command} from 'commander';
 import {bundleFile} from '../lib/bundler.js';
 import * as worker from '../lib/worker.js';
 import * as exportModel from '../lib/export-model.js';
-import { UnsupportedFormatError } from '../lib/error.js';
 
 const program = new Command();
-
 program.name('manifold-cad')
     .description('Compile a ManifoldCAD program into a mesh.')
     .argument('<infile.[js|ts]>', 'Input file')

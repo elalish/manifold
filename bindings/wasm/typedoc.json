@@ -1,33 +1,21 @@
 // typedoc.json
 {
   "entryPoints": [
-    "manifold-encapsulated-types.d.ts",
-    "manifold-global-types.d.ts",
-    "types/manifoldCAD.d.ts",
-    "types/manifoldCADGlobals.d.ts",
-    "lib/worker.ts",
-    "lib/animation.ts",
-    "lib/bundler.ts",
-    "lib/debug.ts",
-    "lib/error.ts",
-    "lib/export-model.ts",
-    "lib/garbage-collector.ts",
-    "lib/gltf-node.ts",
-    "lib/import-model.ts",
-    "lib/level-of-detail.ts",
-    "lib/material.ts",
-    "lib/math.ts",
-    "lib/scene-builder.ts",
-    "lib/util.ts",
-    "lib/wasm.ts",
-    "lib/manifold-gltf.ts"
+    "./manifold.d.ts",
+    "./types/manifoldCAD.d.ts",
+    "./types/manifoldCADGlobals.d.ts",
+    "./lib/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.*",
+    "./lib/manifoldCAD.*",
+    "./lib/*.d.ts"
   ],
   "navigationLinks": {
     "manifoldCAD.org": "https://manifoldCAD.org",
     "C++ Documentation": "https://manifoldcad.org/docs/html/",
     "Algorithm Description": "https://github.com/elalish/manifold/wiki/Manifold-Library",
     "Blog Posts": "https://elalish.blogspot.com/search/label/Manifold",
-    "Web Examples": "https://manifoldcad.org/model-viewer.html",
     "GitHub": "https://github.com/elalish/manifold"
   },
   "externalSymbolLinkMappings": {
@@ -41,11 +29,28 @@
     }
   },
   "useFirstParagraphOfCommentAsSummary": true,
-  "groupReferencesByType": true,
+  "entryPointStrategy": "expand",
   "sortEntryPoints": false,
   "excludeInternal": true,
   "excludeExternals": true,
+  "projectDocuments": [
+    "./documents/bindings.md",
+    "./documents/bindings-examples.md",
+    "./documents/using-manifoldcad.md",
+    "./documents/embedding-manifoldcad.md"
+  ],
+  "navigation": {
+    "includeGroups": true,
+    "includeCategories": true,
+    "includeFolders": false
+  },
   "categorizeByGroup": true,
-  "projectDocuments": ["documents/*.md"],
+  "groupReferencesByType": true,
+  "categoryOrder": ["Core", "Input/Output", "Modelling", "*", "Other"],
+  "groupOrder": [
+    "Documents", "Interfaces", "Classes", "Modelling Functions",
+    "Global Settings", "Management", "Import", "Export",
+    "Low Level Functions", "*", "Type Aliases", "glTF Extension"
+  ],
   "out": "docs"
 }

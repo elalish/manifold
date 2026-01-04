@@ -1,4 +1,4 @@
-// Copyright 2022 The Manifold Authors.
+// Copyright 2022-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as T from './manifold-encapsulated-types';
-export * from './manifold-global-types';
+/**
+ * The core WASM bindings with no frills.
+ *
+ * @group manifold
+ * @packageDocumentation
+ * @primaryExport
+ * @see {@link "Using Manifold" | Using Manifold}
+ * @see {@link "Manifold Examples" | Manifold Examples}
+ */
 
-export type CrossSection = T.CrossSection;
-export type Manifold = T.Manifold;
-export type Mesh = T.Mesh;
+import type * as T from './manifold-encapsulated-types';
+export type * from './manifold-global-types';
+
+export type {MeshOptions, triangulate} from './manifold-encapsulated-types';
+export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
   CrossSection: typeof T.CrossSection;

@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * The bundler resolves files and modules at load time, bundles them, and allows
+ * the manifoldCAD runtime to provide objects (like manifold itself) and
+ * properties (such as `import.meta.url`).
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
+ */
+
 import resolve from '@jridgewell/resolve-uri';
 import * as esbuild from 'esbuild-wasm';
 import MagicString from 'magic-string';

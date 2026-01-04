@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * The core WASM bindings with no frills.
+ *
+ * @group manifoldCAD Runtime
+ * @packageDocumentation
+ */
+
 import {Vec3} from '../manifold-global-types';
 
 const {cos, sin, PI} = Math;

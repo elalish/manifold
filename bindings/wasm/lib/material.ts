@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Assign glTF materials to manifoldCAD models.
+ *
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Modelling
+ */
+
 import * as GLTFTransform from '@gltf-transform/core';
 import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
 import {copyToDocument} from '@gltf-transform/functions';

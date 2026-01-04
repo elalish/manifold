@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Allow manifoldCAD models to specify glTF animations and morphs.
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Modelling
+ */
+
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
 
 import {Manifold, Mesh} from '../manifold-encapsulated-types';

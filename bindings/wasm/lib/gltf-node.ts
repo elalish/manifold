@@ -31,6 +31,8 @@
  * time.
  *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';

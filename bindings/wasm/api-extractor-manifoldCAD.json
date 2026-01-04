@@ -52,6 +52,9 @@
       },
       "tsdoc-undefined-tag": {
         "logLevel": "none"
+      },
+      "tsdoc-reference-missing-hash": {
+        "logLevel": "none"
       }
     }
   }

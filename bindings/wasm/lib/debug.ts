@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Use material properties (like transparency and colour) to debug manifoldCAD
+ * models.
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Modelling
+ */
+
 import {Document} from '@gltf-transform/core';
 
 import {Manifold, Mesh} from '../manifold-encapsulated-types';

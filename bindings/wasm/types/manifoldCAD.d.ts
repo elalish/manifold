@@ -13,20 +13,38 @@
 // limitations under the License.
 
 /**
- * These are the objects and functions that are available to all manifoldCAD
- * models.
+ * These are the objects and functions that are available within manifoldCAD
+ * itself.
+ *
+ * All of the classes, functions and properties of this module are implemented
+ * elsewhere and re-exported here.
  *
  * This is an isomorphic module.  When imported within manifoldCAD, the bundler
  * will swap it out for an identical module running in the worker context.
  * When imported as an ES module, it will implicitly instantiate a manifold wasm
- * module, and export it along with relevant scene-builder properties.
+ * module, and export it along with everything else listed here.
  * This allows models to behave identically when running on manifoldCAD.org,
  * through the CLI, or through nodejs.
  *
  * It can be imported as `manifold-3d/manifoldCAD`.
  *
  * @packageDocumentation
- * @module manifold-3d/manifoldCAD
+ * @module manifoldCAD
+ * @group manifoldCAD
+ * @primaryExport
+ * @see {@link "Using manifoldCAD" | Using manifoldCAD}
+ *
+ * @groupDescription Global State
+ * These objects and functions are specific to top-level scripts
+ * running within manifoldCAD.
+ *
+ * They are only accessible as global objects by a top level script evaluated by
+ * the worker.  Libraries will not have access to them.
+ *
+ * These functions will not be present at all when a model is imported as an ES
+ * module. They can be imported through the {@link lib/scene-builder! | scene
+ * builder} or directly from {@link lib/animation! | animation} and {@link
+ * lib/level-of-detail! | level-of-detail} modules.
  */
 
 export {AnimationMode, getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation.d.ts';
@@ -35,8 +53,7 @@ export {BaseGLTFNode, getGLTFNodes, GLTFAttribute, GLTFMaterial, GLTFNode, reset
 export {importManifold, importModel, ImportOptions} from '../lib/import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail.d.ts'
 export {setMaterial} from '../lib/material.d.ts';
-export {CrossSection, Manifold, Mesh, MeshOptions, triangulate} from '../manifold-encapsulated-types.d.ts';
-export {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from '../manifold-global-types.d.ts';
+export {Box, CrossSection, ErrorStatus, FillRule, JoinType, Manifold, Mat3, Mat4, Mesh, MeshOptions, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, triangulate, Vec2, Vec3} from '../manifold.d.ts';
 
 /**
  * Is this module running in manifoldCAD evaluator?
