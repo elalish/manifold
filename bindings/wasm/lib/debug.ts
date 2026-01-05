@@ -22,7 +22,7 @@
 
 import {Document} from '@gltf-transform/core';
 
-import {Manifold, Mesh} from '../manifold-encapsulated-types';
+import type {Manifold, Mesh} from '../manifold.d.ts';
 
 import {Properties, writeMesh} from './gltf-io.ts';
 import {GLTFMaterial} from './gltf-node.ts';

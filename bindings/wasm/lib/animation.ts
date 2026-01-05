@@ -21,8 +21,7 @@
 
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
 
-import {Manifold, Mesh} from '../manifold-encapsulated-types';
-import {Vec3} from '../manifold-global-types';
+import type {Manifold, Mesh, Vec3} from '../manifold';
 
 import {BaseGLTFNode} from './gltf-node.ts';
 import {euler2quat} from './math.ts';

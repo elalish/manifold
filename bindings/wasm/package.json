@@ -7,10 +7,13 @@
     "manifold-cad": "./bin/manifold-cad"
   },
   "scripts": {
-    "build": "tsc && node ./esbuild.mjs && npm run build:api-extractor",
-    "build:api-extractor": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
-    "clean": "tsc --build --clean",
+    "prebuild": "api-extractor run -c api-extractor-manifold.json",
+    "build": "tsc && node ./esbuild.mjs",
+    "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
+    "build:wasm": "mkdir -p ../../buildWASM && cd ../../buildWASM && emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make",
+    "clean": "tsc --build --clean && rm -fr ./dist/ ./coverage ./docs ./manifold.d.ts",
     "format": "cd ../.. && ./scripts/format.sh",
+    "predocs": "npm run prebuild && npm run postbuild",
     "docs": "npx typedoc",
     "test": "vitest run",
     "test:ui": "vitest --coverage --ui",

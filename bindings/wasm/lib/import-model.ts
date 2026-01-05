@@ -35,8 +35,7 @@
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
-import type {Vec3} from '../manifold-global-types.d.ts';
+import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';

@@ -26,7 +26,7 @@
 import {Document, Material, Node} from '@gltf-transform/core';
 import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold-encapsulated-types';
+import type {Manifold} from '../manifold';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
