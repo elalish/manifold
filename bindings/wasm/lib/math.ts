@@ -13,8 +13,6 @@
 // limitations under the License.
 
 /**
- * The core WASM bindings with no frills.
- *
  * @group manifoldCAD Runtime
  * @packageDocumentation
  */

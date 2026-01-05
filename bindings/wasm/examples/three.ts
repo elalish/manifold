@@ -14,7 +14,8 @@
 
 import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
 
-import Module, {Mesh} from './built/manifold';
+import type {Mesh as MeshType} from '../manifold';
+import Module from '../manifold';
 
 // Load Manifold WASM library
 const wasm = await Module();
@@ -120,7 +121,7 @@ function geometry2mesh(geometry: BufferGeometry) {
 }
 
 // Convert Manifold Mesh to Three.js BufferGeometry
-function mesh2geometry(mesh: Mesh) {
+function mesh2geometry(mesh: MeshType) {
   const geometry = new BufferGeometry();
   // Assign buffers
   geometry.setAttribute(
