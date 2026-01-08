@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {getManifoldModuleSync} from './wasm.ts';
-
 /**
  * Control detail level for the
- * {@link manifold-encapsulated-types!CrossSection.circle CrossSection.circle},
- * {@link manifold-encapsulated-types!Manifold.cylinder Manifold.cylinder},
- * {@link manifold-encapsulated-types!Manifold.sphere Manifold.sphere}, and
- * {@link manifold-encapsulated-types!Manifold.revolve Manifold.revolve}
- * constructors.
+ * {@link manifold!CrossSection.circle | CrossSection.circle},
+ * {@link manifold!CrossSection.revolve | CrossSection.revolve},
+ * {@link manifold!Manifold.cylinder | Manifold.cylinder}, and
+ * {@link manifold!Manifold.sphere | Manifold.sphere} constructors.
  *
  * Libraries should not change these values, and if run through manifoldCAD or
  * the manifoldCAD CLI, will not be able to.  Libraries may get values to
  * determine their own level of detail.
- *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Modelling
  */
+
+import {getManifoldModuleSync} from './wasm.ts';
 
 let minCircularAngle: number = 10.0;
 let minCircularEdgeLength: number = 1.0;

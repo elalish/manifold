@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Vec3} from '../manifold-global-types';
+/**
+ * @group manifoldCAD Runtime
+ * @packageDocumentation
+ */
+
+import type {Vec3} from '../manifold';
 
 const {cos, sin, PI} = Math;
 const TAU = PI * 2;

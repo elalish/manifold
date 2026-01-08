@@ -31,12 +31,13 @@
  * time.
  *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold} from '../manifold-encapsulated-types.d.ts';
-import type {Vec3} from '../manifold-global-types.d.ts';
+import type {Manifold, Vec3} from '../manifold';
 
 const nodes = new Array<BaseGLTFNode>();
 

@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Convenience functions for instantiating or getting a manifold WASM instance.
+ *
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
+ */
+
 import type {ManifoldToplevel} from '../manifold.d.ts';
 import Module from '../manifold.js';
 

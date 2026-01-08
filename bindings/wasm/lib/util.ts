@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * @group manifoldCAD Runtime
+ * @packageDocumentation
+ */
+
 import {originalPositionFor, TraceMap} from '@jridgewell/trace-mapping';
 import convert from 'convert-source-map';
 

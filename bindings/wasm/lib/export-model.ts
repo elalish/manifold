@@ -25,6 +25,8 @@
  * manifoldCAD supports both import and export of glTF, but only exports 3mf.
  *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Input/Output
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
@@ -35,42 +37,60 @@ import * as gltfIO from './gltf-io.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
 
 /**
+ * @group Management
  * @inline
+ * @hidden
  */
-interface Format {
+export interface ExportFormat {
   extension: string;
   mimetype: string;
 }
 
+/**
+ * Through this interface, manifoldCAD can infer what formats each exporter may
+ * support.
+ * @group Management
+ */
 export interface Exporter {
-  exportFormats: Array<Format>;
-  toArrayBuffer: (doc: GLTFTransform.Document) => Promise<ArrayBuffer>;
+  exportFormats: Array<ExportFormat>;
+  toArrayBuffer:
+      (doc: GLTFTransform.Document,
+       options?: ExportOptions) => Promise<ArrayBuffer>;
 }
 
 /**
+ * @group Management
  * @inline
+ * @hidden
  */
-interface ExportOptions {
+export interface ExportOptions {
   /**
    * Use `mimetype` to determine the format of the imported model, rather than
-   * inferring it.
+   * inferring it.  If both `extension` and `mimetype` are specified, `mimetype`
+   * will be used.
    */
   mimetype?: string;
+  /**
+   * Use `extension` to determine the format of the imported model, rather than
+   * inferring it.  If both `extension` and `mimetype` are specified, `mimetype`
+   * will be used.
+   */
+  extension?: string;
 }
 
 const exporters: Array<Exporter> = [];
 register(gltfIO);
 register(export3MF);
 
-function getFormat(identifier: string): Format {
+function getFormat(identifier: string): ExportFormat {
   const formats = exporters.flatMap(ex => ex.exportFormats);
   const format = (findMimeType(identifier, formats) ??
-                  findExtension(identifier, formats)) as Format;
+                  findExtension(identifier, formats)) as ExportFormat;
   if (!format) throw new UnsupportedFormatError(identifier, formats);
   return format;
 }
 
-function getExporter(identifier: Format|string) {
+function getExporter(identifier: ExportFormat|string) {
   const format =
       typeof identifier === 'string' ? getFormat(identifier) : identifier;
   return exporters.find(ex => ex.exportFormats.includes(format))!;
@@ -82,7 +102,7 @@ function getExporter(identifier: Format|string) {
  * @param filetype
  * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
  *     than return false.
- * @group Management Functions
+ * @group Management
  */
 export function supports(filetype: string, throwOnFailure: false): boolean {
   if (throwOnFailure) return !!getFormat(filetype);
@@ -98,7 +118,7 @@ export function supports(filetype: string, throwOnFailure: false): boolean {
  * Register an exporter.
  *
  * Supported formats will be inferred.
- * @group Management Functions
+ * @group Management
  * @param exporter
  */
 export function register(exporter: Exporter) {
@@ -109,14 +129,17 @@ export function register(exporter: Exporter) {
  * Convert an in-memory GLTF document to a binary Blob.
  *
  * @param doc The GLTF document.
- * @param identifier The target format extension or mimetype.
  * @returns A URL encoded blob.
  * @group Low Level Functions
  */
 export async function toBlob(
-    doc: GLTFTransform.Document, identifier: string): Promise<Blob> {
-  const format = getFormat(identifier);
-  const buffer = await getExporter(identifier).toArrayBuffer(doc);
+    doc: GLTFTransform.Document, options: ExportOptions = {}): Promise<Blob> {
+  if (!(options.mimetype || options.extension)) {
+    throw new Error(
+        'Must specify a mimetype or extension when exporting to a Blob.');
+  }
+  const format = getFormat((options.mimetype || options.extension)!);
+  const buffer = await getExporter(format).toArrayBuffer(doc, options);
   return new Blob([buffer], {type: format.mimetype});
 }
 
@@ -124,13 +147,18 @@ export async function toBlob(
  * Convert an in-memory GLTF document to an ArrayBuffer.
  *
  * @param doc The GLTF document.
- * @param identifier The target format extension or mimetype.
  * @returns A URL encoded blob.
  * @group Low Level Functions
  */
 export async function toArrayBuffer(
-    doc: GLTFTransform.Document, identifier: string): Promise<ArrayBuffer> {
-  return await getExporter(identifier).toArrayBuffer(doc);
+    doc: GLTFTransform.Document,
+    options: ExportOptions = {}): Promise<ArrayBuffer> {
+  if (!(options.mimetype || options.extension)) {
+    throw new Error(
+        'Must specify a mimetype or extension when exporting to a Buffer.');
+  }
+  const format = getFormat((options.mimetype || options.extension)!);
+  return await getExporter(format).toArrayBuffer(doc, options);
 }
 
 /**
@@ -145,7 +173,8 @@ export async function writeFile(
   }
   const fs = await import('node:fs/promises');
 
-  const exporter = getExporter(options.mimetype ?? filename);
-  const buffer = await exporter.toArrayBuffer(doc);
+  const exporter =
+      getExporter(options.mimetype ?? options.extension ?? filename);
+  const buffer = await exporter.toArrayBuffer(doc, options);
   return await fs.writeFile(filename, new Uint8Array(buffer));
 }

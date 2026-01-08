@@ -24,12 +24,18 @@
  * functions are available in manifoldCAD.
  *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Input/Output
+ * @groupDescription Modelling Functions
+ * These functions are available within manifoldCAD.
+ * @groupDescription Low Level Functions
+ * These functions are not available within manifoldCAD, but can be used when
+ * including manifold in another project.
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Mesh} from '../manifold-encapsulated-types.d.ts';
-import type {Vec3} from '../manifold-global-types.d.ts';
+import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
@@ -39,20 +45,40 @@ import {findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 /**
+ * @group Management
  * @inline
+ * @hidden
  */
-interface Format {
+export interface ImportFormat {
   extension: string;
   mimetype: string;
 }
 
+/**
+ * Through this interface, manifoldCAD can infer what formats each importer may
+ * support.
+ * @group Management
+ */
 export interface Importer {
-  importFormats: Array<Format>;
-  fromArrayBuffer: (buffer: ArrayBuffer) => Promise<GLTFTransform.Document>;
+  /**
+   * Some importers may support multiple variations of a format.  List each of
+   * them by extension and MIME type.
+   * @readonly
+   */
+  importFormats: Array<ImportFormat>;
+  /**
+   * Given a buffer, return a glTF-transform document.
+   * @function
+   */
+  fromArrayBuffer:
+      (buffer: ArrayBuffer,
+       options?: ImportOptions) => Promise<GLTFTransform.Document>;
 }
 
 /**
+ * @group Management
  * @inline
+ * @hidden
  */
 export interface ImportOptions {
   /**
@@ -96,15 +122,15 @@ export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
   return node2doc.get(node) ?? null;
 };
 
-function getFormat(identifier: string): Format {
+function getFormat(identifier: string): ImportFormat {
   const formats = importers.flatMap(im => im.importFormats);
   const format = (findMimeType(identifier, formats) ??
-                  findExtension(identifier, formats)) as Format;
+                  findExtension(identifier, formats)) as ImportFormat;
   if (!format) throw new UnsupportedFormatError(identifier, formats);
   return format;
 }
 
-function getImporter(identifier: Format|string) {
+function getImporter(identifier: ImportFormat|string) {
   const format =
       typeof identifier === 'string' ? getFormat(identifier) : identifier;
   return importers.find(im => im.importFormats.includes(format))!;
@@ -116,7 +142,7 @@ function getImporter(identifier: Format|string) {
  * @param filetype
  * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
  *     than return false.
- * @group Management Functions
+ * @group Management
  */
 export function supports(
     filetype: string, throwOnFailure: boolean = false): boolean {
@@ -133,7 +159,7 @@ export function supports(
  * Register an importer.
  *
  * Supported formats will be inferred.
- * @group Management Functions
+ * @group Management
  */
 export function register(importer: Importer) {
   importers.push(importer);
@@ -198,7 +224,7 @@ export async function importManifold(
  * Resolve and read a model, be it a file, a URL or a Blob.
  *
  * @group Low Level Functions
- **/
+ */
 export async function readModel(
     source: string|Blob|URL|ArrayBuffer,
     options: ImportOptions = {}): Promise<GLTFTransform.Document> {
@@ -250,21 +276,21 @@ export async function readModel(
  * Fetch a model over HTTP/HTTPS.
  *
  * @group Low Level Functions
- **/
+ */
 export async function fetchModel(
     uri: string, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? uri);
   const response = await fetch(uri);
   const blob = await response.blob();
   return importTransform(
-      await importer.fromArrayBuffer(await blob.arrayBuffer()));
+      await importer.fromArrayBuffer(await blob.arrayBuffer(), options));
 }
 
 /**
  * Read a model from a Blob.
  *
  * @group Low Level Functions
- **/
+ */
 export async function fromBlob(
     blob: Blob, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   if (!blob.type && !options.mimetype) {
@@ -272,15 +298,16 @@ export async function fromBlob(
   }
   const importer = getImporter(options.mimetype ?? blob.type);
   return importTransform(
-      await importer.fromArrayBuffer(await blob.arrayBuffer()));
+      await importer.fromArrayBuffer(await blob.arrayBuffer(), options));
 }
 
 /**
  * Read a model from an ArrayBuffer.
  *
  * @group Low Level Functions
- **/
+ */
 export async function fromArrayBuffer(
+    // FIXME consistency
     buffer: ArrayBuffer, identifier: string): Promise<GLTFTransform.Document> {
   if (!identifier) {
     throw new ImportError(
@@ -293,7 +320,7 @@ export async function fromArrayBuffer(
 /**
  * Read a model from disk.
  * @group Low Level Functions
- **/
+ */
 export async function readFile(filename: string, options: ImportOptions = {}) {
   if (!isNode()) {
     throw new ImportError('Must have a filesystem to read files.');
@@ -305,7 +332,7 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
   const path =
       filename.startsWith('file:') ? fileURLToPath(filename) : filename;
   const buffer = (await fs.readFile(path)).buffer as ArrayBuffer;
-  return importTransform(await importer.fromArrayBuffer(buffer));
+  return importTransform(await importer.fromArrayBuffer(buffer, options));
 }
 
 /**

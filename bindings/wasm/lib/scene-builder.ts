@@ -14,23 +14,19 @@
 
 /**
  * The scene builder provides modelling outside of the native
- * capabilities of Maniold WASM.  This includes scene graphs, materials,
+ * capabilities of Manifold WASM.  This includes scene graphs, materials,
  * and animation functions.  In general, the scene builder
  * follows GLTF semantics.
  *
- * This module includes modelling functions for use inside a ManifoldCAD script
- * (e.g.: `show`, `only`, `setMaterial`, etc.).  It also includes a set of
- * management functions (e.g.: `manifoldToGLTFDoc`, `cleanup`, etc.) that are
- * used to export complete scenes and generally manage the state of the scene
- * builder.
- *
  * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
  */
 
 import {Document, Material, Node} from '@gltf-transform/core';
 import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
-import {Manifold} from '../manifold.js';
+import type {Manifold} from '../manifold';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'

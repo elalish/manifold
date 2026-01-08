@@ -12,10 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Convert between in-memory glTF-transform documents and their serialized
+ * formats. This module also includes some utilities for conversion between glTF
+ * meshes and manifold meshes.
+ *
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Input/Output
+ * @groupDescription Import
+ * These properties implement the {@link lib/import-model!Importer | Importer}
+ * interface. Through this interface, manifoldCAD can determine when to use this
+ * module to import a model.
+ * @groupDescription Export
+ * These properties implement the {@link lib/export-model!Exporter | Exporter}
+ * interface. Through this interface, manifoldCAD can determine when to use this
+ * module to export a model.
+ */
+
 import * as GLTFTransform from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {Mesh as ManifoldMesh, MeshOptions} from '../manifold-encapsulated-types';
+import {Mesh as ManifoldMesh, MeshOptions} from '../manifold';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 
@@ -24,8 +42,18 @@ const binaryFormat = {
   mimetype: 'model/gltf-binary'
 };
 
+/**
+ * @group Import
+ * @readonly
+ */
 export const importFormats = [binaryFormat];
+
+/**
+ * @group Export
+ * @readonly
+ */
 export const exportFormats = [binaryFormat];
+
 
 export const attributeDefs = {
   'POSITION': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
@@ -449,11 +477,17 @@ const getIO = (): GLTFTransform.PlatformIO => {
   return _io;
 };
 
+/**
+ * @group Export
+ */
 export async function toArrayBuffer(doc: GLTFTransform.Document):
     Promise<ArrayBuffer> {
   return (await getIO().writeBinary(doc)).buffer as ArrayBuffer;
 }
 
+/**
+ * @group Import
+ */
 export async function fromArrayBuffer(buffer: ArrayBuffer) {
   return await getIO().readBinary(new Uint8Array(buffer));
 }

@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Objects created by the manifold WASM module will not be garbage collected
+ * by the JavaScript runtime.  This module tracks those objects for later
+ * cleanup.
+ *
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Core
+ */
+
 import type {CrossSection, Manifold} from '../manifold-encapsulated-types.d.ts';
 import type {ManifoldToplevel} from '../manifold.d.ts';
 

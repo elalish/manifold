@@ -12,12 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Serialize in memory glTF-transform documents to 3MF.
+ * @packageDocumentation
+ * @group manifoldCAD Runtime
+ * @category Input/Output
+ * @groupDescription Export
+ * These properties implement the {@link lib/export-model!Exporter | Exporter}
+ * interface. Through this interface, manifoldCAD can determine when to use this
+ * module to export a model.
+ */
+
 import * as GLTFTransform from '@gltf-transform/core';
 import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate';
 
 import type {Mat4} from '../manifold-global-types.d.ts';
 
+import {ExportOptions} from './export-model.ts';
 import {ManifoldPrimitive} from './manifold-gltf';
 
 const supportedFormat = {
@@ -25,6 +37,9 @@ const supportedFormat = {
   mimetype: 'model/3mf'
 };
 
+/**
+ * @group Export
+ */
 export const exportFormats = [supportedFormat];
 
 interface Mesh3MF {
@@ -46,7 +61,7 @@ interface Component3MF {
   transform?: Mat4|Array<string>;
 }
 
-interface Header {
+export interface Header {
   unit?: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter';
   title?: string;
   author?: string;
@@ -72,20 +87,27 @@ const defaultHeader: Header = {
   application: 'ManifoldCAD.org',
 }
 
+export interface Export3MFOptions extends ExportOptions {
+  mimetype?: string;
+  header?: Header;
+}
+
 /**
  * Convert a GLTF-Transform document to a 3MF model.
  *
  * @param doc The GLTF document to convert.
  * @returns A blob containing the converted model.
+ * @group Export
  */
 export async function toArrayBuffer(
-    doc: GLTFTransform.Document, header: Header = {}): Promise<ArrayBuffer> {
+    doc: GLTFTransform.Document,
+    options?: Export3MFOptions): Promise<ArrayBuffer> {
   const to3mf = {
     meshes: [],
     components: [],
     items: [],
     precision: 7,
-    header: {...defaultHeader, ...header}
+    header: {...defaultHeader, ...(options?.header ?? {})}
   } as To3MF;
 
   // GLTF references by array index.
@@ -197,9 +219,3 @@ export async function toArrayBuffer(
   const zipFile = zipSync(files);
   return zipFile.buffer as ArrayBuffer;
 };
-
-export async function toBlob(doc: GLTFTransform.Document, header: Header = {}) {
-  const buffer =
-      new Uint8Array(await toArrayBuffer(doc, header) as ArrayBuffer);
-  return new Blob([buffer], {type: supportedFormat.mimetype});
-}
