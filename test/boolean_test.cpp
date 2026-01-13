@@ -536,6 +536,7 @@ TEST(Boolean, ConvexConvexMinkowski) {
 }
 
 TEST(Boolean, ConvexConvexMinkowskiD) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
   float offsetRadius = 0.1f;
@@ -552,11 +553,10 @@ TEST(Boolean, ConvexConvexMinkowskiD) {
     ExportMesh("minkowski-convex-convex-difference.glb", difference.GetMeshGL(),
                {});
 #endif
-
-  ManifoldParams().processOverlaps = false;
 }
 
 TEST(Boolean, NonConvexConvexMinkowski) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
@@ -576,33 +576,44 @@ TEST(Boolean, NonConvexConvexMinkowski) {
   if (options.exportModels)
     ExportMesh("minkowski-nonconvex-convex.glb", sum.GetMeshGL(), {});
 #endif
-
-  ManifoldParams().processOverlaps = false;
 }
 
-TEST(Boolean, NonConvexNonConvexMinkowski) {
+TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
+  ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
   Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)));
-  EXPECT_NEAR(sum.Volume(), 8.65625f, 1e-3);
-  EXPECT_NEAR(sum.SurfaceArea(), 31.177f, 1e-2);
+  EXPECT_NEAR(sum.Volume(), 8.65625, 1e-5);
+  EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 1e-5);
   EXPECT_EQ(sum.Genus(), 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("minkowski-nonconvex-nonconvex-sum.glb", sum.GetMeshGL(), {});
+#endif
+}
+
+TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
   Manifold difference =
       nonConvex.MinkowskiDifference(nonConvex.Scale(vec3(0.1)));
-  EXPECT_NEAR(difference.Volume(), 0.81554f, 1e-3);
-  EXPECT_NEAR(difference.SurfaceArea(), 6.9505f, 1e-2);
+  EXPECT_NEAR(difference.Volume(), 0.815542, 1e-5);
+  EXPECT_NEAR(difference.SurfaceArea(), 6.95045, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-nonconvex-nonconvex.glb", sum.GetMeshGL(), {});
+    ExportMesh("minkowski-nonconvex-nonconvex-diff.glb", difference.GetMeshGL(),
+               {});
 #endif
-
-  ManifoldParams().processOverlaps = false;
 }
 
 /**

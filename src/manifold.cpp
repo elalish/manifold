@@ -1074,11 +1074,15 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   } else if (!aConvex && !bConvex) {
     for (size_t aFace = 0; aFace < aImpl->NumTri(); aFace++) {
       for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
-        const bool coplanar =
-            linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
-                                      bImpl->faceNormal_[bFace])) ||
-            linalg::all(linalg::equal(aImpl->faceNormal_[aFace],
-                                      -bImpl->faceNormal_[bFace]));
+        // Use tolerance-based coplanarity check instead of exact equality
+        // to handle floating-point precision issues from scaling
+        constexpr double kCoplanarTol = 1e-15;
+        vec3 nA = aImpl->faceNormal_[aFace];
+        vec3 nB = bImpl->faceNormal_[bFace];
+        double dotSame = linalg::dot(nA, nB);
+        double dotOpp = linalg::dot(nA, -nB);
+        const bool coplanar = (std::abs(dotSame - 1.0) < kCoplanarTol) ||
+                              (std::abs(dotOpp - 1.0) < kCoplanarTol);
         if (coplanar) continue;  // Skip Coplanar Triangles
 
         vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
