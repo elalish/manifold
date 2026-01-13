@@ -1,9 +1,6 @@
-// typedoc.json
 {
   "entryPoints": [
     "./manifold.d.ts",
-    "./types/manifoldCAD.d.ts",
-    "./types/manifoldCADGlobals.d.ts",
     "./lib/*.ts"
   ],
   "exclude": [
@@ -34,10 +31,9 @@
   "excludeInternal": true,
   "excludeExternals": true,
   "projectDocuments": [
+    "./documents/embedding-manifoldcad.md",
     "./documents/bindings.md",
-    "./documents/bindings-examples.md",
-    "./documents/using-manifoldcad.md",
-    "./documents/embedding-manifoldcad.md"
+    "./documents/bindings-examples.md"
   ],
   "navigation": {
     "includeGroups": true,
@@ -52,5 +48,5 @@
     "Global Settings", "Management", "Import", "Export",
     "Low Level Functions", "*", "Type Aliases", "glTF Extension"
   ],
-  "out": "docs"
+  "out": "docs/jsapi"
 }

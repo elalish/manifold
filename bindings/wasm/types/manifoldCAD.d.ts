@@ -30,7 +30,7 @@
  *
  * @packageDocumentation
  * @module manifoldCAD
- * @group manifoldCAD
+ * @showGroups true
  * @primaryExport
  * @see {@link "Using manifoldCAD" | Using manifoldCAD}
  *

@@ -16,6 +16,8 @@ export default defineConfig({
   },
   plugins: [viteStaticCopy({
     targets: [
+      // If type declaration files are missing, the web editor can't
+      // load them, and type validation won't work for our core modules.
       {
         src: '../dist/manifoldCAD.d.ts',
         dest: './',  // Targets are relative to 'dist'.
@@ -24,25 +26,17 @@ export default defineConfig({
         src: '../dist/manifoldCADGlobals.d.ts',
         dest: './',
       },
-      // If 'dist/manifold-encapsulated-types.d.ts' and
-      // 'dist/manifold-global-types.d.ts' are missing, the web editor can't
-      // load them, and type validation won't work for our core modules.
-      //
-      // They are generated when building the wasm module.  But we don't
-      // really need to build the whole thing when working up here in JS/TS
-      // territory.  Additionally, they rarely change.  In the case where the
-      // binding files are not present, grab the checked in copies, and use
-      // those instead.  But if they _are_ present, don't overwrite them.
+      // Copy API documentation over.
+      // This gives us /docs/jsuser and /docs/jsapi
+      /*
       {
-        src: '../manifold-encapsulated-types.d.ts',
-        dest: './',
-        overwrite: false,
-      },
-      {
-        src: '../manifold-global-types.d.ts',
-        dest: './',
-        overwrite: false,
+        src: '../docs/',
+        dest: './docs/',
+        silent: true // Fail quiet if docs have not been built.
       }
+        */
+      // FIXME also copy C++ docs to ./docs/api
+      // FIXME create redirects.
     ],
   })],
   resolve: {
