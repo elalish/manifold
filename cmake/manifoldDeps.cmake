@@ -60,15 +60,19 @@ if(MANIFOLD_PAR)
         add_library(TBB::tbb ALIAS tbb)
       endif()
     endif()
-  else()
+  elseif(MANIFOLD_USE_BUILTIN_TBB)
     logmissingdep("TBB" , "Parallel mode")
-    set(MANIFOLD_USE_BUILTIN_TBB ON)
+    message(
+      WARNING
+      "MANIFOLD_USE_BUILTIN_TBB will statically link TBB,"
+      "which may cause issues when you use manifold with other libraries bundling their own TBB."
+    )
     set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
     set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
     FetchContent_Declare(
       TBB
       GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-      GIT_TAG v2022.0.0
+      GIT_TAG v2022.3.0
       GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(TBB)
@@ -76,6 +80,8 @@ if(MANIFOLD_PAR)
       DIRECTORY ${tbb_SOURCE_DIR}
       PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
     )
+  else()
+    message(FATAL_ERROR "Parallel mode enabled, but tbb was not found.")
   endif()
 endif()
 
@@ -119,7 +125,8 @@ if(MANIFOLD_CROSS_SECTION)
       # Jun 15, 2025
       GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
       GIT_PROGRESS TRUE
-      SOURCE_SUBDIR CPP
+      SOURCE_SUBDIR
+      CPP
     )
     FetchContent_MakeAvailable(Clipper2)
     set_property(

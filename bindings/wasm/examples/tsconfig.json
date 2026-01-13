@@ -21,6 +21,8 @@
   },
   "include": [
     "./*.ts",
+    "../lib/*.ts",
+    "../lib/gltf-transform/*.ts"
   ],
   "exclude": []
 }

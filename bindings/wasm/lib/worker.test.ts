@@ -1,4 +1,4 @@
-// Copyright 2022 The Manifold Authors.
+// Copyright 2022-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,38 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {WebIO} from '@gltf-transform/core';
 import {strict as assert} from 'assert';
+import {glob} from 'glob';
+import * as fs from 'node:fs/promises';
+import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
 
-import {readMesh, setupIO} from '../lib/gltf-io';
-
 // @ts-ignore
-import {examples} from './public/examples.js';
-import {Mesh} from './public/manifold';
-import {cleanup, evaluateCADToModel, module} from './worker';
+import {Mesh} from '../manifold';
 
-const io = setupIO(new WebIO());
+import {gltfDocToManifold, importModel} from './import-model.ts';
+import {cleanup, evaluate, exportBlobURL} from './worker.ts';
+
+async function resolveExample(name: string) {
+  const [filepath] =
+      await glob(name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}', {
+        cwd: resolve(import.meta.dirname, '../test/examples/'),
+        withFileTypes: true
+      });
+  if (!filepath) {
+    throw new Error(`Could not find example '${name}'.`);
+  }
+  return filepath.fullpath()
+}
 
 async function runExample(name: string) {
-  const code = examples.functionBodies.get(name);
-  const result = await evaluateCADToModel(code);
+  const filename = await resolveExample(name);
+  const code = await fs.readFile(filename, 'utf-8');
+  const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
+  const glbURL = await exportBlobURL(doc, 'glb')
   cleanup();
-  assert.ok(result?.glbURL);
-  const docIn = await io.read(result?.glbURL);
-  URL.revokeObjectURL(result?.glbURL);
-  const nodes = docIn.getRoot().listNodes();
-  for (const node of nodes) {
-    const docMesh = node.getMesh();
-    if (!docMesh) {
-      continue;
-    }
-    const {mesh} = readMesh(docMesh)!;
-    const manifold = new module.Manifold(mesh as Mesh);
+  assert.ok(glbURL);
+
+  // These tests are agains the first glTF node containing meshes in a given
+  // model.
+  const {document} = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const node = document.getRoot().listNodes().find(node => !!node.getMesh());
+  const manifold = await gltfDocToManifold(document, node);
+  URL.revokeObjectURL(glbURL);
+
+  if (manifold) {
     const volume = manifold.volume();
     const surfaceArea = manifold.surfaceArea();
     const genus = manifold.genus();
-    manifold.delete();
+    cleanup();
     return {volume, surfaceArea, genus};
   }
   assert.ok(false);
@@ -85,8 +97,8 @@ suite('Examples', () => {
   test('Heart', async () => {
     const result = await runExample('Heart');
     expect(result?.genus).to.equal(0, 'Genus');
-    expect(result?.volume).to.be.closeTo(3.342, 0.001, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(11.51, 0.01, 'Surface Area');
+    expect(result?.volume).to.be.closeTo(282742, 10, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(22186, 1, 'Surface Area');
   });
 
   test('Scallop', async () => {
@@ -122,5 +134,37 @@ suite('Examples', () => {
     expect(result?.genus).to.equal(15, 'Genus');
     expect(result?.volume).to.be.closeTo(4175, 1, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(5645, 1, 'Surface Area');
+  });
+
+  test('Involute Gear Library', async () => {
+    const result = await runExample('Involute Gear Library');
+    expect(result?.genus).to.equal(0, 'Genus');
+    expect(result?.volume).to.be.closeTo(2185, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(1667, 1, 'Surface Area');
+  });
+
+  test('Gear Bearing', async () => {
+    const result = await runExample('Gear Bearing');
+    expect(result?.genus).to.equal(1, 'Genus');
+    expect(result?.volume).to.be.closeTo(9074, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(7009, 1, 'Surface Area');
+  });
+
+  test('Voronoi', async () => {
+    const result = await runExample('Voronoi');
+    // This model is non-deterministic.
+    // These values must be very conservative.
+    expect(result?.genus).to.be.lessThan(-25, 'Genus');
+    expect(result?.volume).to.be.greaterThan(5000, 'Volume');
+    expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
+  });
+
+  test('Import Manifold', async () => {
+    const result = await runExample('Import Manifold');
+    expect(result?.genus).to.equal(3, 'Genus');
+    // There are a 1e9 cubic millimeters in a cubic metre.
+    // They add up fast.
+    expect(result?.volume).to.be.closeTo(2.10e15, 1e13, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(1.67e11, 1e9, 'Surface Area');
   });
 });

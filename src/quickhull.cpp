@@ -223,9 +223,9 @@ HalfEdgeMesh::HalfEdgeMesh(const MeshBuilder& builderObject,
 /*
  * Implementation of the algorithm
  */
-std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
+std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   if (originalVertexData.size() == 0) {
-    return {Vec<Halfedge>(), Vec<vec3>()};
+    return {SharedVec<Halfedge>(), Vec<vec3>()};
   }
 
   // Very first: find extreme values and use them to compute the scale of the
@@ -252,7 +252,7 @@ std::pair<Vec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   }
 
   // reorder halfedges
-  Vec<Halfedge> halfedges(mesh.halfedges.size());
+  SharedVec<Halfedge> halfedges(mesh.halfedges.size());
   Vec<int> halfedgeToFace(mesh.halfedges.size());
   Vec<int> counts(mesh.halfedges.size(), 0);
   Vec<int> mapping(mesh.halfedges.size());
@@ -854,8 +854,8 @@ void Manifold::Impl::Hull(VecView<vec3> vertPos) {
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
-  Finish();
-  MarkCoplanar();
+  SortGeometry();
+  SetNormalsAndCoplanar();
 }
 
 }  // namespace manifold

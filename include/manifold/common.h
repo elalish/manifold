@@ -21,7 +21,6 @@
 #endif
 
 #include "linalg.h"
-#include "optional_assert.h"
 
 namespace manifold {
 /** @addtogroup Math
@@ -471,7 +470,7 @@ struct Rect {
  * @brief Boolean operation type: Add (Union), Subtract (Difference), and
  * Intersect.
  */
-enum class OpType { Add, Subtract, Intersect };
+enum class OpType : char { Add, Subtract, Intersect };
 
 constexpr int DEFAULT_SEGMENTS = 0;
 constexpr double DEFAULT_ANGLE = 10.0;

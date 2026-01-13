@@ -105,7 +105,8 @@ std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
-  return std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(impl));
+  return std::make_shared<CsgLeafNode>(
+      std::make_shared<Manifold::Impl>(std::move(impl)));
 }
 
 std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
@@ -162,6 +163,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   ZoneScoped;
   double epsilon = -1;
   double tolerance = -1;
+  Box bbox;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
@@ -186,6 +188,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
     epsilon = std::max(epsilon, nodeEpsilon);
     tolerance = std::max(tolerance, node->pImpl_->tolerance_);
+    bbox = bbox.Union(node->pImpl_->bBox_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -203,7 +206,9 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   Manifold::Impl combined;
   combined.epsilon_ = epsilon;
   combined.tolerance_ = tolerance;
+  combined.bBox_ = bbox;
   combined.vertPos_.resize_nofill(numVert);
+  combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
   combined.faceNormal_.resize_nofill(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
@@ -231,13 +236,15 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         const int nextVert = vertIndices[i];
         const int nextEdge = edgeIndices[i];
         const int nextProp = propVertIndices[i];
+        const bool hasProp = node->pImpl_->NumProp() > 0;
         transform(node->pImpl_->halfedge_.begin(),
                   node->pImpl_->halfedge_.end(),
                   combined.halfedge_.begin() + edgeIndices[i],
-                  [nextVert, nextEdge, nextProp](Halfedge edge) {
+                  [nextVert, nextEdge, nextProp, hasProp](Halfedge edge) {
                     edge.startVert += nextVert;
                     edge.endVert += nextVert;
                     edge.pairedHalfedge += nextEdge;
+                    if (!hasProp) edge.propVert = 0;
                     edge.propVert += nextProp;
                     return edge;
                   });
@@ -259,6 +266,9 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         if (node->transform_ == mat3x4(la::identity)) {
           copy(node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
                combined.vertPos_.begin() + vertIndices[i]);
+          copy(node->pImpl_->vertNormal_.begin(),
+               node->pImpl_->vertNormal_.end(),
+               combined.vertNormal_.begin() + vertIndices[i]);
           copy(node->pImpl_->faceNormal_.begin(),
                node->pImpl_->faceNormal_.end(),
                combined.faceNormal_.begin() + triIndices[i]);
@@ -272,11 +282,16 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
               });
           mat3 normalTransform =
               la::inverse(la::transpose(mat3(node->transform_)));
+          auto vertNormalBegin =
+              TransformIterator(node->pImpl_->vertNormal_.begin(),
+                                TransformNormals({normalTransform}));
           auto faceNormalBegin =
               TransformIterator(node->pImpl_->faceNormal_.begin(),
                                 TransformNormals({normalTransform}));
           copy_n(vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
+          copy_n(vertNormalBegin, node->pImpl_->vertNormal_.size(),
+                 combined.vertNormal_.begin() + vertIndices[i]);
           copy_n(faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
 
@@ -314,7 +329,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   // required to remove parts that are smaller than the tolerance
   combined.RemoveDegenerates();
-  combined.Finish();
+  combined.SortGeometry();
   combined.IncrementMeshIDs();
   return ImplToLeaf(std::move(combined));
 }
@@ -514,6 +529,7 @@ struct CsgStackFrame {
 };
 
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
+  ZoneScoped;
   if (cache_ != nullptr) return cache_;
 
   // Note: We do need a pointer here to avoid vector pointers from being
@@ -618,33 +634,35 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
     std::shared_ptr<CsgStackFrame> frame = stack.back();
     auto impl = frame->op_node->impl_.GetGuard();
     if (frame->finalize) {
-      switch (frame->op_node->op_) {
-        case OpType::Add:
-          *impl = {BatchUnion(frame->positive_children)};
-          break;
-        case OpType::Intersect: {
-          *impl = {BatchBoolean(OpType::Intersect, frame->positive_children)};
-          break;
-        };
-        case OpType::Subtract:
-          if (frame->positive_children.empty()) {
-            // nothing to subtract from, so the result is empty.
-            *impl = {std::make_shared<CsgLeafNode>()};
-          } else {
-            auto positive = BatchUnion(frame->positive_children);
-            if (frame->negative_children.empty()) {
-              // nothing to subtract, result equal to the LHS.
-              *impl = {frame->positive_children[0]};
+      if (!frame->op_node->cache_) {
+        switch (frame->op_node->op_) {
+          case OpType::Add:
+            *impl = {BatchUnion(frame->positive_children)};
+            break;
+          case OpType::Intersect: {
+            *impl = {BatchBoolean(OpType::Intersect, frame->positive_children)};
+            break;
+          };
+          case OpType::Subtract:
+            if (frame->positive_children.empty()) {
+              // nothing to subtract from, so the result is empty.
+              *impl = {std::make_shared<CsgLeafNode>()};
             } else {
-              auto negative = BatchUnion(frame->negative_children);
-              *impl = {SimpleBoolean(*positive->GetImpl(), *negative->GetImpl(),
-                                     OpType::Subtract)};
+              auto positive = BatchUnion(frame->positive_children);
+              if (frame->negative_children.empty()) {
+                // nothing to subtract, result equal to the LHS.
+                *impl = {frame->positive_children[0]};
+              } else {
+                auto negative = BatchUnion(frame->negative_children);
+                *impl = {SimpleBoolean(*positive->GetImpl(),
+                                       *negative->GetImpl(), OpType::Subtract)};
+              }
             }
-          }
-          break;
+            break;
+        }
+        frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
+            (*impl)[0]->Transform(frame->op_node->transform_));
       }
-      frame->op_node->cache_ = std::static_pointer_cast<CsgLeafNode>(
-          (*impl)[0]->Transform(frame->op_node->transform_));
       if (frame->positive_dest != nullptr)
         frame->positive_dest->push_back(std::static_pointer_cast<CsgLeafNode>(
             frame->op_node->cache_->Transform(frame->transform)));

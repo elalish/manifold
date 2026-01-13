@@ -44,6 +44,16 @@
 
 namespace manifold {
 /** @ingroup Private */
+
+// In forward mode, stores the intersections of edges of P with faces of Q.
+// In reverse mode, stores the intersections of faces of P with edges of Q.
+// In reverse, p1q2 -> p2q1, x12 -> x21, v12 -> v21.
+struct Intersections {
+  Vec<std::array<int, 2>> p1q2;
+  Vec<int> x12;
+  Vec<vec3> v12;
+};
+
 class Boolean3 {
  public:
   Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ, OpType op);
@@ -51,10 +61,9 @@ class Boolean3 {
 
  private:
   const Manifold::Impl &inP_, &inQ_;
-  const double expandP_;
-  Vec<std::array<int, 2>> p1q2_, p2q1_;
-  Vec<int> x12_, x21_, w03_, w30_;
-  Vec<vec3> v12_, v21_;
+  const bool expandP_;
+  Intersections xv12_, xv21_;
+  Vec<int> w03_, w30_;
   bool valid = true;
 };
 }  // namespace manifold

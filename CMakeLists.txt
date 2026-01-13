@@ -29,8 +29,8 @@ include(CMakeDependentOption)
 
 # Define Manifold version
 set(MANIFOLD_VERSION_MAJOR 3)
-set(MANIFOLD_VERSION_MINOR 2)
-set(MANIFOLD_VERSION_PATCH 1)
+set(MANIFOLD_VERSION_MINOR 3)
+set(MANIFOLD_VERSION_PATCH 2)
 set(
   MANIFOLD_VERSION
   "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}"
@@ -40,7 +40,7 @@ set(
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
-option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" ON)
+option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" OFF)
 option(
   MANIFOLD_DOWNLOADS
   "Allow Manifold build to download missing dependencies"
@@ -158,6 +158,7 @@ else()
     -Wno-unknown-warning-option
     -Wno-unused
     -Wno-shorten-64-to-32
+    -Wno-alloc-size-larger-than
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -181,19 +182,16 @@ else()
   if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     list(APPEND MANIFOLD_FLAGS -fno-omit-frame-pointer)
   endif()
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # disable fp math optimizations, e.g. FMA for supported architectures, as
-    # this changes floating-point results
-    # clang defaults to -ffp-contract=off so we don't have to set that
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag(-ffp-contract=off HAS_FP_CONTRACT)
-    check_cxx_compiler_flag(-fexcess-precision=standard HAS_FP_PRECISION)
-    if(HAS_FP_CONTRACT)
-      list(APPEND MANIFOLD_FLAGS -ffp-contract=off)
-    endif()
-    if(HAS_FP_PRECISION)
-      list(APPEND MANIFOLD_FLAGS -fexcess-precision=standard)
-    endif()
+  # disable fp math optimizations, e.g. FMA for supported architectures, as
+  # this changes floating-point results
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag(-ffp-contract=off HAS_FP_CONTRACT)
+  check_cxx_compiler_flag(-fexcess-precision=standard HAS_FP_PRECISION)
+  if(HAS_FP_CONTRACT)
+    list(APPEND MANIFOLD_FLAGS -ffp-contract=off)
+  endif()
+  if(HAS_FP_PRECISION)
+    list(APPEND MANIFOLD_FLAGS -fexcess-precision=standard)
   endif()
   if(CODE_COVERAGE)
     list(

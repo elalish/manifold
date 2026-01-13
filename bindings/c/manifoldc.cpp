@@ -493,9 +493,15 @@ ManifoldMeshGL64* manifold_meshgl64_merge(void* mem, ManifoldMeshGL64* m) {
   return m;
 }
 
-int manifold_meshgl_num_prop(ManifoldMeshGL* m) { return from_c(m)->numProp; }
-int manifold_meshgl_num_vert(ManifoldMeshGL* m) { return from_c(m)->NumVert(); }
-int manifold_meshgl_num_tri(ManifoldMeshGL* m) { return from_c(m)->NumTri(); }
+size_t manifold_meshgl_num_prop(ManifoldMeshGL* m) {
+  return from_c(m)->numProp;
+}
+size_t manifold_meshgl_num_vert(ManifoldMeshGL* m) {
+  return from_c(m)->NumVert();
+}
+size_t manifold_meshgl_num_tri(ManifoldMeshGL* m) {
+  return from_c(m)->NumTri();
+}
 
 size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL* m) {
   return from_c(m)->vertProperties.size();

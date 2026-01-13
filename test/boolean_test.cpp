@@ -161,21 +161,28 @@ TEST(Boolean, Simplify) {
   EXPECT_EQ(result2.NumTri(), 20);
 }
 
-TEST(Boolean, DISABLED_SimplifyCracks) {
+TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
       Manifold::Cylinder(2, 50, 50, 180)
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
   Manifold cube = Manifold::Cube(vec3(100, 2, 50));
-  Manifold refined = (cylinder + cube).RefineToLength(0.13071895424836602);
+  Manifold refined = (cylinder + cube).RefineToLength(1);
   Manifold deformed =
       refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
   Manifold simplified = deformed.Simplify(0.005);
 
   // If Simplify adds cracks, volume decreases and surface area increases
-  EXPECT_NEAR(simplified.Volume(), 17848, 1);
-  EXPECT_NEAR(simplified.SurfaceArea(), 20930, 1);
+  EXPECT_EQ(deformed.Genus(), 0);
+  EXPECT_EQ(simplified.Genus(), 0);
+  EXPECT_NEAR(simplified.Volume(), deformed.Volume(), 10);
+  EXPECT_NEAR(simplified.SurfaceArea(), deformed.SurfaceArea(), 1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cracks.glb", simplified.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, NoRetainedVerts) {
@@ -214,6 +221,19 @@ TEST(Boolean, MixedNumProp) {
              }).Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
+}
+
+TEST(Boolean, PropsMismatch) {
+  Manifold ma = Manifold::Cylinder(1, 1);
+  Manifold mb =
+      Manifold::Cube()
+          .Translate({50, 0, 0})
+          .SetProperties(1, [](double* newProp, vec3 pos, const double* _) {
+            newProp[0] = pos.x;
+          });
+
+  Manifold result = ma + mb;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
 TEST(Boolean, UnionDifference) {
@@ -274,6 +294,115 @@ TEST(Boolean, Perturb) {
 
   EXPECT_FLOAT_EQ(empty.Volume(), 0.0);
   EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0);
+}
+
+TEST(Boolean, Perturb1) {
+  const Manifold big = Manifold::Extrude(
+      {{{0, 2}, {2, 0}, {4, 2}, {2, 4}}, {{1, 2}, {2, 3}, {3, 2}, {2, 1}}},
+      1.0);
+  const Manifold little =
+      Manifold::Extrude({{{2, 1}, {3, 2}, {2, 3}, {1, 2}}}, 1.0)
+          .Translate({0, 0, 1});
+  const Manifold punchHole =
+      Manifold::Extrude({{{1, 2}, {2, 2}, {2, 3}}}, 1.0).Translate({0, 0, 1});
+  const Manifold result = (big + little) - punchHole;
+
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 24);
+  EXPECT_FLOAT_EQ(result.Volume(), 7.5);
+  EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("perturb1.glb", result.GetMeshGL(), {});
+#endif
+}
+
+TEST(Boolean, Perturb2) {
+  Manifold cube = Manifold::Cube(vec3(2), true);
+  MeshGL cubeGL = cube.GetMeshGL();
+
+  // Rotate so that nothing is axis-aligned
+  Manifold result = cube.Rotate(5, 10, 15);
+
+  for (size_t tri = 0; tri < cubeGL.NumTri(); ++tri) {
+    MeshGL prism;
+    prism.numProp = 3;
+    prism.triVerts = {4, 2, 0, 1, 3, 5};
+    for (const int v0 : {0, 1, 2}) {
+      const int v1 = (v0 + 1) % 3;
+      const int vIn0 = cubeGL.triVerts[3 * tri + v0];
+      const int vIn1 = cubeGL.triVerts[3 * tri + v1];
+      if (vIn1 > vIn0) {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
+      } else {
+        prism.triVerts.push_back(2 * v0);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v0 + 1);
+        prism.triVerts.push_back(2 * v1);
+        prism.triVerts.push_back(2 * v1 + 1);
+        prism.triVerts.push_back(2 * v0 + 1);
+      }
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+      for (const int j : {0, 1, 2}) {
+        prism.vertProperties.push_back(2 * cubeGL.vertProperties[3 * vIn0 + j]);
+      }
+    }
+    // All verts should be floating-point identical to one of 16 positions: the
+    // 8 starting result cube verts, or exactly double these coordinates.
+    result += Manifold(prism).Rotate(5, 10, 15);
+  }
+  // The result should be a double-sized cube, 4 units to a side.
+  // If symbolic perturbation fails, the number of verts and the surface area
+  // will increase, indicating cracks and internal geometry.
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_EQ(result.NumVert(), 8);
+  EXPECT_FLOAT_EQ(result.Volume(), 64.0);
+  EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
+}
+
+TEST(Boolean, Perturb3) {
+  // Create a nasty gear pattern with many rotated cubes that creates
+  // antiparallel slivers (triangles with normals ~180 degrees apart)
+  // https://github.com/BrunoLevy/thingiCSG/blob/main/DATABASE/Basic/nasty_gear_1.scad
+
+  const int N = 16;  // Number of rotations for the gear pattern
+  const double alpha = 90.0 / N;
+
+  // Create outer gear - many rotated cubes unioned together
+  std::vector<Manifold> outerCubes;
+  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  for (int i = 0; i < N; i++) {
+    outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
+  }
+  Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  Manifold outerGear = gear.Scale({2, 2, 1});
+
+  // Subtract inner from outer to create the nasty gear with slivers
+  Manifold nastyGear = outerGear - gear;
+
+  // const float topArea = CrossSection(gear.Project()).Area();
+  // const float sideArea = gear.SurfaceArea() - 2 * topArea;
+  const float expectedArea = 26.972;  // 3 * sideArea + 6 * topArea;
+  const float expectedVolume = outerGear.Volume() - gear.Volume();
+
+  // The gear should be valid and manifold
+  EXPECT_EQ(nastyGear.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(nastyGear.IsEmpty());
+  EXPECT_EQ(nastyGear.Genus(), 1);
+  EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
+  EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("nastyGear.glb", nastyGear.GetMeshGL(), {});
+#endif
 }
 
 TEST(Boolean, Coplanar) {
@@ -551,14 +680,13 @@ TEST(Boolean, Precision2) {
 }
 
 TEST(Boolean, SimpleCubeRegression) {
-  const bool selfIntersectionChecks = ManifoldParams().selfIntersectionChecks;
+  ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
   Manifold result =
       Manifold::Cube().Rotate(-0.10000000000000001, 0.10000000000000001, -1.) +
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  ManifoldParams().selfIntersectionChecks = selfIntersectionChecks;
 }
 
 TEST(Boolean, BatchBoolean) {
@@ -575,7 +703,7 @@ TEST(Boolean, BatchBoolean) {
   Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
                                         OpType::Add);
 
-  ExpectMeshes(add, {{150, 296}});
+  ExpectMeshes(add, {{152, 300}});
   EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
   EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
 

@@ -22,8 +22,8 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Babylon.js](https://doc.babylonjs.com/features/featuresDeepDive/mesh/mergeMeshes#merging-meshes-with-constructive-solid-geometry) | [trimesh](https://trimesh.org/) | [Gypsum](https://github.com/playkostudios/gypsum) |
 | [Valence 3D](https://apps.apple.com/us/app/valence-3d/id6450967410?mt=8&platform=ipad) | [bitbybit.dev](https://bitbybit.dev) | [PythonOpenSCAD](https://github.com/owebeeone/pythonopenscad) |
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
-| [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) |  [Cadova](https://github.com/tomasf/Cadova)  |
-
+| [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
+| [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
 ### Bindings & Packages
 
 Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
@@ -113,6 +113,7 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
+- `MANIFOLD_STRICT=[<OFF>, ON]`: Treat compile warnings as fatal build errors.
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
@@ -124,7 +125,14 @@ Dependency version override:
 > via `FETCHCONTENT_SOURCE_DIR_*` (see below), or fetch the source from GitHub.
 > Note that the dependency will be built as static dependency to avoid dynamic
 > library conflict. When the system package is unavailable, the option will be
-> automatically set to true.
+> automatically set to true (except for tbb).
+
+> WARNING: These packages are statically linked to the library, which may be
+> unexpected for other consumers of the library. In particular, for tbb, this
+> create two versions of tbb when another library also bring their own tbb,
+> which may cause performance issues or crash the system.
+> It is not recommended to install manifold compiled with builtin tbb, and this
+> option requires explicit opt-in now.
 
 Offline building (with missing dependencies/dependency version override):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.

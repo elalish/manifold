@@ -150,7 +150,7 @@ class MeshBuilder {
 
   // Mesh data
   std::vector<Face> faces;
-  Vec<Halfedge> halfedges;
+  SharedVec<Halfedge> halfedges;
   Vec<int> halfedgeToFace;
   Vec<int> halfedgeNext;
 
@@ -202,7 +202,7 @@ class HalfEdgeMesh {
   Vec<vec3> vertices;
   // Index of one of the half edges of the faces
   std::vector<size_t> halfEdgeIndexFaces;
-  Vec<Halfedge> halfedges;
+  SharedVec<Halfedge> halfedges;
   Vec<int> halfedgeToFace;
   Vec<int> halfedgeNext;
 
@@ -282,7 +282,8 @@ class QuickHull {
   // to a plane to consider a point being on positive side of it (for a point
   // cloud with scale 1) Returns: Convex hull of the point cloud as halfEdge
   // vector and vertex vector
-  std::pair<Vec<Halfedge>, Vec<vec3>> buildMesh(double eps = defaultEps());
+  std::pair<SharedVec<Halfedge>, Vec<vec3>> buildMesh(
+      double eps = defaultEps());
 };
 
 }  // namespace manifold

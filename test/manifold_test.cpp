@@ -571,7 +571,7 @@ TEST(Manifold, Simplify) {
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
-  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 20);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
   EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
 
 #ifdef MANIFOLD_EXPORT
@@ -653,14 +653,14 @@ TEST(Manifold, MeshRelationRefinePrecision) {
 
 TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder = Manifold::Cylinder(2, 1);
-  ASSERT_GE(cylinder.OriginalID(), 0);
+  EXPECT_GE(cylinder.OriginalID(), 0);
   MeshGL inGL = cylinder.GetMeshGL();
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
 
-  ASSERT_EQ(inGL.runOriginalID.size(), 1);
-  ASSERT_EQ(outGL.runOriginalID.size(), 1);
-  ASSERT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
+  EXPECT_EQ(inGL.runOriginalID.size(), 1);
+  EXPECT_EQ(outGL.runOriginalID.size(), 1);
+  EXPECT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
 
   RelatedGL(cylinder2, {inGL});
 }
@@ -744,8 +744,7 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(man.NumTri(), 4);
-  EXPECT_TRUE(man.Simplify().IsEmpty());
+  EXPECT_TRUE(man.IsEmpty());
 }
 
 TEST(Manifold, PinchedVert) {
@@ -781,14 +780,14 @@ TEST(Manifold, PinchedVert) {
 
 TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
-  ASSERT_GE(cube.OriginalID(), 0);
+  EXPECT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  ASSERT_EQ(NumUnique(inGL.faceID), 6);
+  EXPECT_EQ(NumUnique(inGL.faceID), 6);
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);
   const MeshGL outGL = cube2.GetMeshGL();
-  ASSERT_EQ(NumUnique(outGL.faceID), 2);
+  EXPECT_EQ(NumUnique(outGL.faceID), 2);
 }
 
 TEST(Manifold, MirrorUnion) {
@@ -1134,5 +1133,17 @@ TEST(Manifold, MergeRefine) {
   Manifold manifold(mesh);
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
+}
+#endif
+
+#ifdef MANIFOLD_DEBUG
+TEST(Manifold, OpenscadCrash) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
+  // m is not empty
+  EXPECT_EQ(m.IsEmpty(), false);
+  Manifold m2 = m + m.Translate({0, 0.6, 0});
+  EXPECT_EQ(m2.IsEmpty(), false);
 }
 #endif

@@ -1,6 +1,6 @@
 import {beforeAll, expect, suite, test} from 'vitest';
 
-import Module, {type ManifoldToplevel} from './built/manifold'
+import Module, {type ManifoldToplevel} from '../manifold'
 
 let manifoldModule: ManifoldToplevel;
 

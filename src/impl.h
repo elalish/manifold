@@ -15,7 +15,7 @@
 #pragma once
 #include <map>
 
-#include "collider.h"
+#include "lazy_collider.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "shared.h"
@@ -46,20 +46,18 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
-  Vec<Halfedge> halfedge_;
+  SharedVec<Halfedge> halfedge_;
   Vec<double> properties_;
-  // Note that vertNormal_ is not precise due to the use of an approximated acos
-  // function
   Vec<vec3> vertNormal_;
   Vec<vec3> faceNormal_;
   Vec<vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
-  Collider collider_;
+  std::shared_ptr<LazyCollider> collider_ = std::make_shared<LazyCollider>();
 
   static std::atomic<uint32_t> meshIDCounter_;
   static uint32_t ReserveIDs(uint32_t);
 
-  Impl() {}
+  Impl() : collider_{std::make_shared<LazyCollider>(LazyCollider::Empty())} {};
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat3x4 = la::identity);
 
@@ -67,6 +65,16 @@ struct Manifold::Impl {
   Impl(const MeshGLP<Precision, I>& meshGL) {
     const uint32_t numVert = meshGL.NumVert();
     const uint32_t numTri = meshGL.NumTri();
+
+    if (numVert == 0 && numTri == 0) {
+      MakeEmpty(Error::NoError);
+      return;
+    }
+
+    if (numVert < 4 || numTri < 4) {
+      MakeEmpty(Error::NotManifold);
+      return;
+    }
 
     if (meshGL.numProp < 3) {
       MakeEmpty(Error::MissingPositionProperties);
@@ -238,14 +246,13 @@ struct Manifold::Impl {
     // we need to split pinched verts before calculating vertex normals, because
     // the algorithm doesn't work with pinched verts
     CleanupTopology();
-    CalculateNormals();
 
     DedupePropVerts();
-    MarkCoplanar();
+    SetNormalsAndCoplanar();
 
     RemoveDegenerates();
     RemoveUnreferencedVerts();
-    Finish();
+    SortGeometry();
 
     if (!IsFinite()) {
       MakeEmpty(Error::NonFiniteVertex);
@@ -281,16 +288,15 @@ struct Manifold::Impl {
     } while (current != halfedge);
   }
 
-  void MarkCoplanar();
+  void SetNormalsAndCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(bool keepFaceID = false);
+  void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
-  void CalculateNormals();
+  void CalculateVertNormals();
   void IncrementMeshIDs();
 
-  void Update();
   void MakeEmpty(Error status);
   void Warp(std::function<void(vec3&)> warpFunc);
   void WarpBatch(std::function<void(VecView<vec3>)> warpFunc);
@@ -321,7 +327,7 @@ struct Manifold::Impl {
   double MinGap(const Impl& other, double searchLength) const;
 
   // sort.cpp
-  void Finish();
+  void SortGeometry();
   void SortVerts();
   void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
   void CompactProps();
@@ -329,6 +335,7 @@ struct Manifold::Impl {
   void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
   void GatherFaces(const Vec<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
+  void ReorderHalfedges();
 
   // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
@@ -344,10 +351,9 @@ struct Manifold::Impl {
   void CollapseColinearEdges(int firstNewVert = 0);
   void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  bool CollapseEdge(int edge, std::vector<int>& edges);
-  void RecursiveEdgeSwap(int edge, int& tag, std::vector<int>& visited,
-                         std::vector<int>& edgeSwapStack,
-                         std::vector<int>& edges);
+  bool CollapseEdge(int edge, Vec<int>& edges);
+  void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
+                         Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

@@ -12,11 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import ManifoldWorker from './worker-wrapper?worker';
+// '?url' is vite convention to reference a static asset.
+// vite will package the asset and provide a proper URL.
+import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
+// '?worker' is vite convention to load a module as a web worker.
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+
+import ManifoldWorker from '../dist/worker.bundled.js?worker';
+import manifoldWasmUrl from '../manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
-const exampleFunctions = self.examples.functionBodies;
+const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
@@ -94,6 +104,28 @@ function nthKey(n) {
   }
 }
 
+function getAllScripts() {
+  const files = {};
+  for (const [name, contents] of exampleFunctions) {
+    files[name] = contents;
+  }
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = nthKey(i);
+    if (!key || key === 'currentName' || key === 'safe') continue;
+    files[key] = getScript(key)
+  }
+  return files;
+}
+
+function getModelForScript(filename) {
+  const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
+  const model = monaco.editor.getModel(uri) ||
+      monaco.editor.createModel('', 'typescript', uri);
+  model.updateOptions({tabSize: 2});
+  return model;
+}
+
 function saveCurrent() {
   if (editor) {
     const currentName = currentFileElement.textContent;
@@ -114,10 +146,16 @@ function switchTo(scriptName) {
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
-    const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
+    const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
-    editor.setValue(code);
+    const model = getModelForScript(scriptName);
+    editor.setModel(model);
+
+    // Either editor.setValue() or model.setValue() will trigger
+    // onDidChangeModelContent.  This will cause some UI updates, but will also
+    // get monaco-editor-auto-typings to update types.
+    model.setValue(code);
   }
 }
 
@@ -255,54 +293,56 @@ function initializeRun() {
 }
 
 // Editor ------------------------------------------------------------
-let tsWorker = undefined;
 
-async function getManifoldDTS() {
-  const global = await fetch('/manifold-global-types.d.ts')
-                     .then(response => response.text());
+async function createEditor() {
+  self.MonacoEnvironment = {
+    getWorker: (_, label) => {
+      if (label === 'typescript' || label === 'javascript') {
+        return new tsWorker();
+      } else {
+        return new editorWorker();
+      }
+    }
+  };
 
-  const encapsulated = await fetch('/manifold-encapsulated-types.d.ts')
-                           .then(response => response.text());
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    language: 'typescript',
+    automaticLayout: true,
+  });
 
-  return `
-${global.replaceAll('export', '')}
-${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
-declare interface ManifoldToplevel {
-  CrossSection: typeof T.CrossSection;
-  Manifold: typeof T.Manifold;
-  Mesh: typeof T.Mesh;
-  triangulate: typeof T.triangulate;
-  setMinCircularAngle: typeof T.setMinCircularAngle;
-  setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
-  setCircularSegments: typeof T.setCircularSegments;
-  getCircularSegments: typeof T.getCircularSegments;
-  resetToCircularDefaults: typeof T.resetToCircularDefaults;
-  setup: () => void;
-}
-declare const module: ManifoldToplevel;
-`;
-}
+  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+    module: monaco.languages.typescript.ScriptTarget.ESNext,
+    moduleResolution: monaco.languages.typescript.ScriptTarget.NodeNext,
+    allowNonTsExtensions: true,
+  });
 
-async function getEditorDTS() {
-  const global = await fetch('/editor.d.ts').then(response => response.text());
-  return `${global.replace(/^import.*$/gm, '')}`;
-}
-
-require.config({
-  paths:
-      {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
-});
-require(['vs/editor/editor.main'], async function() {
+  // Make sure `manifold-3d/manifoldCAD` types are available for import.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getManifoldDTS());
+      await (await fetch('/manifoldCAD.d.ts')).text(),
+      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+
+  // Types in the global namespace for top-level scripts.
+  // This could be improved in the future.  API-Extractor intentionally doesn't
+  // global variables, so another tool may be a better fit.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getEditorDTS());
-  editor = monaco.editor.create(
-      document.getElementById('editor'),
-      {language: 'typescript', automaticLayout: true});
-  const w = await monaco.languages.typescript.getTypeScriptWorker();
-  tsWorker = await w(editor.getModel().uri);
-  editor.getModel().updateOptions({tabSize: 2});
+      (await (await fetch('/manifoldCADGlobals.d.ts')).text())
+          .replace(/^export /gm, ''));
+
+  // Load up all scripts so that monaco can check types of multi-file models.
+  for (const [filename, content] of Object.entries(getAllScripts())) {
+    getModelForScript(filename).setValue(content);
+  }
+
+  // Initialize auto typing on monaco editor.
+  self.window.typecache = new LocalStorageCache();
+  const autoTypings = await AutoTypings.create(editor, {
+    sourceCache: self.window.typecache,
+    onError: e => {console.error(e)},
+    onUpdate: (update, text) => {console.debug(text)},
+    onUpdateVersions: (versions) => {
+      console.debug(versions)
+    }
+  });
 
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
@@ -348,23 +388,39 @@ require(['vs/editor/editor.main'], async function() {
   }
 
   editor.onDidChangeModelContent(e => {
-    runButton.disabled = false;
+    // The user switched models.
     if (switching) {
       switching = false;
       editor.setScrollTop(0);
+      runButton.disabled = false;
       return;
     }
-    if (isExample) {
+
+    // The user edited an example.
+    // Copy it into a new script.
+    if (isExample && exampleFunctions.get(currentName) != editor.getValue()) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
+      runButton.disabled = false;
+      return;
     }
+
+    // monaco-editor-auto-typings loaded types.  Do nothing.
+    if (autoTypings.isResolving && e.changes.isFlush) {
+      return;
+    }
+
+    // And if we're here, the user made an edit.
+    runButton.disabled = false;
   });
 
   window.onresize = () => {
     editor.layout({});
   };
-});
+};
+
+createEditor();
 
 // Animation ------------------------------------------------------------
 const mv = document.querySelector('model-viewer');
@@ -449,41 +505,70 @@ let manifoldWorker = null;
 
 function createWorker() {
   manifoldWorker = new ManifoldWorker();
-  manifoldWorker.onmessage = function(e) {
-    if (e.data == null) {
+
+  manifoldWorker.onmessage = (e) => {
+    const message = e.data;
+
+    if (message?.type === 'ready') {
       if (tsWorker != null && !manifoldInitialized) {
         initializeRun();
       }
       manifoldInitialized = true;
-      return;
-    }
 
-    if (e.data.log != null) {
-      consoleElement.textContent += e.data.log + '\r\n';
+    } else if (message?.type === 'error') {
+      // Clean up.
+      setScript('safe', 'false');
+      finishRun();
+
+      // Show errors.  If the stack trace makes more sense, show that.
+      const errorText = `${message.name}: ${message.message}`;
+      if (message.stack && message.stack.startsWith(errorText)) {
+        consoleElement.textContent += message.stack + '\r\n';
+      } else {
+        consoleElement.textContent += errorText + '\r\n';
+      }
       consoleElement.scrollTop = consoleElement.scrollHeight;
-      return;
-    }
-
-    finishRun();
-    runButton.disabled = true;
-
-    if (output.threeMFURL != null) {
-      URL.revokeObjectURL(output.threeMFURL);
-      output.threeMFURL = null;
-    }
-    URL.revokeObjectURL(output.glbURL);
-    output.glbURL = e.data.glbURL;
-    output.threeMFURL = e.data.threeMFURL;
-    threemfButton.disabled = output.threeMFURL == null;
-    mv.src = output.glbURL;
-    if (output.glbURL == null) {
       mv.showPoster();
       poster.textContent = 'Error';
+
+      // Clear models.
+      if (output.glbURL) URL.revokeObjectURL(output.glbURL);
+      if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
+      output.glbURL = null;
+      output.threeMFURL = null;
+      threemfButton.disabled = true;
+
+      // Start all over again.
       createWorker();
-    } else {
+
+    } else if (message?.type === 'log') {
+      consoleElement.textContent += message.message + '\r\n';
+      consoleElement.scrollTop = consoleElement.scrollHeight;
+
+    } else if (message?.type === 'done') {
       setScript('safe', 'true');
+      manifoldWorker.postMessage({type: 'export', extension: 'glb'});
+      manifoldWorker.postMessage({type: 'export', extension: '3mf'});
+
+      finishRun();
+      runButton.disabled = true;
+
+    } else if (message?.type === 'blob') {
+      if (message.extension === 'glb') {
+        if (output.glbURL) URL.revokeObjectURL(output.glbURL);
+        output.glbURL = message.blobURL;
+
+        mv.src = output.glbURL;
+      } else if (message?.extension === '3mf') {
+        if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
+        output.threeMFURL = message.blobURL;
+        threemfButton.disabled = false;
+      }
     }
-  }
+  };
+
+  manifoldWorker.postMessage(
+      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
 }
 
 createWorker();
@@ -494,8 +579,20 @@ async function run() {
   enableCancel();
   clearConsole();
   console.log('Running...');
-  const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
-  manifoldWorker.postMessage(output.outputFiles[0].text);
+  const files = {};
+  for (const [filename, contents] of Object.entries(getAllScripts())) {
+    files[`./${filename}`] = contents;
+  }
+  const filename = currentFileElement.textContent;
+  const code = editor.getValue();
+  manifoldWorker.postMessage({
+    type: 'evaluate',
+    code,
+    filename,
+    files,
+    jsCDN: 'jsDelivr',
+    baseUrl: window.location.href
+  });
 }
 
 function cancel() {

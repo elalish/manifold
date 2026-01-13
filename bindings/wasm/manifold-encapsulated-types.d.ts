@@ -1,4 +1,4 @@
-// Copyright 2023 The Manifold Authors.
+// Copyright 2023-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,6 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+/**
+ * @primaryExport
+ */
 
 import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
@@ -1078,6 +1082,7 @@ export interface MeshOptions {
   runTransform?: Float32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
+  tolerance?: number;
 }
 
 /**
@@ -1164,6 +1169,14 @@ export class Mesh {
    * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
    */
   halfedgeTangent: Float32Array;
+
+  /**
+   * Tolerance for mesh simplification. When creating a Manifold, the tolerance
+   * used will be the maximum of this and a baseline tolerance from the size of
+   * the bounding box. Any edge shorter than tolerance may be collapsed.
+   * Tolerance may be enlarged when floating point error accumulates.
+   */
+  tolerance: number;
 
   /**
    * Number of triangles

@@ -7,28 +7,28 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
+    "clean": "rm -fr ./dist",
     "prebuild": "cd .. && npm run build",
     "preinstall": "cd .. && npm ci",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:dev": "vitest"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@gltf-transform/core": "^4.2.0",
     "@gltf-transform/extensions": "^4.2.0",
     "@gltf-transform/functions": "^4.2.0",
     "@jscadui/3mf-export": "^0.5.0",
     "@types/three": "^0.179.0",
-    "gl-matrix": "^3.4.4",
+    "esbuild-wasm": "^0.25.11",
+    "monaco-editor": "^0.54.0",
+    "monaco-editor-auto-typings": "^0.4.6",
     "simple-dropzone": "0.8.3",
     "three": "0.179.1"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",
-    "@vitest/ui": "^3.2.4",
     "typescript": "^5.9.2",
     "vite": "^6.3.5",
-    "vitest": "^3.2.4"
+    "vite-plugin-static-copy": "^3.1.3"
   }
 }

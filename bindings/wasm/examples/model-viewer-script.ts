@@ -16,8 +16,8 @@ import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, mergeDocuments, prune} from '@gltf-transform/functions';
 
 import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from '../lib/gltf-io';
-
-import Module, {Manifold, Mesh} from './built/manifold';
+import type {Manifold as ManifoldType} from '../manifold';
+import Module from '../manifold';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
@@ -37,7 +37,7 @@ const id2properties = new Map<number, Properties>();
 // for reading single-object glTFs, as it simply unions any extra meshes
 // together rather than returning a scene hierarchy.
 async function readGLB(url: string) {
-  const manifolds = Array<Manifold>();
+  const manifolds = Array<ManifoldType>();
   const docIn = await io.read(url);
   await docIn.transform(flatten());
   const nodes = docIn.getRoot().listNodes();
@@ -110,7 +110,7 @@ const mv = document.querySelector('model-viewer');
 
 // Use gltf-io and gltf-transform to convert the resulting Manifold to a glTF
 // and display it with <model-viewer>.
-async function push2MV(manifold: Manifold) {
+async function push2MV(manifold: ManifoldType) {
   disposeMesh(node.getMesh()!);
   const mesh = writeMesh(doc, manifold.getMesh(), id2properties);
   node.setMesh(mesh);

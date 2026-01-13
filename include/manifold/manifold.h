@@ -79,7 +79,7 @@ class CsgLeafNode;
  * starts, in order to update it automatically for transforms and such. This
  * will be easier if your meshes all use the same channels for properties, but
  * this is not a requirement. Operations between meshes with different numbers
- * of peroperties will simply use the larger numProp and pad the smaller one
+ * of properties will simply use the larger numProp and pad the smaller one
  * with zeroes.
  *
  * On output, the triangles are sorted into runs (runIndex, runOriginalID,

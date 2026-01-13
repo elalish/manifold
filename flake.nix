@@ -29,7 +29,7 @@
     flake-utils.lib.eachDefaultSystem
       (system:
       let
-        manifold-version = "3.2.1";
+        manifold-version = "3.3.2";
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -69,6 +69,7 @@
               assimp
             ];
             cmakeFlags = [
+              "-DMANIFOLD_STRICT=ON"
               "-DMANIFOLD_CBIND=ON"
               "-DMANIFOLD_EXPORT=ON"
               "-DBUILD_SHARED_LIBS=ON"
@@ -95,7 +96,9 @@
             mkdir build
             cd build
             emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DMANIFOLD_STRICT=ON \
             -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
+            -DMANIFOLD_USE_BUILTIN_TBB=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
             -DFETCHCONTENT_SOURCE_DIR_TBB=${onetbb-src} \
             -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..

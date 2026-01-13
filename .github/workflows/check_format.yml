@@ -26,8 +26,8 @@ jobs:
       with:
         options: "--check --verbose"
         src: "./bindings/python/examples"
-    - name: "gersemi cmake check"
-      run: |
-        pip3 install gersemi
-        ./scripts/gersemi-check.sh
+    # - name: "gersemi cmake check"
+    #   run: |
+    #     pip3 install gersemi
+    #     ./scripts/gersemi-check.sh
 

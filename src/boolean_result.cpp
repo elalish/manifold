@@ -192,7 +192,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   inclusive_scan(sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
-  return std::make_tuple(faceEdge, facePQ2R);
+  return std::make_tuple(std::move(faceEdge), std::move(facePQ2R));
 }
 
 struct EdgePos {
@@ -200,6 +200,12 @@ struct EdgePos {
   int vert;
   int collisionId;
   bool isStart;
+
+  bool operator<(const EdgePos& other) const {
+    return edgePos < other.edgePos ||
+           // we also sort by collisionId to make things deterministic
+           (edgePos == other.edgePos && collisionId < other.collisionId);
+  }
 };
 
 // thread sanitizer doesn't really know how to check when there are too many
@@ -214,7 +220,7 @@ void AddNewEdgeVerts(
     concurrent_map<int, std::vector<EdgePos>> &edgesP,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const Vec<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
@@ -278,7 +284,8 @@ void AddNewEdgeVerts(
   for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
-std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
+template <typename F>
+void PairUp(std::vector<EdgePos>& edgePos, F f) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -291,17 +298,10 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos>& edgePos) {
                                [](EdgePos x) { return x.isStart; });
   DEBUG_ASSERT(static_cast<size_t>(middle - edgePos.begin()) == nEdges,
                topologyErr, "Non-manifold edge!");
-  auto cmp = [](EdgePos a, EdgePos b) {
-    return a.edgePos < b.edgePos ||
-           // we also sort by collisionId to make things deterministic
-           (a.edgePos == b.edgePos && a.collisionId < b.collisionId);
-  };
-  std::stable_sort(edgePos.begin(), middle, cmp);
-  std::stable_sort(middle, edgePos.end(), cmp);
-  std::vector<Halfedge> edges;
+  std::stable_sort(edgePos.begin(), middle);
+  std::stable_sort(middle, edgePos.end());
   for (size_t i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1});
-  return edges;
+    f(Halfedge{edgePos[i].vert, edgePos[i + nEdges].vert, -1});
 }
 
 void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
@@ -316,13 +316,14 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  auto& halfedgeR = outR.halfedge_;
   const Vec<vec3>& vertPosP = inP.vertPos_;
-  const Vec<Halfedge>& halfedgeP = inP.halfedge_;
+  const SharedVec<Halfedge>& halfedgeP = inP.halfedge_;
 
   for (auto& value : edgesP) {
     const int edgeP = value.first;
-    std::vector<EdgePos>& edgePosP = value.second;
+    std::vector<EdgePos> edgePosP = value.second;
+    std::stable_sort(edgePosP.begin(), edgePosP.end());
 
     const Halfedge& halfedge = halfedgeP[edgeP];
     wholeHalfedgeP[edgeP] = false;
@@ -353,9 +354,6 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
       ++edgePos.vert;
     }
 
-    // sort edges into start/end pairs along length
-    std::vector<Halfedge> edges = PairUp(edgePosP);
-
     // add halfedges to result
     const int faceLeftP = edgeP / 3;
     const int faceLeft = faceP2R[faceLeftP];
@@ -368,7 +366,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
     const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP, -1};
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
 
-    for (Halfedge e : edges) {
+    PairUp(edgePosP, [&](Halfedge e) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
@@ -380,7 +378,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
-    }
+    });
   }
 }
 
@@ -390,13 +388,14 @@ void AppendNewEdges(
     Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  Vec<Halfedge>& halfedgeR = outR.halfedge_;
+  auto& halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
   for (auto& value : edgesNew) {
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
+    std::stable_sort(edgePos.begin(), edgePos.end());
 
     Box bbox;
     for (auto edge : edgePos) {
@@ -411,15 +410,12 @@ void AppendNewEdges(
       edge.edgePos = vertPosR[edge.vert][i];
     }
 
-    // sort edges into start/end pairs along length.
-    std::vector<Halfedge> edges = PairUp(edgePos);
-
     // add halfedges to result
     const int faceLeft = facePQ2R[faceP];
     const int faceRight = facePQ2R[numFaceP + faceQ];
     const TriRef forwardRef = {0, -1, faceP, -1};
     const TriRef backwardRef = {1, -1, faceQ, -1};
-    for (Halfedge e : edges) {
+    PairUp(edgePos, [&](Halfedge e) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
 
@@ -431,7 +427,7 @@ void AppendNewEdges(
       e.pairedHalfedge = forwardEdge;
       halfedgeR[backwardEdge] = e;
       halfedgeRef[backwardEdge] = backwardRef;
-    }
+    });
   }
 }
 
@@ -662,50 +658,18 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   }
 }
 
-void ReorderHalfedges(VecView<Halfedge>& halfedges) {
-  ZoneScoped;
-  // halfedges in the same face are added in non-deterministic order, so we have
-  // to reorder them for determinism
-
-  // step 1: reorder within the same face, such that the halfedge with the
-  // smallest starting vertex is placed first
-  for_each(autoPolicy(halfedges.size() / 3), countAt(0),
-           countAt(halfedges.size() / 3), [&halfedges](size_t tri) {
-             std::array<Halfedge, 3> face = {halfedges[tri * 3],
-                                             halfedges[tri * 3 + 1],
-                                             halfedges[tri * 3 + 2]};
-             int index = 0;
-             for (int i : {1, 2})
-               if (face[i].startVert < face[index].startVert) index = i;
-             for (int i : {0, 1, 2})
-               halfedges[tri * 3 + i] = face[(index + i) % 3];
-           });
-  // step 2: fix paired halfedge
-  for_each(autoPolicy(halfedges.size() / 3), countAt(0),
-           countAt(halfedges.size() / 3), [&halfedges](size_t tri) {
-             for (int i : {0, 1, 2}) {
-               Halfedge& curr = halfedges[tri * 3 + i];
-               int oppositeFace = curr.pairedHalfedge / 3;
-               int index = -1;
-               for (int j : {0, 1, 2})
-                 if (curr.startVert == halfedges[oppositeFace * 3 + j].endVert)
-                   index = j;
-               curr.pairedHalfedge = oppositeFace * 3 + index;
-             }
-           });
-}
-
 }  // namespace
 
 namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
+  ZoneScoped;
 #ifdef MANIFOLD_DEBUG
   Timer assemble;
   assemble.Start();
 #endif
 
-  DEBUG_ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
+  DEBUG_ASSERT(expandP_ == (op == OpType::Add), logicErr,
                "Result op type not compatible with constructor op type.");
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;
@@ -743,14 +707,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const bool invertQ = op == OpType::Subtract;
 
   // Convert winding numbers to inclusion values based on operation type.
-  Vec<int> i12(x12_.size());
-  Vec<int> i21(x21_.size());
+  Vec<int> i12(xv12_.x12.size());
+  Vec<int> i21(xv21_.x12.size());
   Vec<int> i03(w03_.size());
   Vec<int> i30(w30_.size());
 
-  transform(x12_.begin(), x12_.end(), i12.begin(),
+  transform(xv12_.x12.begin(), xv12_.x12.end(), i12.begin(),
             [c3](int v) { return c3 * v; });
-  transform(x21_.begin(), x21_.end(), i21.begin(),
+  transform(xv21_.x12.begin(), xv21_.x12.end(), i21.begin(),
             [c3](int v) { return c3 * v; });
   transform(w03_.begin(), w03_.end(), i03.begin(),
             [c1, c3](int v) { return c1 + c3 * v; });
@@ -767,15 +731,15 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
-  Vec<int> v12R(v12_.size());
-  if (v12_.size() > 0) {
+  Vec<int> v12R(xv12_.v12.size());
+  if (xv12_.v12.size() > 0) {
     exclusive_scan(i12.begin(), i12.end(), v12R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
   const int n12 = numVertR - nPv - nQv;
 
-  Vec<int> v21R(v21_.size());
-  if (v21_.size() > 0) {
+  Vec<int> v21R(xv21_.v12.size());
+  if (xv21_.v12.size() > 0) {
     exclusive_scan(i21.begin(), i21.end(), v21R.begin(), numVertR, AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
@@ -798,9 +762,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
              DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
   for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(),
-             DuplicateVerts({outR.vertPos_, i12, v12R, v12_}));
+             DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
   for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(),
-             DuplicateVerts({outR.vertPos_, i21, v21R, v21_}));
+             DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -818,9 +782,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // This key is the face index of <P, Q>
   concurrent_map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
-  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true, 0);
-  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false,
-                  p1q2_.size());
+  AddNewEdgeVerts(edgesP, edgesNew, xv12_.p1q2, i12, v12R, inP_.halfedge_, true,
+                  0);
+  AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
+                  false, xv12_.p1q2.size());
 
   v12R.clear();
   v21R.clear();
@@ -828,8 +793,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) =
-      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
+  std::tie(faceEdge, facePQ2R) = SizeOutput(
+      outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2, invertQ);
 
   i12.clear();
   i21.clear();
@@ -882,7 +847,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   halfedgeRef.clear();
   faceEdge.clear();
 
-  ReorderHalfedges(outR.halfedge_);
+  outR.ReorderHalfedges();
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
@@ -911,7 +876,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   sort.Start();
 #endif
 
-  outR.Finish();
+  outR.CalculateBBox();
+  outR.SortGeometry();
   outR.IncrementMeshIDs();
 
 #ifdef MANIFOLD_DEBUG

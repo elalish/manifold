@@ -13,64 +13,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve, extname } from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {Command} from 'commander';
 
-import { Command } from 'commander';
-import glMatrix from 'gl-matrix';
-
-import { Evaluator } from '../lib/evaluate.js';
-import * as exporter from '../lib/export.js';
-
-// Setup the evaluator and context.
-const evaluator = new Evaluator();
-evaluator.addContext({glMatrix})
-
-// These are exporter methods that generate Manifold
-// or CrossSection objects.  Tell the evaluator to intercept
-// the calls, and add any created objects to the clean up list.
-for (const name of ['show', 'only', 'setMaterial']) {
-  evaluator.addContextMethodWithCleanup(name, exporter[name]);
-}
-
-// Add additional exporter context.  These need no garbage collection.
-evaluator.addContext({
-  GLTFNode: exporter.GLTFNode,
-  setMorphStart: exporter.setMorphStart,
-  setMorphEnd: exporter.setMorphEnd,
-});
-
-const evaluateCADToModel = async (code) => {
-  const globalDefaults = {};
-
-  evaluator.context.globalDefaults = globalDefaults;
-  const manifold = evaluator.evaluate(code);
-
-  return await exporter.exportModels(globalDefaults, manifold);
-}
+import {bundleFile} from '../lib/bundler.js';
+import * as worker from '../lib/worker.js';
+import * as exportModel from '../lib/export-model.js';
 
 const program = new Command();
+program.name('manifold-cad')
+    .description('Compile a ManifoldCAD program into a mesh.')
+    .argument('<infile.[js|ts]>', 'Input file')
+    .argument('<outfile>', 'Output file')
+    .option('--jscdn <string>', 'Fetch npm packages from a CDN', 'jsDelivr')
 
-program
-  .name('manifold-cad')
-  .description('Compile a ManifoldCAD program into a mesh.')
-  .argument('<infile.js>', 'Input file')
-  .argument('<outfile>', 'Output file')
-  .action( async (infile, outfile) => {
-    const inPath = resolve(infile);
-    const outPath = resolve(outfile);
+    // True means '--bundle' is implied by default, and '--no-bundle'
+    // must be specified to disable bundling.
+    .option('--no-bundle', 'Do not bundle input file before building model', true)
+    .action(async(infile, outfile, options) => {
+      // Choose an exporter.  It will throw if we cannot match the extension.
+      exportModel.supports(outfile, true);
 
-    const is3mf = extname(outPath) === '.3mf';
-    const isGlb = extname(outPath) === '.glb';
-    if (!is3mf && !isGlb) {
-      throw new Error('Output file must be either .glb or .3mf');
-    }
+      // Build the model.
+      let bundle = '';
+      if (options.bundle) {
+        bundle = await bundleFile(infile, {jsCDN: options.jscdn});
+      } else {
+        bundle = await readFile(infile, 'utf-8');
+      }
+      const doc = await worker.evaluate(bundle, {doNotBundle:true});
 
-    const code = await readFile(inPath);
-    const { glbBlob, threeMFBlob} = await evaluateCADToModel(code);
-
-    const binary = is3mf ? threeMFBlob : glbBlob;
-    const outStream = writeFile(outfile, binary.stream());
-  })
+      // Convert it and write it to disk.
+      await exportModel.writeFile(outfile, doc);
+    });
 
 program.parseAsync(process.argv);

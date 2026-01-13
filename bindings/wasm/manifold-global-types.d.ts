@@ -1,4 +1,4 @@
-// Copyright 2023 The Manifold Authors.
+// Copyright 2023-2025 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * @inline
+ * @hidden
+ */
 export interface SealedUint32Array<N extends number> extends Uint32Array {
   length: N;
 }
 
+/**
+ * @inline
+ * @hidden
+ */
 export interface SealedFloat32Array<N extends number> extends Float32Array {
   length: N;
 }

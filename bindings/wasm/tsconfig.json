@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "module": "es2022",
+    "module": "esnext",
     "moduleResolution": "node",
     "lib": [
       "es2022",
@@ -15,12 +15,18 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "declaration": true,
+    "declarationMap": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
   },
   "include": [
     "./lib/*.ts"
+  ],
+  "files": [
+    "./types/manifoldCAD.d.ts",
+    "./types/manifoldCADGlobals.d.ts"
   ],
   "exclude": []
 }
