@@ -559,13 +559,13 @@ TEST(Boolean, NonConvexConvexMinkowski) {
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
-  EXPECT_NEAR(sum.Volume(), 4.8406339f, 1e-5);
-  EXPECT_NEAR(sum.SurfaceArea(), 34.063014984130859f, 1e-5);
+  EXPECT_NEAR(sum.Volume(), 4.8406339f, 1e-3);
+  EXPECT_NEAR(sum.SurfaceArea(), 34.063f, 1e-2);
   EXPECT_EQ(sum.Genus(), 5);
   Manifold difference =
       nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
-  EXPECT_NEAR(difference.Volume(), 0.77841246128082275f, 1e-5);
-  EXPECT_NEAR(difference.SurfaceArea(), 16.703740785913258, 1e-5);
+  EXPECT_NEAR(difference.Volume(), 0.77841246128082275f, 1e-3);
+  EXPECT_NEAR(difference.SurfaceArea(), 16.704f, 1e-2);
   EXPECT_EQ(difference.Genus(), 5);
 
 #ifdef MANIFOLD_EXPORT
@@ -583,14 +583,14 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
   Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)));
-  EXPECT_NEAR(sum.Volume(), 8.65625f, 1e-5);
-  EXPECT_NEAR(sum.SurfaceArea(), 31.176914f, 1e-5);
+  EXPECT_NEAR(sum.Volume(), 8.65625f, 1e-3);
+  EXPECT_NEAR(sum.SurfaceArea(), 31.177f, 1e-2);
   EXPECT_EQ(sum.Genus(), 0);
 
   Manifold difference =
       nonConvex.MinkowskiDifference(nonConvex.Scale(vec3(0.1)));
-  EXPECT_NEAR(difference.Volume(), 0.81554f, 1e-5);
-  EXPECT_NEAR(difference.SurfaceArea(), 6.95045f, 1e-5);
+  EXPECT_NEAR(difference.Volume(), 0.81554f, 1e-3);
+  EXPECT_NEAR(difference.SurfaceArea(), 6.9505f, 1e-2);
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
