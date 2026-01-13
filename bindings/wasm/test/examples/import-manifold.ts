@@ -9,7 +9,7 @@
 // or combined like any other manifoldCAD object.
 
 import {importManifold, Manifold} from 'manifold-3d/manifoldCAD';
-const {compose} = Manifold;
+const {union} = Manifold;
 
 const csg = async () => {
   // glTF (.glb or .gltf) models have a defined scale of 1 unit to 1 metre.  On
@@ -53,7 +53,7 @@ const csg = async () => {
     const {max: [rightside]} = acc.boundingBox();
     const {min: [leftside]} = cur.boundingBox();
 
-    return compose([
+    return union([
       acc.translate([-rightside, 0, 0]),
       cur.translate([-leftside + 20 * metres, 0, 0])
     ]);

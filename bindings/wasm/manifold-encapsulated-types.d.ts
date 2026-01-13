@@ -889,6 +889,7 @@ export class Manifold {
    * overlapping results. It is the inverse operation of Decompose().
    *
    * @param manifolds A list of Manifolds to lazy-union together.
+   * @deprecated Please use {@link add} or {@link union} instead.
    */
   static compose(manifolds: readonly Manifold[]): Manifold;
 

@@ -623,14 +623,6 @@ Module.setup = function() {
     return Module._ReserveIDs(n);
   };
 
-  Module.Manifold.compose = function(manifolds) {
-    const vec = new Module.Vector_manifold();
-    toVec(vec, manifolds);
-    const result = Module._manifoldCompose(vec);
-    vec.delete();
-    return result;
-  };
-
   function manifoldBatchbool(name) {
     return function(...args) {
       if (args.length == 1) args = args[0];
@@ -643,6 +635,10 @@ Module.setup = function() {
   }
 
   Module.Manifold.union = manifoldBatchbool('Union');
+  // Aliasing compose to union.
+  // Native compose has some issues, and is deprecated.
+  Module.Manifold.compose = Module.Manifold.union;
+
   Module.Manifold.difference = manifoldBatchbool('Difference');
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 

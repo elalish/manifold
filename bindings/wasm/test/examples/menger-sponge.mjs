@@ -23,7 +23,7 @@ function mengerSponge(n) {
   const holes = [];
   fractal(holes, result, 1.0, [0.0, 0.0], 1, n);
 
-  const hole = Manifold.compose(holes);
+  const hole = Manifold.union(holes);
 
   result = Manifold.difference([
     result,
