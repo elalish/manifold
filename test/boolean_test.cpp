@@ -580,10 +580,7 @@ TEST(Boolean, NonConvexConvexMinkowski) {
   ManifoldParams().processOverlaps = false;
 }
 
-// DISABLED: NonConvex-NonConvex Minkowski produces non-manifold results on some
-// platforms due to coplanar face handling in the naive implementation.
-// See issue #1430 for discussion on symbolic perturbation robustness.
-TEST(Boolean, DISABLED_NonConvexNonConvexMinkowski) {
+TEST(Boolean, NonConvexNonConvexMinkowski) {
   ManifoldParams().processOverlaps = true;
 
   Manifold tet = Manifold::Tetrahedron();
