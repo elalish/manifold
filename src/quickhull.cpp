@@ -842,7 +842,7 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
 
 // Wrapper to call the QuickHull algorithm with the given vertex data to build
 // the Impl
-void Manifold::Impl::Hull(VecView<vec3> vertPos) {
+void Manifold::Impl::Hull(VecView<const vec3> vertPos) {
   size_t numVert = vertPos.size();
   if (numVert < 4) {
     status_ = Error::InvalidConstruction;

@@ -282,6 +282,8 @@ class Manifold {
    */
   ///@{
   std::vector<Manifold> Decompose() const;
+  [[deprecated(
+      "Compose is deprecated, use BatchBoolean with OpType::Add instead.")]]
   static Manifold Compose(const std::vector<Manifold>&);
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
