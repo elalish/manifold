@@ -453,6 +453,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 }
 
 /**
+ * Deprecated: Use BatchBoolean with OpType::Add instead.
+ *
  * Constructs a new manifold from a vector of other manifolds. This is a purely
  * topological operation, so care should be taken to avoid creating
  * overlapping results. It is the inverse operation of Decompose().
@@ -460,11 +462,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
  * @param manifolds A vector of Manifolds to lazy-union together.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  std::vector<std::shared_ptr<CsgLeafNode>> children;
-  for (const auto& manifold : manifolds) {
-    children.push_back(manifold.pNode_->ToLeafNode());
-  }
-  return Manifold(CsgLeafNode::Compose(children));
+  return BatchBoolean(manifolds, OpType::Add);
 }
 
 /**
