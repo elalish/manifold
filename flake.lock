@@ -3,15 +3,16 @@
     "clipper2-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1749977025,
-        "narHash": "sha256-nkajY57+6xDjL8fJWK31Y75Id6Go3pwtAOVgat3sf5E=",
+        "lastModified": 1766183865,
+        "narHash": "sha256-Pqmrj9SDooM+VU4ObQrtaU9+GN//FsD+Brp+OsN0cPM=",
         "owner": "AngusJohnson",
         "repo": "Clipper2",
-        "rev": "11ef6ca611a732e7d75fcc1b4abe89387523fa64",
+        "rev": "21ebba05db8894f0c7217ad35ea518080f324946",
         "type": "github"
       },
       "original": {
         "owner": "AngusJohnson",
+        "ref": "Clipper2_2.0.1",
         "repo": "Clipper2",
         "type": "github"
       }
@@ -21,60 +22,43 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1726560853,
-        "narHash": "sha256-X6rJYSESBVr3hBoH0WbKE5KvhPU5bloyZ2L4K60/fPQ=",
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "c1dfcf08411b08f6b8615f7d8971a2bfa81d5e8a",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "type": "github"
       },
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "gersemi-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1729957417,
-        "narHash": "sha256-t9W27lwNKRFAraynAGEawFb1qCW9/b3RCm/jeb9zJXg=",
-        "owner": "BlankSpruce",
-        "repo": "gersemi",
-        "rev": "27f279333ec3308f9910d53fe4dd69d622e4bc55",
-        "type": "github"
-      },
-      "original": {
-        "owner": "BlankSpruce",
-        "ref": "0.17.0",
-        "repo": "gersemi",
         "type": "github"
       }
     },
     "gtest-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1690989893,
-        "narHash": "sha256-t0RchAHTJbuI5YW4uyBPykTvcjy90JW9AOPNjIhwh6U=",
+        "lastModified": 1746032069,
+        "narHash": "sha256-HIHMxAUR4bjmFLoltJeIAVSulVQ6kVuIT2Ku+lwAx/4=",
         "owner": "google",
         "repo": "googletest",
-        "rev": "f8d7d77c06936315286eb55f8de22cd23c188571",
+        "rev": "52eb8108c5bdec04579160ae17225d66034bd723",
         "type": "github"
       },
       "original": {
         "owner": "google",
-        "ref": "v1.14.0",
+        "ref": "v1.17.0",
         "repo": "googletest",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1739214665,
-        "narHash": "sha256-26L8VAu3/1YRxS8MHgBOyOM8xALdo6N0I04PgorE7UM=",
+        "lastModified": 1768127708,
+        "narHash": "sha256-1Sm77VfZh3mU0F5OqKABNLWxOuDeHIlcFjsXeeiPazs=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "64e75cd44acf21c7933d61d7721e812eac1b5a0a",
+        "rev": "ffbc9f8cbaacfb331b6017d5a5abb21a492c9a38",
         "type": "github"
       },
       "original": {
@@ -86,16 +70,16 @@
     "onetbb-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1730395391,
-        "narHash": "sha256-XOlC1+rf65oEGKDba9N561NuFo1YJhn3Q1CTGtvkn7A=",
+        "lastModified": 1761737496,
+        "narHash": "sha256-HIHF6KHlEI4rgQ9Epe0+DmNe1y95K9iYa4V/wFnJfEU=",
         "owner": "oneapi-src",
         "repo": "oneTBB",
-        "rev": "0c0ff192a2304e114bc9e6557582dfba101360ff",
+        "rev": "f1862f38f83568d96e814e469ab61f88336cc595",
         "type": "github"
       },
       "original": {
         "owner": "oneapi-src",
-        "ref": "v2022.0.0",
+        "ref": "v2022.3.0",
         "repo": "oneTBB",
         "type": "github"
       }
@@ -104,7 +88,6 @@
       "inputs": {
         "clipper2-src": "clipper2-src",
         "flake-utils": "flake-utils",
-        "gersemi-src": "gersemi-src",
         "gtest-src": "gtest-src",
         "nixpkgs": "nixpkgs",
         "onetbb-src": "onetbb-src"
