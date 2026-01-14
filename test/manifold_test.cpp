@@ -227,9 +227,10 @@ TEST(Manifold, OppositeFace) {
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
   manifoldList.emplace_back(Manifold::Tetrahedron());
-  manifoldList.emplace_back(Manifold::Cube());
-  manifoldList.emplace_back(Manifold::Sphere(1, 4));
-  Manifold manifolds = Manifold::Compose(manifoldList);
+  manifoldList.emplace_back(Manifold::Cube().Translate({2, 0, 0}).AsOriginal());
+  manifoldList.emplace_back(
+      Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
+  Manifold manifolds = Manifold::BatchBoolean(manifoldList, OpType::Add);
 
   ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
 
@@ -249,13 +250,15 @@ TEST(Manifold, DecomposeProps) {
   auto tet = WithPositionColors(Manifold::Tetrahedron());
   manifoldList.emplace_back(tet);
   input.emplace_back(tet.GetMeshGL());
-  auto cube = WithPositionColors(Manifold::Cube());
+  auto cube =
+      WithPositionColors(Manifold::Cube().Translate({2, 0, 0}).AsOriginal());
   manifoldList.emplace_back(cube);
   input.emplace_back(cube.GetMeshGL());
-  auto sphere = WithPositionColors(Manifold::Sphere(1, 4));
+  auto sphere = WithPositionColors(
+      Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
   manifoldList.emplace_back(sphere);
   input.emplace_back(sphere.GetMeshGL());
-  Manifold manifolds = Manifold::Compose(manifoldList);
+  Manifold manifolds = Manifold::BatchBoolean(manifoldList, OpType::Add);
 
   ExpectMeshes(manifolds, {{8, 12, 3}, {6, 8, 3}, {4, 4, 3}});
 
@@ -382,7 +385,7 @@ TEST(Manifold, Warp) {
         v.x += v.z * v.z;
       });
 
-  Manifold simplified = Manifold::Compose({shape});
+  Manifold simplified = Manifold::BatchBoolean({shape}, OpType::Add);
 
   EXPECT_NEAR(shape.Volume(), simplified.Volume(), 0.0001);
   EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
@@ -403,7 +406,7 @@ TEST(Manifold, Warp2) {
         v.x = v.x * cos(angle);
       });
 
-  Manifold simplified = Manifold::Compose({shape});
+  Manifold simplified = Manifold::BatchBoolean({shape}, OpType::Add);
 
   EXPECT_NEAR(shape.Volume(), simplified.Volume(), 0.0001);
   EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
@@ -807,7 +810,7 @@ TEST(Manifold, MirrorUnion) {
 
 TEST(Manifold, MirrorUnion2) {
   auto a = Manifold::Cube();
-  auto result = Manifold::Compose({a.Mirror({1, 0, 0})});
+  auto result = Manifold::BatchBoolean({a.Mirror({1, 0, 0})}, OpType::Add);
   EXPECT_TRUE(result.MatchesTriNormals());
 }
 
@@ -828,15 +831,6 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
 }
 #endif
-
-TEST(Manifold, MultiCompose) {
-  auto part = Manifold::Compose({Manifold::Cube({10, 10, 10})});
-  auto finalAssembly =
-      Manifold::Compose({part, part.Translate({0, 10, 0}),
-                         part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
-                         part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
-  EXPECT_FLOAT_EQ(finalAssembly.Volume(), 4000);
-}
 
 TEST(Manifold, MergeDegenerates) {
   MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();
