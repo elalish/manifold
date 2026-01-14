@@ -25,18 +25,7 @@ export default defineConfig({
       {
         src: '../dist/manifoldCADGlobals.d.ts',
         dest: './',
-      },
-      // Copy API documentation over.
-      // This gives us /docs/jsuser and /docs/jsapi
-      /*
-      {
-        src: '../docs/',
-        dest: './docs/',
-        silent: true // Fail quiet if docs have not been built.
       }
-        */
-      // FIXME also copy C++ docs to ./docs/api
-      // FIXME create redirects.
     ],
   })],
   resolve: {
