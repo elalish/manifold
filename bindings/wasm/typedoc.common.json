@@ -22,6 +22,7 @@
   },
   "useFirstParagraphOfCommentAsSummary": true,
   "excludeExternals": true,
+  "excludeInternal": true,
   "navigation": {
     "includeFolders": false
   },

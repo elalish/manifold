@@ -47,9 +47,6 @@ const GHOST = {
   metallic: 0
 } as GLTFMaterial;
 
-/**
- * @internal
- */
 export function cleanup() {
   ghost = false;
   shown.clear();
@@ -72,7 +69,6 @@ const getDebugMeshByID = (id: number):
  *     Any other mesh will have the GHOST material, while
  *     this one gets it's natural material.
  *
- * @internal
  * @param id The `originalID` of the mesh.
  */
 const getDebugMaterialByID = (id: number):
@@ -93,7 +89,6 @@ const getDebugMaterialByID = (id: number):
  * Everything gets rendered in the GHOST material, while the flagged
  * mesh is added as a debug node.
  *
- * @internal
  * @param id The `originalID` of the mesh.
  */
 export const getMaterialByID = (id: number): GLTFMaterial|undefined =>

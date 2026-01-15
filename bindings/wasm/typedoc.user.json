@@ -4,7 +4,6 @@
   "name": "ManifoldCAD User Guide",
   "customCss": "./documents/user-guide.css",
   "out": "docs/jsuser",
-  "excludeInternal": true,
   "entryPoints": [
     "./types/manifoldCAD.d.ts",
     "./types/manifoldCADGlobals.d.ts"

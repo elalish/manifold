@@ -173,9 +173,6 @@ export const resetGLTFNodes = () => {
   nodes.length = 0;
 };
 
-/**
- * @internal
- */
 export const cleanup = () => {
   resetGLTFNodes();
 };
