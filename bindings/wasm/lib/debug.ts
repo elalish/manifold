@@ -16,7 +16,7 @@
  * Use material properties (like transparency and colour) to debug manifoldCAD
  * models.
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 

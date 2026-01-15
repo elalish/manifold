@@ -29,10 +29,11 @@
  * It can be imported as `manifold-3d/manifoldCAD`.
  *
  * @packageDocumentation
+ * @group ManifoldCAD
+ * @category none
  * @module manifoldCAD
- * @showGroups true
  * @primaryExport
- * @see {@link "Using manifoldCAD" | Using manifoldCAD}
+ * @see {@link "Using ManifoldCAD" | Using ManifoldCAD}
  *
  * @groupDescription Global State
  * These objects and functions are specific to top-level scripts
@@ -40,7 +41,7 @@
  *
  * They are only accessible as global objects by a top level script evaluated by
  * the worker.  Libraries will not have access to them.
- *
+ * @privateRemarks
  * These functions will not be present at all when a model is imported as an ES
  * module. They can be imported through the {@link lib/scene-builder! | scene
  * builder} or directly from {@link lib/animation! | animation} and {@link

@@ -18,7 +18,7 @@
  * cleanup.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

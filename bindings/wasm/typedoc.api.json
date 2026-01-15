@@ -1,52 +1,24 @@
 {
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.common.json"],
+  "name": "Manifold WASM Developer Guide",
+  "customCss": "./documents/developer-guide.css",
+  "out": "docs/jsapi",
   "entryPoints": [
     "./manifold.d.ts",
+    "./types/manifoldCAD.d.ts",
     "./lib/*.ts"
   ],
-  "exclude": [
-    "**/*.test.*",
-    "./lib/manifoldCAD.*",
-    "./lib/*.d.ts"
-  ],
-  "navigationLinks": {
-    "manifoldCAD.org": "https://manifoldCAD.org",
-    "C++ Documentation": "https://manifoldcad.org/docs/html/",
-    "Algorithm Description": "https://github.com/elalish/manifold/wiki/Manifold-Library",
-    "Blog Posts": "https://elalish.blogspot.com/search/label/Manifold",
-    "GitHub": "https://github.com/elalish/manifold"
-  },
-  "externalSymbolLinkMappings": {
-    "@gltf-transform/core": {
-      "Accessor": "https://gltf-transform.dev/modules/core/classes/Accessor",
-      "Document": "https://gltf-transform.dev/modules/core/classes/Document",
-      "Extension": "https://gltf-transform.dev/modules/core/classes/Extension",
-      "ExtensionProperty": "https://gltf-transform.dev/modules/core/classes/ExtensionProperty",
-      "Node": "https://gltf-transform.dev/modules/core/classes/Node",
-      "*": "https://gltf-transform.dev/"
-    }
-  },
-  "useFirstParagraphOfCommentAsSummary": true,
-  "entryPointStrategy": "expand",
   "sortEntryPoints": false,
-  "excludeInternal": true,
-  "excludeExternals": true,
   "projectDocuments": [
     "./documents/embedding-manifoldcad.md",
     "./documents/bindings.md",
-    "./documents/bindings-examples.md"
+    "./documents/bindings-examples.md",
+    "./documents/contributing.md"
   ],
   "navigation": {
     "includeGroups": true,
-    "includeCategories": true,
-    "includeFolders": false
   },
-  "categorizeByGroup": true,
   "groupReferencesByType": true,
-  "categoryOrder": ["Core", "Input/Output", "Modelling", "*", "Other"],
-  "groupOrder": [
-    "Documents", "Interfaces", "Classes", "Modelling Functions",
-    "Global Settings", "Management", "Import", "Export",
-    "Low Level Functions", "*", "Type Aliases", "glTF Extension"
-  ],
-  "out": "docs/jsapi"
+  "defaultCategory": "none"
 }

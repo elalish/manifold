@@ -16,7 +16,7 @@
  * Assign glTF materials to manifoldCAD models.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 

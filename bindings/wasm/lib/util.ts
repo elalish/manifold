@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @packageDocumentation
  */
 

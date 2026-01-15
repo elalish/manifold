@@ -24,7 +24,7 @@
  * functions are available in manifoldCAD.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  * @groupDescription Modelling Functions
  * These functions are available within manifoldCAD.

@@ -23,7 +23,7 @@
  * a set of interfaces for communication in that case.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

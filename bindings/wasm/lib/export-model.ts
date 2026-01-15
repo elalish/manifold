@@ -25,7 +25,7 @@
  * manifoldCAD supports both import and export of glTF, but only exports 3mf.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  */
 
