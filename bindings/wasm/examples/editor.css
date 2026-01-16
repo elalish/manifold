@@ -219,6 +219,16 @@ model-viewer {
   background-image: url(/icons/share.png);
 }
 
+.docs {
+  background-image: url(/icons/docs.png);
+  width: 36px;
+  height: 36px;
+
+  cursor: pointer;
+  border: none;
+  border-radius: 18px;
+}
+
 .cancel {
   background-image: url(/icons/close.png);
   background-size: 20px;
