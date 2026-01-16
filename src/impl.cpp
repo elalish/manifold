@@ -956,37 +956,63 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
     }
     // Non-Convex - Non-Convex Minkowski: Very Slow
   } else if (!aConvex && !bConvex) {
-    std::vector<Manifold> newHulls;
-    for (size_t aFace = 0; aFace < aImpl->NumTri(); aFace++) {
-      for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
-        // Use tolerance-based coplanarity check instead of exact equality
-        // to handle floating-point precision issues from scaling
-        constexpr double kCoplanarTol = 1e-15;
-        vec3 nA = aImpl->faceNormal_[aFace];
-        vec3 nB = bImpl->faceNormal_[bFace];
-        double dotSame = linalg::dot(nA, nB);
-        double dotOpp = linalg::dot(nA, -nB);
-        const bool coplanar = (std::abs(dotSame - 1.0) < kCoplanarTol) ||
-                              (std::abs(dotOpp - 1.0) < kCoplanarTol);
-        if (coplanar) continue;  // Skip Coplanar Triangles
+    const size_t numTriA = aImpl->NumTri();
+    const size_t numTriB = bImpl->NumTri();
+    const size_t totalPairs = numTriA * numTriB;
 
-        vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
-        vec3 a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
-        vec3 a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
-        vec3 b1 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
-        vec3 b2 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
-        vec3 b3 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
-        newHulls.push_back(
-            Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
-                            a2 + b3, a3 + b1, a3 + b2, a3 + b3}));
-        if (newHulls.size() >= BATCH_SIZE) {
-          composedHulls.push_back(Manifold::BatchBoolean(newHulls, OpType::Add));
-          newHulls.clear();
+    // Process face pairs in batches with parallelization
+    for (size_t offset = 0; offset < totalPairs; offset += BATCH_SIZE) {
+      size_t numIter = std::min(totalPairs - offset, BATCH_SIZE);
+      std::vector<Manifold> newHulls(numIter);
+      std::vector<bool> validHull(numIter, false);
+
+      for_each_n(
+          autoPolicy(numIter, 100), countAt(0), numIter,
+          [&](const int iter) {
+            size_t pairIdx = offset + iter;
+            size_t aFace = pairIdx / numTriB;
+            size_t bFace = pairIdx % numTriB;
+
+            // Use tolerance-based coplanarity check instead of exact equality
+            // to handle floating-point precision issues from scaling
+            constexpr double kCoplanarTol = 1e-15;
+            vec3 nA = aImpl->faceNormal_[aFace];
+            vec3 nB = bImpl->faceNormal_[bFace];
+            double dotSame = linalg::dot(nA, nB);
+            double dotOpp = linalg::dot(nA, -nB);
+            const bool coplanar = (std::abs(dotSame - 1.0) < kCoplanarTol) ||
+                                  (std::abs(dotOpp - 1.0) < kCoplanarTol);
+            if (coplanar) return;  // Skip Coplanar Triangles
+
+            vec3 a1 =
+                aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
+            vec3 a2 =
+                aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
+            vec3 a3 =
+                aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
+            vec3 b1 =
+                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
+            vec3 b2 =
+                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
+            vec3 b3 =
+                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
+            newHulls[iter] =
+                Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
+                                a2 + b3, a3 + b1, a3 + b2, a3 + b3});
+            validHull[iter] = true;
+          });
+
+      // Collect valid (non-coplanar) hulls
+      std::vector<Manifold> batchHulls;
+      for (size_t i = 0; i < numIter; ++i) {
+        if (validHull[i]) {
+          batchHulls.push_back(std::move(newHulls[i]));
         }
       }
+      if (!batchHulls.empty()) {
+        composedHulls.push_back(Manifold::BatchBoolean(batchHulls, OpType::Add));
+      }
     }
-    if (!newHulls.empty())
-      composedHulls.push_back(Manifold::BatchBoolean(newHulls, OpType::Add));
   }
   return Manifold::BatchBoolean(composedHulls, inset ? manifold::OpType::Subtract
                                                      : manifold::OpType::Add)
