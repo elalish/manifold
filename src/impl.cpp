@@ -967,8 +967,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
       std::vector<bool> validHull(numIter, false);
 
       for_each_n(
-          autoPolicy(numIter, 100), countAt(0), numIter,
-          [&](const int iter) {
+          autoPolicy(numIter, 100), countAt(0), numIter, [&](const int iter) {
             size_t pairIdx = offset + iter;
             size_t aFace = pairIdx / numTriB;
             size_t bFace = pairIdx % numTriB;
@@ -1010,12 +1009,14 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
         }
       }
       if (!batchHulls.empty()) {
-        composedHulls.push_back(Manifold::BatchBoolean(batchHulls, OpType::Add));
+        composedHulls.push_back(
+            Manifold::BatchBoolean(batchHulls, OpType::Add));
       }
     }
   }
-  return Manifold::BatchBoolean(composedHulls, inset ? manifold::OpType::Subtract
-                                                     : manifold::OpType::Add)
+  return Manifold::BatchBoolean(composedHulls, inset
+                                                   ? manifold::OpType::Subtract
+                                                   : manifold::OpType::Add)
       .AsOriginal();
 }
 
