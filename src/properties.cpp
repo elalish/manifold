@@ -256,7 +256,8 @@ bool Manifold::Impl::IsConvex() const {
     if (linalg::all(linalg::equal(normal0, normal1))) return true;
 
     const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
-    const bool convex = linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
+    const bool convex =
+        linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
     return convex;
   });
 }

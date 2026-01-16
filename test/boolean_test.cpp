@@ -528,8 +528,8 @@ TEST(Boolean, ConvexConvexMinkowski) {
   Manifold sum = cube.MinkowskiSum(sphere);
   // Analytical volume of rounded cuboid: cube + 6 slabs + 12 quarter-cylinders
   // + 8 sphere octants = w³ + 6w²r + 3πwr² + (4/3)πr³
-  double analyticalVolume =
-      w * w * w + 6 * w * w * r + 3 * kPi * w * r * r + (4.0 / 3) * kPi * r * r * r;
+  double analyticalVolume = w * w * w + 6 * w * w * r + 3 * kPi * w * r * r +
+                            (4.0 / 3) * kPi * r * r * r;
   // Discrete sphere approximation differs from analytical by ~1%
   EXPECT_NEAR(sum.Volume(), analyticalVolume, 0.15);
   EXPECT_EQ(sum.Genus(), 0);
