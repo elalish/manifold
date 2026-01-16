@@ -18,7 +18,7 @@
  * meshes and manifold meshes.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  * @groupDescription Import
  * These properties implement the {@link lib/import-model!Importer | Importer}

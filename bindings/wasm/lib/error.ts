@@ -16,7 +16,7 @@
  * Exceptions, and where to find them.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

@@ -1,6 +1,6 @@
 ---
 title: Manifold Examples
-group: manifold
+group: none
 ---
 # Manifold Examples
 

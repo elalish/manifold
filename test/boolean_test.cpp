@@ -672,7 +672,7 @@ TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
   cubes.emplace_back(Manifold::Cube(vec3(3.0), true));
   cubes.emplace_back(Manifold::Cube(vec3(2.0), true));
-  Manifold doubled = Manifold::Compose(cubes);
+  Manifold doubled = Manifold::BatchBoolean(cubes, OpType::Add);
 
   Manifold cube = Manifold::Cube(vec3(1.0), true);
   EXPECT_FALSE((cube ^= doubled).IsEmpty());

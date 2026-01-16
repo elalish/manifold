@@ -19,7 +19,7 @@
  * follows GLTF semantics.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

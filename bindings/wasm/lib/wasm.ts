@@ -16,7 +16,7 @@
  * Convenience functions for instantiating or getting a manifold WASM instance.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

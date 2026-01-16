@@ -15,9 +15,9 @@
 /**
  * The core WASM bindings with no frills.
  *
- * @group manifold
  * @packageDocumentation
  * @primaryExport
+ * @group none
  * @see {@link "Using Manifold" | Using Manifold}
  * @see {@link "Manifold Examples" | Manifold Examples}
  */

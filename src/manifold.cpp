@@ -1100,7 +1100,18 @@ Manifold Manifold::Hull() const {
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
-  return Compose(manifolds).Hull();
+  std::vector<vec3> vertPos;
+  size_t size = 0;
+  for (const auto& man : manifolds) size += man.NumVert();
+  if (size == 0) return Manifold();
+  vertPos.reserve(size);
+  for (const auto& man : manifolds) {
+    const auto& impl = man.pNode_->ToLeafNode()->GetImpl();
+    vertPos.insert(vertPos.end(), impl->vertPos_.begin(), impl->vertPos_.end());
+  }
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->Hull(VecView<const vec3>(vertPos));
+  return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
 /**

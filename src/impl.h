@@ -392,9 +392,9 @@ struct Manifold::Impl {
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false);
 
   // quickhull.cpp
-  void Hull(VecView<vec3> vertPos);
+  void Hull(VecView<const vec3> vertPos);
 
-  // impl.cpp
+  // minkowski.cpp
   Manifold Minkowski(const Impl& other, bool inset) const;
 };
 

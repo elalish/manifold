@@ -46,7 +46,7 @@ Manifold MengerSponge(int n) {
   std::vector<Manifold> holes;
   Fractal(holes, result, 1.0, {0.0, 0.0}, 1, n);
 
-  Manifold hole = Manifold::Compose(holes);
+  Manifold hole = Manifold::BatchBoolean(holes, OpType::Add);
 
   result -= hole;
   hole = hole.Rotate(90);

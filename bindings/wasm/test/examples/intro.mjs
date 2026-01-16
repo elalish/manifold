@@ -29,7 +29,8 @@ export default result;
 
 // See the script drop-down above ("Intro") for usage examples.
 
-// Use GLTFNode for disjoint manifolds rather than compose(), as this will
-// keep them better organized in the GLB. This will also allow you to
-// specify animation, material properties, and even vertex colors via
-// setProperties(). See Tetrahedron Puzzle example.
+// Use GLTFNode for disjoint manifolds (rather than union() or add()),
+// as this will keep them better organized in the GLB. This will also
+// allow you to specify animation, material properties, and even vertex
+// colors via setProperties().
+// See Tetrahedron Puzzle example.

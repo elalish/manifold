@@ -448,7 +448,7 @@ ManifoldManifold* manifold_revolve(void* mem, ManifoldPolygons* cs,
 }
 
 ManifoldManifold* manifold_compose(void* mem, ManifoldManifoldVec* ms) {
-  auto composed = Manifold::Compose(*from_c(ms));
+  auto composed = Manifold::BatchBoolean(*from_c(ms), OpType::Add);
   return to_c(new (mem) Manifold(composed));
 }
 

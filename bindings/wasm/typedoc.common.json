@@ -1,0 +1,34 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "favicon": "https://manifoldcad.org/samples/models/favicon.png",
+  "navigationLinks": {
+    "ManifoldCAD.org": "https://manifoldCAD.org",
+    "ManifoldCAD User Guide": "https://manifoldcad.org/docs/jsuser/",
+    "JS/TS/WASM API": "https://manifoldcad.org/docs/jsapi/",
+    "C++ API": "https://manifoldcad.org/docs/html/",
+    "Algorithm Description": "https://github.com/elalish/manifold/wiki/Manifold-Library",
+    "Blog Posts": "https://elalish.blogspot.com/search/label/Manifold",
+    "GitHub": "https://github.com/elalish/manifold"
+  },
+  "externalSymbolLinkMappings": {
+    "@gltf-transform/core": {
+      "Accessor": "https://gltf-transform.dev/modules/core/classes/Accessor",
+      "Document": "https://gltf-transform.dev/modules/core/classes/Document",
+      "Extension": "https://gltf-transform.dev/modules/core/classes/Extension",
+      "ExtensionProperty": "https://gltf-transform.dev/modules/core/classes/ExtensionProperty",
+      "Node": "https://gltf-transform.dev/modules/core/classes/Node",
+      "*": "https://gltf-transform.dev/"
+    }
+  },
+  "useFirstParagraphOfCommentAsSummary": true,
+  "excludeExternals": true,
+  "excludeInternal": true,
+  "navigation": {
+    "includeFolders": false
+  },
+  "exclude": [
+    "**/*.test.*",
+    "./lib/manifoldCAD.*",
+    "./lib/*.d.ts"
+  ],
+}

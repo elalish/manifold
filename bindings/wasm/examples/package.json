@@ -10,7 +10,8 @@
     "clean": "rm -fr ./dist",
     "prebuild": "cd .. && npm run build",
     "preinstall": "cd .. && npm ci",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:docs": "cp -r ../../../docs ../../../samples ../docs dist && vite preview"
   },
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",

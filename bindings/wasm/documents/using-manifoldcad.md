@@ -1,12 +1,11 @@
 ---
-title: Using manifoldCAD
-group: manifoldCAD
+title: Using ManifoldCAD
 ---
-## Running manifoldCAD
+## Running ManifoldCAD
 
 ### With a Browser
 
-Just go to [manifoldcad.org](https://manifoldcad.org), and check out the examples!
+Just go to [ManifoldCAD.org](https://manifoldcad.org), and check out the examples!
 
 ### On the Command Line
 
@@ -22,4 +21,4 @@ This CLI is written in relatively plain JavaScript and serves as an example of h
 
 ## API Reference
 
-See {@link manifoldCAD}.
+See {@link manifoldCAD | ManifoldCAD}.
