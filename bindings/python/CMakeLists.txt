@@ -73,14 +73,38 @@ else()
   set(MANIFOLD_PYBIND_LIBDIR ${Python_SITEARCH})
 endif()
 
-install(
-  TARGETS manifold3d
-  LIBRARY DESTINATION ${MANIFOLD_PYBIND_LIBDIR} COMPONENT bindings
-)
+configure_file(pyproject.toml.in
+      ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml @ONLY
+      )
+configure_file(getwheelname.py.in
+      ${CMAKE_CURRENT_BINARY_DIR}/getwheelname.py @ONLY
+      )
+configure_file(setup.py
+      ${CMAKE_CURRENT_BINARY_DIR}/setup.py COPYONLY
+      )
+execute_process(COMMAND ${Python_EXECUTABLE} getwheelname.py OUTPUT_VARIABLE PY_WHEELFILE
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      )
+message(STATUS "Detected Python wheel filename ${PY_WHEELFILE}")
+
 if(MANIFOLD_PYBIND_STUBGEN)
-  install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi
-    DESTINATION ${MANIFOLD_PYBIND_LIBDIR}
-    COMPONENT bindings
-  )
+  add_custom_target(python-wheel ALL
+        COMMAND ${Python_EXECUTABLE} -m pip wheel . --no-deps
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Building python wheel package"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/manifold3d.pyi"
+        )
+else()
+  add_custom_target(python-wheel ALL
+        COMMAND ${Python_EXECUTABLE} -m pip wheel . --no-deps
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Building python wheel package"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_FILE_NAME}"
+        )
 endif()
+
+install(CODE
+         "execute_process(
+             COMMAND ${Python_EXECUTABLE} -m pip install --target ${MANIFOLD_PYBIND_LIBDIR} ${PY_WHEELFILE}
+                          )"
+          )
