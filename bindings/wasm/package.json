@@ -9,16 +9,18 @@
   "scripts": {
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
     "build": "tsc && node ./esbuild.mjs",
-    "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
     "build:wasm": "mkdir -p ../../buildWASM && cd ../../buildWASM && emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make",
-    "clean": "tsc --build --clean && rm -fr ./dist/ ./coverage ./docs",
-    "format": "cd ../.. && ./scripts/format.sh",
-    "predocs": "npm run prebuild && npm run postbuild",
-    "docs": "npx typedoc",
+    "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
+    "docs": "npm run docs:jsapi && npm run docs:jsuser",
+    "docs:jsapi": "typedoc --options typedoc.api.json",
+    "docs:jsuser": "typedoc --options typedoc.user.json",
+    "docs:cppapi": "cd ../.. && doxygen",
     "test": "vitest run",
     "test:ui": "vitest --coverage --ui",
     "test:dev": "vitest",
     "test:coverage": "vitest run --coverage",
+    "clean": "tsc --build --clean && rm -fr ./dist/ ./coverage ./docs",
+    "format": "cd ../.. && ./scripts/format.sh",
     "prepare": "npm run build"
   },
   "files": [

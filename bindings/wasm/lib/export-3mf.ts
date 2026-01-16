@@ -15,7 +15,7 @@
 /**
  * Serialize in memory glTF-transform documents to 3MF.
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  * @groupDescription Export
  * These properties implement the {@link lib/export-model!Exporter | Exporter}

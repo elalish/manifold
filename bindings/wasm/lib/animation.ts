@@ -15,7 +15,7 @@
 /**
  * Allow manifoldCAD models to specify glTF animations and morphs.
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 

@@ -31,7 +31,7 @@
  * time.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 
@@ -173,9 +173,6 @@ export const resetGLTFNodes = () => {
   nodes.length = 0;
 };
 
-/**
- * @internal
- */
 export const cleanup = () => {
   resetGLTFNodes();
 };

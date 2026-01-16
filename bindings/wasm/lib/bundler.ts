@@ -17,7 +17,7 @@
  * the manifoldCAD runtime to provide objects (like manifold itself) and
  * properties (such as `import.meta.url`).
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 

@@ -24,7 +24,7 @@
  * functions are available in manifoldCAD.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  * @groupDescription Modelling Functions
  * These functions are available within manifoldCAD.
@@ -101,9 +101,6 @@ const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
 const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
 
-/**
- * @internal
- */
 export const cleanup = () => {
   id2mesh.clear();
   mesh2node.clear();
@@ -341,7 +338,6 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
  * glTF has a defined scale of 1:1 metre.
  * manifoldCAD has a defined scale of 1:1 mm.
  *
- * @internal
  */
 function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
   // Find top level nodes and correct their scale.
@@ -382,7 +378,6 @@ export function gltfDocToManifold(
  * nodes in a document, and convert them to Mesh objects.  Meshless nodes will
  * be silently skipped.
  *
- * @internal
  */
 function gltfNodeToMeshes(
     document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
@@ -410,7 +405,6 @@ function gltfNodeToMeshes(
 /**
  * Convert a Mesh into a Manifold.  Returns null if the result is not manifold
  * or is empty.  All other exceptions will be re-thrown.
- * @internal
  */
 const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
   const {Manifold} = getManifoldModuleSync()!;
@@ -434,7 +428,6 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  * Manifold objects, and return the union.  Non-manifold Meshes will be silently
  * skipped.
  *
- * @internal
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
@@ -486,7 +479,6 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
  * (properties) to be copied into an exported GLTF document.  It will also set
  * ManifoldCAD materials (a subset of GLTF materials) as a fallback.
  *
- * @internal
  */
 function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
   const {Manifold, Mesh} = getManifoldModuleSync()!;

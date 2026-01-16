@@ -42,7 +42,7 @@ jobs:
         cp ../../public/manifold.wasm .
         npm install
         npm run docs
-        mv ./docs ../../public/jsdocs
+        mv ./docs/jsapi ./docs/jsuser ../../public/docs
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3

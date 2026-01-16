@@ -1,6 +1,6 @@
 ---
 title: Using Manifold
-group: manifold
+group: none
 ---
 # Using Manifold
 

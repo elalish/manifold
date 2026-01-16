@@ -1,0 +1,14 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.common.json"],
+  "name": "ManifoldCAD User Guide",
+  "customCss": "./documents/user-guide.css",
+  "out": "docs/jsuser",
+  "entryPoints": [
+    "./types/manifoldCAD.d.ts",
+    "./types/manifoldCADGlobals.d.ts"
+  ],
+  "projectDocuments": [
+    "./documents/using-manifoldcad.md"
+  ]
+}

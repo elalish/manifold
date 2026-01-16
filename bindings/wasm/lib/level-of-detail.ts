@@ -23,7 +23,7 @@
  * the manifoldCAD CLI, will not be able to.  Libraries may get values to
  * determine their own level of detail.
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 
