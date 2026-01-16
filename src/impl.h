@@ -393,6 +393,9 @@ struct Manifold::Impl {
 
   // quickhull.cpp
   void Hull(VecView<vec3> vertPos);
+
+  // impl.cpp
+  Manifold Minkowski(const Impl& other, bool inset) const;
 };
 
 extern std::mutex dump_lock;

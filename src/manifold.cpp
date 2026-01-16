@@ -1025,82 +1025,9 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  * @param inset Whether it should add or subtract from the manifold.
  */
 Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
-  std::vector<Manifold> composedHulls({*this});
-  auto aImpl = this->GetCsgLeafNode().GetImpl();
+  auto aImpl = GetCsgLeafNode().GetImpl();
   auto bImpl = other.GetCsgLeafNode().GetImpl();
-
-  bool aConvex = aImpl->IsConvex();
-  bool bConvex = bImpl->IsConvex();
-
-  // If the convex manifold was supplied first, swap them!
-  Manifold a = *this, b = other;
-  if (aConvex && !bConvex) {
-    a = other;
-    b = *this;
-    aImpl = other.GetCsgLeafNode().GetImpl();
-    bImpl = this->GetCsgLeafNode().GetImpl();
-    aConvex = !aConvex;
-    bConvex = !bConvex;
-  }
-
-  // Early-exit if either input is empty
-  if (b.IsEmpty()) return a;
-  if (a.IsEmpty()) return b;
-
-  // Convex-Convex Minkowski: Very Fast
-  if (!inset && aConvex && bConvex) {
-    std::vector<Manifold> simpleHull;
-    for (const vec3& vertex : aImpl->vertPos_) {
-      simpleHull.push_back(b.Translate(vertex));
-    }
-    composedHulls.push_back(Manifold::Hull(simpleHull));
-    // Convex - Non-Convex Minkowski: Slower
-  } else if ((inset || !aConvex) && bConvex) {
-    const size_t numTri = aImpl->NumTri();
-    std::vector<Manifold> newHulls(numTri);
-    auto policy = autoPolicy(numTri, 100);
-    for_each_n(
-        policy, countAt(0), numTri, [&newHulls, &b, &aImpl](const int face) {
-          newHulls[face] = Manifold::Hull(
-              {b.Translate(
-                   aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
-               b.Translate(
-                   aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 1].startVert]),
-               b.Translate(aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2]
-                                               .startVert])});
-        });
-    composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
-    // Non-Convex - Non-Convex Minkowski: Very Slow
-  } else if (!aConvex && !bConvex) {
-    for (size_t aFace = 0; aFace < aImpl->NumTri(); aFace++) {
-      for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
-        // Use tolerance-based coplanarity check instead of exact equality
-        // to handle floating-point precision issues from scaling
-        constexpr double kCoplanarTol = 1e-15;
-        vec3 nA = aImpl->faceNormal_[aFace];
-        vec3 nB = bImpl->faceNormal_[bFace];
-        double dotSame = linalg::dot(nA, nB);
-        double dotOpp = linalg::dot(nA, -nB);
-        const bool coplanar = (std::abs(dotSame - 1.0) < kCoplanarTol) ||
-                              (std::abs(dotOpp - 1.0) < kCoplanarTol);
-        if (coplanar) continue;  // Skip Coplanar Triangles
-
-        vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
-        vec3 a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
-        vec3 a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
-        vec3 b1 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
-        vec3 b2 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
-        vec3 b3 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
-        composedHulls.push_back(
-            Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
-                            a2 + b3, a3 + b1, a3 + b2, a3 + b3}));
-      }
-    }
-  }
-  return Manifold::BatchBoolean(composedHulls, inset
-                                                   ? manifold::OpType::Subtract
-                                                   : manifold::OpType::Add)
-      .AsOriginal();
+  return aImpl->Minkowski(*bImpl, inset);
 }
 
 /**
