@@ -1,0 +1,6 @@
+@layer typedoc {
+    :root {
+      --light-color-background-secondary: #A288B3;
+      --dark-color-background-secondary: #675772;
+    }
+  }
