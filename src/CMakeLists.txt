@@ -23,6 +23,7 @@ set(
   impl.cpp
   lazy_collider.cpp
   manifold.cpp
+  minkowski.cpp
   polygon.cpp
   properties.cpp
   quickhull.cpp

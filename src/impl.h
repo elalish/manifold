@@ -324,6 +324,7 @@ struct Manifold::Impl {
   bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+  bool IsConvex() const;
   double MinGap(const Impl& other, double searchLength) const;
 
   // sort.cpp
@@ -392,6 +393,9 @@ struct Manifold::Impl {
 
   // quickhull.cpp
   void Hull(VecView<const vec3> vertPos);
+
+  // minkowski.cpp
+  Manifold Minkowski(const Impl& other, bool inset) const;
 };
 
 extern std::mutex dump_lock;

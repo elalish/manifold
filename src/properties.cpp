@@ -235,6 +235,33 @@ int Manifold::Impl::NumDegenerateTris() const {
   });
 }
 
+/**
+ * Returns true if the Manifold is genus 0 and contains no concave edges.
+ */
+bool Manifold::Impl::IsConvex() const {
+  // Convex shape must have genus of 0
+  int chi = NumVert() - NumEdge() + NumTri();
+  int genus = 1 - chi / 2;
+  if (genus != 0) return false;
+
+  // Iterate across all edges; return false if any edges are concave
+  const size_t nbEdges = halfedge_.size();
+  return all_of(countAt(0_uz), countAt(nbEdges), [this](size_t idx) {
+    Halfedge edge = halfedge_[idx];
+    if (!edge.IsForward()) return true;
+
+    const vec3 normal0 = faceNormal_[idx / 3];
+    const vec3 normal1 = faceNormal_[edge.pairedHalfedge / 3];
+
+    if (linalg::all(linalg::equal(normal0, normal1))) return true;
+
+    const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
+    const bool convex =
+        linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
+    return convex;
+  });
+}
+
 double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
   if (IsEmpty()) return 0;
