@@ -1019,35 +1019,33 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
 }
 
 /**
- * Compute the minkowski sum of two manifolds.
- *
- * @param other The other manifold to minkowski sum to this one.
- * @param inset Whether it should add or subtract from the manifold.
- */
-Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
-  auto aImpl = GetCsgLeafNode().GetImpl();
-  auto bImpl = other.GetCsgLeafNode().GetImpl();
-  return aImpl->Minkowski(*bImpl, inset);
-}
-
-/**
  * Compute the minkowski sum of this manifold with another.
  * This corresponds to the morphological dilation of the manifold.
+ *
+ * @note Performance is best when using convex objects. For non-convex inputs,
+ * performance scales with the product of face counts, so keep face counts low.
  *
  * @param other The other manifold to minkowski sum to this one.
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
-  return this->Minkowski(other, false);
+  auto aImpl = GetCsgLeafNode().GetImpl();
+  auto bImpl = other.GetCsgLeafNode().GetImpl();
+  return aImpl->Minkowski(*bImpl, false);
 }
 
 /**
  * Subtract the sweep of the other manifold across this manifold's surface.
  * This corresponds to the morphological erosion of the manifold.
  *
+ * @note Performance is best when using convex objects. For non-convex inputs,
+ * performance scales with the product of face counts, so keep face counts low.
+ *
  * @param other The other manifold to minkowski subtract from this one.
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
-  return this->Minkowski(other, true);
+  auto aImpl = GetCsgLeafNode().GetImpl();
+  auto bImpl = other.GetCsgLeafNode().GetImpl();
+  return aImpl->Minkowski(*bImpl, true);
 }
 
 /**

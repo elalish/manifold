@@ -501,8 +501,6 @@ class Manifold {
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;
-
-  Manifold Minkowski(const Manifold&, bool inset = false) const;
 };
 /** @} */
 

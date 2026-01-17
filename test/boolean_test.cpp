@@ -530,8 +530,12 @@ TEST(Boolean, ConvexConvexMinkowski) {
   // + 8 sphere octants = w³ + 6w²r + 3πwr² + (4/3)πr³
   double analyticalVolume = w * w * w + 6 * w * w * r + 3 * kPi * w * r * r +
                             (4.0 / 3) * kPi * r * r * r;
+  // Analytical surface area: 6 faces + 12 quarter-cylinders + 8 octants
+  // = 6w² + 6πwr + 4πr²
+  double analyticalArea = 6 * w * w + 6 * kPi * w * r + 4 * kPi * r * r;
   // Discrete sphere approximation differs from analytical by ~1%
   EXPECT_NEAR(sum.Volume(), analyticalVolume, 0.15);
+  EXPECT_NEAR(sum.SurfaceArea(), analyticalArea, 0.5);
   EXPECT_EQ(sum.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT

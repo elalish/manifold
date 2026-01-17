@@ -50,7 +50,11 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
   std::shared_ptr<Impl> aImplCopy = std::make_shared<Impl>(*aImpl);
   Manifold a(aImplCopy);
-  std::vector<Manifold> composedHulls({a});
+  std::vector<Manifold> composedHulls;
+  // Reserve space: 1 for base + batches for non-convex cases
+  size_t numBatches = (aImpl->NumTri() + BATCH_SIZE - 1) / BATCH_SIZE;
+  composedHulls.reserve(1 + numBatches);
+  composedHulls.push_back(a);
 
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {
@@ -112,7 +116,6 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
       // Create hulls for all B faces paired with this A face (parallel)
       std::vector<Manifold> faceHulls(numTriB);
-      std::vector<bool> validHull(numTriB, false);
 
       for_each_n(
           autoPolicy(numTriB, 100), countAt(0), numTriB, [&](const int bFace) {
@@ -133,14 +136,13 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
             faceHulls[bFace] =
                 Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
                                 a2 + b3, a3 + b1, a3 + b2, a3 + b3});
-            validHull[bFace] = true;
           });
 
-      // Collect valid hulls for this A face
+      // Collect non-empty hulls for this A face
       std::vector<Manifold> validFaceHulls;
-      for (size_t i = 0; i < numTriB; ++i) {
-        if (validHull[i]) {
-          validFaceHulls.push_back(std::move(faceHulls[i]));
+      for (auto& hull : faceHulls) {
+        if (!hull.IsEmpty()) {
+          validFaceHulls.push_back(std::move(hull));
         }
       }
 
