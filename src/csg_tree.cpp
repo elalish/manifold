@@ -27,41 +27,6 @@
 namespace {
 using namespace manifold;
 
-#ifdef MANIFOLD_DEBUG
-// Memory tracking for debugging batch union memory usage
-static std::atomic<size_t> totalMeshMemory{0};
-static std::atomic<size_t> peakMeshMemory{0};
-static std::atomic<int> activeMeshCount{0};
-
-size_t EstimateMeshMemory(const Manifold::Impl& impl) {
-  size_t mem = 0;
-  mem += impl.vertPos_.size() * sizeof(vec3);
-  mem += impl.halfedge_.size() * sizeof(Halfedge);
-  mem += impl.properties_.size() * sizeof(double);
-  mem += impl.vertNormal_.size() * sizeof(vec3);
-  mem += impl.faceNormal_.size() * sizeof(vec3);
-  mem += impl.halfedgeTangent_.size() * sizeof(vec4);
-  mem += impl.meshRelation_.triRef.size() * sizeof(TriRef);
-  return mem;
-}
-
-void TrackMeshCreated(const Manifold::Impl& impl, const char* location) {
-  size_t mem = EstimateMeshMemory(impl);
-  size_t newTotal = totalMeshMemory.fetch_add(mem) + mem;
-  activeMeshCount.fetch_add(1);
-  size_t currentPeak = peakMeshMemory.load();
-  while (newTotal > currentPeak &&
-         !peakMeshMemory.compare_exchange_weak(currentPeak, newTotal)) {
-  }
-  if (ManifoldParams().verbose) {
-    std::cout << "[CSG Memory] Created mesh at " << location << ": "
-              << (mem / 1024) << " KB, total: " << (newTotal / 1024)
-              << " KB, peak: " << (peakMeshMemory.load() / 1024)
-              << " KB, active: " << activeMeshCount.load() << std::endl;
-  }
-}
-#endif
-
 struct MeshCompare {
   bool operator()(const std::shared_ptr<CsgLeafNode>& a,
                   const std::shared_ptr<CsgLeafNode>& b) {
@@ -207,7 +172,6 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
       dump_lock.unlock();
       throw logicErr("self intersection detected");
     }
-    TrackMeshCreated(impl, "SimpleBoolean");
     return ImplToLeaf(std::move(impl));
   } catch (logicErr& err) {
     dump();
@@ -405,9 +369,6 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.RemoveDegenerates();
   combined.SortGeometry();
   combined.IncrementMeshIDs();
-#ifdef MANIFOLD_DEBUG
-  TrackMeshCreated(combined, "Compose");
-#endif
   return ImplToLeaf(std::move(combined));
 }
 
