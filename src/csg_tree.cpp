@@ -26,10 +26,47 @@
 
 namespace {
 using namespace manifold;
+
+#ifdef MANIFOLD_DEBUG
+// Memory tracking for debugging batch union memory usage
+static std::atomic<size_t> totalMeshMemory{0};
+static std::atomic<size_t> peakMeshMemory{0};
+static std::atomic<int> activeMeshCount{0};
+
+size_t EstimateMeshMemory(const Manifold::Impl& impl) {
+  size_t mem = 0;
+  mem += impl.vertPos_.size() * sizeof(vec3);
+  mem += impl.halfedge_.size() * sizeof(Halfedge);
+  mem += impl.properties_.size() * sizeof(double);
+  mem += impl.vertNormal_.size() * sizeof(vec3);
+  mem += impl.faceNormal_.size() * sizeof(vec3);
+  mem += impl.halfedgeTangent_.size() * sizeof(vec4);
+  mem += impl.meshRelation_.triRef.size() * sizeof(TriRef);
+  return mem;
+}
+
+void TrackMeshCreated(const Manifold::Impl& impl, const char* location) {
+  size_t mem = EstimateMeshMemory(impl);
+  size_t newTotal = totalMeshMemory.fetch_add(mem) + mem;
+  activeMeshCount.fetch_add(1);
+  size_t currentPeak = peakMeshMemory.load();
+  while (newTotal > currentPeak &&
+         !peakMeshMemory.compare_exchange_weak(currentPeak, newTotal)) {
+  }
+  if (ManifoldParams().verbose) {
+    std::cout << "[CSG Memory] Created mesh at " << location << ": "
+              << (mem / 1024) << " KB, total: " << (newTotal / 1024)
+              << " KB, peak: " << (peakMeshMemory.load() / 1024)
+              << " KB, active: " << activeMeshCount.load() << std::endl;
+  }
+}
+#endif
+
 struct MeshCompare {
   bool operator()(const std::shared_ptr<CsgLeafNode>& a,
                   const std::shared_ptr<CsgLeafNode>& b) {
-    return a->GetImpl()->NumVert() < b->GetImpl()->NumVert();
+    // Use NumVert() which doesn't trigger transform application.
+    return a->NumVert() < b->NumVert();
   }
 };
 
@@ -104,6 +141,34 @@ std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
+Box CsgLeafNode::GetBoundingBox() const {
+  // Compute transformed bounding box without triggering full mesh transform.
+  // This is an approximation - the actual bounding box of the transformed mesh
+  // may be tighter, but this is sufficient for overlap checks.
+  const Box& box = pImpl_->bBox_;
+  if (transform_ == mat3x4(la::identity)) {
+    return box;
+  }
+
+  // Transform all 8 corners and compute the axis-aligned bounding box
+  vec3 corners[8] = {
+      {box.min.x, box.min.y, box.min.z}, {box.max.x, box.min.y, box.min.z},
+      {box.min.x, box.max.y, box.min.z}, {box.max.x, box.max.y, box.min.z},
+      {box.min.x, box.min.y, box.max.z}, {box.max.x, box.min.y, box.max.z},
+      {box.min.x, box.max.y, box.max.z}, {box.max.x, box.max.y, box.max.z}};
+
+  vec3 newMin = transform_ * vec4(corners[0], 1.0);
+  vec3 newMax = newMin;
+  for (int i = 1; i < 8; i++) {
+    vec3 p = transform_ * vec4(corners[i], 1.0);
+    newMin = la::min(newMin, p);
+    newMax = la::max(newMax, p);
+  }
+  return Box{newMin, newMax};
+}
+
+size_t CsgLeafNode::NumVert() const { return pImpl_->NumVert(); }
+
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
   return std::make_shared<CsgLeafNode>(
       std::make_shared<Manifold::Impl>(std::move(impl)));
@@ -142,6 +207,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
       dump_lock.unlock();
       throw logicErr("self intersection detected");
     }
+    TrackMeshCreated(impl, "SimpleBoolean");
     return ImplToLeaf(std::move(impl));
   } catch (logicErr& err) {
     dump();
@@ -151,7 +217,8 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
     throw err;
   }
 #else
-  return ImplToLeaf(Boolean3(a, b, op).Result(op));
+  auto impl = Boolean3(a, b, op).Result(op);
+  return ImplToLeaf(std::move(impl));
 #endif
 }
 
@@ -188,7 +255,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
     epsilon = std::max(epsilon, nodeEpsilon);
     tolerance = std::max(tolerance, node->pImpl_->tolerance_);
-    bbox = bbox.Union(node->pImpl_->bBox_);
+    bbox = bbox.Union(node->GetBoundingBox());
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -323,7 +390,14 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
     for (const auto& pair : node->pImpl_->meshRelation_.meshIDtransform) {
-      combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
+      Manifold::Impl::Relation rel = pair.second;
+      // Apply the node's transform to the mesh relation if not identity.
+      // This is necessary because we may not have called GetImpl() which would
+      // have applied the transform to the mesh relations.
+      if (node->transform_ != mat3x4(la::identity)) {
+        rel.transform = node->transform_ * Mat4(rel.transform);
+      }
+      combined.meshRelation_.meshIDtransform[pair.first + offset] = rel;
     }
   }
 
@@ -331,6 +405,9 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   combined.RemoveDegenerates();
   combined.SortGeometry();
   combined.IncrementMeshIDs();
+#ifdef MANIFOLD_DEBUG
+  TrackMeshCreated(combined, "Compose");
+#endif
   return ImplToLeaf(std::move(combined));
 }
 
@@ -414,7 +491,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     Vec<Box> boxes;
     boxes.reserve(children.size() - start);
     for (size_t i = start; i < children.size(); i++) {
-      boxes.push_back(children[i]->GetImpl()->bBox_);
+      boxes.push_back(children[i]->GetBoundingBox());
     }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
