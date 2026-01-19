@@ -462,7 +462,8 @@ ManifoldMeshGL* manifold_get_meshgl(void* mem, ManifoldManifold* m) {
   return to_c(new (mem) MeshGL(mesh));
 }
 
-ManifoldMeshGL* manifold_get_meshgl_w_normals(void* mem, ManifoldManifold* m, int32_t normalIdx) {
+ManifoldMeshGL* manifold_get_meshgl_w_normals(void* mem, ManifoldManifold* m,
+                                              int32_t normalIdx) {
   auto mesh = from_c(m)->GetMeshGL(normalIdx);
   return to_c(new (mem) MeshGL(mesh));
 }
@@ -485,7 +486,9 @@ ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m) {
   return to_c(new (mem) MeshGL64(mesh));
 }
 
-ManifoldMeshGL64* manifold_get_meshgl64_w_normals(void* mem, ManifoldManifold* m, int32_t normalIdx) {
+ManifoldMeshGL64* manifold_get_meshgl64_w_normals(void* mem,
+                                                  ManifoldManifold* m,
+                                                  int32_t normalIdx) {
   auto mesh = from_c(m)->GetMeshGL64(normalIdx);
   return to_c(new (mem) MeshGL64(mesh));
 }
