@@ -41,19 +41,84 @@ import type {Manifold, Vec3} from '../manifold';
 
 const nodes = new Array<BaseGLTFNode>();
 
+
+/**
+ * @inline
+ */
 export type GLTFAttribute =
     'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|'COLOR_0'|
     'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
 
+/**
+ * Define a material using the glTF metallic-roughness physically-based rendering model.
+ * Materials can be applied to a model through `setMaterial()`, 
+ * or set as a {@link GLTFNode.material | GLTFNode property}.
+ * 
+ * @see {@link https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials | glTF 2.0 Specification: Materials}
+ * @see {@link https://physicallybased.info/ | Physically Based - The PBR values database}
+ * @sortStrategy source-order
+ */
 export interface GLTFMaterial {
+  /**
+   * Every vertex in a glTF Mesh has a set of attributes.
+   * `POSITION` cannot be specified -- ManifoldCAD will set it internally.
+   *
+   * Some properties such as `TEXCOORD_0` and `TEXCOORD_1` may be set when importing a model that has a texture or material.
+   * 
+   * @see {@link https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview | glTF 2.0 Specification: Meshes Overview}
+   * @see {@link https://manifoldcad.org/#Tetrahedron%20Puzzle | ManifoldCAD Example: Tetrahedron Puzzle}
+   */
   attributes?: GLTFAttribute[];
+
+  /**
+   * Roughness of the material. 
+   * Ranges from 0 (smooth) to 1.0 (rough).
+   */
   roughness?: number;
+
+  /**
+   * Metallic property of the material.
+   * Ranges from 0 (more diffuse reflection) to 1.0 (more specular reflection).
+   */
   metallic?: number;
+
+  /**
+   * Base colour of the material.
+   * RGB values, ranging from 0 to 1.0.
+   */
   baseColorFactor?: [number, number, number];
+
+  /**
+   * Transparency of the material.
+   * Ranges from 0 (fully transparent) to 1.0 (fully opaque).
+   */
   alpha?: number;
+
+  /**
+   * Render model as unlit or shadeless, as opposed to physically based rendering.
+   * 
+   * @see {@link https://github.com/KhronosGroup/gltf/tree/main/extensions/2.0/Khronos/KHR_materials_unlit | KHR_materials_unlit}
+   * @see {@link https://gltf-transform.dev/modules/extensions/classes/KHRMaterialsUnlit | glTF Transform: KHRMaterialsUnlit}
+   */
   unlit?: boolean;
+
+  /**
+   * Material name.  Will be passed through when exported.
+   */
   name?: string;
+
+  /**
+   * If set, this material is a copy of another material on an in-memory glTF model.
+   * This is used by `importManifold` and `importModel` to pass original materials and textures through manifold.
+   * @internal
+   */
   sourceMaterial?: GLTFTransform.Material;
+
+  /**
+   * If set, this material is a copy of another material on an in-memory glTF model.
+   * This is used by `importManifold` and `importModel` to pass original materials and textures through manifold.
+   * @internal
+   */
   sourceRunID?: number;
 }
 

@@ -471,6 +471,8 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
+   * 
+   * @group Basics
    */
   constructor(mesh: Mesh);
 
@@ -1220,6 +1222,8 @@ export interface MeshOptions {
  * libraries directly. This may not be manifold since the verts are duplicated
  * along property boundaries that do not match. The additional merge vectors
  * store this missing information, allowing the manifold to be reconstructed.
+ * 
+ * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
  */
 export class Mesh {
   constructor(options: MeshOptions);

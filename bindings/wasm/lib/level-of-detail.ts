@@ -14,10 +14,10 @@
 
 /**
  * Control detail level for the
- * {@link manifold!CrossSection.circle | CrossSection.circle},
- * {@link manifold!CrossSection.revolve | CrossSection.revolve},
- * {@link manifold!Manifold.cylinder | Manifold.cylinder}, and
- * {@link manifold!Manifold.sphere | Manifold.sphere} constructors.
+ * {@link manifold.CrossSection.circle | CrossSection.circle},
+ * {@link manifold.CrossSection.revolve | CrossSection.revolve},
+ * {@link manifold.Manifold.cylinder | Manifold.cylinder}, and
+ * {@link manifold.Manifold.sphere | Manifold.sphere} constructors.
  *
  * Libraries should not change these values, and if run through manifoldCAD or
  * the manifoldCAD CLI, will not be able to.  Libraries may get values to
@@ -72,8 +72,8 @@ export const setCircularSegments = (segments: number) =>
 
 /**
  * Reset the circular construction parameters to their defaults if
- * {@link setMinCircularAngle}, {@link setMinCircularEdgeLength}, or {@link
- * setCircularSegments} have been called.
+ * `setMinCircularAngle()`, `setMinCircularEdgeLength()`, or 
+ * `setCircularSegments()` have been called.
  */
 export const resetToCircularDefaults = () => {
   getManifoldModuleSync()?.resetToCircularDefaults();
@@ -99,8 +99,7 @@ export const getMinCircularAngle = () => minCircularAngle;
 export const getMinCircularEdgeLength = () => minCircularEdgeLength;
 
 /**
- * Determine the result of the {@link setMinCircularAngle},
- * {@link setMinCircularEdgeLength}, and {@link setCircularSegments} defaults.
+ * Determine the result of `setMinCircularAngle()`, `setMinCircularEdgeLength()`, and `setCircularSegments()` for a given radius.
  *
  * @param radius For a given radius of circle, determine how many default
  * segments there will be.

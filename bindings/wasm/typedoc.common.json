@@ -24,8 +24,6 @@
   "searchInDocuments": true,
   "useFirstParagraphOfCommentAsSummary": true,
   "excludeExternals": true,
-  "excludeInternal": true,
-
   "defaultCategory": "None",
   "categorizeByGroup": false,
   "groupReferencesByType": false,
@@ -34,12 +32,10 @@
     "includeCategories": false,
     "includeGroups": false
   },
-
   "exclude": [
     "**/*.test.*",
     "./lib/*.d.ts"
   ],
-
   "groupOrder": [
     "Documents", 
     "Interfaces", "Classes",
@@ -63,5 +59,21 @@
     "kind",
     "instance-first",
     "alphabetical-ignoring-documents"
+  ],
+  "notRenderedTags": [
+    "@showCategories",
+    "@showGroups",
+    "@hideCategories",
+    "@hideGroups",
+    "@disableGroups",
+    "@expand",
+    "@preventExpand",
+    "@expandType",
+    "@summary",
+    "@group",
+    "@groupDescription",
+    "@category",
+    "@categoryDescription",
+    "@sortStrategy"
   ]
 }
