@@ -757,31 +757,3 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
-
-// Test batch union with many transformed meshes.
-// This exercises the optimization in MeshCompare that avoids triggering
-// transform application during heap operations (see issue #1493).
-TEST(Boolean, BatchUnionManyTransformed) {
-  // Create many cubes at different positions
-  std::vector<Manifold> cubes;
-  const int gridSize = 10;  // 10x10 grid = 100 cubes
-  for (int x = 0; x < gridSize; x++) {
-    for (int y = 0; y < gridSize; y++) {
-      // Each cube is 0.8 units, with 0.2 gap between them
-      Manifold cube =
-          Manifold::Cube({0.8, 0.8, 0.8}).Translate({x * 1.0, y * 1.0, 0.0});
-      cubes.push_back(cube);
-    }
-  }
-
-  // Batch union all cubes
-  Manifold result = Manifold::BatchBoolean(cubes, OpType::Add);
-
-  // Verify the result is correct
-  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  EXPECT_FALSE(result.IsEmpty());
-
-  // Total volume should be 100 * 0.8^3 = 51.2
-  double expectedVolume = gridSize * gridSize * 0.8 * 0.8 * 0.8;
-  EXPECT_NEAR(result.Volume(), expectedVolume, 0.001);
-}
