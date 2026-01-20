@@ -70,7 +70,7 @@ typedef struct ManifoldProperties {
   double volume;
 } ManifoldProperties;
 
-typedef struct MeshGLOptions {
+typedef struct ManifoldMeshGLOptions {
   uint32_t* run_indices;
   size_t run_indices_length;
   uint32_t* run_original_ids;
@@ -79,9 +79,9 @@ typedef struct MeshGLOptions {
   uint32_t* merge_to_vert;
   size_t merge_verts_length;
   float* halfedge_tangents;
-} MeshGLOptions;
+} ManifoldMeshGLOptions;
 
-typedef struct MeshGL64Options {
+typedef struct ManifoldMeshGL64Options {
   uint64_t* run_indices;
   size_t run_indices_length;
   uint32_t* run_original_ids;
@@ -90,7 +90,7 @@ typedef struct MeshGL64Options {
   uint64_t* merge_to_vert;
   size_t merge_verts_length;
   double* halfedge_tangents;
-} MeshGL64Options;
+} ManifoldMeshGL64Options;
 
 // enums
 

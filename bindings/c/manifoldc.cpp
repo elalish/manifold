@@ -379,7 +379,7 @@ ManifoldMeshGL* manifold_meshgl_w_tangents(void* mem, float* vert_props,
 ManifoldMeshGL* manifold_meshgl_w_options(void* mem, float* vert_props,
                                           size_t n_verts, size_t n_props,
                                           uint32_t* tri_verts, size_t n_tris,
-                                          MeshGLOptions* options) {
+                                          ManifoldMeshGLOptions* options) {
   auto mesh = new (mem) MeshGL();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
@@ -440,7 +440,7 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(void* mem, double* vert_props,
                                               size_t n_verts, size_t n_props,
                                               uint64_t* tri_verts,
                                               size_t n_tris,
-                                              MeshGL64Options* options) {
+                                              ManifoldMeshGL64Options* options) {
   auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
