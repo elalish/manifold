@@ -115,19 +115,19 @@ Box CsgLeafNode::GetBoundingBox() const {
     return box;
   }
 
-  // Transform all 8 corners and compute the axis-aligned bounding box
-  vec3 corners[8] = {
-      {box.min.x, box.min.y, box.min.z}, {box.max.x, box.min.y, box.min.z},
-      {box.min.x, box.max.y, box.min.z}, {box.max.x, box.max.y, box.min.z},
-      {box.min.x, box.min.y, box.max.z}, {box.max.x, box.min.y, box.max.z},
-      {box.min.x, box.max.y, box.max.z}, {box.max.x, box.max.y, box.max.z}};
-
-  vec3 newMin = transform_ * vec4(corners[0], 1.0);
+  // Arvo's algorithm for transforming AABBs efficiently.
+  // Instead of transforming all 8 corners, we compute min/max directly
+  // from the matrix elements based on their signs.
+  vec3 newMin = transform_[3];  // translation component
   vec3 newMax = newMin;
-  for (int i = 1; i < 8; i++) {
-    vec3 p = transform_ * vec4(corners[i], 1.0);
-    newMin = la::min(newMin, p);
-    newMax = la::max(newMax, p);
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      const auto a = transform_[j][i] * box.min[j];
+      const auto b = transform_[j][i] * box.max[j];
+      newMin[i] += std::min(a, b);
+      newMax[i] += std::max(a, b);
+    }
   }
   return Box{newMin, newMax};
 }
