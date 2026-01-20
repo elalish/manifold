@@ -62,6 +62,7 @@ export interface GLTFMaterial {
  * properties live here.
  */
 export abstract class BaseGLTFNode {
+  /** @internal */
   _parent?: BaseGLTFNode;
   name?: string;
 
@@ -127,8 +128,11 @@ export class GLTFNodeTracked extends GLTFNode {
  * when exported.
  */
 export class VisualizationGLTFNode extends BaseGLTFNode {
+  /** @internal */
   node?: GLTFTransform.Node;
+  /** @internal */
   document: GLTFTransform.Document;
+  /** @internal */
   uri?: string;
 
   constructor(

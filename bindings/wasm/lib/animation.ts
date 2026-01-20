@@ -39,7 +39,6 @@ let animationFPS: number = 30;
  * Set the animation repeat mode.
  *
  * @param mode 'loop' or 'ping-pong'
- * @group Global Settings
  */
 export const setAnimationMode = (mode: AnimationMode): void => {
   animationMode = mode
@@ -47,7 +46,6 @@ export const setAnimationMode = (mode: AnimationMode): void => {
 
 /**
  * Get the current animation repeat mode.
- * @group Global Settings
  */
 export const getAnimationMode = (): AnimationMode => animationMode;
 
@@ -55,7 +53,6 @@ export const getAnimationMode = (): AnimationMode => animationMode;
  * Set the duration of the animation, in seconds.
  *
  * @param duration in seconds.
- * @group Global Settings
  */
 export const setAnimationDuration = (duration: number): void => {
   animationDuration = duration;
@@ -63,7 +60,6 @@ export const setAnimationDuration = (duration: number): void => {
 
 /**
  * Get the current duruation of the animation, in seconds.
- * @group Global Settings
  */
 export const getAnimationDuration = (): number => animationDuration;
 
@@ -71,7 +67,6 @@ export const getAnimationDuration = (): number => animationDuration;
  * Set the animation frame rate.
  *
  * @param fps in frames per second.
- * @group Global Settings
  */
 export const setAnimationFPS = (fps: number): void => {
   animationFPS = fps;
@@ -79,7 +74,6 @@ export const setAnimationFPS = (fps: number): void => {
 
 /**
  * Get the current animation frame rate.
- * @group Global Settings
  */
 export const getAnimationFPS = (): number => animationFPS;
 
@@ -246,7 +240,6 @@ export function morphEnd(
  * linearly interpolated across the length of the overall animation. This
  * animation will only be shown if this manifold is used directly on a GLTFNode.
  *
- * @group Modelling Functions
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the first animation frame.
  */
@@ -266,7 +259,6 @@ export const setMorphStart =
  * linearly interpolated across the length of the overall animation. This
  * animation will only be shown if this manifold is used directly on a GLTFNode.
  *
- * @group Modelling Functions
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the last animation frame.
  */

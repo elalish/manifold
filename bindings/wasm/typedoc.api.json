@@ -6,7 +6,6 @@
   "out": "docs/jsapi",
   "entryPoints": [
     "./manifold.d.ts",
-    "./types/manifoldCAD.d.ts",
     "./lib/*.ts"
   ],
   "sortEntryPoints": false,

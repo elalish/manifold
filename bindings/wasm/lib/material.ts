@@ -49,7 +49,6 @@ export function cleanup() {
  * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
  *
- * @group Modelling Functions
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */

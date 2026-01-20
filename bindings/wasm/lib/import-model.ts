@@ -26,8 +26,6 @@
  * @packageDocumentation
  * @group ManifoldCAD
  * @category Input/Output
- * @groupDescription Modelling Functions
- * These functions are available within manifoldCAD.
  * @groupDescription Low Level Functions
  * These functions are not available within manifoldCAD, but can be used when
  * including manifold in another project.
@@ -164,9 +162,6 @@ export function register(importer: Importer) {
 
 /**
  * Import a model, for display only.
- *
- * @group Modelling Functions
- * @returns
  */
 export async function importModel(
     source: string|Blob|URL|ArrayBuffer,
@@ -197,8 +192,6 @@ export async function importModel(
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
- *
- * @group Modelling Functions
  */
 export async function importManifold(
     source: string|Blob|URL|ArrayBuffer,

@@ -16,36 +16,9 @@
  * These are the objects and functions that are available within manifoldCAD
  * itself.
  *
- * All of the classes, functions and properties of this module are implemented
- * elsewhere and re-exported here.
- *
- * This is an isomorphic module.  When imported within manifoldCAD, the bundler
- * will swap it out for an identical module running in the worker context.
- * When imported as an ES module, it will implicitly instantiate a manifold wasm
- * module, and export it along with everything else listed here.
- * This allows models to behave identically when running on manifoldCAD.org,
- * through the CLI, or through nodejs.
- *
- * It can be imported as `manifold-3d/manifoldCAD`.
- *
  * @packageDocumentation
- * @group ManifoldCAD
- * @category none
  * @module manifoldCAD
- * @primaryExport
  * @see {@link "Using ManifoldCAD" | Using ManifoldCAD}
- *
- * @groupDescription Global State
- * These objects and functions are specific to top-level scripts
- * running within manifoldCAD.
- *
- * They are only accessible as global objects by a top level script evaluated by
- * the worker.  Libraries will not have access to them.
- * @privateRemarks
- * These functions will not be present at all when a model is imported as an ES
- * module. They can be imported through the {@link lib/scene-builder! | scene
- * builder} or directly from {@link lib/animation! | animation} and {@link
- * lib/level-of-detail! | level-of-detail} modules.
  */
 
 export {AnimationMode, getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation.d.ts';

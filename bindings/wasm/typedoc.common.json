@@ -20,15 +20,48 @@
       "*": "https://gltf-transform.dev/"
     }
   },
+  "searchInComments": true,
+  "searchInDocuments": true,
   "useFirstParagraphOfCommentAsSummary": true,
   "excludeExternals": true,
   "excludeInternal": true,
+
+  "defaultCategory": "None",
+  "categorizeByGroup": false,
+  "groupReferencesByType": false,
   "navigation": {
-    "includeFolders": false
+    "includeFolders": false,
+    "includeCategories": false,
+    "includeGroups": false
   },
+
   "exclude": [
     "**/*.test.*",
-    "./lib/manifoldCAD.*",
     "./lib/*.d.ts"
   ],
+
+  "groupOrder": [
+    "Documents", 
+    "Interfaces", "Classes",
+    "Basics",
+    "Constructors", "Properties", "Accessors",
+    "Input & Output", "Polygons", "Information", "Measurement", "Mesh ID", "Transformations",
+    "Boolean", "Properties", "Smoothing", "Convex Hull",
+    "Functions", "Methods", "*"
+  ],
+  "kindSortOrder": [
+    "Reference", "Project", "Module", "Namespace",
+    "Interface", "Enum", "EnumMember",
+    "Class", "Constructor",
+    "Property", "Variable", "Accessor",
+    "Function", "Method", "Parameter",
+    "CallSignature", "ConstructorSignature", "IndexSignature", "GetSignature", "SetSignature",
+    "TypeParameter", "TypeLiteral", "TypeAlias"
+  ],
+  "sort": [
+    "documents-first",
+    "kind",
+    "instance-first",
+    "alphabetical-ignoring-documents"
+  ]
 }

@@ -12,6 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * All of the classes, functions and properties of this module are implemented
+ * elsewhere and re-exported here.
+ *
+ * This is an isomorphic module.  When imported within manifoldCAD, the bundler
+ * will swap it out for an identical module running in the worker context.
+ * When imported as an ES module, it will implicitly instantiate a manifold wasm
+ * module, and export it along with everything else listed here.
+ * This allows models to behave identically when running on manifoldCAD.org,
+ * through the CLI, or through nodejs.
+ *
+ * @packageDocumentation
+ * @group ManifoldCAD
+ * @category none
+ * @module manifoldCAD
+ */
+
 import type {ManifoldToplevel} from '../manifold.d.ts';
 
 import * as debug from './debug.ts';

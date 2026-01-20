@@ -40,7 +40,6 @@ let minCircularEdgeLength: number = 1.0;
  * @param angle The minimum angle in degrees between consecutive segments. The
  * angle will increase if the the segments hit the minimum edge length.
  * Default is 10 degrees.
- * @group Global Settings
  */
 export const setMinCircularAngle = (angle: number) => {
   minCircularAngle = angle;
@@ -54,7 +53,6 @@ export const setMinCircularAngle = (angle: number) => {
  *
  * @param length The minimum length of segments. The length will
  * increase if the the segments hit the minimum angle. Default is 1.0.
- * @group Global Settings
  */
 export const setMinCircularEdgeLength = (length: number) => {
   minCircularEdgeLength = length;
@@ -68,7 +66,6 @@ export const setMinCircularEdgeLength = (length: number) => {
  *
  * @param segments Number of circular segments. Default is 0, meaning no
  * constraint is applied.
- * @group Global Settings
  */
 export const setCircularSegments = (segments: number) =>
     getManifoldModuleSync()?.setCircularSegments(segments);
@@ -77,7 +74,6 @@ export const setCircularSegments = (segments: number) =>
  * Reset the circular construction parameters to their defaults if
  * {@link setMinCircularAngle}, {@link setMinCircularEdgeLength}, or {@link
  * setCircularSegments} have been called.
- * @group Global Settings
  */
 export const resetToCircularDefaults = () => {
   getManifoldModuleSync()?.resetToCircularDefaults();
@@ -91,7 +87,6 @@ export const resetToCircularDefaults = () => {
  * @returns The minimum angle in degrees between consecutive segments. The
  * angle will increase if the the segments hit the minimum edge length.
  * Default is 10 degrees.
- * @group Global Settings
  */
 export const getMinCircularAngle = () => minCircularAngle;
 
@@ -100,7 +95,6 @@ export const getMinCircularAngle = () => minCircularAngle;
  *
  * @returns The minimum length of segments. The length will
  * increase if the the segments hit the minimum angle. Default is 1.0.
- * @group Global Settings
  */
 export const getMinCircularEdgeLength = () => minCircularEdgeLength;
 
@@ -110,7 +104,6 @@ export const getMinCircularEdgeLength = () => minCircularEdgeLength;
  *
  * @param radius For a given radius of circle, determine how many default
  * segments there will be.
- * @group Global Settings
  */
 export const getCircularSegments = (radius: number) =>
     getManifoldModuleSync()?.getCircularSegments(radius)!;
