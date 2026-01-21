@@ -181,8 +181,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
     throw err;
   }
 #else
-  auto impl = Boolean3(a, b, op).Result(op);
-  return ImplToLeaf(std::move(impl));
+  return ImplToLeaf(Boolean3(a, b, op).Result(op));
 #endif
 }
 
