@@ -28,6 +28,9 @@ manifoldCAD = manifold + [TypeScript](https://www.typescriptlang.org/) + [glTF](
 
 <div style="clear:both"></div>
 
+<!-- #endregion IncludeInUserGuide -->
+<!-- #region NoStlPlease -->
+
 ## 3D Formats
 
 [ [EXT_mesh_manifold](https://manifoldcad.org/docs/jsapi/modules/manifold-gltf.html) ]
@@ -36,8 +39,7 @@ Please avoid saving to STL files! They are lossy and inefficient - when saving a
 
 If you use vertex properties for things like interpolated normals or texture UV coordinates, [glTF](https://www.khronos.org/Gltf) is recommended, specifically using the [`EXT_mesh_manifold`](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_mesh_manifold/README.md) extension. This allows for the lossless and efficient transmission of manifoldness even with property boundaries. Try our [make-manifold](https://manifoldcad.org/make-manifold) page to add this extension to your existing glTF/GLB models. 
 
-<!-- #endregion IncludeInUserGuide -->
-
+<!-- #endregion NoStlPlease -->
 
 ## About the author
 

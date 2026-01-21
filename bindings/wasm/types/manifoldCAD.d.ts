@@ -42,7 +42,10 @@
 
 /**
  * {@include ../README.md#IncludeInUserGuide}
+ *
  * {@include ../documents/using-manifoldcad.md}
+ *
+ * {@include ../README.md#NoStlPlease}
  *
  * @packageDocumentation
  * @module manifoldCAD
