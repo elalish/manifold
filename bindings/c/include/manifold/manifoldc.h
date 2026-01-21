@@ -49,6 +49,10 @@ ManifoldMeshGL* manifold_meshgl_w_tangents(void* mem, float* vert_props,
                                            size_t n_verts, size_t n_props,
                                            uint32_t* tri_verts, size_t n_tris,
                                            float* halfedge_tangent);
+ManifoldMeshGL* manifold_meshgl_w_options(void* mem, float* vert_props,
+                                          size_t n_verts, size_t n_props,
+                                          uint32_t* tri_verts, size_t n_tris,
+                                          ManifoldMeshGLOptions* options);
 ManifoldMeshGL* manifold_get_meshgl(void* mem, ManifoldManifold* m);
 ManifoldMeshGL* manifold_get_meshgl_w_normals(void* mem, ManifoldManifold* m,
                                               int32_t normalIdx);
@@ -64,6 +68,11 @@ ManifoldMeshGL64* manifold_meshgl64_w_tangents(void* mem, double* vert_props,
                                                uint64_t* tri_verts,
                                                size_t n_tris,
                                                double* halfedge_tangent);
+ManifoldMeshGL64* manifold_meshgl64_w_options(void* mem, double* vert_props,
+                                              size_t n_verts, size_t n_props,
+                                              uint64_t* tri_verts,
+                                              size_t n_tris,
+                                              ManifoldMeshGL64Options* options);
 ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m);
 ManifoldMeshGL64* manifold_get_meshgl64_w_normals(void* mem,
                                                   ManifoldManifold* m,
