@@ -633,3 +633,21 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
+
+TEST(Boolean, Offset) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 12);
+  Manifold fat = cutout.Offset(5);
+  Manifold thin = cutout.Offset(-5);
+  EXPECT_EQ(fat.Genus(), cutout.Genus());
+  EXPECT_EQ(thin.Genus(), -7);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("fat.glb", fat.GetMeshGL(), {});
+    ExportMesh("thin.glb", thin.GetMeshGL(), {});
+  }
+#endif
+}

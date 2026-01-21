@@ -1085,4 +1085,191 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);
 }
+
+// Creates a prism extruding a triangle from innerPos to outerPos.
+// The quad diagonal direction is determined by comparing original vertex
+// indices (origIdx) to ensure adjacent triangles sharing an edge use the
+// same diagonal, preventing slivers.
+Manifold MakePrism(const vec3 innerPos[3], const vec3 outerPos[3],
+                   const int origIdx[3]) {
+  MeshGL prism;
+  prism.numProp = 3;
+
+  // Add vertices: for each triangle vertex, inner then outer
+  // Vertex layout: 0=inner0, 1=outer0, 2=inner1, 3=outer1, 4=inner2, 5=outer2
+  for (int v = 0; v < 3; v++) {
+    // Inner vertex (2*v)
+    prism.vertProperties.push_back(static_cast<float>(innerPos[v].x));
+    prism.vertProperties.push_back(static_cast<float>(innerPos[v].y));
+    prism.vertProperties.push_back(static_cast<float>(innerPos[v].z));
+    // Outer vertex (2*v + 1)
+    prism.vertProperties.push_back(static_cast<float>(outerPos[v].x));
+    prism.vertProperties.push_back(static_cast<float>(outerPos[v].y));
+    prism.vertProperties.push_back(static_cast<float>(outerPos[v].z));
+  }
+
+  // Inner face (reversed winding): vertices 4, 2, 0
+  prism.triVerts.push_back(4);
+  prism.triVerts.push_back(2);
+  prism.triVerts.push_back(0);
+  // Outer face (normal winding): vertices 1, 3, 5
+  prism.triVerts.push_back(1);
+  prism.triVerts.push_back(3);
+  prism.triVerts.push_back(5);
+
+  // Add quad faces for each edge, with diagonal based on original vertex order
+  for (int v0 = 0; v0 < 3; v0++) {
+    const int v1 = (v0 + 1) % 3;
+    const int idx0 = origIdx[v0];
+    const int idx1 = origIdx[v1];
+
+    // Prism vertex indices for this edge
+    const uint32_t inner0 = 2 * v0;
+    const uint32_t outer0 = 2 * v0 + 1;
+    const uint32_t inner1 = 2 * v1;
+    const uint32_t outer1 = 2 * v1 + 1;
+
+    // Choose diagonal based on original vertex index ordering
+    // This ensures adjacent triangles use the same diagonal for shared edges
+    if (idx1 > idx0) {
+      // Diagonal from inner0 to outer1
+      prism.triVerts.push_back(inner0);
+      prism.triVerts.push_back(inner1);
+      prism.triVerts.push_back(outer1);
+      prism.triVerts.push_back(inner0);
+      prism.triVerts.push_back(outer1);
+      prism.triVerts.push_back(outer0);
+    } else {
+      // Diagonal from inner1 to outer0
+      prism.triVerts.push_back(inner0);
+      prism.triVerts.push_back(inner1);
+      prism.triVerts.push_back(outer0);
+      prism.triVerts.push_back(inner1);
+      prism.triVerts.push_back(outer1);
+      prism.triVerts.push_back(outer0);
+    }
+  }
+
+  return Manifold(prism);
+}
+
+/**
+ * Inflate the Manifold by the specified delta, rounding convex vertices.
+ *
+ * @param delta Positive deltas will add volume to all surfaces of the Manifold,
+ * dilating it. Negative deltas will have the opposite effect, eroding it.
+ * @param circularSegments Denotes the resolution of the sphere used at convex
+ * vertices. Default is calculated by the static Quality defaults according to
+ * the radius, which is delta.
+ */
+/**
+ * Simple offset implementation using cylinders on convex edges and spheres
+ * on convex vertices. Based on PR #668.
+ */
+Manifold Manifold::Offset(double delta, int circularSegments) const {
+  auto pImpl = GetCsgLeafNode().GetImpl();
+
+  const bool inset = delta < 0;
+  const double radius = std::abs(delta);
+  const int n = circularSegments > 0 ? (circularSegments + 3) / 4
+                                     : Quality::GetCircularSegments(radius) / 4;
+  const Manifold sphere = Manifold::Sphere(radius, 4 * n);
+  const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
+
+  // Find convex edges and vertices
+  std::vector<int> convexEdges;
+  std::vector<bool> vertConvex(NumVert(), false);
+
+  for (size_t idx = 0; idx < pImpl->halfedge_.size(); idx++) {
+    const Halfedge& edge = pImpl->halfedge_[idx];
+    if (!edge.IsForward()) continue;
+
+    const int face0 = idx / 3;
+    const int face1 = edge.pairedHalfedge / 3;
+    const vec3 normal0 = pImpl->faceNormal_[face0];
+    const vec3 normal1 = pImpl->faceNormal_[face1];
+
+    const vec3 edgeVec =
+        pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
+    const double convexity =
+        (inset ? -1.0 : 1.0) * la::dot(edgeVec, la::cross(normal0, normal1));
+
+    if (convexity > 0) {
+      convexEdges.push_back(idx);
+      vertConvex[edge.startVert] = true;
+      vertConvex[edge.endVert] = true;
+    }
+  }
+
+  std::vector<int> convexVerts;
+  for (size_t i = 0; i < vertConvex.size(); i++) {
+    if (vertConvex[i]) convexVerts.push_back(i);
+  }
+
+  std::vector<Manifold> batch(NumTri());
+
+  // Extrude triangles using consistent quad diagonals based on vertex ordering
+  for (size_t tri = 0; tri < NumTri(); tri++) {
+    vec3 innerPos[3], outerPos[3];
+    int origIdx[3];
+    const vec3 normal = radius * pImpl->faceNormal_[tri];
+    for (int i = 0; i < 3; i++) {
+      origIdx[i] = pImpl->halfedge_[3 * tri + i].startVert;
+      innerPos[i] = pImpl->vertPos_[origIdx[i]] - (inset ? normal : vec3(0.0));
+      outerPos[i] = pImpl->vertPos_[origIdx[i]] + (inset ? vec3(0.0) : normal);
+    }
+    batch[tri] = MakePrism(innerPos, outerPos, origIdx);
+  }
+
+  const Manifold faces = BatchBoolean(batch, OpType::Add).AsOriginal();
+  std::cout << faces.NumTri() << std::endl;
+
+  std::vector<Manifold> batch2(convexEdges.size() + convexVerts.size() + 1);
+
+  // Add cylinders on convex edges
+  for (size_t i = 0; i < convexEdges.size(); i++) {
+    const Halfedge& halfedge = pImpl->halfedge_[convexEdges[i]];
+    vec3 edge =
+        pImpl->vertPos_[halfedge.endVert] - pImpl->vertPos_[halfedge.startVert];
+    const double length = la::length(edge);
+    if (length < 1e-10) continue;
+
+    // Compute rotation to align cylinder with edge
+    edge = la::normalize(edge);
+    vec3 up(0, 0, 1);
+    vec3 axis = la::cross(up, edge);
+    double angle = std::acos(std::clamp(la::dot(up, edge), -1.0, 1.0));
+
+    Manifold cyl = cylinder.Scale({1, 1, length});
+    if (la::length(axis) > 1e-10) {
+      axis = la::normalize(axis);
+      // Rodrigues rotation formula via Transform
+      double c = std::cos(angle);
+      double s = std::sin(angle);
+      double t = 1 - c;
+      mat3x4 rot = {{c + axis.x * axis.x * t, axis.x * axis.y * t + axis.z * s,
+                     axis.x * axis.z * t - axis.y * s},
+                    {axis.y * axis.x * t - axis.z * s, c + axis.y * axis.y * t,
+                     axis.y * axis.z * t + axis.x * s},
+                    {axis.z * axis.x * t + axis.y * s,
+                     axis.z * axis.y * t - axis.x * s, c + axis.z * axis.z * t},
+                    {0, 0, 0}};
+      cyl = cyl.Transform(rot);
+    }
+    batch2[i] = cyl.Translate(pImpl->vertPos_[halfedge.startVert]);
+  }
+
+  // Add spheres on convex vertices
+  for (size_t i = 0; i < convexVerts.size(); i++) {
+    batch2[convexEdges.size() + i] =
+        sphere.Translate(pImpl->vertPos_[convexVerts[i]]);
+  }
+
+  batch2.back() = faces;
+
+  const Manifold shell = BatchBoolean(batch2, OpType::Add).AsOriginal();
+  std::cout << shell.NumTri() << std::endl;
+
+  return Boolean(shell, inset ? OpType::Subtract : OpType::Add).AsOriginal();
+}
 }  // namespace manifold
