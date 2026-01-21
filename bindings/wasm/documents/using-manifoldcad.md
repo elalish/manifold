@@ -16,5 +16,3 @@ Usage: manifold-cad [options] <infile.js> <outfile>
 ```
 
 The output file can be in either `.glb` or `.3mf` format, determined by extension.
-
-This CLI is written in relatively plain JavaScript and serves as an example of how to use Manifold in a `node.js` environment.

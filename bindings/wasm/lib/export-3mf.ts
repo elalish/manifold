@@ -31,7 +31,7 @@ import {strToU8, zipSync} from 'fflate';
 import type {Mat4} from '../manifold-global-types.d.ts';
 
 import type {ExportOptions} from './export-model.ts';
-import {ManifoldPrimitive} from './manifold-gltf';
+import {ManifoldPrimitive} from './manifold-gltf.ts';
 
 const supportedFormat = {
   extension: '3mf',

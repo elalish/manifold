@@ -41,14 +41,11 @@
  */
 
 /**
- * These are the objects and functions that are available within manifoldCAD
- * itself.
+ * {@include ../README.md#IncludeInUserGuide}
+ * {@include ../documents/using-manifoldcad.md}
  *
  * @packageDocumentation
  * @module manifoldCAD
- * @see {@link https://www.manifoldcad.org | ManifoldCAD.org}
- * @see {@link https://manifoldcad.org/docs/jsapi/modules/manifoldCAD.html | Manifold WASM Developer Guide: Module manifoldCAD}
- * @sortStrategy kind
  */
 
 /** @group Basics */
@@ -79,18 +76,17 @@ export {CrossSection, Manifold, triangulate} from '../manifold';
 export declare function isManifoldCAD(): boolean
 
 /* Type Aliases */
-export type { FillRule, JoinType
+export type {
+  Mat3, Mat4, Vec2, Vec3,
+  Polygons, SimplePolygon, FillRule, JoinType,
+  Box, Rect, Smoothness,
+  ErrorStatus
 } from '../manifold';
-export type {Box, Rect} from '../manifold';
-export type {Polygons, SimplePolygon} from '../manifold';
-export type {Mat3, Mat4, Vec2, Vec3} from '../manifold';
-export type {Smoothness} from '../manifold';
-export type {ErrorStatus} from '../manifold';
 
 /* See the Developer Guide for more detail on these: */
 /** @internal */
 export type {SealedFloat32Array, SealedUint32Array} from '../manifold';
-/** @inernal */
+/** @internal */
 export type {ImportOptions} from '../lib/import-model';
 /** @internal */
 export type {MeshOptions} from '../manifold';

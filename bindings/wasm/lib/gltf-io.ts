@@ -33,8 +33,7 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {Mesh as ManifoldMesh} from '../manifold';
-import type {MeshOptions} from '../manifold.d.ts';
+import type {Mesh as ManifoldMesh, MeshOptions} from '../manifold.d.ts';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 

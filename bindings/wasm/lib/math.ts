@@ -17,7 +17,7 @@
  * @packageDocumentation
  */
 
-import type {Vec3} from '../manifold';
+import type {Vec3} from '../manifold.d.ts';
 
 const {cos, sin, PI} = Math;
 const TAU = PI * 2;

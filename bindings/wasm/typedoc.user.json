@@ -6,11 +6,10 @@
   "out": "docs/jsuser",
   "entryPoints": [ "./types/manifoldCAD.d.ts" ],
   "alwaysCreateEntryPointModule": false,
-  "projectDocuments": [
-    "./README.md",
-    "./documents/using-manifoldcad.md",
-  ],
   "excludeInternal": true,
   "readme": "none",
   "categorizeByGroup": true,
+  "navigation": {
+    "includeGroups": true
+  }
 }
