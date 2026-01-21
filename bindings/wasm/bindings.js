@@ -333,6 +333,14 @@ Module.setup = function() {
     };
   };
 
+  Module.Manifold.prototype.minkowskiSum = function(other) {
+    return this._MinkowskiSum(other);
+  };
+
+  Module.Manifold.prototype.minkowskiDifference = function(other) {
+    return this._MinkowskiDifference(other);
+  };
+
   class Mesh {
     constructor({
       numProp = 3,
