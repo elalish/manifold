@@ -953,6 +953,7 @@ export class Manifold {
    * This corresponds to the morphological dilation of the manifold.
    *
    * @param other The other manifold to minkowski sum to this one.
+   * @group Boolean
    */
   minkowskiSum(other: Manifold): Manifold;
 
@@ -961,6 +962,7 @@ export class Manifold {
    * This corresponds to the morphological erosion of the manifold.
    *
    * @param other The other manifold to minkowski subtract from this one.
+   * @group Boolean
    */
   minkowskiDifference(other: Manifold): Manifold;
 
