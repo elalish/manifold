@@ -97,6 +97,7 @@ export function resetToCircularDefaults(): void;
  *
  * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html | C++ API: CrossSection Class Reference}
  * @see {@link https://www.angusj.com/clipper2/Docs/Overview.htm | Clipper2 - Polygon Clipping Offsetting & Triangulating}
+ * @group Basics
  */
 export class CrossSection {
   /**
@@ -459,6 +460,7 @@ export class CrossSection {
  * consistent meaning between different inputs.
  *
  * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html | C++ API: Manifold Class Reference}
+ * @group Basics
  */
 export class Manifold {
   /**
@@ -471,7 +473,7 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
-   * 
+   *
    * @group Basics
    */
   constructor(mesh: Mesh);
@@ -1203,6 +1205,10 @@ export class Manifold {
   delete(): void;
 }
 
+/**
+ * @group Input & Output
+ * @internal
+ */
 export interface MeshOptions {
   numProp: number;
   vertProperties: Float32Array;
@@ -1222,8 +1228,10 @@ export interface MeshOptions {
  * libraries directly. This may not be manifold since the verts are duplicated
  * along property boundaries that do not match. The additional merge vectors
  * store this missing information, allowing the manifold to be reconstructed.
- * 
+ *
  * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
+ * @group Input & Output
+ * @internal
  */
 export class Mesh {
   constructor(options: MeshOptions);

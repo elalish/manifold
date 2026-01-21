@@ -11,5 +11,6 @@
     "./documents/using-manifoldcad.md",
   ],
   "excludeInternal": true,
-  "readme": "none"
+  "readme": "none",
+  "categorizeByGroup": true,
 }

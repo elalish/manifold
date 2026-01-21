@@ -76,7 +76,7 @@ export interface Importer {
 /**
  * @group Management
  * @inline
- * @hidden
+ * @internal
  */
 export interface ImportOptions {
   /**

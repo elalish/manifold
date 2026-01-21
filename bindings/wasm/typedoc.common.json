@@ -41,7 +41,9 @@
     "Interfaces", "Classes",
     "Basics",
     "Constructors", "Properties", "Accessors",
-    "Input & Output", "Polygons", "Information", "Measurement", "Mesh ID", "Transformations",
+    "Input & Output", "Polygons", 
+    "Material", "Scene Graph", "Animation", "Level of Detail",
+    "Information", "Measurement", "Mesh ID", "Transformations",
     "Boolean", "Properties", "Smoothing", "Convex Hull",
     "Functions", "Methods", "*"
   ],

@@ -23,6 +23,12 @@
  * This allows models to behave identically when running on manifoldCAD.org,
  * through the CLI, or through nodejs.
  *
+ * There is separate user facing documentation for this module;
+ * `types/manifoldCAD.d.ts` which is rolled up into `dist/manifoldCAD.d.ts`.
+ *
+ * @see {@link https://manifoldcad.org/docs/jsuser/index.html | ManifoldCAD User Guide}
+ * @see {@link https://manifoldcad.org/docs/jsapi/documents/Contributing.html#writing-for-the-user-guide | Writing for the User Guide}
+ *
  * @packageDocumentation
  * @group ManifoldCAD
  * @category none
@@ -37,7 +43,8 @@ import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
-export {GLTFAttribute, GLTFMaterial, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
+export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
+export {GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
