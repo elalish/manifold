@@ -54,6 +54,13 @@ class CsgLeafNode final : public CsgNode {
   static std::shared_ptr<CsgLeafNode> Compose(
       const std::vector<std::shared_ptr<CsgLeafNode>>& nodes);
 
+  // Returns the bounding box without triggering eager transform application.
+  // This is more efficient for overlap checks when we don't need the full mesh.
+  Box GetBoundingBox() const;
+
+  // Returns the number of vertices without triggering eager transform.
+  size_t NumVert() const;
+
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
   mutable mat3x4 transform_ = la::identity;
