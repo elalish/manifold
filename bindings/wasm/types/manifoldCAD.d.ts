@@ -51,7 +51,9 @@
  * @module manifoldCAD
  */
 
-/** @group Basics */
+// We do not want to merge these exports.
+// The TypeDoc comments are important, and clang-format will stomp on them.
+// clang-format off
 /** @group Animation */
 export type {AnimationMode} from '../lib/animation';
 /** @group Animation */
@@ -59,16 +61,20 @@ export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, se
 /** @group Material */
 export {only, show} from '../lib/debug';
 /** @group Material */
-export type {GLTFMaterial} from '../lib/gltf-node';
+export type {GLTFAttribute, GLTFMaterial} from '../lib/gltf-node';
 /** @group Scene Graph */
-export {BaseGLTFNode, getGLTFNodes, GLTFAttribute, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node';
+export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node';
 /** @group Input & Output */
 export {importManifold, importModel} from '../lib/import-model';
 /** @group Level of Detail */
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail'
 /** @group Material */
 export {setMaterial} from '../lib/material';
-export {CrossSection, Manifold, triangulate} from '../manifold';
+/** @group Basics */
+export {CrossSection, Manifold} from '../manifold';
+/** @group Polygons */
+export {triangulate} from '../manifold';
+// clang-format on
 
 /**
  * Is this module running in manifoldCAD.org or the ManifoldCAD CLI?
