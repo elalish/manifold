@@ -57,7 +57,7 @@ export function getAnimationMode(): AnimationMode {
  *
  * @param duration in seconds.
  */
-export const setAnimationDuration = (duration: number): void => {
+export function setAnimationDuration(duration: number): void {
   animationDuration = duration;
 };
 
