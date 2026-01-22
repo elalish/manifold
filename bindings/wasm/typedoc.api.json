@@ -8,6 +8,11 @@
     "./manifold.d.ts",
     "./lib/*.ts"
   ],
+  "exclude": [
+    "./lib/scene-builder.ts",
+    "./**/*.test.ts",
+    "./lib/*.d.ts"
+  ],
   "sortEntryPoints": false,
   "projectDocuments": [
     "./documents/embedding-manifoldcad.md",
