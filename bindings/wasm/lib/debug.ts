@@ -24,8 +24,9 @@ import {Document} from '@gltf-transform/core';
 
 import type {Manifold, Mesh} from '../manifold.d.ts';
 
-import {Properties, writeMesh} from './gltf-io.ts';
-import {GLTFMaterial} from './gltf-node.ts';
+import type {Properties} from './gltf-io.ts';
+import {writeMesh} from './gltf-io.ts';
+import type {GLTFMaterial} from './gltf-node.ts';
 import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
 
 // Debug setup to show source meshes
@@ -106,10 +107,9 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
  * will allow you find the object even if it doesn't currently intersect the
  * result.
  *
- * @group Modelling Functions
  * @param manifold The object to show - returned for chaining.
  */
-export const show = (manifold: Manifold) => {
+export function show(manifold: Manifold) {
   return debug(manifold, shown);
 };
 
@@ -119,10 +119,9 @@ export const show = (manifold: Manifold) => {
  * debugging as it allows you to see objects that may be hidden in the interior
  * of the result. Multiple objects marked `only()` will all be shown.
  *
- * @group Modelling Functions
  * @param manifold The object to show - returned for chaining.
  */
-export const only = (manifold: Manifold) => {
+export function only(manifold: Manifold) {
   ghost = true;
   return debug(manifold, singles);
 };

@@ -26,19 +26,22 @@
 import {Document, Material, Node} from '@gltf-transform/core';
 import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold';
+import type {Manifold} from '../manifold.d.ts';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
-import {Properties, writeMesh} from './gltf-io.ts';
-import {BaseGLTFNode, GLTFMaterial, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
+import type {Properties} from './gltf-io.ts';
+import {writeMesh} from './gltf-io.ts';
+import type {GLTFMaterial} from './gltf-node.ts';
+import {BaseGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupImport} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';
-export {GLTFAttribute, GLTFMaterial, GLTFNode} from './gltf-node.ts';
+export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
+export {GLTFNode} from './gltf-node.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 

@@ -12,53 +12,90 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/* This file is used in two ways.
+ * Run it through typedoc (`npm run docs:jsuser`), and it generates
+ * the ManifoldCAD User Guide.
+ * On the other hand API Extractor (`npm run postbuild`) rolls up
+ * all of the imported references to generate `dist/manifoldCAD.d.ts`.
+ *
+ * Getting TypeDoc to play nice is hard!
+ * Groups added here are not honoured on:
+ *   * Classes.
+ *   * Interfaces.
+ *   * Types that already have TypeDoc comments.
+ *   * Arrow functions.
+ *
+ * I've taken the approach of:
+ *   * Switching exports away from arrow functions, and setting groups here.
+ *   * Setting groups on Classes and Interfaces in their upstream files.
+ *     This might require some editing on the Developer Guide side for
+ *     consistency.
+ *   * Marking a few types as `@internal` -- typical users won't interact
+ *     Mesh objects or SealedUInt32Arrays.
+ *   * Good user documentation outweighs good developer documentation.
+ *     We can just read the code anyhow.
+ *
+ * It's also possible to just `export declare`, and _not_ re-export
+ * the original comment.  That may be required if user and developer
+ * documentation diverge significantly.
+ */
+
 /**
- * These are the objects and functions that are available within manifoldCAD
- * itself.
+ * {@include ../README.md#IncludeInUserGuide}
  *
- * All of the classes, functions and properties of this module are implemented
- * elsewhere and re-exported here.
- *
- * This is an isomorphic module.  When imported within manifoldCAD, the bundler
- * will swap it out for an identical module running in the worker context.
- * When imported as an ES module, it will implicitly instantiate a manifold wasm
- * module, and export it along with everything else listed here.
- * This allows models to behave identically when running on manifoldCAD.org,
- * through the CLI, or through nodejs.
- *
- * It can be imported as `manifold-3d/manifoldCAD`.
+ * {@include ../documents/using-manifoldcad.md}
  *
  * @packageDocumentation
- * @group ManifoldCAD
- * @category none
  * @module manifoldCAD
- * @primaryExport
- * @see {@link "Using ManifoldCAD" | Using ManifoldCAD}
- *
- * @groupDescription Global State
- * These objects and functions are specific to top-level scripts
- * running within manifoldCAD.
- *
- * They are only accessible as global objects by a top level script evaluated by
- * the worker.  Libraries will not have access to them.
- * @privateRemarks
- * These functions will not be present at all when a model is imported as an ES
- * module. They can be imported through the {@link lib/scene-builder! | scene
- * builder} or directly from {@link lib/animation! | animation} and {@link
- * lib/level-of-detail! | level-of-detail} modules.
  */
 
-export {AnimationMode, getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation.d.ts';
-export {only, show} from '../lib/debug.ts';
-export {BaseGLTFNode, getGLTFNodes, GLTFAttribute, GLTFMaterial, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node.d.ts';
-export {importManifold, importModel, ImportOptions} from '../lib/import-model.ts';
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail.d.ts'
-export {setMaterial} from '../lib/material.d.ts';
-export {Box, CrossSection, ErrorStatus, FillRule, JoinType, Manifold, Mat3, Mat4, Mesh, MeshOptions, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, triangulate, Vec2, Vec3} from '../manifold.d.ts';
+// We do not want to merge these exports.
+// The TypeDoc comments are important, and clang-format will stomp on them.
+// clang-format off
+/** @group Animation */
+export type {AnimationMode} from '../lib/animation';
+/** @group Animation */
+export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation';
+/** @group Material */
+export {only, show} from '../lib/debug';
+/** @group Material */
+export type {GLTFAttribute, GLTFMaterial} from '../lib/gltf-node';
+/** @group Scene Graph */
+export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node';
+/** @group Input & Output */
+export {importManifold, importModel} from '../lib/import-model';
+/** @group Level of Detail */
+export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail'
+/** @group Material */
+export {setMaterial} from '../lib/material';
+/** @group Basics */
+export {CrossSection, Manifold} from '../manifold';
+/** @group Polygons */
+export {triangulate} from '../manifold';
+// clang-format on
 
 /**
- * Is this module running in manifoldCAD evaluator?
+ * Is this module running in manifoldCAD.org or the ManifoldCAD CLI?
  *
  * @returns boolean
+ * @group Information
  */
 export declare function isManifoldCAD(): boolean
+
+/* Type Aliases */
+export type {
+  Mat3, Mat4, Vec2, Vec3,
+  Polygons, SimplePolygon, FillRule, JoinType,
+  Box, Rect, Smoothness,
+  ErrorStatus
+} from '../manifold';
+
+/* See the Developer Guide for more detail on these: */
+/** @internal */
+export type {SealedFloat32Array, SealedUint32Array} from '../manifold';
+/** @internal */
+export type {ImportOptions} from '../lib/import-model';
+/** @internal */
+export type {MeshOptions} from '../manifold';
+/** @internal */
+export {Mesh} from '../manifold';

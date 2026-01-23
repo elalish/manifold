@@ -12,6 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * All of the classes, functions and properties of this module are implemented
+ * elsewhere and re-exported here.
+ *
+ * This is an isomorphic module.  When imported within manifoldCAD, the bundler
+ * will swap it out for an identical module running in the worker context.
+ * When imported as an ES module, it will implicitly instantiate a manifold wasm
+ * module, and export it along with everything else listed here.
+ * This allows models to behave identically when running on manifoldCAD.org,
+ * through the CLI, or through nodejs.
+ *
+ * There is separate user facing documentation for this module;
+ * `types/manifoldCAD.d.ts` which is rolled up into `dist/manifoldCAD.d.ts`.
+ *
+ * @see {@link https://manifoldcad.org/docs/jsuser/index.html | ManifoldCAD User Guide}
+ * @see {@link https://manifoldcad.org/docs/jsapi/documents/Contributing.html#writing-for-the-user-guide | Writing for the User Guide}
+ *
+ * @packageDocumentation
+ * @group ManifoldCAD
+ * @category none
+ * @module manifoldCAD
+ */
+
 import type {ManifoldToplevel} from '../manifold.d.ts';
 
 import * as debug from './debug.ts';
@@ -20,7 +43,8 @@ import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
-export {GLTFAttribute, GLTFMaterial, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
+export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
+export {GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 

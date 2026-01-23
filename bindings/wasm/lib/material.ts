@@ -26,7 +26,8 @@ import {copyToDocument} from '@gltf-transform/functions';
 
 import type {Manifold} from '../manifold.d.ts';
 
-import {GLTFMaterial, GLTFNode} from './gltf-node.ts';
+import type {GLTFMaterial} from './gltf-node.ts';
+import {GLTFNode} from './gltf-node.ts';
 import {getDocumentByID} from './import-model.ts';
 
 const defaultMaterial = {
@@ -49,16 +50,15 @@ export function cleanup() {
  * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
  *
- * @group Modelling Functions
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */
-export const setMaterial =
-    (manifold: Manifold, material: GLTFMaterial): Manifold => {
-      const out = manifold.asOriginal();
-      id2material.set(out.originalID(), material);
-      return out;
-    };
+export function setMaterial(
+    manifold: Manifold, material: GLTFMaterial): Manifold {
+  const out = manifold.asOriginal();
+  id2material.set(out.originalID(), material);
+  return out;
+}
 
 /**
  * @internal
