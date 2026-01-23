@@ -24,5 +24,13 @@
     "includeGroups": true,
   },
   "groupReferencesByType": true,
-  "defaultCategory": "none"
+  "defaultCategory": "none",
+  "excludeTags": [
+    "@override",
+    "@virtual",
+    "@satisfies",
+    "@overload",
+    "@inline",
+    "@inlineType"
+  ]
 }

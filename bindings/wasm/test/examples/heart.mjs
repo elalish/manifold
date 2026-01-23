@@ -48,7 +48,7 @@ const scale = 100 / (box.max[0] - box.min[0]);
 setMorphStart(ball, func);
 const node = new GLTFNode();
 node.manifold = ball;
-node.scale = [scale, scale, scale];
+node.scaling = [scale, scale, scale];
 
 setAnimationDuration(5); // seconds
 setAnimationMode('ping-pong');

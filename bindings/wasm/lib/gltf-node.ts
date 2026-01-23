@@ -36,8 +36,12 @@
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';
+import {MathUtils} from '@gltf-transform/core';
 
-import type {Manifold, Vec3} from '../manifold.d.ts';
+import type {Manifold, Mat4, Vec3} from '../manifold.d.ts';
+
+import type {Quat} from './math.ts';
+import {euler2quat, identityMat4, mirrorMat4, multiplyMat4, quat2euler, rotateMat4, scaleMat4, translateMat4} from './math.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -154,18 +158,25 @@ export interface GLTFMaterial {
  * The abstract class from which other classes inherit.  Common methods and
  * properties live here.
  * @group Scene Graph
+ *
+ * @privateRemarks
+ * Internally, gltf-transform stores transformations as separate translation,
+ * rotation and scale vectors.  It can convert those vectors to and from a
+ * transformation matrix as needed.  Translation, rotation and scale will be
+ * applied in that order.
  */
 export abstract class BaseGLTFNode {
-  /** @internal */
-  _parent?: BaseGLTFNode;
-  name?: string;
+  private _parent?: BaseGLTFNode;
 
-  // Internally, gltf-transform stores transformations as separate translation,
-  // rotation and scale vectors.  It can convert those vectors to and from a
-  // transformation matrix as needed.
-  translation?: Vec3|((t: number) => Vec3);
-  rotation?: Vec3|((t: number) => Vec3);
-  scale?: Vec3|((t: number) => Vec3);
+  private _scaling: Vec3 = [1.0, 1.0, 1.0];
+  private _rotation: Vec3 = [0.0, 0.0, 0.0];
+  private _translation: Vec3 = [0.0, 0.0, 0.0];
+
+  private _scalingFn: ((t: number) => Vec3)|null = null;
+  private _rotationFn: ((t: number) => Vec3)|null = null;
+  private _translationFn: ((t: number) => Vec3)|null = null;
+
+  name?: string;
 
   constructor(parent?: BaseGLTFNode) {
     this._parent = parent;
@@ -173,6 +184,81 @@ export abstract class BaseGLTFNode {
 
   get parent() {
     return this._parent;
+  }
+
+  get translation() {
+    return this._translationFn ?? this._translation;
+  }
+
+  set translation(v: Vec3|((t: number) => Vec3)) {
+    if (Array.isArray(v)) {
+      this._translation = v;
+    } else if (typeof v === 'function') {
+      this._translationFn = v;
+    } else {
+      throw new TypeError('Must be a Vec3 or a function that returns a Vec3');
+    }
+  }
+
+  get rotation() {
+    return this._rotationFn ?? this._rotation;
+  }
+
+  set rotation(v: Vec3|((t: number) => Vec3)) {
+    if (Array.isArray(v)) {
+      this._rotation = v;
+    } else if (typeof v === 'function') {
+      this._rotationFn = v;
+    } else {
+      throw new TypeError('Must be a Vec3 or a function that returns a Vec3');
+    }
+  }
+
+  get scaling() {
+    return this._scalingFn ?? this._scaling;
+  }
+
+  set scaling(v: Vec3|((t: number) => Vec3)) {
+    if (Array.isArray(v)) {
+      this._scaling = v;
+    } else if (typeof v === 'function') {
+      this._scalingFn = v;
+    } else {
+      throw new TypeError('Must be a Vec3 or a function that returns a Vec3');
+    }
+  }
+
+  transform(transform: Mat4) {
+    const {compose, decompose} = MathUtils;
+    const oldmatrix: Mat4 = identityMat4();
+    compose(
+        this._translation, euler2quat(this._rotation), this._scaling,
+        oldmatrix);
+    const newmatrix = multiplyMat4(transform, oldmatrix);
+
+    const quat: Quat = [0, 0, 0, 0];
+    decompose(newmatrix, this._translation, quat, this._scaling);
+    this.rotation = quat2euler(quat);
+  }
+
+  mirror(normal: readonly[number, number, number]) {
+    this.transform(mirrorMat4(normal as Vec3));
+    return this;
+  }
+
+  rotate(v: readonly[number, number, number]) {
+    this.transform(rotateMat4(v[0], v[1], v[2]));
+    return this;
+  }
+
+  scale(v: readonly[number, number, number]) {
+    this.transform(scaleMat4(v[0], v[1], v[2]));
+    return this;
+  }
+
+  translate(v: readonly[number, number, number]) {
+    this.transform(translateMat4(v[0], v[1], v[2]));
+    return this;
   }
 }
 

@@ -27,6 +27,8 @@ The ManifoldCAD User Guide is generated from the declaration files present in `t
 
 TypeDoc reflections (comments) flagged as `@internal` will _not_ be visible in the User Guide, but will be present in the Developer Guide.  Reflections tagged as `@hidden` will not be visible in either guide.
 
+The `@privateRemarks` section of a comment will be visible in the Developer Guide but not the User Guide.
+
 ### WASM Bindings
 
 The manifold library itself is documented in three files:

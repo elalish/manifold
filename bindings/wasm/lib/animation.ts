@@ -114,7 +114,7 @@ export function cleanup() {
 export function addMotion(
     doc: Document, type: 'translation'|'rotation'|'scale', node: BaseGLTFNode,
     out: Node): Vec3|null {
-  const motion = node[type];
+  const motion = node[type === 'scale' ? 'scaling' : type];
   if (motion == null) {
     return null;
   }
