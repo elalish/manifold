@@ -15,6 +15,7 @@
 import * as fs from 'node:fs/promises';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
+import {toArrayBuffer} from './export-model.ts';
 import * as importer from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
@@ -45,7 +46,7 @@ suite('supports()', () => {
   });
 });
 
-suite('importModel()', () => {
+suite('importManifold()', () => {
   test('imports a model with EXT_mesh_manifold', async () => {
     const model = await importer.importManifold(new URL(
         '../test/fixtures/models/boxExtMeshManifold.glb', import.meta.url));
@@ -117,5 +118,29 @@ suite('importModel()', () => {
     const model = await importer.importManifold(
         buffer.buffer as ArrayBuffer, {mimetype: 'model/gltf-binary'});
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('Orients a model correctly', async () => {
+    // The other tests implicitly cover conversion from glTF's default
+    // scale of 1:1m.  This test covers conversion between up being +Y in
+    // glTF and +Z in manifold.
+
+    // Here's a four sided pyramid, with the apex pointing towards +Z.
+    const script = 'import {Manifold} from \'manifold-3d/manifoldCAD\';\n' +
+        'export default Manifold.cylinder(1,1,0,4,true);\n';
+
+    const options = {mimetype: 'model/gltf-binary'};
+    const doc = await worker.evaluate(script);
+    const buffer = await toArrayBuffer(doc, options);
+    const model = await importer.importManifold(buffer, options);
+
+    // Count the number of vertices above the Z=0 plane.
+    let above = 0;
+    const mesh = model.getMesh();
+    for (let i = 0; i < mesh.numVert; i++) {
+      if (mesh.position(i)[2] > 0) above++;
+    }
+
+    expect(above).toEqual(1);
   });
 });

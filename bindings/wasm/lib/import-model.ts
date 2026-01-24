@@ -39,6 +39,7 @@ import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import {setMaterialByID} from './material.ts';
+import {multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
@@ -329,16 +330,23 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
  * Scale and transform imported geometry.
  *
  * glTF has a defined scale of 1:1 metre.
- * manifoldCAD has a defined scale of 1:1 mm.
+ * ManifoldCAD has a defined scale of 1:1 mm.
  *
+ * glTF defines up as '+Y'.
+ * ManifoldCAD defines up as '+Z'.
  */
 function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
-  // Find top level nodes and correct their scale.
+  // Find top level nodes and correct their scale and orientation.
   for (const sourceNode of doc.getRoot().listNodes()) {
     if (sourceNode.getParentNode()) continue;
 
     const scale = sourceNode.getScale();
     sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
+
+    const halfRoot2 = Math.sqrt(2) / 2;
+    const original = sourceNode.getRotation();
+    const rotated = multiplyQuat(original, [-halfRoot2, 0, 0, halfRoot2])
+    sourceNode.setRotation(rotated);
   }
   return doc;
 }

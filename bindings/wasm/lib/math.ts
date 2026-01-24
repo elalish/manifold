@@ -20,20 +20,20 @@
 import type {Vec3} from '../manifold.d.ts';
 
 const {cos, sin, PI} = Math;
-const TAU = PI * 2;
 
-export type Vec4 = [number, number, number, number];
+export type Quat = [number, number, number, number];
+export type Vec4 = Quat;
 
-export function euler2quat(rotation: Vec3): Vec4 {
+export function euler2quat(rotation: Vec3): Quat {
   // https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Source_code
-  const cr = cos(rotation[2] * 0.5 * TAU / 360);
-  const sr = sin(rotation[2] * 0.5 * TAU / 360);
-  const cp = cos(rotation[1] * 0.5 * TAU / 360);
-  const sp = sin(rotation[1] * 0.5 * TAU / 360);
-  const cy = cos(rotation[0] * 0.5 * TAU / 360);
-  const sy = sin(rotation[0] * 0.5 * TAU / 360);
+  const cr = cos(rotation[2] * PI / 360);
+  const sr = sin(rotation[2] * PI / 360);
+  const cp = cos(rotation[1] * PI / 360);
+  const sp = sin(rotation[1] * PI / 360);
+  const cy = cos(rotation[0] * PI / 360);
+  const sy = sin(rotation[0] * PI / 360);
 
-  const q: Vec4 = [0, 0, 0, 0];
+  const q: Quat = [0, 0, 0, 0];
   q[3] = cr * cp * cy + sr * sp * sy;
   q[2] = sr * cp * cy - cr * sp * sy;
   q[1] = cr * sp * cy + sr * cp * sy;
@@ -41,3 +41,12 @@ export function euler2quat(rotation: Vec3): Vec4 {
 
   return q;
 };
+
+export function multiplyQuat(a: Quat, b: Quat): Quat {
+  return [
+    a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+    a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+    a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+    a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0],
+  ];
+}
