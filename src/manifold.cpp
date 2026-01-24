@@ -1126,4 +1126,8 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);
 }
+
+std::vector<int> Manifold::WindingNumbers(const std::vector<vec3>& pos) const {
+  return Boolean3::Winding(*GetCsgLeafNode().GetImpl(), pos);
+}
 }  // namespace manifold

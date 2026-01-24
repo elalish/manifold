@@ -348,6 +348,7 @@ class Manifold {
   double SurfaceArea() const;
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
+  std::vector<int> WindingNumbers(const std::vector<vec3>& pos) const;
   ///@}
 
   /** @name Mesh ID

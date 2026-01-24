@@ -59,6 +59,9 @@ class Boolean3 {
   Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ, OpType op);
   Manifold::Impl Result(OpType op) const;
 
+  static std::vector<int> Winding(const Manifold::Impl& manifold,
+                                  const Vec<vec3>& pos);
+
  private:
   const Manifold::Impl &inP_, &inQ_;
   const bool expandP_;
