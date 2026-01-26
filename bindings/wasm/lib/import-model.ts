@@ -39,7 +39,7 @@ import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import {setMaterialByID} from './material.ts';
-import {multiplyQuat} from './math.ts';
+import {euler2quat, multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
@@ -343,9 +343,8 @@ function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
     const scale = sourceNode.getScale();
     sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
 
-    const halfRoot2 = Math.sqrt(2) / 2;
     const original = sourceNode.getRotation();
-    const rotated = multiplyQuat(original, [-halfRoot2, 0, 0, halfRoot2])
+    const rotated = multiplyQuat(original, euler2quat([90, 0, 0]));
     sourceNode.setRotation(rotated);
   }
   return doc;
