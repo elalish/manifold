@@ -23,20 +23,21 @@
  * @category Core
  */
 
-import {Document, Material, Node} from '@gltf-transform/core';
+import {Accessor, Document, Material, Node} from '@gltf-transform/core';
 import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold.d.ts';
+import type {Manifold, Vec2, Vec3} from '../manifold.d.ts';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import type {Properties} from './gltf-io.ts';
 import {writeMesh} from './gltf-io.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
-import {BaseGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
+import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupImport} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
+import {getManifoldModuleSync} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export {only, show} from './debug.ts';
@@ -111,7 +112,6 @@ function addMesh(
   log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
       (volume / 100).toLocaleString()} cm^3`);
 
-  // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.getMesh();
 
   // Material
@@ -256,6 +256,52 @@ function exportTransform(doc: Document) {
   return wrapper
 }
 
+function createNodeFromCrossSection(
+    doc: Document, nodeDef: CrossSectionGLTFNode): Node {
+  const node = createGLTFnode(doc, nodeDef);
+  const cs = nodeDef._crossSection;
+  if (!cs) return node;
+
+  //const backupMaterial = getBackupMaterial(nodeDef);
+
+
+  const {triangulate} = getManifoldModuleSync()!;
+  const polygons = cs.toPolygons();
+  const positions = new Float32Array(
+      polygons.flat().map((v: Vec2): Vec3 => ([...v, 0])).flat());
+  const triangles = triangulate(polygons);
+  const indices = new Uint32Array(triangles.flat());
+
+  const buffer = doc.getRoot().listBuffers()[0];
+
+  const positionAccessor = doc.createAccessor()
+                               .setArray(positions)
+                               .setType(Accessor.Type.VEC3)
+                               .setBuffer(buffer);
+
+  const indicesAccessor = doc.createAccessor()
+                              .setArray(indices)
+                              .setType(Accessor.Type.SCALAR)
+                              .setBuffer(buffer);
+
+  const material = doc.createMaterial()
+                       .setRoughnessFactor(1)
+                       .setMetallicFactor(0)
+                       .setDoubleSided(true)
+                       .setBaseColorFactor([1, 0, 1, 1]);
+
+  const primitive = doc.createPrimitive()
+                        .setMaterial(material)
+                        .setIndices(indicesAccessor)
+                        .setAttribute('POSITION', positionAccessor);
+
+  const mesh = doc.createMesh(`CrossSection Mesh ${nodeDef.name}`);
+  mesh.addPrimitive(primitive);
+  node.setMesh(mesh);
+
+  return node;
+}
+
 /**
  * Convert a Manifold object into a GLTF-Transform Document.
  *
@@ -290,12 +336,16 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
   let leafNodes = 0;
   let visualizationNodes = 0;
+  let crossSectionNodes = 0;
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of nodes) {
     if (nodeDef instanceof VisualizationGLTFNode) {
       node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
       ++visualizationNodes;
+    } else if (nodeDef instanceof CrossSectionGLTFNode) {
+      node2gltf.set(nodeDef, createNodeFromCrossSection(doc, nodeDef));
+      ++crossSectionNodes;
     } else {
       node2gltf.set(
           nodeDef,
@@ -320,11 +370,15 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
 
   log(`Total glTF nodes: ${nodes.length}`);
   if (leafNodes) {
-    log(`Total mesh references: ${leafNodes}`);
+    log(`  Meshes: ${leafNodes}`);
+  }
+   if (crossSectionNodes) {
+    log(`  Cross section meshes: ${crossSectionNodes}`);
   }
   if (visualizationNodes) {
-    log(`Total visualization-only (imported) nodes: ${visualizationNodes}`);
+    log(`  Visualization-only (imported) nodes: ${visualizationNodes}`);
   }
+ 
 
   cleanupAnimationInDoc();
   await doc.transform(unpartition());
