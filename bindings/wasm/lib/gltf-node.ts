@@ -37,7 +37,7 @@
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Vec3} from '../manifold.d.ts';
+import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -259,6 +259,38 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
 }
 
 /**
+ * Display a CrossSection in 3D space.
+ *
+ * A CrossSection object is two dimensional.  Attaching it as a node
+ * allows it to be included in the final exported file, complete with
+ * transformations.
+ *
+ * > [!NOTICE]
+ * >
+ * > CrossSections are not -- and can never be -- manifold.  That means
+ * > some exporters (like `.3mf`) will just skip over them entirely.
+ *
+ * @group Scene Graph
+ */
+export class CrossSectionGLTFNode extends BaseGLTFNode {
+  /** @internal */
+  _crossSection?: CrossSection;
+  material?: GLTFMaterial;
+
+  constructor(cs?: CrossSection, parent?: BaseGLTFNode) {
+    super(parent);
+    this._crossSection = cs;
+  }
+
+  clone(newParent?: BaseGLTFNode) {
+    const copy =
+        new CrossSectionGLTFNode(this._crossSection, newParent ?? this.parent);
+    Object.assign(copy, this);
+    return copy;
+  }
+}
+
+/**
  * Get a list of GLTF nodes that have been created in this model.
  *
  * This function only works in scripts directly evaluated by the manifoldCAD
@@ -298,8 +330,8 @@ export const cleanup = () => {
  * @returns An array of GLTFNodes.
  */
 export async function anyToGLTFNodeList(
-    any: Manifold|BaseGLTFNode|
-    Array<Manifold|BaseGLTFNode>): Promise<Array<BaseGLTFNode>> {
+    any: Manifold|BaseGLTFNode|CrossSection|
+    Array<Manifold|BaseGLTFNode|CrossSection>): Promise<Array<BaseGLTFNode>> {
   if (Array.isArray(any)) {
     return await any.map(anyToGLTFNodeList)
         .reduce(
@@ -312,6 +344,9 @@ export async function anyToGLTFNodeList(
   } else if (any.constructor.name === 'Manifold') {
     const node = new GLTFNode();
     node.manifold = any as Manifold;
+    return [node];
+  } else if (any.constructor.name === 'CrossSection') {
+    const node = new CrossSectionGLTFNode(any as CrossSection);
     return [node];
   }
 

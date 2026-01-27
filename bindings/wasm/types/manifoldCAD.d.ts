@@ -61,7 +61,7 @@ export {only, show} from '../lib/debug';
 /** @group Material */
 export type {GLTFAttribute, GLTFMaterial} from '../lib/gltf-node';
 /** @group Scene Graph */
-export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode} from '../lib/gltf-node';
+export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode, CrossSectionGLTFNode} from '../lib/gltf-node';
 /** @group Input & Output */
 export {importManifold, importModel} from '../lib/import-model';
 /** @group Level of Detail */
