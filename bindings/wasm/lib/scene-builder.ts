@@ -233,13 +233,25 @@ function createNodeFromCache(
   return node;
 }
 
-function createWrapper(doc: Document) {
-  const halfRoot2 = Math.sqrt(2) / 2;
+/**
+ * Scale and transform exported geometry, by wrapping it a top level node with a
+ * transformation.
+ *
+ * glTF has a defined scale of 1:1 metre.
+ * ManifoldCAD has a defined scale of 1:1 mm.
+ *
+ * glTF defines up as '+Y'.
+ * ManifoldCAD defines up as '+Z'.
+ *
+ * See also `importTransform()` in `import-model.ts`.
+ */
+function exportTransform(doc: Document) {
   // GLTF has a defined scale of 1:1 metre.
   const mm2m = 1 / 1000;
-  const wrapper = doc.createNode('wrapper')
-                      .setRotation([-halfRoot2, 0, 0, halfRoot2])
-                      .setScale([mm2m, mm2m, mm2m]);
+
+  const wrapper = doc.createNode('wrapper');
+  wrapper.setRotation(euler2quat([-90, 0, 0]));
+  wrapper.setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
   return wrapper
 }
@@ -270,7 +282,7 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   }
 
   const doc = new Document();
-  const root = createWrapper(doc);
+  const root = exportTransform(doc);
 
   addAnimationToDoc(doc);
 
