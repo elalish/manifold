@@ -250,7 +250,7 @@ function exportTransform(doc: Document) {
   const mm2m = 1 / 1000;
 
   const wrapper = doc.createNode('wrapper');
-  wrapper.setRotation(euler2quat([90, 0, 0]));
+  wrapper.setRotation(euler2quat([-90, 0, 0]));
   wrapper.setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
   return wrapper
