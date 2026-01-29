@@ -262,7 +262,7 @@ function createNodeFromCrossSection(
   const cs = nodeDef._crossSection;
   if (!cs) return node;
 
-  //const backupMaterial = getBackupMaterial(nodeDef);
+  // const backupMaterial = getBackupMaterial(nodeDef);
 
 
   const {triangulate} = getManifoldModuleSync()!;
@@ -372,13 +372,13 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   if (leafNodes) {
     log(`  Meshes: ${leafNodes}`);
   }
-   if (crossSectionNodes) {
+  if (crossSectionNodes) {
     log(`  Cross section meshes: ${crossSectionNodes}`);
   }
   if (visualizationNodes) {
     log(`  Visualization-only (imported) nodes: ${visualizationNodes}`);
   }
- 
+
 
   cleanupAnimationInDoc();
   await doc.transform(unpartition());
