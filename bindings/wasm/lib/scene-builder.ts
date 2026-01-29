@@ -46,6 +46,8 @@ export {GLTFNode} from './gltf-node.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 
+let crossSectionCount: number = 0;
+
 /**
  * Reset and garbage collect the scene builder and any
  * encapsulated modules.
@@ -57,6 +59,7 @@ export function cleanup() {
   cleanupDebug();
   cleanupMaterial();
   cleanupImport();
+  crossSectionCount = 0;
 }
 
 // Swallow informational logs in testing framework
@@ -100,17 +103,17 @@ function addMesh(
     return;
   }
 
-  log(`Triangles: ${numTri.toLocaleString()}`);
+  log(`  Triangles: ${numTri.toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
-  log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
       size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
+  log(`  Genus: ${manifold.genus().toLocaleString()}`);
   const volume = Math.round(manifold.volume() / 10);
-  log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
-      (volume / 100).toLocaleString()} cm^3`);
+  log(`  Volume: ${(volume / 100).toLocaleString()} cm^3`);
 
   const manifoldMesh = manifold.getMesh();
 
@@ -135,7 +138,6 @@ function addMesh(
 
   // Animation Morph
   morphEnd(doc, manifoldMesh, mesh, inputPositions, morph);
-
 
   // If we're using a debug mode (`show` or `only`), check
   // to see if this mesh requires special handling.
@@ -197,37 +199,36 @@ function createNodeFromCache(
     doc: Document, nodeDef: GLTFNode,
     manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
   const node = createGLTFnode(doc, nodeDef);
+  const manifold = nodeDef.manifold!;
 
-  const {manifold} = nodeDef;
-  if (manifold) {
-    // Animation Morph
-    setMorph(doc, node, manifold);
-    const backupMaterial = getBackupMaterial(nodeDef);
-    const cachedNodes = manifold2node.get(manifold);
+  // Animation Morph
+  setMorph(doc, node, manifold);
+  const backupMaterial = getBackupMaterial(nodeDef);
+  const cachedNodes = manifold2node.get(manifold);
 
-    if (cachedNodes == null) {
-      // Cache miss.
-      addMesh(doc, node, manifold, backupMaterial);
-      const cache = new Map<GLTFMaterial, Node>();
-      cache.set(backupMaterial, node);
-      manifold2node.set(manifold, cache);
+  if (cachedNodes == null) {
+    // Cache miss.
+    log(`Exporting Manifold ${
+        nodeDef.name ? `"${nodeDef.name}"` : 'object'} as mesh:`);
+    addMesh(doc, node, manifold, backupMaterial);
+    const cache = new Map<GLTFMaterial, Node>();
+    cache.set(backupMaterial, node);
+    manifold2node.set(manifold, cache);
+
+  } else {
+    // Cache hit...
+    const cachedNode = cachedNodes.get(backupMaterial);
+    if (cachedNode == null) {
+      // ...but not for this material.
+      const [oldBackupMaterial, oldNode] = cachedNodes.entries().next().value!;
+      cloneNodeNewMaterial(
+          doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
+          getCachedMaterial(doc, oldBackupMaterial));
+      cachedNodes.set(backupMaterial, node);
 
     } else {
-      // Cache hit...
-      const cachedNode = cachedNodes.get(backupMaterial);
-      if (cachedNode == null) {
-        // ...but not for this material.
-        const [oldBackupMaterial, oldNode] =
-            cachedNodes.entries().next().value!;
-        cloneNodeNewMaterial(
-            doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
-            getCachedMaterial(doc, oldBackupMaterial));
-        cachedNodes.set(backupMaterial, node);
-
-      } else {
-        // ...for this exact material.
-        cloneNode(node, cachedNode);
-      }
+      // ...for this exact material.
+      cloneNode(node, cachedNode);
     }
   }
   return node;
@@ -259,11 +260,7 @@ function exportTransform(doc: Document) {
 function createNodeFromCrossSection(
     doc: Document, nodeDef: CrossSectionGLTFNode): Node {
   const node = createGLTFnode(doc, nodeDef);
-  const cs = nodeDef._crossSection;
-  if (!cs) return node;
-
-  // const backupMaterial = getBackupMaterial(nodeDef);
-
+  const cs = nodeDef.crossSection!;
 
   const {triangulate} = getManifoldModuleSync()!;
   const polygons = cs.toPolygons();
@@ -271,6 +268,19 @@ function createNodeFromCrossSection(
       polygons.flat().map((v: Vec2): Vec3 => ([...v, 0])).flat());
   const triangles = triangulate(polygons);
   const indices = new Uint32Array(triangles.flat());
+
+  log(`Exporting CrossSection ${
+      nodeDef.name ? `"${nodeDef.name}"` : 'object'} as mesh:`);
+  log(`  Triangles: ${triangles.length.toLocaleString()}`);
+  const box = cs.bounds();
+  const size = [0, 0];
+  for (let i = 0; i < 2; i++) {
+    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+  }
+  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+      size[1].toLocaleString()} mm`);
+  const area = Math.round(cs.area());
+  log(`  Area: ${(area / 100).toLocaleString()} cm^2`);
 
   const buffer = doc.getRoot().listBuffers()[0];
 
@@ -284,18 +294,19 @@ function createNodeFromCrossSection(
                               .setType(Accessor.Type.SCALAR)
                               .setBuffer(buffer);
 
-  const material = doc.createMaterial()
-                       .setRoughnessFactor(1)
-                       .setMetallicFactor(0)
-                       .setDoubleSided(true)
-                       .setBaseColorFactor([1, 0, 1, 1]);
+  const material = getCachedMaterial(doc, {
+    baseColorFactor: [1, 0, 1],
+    ...(nodeDef.material ?? {}),
+    doubleSided: true
+  });
 
   const primitive = doc.createPrimitive()
                         .setMaterial(material)
                         .setIndices(indicesAccessor)
                         .setAttribute('POSITION', positionAccessor);
 
-  const mesh = doc.createMesh(`CrossSection Mesh ${nodeDef.name}`);
+  const mesh =
+      doc.createMesh(nodeDef.name || `CrossSection_${crossSectionCount++}`);
   mesh.addPrimitive(primitive);
   node.setMesh(mesh);
 
@@ -323,42 +334,56 @@ export async function manifoldToGLTFDoc(manifold: Manifold) {
  * @returns An in-memory GLTF-Transform Document
  */
 export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
-  if (nodes.length == 0) {
-    throw new TypeError('nodes[] must contain at least one GLTFNode.')
-  }
-
   const doc = new Document();
   const root = exportTransform(doc);
 
   addAnimationToDoc(doc);
 
+  const uniqueNodes: Set<BaseGLTFNode> = new Set();
+  const recurse = (node: BaseGLTFNode) => {
+    uniqueNodes.add(node);
+    for (const child of node.listChildren()) {
+      recurse(child);
+    }
+  };
+  nodes.forEach(node => recurse(node));
+
   const node2gltf = new Map<BaseGLTFNode, Node>();
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
-  let leafNodes = 0;
+  let manifoldNodes = 0;
   let visualizationNodes = 0;
   let crossSectionNodes = 0;
+  let noGeometryNodes = 0;
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
-  for (const nodeDef of nodes) {
-    if (nodeDef instanceof VisualizationGLTFNode) {
-      node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
-      ++visualizationNodes;
-    } else if (nodeDef instanceof CrossSectionGLTFNode) {
+  for (const nodeDef of uniqueNodes) {
+    if (nodeDef instanceof GLTFNode && nodeDef.manifold) {
+      // Manifold Object.
+      node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
+      ++manifoldNodes;
+
+    } else if (
+        nodeDef instanceof CrossSectionGLTFNode && nodeDef.crossSection) {
+      // Cross Section Object.
       node2gltf.set(nodeDef, createNodeFromCrossSection(doc, nodeDef));
       ++crossSectionNodes;
+
+    } else if (nodeDef instanceof VisualizationGLTFNode) {
+      // Copy from another glTF document in memory.
+      node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
+      ++visualizationNodes;
+
     } else {
-      node2gltf.set(
-          nodeDef,
-          createNodeFromCache(doc, nodeDef as GLTFNode, manifold2node));
-      if ((nodeDef as GLTFNode).manifold) {
-        ++leafNodes;
-      }
+      // No geometry here.  Create the node anyhow as it may contain
+      // transformations.
+      node2gltf.set(nodeDef, createGLTFnode(doc, nodeDef as GLTFNode));
+      ++noGeometryNodes;
     }
   }
 
   // Step through each node and set its parent.
   // Nodes without parents are added directly to the root.
-  for (const nodeDef of nodes) {
+  for (const nodeDef of uniqueNodes) {
     const gltfNode = node2gltf.get(nodeDef)!;
     const {parent} = nodeDef;
     if (parent) {
@@ -368,17 +393,19 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
     }
   }
 
-  log(`Total glTF nodes: ${nodes.length}`);
-  if (leafNodes) {
-    log(`  Meshes: ${leafNodes}`);
+  log(`Total glTF nodes: ${uniqueNodes.size}`);
+  if (manifoldNodes) {
+    log(`  Manifold meshes: ${manifoldNodes}`);
   }
   if (crossSectionNodes) {
-    log(`  Cross section meshes: ${crossSectionNodes}`);
+    log(`  CrossSection meshes: ${crossSectionNodes}`);
   }
   if (visualizationNodes) {
     log(`  Visualization-only (imported) nodes: ${visualizationNodes}`);
   }
-
+  if (noGeometryNodes) {
+    log(`  Nodes without geometry: ${noGeometryNodes}`);
+  }
 
   cleanupAnimationInDoc();
   await doc.transform(unpartition());

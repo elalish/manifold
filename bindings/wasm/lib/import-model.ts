@@ -381,13 +381,18 @@ export function gltfDocToManifold(
  */
 function gltfNodeToMeshes(
     document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
-  const getDescendants = (root: GLTFTransform.Node) => {
-    const descendants: Array<GLTFTransform.Node> = [];
-    root.traverse(descendant => descendants.push(descendant));
-    return descendants;
-  };
-  const descendants: Array<GLTFTransform.Node> =
-      node ? getDescendants(node) : document.getRoot().listNodes();
+  const descendants: Array<GLTFTransform.Node> = [];
+  const getDescendants = (root: GLTFTransform.Node) =>
+      root.traverse(node => descendants.push(node));
+
+  if (node) {
+    getDescendants(node);
+  } else {
+    for (const node of document.getRoot().listNodes()) {
+      if (node.getParentNode()) continue;
+      getDescendants(node);
+    }
+  }
 
   return descendants
       .map(descendant => {

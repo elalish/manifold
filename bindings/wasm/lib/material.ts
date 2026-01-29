@@ -36,6 +36,7 @@ const defaultMaterial = {
   baseColorFactor: [1, 1, 0] as [number, number, number],
   alpha: 1,
   unlit: false,
+  doubleSided: false
 };
 
 const id2material = new Map<number, GLTFMaterial>();
@@ -104,7 +105,7 @@ function copyImportedMaterial(
 function makeDefaultMaterial(
     doc: GLTFTransform.Document,
     matIn: GLTFMaterial = {}): GLTFTransform.Material {
-  const {roughness, metallic, baseColorFactor, alpha, unlit} = {
+  const {roughness, metallic, baseColorFactor, alpha, unlit, doubleSided} = {
     ...defaultMaterial,
     ...matIn
   };
@@ -123,7 +124,8 @@ function makeDefaultMaterial(
 
   return material.setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
-      .setBaseColorFactor([...baseColorFactor, alpha]);
+      .setBaseColorFactor([...baseColorFactor, alpha])
+      .setDoubleSided(!!doubleSided);
 }
 
 /**

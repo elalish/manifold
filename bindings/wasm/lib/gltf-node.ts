@@ -148,6 +148,14 @@ export interface GLTFMaterial {
    * @internal
    */
   sourceRunID?: number;
+
+  /**
+   * Treat this material as double sided.
+   * This is implied for translucent materials (`alpha < 1.0`) and
+   * CrossSections.
+   * @internal
+   */
+  doubleSided?: boolean;
 }
 
 /**
@@ -157,7 +165,9 @@ export interface GLTFMaterial {
  */
 export abstract class BaseGLTFNode {
   /** @internal */
-  _parent?: BaseGLTFNode;
+  private _parent?: BaseGLTFNode;
+  /** @internal */
+  private _children: Set<BaseGLTFNode> = new Set();
   name?: string;
 
   // Internally, gltf-transform stores transformations as separate translation,
@@ -179,10 +189,21 @@ export abstract class BaseGLTFNode {
 
   constructor(parent?: BaseGLTFNode) {
     this._parent = parent;
+    if (parent) {
+      parent.addChild(this);
+    }
   }
 
   get parent() {
     return this._parent;
+  }
+
+  addChild(child: BaseGLTFNode) {
+    this._children.add(child);
+  }
+
+  listChildren(): Array<BaseGLTFNode> {
+    return [...this._children.values()];
   }
 }
 
@@ -243,16 +264,16 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
   uri?: string;
 
   constructor(
-      document: GLTFTransform.Document, node?: GLTFTransform.Node,
+      document: GLTFTransform.Document, node?: GLTFTransform.Node|null,
       parent?: BaseGLTFNode) {
     super(parent);
     this.document = document;
-    this.node = node;
+    this.node = node ?? undefined;
   }
 
   clone(newParent?: BaseGLTFNode) {
     const copy = new VisualizationGLTFNode(
-        this.document, this.node, newParent ?? this.parent);
+        this.document, this.node, newParent || this.parent);
     Object.assign(copy, this);
     return copy;
   }
@@ -274,17 +295,17 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
  */
 export class CrossSectionGLTFNode extends BaseGLTFNode {
   /** @internal */
-  _crossSection?: CrossSection;
+  crossSection?: CrossSection;
   material?: GLTFMaterial;
 
-  constructor(cs?: CrossSection, parent?: BaseGLTFNode) {
+  constructor(cs?: CrossSection|null, parent?: BaseGLTFNode) {
     super(parent);
-    this._crossSection = cs;
+    this.crossSection = cs ?? undefined;
   }
 
   clone(newParent?: BaseGLTFNode) {
     const copy =
-        new CrossSectionGLTFNode(this._crossSection, newParent ?? this.parent);
+        new CrossSectionGLTFNode(this.crossSection, newParent || this.parent);
     Object.assign(copy, this);
     return copy;
   }
