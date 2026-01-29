@@ -15,6 +15,9 @@
 import * as fs from 'node:fs/promises';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
+import type {Vec3} from '../manifold.d.ts';
+
+import {toArrayBuffer} from './export-model.ts';
 import * as importer from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
@@ -45,7 +48,7 @@ suite('supports()', () => {
   });
 });
 
-suite('importModel()', () => {
+suite('importManifold()', () => {
   test('imports a model with EXT_mesh_manifold', async () => {
     const model = await importer.importManifold(new URL(
         '../test/fixtures/models/boxExtMeshManifold.glb', import.meta.url));
@@ -117,5 +120,38 @@ suite('importModel()', () => {
     const model = await importer.importManifold(
         buffer.buffer as ArrayBuffer, {mimetype: 'model/gltf-binary'});
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('Orients a model correctly', async () => {
+    // The other tests implicitly cover conversion from glTF's default
+    // scale of 1:1m.  This test covers conversion between up being +Y in
+    // glTF and +Z in manifold.
+
+    // Some quick vector math to check our results.
+    const vdiff = (a: Vec3, b: Vec3): number =>
+        Math.sqrt(a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+    const vCloseTo = (a: Vec3, b: Vec3, margin = 0.0000001): boolean =>
+        vdiff(a, b) <= margin;
+    const vContains = (haystack: Array<Vec3>, needle: Vec3): boolean =>
+        !!haystack.find(x => vCloseTo(needle, x));
+
+    // Here's an asymmetric shape.
+    const pts: Array<Vec3> =
+        [[-1, 0, 0], [4, 0, 0], [0, -2, 0], [0, 3, 0], [0, 0, 5]];
+    const script = `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
+        `export default Manifold.hull(${JSON.stringify(pts)});\n`;
+
+    // Evaluate, export it and re-import the model.
+    const options = {mimetype: 'model/gltf-binary'};
+    const doc = await worker.evaluate(script);
+    const buffer = await toArrayBuffer(doc, options);
+    const model = await importer.importManifold(buffer, options);
+    const mesh = model.getMesh();
+
+    // Did we get the same points back after all that?
+    expect(mesh.numVert).toEqual(pts.length);
+    for (let i = 0; i < mesh.numVert; i++) {
+      expect(vContains(pts, mesh.position(i) as unknown as Vec3)).toBeTruthy();
+    }
   });
 });

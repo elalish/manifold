@@ -164,6 +164,12 @@ export abstract class BaseGLTFNode {
   // rotation and scale vectors.  It can convert those vectors to and from a
   // transformation matrix as needed.
   translation?: Vec3|((t: number) => Vec3);
+
+  /**
+   * Rotations are applied in `XYZ` order.
+   * That is roll first, then pitch and finally yaw.
+   * This matches the behaviour of `Manifold.rotate()`.
+   */
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
 
