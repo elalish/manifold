@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <vector>
 
 #include "manifold/common.h"
