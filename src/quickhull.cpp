@@ -241,14 +241,12 @@ std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   // dimensional subspace of R^3.
   planar = false;
   createConvexHalfedgeMesh();
+
   if (planar) {
+    // the extra point index was set to make the mesh has volume, we now set its
+    // coordinate back to make the coordinates correct
     const int extraPointIndex = planarPointCloudTemp.size() - 1;
-    for (auto& he : mesh.halfedges) {
-      if (he.endVert == extraPointIndex) {
-        he.endVert = 0;
-      }
-    }
-    planarPointCloudTemp.clear();
+    planarPointCloudTemp.back() = planarPointCloudTemp.front();
   }
 
   // reorder halfedges
@@ -706,19 +704,20 @@ void QuickHull::setupInitialTetrahedron() {
   }
   if (maxD == epsilonSquared) {
     // It appears that the point cloud belongs to a 1 dimensional subspace of
-    // R^3: convex hull has no volume => return a thin triangle Pick any point
-    // other than selectedPoints.first and selectedPoints.second as the third
-    // point of the triangle
+    // R^3: convex hull has no volume => return a degenerate tetrahedron
+    // Pick two points other than selectedPoints.first and selectedPoints.second
     auto it =
         std::find_if(originalVertexData.begin(), originalVertexData.end(),
                      [&](const vec3& ve) {
                        return ve != originalVertexData[selectedPoints.first] &&
                               ve != originalVertexData[selectedPoints.second];
                      });
-    const size_t thirdPoint =
-        (it == originalVertexData.end())
-            ? selectedPoints.first
-            : std::distance(originalVertexData.begin(), it);
+    if (it == originalVertexData.end()) {
+      size_t i = 0;
+      while (i == selectedPoints.first || i == selectedPoints.second) i++;
+      it = originalVertexData.begin() + i;
+    }
+    const size_t thirdPoint = std::distance(originalVertexData.begin(), it);
     it =
         std::find_if(originalVertexData.begin(), originalVertexData.end(),
                      [&](const vec3& ve) {
@@ -726,10 +725,14 @@ void QuickHull::setupInitialTetrahedron() {
                               ve != originalVertexData[selectedPoints.second] &&
                               ve != originalVertexData[thirdPoint];
                      });
-    const size_t fourthPoint =
-        (it == originalVertexData.end())
-            ? selectedPoints.first
-            : std::distance(originalVertexData.begin(), it);
+    if (it == originalVertexData.end()) {
+      size_t i = 0;
+      while (i == selectedPoints.first || i == selectedPoints.second ||
+             i == thirdPoint)
+        i++;
+      it = originalVertexData.begin() + i;
+    }
+    const size_t fourthPoint = std::distance(originalVertexData.begin(), it);
     return mesh.setup(selectedPoints.first, selectedPoints.second, thirdPoint,
                       fourthPoint);
   }
