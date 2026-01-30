@@ -376,6 +376,43 @@ ManifoldMeshGL* manifold_meshgl_w_tangents(void* mem, float* vert_props,
   return to_c(mesh);
 }
 
+ManifoldMeshGL* manifold_meshgl_w_options(void* mem, float* vert_props,
+                                          size_t n_verts, size_t n_props,
+                                          uint32_t* tri_verts, size_t n_tris,
+                                          ManifoldMeshGLOptions* options) {
+  auto mesh = new (mem) MeshGL();
+  mesh->numProp = n_props;
+  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
+  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
+
+  if (options->halfedge_tangents != nullptr) {
+    mesh->halfedgeTangent =
+        vector_of_array(options->halfedge_tangents, n_tris * 3 * 4);
+  }
+
+  if (options->run_indices != nullptr) {
+    mesh->runIndex =
+        vector_of_array(options->run_indices, options->run_indices_length);
+  }
+
+  if (options->run_original_ids != nullptr) {
+    mesh->runOriginalID = vector_of_array(options->run_original_ids,
+                                          options->run_original_ids_length);
+  }
+
+  if (options->merge_from_vert != nullptr) {
+    mesh->mergeFromVert =
+        vector_of_array(options->merge_from_vert, options->merge_verts_length);
+  }
+
+  if (options->merge_to_vert != nullptr) {
+    mesh->mergeToVert =
+        vector_of_array(options->merge_to_vert, options->merge_verts_length);
+  }
+
+  return to_c(mesh);
+}
+
 ManifoldMeshGL64* manifold_meshgl64(void* mem, double* vert_props,
                                     size_t n_verts, size_t n_props,
                                     uint64_t* tri_verts, size_t n_tris) {
@@ -396,6 +433,42 @@ ManifoldMeshGL64* manifold_meshgl64_w_tangents(void* mem, double* vert_props,
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
   mesh->halfedgeTangent = vector_of_array(halfedge_tangent, n_tris * 3 * 4);
+  return to_c(mesh);
+}
+
+ManifoldMeshGL64* manifold_meshgl64_w_options(
+    void* mem, double* vert_props, size_t n_verts, size_t n_props,
+    uint64_t* tri_verts, size_t n_tris, ManifoldMeshGL64Options* options) {
+  auto mesh = new (mem) MeshGL64();
+  mesh->numProp = n_props;
+  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
+  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
+
+  if (options->halfedge_tangents != nullptr) {
+    mesh->halfedgeTangent =
+        vector_of_array(options->halfedge_tangents, n_tris * 3 * 4);
+  }
+
+  if (options->run_indices != nullptr) {
+    mesh->runIndex =
+        vector_of_array(options->run_indices, options->run_indices_length);
+  }
+
+  if (options->run_original_ids != nullptr) {
+    mesh->runOriginalID = vector_of_array(options->run_original_ids,
+                                          options->run_original_ids_length);
+  }
+
+  if (options->merge_from_vert != nullptr) {
+    mesh->mergeFromVert =
+        vector_of_array(options->merge_from_vert, options->merge_verts_length);
+  }
+
+  if (options->merge_to_vert != nullptr) {
+    mesh->mergeToVert =
+        vector_of_array(options->merge_to_vert, options->merge_verts_length);
+  }
+
   return to_c(mesh);
 }
 
@@ -462,6 +535,12 @@ ManifoldMeshGL* manifold_get_meshgl(void* mem, ManifoldManifold* m) {
   return to_c(new (mem) MeshGL(mesh));
 }
 
+ManifoldMeshGL* manifold_get_meshgl_w_normals(void* mem, ManifoldManifold* m,
+                                              int32_t normalIdx) {
+  auto mesh = from_c(m)->GetMeshGL(normalIdx);
+  return to_c(new (mem) MeshGL(mesh));
+}
+
 ManifoldMeshGL* manifold_meshgl_copy(void* mem, ManifoldMeshGL* m) {
   return to_c(new (mem) MeshGL(*from_c(m)));
 }
@@ -477,6 +556,13 @@ ManifoldMeshGL* manifold_meshgl_merge(void* mem, ManifoldMeshGL* m) {
 
 ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m) {
   auto mesh = from_c(m)->GetMeshGL64();
+  return to_c(new (mem) MeshGL64(mesh));
+}
+
+ManifoldMeshGL64* manifold_get_meshgl64_w_normals(void* mem,
+                                                  ManifoldManifold* m,
+                                                  int32_t normalIdx) {
+  auto mesh = from_c(m)->GetMeshGL64(normalIdx);
   return to_c(new (mem) MeshGL64(mesh));
 }
 
