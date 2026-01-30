@@ -587,16 +587,23 @@ Manifold Manifold::Translate(vec3 v) const {
 Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
 
 /**
- * Applies an Euler angle rotation to the manifold, first about the X axis, then
- * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
- * and eliminate it completely for any multiples of 90 degrees. Additionally,
- * more efficient code paths are used to update the manifold when the transforms
- * only rotate by multiples of 90 degrees. This operation can be chained.
- * Transforms are combined and applied lazily.
+ * Applies an Euler angle rotation to the manifold, This operation can be
+ * chained. Transforms are combined and applied lazily.
  *
- * @param xDegrees First rotation, degrees about the X-axis.
- * @param yDegrees Second rotation, degrees about the Y-axis.
- * @param zDegrees Third rotation, degrees about the Z-axis.
+ * We use degrees so that we can minimize rounding error, and eliminate it
+ * completely for any multiples of 90 degrees. Additionally, more efficient code
+ * paths are used to update the manifold when the transforms only rotate by
+ * multiples of 90 degrees.
+ *
+ * From the reference frame of the model being rotated, rotations are applied in
+ * *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+ *
+ * From the global reference frame, a model will be rotated in *x-y-z* order.
+ * That is about the global X axis, then global Y axis, and finally global Z.
+ *
+ * @param xDegrees First rotation, degrees about the global X-axis.
+ * @param yDegrees Second rotation, degrees about the global Y-axis.
+ * @param zDegrees Third rotation, degrees about the global Z-axis.
  */
 Manifold Manifold::Rotate(double xDegrees, double yDegrees,
                           double zDegrees) const {
