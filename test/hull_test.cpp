@@ -216,11 +216,11 @@ TEST(Hull, Degenerate2D) {
   // issue 1491
   // note that we need 5 points to trigger this bug
   Manifold hull = Manifold::Hull({
-    {0.0, 0.0, 0.0},
-    {0.0, 0.0, 1.0},
-    {0.5, 0.0, 0.0},
-    {0.5, 0.0, 0.0},
-    {0.5, 0.0, 1.0},
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 1.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 1.0},
   });
   EXPECT_TRUE(!hull.IsEmpty());
 
@@ -238,11 +238,11 @@ TEST(Hull, Degenerate2D) {
 TEST(Hull, Degenerate1D) {
   // issue 1491
   Manifold hull = Manifold::Hull({
-    {0.0, 0.0, 0.0},
-    {0.0, 0.0, 0.0},
-    {0.5, 0.0, 0.0},
-    {0.5, 0.0, 0.0},
-    {0.5, 0.0, 0.0},
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
   });
   EXPECT_TRUE(!hull.IsEmpty());
 
