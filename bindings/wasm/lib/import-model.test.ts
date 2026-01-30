@@ -129,7 +129,7 @@ suite('importManifold()', () => {
 
     // Some quick vector math to check our results.
     const vdiff = (a: Vec3, b: Vec3): number =>
-        Math.sqrt(a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+        Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
     const vCloseTo = (a: Vec3, b: Vec3, margin = 0.0000001): boolean =>
         vdiff(a, b) <= margin;
     const vContains = (haystack: Array<Vec3>, needle: Vec3): boolean =>
