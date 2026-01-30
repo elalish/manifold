@@ -263,3 +263,11 @@ TEST(CrossSection, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.Area(), 7234.478452);
   EXPECT_FLOAT_EQ(subtract.NumVert(), 42);
 }
+
+TEST(CrossSection, NegativeOffset) {
+  CrossSection plusSign = CrossSection::Square({30, 50}, true) +
+                          CrossSection::Square({50, 30}, true);
+  CrossSection dilated =
+      plusSign.Offset(-10, CrossSection::JoinType::Round, 2.0, 1024);
+  EXPECT_NEAR(dilated.Area(), 30 * 30 - 10 * 10 * M_PI, 0.01);
+}
