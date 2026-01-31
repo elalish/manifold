@@ -44,7 +44,7 @@ import {getManifoldModule} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
 export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
-export {GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
+export {CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
