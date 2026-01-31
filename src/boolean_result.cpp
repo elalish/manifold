@@ -217,10 +217,11 @@ __attribute__((no_sanitize("thread")))
 #endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
-    concurrent_map<int, std::vector<EdgePos>> &edgesP,
-    concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    concurrent_map<int, std::vector<EdgePos>>& edgesP,
+    concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
+    const Vec<std::array<int, 2>>& p1q2, const Vec<int>& i12,
+    const Vec<int>& v12R, const VecView<Halfedge>& halfedgeP, bool forward,
+    size_t offset) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
