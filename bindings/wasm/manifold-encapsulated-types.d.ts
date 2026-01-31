@@ -671,12 +671,19 @@ export class Manifold {
   translate(x: number, y?: number, z?: number): Manifold;
 
   /**
-   * Applies an Euler angle rotation to the manifold, first about the X axis,
-   * then Y, then Z, in degrees. We use degrees so that we can minimize rounding
-   * error, and eliminate it completely for any multiples of 90 degrees.
-   * Additionally, more efficient code paths are used to update the manifold
-   * when the transforms only rotate by multiples of 90 degrees. This operation
-   * can be chained. Transforms are combined and applied lazily.
+   * Applies an Euler or Tait-Bryan angle rotation to the manifold.  This
+   * operation can be chained. Transforms are combined and applied lazily.
+   *
+   * We use degrees so that we can minimize rounding error, and eliminate it
+   * completely for any multiples of 90 degrees. Additionally, more efficient
+   * code paths are used to update the manifold when the transforms only rotate
+   * by multiples of 90 degrees.
+   *
+   * From the reference frame of the model being rotated, rotations are applied
+   * in *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+   *
+   * From the global reference frame, a model will be rotated in *x-y-z* order.
+   * That is about the global X axis, then global Y axis, and finally global Z.
    *
    * @param v [X, Y, Z] rotation in degrees.
    * @group Transformations
