@@ -211,3 +211,70 @@ TEST(Hull, DisabledFaceTest) {
   EXPECT_TRUE(!hull.IsEmpty());
   EXPECT_TRUE(isMeshConvex(hull));
 }
+
+TEST(Hull, Degenerate2D) {
+  // issue 1491
+  // note that we need 5 points to trigger this bug
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 1.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 1.0},
+  });
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 1.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+}
+
+TEST(Hull, Degenerate1D) {
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+  });
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+}
+
+TEST(Hull, NotEnoughPoints) {
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+  });
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+}
+
+TEST(Hull, EmptyHull) {
+  Manifold hull = Manifold::Hull(std::vector<vec3>());
+  EXPECT_TRUE(hull.IsEmpty());
+}

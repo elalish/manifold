@@ -241,14 +241,12 @@ std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   // dimensional subspace of R^3.
   planar = false;
   createConvexHalfedgeMesh();
+
   if (planar) {
+    // the extra point index was set to make the mesh has volume, we now set its
+    // coordinate back to make the coordinates correct
     const int extraPointIndex = planarPointCloudTemp.size() - 1;
-    for (auto& he : mesh.halfedges) {
-      if (he.endVert == extraPointIndex) {
-        he.endVert = 0;
-      }
-    }
-    planarPointCloudTemp.clear();
+    planarPointCloudTemp.back() = planarPointCloudTemp.front();
   }
 
   // reorder halfedges
@@ -651,9 +649,13 @@ void QuickHull::setupInitialTetrahedron() {
 
   // If we have at most 4 points, just return a degenerate tetrahedron:
   if (vertexCount <= 4) {
-    size_t v[4] = {0, std::min((size_t)1, vertexCount - 1),
-                   std::min((size_t)2, vertexCount - 1),
-                   std::min((size_t)3, vertexCount - 1)};
+    if (vertexCount < 4) {
+      planarPointCloudTemp = Vec<vec3>(originalVertexData);
+      while (planarPointCloudTemp.size() < 4)
+        planarPointCloudTemp.push_back(planarPointCloudTemp.back());
+      originalVertexData = planarPointCloudTemp;
+    }
+    size_t v[4] = {0, 1, 2, 3};
     const vec3 N =
         getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
                           originalVertexData[v[2]]);
@@ -681,9 +683,7 @@ void QuickHull::setupInitialTetrahedron() {
   }
   if (maxD == epsilonSquared) {
     // A degenerate case: the point cloud seems to consists of a single point
-    return mesh.setup(0, std::min((size_t)1, vertexCount - 1),
-                      std::min((size_t)2, vertexCount - 1),
-                      std::min((size_t)3, vertexCount - 1));
+    return mesh.setup(0, 1, 2, 3);
   }
   DEBUG_ASSERT(selectedPoints.first != selectedPoints.second, logicErr,
                "degenerate selectedPoints");
@@ -706,32 +706,16 @@ void QuickHull::setupInitialTetrahedron() {
   }
   if (maxD == epsilonSquared) {
     // It appears that the point cloud belongs to a 1 dimensional subspace of
-    // R^3: convex hull has no volume => return a thin triangle Pick any point
-    // other than selectedPoints.first and selectedPoints.second as the third
-    // point of the triangle
-    auto it =
-        std::find_if(originalVertexData.begin(), originalVertexData.end(),
-                     [&](const vec3& ve) {
-                       return ve != originalVertexData[selectedPoints.first] &&
-                              ve != originalVertexData[selectedPoints.second];
-                     });
-    const size_t thirdPoint =
-        (it == originalVertexData.end())
-            ? selectedPoints.first
-            : std::distance(originalVertexData.begin(), it);
-    it =
-        std::find_if(originalVertexData.begin(), originalVertexData.end(),
-                     [&](const vec3& ve) {
-                       return ve != originalVertexData[selectedPoints.first] &&
-                              ve != originalVertexData[selectedPoints.second] &&
-                              ve != originalVertexData[thirdPoint];
-                     });
-    const size_t fourthPoint =
-        (it == originalVertexData.end())
-            ? selectedPoints.first
-            : std::distance(originalVertexData.begin(), it);
-    return mesh.setup(selectedPoints.first, selectedPoints.second, thirdPoint,
-                      fourthPoint);
+    // R^3: convex hull has no volume => return a degenerate tetrahedron
+    // Pick two points other than selectedPoints.first and selectedPoints.second
+    size_t firstPoint = selectedPoints.first;
+    size_t secondPoint = selectedPoints.second;
+    size_t thirdPoint = 0;
+    while (thirdPoint == firstPoint || thirdPoint == secondPoint) thirdPoint++;
+    size_t fourthPoint = thirdPoint + 1;
+    while (fourthPoint == firstPoint || fourthPoint == secondPoint)
+      fourthPoint++;
+    return mesh.setup(firstPoint, secondPoint, thirdPoint, fourthPoint);
   }
 
   // These three points form the base triangle for our tetrahedron.
@@ -844,11 +828,8 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
 // the Impl
 void Manifold::Impl::Hull(VecView<const vec3> vertPos) {
   size_t numVert = vertPos.size();
-  if (numVert < 4) {
-    status_ = Error::InvalidConstruction;
-    return;
-  }
-
+  // empty hull
+  if (vertPos.empty()) return;
   QuickHull qh(vertPos);
   std::tie(halfedge_, vertPos_) = qh.buildMesh();
   CalculateBBox();
