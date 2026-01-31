@@ -649,9 +649,13 @@ void QuickHull::setupInitialTetrahedron() {
 
   // If we have at most 4 points, just return a degenerate tetrahedron:
   if (vertexCount <= 4) {
-    size_t v[4] = {0, std::min((size_t)1, vertexCount - 1),
-                   std::min((size_t)2, vertexCount - 1),
-                   std::min((size_t)3, vertexCount - 1)};
+    if (vertexCount < 4) {
+      planarPointCloudTemp = Vec<vec3>(originalVertexData);
+      while (planarPointCloudTemp.size() < 4)
+        planarPointCloudTemp.push_back(planarPointCloudTemp.back());
+      originalVertexData = planarPointCloudTemp;
+    }
+    size_t v[4] = {0, 1, 2, 3};
     const vec3 N =
         getTriangleNormal(originalVertexData[v[0]], originalVertexData[v[1]],
                           originalVertexData[v[2]]);
@@ -824,11 +828,8 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
 // the Impl
 void Manifold::Impl::Hull(VecView<const vec3> vertPos) {
   size_t numVert = vertPos.size();
-  if (numVert < 4) {
-    status_ = Error::InvalidConstruction;
-    return;
-  }
-
+  // empty hull
+  if (vertPos.empty()) return;
   QuickHull qh(vertPos);
   std::tie(halfedge_, vertPos_) = qh.buildMesh();
   CalculateBBox();
