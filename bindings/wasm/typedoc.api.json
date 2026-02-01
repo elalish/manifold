@@ -6,8 +6,12 @@
   "out": "docs/jsapi",
   "entryPoints": [
     "./manifold.d.ts",
-    "./types/manifoldCAD.d.ts",
     "./lib/*.ts"
+  ],
+  "exclude": [
+    "./lib/scene-builder.ts",
+    "./**/*.test.ts",
+    "./lib/*.d.ts"
   ],
   "sortEntryPoints": false,
   "projectDocuments": [

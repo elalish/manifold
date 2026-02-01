@@ -33,7 +33,7 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {Mesh as ManifoldMesh, MeshOptions} from '../manifold';
+import type {Mesh as ManifoldMesh, MeshOptions} from '../manifold.d.ts';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
 
@@ -354,10 +354,11 @@ export function writeMesh(
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_mesh_manifold', manifoldPrimitive);
 
-  const indices = doc.createAccessor('manifold indices')
-                      .setBuffer(buffer)
-                      .setType(GLTFTransform.Accessor.Type.SCALAR)
-                      .setArray(manifoldMesh.triVerts);
+  const indices =
+      doc.createAccessor('manifold indices')
+          .setBuffer(buffer)
+          .setType(GLTFTransform.Accessor.Type.SCALAR)
+          .setArray(manifoldMesh.triVerts as Uint32Array<ArrayBuffer>);
   manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(runIndex);
 

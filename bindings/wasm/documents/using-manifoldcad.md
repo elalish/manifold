@@ -17,8 +17,8 @@ Usage: manifold-cad [options] <infile.js> <outfile>
 
 The output file can be in either `.glb` or `.3mf` format, determined by extension.
 
-This CLI is written in relatively plain JavaScript and serves as an example of how to use Manifold in a `node.js` environment.
+## Coordinate Systems
 
-## API Reference
+ManifoldCAD uses a right-handed coordinate system where '+Z' is up.  Length units are assumed to be millimetres.  This is slightly at odds with glTF, which also uses a right handed coordinate system, but specifies '+Y' as up, and length units are in metres.
 
-See {@link manifoldCAD | ManifoldCAD}.
+ManifoldCAD will scale and rotate automatically when importing or exporting glTF models.  This means that an arrow pointing in the '+Z' direction in will point in the '+Y' direction after export.  However, that arrow will still point up, and will still be the same size.

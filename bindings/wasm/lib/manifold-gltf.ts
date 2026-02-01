@@ -52,7 +52,8 @@
  * @module manifold-gltf
  */
 
-import {Accessor, Extension, ExtensionProperty, GLTF, IProperty, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
+import type {GLTF, IProperty,} from '@gltf-transform/core';
+import {Accessor, Extension, ExtensionProperty, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
 
 const NAME = 'EXT_mesh_manifold';
 const MERGE = 'MERGE';

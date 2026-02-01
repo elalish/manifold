@@ -3,4 +3,10 @@
       --light-color-background-secondary: #A288B3;
       --dark-color-background-secondary: #675772;
     }
+    /* Hide right-hand navigation bar.
+     * It is redundant for such a small site.
+     */
+    .tsd-page-navigation {
+      display: none
+    }
   }

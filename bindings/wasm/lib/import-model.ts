@@ -26,8 +26,6 @@
  * @packageDocumentation
  * @group ManifoldCAD
  * @category Input/Output
- * @groupDescription Modelling Functions
- * These functions are available within manifoldCAD.
  * @groupDescription Low Level Functions
  * These functions are not available within manifoldCAD, but can be used when
  * including manifold in another project.
@@ -41,6 +39,7 @@ import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import {setMaterialByID} from './material.ts';
+import {euler2quat, multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
@@ -78,7 +77,7 @@ export interface Importer {
 /**
  * @group Management
  * @inline
- * @hidden
+ * @internal
  */
 export interface ImportOptions {
   /**
@@ -164,9 +163,6 @@ export function register(importer: Importer) {
 
 /**
  * Import a model, for display only.
- *
- * @group Modelling Functions
- * @returns
  */
 export async function importModel(
     source: string|Blob|URL|ArrayBuffer,
@@ -197,8 +193,6 @@ export async function importModel(
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
- *
- * @group Modelling Functions
  */
 export async function importManifold(
     source: string|Blob|URL|ArrayBuffer,
@@ -336,16 +330,22 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
  * Scale and transform imported geometry.
  *
  * glTF has a defined scale of 1:1 metre.
- * manifoldCAD has a defined scale of 1:1 mm.
+ * ManifoldCAD has a defined scale of 1:1 mm.
  *
+ * glTF defines up as '+Y'.
+ * ManifoldCAD defines up as '+Z'.
  */
 function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
-  // Find top level nodes and correct their scale.
+  // Find top level nodes and correct their scale and orientation.
   for (const sourceNode of doc.getRoot().listNodes()) {
     if (sourceNode.getParentNode()) continue;
 
     const scale = sourceNode.getScale();
     sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
+
+    const original = sourceNode.getRotation();
+    const rotated = multiplyQuat(original, euler2quat([90, 0, 0]));
+    sourceNode.setRotation(rotated);
   }
   return doc;
 }

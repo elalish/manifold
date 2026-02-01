@@ -28,9 +28,19 @@ export interface SealedFloat32Array<N extends number> extends Float32Array {
   length: N;
 }
 
+/**
+ * A vector in two dimensional space.
+ */
 export type Vec2 = [number, number];
+
+/**
+ * A vector in three dimensional space.
+ */
 export type Vec3 = [number, number, number];
-// 3x3 matrix stored in column-major order
+
+/**
+ * 3x3 matrix stored in column-major order.
+ */
 export type Mat3 = [
   number,
   number,
@@ -42,7 +52,10 @@ export type Mat3 = [
   number,
   number,
 ];
-// 4x4 matrix stored in column-major order
+
+/**
+ * 4x4 matrix stored in column-major order.
+ */
 export type Mat4 = [
   number,
   number,
@@ -63,22 +76,41 @@ export type Mat4 = [
 ];
 export type SimplePolygon = Vec2[];
 export type Polygons = SimplePolygon|SimplePolygon[];
+
+/**
+ * A two dimensional rectangle, aligned to the coordinate system.
+ * @see {@link CrossSection.bounds}
+ */
 export type Rect = {
   min: Vec2,
   max: Vec2
 };
+
+/**
+ * A three dimensional box, aligned to the coordinate system.
+ *
+ * @see {@link Manifold.boundingBox}
+ * @see {@link Manifold.levelSet}
+ */
 export type Box = {
   min: Vec3,
   max: Vec3
 };
+
 export type Smoothness = {
   halfedge: number,
   smoothness: number
 };
-export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
-export type JoinType = 'Square'|'Round'|'Miter'
+
+export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
+
+export type JoinType = 'Square'|'Round'|'Miter';
+
+/**
+ * @see {@link Manifold.status}
+ */
 export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
     'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
     'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
-    'InvalidConstruction'
+    'InvalidConstruction';

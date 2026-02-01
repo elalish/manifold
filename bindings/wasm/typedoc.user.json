@@ -4,11 +4,12 @@
   "name": "ManifoldCAD User Guide",
   "customCss": "./documents/user-guide.css",
   "out": "docs/jsuser",
-  "entryPoints": [
-    "./types/manifoldCAD.d.ts",
-    "./types/manifoldCADGlobals.d.ts"
-  ],
-  "projectDocuments": [
-    "./documents/using-manifoldcad.md"
-  ]
+  "entryPoints": [ "./types/manifoldCAD.d.ts" ],
+  "alwaysCreateEntryPointModule": false,
+  "excludeInternal": true,
+  "readme": "none",
+  "categorizeByGroup": true,
+  "navigation": {
+    "includeGroups": true
+  }
 }

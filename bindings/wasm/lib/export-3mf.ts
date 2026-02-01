@@ -25,12 +25,13 @@
 
 import * as GLTFTransform from '@gltf-transform/core';
 import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
-import {strToU8, Zippable, zipSync} from 'fflate';
+import type {Zippable} from 'fflate';
+import {strToU8, zipSync} from 'fflate';
 
 import type {Mat4} from '../manifold-global-types.d.ts';
 
-import {ExportOptions} from './export-model.ts';
-import {ManifoldPrimitive} from './manifold-gltf';
+import type {ExportOptions} from './export-model.ts';
+import {ManifoldPrimitive} from './manifold-gltf.ts';
 
 const supportedFormat = {
   extension: '3mf',

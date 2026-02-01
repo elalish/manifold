@@ -21,12 +21,13 @@
 
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
 
-import type {Manifold, Mesh, Vec3} from '../manifold';
+import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 
 import {BaseGLTFNode} from './gltf-node.ts';
 import {euler2quat} from './math.ts';
 
 /**
+ * @hidden
  * @inline
  */
 export type AnimationMode = 'loop'|'ping-pong';
@@ -39,49 +40,49 @@ let animationFPS: number = 30;
  * Set the animation repeat mode.
  *
  * @param mode 'loop' or 'ping-pong'
- * @group Global Settings
  */
-export const setAnimationMode = (mode: AnimationMode): void => {
+export function setAnimationMode(mode: AnimationMode): void {
   animationMode = mode
-};
+}
 
 /**
  * Get the current animation repeat mode.
- * @group Global Settings
  */
-export const getAnimationMode = (): AnimationMode => animationMode;
+export function getAnimationMode(): AnimationMode {
+  return animationMode;
+}
 
 /**
  * Set the duration of the animation, in seconds.
  *
  * @param duration in seconds.
- * @group Global Settings
  */
-export const setAnimationDuration = (duration: number): void => {
+export function setAnimationDuration(duration: number): void {
   animationDuration = duration;
 };
 
 /**
  * Get the current duruation of the animation, in seconds.
- * @group Global Settings
  */
-export const getAnimationDuration = (): number => animationDuration;
+export function getAnimationDuration(): number {
+  return animationDuration;
+}
 
 /**
  * Set the animation frame rate.
  *
  * @param fps in frames per second.
- * @group Global Settings
  */
-export const setAnimationFPS = (fps: number): void => {
+export function setAnimationFPS(fps: number): void {
   animationFPS = fps;
 };
 
 /**
  * Get the current animation frame rate.
- * @group Global Settings
  */
-export const getAnimationFPS = (): number => animationFPS;
+export function getAnimationFPS(): number {
+  return animationFPS;
+}
 
 /**
  *
@@ -246,19 +247,18 @@ export function morphEnd(
  * linearly interpolated across the length of the overall animation. This
  * animation will only be shown if this manifold is used directly on a GLTFNode.
  *
- * @group Modelling Functions
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the first animation frame.
  */
-export const setMorphStart =
-    (manifold: Manifold, func: (v: Vec3) => void): void => {
+export function setMorphStart(manifold: Manifold, func: (v: Vec3) => void):
+    void {
       const morph = manifold2morph.get(manifold);
       if (morph != null) {
         morph.start = func;
       } else {
         manifold2morph.set(manifold, {start: func});
       }
-    };
+    }
 
 /**
  * Apply a morphing animation to the input manifold. Specify the end
@@ -266,19 +266,18 @@ export const setMorphStart =
  * linearly interpolated across the length of the overall animation. This
  * animation will only be shown if this manifold is used directly on a GLTFNode.
  *
- * @group Modelling Functions
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the last animation frame.
  */
-export const setMorphEnd =
-    (manifold: Manifold, func: (v: Vec3) => void): void => {
+export function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void):
+    void {
       const morph = manifold2morph.get(manifold);
       if (morph != null) {
         morph.end = func;
       } else {
         manifold2morph.set(manifold, {end: func});
       }
-    };
+    }
 
 /**
  *
