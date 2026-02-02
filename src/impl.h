@@ -165,6 +165,7 @@ struct Manifold::Impl {
   int NumDegenerateTris() const;
   bool HasSimpleProps() const;
   bool IsConvex() const;
+  bool IsVug() const;
   double MinGap(const Impl& other, double searchLength) const;
 
   // boolean3.cpp
