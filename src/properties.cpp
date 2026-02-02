@@ -262,6 +262,16 @@ bool Manifold::Impl::IsConvex() const {
   });
 }
 
+/**
+ * Returns true if the Manifold has negative volume, not including manifolds
+ * less than tolerance thick on average (indeterminate volume).
+ */
+bool Manifold::Impl::IsVug() const {
+  const double volume = GetProperty(Property::Volume);
+  const double area = GetProperty(Property::SurfaceArea);
+  return volume < -area * tolerance_;
+}
+
 double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
   if (IsEmpty()) return 0;
