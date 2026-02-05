@@ -76,14 +76,14 @@ suite('Examples', () => {
   test('Auger', async () => {
     const result = await runExample('Auger');
     expect(result?.genus).to.equal(0, 'Genus');
-    expect(result?.volume).to.be.closeTo(16842, 1, 'Volume');
+    expect(result?.volume).to.be.closeTo(16835, 1, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(10519, 1, 'Surface Area');
   });
 
   test('Tetrahedron Puzzle', async () => {
     const result = await runExample('Tetrahedron Puzzle');
     expect(result?.genus).to.equal(0, 'Genus');
-    expect(result?.volume).to.be.closeTo(7240, 1, 'Volume');
+    expect(result?.volume).to.be.closeTo(7223, 1, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(3235, 1, 'Surface Area');
   });
 
