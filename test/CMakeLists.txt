@@ -61,7 +61,7 @@ endif()
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
 exportbin(manifold_test)
 
-add_test(NAME manifold_test COMMAND manifold_test)
+gtest_discover_tests(manifold_test)
 
 if(MANIFOLD_FUZZ)
   fuzztest_setup_fuzzing_flags()
