@@ -224,13 +224,6 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(${PROJECT_SOURCE_DIR}/cmake/manifoldDeps.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/configHelper.cmake)
 
-if(WIN32)
-  # Standardize output locations so .exe and .dll files end up together.
-  # Should be right before `add_subdirectory(src)`
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-endif()
 add_subdirectory(src)
 add_subdirectory(bindings)
 if(MANIFOLD_TEST)
