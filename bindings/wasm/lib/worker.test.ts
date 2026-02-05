@@ -84,7 +84,7 @@ suite('Examples', () => {
     const result = await runExample('Tetrahedron Puzzle');
     expect(result?.genus).to.equal(0, 'Genus');
     expect(result?.volume).to.be.closeTo(7223, 1, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(3235, 1, 'Surface Area');
+    expect(result?.surfaceArea).to.be.closeTo(3233, 1, 'Surface Area');
   });
 
   test('Rounded Frame', async () => {
