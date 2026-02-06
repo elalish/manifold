@@ -61,7 +61,13 @@ endif()
 target_compile_options(manifold_test PRIVATE ${MANIFOLD_FLAGS})
 exportbin(manifold_test)
 
-add_test(NAME manifold_test COMMAND manifold_test)
+if(WIN32)
+  # If you want to fix the DLL availability at build time, be my guest.
+  add_test(NAME manifold_test COMMAND manifold_test)
+else()
+  # *nix users get the tests individually broken out!
+  gtest_discover_tests(manifold_test)
+endif()
 
 if(MANIFOLD_FUZZ)
   fuzztest_setup_fuzzing_flags()
