@@ -58,3 +58,8 @@ if(MANIFOLD_EXPORT)
   target_compile_options(convertFile PRIVATE ${MANIFOLD_FLAGS})
   exportbin(convertFile)
 endif()
+
+# Adding this just to confirm it builds; the executable doesn't do anything useful.
+add_executable(f3dNoop f3d_skeleton.cpp)
+target_link_libraries(f3dNoop manifold)
+target_compile_options(f3dNoop PRIVATE ${MANIFOLD_FLAGS})
