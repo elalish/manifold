@@ -3,7 +3,7 @@
  *
  * Launches f3d on your Manifold and exits.
  * Installing f3d and being present on the path is an exercise left to the
- reader.
+ reader. https://f3d.app/download
  * Won't work on Windows, except in cygwin, because of how we run f3d. Feel free
  to fix it.
  *
