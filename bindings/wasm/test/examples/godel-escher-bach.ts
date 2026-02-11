@@ -38,9 +38,8 @@ function font(height: number = 100, stroke: number = 18) {
   letters['B'] = letters['E'].subtract(maskB).add(loops.intersect(maskB));
 
   // Hull four loops to make the outline of an O.
-  letters['O'] = hull([
-                   loops, loops.mirror([1, 0])
-                 ]).subtract(letters['O'].offset(-stroke));
+  letters['O'] = hull([loops, loops.mirror([1, 0])]);
+  letters['O'] = letters['O'].subtract(letters['O'].offset(-stroke));
 
   // Mask O and add a bar to make G.
   const barLength = 2 * stroke + (height - (stroke * 3)) / 2;
