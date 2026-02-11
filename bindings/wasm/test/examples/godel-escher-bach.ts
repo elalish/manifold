@@ -22,33 +22,33 @@ function font(height: number = 100, stroke: number = 18) {
 
   // 'E' to start.
   letters['E'] = square([height, height], true)
-      .subtract(square([height, height - 2 * stroke], true).translate([stroke, 0]))
-      .add(square([height, stroke], true));
+                     .subtract(square([height, height - 2 * stroke], true)
+                                   .translate([stroke, 0]))
+                     .add(square([height, stroke], true));
 
   // A loop of B, or corners of G.
-  const loop = circle(r)
-      .subtract(circle(r - stroke))
-      .translate([height / 2 - r, height / 2 - r]);
+  const loop = circle(r).subtract(circle(r - stroke)).translate([
+    height / 2 - r, height / 2 - r
+  ]);
 
   // Mask two loops to make the curved part of B.
   // Subtract the mask to clip E for the square part.
   const loops = loop.add(loop.mirror([0, 1]));
   const maskB = square([r, height]).translate([height / 2 - r, -height / 2]);
-  letters['B'] = letters['E']
-      .subtract(maskB)
-      .add(loops.intersect(maskB));
+  letters['B'] = letters['E'].subtract(maskB).add(loops.intersect(maskB));
 
   // Hull four loops to make the outline of an O.
-  letters['O'] = hull([loops, loops.mirror([1, 0])])
-      .subtract(letters['O'].offset(-stroke));
+  letters['O'] = hull([
+                   loops, loops.mirror([1, 0])
+                 ]).subtract(letters['O'].offset(-stroke));
 
   // Mask O and add a bar to make G.
   const barLength = 2 * stroke + (height - (stroke * 3)) / 2;
-  const bar = square([barLength, stroke], true)
-      .translate([(height - barLength) / 2, 0]);
-  letters['G'] = letters['O']
-      .subtract(square([height, (height / 2 - r)]))
-      .add(bar);
+  const bar = square([barLength, stroke], true).translate([
+    (height - barLength) / 2, 0
+  ]);
+  letters['G'] =
+      letters['O'].subtract(square([height, (height / 2 - r)])).add(bar);
 
   return letters;
 }
@@ -76,8 +76,8 @@ export default () => {
 
   // And the same for the right.
   const rightCS = union([
-      E.translate([0, (height + offset) / 2]),
-      G.translate([0, -(height + offset) / 2])
+    E.translate([0, (height + offset) / 2]),
+    G.translate([0, -(height + offset) / 2])
   ]);
   const rightNode = new CrossSectionGLTFNode(rightCS, root);
   rightNode.name = 'Right';
@@ -99,13 +99,13 @@ export default () => {
   // Extrude each CrossSection, and orient it in 3D space,
   // then compute the intersection.
   const intersection = nodes
-      .map((node: CrossSectionGLTFNode) => {
-        const extrusion = node.crossSection!.extrude(4 * height);
-        return extrusion
-            .rotate(node.rotation as Vec3)
-            .translate(node.translation as Vec3);
-      })
-      .reduce((acc, cur) => acc.intersect(cur));
+                           .map((node: CrossSectionGLTFNode) => {
+                             const extrusion =
+                                 node.crossSection!.extrude(4 * height);
+                             return extrusion.rotate(node.rotation as Vec3)
+                                 .translate(node.translation as Vec3);
+                           })
+                           .reduce((acc, cur) => acc.intersect(cur));
 
   // Put the result into a node so it can be oriented
   // in the same context as our CrossSection nodes.
