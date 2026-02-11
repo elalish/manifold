@@ -19,7 +19,7 @@
 
 import type {Vec3} from '../manifold.d.ts';
 
-const {cos, sin, PI} = Math;
+const {cos, sin, sqrt, PI} = Math;
 
 /**
  * A quaternion in `XYZW` order.
@@ -32,23 +32,27 @@ export type Quat = [number, number, number, number];
 export type Vec4 = Quat;
 
 /**
- * Convert Euler angles to a quaternion.
+ * Convert Euler (Tait-Bryan) angles to a quaternion.
  *
- * Rotations are applied in `XYZ` order.
- * That is roll first, then pitch and finally yaw.
+ * From the reference frame of the model being rotated, rotations are applied in
+ * *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+ *
+ * From the global reference frame, a model will be rotated in *x-y-z* order.
+ * That is about the global X axis, then global Y axis, and finally global Z.
+ *
  * This matches the behaviour of `Manifold.rotate()`.
  *
- * @param rotation Degrees, in `XYZ` format.
+ * @param rotation [X, Y, Z] rotation in degrees.
  */
 export function euler2quat(rotation: Vec3): Quat {
   const [cx, cy, cz] = rotation.map(r => cos(r * PI / 360));
   const [sx, sy, sz] = rotation.map(r => sin(r * PI / 360));
 
   return [
-    sx * cy * cz + cx * sy * sz,  // X
-    cx * sy * cz - sx * cy * sz,  // Y
-    cx * cy * sz + sx * sy * cz,  // Z
-    cx * cy * cz - sx * sy * sz   // W
+    sx * cy * cz - cx * sy * sz,  // X
+    cx * sy * cz + sx * cy * sz,  // Y
+    cx * cy * sz - sx * sy * cz,  // Z
+    cx * cy * cz + sx * sy * sz   // W
   ];
 }
 
@@ -65,4 +69,11 @@ export function multiplyQuat(a: Quat, b: Quat): Quat {
     az * bw + aw * bz + ax * by - ay * bx,  // Z
     aw * bw - ax * bx - ay * by - az * bz   // W
   ];
+}
+
+/**
+ * Calculate the distance between two vectors.
+ */
+export function distanceVec3(a: Vec3, b: Vec3): number {
+  return sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
 }

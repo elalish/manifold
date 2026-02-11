@@ -166,8 +166,12 @@ export abstract class BaseGLTFNode {
   translation?: Vec3|((t: number) => Vec3);
 
   /**
-   * Rotations are applied in `XYZ` order.
-   * That is roll first, then pitch and finally yaw.
+   * From the reference frame of the model being rotated, rotations are applied
+   * in *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+   *
+   * From the global reference frame, a model will be rotated in *x-y-z* order.
+   * That is about the global X axis, then global Y axis, and finally global Z.
+   *
    * This matches the behaviour of `Manifold.rotate()`.
    */
   rotation?: Vec3|((t: number) => Vec3);
