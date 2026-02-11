@@ -19,7 +19,7 @@
 
 import type {Vec3} from '../manifold.d.ts';
 
-const {cos, sin, PI} = Math;
+const {cos, sin, sqrt, PI} = Math;
 
 /**
  * A quaternion in `XYZW` order.
@@ -69,4 +69,11 @@ export function multiplyQuat(a: Quat, b: Quat): Quat {
     az * bw + aw * bz + ax * by - ay * bx,  // Z
     aw * bw - ax * bx - ay * by - az * bz   // W
   ];
+}
+
+/**
+ * Calculate the distance between two vectors.
+ */
+export function distanceVec3(a: Vec3, b: Vec3): number {
+  return sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
 }
