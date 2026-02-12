@@ -46,7 +46,8 @@ async function runExample(name: string, firstMeshOnly: boolean = true) {
 
   // These tests are agains the first glTF node containing meshes in a given
   // model.
-  const {document} = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const node = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const document = node.document!;
   URL.revokeObjectURL(glbURL);
 
   const firstMesh =

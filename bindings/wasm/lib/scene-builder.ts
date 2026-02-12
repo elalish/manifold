@@ -88,7 +88,7 @@ function applyTransformation(
   }
 }
 
-function createGLTFnode(doc: Document, node: GLTFNode): Node {
+function createGLTFnode(doc: Document, node: BaseGLTFNode): Node {
   const out = doc.createNode(node.name);
   applyTransformation(doc, node, out);
   return out;
@@ -357,28 +357,30 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
   for (const nodeDef of uniqueNodes) {
-    if (nodeDef instanceof GLTFNode && nodeDef.manifold) {
+    let node: Node|null = null;
+    if (!nodeDef.hasGeometry()) {
+      // No geometry here.  Create the node anyhow as it may contain
+      // transformations.
+      node = createGLTFnode(doc, nodeDef);
+      ++noGeometryNodes;
+
+    } else if (nodeDef instanceof GLTFNode) {
       // Manifold Object.
-      node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
+      node = createNodeFromCache(doc, nodeDef, manifold2node);
       ++manifoldNodes;
 
-    } else if (
-        nodeDef instanceof CrossSectionGLTFNode && nodeDef.crossSection) {
+    } else if (nodeDef instanceof CrossSectionGLTFNode) {
       // Cross Section Object.
-      node2gltf.set(nodeDef, createNodeFromCrossSection(doc, nodeDef));
+      node = createNodeFromCrossSection(doc, nodeDef);
       ++crossSectionNodes;
 
     } else if (nodeDef instanceof VisualizationGLTFNode) {
       // Copy from another glTF document in memory.
-      node2gltf.set(nodeDef, copyNodeToDocument(doc, nodeDef));
+      node = copyNodeToDocument(doc, nodeDef);
       ++visualizationNodes;
-
-    } else {
-      // No geometry here.  Create the node anyhow as it may contain
-      // transformations.
-      node2gltf.set(nodeDef, createGLTFnode(doc, nodeDef as GLTFNode));
-      ++noGeometryNodes;
     }
+
+    node2gltf.set(nodeDef, node!);
   }
 
   // Step through each node and set its parent.

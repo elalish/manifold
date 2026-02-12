@@ -125,7 +125,8 @@ suite('VisualizationGLTFNode', () => {
     const url = new URL('../test/fixtures/models/box.glb', import.meta.url);
     const doc = await importer.readModel(url);
     const parent = new GLTFNode();
-    const node = new VisualizationGLTFNode(doc, null, parent);
+    const node = new VisualizationGLTFNode(parent);
+    node.document = doc;
     const clone = node.clone();
 
     expect(clone).toBeInstanceOf(BaseGLTFNode);
@@ -138,7 +139,8 @@ suite('VisualizationGLTFNode', () => {
     const url = new URL('../test/fixtures/models/box.glb', import.meta.url);
     const doc = await importer.readModel(url);
     const parent = new GLTFNode();
-    const node = new VisualizationGLTFNode(doc, null, parent);
+    const node = new VisualizationGLTFNode(parent);
+    node.document = doc;
     const cloneParent = new GLTFNode();
     const clone = node.clone(cloneParent);
 
@@ -152,7 +154,7 @@ suite('VisualizationGLTFNode', () => {
 suite('CrossSectionGTLFNode', () => {
   test('clone()', async () => {
     const parent = new GLTFNode();
-    const node = new CrossSectionGLTFNode(null, parent)
+    const node = new CrossSectionGLTFNode(parent)
     const clone = node.clone();
 
     expect(clone).toBeInstanceOf(BaseGLTFNode);
@@ -162,7 +164,7 @@ suite('CrossSectionGTLFNode', () => {
 
   test('clone(newParent)', async () => {
     const parent = new GLTFNode();
-    const node = new CrossSectionGLTFNode(null, parent)
+    const node = new CrossSectionGLTFNode(parent)
     const cloneParent = new GLTFNode();
     const clone = node.clone(cloneParent);
 

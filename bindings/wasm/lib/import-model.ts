@@ -174,7 +174,8 @@ export async function importModel(
         `Model imported from \`${source}\` contains no nodes.`);
   }
 
-  const targetNode = new VisualizationGLTFNode(sourceDoc);
+  const targetNode = new VisualizationGLTFNode();
+  targetNode.document = sourceDoc
   if (sourceNodes.length == 1) {
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
@@ -199,7 +200,7 @@ export async function importManifold(
     options: ImportOptions = {}): Promise<Manifold> {
   const {document, node} = await importModel(source, options);
   try {
-    return gltfDocToManifold(document, node, options.tolerance);
+    return gltfDocToManifold(document!, node, options.tolerance);
   } catch (e) {
     if (e instanceof ImportError) {
       const newError = new Error(

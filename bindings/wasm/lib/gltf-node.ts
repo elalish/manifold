@@ -205,6 +205,14 @@ export abstract class BaseGLTFNode {
   listChildren(): Array<BaseGLTFNode> {
     return [...this._children.values()];
   }
+
+  /**
+   * Does this node have any geometry that needs to be converted on export?
+   * @internal
+   */
+  hasGeometry(): boolean {
+    return false;
+  }
 }
 
 /**
@@ -219,6 +227,10 @@ export class GLTFNode extends BaseGLTFNode {
     const copy = new GLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  hasGeometry() {
+    return !!this.manifold;
   }
 }
 
@@ -259,23 +271,22 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
   /** @internal */
   node?: GLTFTransform.Node;
   /** @internal */
-  document: GLTFTransform.Document;
+  document?: GLTFTransform.Document;
   /** @internal */
   uri?: string;
 
-  constructor(
-      document: GLTFTransform.Document, node?: GLTFTransform.Node|null,
-      parent?: BaseGLTFNode) {
+  constructor(parent?: BaseGLTFNode) {
     super(parent);
-    this.document = document;
-    this.node = node ?? undefined;
   }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy = new VisualizationGLTFNode(
-        this.document, this.node, newParent || this.parent);
+    const copy = new VisualizationGLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  hasGeometry() {
+    return !!this.document;
   }
 }
 
@@ -298,16 +309,18 @@ export class CrossSectionGLTFNode extends BaseGLTFNode {
   crossSection?: CrossSection;
   material?: GLTFMaterial;
 
-  constructor(cs?: CrossSection|null, parent?: BaseGLTFNode) {
+  constructor(parent?: BaseGLTFNode) {
     super(parent);
-    this.crossSection = cs ?? undefined;
   }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy =
-        new CrossSectionGLTFNode(this.crossSection, newParent || this.parent);
+    const copy = new CrossSectionGLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  hasGeometry() {
+    return !!this.crossSection;
   }
 }
 
@@ -367,7 +380,8 @@ export async function anyToGLTFNodeList(
     node.manifold = any as Manifold;
     return [node];
   } else if (any.constructor.name === 'CrossSection') {
-    const node = new CrossSectionGLTFNode(any as CrossSection);
+    const node = new CrossSectionGLTFNode();
+    node.crossSection = any as CrossSection;
     return [node];
   }
 

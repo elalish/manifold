@@ -1,4 +1,4 @@
-// This example recreats the cover of 'Gödel, Escher, Bach: an Eternal Golden
+// This example recreates the cover of 'Gödel, Escher, Bach: an Eternal Golden
 // Braid' by Douglas Hofstadter.  It demonstrates the use of CrossSections and
 // CrossSectionGLTFNodes to incorporate two dimensional drawings in a model.
 //
@@ -55,18 +55,18 @@ function font(height: number = 100, stroke: number = 18) {
 export default () => {
   const height = 100;
   const offset = height / 2;
-  const nodes: Array<GLTFNode> = [];
+  const nodes: Array<CrossSectionGLTFNode> = [];
 
   const {G, E, B} = font();
   const root = new GLTFNode();
 
   // Create a cross section for the left side view.
-  const leftCS = union([
+  // And also, a display node for it.
+  const leftNode = new CrossSectionGLTFNode(root);
+  leftNode.crossSection = union([
     G.translate([0, (height + offset) / 2]),
     E.translate([0, -(height + offset) / 2])
   ]);
-  // And also, a display node for it.
-  const leftNode = new CrossSectionGLTFNode(leftCS, root);
   leftNode.name = 'Left';
   leftNode.rotation = [90, 0, 90];
   leftNode.translation = [-height - offset, 0, 0];
@@ -74,11 +74,11 @@ export default () => {
   nodes.push(leftNode);
 
   // And the same for the right.
-  const rightCS = union([
+  const rightNode = new CrossSectionGLTFNode(root);
+  rightNode.crossSection = union([
     E.translate([0, (height + offset) / 2]),
     G.translate([0, -(height + offset) / 2])
   ]);
-  const rightNode = new CrossSectionGLTFNode(rightCS, root);
   rightNode.name = 'Right';
   rightNode.rotation = [90, 0, 0];
   rightNode.translation = [0, height + offset, 0];
@@ -86,9 +86,9 @@ export default () => {
   nodes.push(rightNode);
 
   // Now the bottom.
-  const bottomCS = B;
-  const bottomNode = new CrossSectionGLTFNode(bottomCS, root);
-  bottomNode.name = 'Bottom'
+  const bottomNode = new CrossSectionGLTFNode(root);
+  bottomNode.crossSection = B;
+  bottomNode.name = 'Bottom';
   bottomNode.rotation = [0, 0, 0];
   bottomNode.translation = [0, 0, -height * 2];
   bottomNode.material = {baseColorFactor: [1, 0, 1], unlit: true};
@@ -98,7 +98,7 @@ export default () => {
   // Extrude each CrossSection, and orient it in 3D space,
   // then compute the intersection.
   const intersection = nodes
-                           .map((node: CrossSectionGLTFNode) => {
+                           .map((node) => {
                              const extrusion =
                                  node.crossSection!.extrude(4 * height);
                              return extrusion.rotate(node.rotation as Vec3)
