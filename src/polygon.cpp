@@ -14,7 +14,6 @@
 
 #include "manifold/polygon.h"
 
-#include <functional>
 #include <map>
 #include <set>
 
@@ -661,7 +660,9 @@ class EarClip {
   }
 
   // Find the actual rightmost starts after degenerate removal. Also calculate
-  // the polygon bounding boxes.
+  // the polygon bounding boxes. Only holes need rightmost starts, and the CCW
+  // check is to handle degenerate cases for them - the other contour starts are
+  // arbitrary.
   void FindStart(VertItr first) {
     const vec2 origin = first->pos;
 
@@ -680,7 +681,7 @@ class EarClip {
       areaCompensation += (area - t1) + area1;
       area = t1;
 
-      if (v->pos.x > maxX) {
+      if (v->pos.x > maxX && v->IsReflex(epsilon_)) {
         maxX = v->pos.x;
         start = v;
       }
