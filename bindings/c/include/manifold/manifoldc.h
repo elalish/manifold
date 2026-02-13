@@ -501,6 +501,20 @@ void manifold_delete_triangulation(ManifoldTriangulation* m);
 
 // MeshIO / Export
 
+// Import a manifold from a Wavefront obj file.
+// The obj_file parameter is the content of the obj file, not the filename,
+// and should be null-terminated.
+ManifoldManifold* manifold_read_obj(void* mem, char* obj_file);
+// Export a manifold to a Wavefront obj file.
+// The callback accepts two parameters:
+// 1. Temporary null-terminated string buffer, containing the content of the
+//    file. This buffer will be freed automatically after returning from the
+//    callback.
+// 2. An arg value (the third parameter in the manifold_write_obj function), for
+//    passing additional data into the callback.
+void manifold_write_obj(ManifoldManifold* manifold,
+                        void (*callback)(char*, void*), void* args);
+
 #ifdef MANIFOLD_EXPORT
 ManifoldMaterial* manifold_material(void* mem);
 void manifold_material_set_roughness(ManifoldMaterial* mat, double roughness);
