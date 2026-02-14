@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "manifold/meshIO.h"
+#include "meshIO.h"
 
 #include <iostream>
 

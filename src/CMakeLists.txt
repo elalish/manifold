@@ -34,7 +34,6 @@ set(
   tree2d.cpp
   # optional source files
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO/meshIO.cpp>
 )
 
 set(
@@ -70,7 +69,6 @@ target_link_libraries(
     # optional dependencies
     $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
     $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:Clipper2::Clipper2>
-    $<$<BOOL:${MANIFOLD_EXPORT}>:assimp::assimp>
 )
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
@@ -81,7 +79,6 @@ set(
   MANIFOLD_DEBUG
   MANIFOLD_ASSERT
   MANIFOLD_CROSS_SECTION
-  MANIFOLD_EXPORT
   TRACY_ENABLE
   TRACY_MEMORY_USAGE
 )

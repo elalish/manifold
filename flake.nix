@@ -66,12 +66,10 @@
             ]) ++ (if parallel then [ pkgs.tbb_2021_11 ] else [ ]);
             buildInputs = with pkgs; [
               clipper2
-              assimp
             ];
             cmakeFlags = [
               "-DMANIFOLD_STRICT=ON"
               "-DMANIFOLD_CBIND=ON"
-              "-DMANIFOLD_EXPORT=ON"
               "-DBUILD_SHARED_LIBS=ON"
               "-DMANIFOLD_PAR=${if parallel then "ON" else "OFF"}"
             ];

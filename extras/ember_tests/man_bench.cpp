@@ -7,8 +7,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "../meshIO.h"
 #include "manifold/manifold.h"
-#include "manifold/meshIO.h"
 
 #ifdef CONTROL_PARALLELISM
 #include "tbb/global_control.h"

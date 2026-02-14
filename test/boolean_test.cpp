@@ -73,13 +73,7 @@ TEST(Boolean, Normals) {
 
   MeshGL output = result.GetMeshGL(0);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.faceted = false;
-  opt.mat.roughness = 0;
-  opt.mat.normalIdx = 0;
-  if (options.exportModels) ExportMesh("normals.glb", output, opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
   output.mergeFromVert.clear();
   output.mergeToVert.clear();
@@ -133,9 +127,7 @@ TEST(Boolean, Cubes) {
   EXPECT_NEAR(result.Volume(), 1.6, 0.001);
   EXPECT_NEAR(result.SurfaceArea(), 9.2, 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubes.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cubes.obj", result);
 }
 
 TEST(Boolean, Simplify) {
@@ -179,10 +171,7 @@ TEST(Boolean, SimplifyCracks) {
   EXPECT_NEAR(simplified.Volume(), deformed.Volume(), 10);
   EXPECT_NEAR(simplified.SurfaceArea(), deformed.SurfaceArea(), 1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("cracks.glb", simplified.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
 TEST(Boolean, NoRetainedVerts) {
@@ -312,9 +301,7 @@ TEST(Boolean, Perturb1) {
   EXPECT_FLOAT_EQ(result.Volume(), 7.5);
   EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("perturb1.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("perturb1.obj", result);
 }
 
 TEST(Boolean, Perturb2) {
@@ -399,10 +386,7 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("nastyGear.glb", nastyGear.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("nastyGear.obj", nastyGear);
 }
 
 TEST(Boolean, Coplanar) {
@@ -415,12 +399,7 @@ TEST(Boolean, Coplanar) {
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("coplanar.obj", out);
 
   RelatedGL(out, {cylinderGL});
 }
@@ -451,9 +430,7 @@ TEST(Boolean, FaceUnion) {
   EXPECT_NEAR(cubes.Volume(), 2, 1e-5);
   EXPECT_NEAR(cubes.SurfaceArea(), 10, 1e-5);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("faceUnion.obj", cubes);
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -538,10 +515,7 @@ TEST(Boolean, ConvexConvexMinkowski) {
   EXPECT_NEAR(sum.SurfaceArea(), analyticalArea, 0.5);
   EXPECT_EQ(sum.Genus(), 0);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("minkowski-convex-convex.glb", sum.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("minkowski-convex-convex.obj", sum);
 }
 
 TEST(Boolean, ConvexConvexMinkowskiDifference) {
@@ -561,11 +535,8 @@ TEST(Boolean, ConvexConvexMinkowskiDifference) {
   EXPECT_NEAR(difference.SurfaceArea(), analyticalArea, 0.1);
   EXPECT_EQ(difference.Genus(), 0);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-convex-convex-difference.glb", difference.GetMeshGL(),
-               {});
-#endif
+    WriteTestOBJ("minkowski-convex-convex-difference.obj", difference);
 }
 
 TEST(Boolean, NonConvexConvexMinkowskiSum) {
@@ -580,10 +551,8 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
   EXPECT_NEAR(sum.SurfaceArea(), 34.06, 1e-2);
   EXPECT_EQ(sum.Genus(), 5);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-nonconvex-convex-sum.glb", sum.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("minkowski-nonconvex-convex-sum.obj", sum);
 }
 
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
@@ -599,11 +568,8 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   EXPECT_NEAR(difference.SurfaceArea(), 16.70, 1e-2);
   EXPECT_EQ(difference.Genus(), 5);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-nonconvex-convex-difference.glb",
-               difference.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("minkowski-nonconvex-convex-difference.obj", difference);
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
@@ -618,10 +584,8 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
   EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 1e-5);
   EXPECT_EQ(sum.Genus(), 0);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-nonconvex-nonconvex-sum.glb", sum.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("minkowski-nonconvex-nonconvex-sum.obj", sum);
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
@@ -637,11 +601,8 @@ TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
   EXPECT_NEAR(difference.SurfaceArea(), 6.95045, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("minkowski-nonconvex-nonconvex-diff.glb", difference.GetMeshGL(),
-               {});
-#endif
+    WriteTestOBJ("minkowski-nonconvex-nonconvex-diff.obj", difference);
 }
 
 /**

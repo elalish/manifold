@@ -171,6 +171,16 @@ TEST(Manifold, InvalidInput7) {
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
+TEST(Manifold, ObjRoundTrip) {
+  Manifold m = Manifold::Cube();
+  std::stringstream ss;
+  m.WriteOBJ(ss);
+  ss.seekg(0);
+  Manifold m2 = Manifold::ReadOBJ(ss);
+  EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(m2.Volume(), 1);
+}
+
 TEST(Manifold, OppositeFace) {
   MeshGL gl;
   gl.vertProperties = {
@@ -577,9 +587,7 @@ TEST(Manifold, Simplify) {
   EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
   EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("torus.glb", simplified.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
 #endif
 
@@ -599,12 +607,7 @@ TEST(Manifold, MeshRelation) {
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
   gyroid = gyroid.Simplify();
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("gyroid.obj", gyroid);
 
   RelatedGL(gyroid, {gyroidMeshGL});
 }
@@ -626,12 +629,7 @@ TEST(Manifold, MeshRelationRefine) {
   ExpectMeshes(csaszar, {{9019, 18038, 3}});
   RelatedGL(csaszar, {inGL});
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("csaszar.obj", csaszar);
 }
 
 TEST(Manifold, MeshRelationRefinePrecision) {
@@ -645,13 +643,7 @@ TEST(Manifold, MeshRelationRefinePrecision) {
   EXPECT_EQ(runOriginalID.size(), 1);
   EXPECT_EQ(runOriginalID[0], id);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels)
-    ExportMesh("csaszarSmooth.glb", csaszar.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("csaszarSmooth.obj", csaszar);
 }
 
 TEST(Manifold, MeshGLRoundTrip) {
@@ -798,10 +790,7 @@ TEST(Manifold, MirrorUnion) {
   auto b = a.Translate({2.5, 2.5, 2.5});
   auto result = a + b + b.Mirror({1, 1, 0});
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("manifold_mirror_union.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("manifold_mirror_union.obj", result);
 
   auto vol_a = a.Volume();
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.Volume());
@@ -852,7 +841,6 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
 
-#ifdef MANIFOLD_EXPORT
 TEST(Manifold, MergeRefine) {
   MeshGL mesh;
   mesh.tolerance = 1e-5;
@@ -1128,7 +1116,6 @@ TEST(Manifold, MergeRefine) {
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }
-#endif
 
 #ifdef MANIFOLD_DEBUG
 TEST(Manifold, OpenscadCrash) {

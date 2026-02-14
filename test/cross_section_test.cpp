@@ -37,10 +37,8 @@ TEST(CrossSection, MirrorUnion) {
   auto cross = a + b + b.Mirror({1, 1});
   auto result = Manifold::Extrude(cross.ToPolygons(), 5.);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_mirror_union.glb", result.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("cross_section_mirror_union.obj", result);
 
   EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
   EXPECT_TRUE(a.Mirror(vec2(0.0)).IsEmpty());
@@ -72,10 +70,8 @@ TEST(CrossSection, RoundOffset) {
   auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
   auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_round_offset.glb", result.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("cross_section_round_offset.obj", result);
 
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(), 4386, 1);
@@ -88,10 +84,8 @@ TEST(CrossSection, BevelOffset) {
   auto rounded = a.Offset(5., CrossSection::JoinType::Bevel, 2, segments);
   auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_bevel_offset.glb", result.GetMeshGL(), {});
-#endif
+    WriteTestOBJ("cross_section_bevel_offset.obj", result);
 
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(),
@@ -207,12 +201,10 @@ TEST(CrossSection, Hull) {
   auto centres = SimplePolygon{{0, 0}, {0, 30}, {30, 0}, {15, 5}};
   auto tri = CrossSection::Hull(centres);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     auto circ_tri_ex = Manifold::Extrude(circ_tri.ToPolygons(), 10);
-    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMeshGL(), {});
+    WriteTestOBJ("cross_section_hull_circ_tri.obj", circ_tri_ex);
   }
-#endif
 
   auto circ_area = circ.Area();
   EXPECT_FLOAT_EQ(circ_area, (circ - circ.Scale({0.8, 0.8})).Hull().Area());

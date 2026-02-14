@@ -230,6 +230,9 @@ using MeshGL = MeshGLP<float>;
  */
 using MeshGL64 = MeshGLP<double, uint64_t>;
 
+MeshGL64 ReadOBJ(std::istream& stream);
+bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh);
+
 /**
  * @brief This library's internal representation of an oriented, 2-manifold,
  * triangle mesh - a simple boundary-representation of a solid object. Use this
@@ -432,21 +435,10 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
-  /** @name Debugging I/O
+  /** @name I/O
    * Self-contained mechanism for reading and writing high precision Manifold
    * data.  Write function creates special-purpose OBJ files, and Read function
-   * reads them in.  Be warned these are not (and not intended to be)
-   * full-featured OBJ importers/exporters.  Their primary use is to extract
-   * accurate Manifold data for debugging purposes - writing out any info
-   * needed to accurately reproduce a problem case's state.  Consequently, they
-   * may store and process additional data in comments that other OBJ parsing
-   * programs won't understand.
-   *
-   * The "format" read and written by these functions is not guaranteed to be
-   * stable from release to release - it will be modified as needed to ensure
-   * it captures information needed for debugging.  The only API guarantee is
-   * that the ReadOBJ method in a given build/release will read in the output
-   * of the WriteOBJ method produced by that release.
+   * reads them in.
    *
    * To work with a file, the caller should prepare the ifstream/ostream
    * themselves, as follows:
@@ -478,10 +470,8 @@ class Manifold {
    * ofile.close();
    * @endcode
    */
-#ifdef MANIFOLD_DEBUG
   static Manifold ReadOBJ(std::istream& stream);
   bool WriteOBJ(std::ostream& stream) const;
-#endif
 
   /** @name Testing Hooks
    *  These are just for internal testing.

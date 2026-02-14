@@ -14,6 +14,7 @@
 
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
 // opaque pointers
 
@@ -28,11 +29,6 @@ typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldTriangulation ManifoldTriangulation;
-
-#ifdef MANIFOLD_EXPORT
-typedef struct ManifoldMaterial ManifoldMaterial;
-typedef struct ManifoldExportOptions ManifoldExportOptions;
-#endif
 
 // structs
 
