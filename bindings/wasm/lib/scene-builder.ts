@@ -23,7 +23,7 @@
  * @category Core
  */
 
-import {Accessor, Document, Material, Node} from '@gltf-transform/core';
+import {Document, Material, Node} from '@gltf-transform/core';
 import {copyToDocument, unpartition} from '@gltf-transform/functions';
 
 import type {Manifold, Vec2, Vec3} from '../manifold.d.ts';
@@ -46,8 +46,6 @@ export {GLTFNode} from './gltf-node.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 
-let crossSectionCount: number = 0;
-
 /**
  * Reset and garbage collect the scene builder and any
  * encapsulated modules.
@@ -59,7 +57,6 @@ export function cleanup() {
   cleanupDebug();
   cleanupMaterial();
   cleanupImport();
-  crossSectionCount = 0;
 }
 
 // Swallow informational logs in testing framework
@@ -94,16 +91,11 @@ function createGLTFnode(doc: Document, node: BaseGLTFNode): Node {
   return out;
 }
 
-function addMesh(
-    doc: Document, node: Node, manifold: Manifold,
-    backupMaterial: GLTFMaterial = {}) {
-  const numTri = manifold.numTri();
-  if (numTri == 0) {
-    log('Empty manifold, skipping.');
-    return;
-  }
-
-  log(`  Triangles: ${numTri.toLocaleString()}`);
+function logManifold(nodeDef:GLTFNode) {
+  const manifold = nodeDef.manifold!;
+  const name = nodeDef.name ? `"${nodeDef.name}"` : 'object';
+  log(`Exporting Manifold ${name} as mesh:`);
+  log(`  Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
@@ -114,6 +106,27 @@ function addMesh(
   log(`  Genus: ${manifold.genus().toLocaleString()}`);
   const volume = Math.round(manifold.volume() / 10);
   log(`  Volume: ${(volume / 100).toLocaleString()} cm^3`);
+}
+
+function logCrossSection(nodeDef:CrossSectionGLTFNode) {
+  const cs = nodeDef.crossSection!;
+  const name = nodeDef.name ? `"${nodeDef.name}"` : 'object';
+  log(`Exporting CrossSection ${name} as mesh:`);
+  //log(`  Triangles: ${triangles.length.toLocaleString()}`);
+  const box = cs.bounds();
+  const size = [0, 0];
+  for (let i = 0; i < 2; i++) {
+    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+  }
+  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+      size[1].toLocaleString()} mm`);
+  const area = Math.round(cs.area());
+  log(`  Area: ${(area / 100).toLocaleString()} cm^2`);
+}
+
+function addMesh(
+    doc: Document, node: Node, manifold: Manifold,
+    backupMaterial: GLTFMaterial = {}) {
 
   const manifoldMesh = manifold.getMesh();
 
@@ -146,6 +159,44 @@ function addMesh(
   for (const debugNode of debugNodes) {
     node.addChild(debugNode)
   }
+}
+
+function createNodeFromCrossSection(
+    doc: Document, nodeDef: CrossSectionGLTFNode): Node {
+  const node = createGLTFnode(doc, nodeDef);
+ 
+  logCrossSection(nodeDef);
+
+  // Material.
+  const id2properties = new Map<number, Properties>();
+  id2properties.set(nodeDef.runID, {
+    material: getCachedMaterial(doc, {
+      baseColorFactor: [1, 0, 1],
+      ...(nodeDef.material ?? {}),
+      doubleSided: true
+    }),
+    // CrossSection does not have vertex attributes beyond position.
+    attributes: ['POSITION']
+  });
+
+  // Convert geometry to a Mesh.
+  const {Mesh, triangulate} = getManifoldModuleSync()!; // Lazy instantiation.
+  const polygons = nodeDef.crossSection!.toPolygons();
+  const triangles = triangulate(polygons); 
+  const manifoldMesh = new Mesh({
+    numProp: 3, // Position only.
+    vertProperties: new Float32Array(
+      polygons.flat().map((v: Vec2): Vec3 => ([...v, 0])).flat()),
+    triVerts: new Uint32Array(triangles.flat()),
+    runIndex: new Uint32Array([0, 3*(triangles.length)]),
+    runOriginalID: new Uint32Array(triangles.length).fill(nodeDef.runID)
+  });
+
+  // And finally export the mesh.
+  const mesh = writeMesh(doc, manifoldMesh, id2properties, false);
+  node.setMesh(mesh);
+  mesh.setName(nodeDef.name || `CrossSection_${nodeDef.runID}`);
+  return node;
 }
 
 function cloneNode(toNode: Node, fromNode: Node) {
@@ -208,8 +259,7 @@ function createNodeFromCache(
 
   if (cachedNodes == null) {
     // Cache miss.
-    log(`Exporting Manifold ${
-        nodeDef.name ? `"${nodeDef.name}"` : 'object'} as mesh:`);
+    logManifold(nodeDef);
     addMesh(doc, node, manifold, backupMaterial);
     const cache = new Map<GLTFMaterial, Node>();
     cache.set(backupMaterial, node);
@@ -255,62 +305,6 @@ function exportTransform(doc: Document) {
   wrapper.setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
   return wrapper
-}
-
-function createNodeFromCrossSection(
-    doc: Document, nodeDef: CrossSectionGLTFNode): Node {
-  const node = createGLTFnode(doc, nodeDef);
-  const cs = nodeDef.crossSection!;
-
-  const {triangulate} = getManifoldModuleSync()!;
-  const polygons = cs.toPolygons();
-  const positions = new Float32Array(
-      polygons.flat().map((v: Vec2): Vec3 => ([...v, 0])).flat());
-  const triangles = triangulate(polygons);
-  const indices = new Uint32Array(triangles.flat());
-
-  log(`Exporting CrossSection ${
-      nodeDef.name ? `"${nodeDef.name}"` : 'object'} as mesh:`);
-  log(`  Triangles: ${triangles.length.toLocaleString()}`);
-  const box = cs.bounds();
-  const size = [0, 0];
-  for (let i = 0; i < 2; i++) {
-    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
-  }
-  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
-      size[1].toLocaleString()} mm`);
-  const area = Math.round(cs.area());
-  log(`  Area: ${(area / 100).toLocaleString()} cm^2`);
-
-  const buffer = doc.getRoot().listBuffers()[0];
-
-  const positionAccessor = doc.createAccessor()
-                               .setArray(positions)
-                               .setType(Accessor.Type.VEC3)
-                               .setBuffer(buffer);
-
-  const indicesAccessor = doc.createAccessor()
-                              .setArray(indices)
-                              .setType(Accessor.Type.SCALAR)
-                              .setBuffer(buffer);
-
-  const material = getCachedMaterial(doc, {
-    baseColorFactor: [1, 0, 1],
-    ...(nodeDef.material ?? {}),
-    doubleSided: true
-  });
-
-  const primitive = doc.createPrimitive()
-                        .setMaterial(material)
-                        .setIndices(indicesAccessor)
-                        .setAttribute('POSITION', positionAccessor);
-
-  const mesh =
-      doc.createMesh(nodeDef.name || `CrossSection_${crossSectionCount++}`);
-  mesh.addPrimitive(primitive);
-  node.setMesh(mesh);
-
-  return node;
 }
 
 /**

@@ -38,6 +38,7 @@
 import type * as GLTFTransform from '@gltf-transform/core';
 
 import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
+import { getManifoldModuleSync } from './wasm.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -230,7 +231,8 @@ export class GLTFNode extends BaseGLTFNode {
   }
 
   hasGeometry() {
-    return !!this.manifold;
+    if (!this.manifold) return false;
+    return this.manifold && !this.manifold.isEmpty();
   }
 }
 
@@ -305,9 +307,10 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
  * @group Scene Graph
  */
 export class CrossSectionGLTFNode extends BaseGLTFNode {
-  /** @internal */
   crossSection?: CrossSection;
   material?: GLTFMaterial;
+
+  private _runid?: number;
 
   constructor(parent?: BaseGLTFNode) {
     super(parent);
@@ -320,7 +323,23 @@ export class CrossSectionGLTFNode extends BaseGLTFNode {
   }
 
   hasGeometry() {
-    return !!this.crossSection;
+    if (!this.crossSection) return false;
+    return this.crossSection && !this.crossSection.isEmpty();
+  }
+
+  /**
+   * Get the runID for this node.
+   * If there is no runID set, lazily assign one.
+   * 
+   * We don't need these for regular operations, but they do help when
+   * converting to meshes for export.
+   * @internal
+   */
+  get runID(): number {
+    if (this._runid === undefined) {
+      this._runid = getManifoldModuleSync()!.Manifold.reserveIDs(1);
+    }
+    return this._runid;
   }
 }
 
