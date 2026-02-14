@@ -230,6 +230,9 @@ using MeshGL = MeshGLP<float>;
  */
 using MeshGL64 = MeshGLP<double, uint64_t>;
 
+MeshGL64 ReadOBJ(std::istream& stream);
+bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh);
+
 /**
  * @brief This library's internal representation of an oriented, 2-manifold,
  * triangle mesh - a simple boundary-representation of a solid object. Use this
