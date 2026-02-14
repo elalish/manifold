@@ -41,7 +41,7 @@ void print_usage() {
   printf("-------------------------------\n");
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
-  printf("  -e: Export GLB models of samples\n");
+  printf("  -e: Export OBJ models of samples\n");
   printf("  -c: Enable self-intersection checks (needs MANIFOLD_DEBUG)\n");
   printf(
       "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
@@ -485,16 +485,11 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
   }
 }
 
-#ifdef MANIFOLD_EXPORT
-MeshGL ReadMesh(const std::string& filename) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  return ImportMesh(dir + "/models/" + filename);
-}
-#endif
-
-#ifdef MANIFOLD_DEBUG
 Manifold ReadTestOBJ(const std::string& filename) {
+  return Manifold(ReadTestMeshGL64OBJ(filename));
+}
+
+MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #ifdef __EMSCRIPTEN__
   std::string obj = "/models/" + filename;
 #else
@@ -505,8 +500,14 @@ Manifold ReadTestOBJ(const std::string& filename) {
 #endif
   std::ifstream f;
   f.open(obj);
-  Manifold a = Manifold::ReadOBJ(f);
+  MeshGL64 a = ReadOBJ(f);
   f.close();
   return a;
 }
-#endif
+
+void WriteTestOBJ(const std::string& filename, Manifold m) {
+  std::ofstream f;
+  f.open(filename);
+  WriteOBJ(f, m.GetMeshGL64());
+  f.close();
+}

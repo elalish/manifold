@@ -71,11 +71,7 @@ TEST(Hull, Tictac) {
                                       sphere.Translate({0, 0, tictacMid})};
   const auto tictac = Manifold::Hull(spheres);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("tictac_hull.glb", tictac.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("tictac_hull.obj", tictac);
 
   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
@@ -146,11 +142,7 @@ TEST(Hull, FailingTest1) {
       {-20.442623138f, -35.407661438f, 8.2749996185f},
       {10.229375839f, -14.717799187f, 10.508025169f}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("failing_test1.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("failing_test1.obj", hull);
   EXPECT_TRUE(isMeshConvex(hull, 1.09375e-05));
 }
 
@@ -179,11 +171,7 @@ TEST(Hull, FailingTest2) {
       {174.17001343f, -19.502000809f, 29.562002182f},
       {190.06401062f, -0.81000006199f, -14.250000954f}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("failing_test2.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("failing_test2.obj", hull);
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
 }
 
@@ -203,11 +191,7 @@ TEST(Hull, DisabledFaceTest) {
       {29.590316772, 20.917686462, 73.143547058},
       {101.61526489, 98.461585999, 30.909877777}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("disabledFaceTest.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("disabledFaceTest.obj", hull);
   EXPECT_TRUE(!hull.IsEmpty());
   EXPECT_TRUE(isMeshConvex(hull));
 }

@@ -61,10 +61,7 @@ void ExpectMeshes(const Manifold& manifold,
 void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold, bool noMerge = true);
 void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2);
-#ifdef MANIFOLD_EXPORT
-MeshGL ReadMesh(const std::string& filename);
-#endif
-#ifdef MANIFOLD_DEBUG
 Manifold ReadTestOBJ(const std::string& filename);
-#endif
+MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename);
+void WriteTestOBJ(const std::string& filename, Manifold m);
 void RegisterPolygonTests();

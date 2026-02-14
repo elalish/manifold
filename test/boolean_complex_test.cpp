@@ -40,13 +40,7 @@ TEST(BooleanComplex, Sphere) {
   result = result.Refine(4);
   RelatedGL(result, {sphereGL});
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels)
-    ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("sphereUnion.obj", result);
 }
 
 TEST(BooleanComplex, MeshRelation) {
@@ -63,13 +57,7 @@ TEST(BooleanComplex, MeshRelation) {
   Manifold result = gyroid + gyroid2;
   result = result.RefineToLength(0.1);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels)
-    ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("gyroidUnion.obj", result);
 
   EXPECT_TRUE(result.MatchesTriNormals());
   EXPECT_LE(result.NumDegenerateTris(), 12);
@@ -242,9 +230,7 @@ TEST(BooleanComplex, Close) {
   EXPECT_NEAR(result.Volume(), (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
   EXPECT_NEAR(result.SurfaceArea(), 4 * kPi * r * r, tol * r * r);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("close.obj", result);
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
@@ -520,9 +506,7 @@ TEST(BooleanComplex, Sweep) {
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
 
   EXPECT_NEAR(shape.Volume(), 3757, 1);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("unionError.obj", shape);
 }
 #endif
 
@@ -1488,15 +1472,15 @@ TEST(BooleanComplex, Ring) {
 TEST(BooleanComplex, SelfIntersect) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("self_intersectA.glb");
-  Manifold m2 = ReadMesh("self_intersectB.glb");
+  Manifold m1 = ReadTestOBJ("self_intersectA.obj");
+  Manifold m2 = ReadTestOBJ("self_intersectB.obj");
   Manifold res = m1 + m2;
   res.GetMeshGL();  // test crash
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7081) {
-  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
+  Manifold m1 = ReadTestOBJ("Generic_Twin_7081.1.t0_left.obj");
+  Manifold m2 = ReadTestOBJ("Generic_Twin_7081.1.t0_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
@@ -1504,8 +1488,8 @@ TEST(BooleanComplex, GenericTwinBooleanTest7081) {
 TEST(BooleanComplex, GenericTwinBooleanTest7863) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
+  Manifold m1 = ReadTestOBJ("Generic_Twin_7863.1.t0_left.obj");
+  Manifold m2 = ReadTestOBJ("Generic_Twin_7863.1.t0_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
@@ -1513,15 +1497,15 @@ TEST(BooleanComplex, GenericTwinBooleanTest7863) {
 TEST(BooleanComplex, Havocglass8Bool) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("Havocglass8_left.glb");
-  Manifold m2 = ReadMesh("Havocglass8_right.glb");
+  Manifold m1 = ReadTestOBJ("Havocglass8_left.obj");
+  Manifold m2 = ReadTestOBJ("Havocglass8_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
 
 TEST(BooleanComplex, CraycloudBool) {
-  Manifold m1 = ReadMesh("Cray_left.glb");
-  Manifold m2 = ReadMesh("Cray_right.glb");
+  Manifold m1 = ReadTestOBJ("Cray_left.obj");
+  Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(res.IsEmpty());
@@ -1530,16 +1514,14 @@ TEST(BooleanComplex, CraycloudBool) {
 }
 
 TEST(BooleanComplex, HullMask) {
-  Manifold body = ReadMesh("hull-body.glb");
-  Manifold mask = ReadMesh("hull-mask.glb");
+  Manifold body = ReadTestOBJ("hull-body.obj");
+  Manifold mask = ReadTestOBJ("hull-mask.obj");
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMeshGL();
 }
 
 TEST(BooleanComplex, SimpleOffset) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  MeshGL seeds = ImportMesh(dir + "/models/" + "Generic_Twin_91.1.t0.glb");
+  MeshGL64 seeds = ReadTestMeshGL64OBJ("Generic_Twin_91.1.t0.obj");
   EXPECT_TRUE(seeds.NumTri() > 10);
   EXPECT_TRUE(seeds.NumVert() > 10);
   // Unique edges

@@ -68,12 +68,10 @@ TEST(Properties, Tolerance) {
   EXPECT_NEAR(imperfect2.Volume(), imperfect3.Volume(), 0.01);
   EXPECT_NEAR(imperfect2.SurfaceArea(), imperfect3.SurfaceArea(), 0.02);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("tolerance.glb", imperfect2.GetMeshGL(), {});
-    ExportMesh("tolerance2.glb", imperfect3.GetMeshGL(), {});
+    WriteTestOBJ("tolerance.obj", imperfect2);
+    WriteTestOBJ("tolerance2.obj", imperfect3);
   }
-#endif
 }
 
 TEST(Properties, ToleranceSphere) {
@@ -86,9 +84,7 @@ TEST(Properties, ToleranceSphere) {
   EXPECT_EQ(sphere2.Genus(), 0);
   EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
   EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("sphere.glb", sphere2.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("sphere.obj", sphere2);
 }
 
 /**
@@ -152,9 +148,7 @@ TEST(Properties, Coplanar) {
   }
   EXPECT_EQ(minPegZ, 0);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("coplanar.glb", resultGL, {});
-#endif
+  if (options.exportModels) WriteTestOBJ("coplanar.obj", result);
 }
 
 // These tests verify the calculation of MinGap functions.

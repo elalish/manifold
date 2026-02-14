@@ -44,10 +44,7 @@ TEST(SDF, SphereShell) {
 
   EXPECT_NEAR(sphere.Genus(), 14235, 1000);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("sphereShellSDF.glb", sphere.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("sphereShellSDF.obj", sphere);
 }
 
 TEST(SDF, CubeVoid) {
@@ -71,10 +68,7 @@ TEST(SDF, Bounds) {
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
   const double epsilon = cubeVoid.GetEpsilon();
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("cubeVoid.glb", cubeVoid.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cubeVoid.obj", cubeVoid);
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
@@ -95,10 +89,7 @@ TEST(SDF, Bounds2) {
       CubeVoid(), {vec3(-size / 2), vec3(size / 2)}, edgeLength);
   Box bounds = cubeVoid.BoundingBox();
   const double epsilon = cubeVoid.GetEpsilon();
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("cubeVoid2.glb", cubeVoid.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cubeVoid2.obj", cubeVoid);
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
@@ -116,9 +107,7 @@ TEST(SDF, Bounds3) {
   Manifold sphere =
       Manifold::LevelSet([radius](vec3 pos) { return radius - length(pos); },
                          {vec3(-1), vec3(1)}, 0.1);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("sphere.glb", sphere.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("sphere.obj", sphere);
 
   EXPECT_EQ(sphere.Status(), Manifold::Error::NoError);
   EXPECT_EQ(sphere.Genus(), 0);
@@ -162,9 +151,7 @@ TEST(SDF, Void) {
 TEST(SDF, Resize) {
   const double size = 20;
   Manifold layers = Manifold::LevelSet(Layers(), {vec3(0.0), vec3(size)}, 1);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("layers.glb", layers.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("layers.obj", layers);
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
   EXPECT_EQ(layers.Genus(), -8);
@@ -194,10 +181,7 @@ TEST(SDF, SineSurface) {
   EXPECT_NEAR(smoothed.Volume(), 107.4, 0.1);
   EXPECT_NEAR(smoothed.SurfaceArea(), 394.7, 0.1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("sinesurface.obj", smoothed);
 }
 
 TEST(SDF, Blobs) {
@@ -228,7 +212,5 @@ TEST(SDF, Blobs) {
   const int genus = 1 - chi / 2;
   EXPECT_EQ(genus, 0);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("blobs.glb", blobs.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("blobs.obj", blobs);
 }
