@@ -55,14 +55,14 @@ function font(height: number = 100, stroke: number = 18) {
 export default () => {
   const height = 100;
   const offset = height / 2;
-  const nodes: Array<CrossSectionGLTFNode> = [];
+  const csNodes: Array<CrossSectionGLTFNode> = [];
 
   const {G, E, B} = font();
-  const root = new GLTFNode();
+  const rootNode = new GLTFNode();
 
   // Create a cross section for the left side view.
   // And also, a display node for it.
-  const leftNode = new CrossSectionGLTFNode(root);
+  const leftNode = new CrossSectionGLTFNode(rootNode);
   leftNode.crossSection = union([
     G.translate([0, (height + offset) / 2]),
     E.translate([0, -(height + offset) / 2])
@@ -71,10 +71,10 @@ export default () => {
   leftNode.rotation = [90, 0, 90];
   leftNode.translation = [-height - offset, 0, 0];
   leftNode.material = {baseColorFactor: [1, 1, 0], unlit: true};
-  nodes.push(leftNode);
+  csNodes.push(leftNode);
 
   // And the same for the right.
-  const rightNode = new CrossSectionGLTFNode(root);
+  const rightNode = new CrossSectionGLTFNode(rootNode);
   rightNode.crossSection = union([
     E.translate([0, (height + offset) / 2]),
     G.translate([0, -(height + offset) / 2])
@@ -83,21 +83,21 @@ export default () => {
   rightNode.rotation = [90, 0, 0];
   rightNode.translation = [0, height + offset, 0];
   rightNode.material = {baseColorFactor: [0, 1, 1], unlit: true};
-  nodes.push(rightNode);
+  csNodes.push(rightNode);
 
   // Now the bottom.
-  const bottomNode = new CrossSectionGLTFNode(root);
+  const bottomNode = new CrossSectionGLTFNode(rootNode);
   bottomNode.crossSection = B;
   bottomNode.name = 'Bottom';
   bottomNode.rotation = [0, 0, 0];
   bottomNode.translation = [0, 0, -height * 2];
   bottomNode.material = {baseColorFactor: [1, 0, 1], unlit: true};
-  nodes.push(bottomNode);
+  csNodes.push(bottomNode);
 
   // Time for some Constructive Solid Geometry.
   // Extrude each CrossSection, and orient it in 3D space,
   // then compute the intersection.
-  const intersection = nodes
+  const intersection = csNodes
                            .map((node) => {
                              const extrusion =
                                  node.crossSection!.extrude(4 * height);
@@ -108,7 +108,7 @@ export default () => {
 
   // Put the result into a node so it can be oriented
   // in the same context as our CrossSection nodes.
-  const intersectionNode = new GLTFNode(root);
+  const intersectionNode = new GLTFNode(rootNode);
   intersectionNode.name = 'Intersection';
   intersectionNode.manifold = intersection;
   intersectionNode.material = {
@@ -117,6 +117,6 @@ export default () => {
     roughness: 0.4
   };
 
-  root.rotation = [0, 0, -45];
-  return root;
+  rootNode.rotation = [0, 0, -45];
+  return [rootNode, csNodes, intersectionNode];
 }

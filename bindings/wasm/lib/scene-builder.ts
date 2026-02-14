@@ -333,15 +333,6 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
 
   addAnimationToDoc(doc);
 
-  const uniqueNodes: Set<BaseGLTFNode> = new Set();
-  const recurse = (node: BaseGLTFNode) => {
-    uniqueNodes.add(node);
-    for (const child of node.listChildren()) {
-      recurse(child);
-    }
-  };
-  nodes.forEach(node => recurse(node));
-
   const node2gltf = new Map<BaseGLTFNode, Node>();
   const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
   let manifoldNodes = 0;
@@ -350,7 +341,7 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   let noGeometryNodes = 0;
 
   // First, create a node in the GLTF document for each ManifoldCAD node.
-  for (const nodeDef of uniqueNodes) {
+  for (const nodeDef of nodes) {
     let node: Node|null = null;
     if (!nodeDef.hasGeometry()) {
       // No geometry here.  Create the node anyhow as it may contain
@@ -379,7 +370,7 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
 
   // Step through each node and set its parent.
   // Nodes without parents are added directly to the root.
-  for (const nodeDef of uniqueNodes) {
+  for (const nodeDef of nodes) {
     const gltfNode = node2gltf.get(nodeDef)!;
     const {parent} = nodeDef;
     if (parent) {
@@ -389,7 +380,7 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
     }
   }
 
-  log(`Total glTF nodes: ${uniqueNodes.size}`);
+  log(`Total glTF nodes: ${nodes.length}`);
   if (manifoldNodes) {
     log(`  Manifold meshes: ${manifoldNodes}`);
   }

@@ -167,8 +167,6 @@ export interface GLTFMaterial {
 export abstract class BaseGLTFNode {
   /** @internal */
   private _parent?: BaseGLTFNode;
-  /** @internal */
-  private _children: Set<BaseGLTFNode> = new Set();
   name?: string;
 
   // Internally, gltf-transform stores transformations as separate translation,
@@ -190,21 +188,10 @@ export abstract class BaseGLTFNode {
 
   constructor(parent?: BaseGLTFNode) {
     this._parent = parent;
-    if (parent) {
-      parent.addChild(this);
-    }
   }
 
   get parent() {
     return this._parent;
-  }
-
-  addChild(child: BaseGLTFNode) {
-    this._children.add(child);
-  }
-
-  listChildren(): Array<BaseGLTFNode> {
-    return [...this._children.values()];
   }
 
   /**
