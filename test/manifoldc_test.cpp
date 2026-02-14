@@ -122,7 +122,7 @@ TEST(CBIND, obj_round_trip) {
       [](char* tmp, void* arg) {
         size_t len = strlen(tmp);
         char** bufferPtr = (char**)arg;
-        *bufferPtr = (char*)malloc(len);
+        *bufferPtr = (char*)malloc(len + 1);
         strncpy(*bufferPtr, tmp, len + 1);
       },
       &buffer);
