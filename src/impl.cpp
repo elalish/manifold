@@ -149,21 +149,6 @@ int GetLabels(std::vector<int>& components,
   return uf.connectedComponents(components);
 }
 
-std::string FLOAT_PATTERN = "(-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)";
-std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
-std::string TRAILING_SPACES = "(?:\\s*)";
-std::string SEPARATOR = "\\s+";
-std::regex TOLERANCE_COMMENT_PATTERN("^# tolerance = " + FLOAT_PATTERN +
-                                     TRAILING_SPACES);
-std::regex EPSILON_COMMENT_PATTERN("^# epsilon = " + FLOAT_PATTERN +
-                                   TRAILING_SPACES);
-std::regex VERTEX_PATTERN("^v" + SEPARATOR + FLOAT_PATTERN + SEPARATOR +
-                          FLOAT_PATTERN + SEPARATOR + FLOAT_PATTERN +
-                          TRAILING_SPACES);
-std::regex FACE_PATTERN("^f" + SEPARATOR + FACE_ELEMENT + SEPARATOR +
-                        FACE_ELEMENT + SEPARATOR + FACE_ELEMENT +
-                        TRAILING_SPACES);
-
 template <typename T>
 double FromChars(T buffer) {
   double tmp;
@@ -831,6 +816,22 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
 
 static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     std::istream& stream) {
+  static const std::string FLOAT_PATTERN =
+      "(-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)";
+  static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
+  static const std::string TRAILING_SPACES = "(?:\\s*)";
+  static const std::string SEPARATOR = "\\s+";
+  static const std::regex TOLERANCE_COMMENT_PATTERN(
+      "^# tolerance = " + FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex EPSILON_COMMENT_PATTERN(
+      "^# epsilon = " + FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex VERTEX_PATTERN("^v" + SEPARATOR + FLOAT_PATTERN +
+                                         SEPARATOR + FLOAT_PATTERN + SEPARATOR +
+                                         FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex FACE_PATTERN("^f" + SEPARATOR + FACE_ELEMENT +
+                                       SEPARATOR + FACE_ELEMENT + SEPARATOR +
+                                       FACE_ELEMENT + TRAILING_SPACES);
+
   MeshGL64 mesh;
   std::optional<double> epsilon;
   if (!stream.good()) return std::make_pair(mesh, epsilon);
