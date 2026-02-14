@@ -1572,7 +1572,7 @@ TEST(BooleanComplex, SimpleOffset) {
     vec3 a = ev[0] - ev[2];
     vec3 b = ev[1] - ev[2];
     vec3 n = la::normalize(la::cross(a, b));
-    if (!all(isfinite(n))) continue;
+    if (!la::all(la::isfinite(n))) continue;
     // Extrude the points above and below the plane of the triangle
     vec3 pnts[6];
     for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
