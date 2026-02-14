@@ -841,7 +841,6 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
 
-#ifdef MANIFOLD_EXPORT
 TEST(Manifold, MergeRefine) {
   MeshGL mesh;
   mesh.tolerance = 1e-5;
@@ -1117,7 +1116,6 @@ TEST(Manifold, MergeRefine) {
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }
-#endif
 
 #ifdef MANIFOLD_DEBUG
 TEST(Manifold, OpenscadCrash) {

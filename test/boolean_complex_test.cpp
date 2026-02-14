@@ -1468,7 +1468,6 @@ TEST(BooleanComplex, Ring) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
-#ifdef MANIFOLD_EXPORT
 TEST(BooleanComplex, SelfIntersect) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
@@ -1603,7 +1602,6 @@ TEST(BooleanComplex, SimpleOffset) {
   }
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
 }
-#endif
 
 #ifdef MANIFOLD_DEBUG
 TEST(BooleanComplex, OffsetTriangulationFailure) {

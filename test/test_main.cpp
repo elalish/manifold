@@ -17,7 +17,7 @@
 #include "manifold/manifold.h"
 #include "test.h"
 
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
+#if defined(MANIFOLD_DEBUG)
 #include <fstream>
 #endif
 
@@ -85,11 +85,6 @@ int main(int argc, char** argv) {
         print_usage();
         return 0;
       case 'e':
-#ifndef MANIFOLD_EXPORT
-        printf(
-            "Export not possible because MANIFOLD_EXPORT compile flag is not "
-            "set.\n");
-#endif
         options.exportModels = true;
         break;
       case 'v':

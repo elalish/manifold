@@ -132,9 +132,7 @@ TEST(SDF, Void) {
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
   const double epsilon = cube.GetEpsilon();
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cube.gltf", cube.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cube.obj", cube);
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cube.Genus(), 0);

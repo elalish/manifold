@@ -28,11 +28,6 @@ add_library(
 )
 exportlib(manifoldc)
 
-if(MANIFOLD_EXPORT)
-  target_sources(manifoldc PRIVATE meshIOc.cpp)
-  target_compile_options(manifoldc PUBLIC -DMANIFOLD_EXPORT)
-endif()
-
 target_link_libraries(manifoldc PRIVATE manifold)
 
 target_include_directories(
