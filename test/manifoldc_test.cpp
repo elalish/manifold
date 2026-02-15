@@ -133,6 +133,7 @@ TEST(CBIND, obj_round_trip) {
   manifold_destruct_manifold(result);
   free(cube);
   free(result);
+  free(buffer);
 }
 
 TEST(CBIND, level_set) {
