@@ -7,11 +7,10 @@ export default defineConfig({
     testTimeout: 15000,
     exclude: ['**/node_modules/**', 'lib/*.test.js', 'test/fixtures/**'],
     coverage: {
-      include: ['lib/**', 'test/**'],
+      include: ['lib/**'],
       exclude: [
         'lib/*.js', 'lib/*.test.js', 'lib/node-http-import-hook.mjs',
-        'test/fixtures/**', 'test/examples/**', 'examples/**',
-        ...coverageConfigDefaults.exclude
+        'lib/*.d.ts', 'examples/**', ...coverageConfigDefaults.exclude
       ],
       reporters: ['text', 'html']
     }

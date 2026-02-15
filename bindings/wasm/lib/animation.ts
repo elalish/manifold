@@ -284,6 +284,7 @@ export function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void):
  * @internal
  */
 export function addAnimationToDoc(doc: Document) {
+  const buffer = doc.getRoot().listBuffers()[0];
   animation = doc.createAnimation('');
   hasAnimation = false;
   const nFrames = Math.round(animationDuration * animationFPS) + 1;
@@ -296,11 +297,11 @@ export function addAnimationToDoc(doc: Document) {
         animationMode !== 'ping-pong' ? x : (1 - Math.cos(x * 2 * Math.PI)) / 2;
   }
   timesAccessor = doc.createAccessor('animation times')
-                      .setBuffer(doc.createBuffer())
+                      .setBuffer(buffer)
                       .setArray(times)
                       .setType(Accessor.Type.SCALAR);
   weightsAccessor = doc.createAccessor('animation weights')
-                        .setBuffer(doc.getRoot().listBuffers()[0])
+                        .setBuffer(buffer)
                         .setArray(weights)
                         .setType(Accessor.Type.SCALAR);
   weightsSampler = doc.createAnimationSampler()
