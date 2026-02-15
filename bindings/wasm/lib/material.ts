@@ -27,7 +27,7 @@ import {copyToDocument} from '@gltf-transform/functions';
 import type {Manifold} from '../manifold.d.ts';
 
 import type {GLTFMaterial} from './gltf-node.ts';
-import {GLTFNode} from './gltf-node.ts';
+import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode} from './gltf-node.ts';
 import {getDocumentByID} from './import-model.ts';
 
 const defaultMaterial = {
@@ -76,16 +76,18 @@ export const setMaterialByID = (id: number, material: GLTFMaterial) => {
 };
 
 /**
+ * Recurse up the scene graph to find a material.
  * @internal
  */
-export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
-  if (node == null) {
-    return {};
+export function getBackupMaterial(node?: BaseGLTFNode): GLTFMaterial {
+  if (node != null &&
+      (node instanceof GLTFNode || node instanceof CrossSectionGLTFNode)) {
+    if (node.material == null) {
+      return getBackupMaterial((node.parent as GLTFNode));
+    }
+    return node.material;
   }
-  if (node.material == null) {
-    node.material = getBackupMaterial((node.parent as GLTFNode));
-  }
-  return node.material;
+  return {}
 }
 
 function copyImportedMaterial(

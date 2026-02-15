@@ -38,7 +38,8 @@
 import type * as GLTFTransform from '@gltf-transform/core';
 
 import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
-import { getManifoldModuleSync } from './wasm.ts';
+
+import {getManifoldModuleSync} from './wasm.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -317,7 +318,7 @@ export class CrossSectionGLTFNode extends BaseGLTFNode {
   /**
    * Get the runID for this node.
    * If there is no runID set, lazily assign one.
-   * 
+   *
    * We don't need these for regular operations, but they do help when
    * converting to meshes for export.
    * @internal
