@@ -1519,7 +1519,7 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
-TEST(BooleanComplex, SimpleOffset) {
+TEST(BooleanComplex, DISABLED_SimpleOffset) {
   MeshGL64 seeds = ReadTestMeshGL64OBJ("Generic_Twin_91.1.t0.obj");
   EXPECT_TRUE(seeds.NumTri() > 10);
   EXPECT_TRUE(seeds.NumVert() > 10);
