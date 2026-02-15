@@ -59,6 +59,7 @@ export default () => {
 
   const {G, E, B} = font();
   const rootNode = new GLTFNode();
+  rootNode.name = 'Root';
 
   // Create a cross section for the left side view.
   // And also, a display node for it.

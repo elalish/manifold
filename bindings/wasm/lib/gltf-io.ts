@@ -282,7 +282,8 @@ function writePrimitiveAttributes(
 
   // For each run, create a primitive, set material and collate attributes.
   const buffer = doc.getRoot().listBuffers()[0];
-  for (const id of manifoldMesh.runOriginalID) {
+  for (let run = 0; run < (manifoldMesh.runIndex.length - 1); run++) {
+    const id = manifoldMesh.runOriginalID[run];
     const primitive = doc.createPrimitive();
 
     const properties = id2properties.get(id);

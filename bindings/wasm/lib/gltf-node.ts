@@ -199,8 +199,8 @@ export abstract class BaseGLTFNode {
    * Does this node have any geometry that needs to be converted on export?
    * @internal
    */
-  hasGeometry(): boolean {
-    return false;
+  isEmpty(): boolean {
+    return true;
   }
 }
 
@@ -218,9 +218,8 @@ export class GLTFNode extends BaseGLTFNode {
     return copy;
   }
 
-  hasGeometry() {
-    if (!this.manifold) return false;
-    return this.manifold && !this.manifold.isEmpty();
+  isEmpty() {
+    return this.manifold?.isEmpty() ?? true;
   }
 }
 
@@ -275,8 +274,8 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
     return copy;
   }
 
-  hasGeometry() {
-    return !!this.document;
+  isEmpty() {
+    return !this.document;
   }
 }
 
@@ -310,9 +309,8 @@ export class CrossSectionGLTFNode extends BaseGLTFNode {
     return copy;
   }
 
-  hasGeometry() {
-    if (!this.crossSection) return false;
-    return this.crossSection && !this.crossSection.isEmpty();
+  isEmpty() {
+    return this.crossSection?.isEmpty() ?? true;
   }
 
   /**
@@ -379,9 +377,7 @@ export async function anyToGLTFNodeList(
             async (acc, cur) => ([...(await acc), ...(await cur)]),
             new Promise(resolve => resolve([])));
   } else if (any instanceof BaseGLTFNode) {
-    const node = any as BaseGLTFNode;
-    if (!node.parent) return [node];
-    return [await anyToGLTFNodeList(node.parent), node].flat();
+    return [any];
   } else if (any.constructor.name === 'Manifold') {
     const node = new GLTFNode();
     node.manifold = any as Manifold;
