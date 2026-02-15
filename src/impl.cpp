@@ -836,7 +836,7 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
   std::optional<double> epsilon;
   if (!stream.good()) return std::make_pair(mesh, epsilon);
 
-  constexpr size_t BUFFER_SIZE = 100;
+  constexpr size_t BUFFER_SIZE = 1000;
   std::array<char, BUFFER_SIZE> buffer;
   std::cmatch m;
 
