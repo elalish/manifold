@@ -174,7 +174,8 @@ export async function importModel(
         `Model imported from \`${source}\` contains no nodes.`);
   }
 
-  const targetNode = new VisualizationGLTFNode(sourceDoc);
+  const targetNode = new VisualizationGLTFNode();
+  targetNode.document = sourceDoc
   if (sourceNodes.length == 1) {
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
@@ -199,7 +200,7 @@ export async function importManifold(
     options: ImportOptions = {}): Promise<Manifold> {
   const {document, node} = await importModel(source, options);
   try {
-    return gltfDocToManifold(document, node, options.tolerance);
+    return gltfDocToManifold(document!, node, options.tolerance);
   } catch (e) {
     if (e instanceof ImportError) {
       const newError = new Error(
@@ -381,13 +382,18 @@ export function gltfDocToManifold(
  */
 function gltfNodeToMeshes(
     document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
-  const getDescendants = (root: GLTFTransform.Node) => {
-    const descendants: Array<GLTFTransform.Node> = [];
-    root.traverse(descendant => descendants.push(descendant));
-    return descendants;
-  };
-  const descendants: Array<GLTFTransform.Node> =
-      node ? getDescendants(node) : document.getRoot().listNodes();
+  const descendants: Array<GLTFTransform.Node> = [];
+  const getDescendants = (root: GLTFTransform.Node) =>
+      root.traverse(node => descendants.push(node));
+
+  if (node) {
+    getDescendants(node);
+  } else {
+    for (const node of document.getRoot().listNodes()) {
+      if (node.getParentNode()) continue;
+      getDescendants(node);
+    }
+  }
 
   return descendants
       .map(descendant => {

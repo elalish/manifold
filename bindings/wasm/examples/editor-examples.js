@@ -1,5 +1,6 @@
 import auger from '../test/examples/auger.mjs?raw';
 import gearBearing from '../test/examples/gear-bearing.ts?raw';
+import godelEscherBach from '../test/examples/godel-escher-bach.ts?raw';
 import gyroidModule from '../test/examples/gyroid-module.ts?raw';
 import heart from '../test/examples/heart.mjs?raw';
 import importManifold from '../test/examples/import-manifold.ts?raw';
@@ -28,6 +29,7 @@ examples.set('Gear Bearing', gearBearing);
 examples.set('involute-gear-library', involuteGearLibrary);
 examples.set('Voronoi', voronoi);
 examples.set('Import Manifold', importManifold);
+examples.set('Gödel, Escher, Bach', godelEscherBach)
 
 if (typeof self !== 'undefined') {
   self.examples = examples;

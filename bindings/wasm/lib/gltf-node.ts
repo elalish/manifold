@@ -37,7 +37,9 @@
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Vec3} from '../manifold.d.ts';
+import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
+
+import {getManifoldModuleSync} from './wasm.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
@@ -148,6 +150,14 @@ export interface GLTFMaterial {
    * @internal
    */
   sourceRunID?: number;
+
+  /**
+   * Treat this material as double sided.
+   * This is implied for translucent materials (`alpha < 1.0`) and
+   * CrossSections.
+   * @internal
+   */
+  doubleSided?: boolean;
 }
 
 /**
@@ -157,7 +167,7 @@ export interface GLTFMaterial {
  */
 export abstract class BaseGLTFNode {
   /** @internal */
-  _parent?: BaseGLTFNode;
+  private _parent?: BaseGLTFNode;
   name?: string;
 
   // Internally, gltf-transform stores transformations as separate translation,
@@ -184,6 +194,14 @@ export abstract class BaseGLTFNode {
   get parent() {
     return this._parent;
   }
+
+  /**
+   * Does this node have any geometry that needs to be converted on export?
+   * @internal
+   */
+  isEmpty(): boolean {
+    return true;
+  }
 }
 
 /**
@@ -198,6 +216,10 @@ export class GLTFNode extends BaseGLTFNode {
     const copy = new GLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  isEmpty() {
+    return this.manifold?.isEmpty() ?? true;
   }
 }
 
@@ -238,23 +260,72 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
   /** @internal */
   node?: GLTFTransform.Node;
   /** @internal */
-  document: GLTFTransform.Document;
+  document?: GLTFTransform.Document;
   /** @internal */
   uri?: string;
 
-  constructor(
-      document: GLTFTransform.Document, node?: GLTFTransform.Node,
-      parent?: BaseGLTFNode) {
+  constructor(parent?: BaseGLTFNode) {
     super(parent);
-    this.document = document;
-    this.node = node;
   }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy = new VisualizationGLTFNode(
-        this.document, this.node, newParent ?? this.parent);
+    const copy = new VisualizationGLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  isEmpty() {
+    return !this.document;
+  }
+}
+
+/**
+ * Display a CrossSection in 3D space.
+ *
+ * A CrossSection object is two dimensional.  Attaching it as a node
+ * allows it to be included in the final exported file, complete with
+ * transformations.
+ *
+ * > [!NOTICE]
+ * >
+ * > CrossSections are not -- and can never be -- manifold.  That means
+ * > some exporters (like `.3mf`) will just skip over them entirely.
+ *
+ * @group Scene Graph
+ */
+export class CrossSectionGLTFNode extends BaseGLTFNode {
+  crossSection?: CrossSection;
+  material?: GLTFMaterial;
+
+  private _runid?: number;
+
+  constructor(parent?: BaseGLTFNode) {
+    super(parent);
+  }
+
+  clone(newParent?: BaseGLTFNode) {
+    const copy = new CrossSectionGLTFNode(newParent ?? this.parent);
+    Object.assign(copy, this);
+    return copy;
+  }
+
+  isEmpty() {
+    return this.crossSection?.isEmpty() ?? true;
+  }
+
+  /**
+   * Get the runID for this node.
+   * If there is no runID set, lazily assign one.
+   *
+   * We don't need these for regular operations, but they do help when
+   * converting to meshes for export.
+   * @internal
+   */
+  get runID(): number {
+    if (this._runid === undefined) {
+      this._runid = getManifoldModuleSync()!.Manifold.reserveIDs(1);
+    }
+    return this._runid;
   }
 }
 
@@ -298,20 +369,22 @@ export const cleanup = () => {
  * @returns An array of GLTFNodes.
  */
 export async function anyToGLTFNodeList(
-    any: Manifold|BaseGLTFNode|
-    Array<Manifold|BaseGLTFNode>): Promise<Array<BaseGLTFNode>> {
+    any: Manifold|BaseGLTFNode|CrossSection|
+    Array<Manifold|BaseGLTFNode|CrossSection>): Promise<Array<BaseGLTFNode>> {
   if (Array.isArray(any)) {
     return await any.map(anyToGLTFNodeList)
         .reduce(
             async (acc, cur) => ([...(await acc), ...(await cur)]),
             new Promise(resolve => resolve([])));
   } else if (any instanceof BaseGLTFNode) {
-    const node = any as BaseGLTFNode;
-    if (!node.parent) return [node];
-    return [await anyToGLTFNodeList(node.parent), node].flat();
+    return [any];
   } else if (any.constructor.name === 'Manifold') {
     const node = new GLTFNode();
     node.manifold = any as Manifold;
+    return [node];
+  } else if (any.constructor.name === 'CrossSection') {
+    const node = new CrossSectionGLTFNode();
+    node.crossSection = any as CrossSection;
     return [node];
   }
 

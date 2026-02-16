@@ -112,6 +112,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
       'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
+      'CrossSectionGLTFNode',
       // Import
       'importModel', 'importManifold',
       // Getters for global properties
