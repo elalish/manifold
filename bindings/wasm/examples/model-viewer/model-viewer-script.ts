@@ -15,9 +15,10 @@
 import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, mergeDocuments, prune} from '@gltf-transform/functions';
 
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from '../lib/gltf-io';
-import type {Manifold as ManifoldType} from '../manifold';
-import Module from '../manifold';
+import type {Properties} from '../../lib/gltf-io';
+import {disposeMesh, readMesh, setupIO, writeMesh} from '../../lib/gltf-io';
+import type {Manifold as ManifoldType} from '../../manifold';
+import Module from '../../manifold';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());

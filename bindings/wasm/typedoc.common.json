@@ -34,7 +34,8 @@
   },
   "exclude": [
     "**/*.test.*",
-    "./lib/*.d.ts"
+    "./lib/*.d.ts",
+    "editor/**"
   ],
   "groupOrder": [
     "Documents", 

@@ -3,10 +3,8 @@ import {resolve} from 'path'
 import {defineConfig} from 'vite'
 import {viteStaticCopy} from 'vite-plugin-static-copy'
 
-import emscriptenStaticWorkerOptions from './vite-fixup-plugin.js'
-
 export default defineConfig({
-  worker: {format: 'es', plugins: () => ([emscriptenStaticWorkerOptions])},
+  worker: {format: 'es'},
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -37,13 +35,10 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    sourcemap: 'hidden',
+    sourcemap: false,
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),
-        makeManifold: resolve(__dirname, 'make-manifold.html'),
-        modelViewer: resolve(__dirname, 'model-viewer.html'),
-        three: resolve(__dirname, 'three.html'),
       },
       output: {
         entryFileNames: `assets/[name].js`,
