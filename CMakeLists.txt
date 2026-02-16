@@ -46,7 +46,6 @@ option(
   "Allow Manifold build to download missing dependencies"
   ON
 )
-option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(
   MANIFOLD_OPTIMIZED
@@ -94,9 +93,11 @@ set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 option(TRACY_ENABLE "Use tracy profiling" OFF)
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
+option(ASSIMP_ENABLE "Enable ASSIMP for utilities in extras" OFF)
 mark_as_advanced(TRACY_ENABLE)
 mark_as_advanced(TRACY_MEMORY_USAGE)
 mark_as_advanced(MANIFOLD_FUZZ)
+mark_as_advanced(ASSIMP_ENABLE)
 
 # Always build position independent code for relocatability
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -291,7 +292,6 @@ set(
   polygon.h
   vec_view.h
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO.h>
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 list(

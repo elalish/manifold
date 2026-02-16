@@ -13,7 +13,7 @@ decompress and put the `raw_meshes` directory inside `testfiles`.
 ## Running the benchmark
 
 1. Download the dataset.
-2. Build the binary with `MANIFOLD_PAR` and `MANIFOLD_EXPORT` enabled. The
+2. Build the binary with `MANIFOLD_PAR` and `ASSIMP_ENABLE` enabled. The
    binary should be inside `build/extras` (relative to the project root).
 3. Run `python do_ember_tests.py`. This will take 10 minutes to an hour
    depending on your machine. At the end, a `benchmark.csv` file will be

@@ -152,8 +152,7 @@ if(TRACY_ENABLE)
   FetchContent_MakeAvailable(tracy)
 endif()
 
-# If we're supporting mesh I/O, we need assimp
-if(MANIFOLD_EXPORT)
+if(ASSIMP_ENABLE)
   find_package(assimp REQUIRED)
 endif()
 

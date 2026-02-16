@@ -17,12 +17,16 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <iomanip>
 #include <map>
 #include <optional>
+#include <regex>
+#include <sstream>
 
 #include "csg_tree.h"
 #include "disjoint_sets.h"
 #include "hashtable.h"
+#include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
 #include "mesh_fixes.h"
 #include "parallel.h"
@@ -143,6 +147,15 @@ int GetLabels(std::vector<int>& components,
   }
 
   return uf.connectedComponents(components);
+}
+
+template <typename T>
+double FromChars(T buffer) {
+  double tmp;
+  std::istringstream iss(buffer);
+  iss >> std::setprecision(19);
+  iss >> tmp;
+  return tmp;
 }
 }  // namespace
 
@@ -773,25 +786,27 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
-#ifdef MANIFOLD_DEBUG
-/**
- * Debugging output using high precision OBJ files with specialized comments
- */
-std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
+static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
+                                         const MeshGL64& mesh,
+                                         std::optional<double> epsilon) {
   stream << std::setprecision(19);  // for double precision
   stream << std::fixed;             // for uniformity in output numbers
   stream << "# ======= begin mesh ======" << std::endl;
-  stream << "# tolerance = " << impl.tolerance_ << std::endl;
-  stream << "# epsilon = " << impl.epsilon_ << std::endl;
-  // TODO: Mesh relation, vertex normal and face normal
-  for (const vec3& v : impl.vertPos_)
-    stream << "v " << v.x << " " << v.y << " " << v.z << std::endl;
+  stream << "# tolerance = " << mesh.tolerance << std::endl;
+  if (epsilon.has_value())
+    stream << "# epsilon = " << epsilon.value() << std::endl;
+  for (size_t i = 0; i < mesh.NumVert(); i++) {
+    stream << "v";
+    size_t offset = i * mesh.numProp;
+    for (size_t j : {0, 1, 2}) stream << " " << mesh.vertProperties[offset + j];
+    stream << std::endl;
+  }
   std::vector<ivec3> triangles;
-  triangles.reserve(impl.halfedge_.size() / 3);
-  for (size_t i = 0; i < impl.halfedge_.size(); i += 3)
-    triangles.emplace_back(impl.halfedge_[i].startVert + 1,
-                           impl.halfedge_[i + 1].startVert + 1,
-                           impl.halfedge_[i + 2].startVert + 1);
+  triangles.reserve(mesh.NumTri());
+  for (size_t i = 0; i < mesh.NumTri(); i++)
+    triangles.emplace_back(mesh.triVerts[3 * i] + 1,
+                           mesh.triVerts[3 * i + 1] + 1,
+                           mesh.triVerts[3 * i + 2] + 1);
   sort(triangles.begin(), triangles.end());
   for (const auto& tri : triangles)
     stream << "f " << tri.x << " " << tri.y << " " << tri.z << std::endl;
@@ -799,87 +814,105 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   return stream;
 }
 
-/**
- * Import a mesh from a Wavefront OBJ file that was exported with Write.  This
- * function is the counterpart to Write and should be used with it.  This
- * function is not guaranteed to be able to import OBJ files not written by the
- * Write function.
- */
-Manifold Manifold::ReadOBJ(std::istream& stream) {
-  if (!stream.good()) return Invalid();
+static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
+    std::istream& stream) {
+  static const std::string FLOAT_PATTERN =
+      "(-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)";
+  static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
+  static const std::string TRAILING_SPACES = "(?:\\s*)";
+  static const std::string SEPARATOR = "\\s+";
+  static const std::regex TOLERANCE_COMMENT_PATTERN(
+      "^# tolerance = " + FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex EPSILON_COMMENT_PATTERN(
+      "^# epsilon = " + FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex VERTEX_PATTERN("^v" + SEPARATOR + FLOAT_PATTERN +
+                                         SEPARATOR + FLOAT_PATTERN + SEPARATOR +
+                                         FLOAT_PATTERN + TRAILING_SPACES);
+  static const std::regex FACE_PATTERN("^f" + SEPARATOR + FACE_ELEMENT +
+                                       SEPARATOR + FACE_ELEMENT + SEPARATOR +
+                                       FACE_ELEMENT + TRAILING_SPACES);
 
   MeshGL64 mesh;
   std::optional<double> epsilon;
-  stream >> std::setprecision(19);
-  while (true) {
-    char c = stream.get();
-    if (stream.eof()) break;
-    switch (c) {
-      case '#': {
-        char c = stream.get();
-        if (c == ' ') {
-          constexpr int SIZE = 10;
-          std::array<char, SIZE> tmp;
-          stream.get(tmp.data(), SIZE, '\n');
-          if (strncmp(tmp.data(), "tolerance", SIZE) == 0) {
-            // skip 3 letters
-            for (int _ : {0, 1, 2}) stream.get();
-            stream >> mesh.tolerance;
-          } else if (strncmp(tmp.data(), "epsilon =", SIZE) == 0) {
-            double tmp;
-            stream >> tmp;
-            epsilon = {tmp};
-          } else {
-            // add it back because it is not what we want
-            int end = 0;
-            while (end < SIZE && tmp[end] != 0) end++;
-            while (--end > -1) stream.putback(tmp[end]);
-          }
-          c = stream.get();
-        }
-        // just skip the remaining comment
-        while (c != '\n' && !stream.eof()) {
-          c = stream.get();
-        }
-        break;
-      }
-      case 'v':
-        for (int _ : {0, 1, 2}) {
-          double x;
-          stream >> x;
-          mesh.vertProperties.push_back(x);
-        }
-        break;
-      case 'f':
-        for (int _ : {0, 1, 2}) {
-          uint64_t x;
-          stream >> x;
-          mesh.triVerts.push_back(x - 1);
-        }
-        break;
-      case '\r':
-      case '\n':
-        break;
-      default:
-        DEBUG_ASSERT(false, userErr, "unexpected character in Manifold import");
+  if (!stream.good()) return std::make_pair(mesh, epsilon);
+
+  constexpr size_t BUFFER_SIZE = 1000;
+  std::array<char, BUFFER_SIZE> buffer;
+  std::cmatch m;
+
+  while (!stream.eof()) {
+    // extract line, and skip the line if it is longer than BUFFER_SIZE
+    // because the lines we care about should not be that long
+    // not using std::basic_istream<...>::getline because getline throws when
+    // the size exceeds the limit, but we don't want exception related code
+    size_t i = 0;
+    char c;
+    while (!stream.eof() && (c = stream.get()) != '\n' && c != '\r')
+      if (i < BUFFER_SIZE) buffer[i++] = c;
+    if (i == BUFFER_SIZE) continue;
+    buffer[i] = '\0';
+    // check pattern...
+    if (std::regex_match(buffer.data(), m, TOLERANCE_COMMENT_PATTERN)) {
+      mesh.tolerance = FromChars(m[1]);
+    } else if (std::regex_match(buffer.data(), m, EPSILON_COMMENT_PATTERN)) {
+      epsilon = {FromChars(m[1])};
+    } else if (std::regex_match(buffer.data(), m, VERTEX_PATTERN)) {
+      for (int j : {0, 1, 2})
+        mesh.vertProperties.push_back(FromChars(m[j + 1]));
+    } else if (std::regex_match(buffer.data(), m, FACE_PATTERN)) {
+      for (int j : {0, 1, 2})
+        mesh.triVerts.push_back(std::stoi(m[j + 1].str()) - 1);
     }
   }
-  auto m = std::make_shared<Manifold::Impl>(mesh);
-  if (epsilon) m->SetEpsilon(*epsilon);
-  return Manifold(m);
+
+  return std::make_pair(mesh, epsilon);
+}
+
+/**
+ * Import a mesh from a Wavefront OBJ file.
+ */
+MeshGL64 ReadOBJ(std::istream& stream) {
+  return ReadOBJWithEpsilon(stream).first;
+}
+
+/**
+ * Import a mesh from a Wavefront OBJ file.
+ * This supports reading tolerance and epsilon values from WriteOBJ.
+ */
+Manifold Manifold::ReadOBJ(std::istream& stream) {
+  if (!stream.good()) return Invalid();
+  auto [mesh, epsilon] = ReadOBJWithEpsilon(stream);
+  auto impl = std::make_shared<Impl>(mesh);
+  if (epsilon) impl->SetEpsilon(epsilon.value());
+  return Manifold(impl);
+}
+
+/**
+ * Export the mesh to a Wavefront OBJ file in a way that preserves the full
+ * 64-bit precision of the vertex positions.
+ */
+bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
+  if (!stream.good()) return false;
+  WriteOBJWithEpsilon(stream, mesh, {});
+  return true;
+}
+
+/**
+ * Debugging output using high precision OBJ files with specialized comments
+ */
+std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
+  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl, -1);
+  return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
 }
 
 /**
  * Export the mesh to a Wavefront OBJ file in a way that preserves the full
  * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon. Useful for debugging and testing.  Files written
- * by WriteOBJ should be read back in with ReadOBJ.
+ * the tolerance and epsilon.
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
   if (!stream.good()) return false;
   stream << *this->GetCsgLeafNode().GetImpl();
   return true;
 }
-#endif
-
 }  // namespace manifold

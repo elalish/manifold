@@ -14,6 +14,7 @@
 
 #include "manifold/manifoldc.h"
 
+#include <sstream>
 #include <vector>
 
 #include "conv.h"
@@ -910,6 +911,36 @@ void manifold_destruct_box(ManifoldBox* b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect* r) { from_c(r)->~Rect(); }
 void manifold_destruct_triangulation(ManifoldTriangulation* m) {
   from_c(m)->~vector<ivec3>();
+}
+
+// IO
+
+ManifoldManifold* manifold_read_obj(void* mem, char* obj_file) {
+  std::istringstream iss(obj_file);
+  Manifold m = Manifold::ReadOBJ(iss);
+  return to_c(new (mem) Manifold(m));
+}
+
+ManifoldMeshGL64* manifold_meshgl64_read_obj(void* mem, char* obj_file) {
+  std::istringstream iss(obj_file);
+  MeshGL64 m = ReadOBJ(iss);
+  return to_c(new (mem) MeshGL64(std::move(m)));
+}
+
+void manifold_write_obj(ManifoldManifold* manifold,
+                        void (*callback)(char*, void*), void* args) {
+  std::stringstream ss;
+  const Manifold* m = from_c(manifold);
+  m->WriteOBJ(ss);
+  callback(ss.str().data(), args);
+}
+
+void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
+                                 void (*callback)(char*, void*), void* args) {
+  std::stringstream ss;
+  const MeshGL64* m = from_c(mesh);
+  WriteOBJ(ss, *m);
+  callback(ss.str().data(), args);
 }
 
 #ifdef __cplusplus

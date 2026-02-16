@@ -501,31 +501,32 @@ void manifold_delete_triangulation(ManifoldTriangulation* m);
 
 // MeshIO / Export
 
-#ifdef MANIFOLD_EXPORT
-ManifoldMaterial* manifold_material(void* mem);
-void manifold_material_set_roughness(ManifoldMaterial* mat, double roughness);
-void manifold_material_set_metalness(ManifoldMaterial* mat, double metalness);
-void manifold_material_set_color(ManifoldMaterial* mat, ManifoldVec3 color);
-ManifoldExportOptions* manifold_export_options(void* mem);
-void manifold_export_options_set_faceted(ManifoldExportOptions* options,
-                                         int faceted);
-void manifold_export_options_set_material(ManifoldExportOptions* options,
-                                          ManifoldMaterial* mat);
-void manifold_export_meshgl(const char* filename, ManifoldMeshGL* mesh,
-                            ManifoldExportOptions* options);
-ManifoldMeshGL* manifold_import_meshgl(void* mem, const char* filename,
-                                       int force_cleanup);
-
-size_t manifold_material_size();
-size_t manifold_export_options_size();
-
-void manifold_destruct_material(ManifoldMaterial* m);
-void manifold_destruct_export_options(ManifoldExportOptions* options);
-
-void manifold_delete_material(ManifoldMaterial* m);
-void manifold_delete_export_options(ManifoldExportOptions* options);
-#endif
-
+// Import a manifold from a Wavefront obj file.
+// The obj_file parameter is the content of the obj file, not the filename,
+// and should be null-terminated.
+ManifoldManifold* manifold_read_obj(void* mem, char* obj_file);
+// Import a meshgl from a Wavefront obj file.
+// The obj_file parameter is the content of the obj file, not the filename,
+// and should be null-terminated.
+ManifoldMeshGL64* manifold_meshgl64_read_obj(void* mem, char* obj_file);
+// Export a manifold to a Wavefront obj file.
+// The callback accepts two parameters:
+// 1. Temporary null-terminated string buffer, containing the content of the
+//    file. This buffer will be freed automatically after returning from the
+//    callback.
+// 2. An arg value (the third parameter in the manifold_write_obj function), for
+//    passing additional data into the callback.
+void manifold_write_obj(ManifoldManifold* manifold,
+                        void (*callback)(char*, void*), void* args);
+// Export a MeshGL64 to a Wavefront obj file.
+// The callback accepts two parameters:
+// 1. Temporary null-terminated string buffer, containing the content of the
+//    file. This buffer will be freed automatically after returning from the
+//    callback.
+// 2. An arg value (the third parameter in the manifold_write_obj function), for
+//    passing additional data into the callback.
+void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
+                                 void (*callback)(char*, void*), void* args);
 #ifdef __cplusplus
 }
 #endif

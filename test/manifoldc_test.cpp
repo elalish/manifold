@@ -1,9 +1,11 @@
 #include "manifold/manifoldc.h"
 
 #include <cmath>
+#include <fstream>
 
 #include "gtest/gtest.h"
 #include "manifold/types.h"
+#include "test.h"
 
 void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
 
@@ -111,6 +113,29 @@ TEST(CBIND, warp_translation) {
   free(context);
 }
 
+TEST(CBIND, obj_round_trip) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
+  char* buffer = NULL;
+  manifold_write_obj(
+      cube,
+      [](char* tmp, void* arg) {
+        size_t len = strlen(tmp);
+        char** bufferPtr = (char**)arg;
+        *bufferPtr = (char*)malloc(len + 1);
+        strncpy(*bufferPtr, tmp, len + 1);
+      },
+      &buffer);
+  EXPECT_NE(buffer, (char*)NULL);
+  ManifoldManifold* result = manifold_read_obj(alloc_manifold_buffer(), buffer);
+  EXPECT_EQ(manifold_volume(result), 1.0);
+  manifold_destruct_manifold(cube);
+  manifold_destruct_manifold(result);
+  free(cube);
+  free(result);
+  free(buffer);
+}
+
 TEST(CBIND, level_set) {
   // can't convert lambda with captures to funptr
   double (*sdf)(double, double, double, void*) = [](double x, double y,
@@ -153,14 +178,16 @@ TEST(CBIND, level_set) {
   ManifoldMeshGL* sdf_mesh =
       manifold_get_meshgl(alloc_meshgl_buffer(), sdf_man);
 
-#ifdef MANIFOLD_EXPORT
-  ManifoldExportOptions* options =
-      manifold_export_options(malloc(manifold_export_options_size()));
-  const char* name = "cbind_sdf_test.glb";
-  manifold_export_meshgl(name, sdf_mesh, options);
-  manifold_destruct_export_options(options);
-  free(options);
-#endif
+  if (options.exportModels) {
+    manifold_write_obj(
+        sdf_man,
+        [](char* buffer, void*) {
+          std::ofstream of("cbind_sdf_test.obj");
+          of << buffer;
+          of.close();
+        },
+        NULL);
+  }
 
   EXPECT_EQ(manifold_status(sdf_man), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_status(sdf_man_context), MANIFOLD_NO_ERROR);

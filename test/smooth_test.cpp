@@ -39,9 +39,7 @@ TEST(Smooth, Tetrahedron) {
   }
   EXPECT_NEAR(maxMeanCurvature, 4.73, 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothTet.obj", smooth);
 }
 
 TEST(Smooth, RefineQuads) {
@@ -65,13 +63,7 @@ TEST(Smooth, RefineQuads) {
   // being stretched out into circular arcs, which introduces unavoidable error.
   EXPECT_LE(maxDiff, 0.07);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions options2;
-  options2.mat.metalness = 0;
-  options2.mat.roughness = 0.5;
-  options2.mat.colorIdx = 0;
-  if (options.exportModels) ExportMesh("refineQuads.glb", out, options2);
-#endif
+  if (options.exportModels) WriteTestOBJ("refineQuads.obj", cylinder);
 }
 
 TEST(Smooth, TruncatedCone) {
@@ -86,15 +78,7 @@ TEST(Smooth, TruncatedCone) {
   EXPECT_NEAR(smooth2.Volume(), smooth1.Volume(), 0.01);
   EXPECT_NEAR(smooth2.SurfaceArea(), smooth1.SurfaceArea(), 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  MeshGL out = smooth.GetMeshGL();
-  ExportOptions options2;
-  options2.faceted = false;
-  options2.mat.normalIdx = 0;
-  options2.mat.roughness = 0;
-  if (options.exportModels)
-    ExportMesh("smoothTruncatedCone.glb", out, options2);
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -117,10 +101,7 @@ TEST(Smooth, ToLength) {
   }
   EXPECT_NEAR(maxMeanCurvature, 1.67, 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("smoothToLength.glb", smooth.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }
 #endif
 
@@ -174,10 +155,7 @@ TEST(Smooth, Precision) {
   EXPECT_NEAR(std::sqrt(minR2), radius - tolerance, 1e-4);
   EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
   EXPECT_EQ(smoothed.NumTri(), 7984);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("refineCylinder.glb", smoothed.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("refineCylinder.obj", smoothed);
 }
 
 TEST(Smooth, Normals) {
@@ -188,10 +166,7 @@ TEST(Smooth, Normals) {
   EXPECT_FLOAT_EQ(out.Volume(), byNormals.Volume());
   EXPECT_FLOAT_EQ(out.SurfaceArea(), byNormals.SurfaceArea());
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("smoothNormals.glb", byNormals.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothNormals.obj", byNormals);
 }
 
 TEST(Smooth, Manual) {
@@ -210,7 +185,6 @@ TEST(Smooth, Manual) {
   EXPECT_NEAR(interp.Volume(), 3.74, 0.01);
   EXPECT_NEAR(interp.SurfaceArea(), 11.78, 0.01);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     interp = interp.CalculateCurvature(-1, 0).SetProperties(
         3, [](double* newProp, vec3 pos, const double* oldProp) {
@@ -219,13 +193,8 @@ TEST(Smooth, Manual) {
           vec3 color = la::lerp(purple, red, smoothstep(0.0, 2.0, oldProp[0]));
           for (const int i : {0, 1, 2}) newProp[i] = color[i];
         });
-    const MeshGL out = interp.GetMeshGL();
-    ExportOptions options;
-    options.mat.roughness = 0.1;
-    options.mat.colorIdx = 0;
-    ExportMesh("manual.glb", out, options);
+    WriteTestOBJ("manual.obj", interp);
   }
-#endif
 }
 
 TEST(Smooth, Mirrored) {
@@ -237,10 +206,7 @@ TEST(Smooth, Mirrored) {
   EXPECT_NEAR(smooth.Volume(), mirror.Volume(), 0.1);
   EXPECT_NEAR(smooth.SurfaceArea(), mirror.SurfaceArea(), 0.1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("smoothMirrored.glb", mirror.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothMirrored.obj", mirror);
 }
 
 TEST(Smooth, Csaszar) {
@@ -250,15 +216,7 @@ TEST(Smooth, Csaszar) {
   EXPECT_NEAR(csaszar.Volume(), 79890, 10);
   EXPECT_NEAR(csaszar.SurfaceArea(), 11950, 10);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    const MeshGL out = csaszar.GetMeshGL();
-    ExportOptions options;
-    options.faceted = false;
-    options.mat.roughness = 0.1;
-    ExportMesh("smoothCsaszar.glb", out, options);
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothCsaszar.obj", csaszar);
 }
 
 vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
@@ -333,13 +291,7 @@ TEST(Smooth, Torus) {
   }
   EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions options2;
-  options2.faceted = false;
-  options2.mat.normalIdx = 1;
-  options2.mat.roughness = 0;
-  if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothTorus.obj", smooth);
 }
 #endif
 
@@ -382,14 +334,7 @@ TEST(Smooth, SineSurface) {
   EXPECT_NEAR(smoothed3.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
               smoothed3.Volume(), 1e-5);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportOptions options2;
-    // options2.faceted = false;
-    // options2.mat.normalIdx = 0;
-    ExportMesh("smoothSineSurface.glb", smoothed.GetMeshGL(), options2);
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothSineSurface.obj", smoothed);
 }
 
 TEST(Smooth, SDF) {
@@ -441,10 +386,5 @@ TEST(Smooth, SDF) {
   EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.026);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportOptions options2;
-    ExportMesh("smoothGyroid.glb", smoothed.GetMeshGL(), options2);
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);
 }
