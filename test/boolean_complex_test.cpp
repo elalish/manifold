@@ -1519,7 +1519,9 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
-TEST(BooleanComplex, DISABLED_SimpleOffset) {
+TEST(BooleanComplex, SimpleOffset) {
+  ManifoldParamGuard guard;
+  manifold::ManifoldParams().processOverlaps = true;
   MeshGL64 seeds = ReadTestMeshGL64OBJ("Generic_Twin_91.1.t0.obj");
   EXPECT_TRUE(seeds.NumTri() > 10);
   EXPECT_TRUE(seeds.NumVert() > 10);
@@ -1601,6 +1603,7 @@ TEST(BooleanComplex, DISABLED_SimpleOffset) {
     c += right;
   }
   EXPECT_EQ(c.Status(), Manifold::Error::NoError);
+  if (options.exportModels) WriteTestOBJ("offset.obj", c.GetMeshGL());
 }
 
 #ifdef MANIFOLD_DEBUG
