@@ -176,7 +176,7 @@ suite('Examples', () => {
   test('Godel, Escher Bach', async () => {
     const result = await runExample('Godel Escher Bach', false);
     expect(result?.genus).to.equal(8, 'Genus');
-    expect(result?.volume).to.be.closeTo(614453, 1, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(145029, 1, 'Surface Area');
+    expect(result?.volume).to.be.closeTo(854805, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(158946, 1, 'Surface Area');
   });
 });

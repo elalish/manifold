@@ -7,66 +7,50 @@
 // manifold objects. When exporting to glTF, CrossSections will be visible, but
 // will not have `EXT_mesh_manifold` applied.
 
-import {CrossSection, CrossSectionGLTFNode, GLTFNode, Vec3} from 'manifold-3d/manifoldCAD';
+import {Font, getGlyphPath, pathToSVG} from 'text-shaper';
+import {pointsOnPath} from 'points-on-path';
+import {CrossSection, Manifold, CrossSectionGLTFNode, GLTFNode, Polygons, Vec3} from 'manifold-3d/manifoldCAD';
 
-const {circle, square, union, hull} = CrossSection;
+const fonturl = 'https://github.com/theleagueof/orbitron/raw/refs/heads/master/webfonts/orbitron-black-webfont.ttf';
 
-/**
- * There are lots of ways to represent letters.
- * This is probably not the best way, but it only really needs to do three
- * letters.
- */
-function font(height: number = 100, stroke: number = 18) {
-  const letters: {[key: string]: CrossSection} = {};
-  const r = (height + stroke) / 4;  // Outer radius of loops and arcs.
+// Return a function that generates a CrossSection for a given letter.
+// Getting the function is asynchronous as it depends on a fetch, but
+// the function itself is synchronous.
+const characterGenerator = async (fonturl:string, height=100) => {
+  const font = await Font.fromURL(fonturl);
 
-  // 'E' to start.
-  letters['E'] = square([height, height], true)
-                     .subtract(square([height, height - 2 * stroke], true)
-                                   .translate([stroke, 0]))
-                     .add(square([height, stroke], true));
+  // Helper function to center and scale a CrossSection
+  // This particular demo looks best if characters are square, so ignore aspect ratio.
+  const resize = (cs:CrossSection) => {
+    const {min, max} = cs.bounds();
+    return cs
+        .translate([-(min[0]+max[0])/2,-(min[1]+max[1])/2])
+        .scale([height/(max[0]-min[0]),height/(max[1]-min[1])]);
+  };
 
-  // A loop of B, or corners of G.
-  const loop = circle(r).subtract(circle(r - stroke)).translate([
-    height / 2 - r, height / 2 - r
-  ]);
-
-  // Mask two loops to make the curved part of B.
-  // Subtract the mask to clip E for the square part.
-  const loops = loop.add(loop.mirror([0, 1]));
-  const maskB = square([r, height]).translate([height / 2 - r, -height / 2]);
-  letters['B'] = letters['E'].subtract(maskB).add(loops.intersect(maskB));
-
-  // Hull four loops to make the outline of an O.
-  letters['O'] = hull([loops, loops.mirror([1, 0])]);
-  letters['O'] = letters['O'].subtract(letters['O'].offset(-stroke));
-
-  // Mask O and add a bar to make G.
-  const barLength = 2 * stroke + (height - (stroke * 3)) / 2;
-  const bar = square([barLength, stroke], true).translate([
-    (height - barLength) / 2, 0
-  ]);
-  letters['G'] =
-      letters['O'].subtract(square([height, (height / 2 - r)])).add(bar);
-
-  return letters;
+  return (char:string): CrossSection => {
+    const glyphpath = getGlyphPath(font, font.glyphIdForChar(char));
+    const svgpath = pathToSVG(glyphpath, {flipY: true, scale: 1});
+    const cs = new CrossSection(pointsOnPath(svgpath) as Polygons);
+    return resize(cs).mirror([0,1]);
+  }
 }
-
-export default () => {
+ 
+export default async () => {
   const height = 100;
   const offset = height / 2;
-  const csNodes: Array<CrossSectionGLTFNode> = [];
+  const char = await characterGenerator(fonturl, height);
 
-  const {G, E, B} = font();
+  const csNodes: Array<CrossSectionGLTFNode> = [];
   const rootNode = new GLTFNode();
   rootNode.name = 'Root';
 
   // Create a cross section for the left side view.
   // And also, a display node for it.
   const leftNode = new CrossSectionGLTFNode(rootNode);
-  leftNode.crossSection = union([
-    G.translate([0, (height + offset) / 2]),
-    E.translate([0, -(height + offset) / 2])
+  leftNode.crossSection = CrossSection.union([
+    char('G').translate([0, (height + offset) / 2]),
+    char('E').translate([0, -(height + offset) / 2])
   ]);
   leftNode.name = 'Left';
   leftNode.rotation = [90, 0, 90];
@@ -76,9 +60,9 @@ export default () => {
 
   // And the same for the right.
   const rightNode = new CrossSectionGLTFNode(rootNode);
-  rightNode.crossSection = union([
-    E.translate([0, (height + offset) / 2]),
-    G.translate([0, -(height + offset) / 2])
+  rightNode.crossSection = CrossSection.union([
+    char('E').translate([0, (height + offset) / 2]),
+    char('G').translate([0, -(height + offset) / 2])
   ]);
   rightNode.name = 'Right';
   rightNode.rotation = [90, 0, 0];
@@ -88,7 +72,7 @@ export default () => {
 
   // Now the bottom.
   const bottomNode = new CrossSectionGLTFNode(rootNode);
-  bottomNode.crossSection = B;
+  bottomNode.crossSection = char('B');
   bottomNode.name = 'Bottom';
   bottomNode.rotation = [0, 0, 0];
   bottomNode.translation = [0, 0, -height * 2];
@@ -96,16 +80,16 @@ export default () => {
   csNodes.push(bottomNode);
 
   // Time for some Constructive Solid Geometry.
-  // Extrude each CrossSection, and orient it in 3D space,
-  // then compute the intersection.
-  const intersection = csNodes
-                           .map((node) => {
-                             const extrusion =
-                                 node.crossSection!.extrude(4 * height);
-                             return extrusion.rotate(node.rotation as Vec3)
-                                 .translate(node.translation as Vec3);
-                           })
-                           .reduce((acc, cur) => acc.intersect(cur));
+  // Extrude each CrossSection and apply the same rotation and translation.
+  // Then compute the intersection.
+  const extrude = (node:CrossSectionGLTFNode) => {
+    let extrusion = node.crossSection!.extrude(4 * height);
+    extrusion = extrusion.rotate(node.rotation as Vec3);
+    extrusion = extrusion.translate(node.translation as Vec3);
+    return extrusion;
+  }
+  const intersect = ((acc:Manifold, cur:Manifold) => acc.intersect(cur))
+  const intersection = csNodes.map(extrude).reduce(intersect);
 
   // Put the result into a node so it can be oriented
   // in the same context as our CrossSection nodes.
