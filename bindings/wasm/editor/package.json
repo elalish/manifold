@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
     "clean": "rm -fr ./dist",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "public": "cp -rv dist/* ../public/"
   },
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",

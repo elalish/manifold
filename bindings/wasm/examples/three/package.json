@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "public": "cp -rv dist/* ../../public/"
   },
   "dependencies": {
     "three": "0.182.0",

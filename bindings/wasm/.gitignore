@@ -13,3 +13,4 @@ test/*.d.ts.map
 dist/
 coverage/
 test/results
+public/

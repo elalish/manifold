@@ -23,7 +23,7 @@ jobs:
         mv ./samples ./public
         mv ./docs ./public
 
-    - name: Download built examples
+    - name: Download manifoldCAD editor, examples and documentation
       uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
@@ -34,15 +34,6 @@ jobs:
         check_artifacts: true 
         name: wasm
         path: ./public
-
-    - name: Deploy Javascript Docs to Github Pages
-      run: |
-        cd bindings/wasm
-        cp ../../public/manifold.js .
-        cp ../../public/manifold.wasm .
-        npm install
-        npm run docs
-        mv ./docs/jsapi ./docs/jsuser ../../public/docs
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3
