@@ -12,7 +12,8 @@
   "dependencies": {
     "@gltf-transform/core": "^4.2.0",
     "@gltf-transform/functions": "^4.2.0",
-    "@jscadui/3mf-export": "^0.5.0"
+    "@google/model-viewer": "^4.1.0",
+    "manifold-3d": "file:../.."
   },
   "devDependencies": {
     "@types/node": "^25.0.9",

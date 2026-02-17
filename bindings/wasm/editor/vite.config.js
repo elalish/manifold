@@ -6,11 +6,19 @@ import {viteStaticCopy} from 'vite-plugin-static-copy'
 export default defineConfig({
   worker: {format: 'es'},
   server: {
+    // `npm run dev`
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     fs: {allow: [resolve(__dirname, '..')]}
+  },
+  preview: {
+    // `npm run preview`
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    },
   },
   plugins: [viteStaticCopy({
     targets: [
@@ -35,7 +43,7 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    sourcemap: false,
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),

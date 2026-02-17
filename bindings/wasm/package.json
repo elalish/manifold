@@ -61,7 +61,7 @@
     "./manifold-gltf": {
       "import": {
         "types": "./lib/manifold-gltf.d.ts",
-        "default": "./lib/manifold-gltf.d.ts"
+        "default": "./lib/manifold-gltf.js"
       }
     },
     "./lib/worker.bundled.js": {
@@ -76,7 +76,14 @@
         "default": "./manifold.js"
       }
     },
-    "./lib/*": "./lib/*"
+    "./lib/*.js": "./lib/*.js",
+    "./lib/*.d.ts": "./lib/*.d.ts",
+    "./lib/*": {
+      "import": {
+        "types": "./lib/*.d.ts",
+        "default": "./lib/*.js"
+      }
+    }
   },
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -104,6 +111,11 @@
     "url": "https://github.com/elalish/manifold/issues"
   },
   "homepage": "https://github.com/elalish/manifold#readme",
+  "peerDependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0"
+  },
   "devDependencies": {
     "@chialab/esbuild-plugin-meta-url": "^0.19.0",
     "@microsoft/api-extractor": "^7.55.2",

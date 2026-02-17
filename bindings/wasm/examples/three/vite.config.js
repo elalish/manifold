@@ -19,9 +19,9 @@ export default defineConfig({
         three: resolve(__dirname, 'three.html'),
       },
       output: {
-        entryFileNames: `assets/[name].js`,
-        chunkFileNames: `assets/[name].js`,
-        assetFileNames: `assets/[name].[ext]`
+        entryFileNames: `assets/three/[name].js`,
+        chunkFileNames: `assets/three/[name].js`,
+        assetFileNames: `assets/three/[name].[ext]`
       }
     }
   },

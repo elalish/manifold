@@ -37,8 +37,6 @@ target_link_options(
 
 set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
-
 # ensure that interface files are copied over when modified
 add_custom_target(
   js_deps
@@ -53,12 +51,4 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
     ${CMAKE_CURRENT_SOURCE_DIR}
-  # copy WASM build and TS declarations for Vite to package into ManifoldCAD.org
-  COMMAND
-    ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/manifold*
-    ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/
-  # copy TS declarations to public so they can be accessed by our editor
-  COMMAND
-    ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/
 )

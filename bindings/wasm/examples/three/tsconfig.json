@@ -14,15 +14,10 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "declaration": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
   },
   "include": [
     "./*.ts",
-    "../lib/*.ts",
   ],
   "exclude": []
 }
-

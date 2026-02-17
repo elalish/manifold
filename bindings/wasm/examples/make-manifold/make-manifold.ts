@@ -17,11 +17,13 @@ import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {prune} from '@gltf-transform/functions';
 import {SimpleDropzone} from 'simple-dropzone';
 
-import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from '../lib/gltf-io';
-import Module from '../manifold.js';
+import {EXTManifold} from 'manifold-3d/manifold-gltf';
+import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-3d/lib/gltf-io';
+import Module from 'manifold-3d';
 
 // Set up gltf-transform
-const io = setupIO(new WebIO());
+const io = new WebIO();
+io.registerExtensions([EXTManifold]);
 io.registerExtensions(KHRONOS_EXTENSIONS);
 
 // Set up Manifold WASM library
