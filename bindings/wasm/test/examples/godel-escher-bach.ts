@@ -11,8 +11,9 @@ import {CrossSection, CrossSectionGLTFNode, GLTFNode, Manifold, Polygons, Vec3} 
 import {pointsOnPath} from 'points-on-path';
 import {Font, getGlyphPath, pathToSVG} from 'text-shaper';
 
+// Orbitron Font from https://github.com/theleagueof/orbitron/
 const fonturl =
-    'https://github.com/theleagueof/orbitron/raw/refs/heads/master/webfonts/orbitron-black-webfont.ttf';
+    'https://raw.githubusercontent.com/theleagueof/orbitron/master/webfonts/orbitron-black-webfont.ttf';
 
 // Return a function that generates a CrossSection for a given letter.
 // Getting the function is asynchronous as it depends on a fetch, but
