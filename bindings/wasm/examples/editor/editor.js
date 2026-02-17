@@ -21,8 +21,8 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
-import ManifoldWorker from '../dist/worker.bundled.js?worker';
-import manifoldWasmUrl from '../manifold.wasm?url';
+import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
+import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js

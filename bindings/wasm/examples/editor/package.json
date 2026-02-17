@@ -9,12 +9,12 @@
     "build:watch": "vite build --watch",
     "clean": "rm -fr ./dist",
     "preview": "vite preview",
-    "public": "cp -rv dist/* ../public/"
+    "public": "cp -rv dist/* ../../public/"
   },
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@google/model-viewer": "^4.1.0",
-    "manifold-3d": "file:..",
+    "manifold-3d": "file:../..",
     "monaco-editor": "^0.54.0",
     "monaco-editor-auto-typings": "^0.4.6"
   },
