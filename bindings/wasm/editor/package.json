@@ -14,7 +14,6 @@
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@google/model-viewer": "^4.1.0",
-    "esbuild-wasm": "^0.27.2",
     "manifold-3d": "file:..",
     "monaco-editor": "^0.54.0",
     "monaco-editor-auto-typings": "^0.4.6"

@@ -4,6 +4,21 @@ group: none
 category: none
 ---
 
+## Debugging
+
+To debug the WASM build directly in Chrome dev tools, simply build in debug mode:
+```
+emcmake cmake -DCMAKE_BUILD_TYPE=Debug .. && emmake make
+```
+and install the [DWARF](goo.gle/wasm-debugging-extension) Chrome extension.
+
+When testing [ManifoldCAD.org](https://manifoldcad.org/) (either locally or the
+deployed version) note that it uses a service worker for faster loading. This
+means you need to open the page twice to see updates (the first time loads the
+old version and caches the new one, the second time loads the new version from
+cache). To see changes on each reload, open Chrome dev tools, go to the
+Application tab and check "update on reload".
+
 ## Documentation
 
 This guide and the ManifoldCAD User Guide are built using [TypeDoc](https://typedoc.org).

@@ -33,7 +33,6 @@
     self.ModelViewerElement = self.ModelViewerElement || {};
     self.ModelViewerElement.modelCacheSize = 0;
   </script>
-  <script type="module" src="/editor-examples.js"></script>
 </head>
 
 <body>
@@ -88,6 +87,9 @@
     </div>
   </div>
 </body>
+<script type="module">
+import { ModelViewerElement } from '@google/model-viewer';
+</script>
+<script type="module" src="editor-examples.js"></script>
 <script type="module" src="editor.js"></script>
-<script>import { ModelViewerElement } from '@google/model-viewer';</script>
 </html>
