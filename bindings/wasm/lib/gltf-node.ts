@@ -286,7 +286,7 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
  * allows it to be included in the final exported file, complete with
  * transformations.
  *
- * > [!NOTICE]
+ * > [!NOTE]
  * >
  * > CrossSections are not -- and can never be -- manifold.  That means
  * > some exporters (like `.3mf`) will just skip over them entirely.

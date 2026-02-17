@@ -254,8 +254,11 @@ export function writeMesh(
     doc: GLTFTransform.Document, manifoldMesh: ManifoldMesh,
     id2properties: Map<number, Properties>,
     EXT_mesh_manifold: boolean = true): GLTFTransform.Mesh {
-  const mesh = doc.createMesh();
+  if (doc.getRoot().listBuffers().length === 0) {
+    doc.createBuffer();
+  }
 
+  const mesh = doc.createMesh();
   writePrimitiveAttributes(doc, mesh, manifoldMesh, id2properties);
   if (EXT_mesh_manifold) {
     writeExtMeshManifoldIndices(doc, mesh, manifoldMesh);
