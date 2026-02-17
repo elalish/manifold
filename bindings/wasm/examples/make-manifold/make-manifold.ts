@@ -15,11 +15,10 @@
 import {Document, WebIO} from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {prune} from '@gltf-transform/functions';
-import {SimpleDropzone} from 'simple-dropzone';
-
-import {EXTManifold} from 'manifold-3d/manifold-gltf';
-import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-3d/lib/gltf-io';
 import Module from 'manifold-3d';
+import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-3d/lib/gltf-io';
+import {EXTManifold} from 'manifold-3d/manifold-gltf';
+import {SimpleDropzone} from 'simple-dropzone';
 
 // Set up gltf-transform
 const io = new WebIO();

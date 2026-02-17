@@ -14,11 +14,10 @@
 
 import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, mergeDocuments, prune} from '@gltf-transform/functions';
-
-import type {Properties} from 'manifold-3d/lib/gltf-io';
-import {disposeMesh, readMesh, setupIO, writeMesh} from 'manifold-3d/lib/gltf-io';
 import type {Manifold as ManifoldType} from 'manifold-3d';
 import Module from 'manifold-3d';
+import type {Properties} from 'manifold-3d/lib/gltf-io';
+import {disposeMesh, readMesh, setupIO, writeMesh} from 'manifold-3d/lib/gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
