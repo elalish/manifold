@@ -10,10 +10,15 @@
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
     "build": "tsc && node ./esbuild.mjs",
     "build:wasm": "mkdir -p ../../buildWASM && cd ../../buildWASM && emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make",
+    "build:all": "npm run build && npm run build:editor && npm run build:examples",
     "build:editor": "cd examples/editor && npm run build",
     "build:examples": "(cd examples/three && npm run build) && (cd examples/model-viewer && npm run build) && (cd examples/make-manifold && npm run build)",
+    "ci:all": "npm ci && npm run ci:editor && npm run ci:examples",
     "ci:editor": "cd examples/editor && npm ci",
     "ci:examples": "(cd examples/three && npm ci) && (cd examples/model-viewer && npm ci) && (cd examples/make-manifold && npm ci)",
+    "install:all": "npm install && npm run install:editor && npm run install:examples",
+    "install:editor": "cd examples/editor && npm install",
+    "install:examples": "(cd examples/three && npm install) && (cd examples/model-viewer && npm install) && (cd examples/make-manifold && npm install)",
     "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
     "docs": "npm run docs:jsapi && npm run docs:jsuser",
     "docs:jsapi": "typedoc --options typedoc.api.json",
@@ -123,7 +128,7 @@
     "@gltf-transform/core": "^4.2.0",
     "@gltf-transform/extensions": "^4.2.0",
     "@gltf-transform/functions": "^4.2.0",
-    "esbuild-wasm": "0.27.2"
+    "esbuild-wasm": "^0.27.3"
   },
   "devDependencies": {
     "@chialab/esbuild-plugin-meta-url": "^0.19.0",
@@ -149,5 +154,6 @@
     "convert-source-map": "^2.0.0",
     "fflate": "^0.8.0",
     "magic-string": "^0.30.21"
+
   }
 }

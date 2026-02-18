@@ -11,6 +11,9 @@
     "preview": "vite preview",
     "public": "cp -rv dist/* ../../public/"
   },
+  "peerDependencies": {
+    "esbuild-wasm": "^0.27.3"
+  },
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@google/model-viewer": "^4.1.0",
