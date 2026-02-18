@@ -15,14 +15,13 @@
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
+import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
 import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-
-import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
-import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
