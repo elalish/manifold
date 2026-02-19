@@ -288,7 +288,7 @@ class Collider {
     // create global counters
     std::unique_ptr<std::atomic<int>[]> counter(
         new std::atomic<int>[NumInternal()]);
-    for (int i = 0; i < NumInternal(); ++i) {
+    for (size_t i = 0; i < NumInternal(); ++i) {
       counter[i].store(0, std::memory_order_relaxed);
     }
     // kernel over leaves to save internal Boxes
