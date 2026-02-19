@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <atomic>
+#include <memory>
 #include <set>
 
 #include "disjoint_sets.h"
@@ -316,15 +317,20 @@ void Manifold::Impl::CompactProps() {
 
   const int numProp = NumProp();
   const auto numVerts = properties_.size() / numProp;
-  Vec<int> keep(numVerts, 0);
+  std::unique_ptr<std::atomic<int>[]> keep(new std::atomic<int>[numVerts]);
+  for (int i = 0; i < static_cast<int>(numVerts); ++i)
+    keep[i].store(0, std::memory_order_relaxed);
   auto policy = autoPolicy(numVerts, 1e5);
 
   for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
-    reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
-        ->store(1, std::memory_order_relaxed);
+    keep[h.propVert].store(1, std::memory_order_relaxed);
+  });
+  Vec<int> keepPlain(numVerts);
+  for_each_n(policy, countAt(0), numVerts, [&](const int i) {
+    keepPlain[i] = keep[i].load(std::memory_order_relaxed);
   });
   Vec<int> propOld2New(numVerts + 1, 0);
-  inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
+  inclusive_scan(keepPlain.begin(), keepPlain.end(), propOld2New.begin() + 1);
 
   Vec<double> oldProp = properties_;
   const int numVertsNew = propOld2New[numVerts];
@@ -332,8 +338,9 @@ void Manifold::Impl::CompactProps() {
   properties.resize_nofill(numProp * numVertsNew);
   for_each_n(
       policy, countAt(0), numVerts,
-      [&properties, &oldProp, &propOld2New, &keep, &numProp](const int oldIdx) {
-        if (keep[oldIdx] == 0) return;
+      [&properties, &oldProp, &propOld2New, &keepPlain,
+       &numProp](const int oldIdx) {
+        if (keepPlain[oldIdx] == 0) return;
         for (int p = 0; p < numProp; ++p) {
           properties[propOld2New[oldIdx] * numProp + p] =
               oldProp[oldIdx * numProp + p];

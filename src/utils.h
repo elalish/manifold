@@ -71,20 +71,17 @@ void Permute(std::vector<T>& inOut, const Vec<T1>& new2Old) {
 }
 
 template <typename T>
-T AtomicAdd(T& target, T add) {
-  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
-  T old_val = tar.load();
-  while (!tar.compare_exchange_weak(old_val, old_val + add,
-                                    std::memory_order_seq_cst)) {
+T AtomicAdd(std::atomic<T>& target, T add) {
+  T old_val = target.load(std::memory_order_relaxed);
+  while (!target.compare_exchange_weak(old_val, old_val + add,
+                                       std::memory_order_relaxed)) {
   }
   return old_val;
 }
 
 template <>
-inline int AtomicAdd(int& target, int add) {
-  std::atomic<int>& tar = reinterpret_cast<std::atomic<int>&>(target);
-  int old_val = tar.fetch_add(add, std::memory_order_seq_cst);
-  return old_val;
+inline int AtomicAdd<int>(std::atomic<int>& target, int add) {
+  return target.fetch_add(add, std::memory_order_relaxed);
 }
 
 template <typename T>

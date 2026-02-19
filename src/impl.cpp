@@ -232,17 +232,17 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
 void Manifold::Impl::RemoveUnreferencedVerts() {
   ZoneScoped;
   const int numVert = NumVert();
-  Vec<int> keep(numVert, 0);
+  std::unique_ptr<std::atomic<int>[]> keep(new std::atomic<int>[numVert]);
+  for (int i = 0; i < numVert; ++i) keep[i].store(0, std::memory_order_relaxed);
   auto policy = autoPolicy(numVert, 1e5);
   for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
     if (h.startVert >= 0) {
-      reinterpret_cast<std::atomic<int>*>(&keep[h.startVert])
-          ->store(1, std::memory_order_relaxed);
+      keep[h.startVert].store(1, std::memory_order_relaxed);
     }
   });
 
   for_each_n(policy, countAt(0), numVert, [&keep, this](int v) {
-    if (keep[v] == 0) {
+    if (keep[v].load(std::memory_order_relaxed) == 0) {
       vertPos_[v] = vec3(NAN);
     }
   });
@@ -458,10 +458,15 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       // locally for each slice.
       // This helps with memory locality, and is faster for larger meshes.
       Vec<HalfedgePairData> entries(numHalfedge);
-      Vec<int> offsets(vertCount * 2, 0);
-      auto setOffset = [&offsets, vertCount](int _e, int v0, int v1) {
+      const int offsetsSize = vertCount * 2;
+      std::unique_ptr<std::atomic<int>[]> offsetsCount(
+          new std::atomic<int>[offsetsSize]);
+      for (int i = 0; i < offsetsSize; ++i)
+        offsetsCount[i].store(0, std::memory_order_relaxed);
+      auto setOffset = [&offsetsCount, vertCount](int _e, int v0, int v1) {
         const int offset = v0 > v1 ? 0 : vertCount;
-        AtomicAdd(offsets[std::min(v0, v1) + offset], 1);
+        offsetsCount[std::min(v0, v1) + offset].fetch_add(
+            1, std::memory_order_relaxed);
       };
       if (triVert.empty()) {
         for_each_n(policy, countAt(0), numTri,
@@ -472,22 +477,36 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
                    PrepHalfedges<false, decltype(setOffset)>{
                        halfedge_, triProp, triVert, setOffset});
       }
+      Vec<int> offsets(offsetsSize);
+      for_each_n(policy, countAt(0), offsets.size(), [&](const int i) {
+        offsets[i] = offsetsCount[i].load(std::memory_order_relaxed);
+      });
       exclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
+      std::unique_ptr<std::atomic<int>[]> offsetsAlloc(
+          new std::atomic<int>[offsets.size()]);
+      for_each_n(policy, countAt(0), offsets.size(), [&](const int i) {
+        offsetsAlloc[i].store(offsets[i], std::memory_order_relaxed);
+      });
       for_each_n(policy, countAt(0), numTri,
-                 [this, &offsets, &entries, vertCount](const int tri) {
+                 [this, &offsetsAlloc, &entries, vertCount](const int tri) {
                    for (const int i : {0, 1, 2}) {
                      const int e = 3 * tri + i;
                      const int v0 = halfedge_[e].startVert;
                      const int v1 = halfedge_[e].endVert;
                      const int offset = v0 > v1 ? 0 : vertCount;
                      const int start = std::min(v0, v1);
-                     const int index = AtomicAdd(offsets[start + offset], 1);
+                    const int index = offsetsAlloc[start + offset].fetch_add(
+                        1, std::memory_order_relaxed);
                      entries[index] = {std::max(v0, v1), tri, e};
                    }
                  });
-      for_each_n(policy, countAt(0), offsets.size(), [&](const int v) {
-        int start = v == 0 ? 0 : offsets[v - 1];
-        int end = offsets[v];
+      Vec<int> offsetsFinal(offsets.size());
+      for_each_n(policy, countAt(0), offsetsFinal.size(), [&](const int i) {
+        offsetsFinal[i] = offsetsAlloc[i].load(std::memory_order_relaxed);
+      });
+      for_each_n(policy, countAt(0), offsetsFinal.size(), [&](const int v) {
+        int start = v == 0 ? 0 : offsetsFinal[v - 1];
+        int end = offsetsFinal[v];
         for (int i = start; i < end; ++i) ids[i] = i;
         std::sort(ids.begin() + start, ids.begin() + end,
                   [&entries](int a, int b) { return entries[a] < entries[b]; });

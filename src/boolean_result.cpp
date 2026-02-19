@@ -71,10 +71,13 @@ struct CountVerts {
   VecView<const int> inclusion;
 
   void operator()(size_t i) {
-    if (atomic)
-      AtomicAdd(count[i / 3], std::abs(inclusion[halfedges[i].startVert]));
-    else
+    if constexpr (atomic) {
+      // This specialization is no longer used; keep for historical reference.
+      // (Would require a real atomic storage type.)
+      DEBUG_ASSERT(false, logicErr, "atomic CountVerts is unsupported");
+    } else {
       count[i / 3] += std::abs(inclusion[halfedges[i].startVert]);
+    }
   }
 };
 
@@ -91,11 +94,8 @@ struct CountNewVerts {
     int faceQ = pq[idx][inverted ? 0 : 1];
     int inclusion = std::abs(i12[idx]);
 
-    if (atomic) {
-      AtomicAdd(countQ[faceQ], inclusion);
-      const Halfedge half = halfedges[edgeP];
-      AtomicAdd(countP[edgeP / 3], inclusion);
-      AtomicAdd(countP[half.pairedHalfedge / 3], inclusion);
+    if constexpr (atomic) {
+      DEBUG_ASSERT(false, logicErr, "atomic CountNewVerts is unsupported");
     } else {
       countQ[faceQ] += inclusion;
       const Halfedge half = halfedges[edgeP];
@@ -111,39 +111,28 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     const Vec<int>& i21, const Vec<std::array<int, 2>>& p1q2,
     const Vec<std::array<int, 2>>& p2q1, bool invertQ) {
   ZoneScoped;
-  Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
+  const int numFaceP = inP.NumTri();
+  const int numFaceQ = inQ.NumTri();
+  const int numFacePQ = numFaceP + numFaceQ;
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
 
-  auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
-  auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
+  // This sizing pass is performance-sensitive but must be deterministic and
+  // race-free; run it sequentially even when compiled with parallel support.
+  Vec<int> sidesPerFacePQ(numFacePQ, 0);
+  auto sidesPerFaceP = sidesPerFacePQ.view(0, numFaceP);
+  auto sidesPerFaceQ = sidesPerFacePQ.view(numFaceP, numFaceQ);
 
-  if (inP.halfedge_.size() >= 1e5) {
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<true>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<true>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  } else {
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<false>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<false>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  }
+  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inP.halfedge_.size()),
+           CountVerts<false>({inP.halfedge_, sidesPerFaceP, i03}));
+  for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inQ.halfedge_.size()),
+           CountVerts<false>({inQ.halfedge_, sidesPerFaceQ, i30}));
 
-  if (i12.size() >= 1e5) {
-    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(),
-               CountNewVerts<false, true>(
-                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(),
-               CountNewVerts<true, true>(
-                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
-  } else {
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(),
-               CountNewVerts<false, false>(
-                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(),
-               CountNewVerts<true, false>(
-                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
-  }
+  for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(),
+             CountNewVerts<false, false>(
+                 {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
+  for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(),
+             CountNewVerts<true, false>(
+                 {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
@@ -465,8 +454,8 @@ struct DuplicateHalfedges {
     const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
 
     for (int i = 0; i < std::abs(inclusion); ++i) {
-      int forwardEdge = AtomicAdd(facePtr[newFace], 1);
-      int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
+      int forwardEdge = facePtr[newFace]++;
+      int backwardEdge = facePtr[faceRight]++;
       halfedge.pairedHalfedge = backwardEdge;
 
       halfedgesR[forwardEdge] = halfedge;
@@ -487,10 +476,76 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                       const Vec<int>& vP2R, VecView<const int> faceP2R,
                       bool forward) {
   ZoneScoped;
+#if MANIFOLD_PAR == 1
+  // In parallel mode, we need atomic per-face counters, but we can't store
+  // `std::atomic<T>` inside `Vec<T>` (it's non-copyable and `Vec` instantiates
+  // copy paths). So use a fixed atomic array and copy back afterwards.
+  struct DuplicateHalfedgesAtomic {
+    VecView<Halfedge> halfedgesR;
+    VecView<TriRef> halfedgeRef;
+    std::atomic<int>* facePtr;
+    VecView<const char> wholeHalfedgeP;
+    VecView<const Halfedge> halfedgesP;
+    VecView<const int> i03;
+    VecView<const int> vP2R;
+    VecView<const int> faceP2R;
+    const bool forward;
+
+    void operator()(const int idx) {
+      if (!wholeHalfedgeP[idx]) return;
+      Halfedge halfedge = halfedgesP[idx];
+      if (!halfedge.IsForward()) return;
+
+      const int inclusion = i03[halfedge.startVert];
+      if (inclusion == 0) return;
+      if (inclusion < 0) {  // reverse
+        std::swap(halfedge.startVert, halfedge.endVert);
+      }
+      halfedge.startVert = vP2R[halfedge.startVert];
+      halfedge.endVert = vP2R[halfedge.endVert];
+      const int faceLeftP = idx / 3;
+      const int newFace = faceP2R[faceLeftP];
+      const int faceRightP = halfedge.pairedHalfedge / 3;
+      const int faceRight = faceP2R[faceRightP];
+      const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP, -1};
+      const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP, -1};
+
+      for (int i = 0; i < std::abs(inclusion); ++i) {
+        int forwardEdge =
+            facePtr[newFace].fetch_add(1, std::memory_order_relaxed);
+        int backwardEdge =
+            facePtr[faceRight].fetch_add(1, std::memory_order_relaxed);
+        halfedge.pairedHalfedge = backwardEdge;
+
+        halfedgesR[forwardEdge] = halfedge;
+        halfedgesR[backwardEdge] = {halfedge.endVert, halfedge.startVert,
+                                    forwardEdge};
+        halfedgeRef[forwardEdge] = forwardRef;
+        halfedgeRef[backwardEdge] = backwardRef;
+
+        ++halfedge.startVert;
+        ++halfedge.endVert;
+      }
+    }
+  };
+
+  std::unique_ptr<std::atomic<int>[]> facePtrAtomic(
+      new std::atomic<int>[facePtrR.size()]);
+  for (size_t i = 0; i < facePtrR.size(); ++i)
+    facePtrAtomic[i].store(facePtrR[i], std::memory_order_relaxed);
+  for_each_n(
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
+      DuplicateHalfedgesAtomic({outR.halfedge_, halfedgeRef, facePtrAtomic.get(),
+                                wholeHalfedgeP, inP.halfedge_, i03, vP2R,
+                                faceP2R, forward}));
+  for (size_t i = 0; i < facePtrR.size(); ++i)
+    facePtrR[i] = facePtrAtomic[i].load(std::memory_order_relaxed);
+#else
   for_each_n(
       autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
+#endif
 }
 
 struct MapTriRef {

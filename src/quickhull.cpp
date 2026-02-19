@@ -252,20 +252,25 @@ std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   // reorder halfedges
   SharedVec<Halfedge> halfedges(mesh.halfedges.size());
   Vec<int> halfedgeToFace(mesh.halfedges.size());
-  Vec<int> counts(mesh.halfedges.size(), 0);
+  std::unique_ptr<std::atomic<int>[]> counts(
+      new std::atomic<int>[mesh.halfedges.size()]);
+  for (size_t i = 0; i < mesh.halfedges.size(); ++i)
+    counts[i].store(0, std::memory_order_relaxed);
   Vec<int> mapping(mesh.halfedges.size());
   Vec<int> faceMap(mesh.faces.size());
 
   // Some faces are disabled and should not go into the halfedge vector, we can
   // update the face indices of the halfedges at the end using index/3
-  int j = 0;
+  std::atomic<int> j(0);
   for_each(
       autoPolicy(mesh.halfedges.size()), countAt(0_uz),
       countAt(mesh.halfedges.size()), [&](size_t i) {
         if (mesh.halfedges[i].pairedHalfedge < 0) return;
         if (mesh.faces[mesh.halfedgeToFace[i]].isDisabled()) return;
-        if (AtomicAdd(counts[mesh.halfedgeToFace[i]], 1) > 0) return;
-        int currIndex = AtomicAdd(j, 3);
+        if (counts[mesh.halfedgeToFace[i]].fetch_add(
+                1, std::memory_order_relaxed) > 0)
+          return;
+        int currIndex = j.fetch_add(3, std::memory_order_relaxed);
         mapping[i] = currIndex;
         halfedges[currIndex + 0] = mesh.halfedges[i];
         halfedgeToFace[currIndex + 0] = mesh.halfedgeToFace[i];
@@ -283,36 +288,48 @@ std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
         halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
         halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
       });
-  halfedges.resize(j);
-  halfedgeToFace.resize(j);
+  const int jVal = j.load(std::memory_order_relaxed);
+  halfedges.resize(jVal);
+  halfedgeToFace.resize(jVal);
   // fix pairedHalfedge id
   for_each(
       autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
       [&](Halfedge& he) { he.pairedHalfedge = mapping[he.pairedHalfedge]; });
-  counts.resize_nofill(originalVertexData.size() + 1);
-  fill(counts.begin(), counts.end(), 0);
+  std::unique_ptr<std::atomic<int>[]> vertCounts(
+      new std::atomic<int>[originalVertexData.size() + 1]);
+  for (size_t i = 0; i < originalVertexData.size() + 1; ++i)
+    vertCounts[i].store(0, std::memory_order_relaxed);
 
   // remove unused vertices
   for_each(autoPolicy(halfedges.size() / 3), countAt(0_uz),
            countAt(halfedges.size() / 3), [&](size_t i) {
-             AtomicAdd(counts[halfedges[3 * i].startVert], 1);
-             AtomicAdd(counts[halfedges[3 * i + 1].startVert], 1);
-             AtomicAdd(counts[halfedges[3 * i + 2].startVert], 1);
+             vertCounts[halfedges[3 * i].startVert].fetch_add(
+                 1, std::memory_order_relaxed);
+             vertCounts[halfedges[3 * i + 1].startVert].fetch_add(
+                 1, std::memory_order_relaxed);
+             vertCounts[halfedges[3 * i + 2].startVert].fetch_add(
+                 1, std::memory_order_relaxed);
            });
+  Vec<int> countsPlain(originalVertexData.size() + 1);
+  for_each_n(autoPolicy(countsPlain.size()), countAt(0_uz), countsPlain.size(),
+             [&](size_t i) {
+               countsPlain[i] = vertCounts[i].load(std::memory_order_relaxed);
+             });
   auto saturate = [](int c) { return c > 0 ? 1 : 0; };
-  exclusive_scan(TransformIterator(counts.begin(), saturate),
-                 TransformIterator(counts.end(), saturate), counts.begin(), 0);
-  Vec<vec3> vertices(counts.back());
+  exclusive_scan(TransformIterator(countsPlain.begin(), saturate),
+                 TransformIterator(countsPlain.end(), saturate),
+                 countsPlain.begin(), 0);
+  Vec<vec3> vertices(countsPlain.back());
   for_each(autoPolicy(originalVertexData.size()), countAt(0_uz),
            countAt(originalVertexData.size()), [&](size_t i) {
-             if (counts[i + 1] - counts[i] > 0) {
-               vertices[counts[i]] = originalVertexData[i];
+             if (countsPlain[i + 1] - countsPlain[i] > 0) {
+               vertices[countsPlain[i]] = originalVertexData[i];
              }
            });
   for_each(autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
            [&](Halfedge& he) {
-             he.startVert = counts[he.startVert];
-             he.endVert = counts[he.endVert];
+             he.startVert = countsPlain[he.startVert];
+             he.endVert = countsPlain[he.endVert];
            });
   return {std::move(halfedges), std::move(vertices)};
 }

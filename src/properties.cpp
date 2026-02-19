@@ -14,6 +14,8 @@
 
 #include <limits>
 
+#include <atomic>
+
 #if MANIFOLD_PAR == 1
 #include <tbb/combinable.h>
 #endif
@@ -26,10 +28,10 @@ namespace {
 using namespace manifold;
 
 struct CurvatureAngles {
-  VecView<double> meanCurvature;
-  VecView<double> gaussianCurvature;
-  VecView<double> area;
-  VecView<double> degree;
+  std::atomic<double>* meanCurvature;
+  std::atomic<double>* gaussianCurvature;
+  std::atomic<double>* area;
+  std::atomic<double>* degree;
   VecView<const Halfedge> halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
@@ -298,14 +300,40 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  Vec<double> vertMeanCurvature(NumVert(), 0);
-  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
-  Vec<double> vertArea(NumVert(), 0);
-  Vec<double> degree(NumVert(), 0);
+  const int numVert = NumVert();
+  std::unique_ptr<std::atomic<double>[]> vertMeanCurvatureAtomic(
+      new std::atomic<double>[numVert]);
+  std::unique_ptr<std::atomic<double>[]> vertGaussianCurvatureAtomic(
+      new std::atomic<double>[numVert]);
+  std::unique_ptr<std::atomic<double>[]> vertAreaAtomic(
+      new std::atomic<double>[numVert]);
+  std::unique_ptr<std::atomic<double>[]> degreeAtomic(
+      new std::atomic<double>[numVert]);
+  for (int i = 0; i < numVert; ++i) {
+    vertMeanCurvatureAtomic[i].store(0.0, std::memory_order_relaxed);
+    vertGaussianCurvatureAtomic[i].store(kTwoPi, std::memory_order_relaxed);
+    vertAreaAtomic[i].store(0.0, std::memory_order_relaxed);
+    degreeAtomic[i].store(0.0, std::memory_order_relaxed);
+  }
   auto policy = autoPolicy(NumTri(), 1e4);
   for_each(policy, countAt(0_uz), countAt(NumTri()),
-           CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
-                            degree, halfedge_, vertPos_, faceNormal_}));
+           CurvatureAngles({vertMeanCurvatureAtomic.get(),
+                            vertGaussianCurvatureAtomic.get(),
+                            vertAreaAtomic.get(), degreeAtomic.get(), halfedge_,
+                            vertPos_, faceNormal_}));
+
+  Vec<double> vertMeanCurvature(numVert);
+  Vec<double> vertGaussianCurvature(numVert);
+  Vec<double> vertArea(numVert);
+  Vec<double> degree(numVert);
+  for_each_n(policy, countAt(0), numVert, [&](const int vert) {
+    vertMeanCurvature[vert] =
+        vertMeanCurvatureAtomic[vert].load(std::memory_order_relaxed);
+    vertGaussianCurvature[vert] =
+        vertGaussianCurvatureAtomic[vert].load(std::memory_order_relaxed);
+    vertArea[vert] = vertAreaAtomic[vert].load(std::memory_order_relaxed);
+    degree[vert] = degreeAtomic[vert].load(std::memory_order_relaxed);
+  });
   for_each_n(policy, countAt(0), NumVert(),
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {
@@ -320,16 +348,19 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   properties_ = Vec<double>(numProp * NumPropVert(), 0);
   numProp_ = numProp;
 
-  Vec<uint8_t> counters(NumPropVert(), 0);
+  const int numPropVert = NumPropVert();
+  std::unique_ptr<std::atomic<uint8_t>[]> counters(
+      new std::atomic<uint8_t>[numPropVert]);
+  for (int i = 0; i < numPropVert; ++i)
+    counters[i].store(0, std::memory_order_relaxed);
   for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
     for (const int i : {0, 1, 2}) {
       const Halfedge& edge = halfedge_[3 * tri + i];
       const int vert = edge.startVert;
       const int propVert = edge.propVert;
 
-      auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
-          static_cast<uint8_t>(1));
+      auto old = counters[propVert].exchange(static_cast<uint8_t>(1),
+                                             std::memory_order_relaxed);
       if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {

@@ -212,7 +212,7 @@ struct FindCollision {
 
 struct BuildInternalBoxes {
   VecView<Box> nodeBBox_;
-  VecView<int> counter_;
+  std::atomic<int>* counter_;
   const VecView<int> nodeParent_;
   const VecView<std::pair<int, int>> internalChildren_;
 
@@ -221,7 +221,9 @@ struct BuildInternalBoxes {
     do {
       node = nodeParent_[node];
       int internal = Node2Internal(node);
-      if (AtomicAdd(counter_[internal], 1) == 0) return;
+      if (counter_[internal].fetch_add(1, std::memory_order_relaxed) == 0) {
+        return;
+      }
       nodeBBox_[node] = nodeBBox_[internalChildren_[internal].first].Union(
           nodeBBox_[internalChildren_[internal].second]);
     } while (node != kRoot);
@@ -284,11 +286,15 @@ class Collider {
     auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
     copy(leafBB.cbegin(), leafBB.cend(), leaves.begin());
     // create global counters
-    Vec<int> counter(NumInternal(), 0);
+    std::unique_ptr<std::atomic<int>[]> counter(
+        new std::atomic<int>[NumInternal()]);
+    for (int i = 0; i < NumInternal(); ++i) {
+      counter[i].store(0, std::memory_order_relaxed);
+    }
     // kernel over leaves to save internal Boxes
     for_each_n(autoPolicy(NumInternal(), 1e3), countAt(0), NumLeaves(),
                collider_internal::BuildInternalBoxes(
-                   {nodeBBox_, counter, nodeParent_, internalChildren_}));
+                   {nodeBBox_, counter.get(), nodeParent_, internalChildren_}));
   }
 
   template <const bool selfCollision = false, typename F, typename Recorder>

@@ -201,7 +201,7 @@ struct GridVert {
 
 struct NearSurface {
   VecView<vec3> vertPos;
-  VecView<int> vertIndex;
+  std::atomic<int>& vertIndex;
   HashTableD<GridVert> gridVerts;
   VecView<const double> voxels;
   const std::function<double(vec3)> sdf;
@@ -266,7 +266,7 @@ struct NearSurface {
                                    vMax, tol, level, sdf);
       // Bound the delta of each vert to ensure the tetrahedron cannot invert.
       if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
-        const int idx = AtomicAdd(vertIndex[0], 1);
+        const int idx = vertIndex.fetch_add(1, std::memory_order_relaxed);
         vertPos[idx] = Bound(pos, origin, spacing, gridSize);
         gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
@@ -284,7 +284,7 @@ struct NearSurface {
 
 struct ComputeVerts {
   VecView<vec3> vertPos;
-  VecView<int> vertIndex;
+  std::atomic<int>& vertIndex;
   HashTableD<GridVert> gridVerts;
   VecView<const double> voxels;
   const std::function<double(vec3)> sdf;
@@ -325,7 +325,7 @@ struct ComputeVerts {
         continue;
       }
 
-      const int idx = AtomicAdd(vertIndex[0], 1);
+      const int idx = vertIndex.fetch_add(1, std::memory_order_relaxed);
       const vec3 pos = FindSurface(position, gridVert.distance,
                                    Position(neighborIndex, origin, spacing),
                                    val, tol, level, sdf);
@@ -337,7 +337,7 @@ struct ComputeVerts {
 
 struct BuildTris {
   VecView<ivec3> triVerts;
-  VecView<int> triIndex;
+  std::atomic<int>& triIndex;
   const HashTableD<GridVert> gridVerts;
   const ivec3 gridPow;
 
@@ -346,7 +346,7 @@ struct BuildTris {
     const ivec3 verts(edges[tri[0]], edges[tri[1]], edges[tri[2]]);
     if (verts[0] == verts[1] || verts[1] == verts[2] || verts[2] == verts[0])
       return;
-    int idx = AtomicAdd(triIndex[0], 1);
+    int idx = triIndex.fetch_add(1, std::memory_order_relaxed);
     triVerts[idx] = verts;
   }
 
@@ -491,13 +491,14 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   vertPos.resize_nofill(gridVerts.Size() * 7);
 
   while (1) {
-    Vec<int> index(1, 0);
+    std::atomic<int> index(0);
     for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
                NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                             gridSize, gridPow, spacing, level, tolerance}));
 
     if (gridVerts.Full()) {  // Resize HashTable
-      const vec3 lastVert = vertPos[index[0] - 1];
+      const int n = index.load(std::memory_order_relaxed);
+      const vec3 lastVert = vertPos[n - 1];
       const uint64_t lastIndex =
           EncodeIndex(ivec4(ivec3((lastVert - origin) / spacing), 1), gridPow);
       const double ratio = static_cast<double>(maxIndex) / lastIndex;
@@ -513,17 +514,17 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
           pol, countAt(0), gridVerts.Size(),
           ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                         gridSize, gridPow, spacing, level, tolerance}));
-      vertPos.resize(index[0]);
+      vertPos.resize(index.load(std::memory_order_relaxed));
       break;
     }
   }
 
   Vec<ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
-  Vec<int> index(1, 0);
+  std::atomic<int> index(0);
   for_each_n(pol, countAt(0), gridVerts.Size(),
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
-  triVerts.resize(index[0]);
+  triVerts.resize(index.load(std::memory_order_relaxed));
 
   pImpl_->CreateHalfedges(triVerts);
   pImpl_->CleanupTopology();

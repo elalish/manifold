@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <memory>
 
 #include "utils.h"
 #include "vec.h"
@@ -24,24 +25,21 @@ using hash_fun_t = uint64_t(uint64_t);
 inline constexpr uint64_t kOpen = std::numeric_limits<uint64_t>::max();
 
 template <typename T>
-T AtomicCAS(T& target, T compare, T val) {
-  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
-  tar.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
+T AtomicCAS(std::atomic<T>& target, T compare, T val) {
+  target.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
   return compare;
 }
 
 template <typename T>
-void AtomicStore(T& target, T val) {
-  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
+void AtomicStore(std::atomic<T>& target, T val) {
   // release is good enough, although not really something general
-  tar.store(val, std::memory_order_release);
+  target.store(val, std::memory_order_release);
 }
 
 template <typename T>
-T AtomicLoad(const T& target) {
-  const std::atomic<T>& tar = reinterpret_cast<const std::atomic<T>&>(target);
+T AtomicLoad(const std::atomic<T>& target) {
   // acquire is good enough, although not general
-  return tar.load(std::memory_order_acquire);
+  return target.load(std::memory_order_acquire);
 }
 
 }  // namespace
@@ -51,11 +49,11 @@ namespace manifold {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
-  HashTableD(Vec<uint64_t>& keys, Vec<V>& values, std::atomic<size_t>& used,
-             uint32_t step = 1)
-      : step_{step}, keys_{keys}, values_{values}, used_{used} {}
+  HashTableD(std::atomic<uint64_t>* keys, int size, Vec<V>& values,
+             std::atomic<size_t>& used, uint32_t step = 1)
+      : step_{step}, keys_{keys}, size_{size}, values_{values}, used_{used} {}
 
-  int Size() const { return keys_.size(); }
+  int Size() const { return size_; }
 
   bool Full() const {
     return used_.load(std::memory_order_relaxed) * 2 >
@@ -66,7 +64,7 @@ class HashTableD {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       if (Full()) return;
-      uint64_t& k = keys_[idx];
+      std::atomic<uint64_t>& k = keys_[idx];
       const uint64_t found = AtomicCAS(k, kOpen, key);
       if (found == kOpen) {
         used_.fetch_add(1, std::memory_order_relaxed);
@@ -106,7 +104,8 @@ class HashTableD {
 
  private:
   uint32_t step_;
-  VecView<uint64_t> keys_;
+  std::atomic<uint64_t>* keys_;
+  int size_;
   VecView<V> values_;
   std::atomic<size_t>& used_;
 };
@@ -115,29 +114,45 @@ template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
   HashTable(size_t size, uint32_t step = 1)
-      : keys_{size == 0 ? 0 : 1_uz << (int)ceil(log2(size)), kOpen},
-        values_{size == 0 ? 0 : 1_uz << (int)ceil(log2(size)), {}},
-        step_(step) {}
+      : size_(static_cast<int>(size == 0 ? 0 : 1_uz << (int)ceil(log2(size)))),
+        keys_(size_ == 0 ? nullptr : new std::atomic<uint64_t>[size_]),
+        values_{static_cast<size_t>(size_), {}},
+        step_(step) {
+    for (int i = 0; i < size_; ++i) keys_[i].store(kOpen, std::memory_order_relaxed);
+  }
 
   HashTable(const HashTable& other)
-      : keys_(other.keys_), values_(other.values_), step_(other.step_) {
-    used_.store(other.used_.load());
+      : size_(other.size_),
+        keys_(size_ == 0 ? nullptr : new std::atomic<uint64_t>[size_]),
+        values_(other.values_),
+        step_(other.step_) {
+    used_.store(other.used_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    for (int i = 0; i < size_; ++i) {
+      keys_[i].store(other.keys_[i].load(std::memory_order_relaxed),
+                     std::memory_order_relaxed);
+    }
   }
 
   HashTable& operator=(const HashTable& other) {
     if (this == &other) return *this;
-    keys_ = other.keys_;
     values_ = other.values_;
-    used_.store(other.used_.load());
+    used_.store(other.used_.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
     step_ = other.step_;
+    size_ = other.size_;
+    keys_.reset(size_ == 0 ? nullptr : new std::atomic<uint64_t>[size_]);
+    for (int i = 0; i < size_; ++i) {
+      keys_[i].store(other.keys_[i].load(std::memory_order_relaxed),
+                     std::memory_order_relaxed);
+    }
     return *this;
   }
 
-  HashTableD<V, H> D() { return {keys_, values_, used_, step_}; }
+  HashTableD<V, H> D() { return {keys_.get(), size_, values_, used_, step_}; }
 
   int Entries() const { return used_.load(std::memory_order_relaxed); }
 
-  size_t Size() const { return keys_.size(); }
+  size_t Size() const { return static_cast<size_t>(size_); }
 
   bool Full() const {
     return used_.load(std::memory_order_relaxed) * 2 > Size();
@@ -152,7 +167,8 @@ class HashTable {
   static uint64_t Open() { return kOpen; }
 
  private:
-  Vec<uint64_t> keys_;
+  int size_ = 0;
+  std::unique_ptr<std::atomic<uint64_t>[]> keys_;
   Vec<V> values_;
   std::atomic<size_t> used_ = 0;
   uint32_t step_;

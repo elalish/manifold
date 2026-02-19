@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <unordered_map>
+#include <atomic>
+#include <memory>
 
 #include "impl.h"
 #include "parallel.h"
@@ -386,13 +388,14 @@ Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
 
 Vec<int> Manifold::Impl::VertHalfedge() const {
   Vec<int> vertHalfedge(NumVert());
-  Vec<uint8_t> counters(NumVert(), 0);
+  std::unique_ptr<std::atomic<uint8_t>[]> counters(
+      new std::atomic<uint8_t>[NumVert()]);
+  for (int i = 0; i < NumVert(); ++i)
+    counters[i].store(0, std::memory_order_relaxed);
   for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
              [&vertHalfedge, &counters, this](const int idx) {
-               auto old = std::atomic_exchange(
-                   reinterpret_cast<std::atomic<uint8_t>*>(
-                       &counters[halfedge_[idx].startVert]),
-                   static_cast<uint8_t>(1));
+               auto old = counters[halfedge_[idx].startVert].exchange(
+                   static_cast<uint8_t>(1), std::memory_order_relaxed);
                if (old == 1) return;
                // arbitrary, last one wins.
                vertHalfedge[halfedge_[idx].startVert] = idx;
