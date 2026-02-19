@@ -2,19 +2,15 @@
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
   inputs.gtest-src = {
-    url = "github:google/googletest/v1.14.0";
+    url = "github:google/googletest/v1.17.0";
     flake = false;
   };
   inputs.clipper2-src = {
-    url = "github:AngusJohnson/Clipper2";
+    url = "github:AngusJohnson/Clipper2/Clipper2_2.0.1";
     flake = false;
   };
   inputs.onetbb-src = {
-    url = "github:oneapi-src/oneTBB/v2022.0.0";
-    flake = false;
-  };
-  inputs.gersemi-src = {
-    url = "github:BlankSpruce/gersemi/0.17.0";
+    url = "github:oneapi-src/oneTBB/v2022.3.0";
     flake = false;
   };
   outputs =
@@ -24,7 +20,6 @@
     , gtest-src
     , clipper2-src
     , onetbb-src
-    , gersemi-src
     }:
     flake-utils.lib.eachDefaultSystem
       (system:
@@ -40,17 +35,6 @@
               });
             })
           ];
-        };
-        gersemi = with pkgs.python3Packages; buildPythonPackage {
-          pname = "gersemi";
-          version = "0.17.0";
-          src = gersemi-src;
-          propagatedBuildInputs = [
-            appdirs
-            lark
-            pyyaml
-          ];
-          doCheck = true;
         };
         manifold =
           { parallel ? true }: pkgs.stdenv.mkDerivation {
@@ -132,7 +116,7 @@
             version = manifold-version;
             src = self;
             propagatedBuildInputs = [ numpy ];
-            buildInputs = with pkgs; [ clipper2 tbb_2021_11 ];
+            buildInputs = with pkgs; [ clipper2 onetbb ];
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
@@ -160,26 +144,22 @@
               pytest
 
               # formatting tools
-              gersemi
               black
 
               # misc
               matplotlib
             ]))
 
+            gersemi
             ninja
             cmake
-            tbb_2021_11
+            onetbb
             gtest
             assimp
             clipper2
             pkg-config
-
-            # useful tools
-            clang-tools_18
-            clang_18
-            llvmPackages_18.bintools
             tracy
+            llvmPackages_20.clang-tools
           ];
         };
       }
