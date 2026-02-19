@@ -1,0 +1,30 @@
+{
+  "name": "manifold-editor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:watch": "vite build --watch",
+    "clean": "rm -fr ./dist",
+    "preview": "vite preview",
+    "public": "cp -rv dist/* ../../public/"
+  },
+  "peerDependencies": {
+    "esbuild-wasm": "^0.27.3"
+  },
+  "dependencies": {
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@google/model-viewer": "^4.1.0",
+    "manifold-3d": "file:../..",
+    "monaco-editor": "^0.54.0",
+    "monaco-editor-auto-typings": "^0.4.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "typescript": "^5.9.3",
+    "vite": "7.3.1",
+    "vite-plugin-static-copy": "^3.1.5"
+  }
+}

@@ -3,27 +3,33 @@ import {resolve} from 'path'
 import {defineConfig} from 'vite'
 import {viteStaticCopy} from 'vite-plugin-static-copy'
 
-import emscriptenStaticWorkerOptions from './vite-fixup-plugin.js'
-
 export default defineConfig({
-  worker: {format: 'es', plugins: () => ([emscriptenStaticWorkerOptions])},
+  worker: {format: 'es'},
   server: {
+    // `npm run dev`
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     fs: {allow: [resolve(__dirname, '..')]}
   },
+  preview: {
+    // `npm run preview`
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    },
+  },
   plugins: [viteStaticCopy({
     targets: [
       // If type declaration files are missing, the web editor can't
       // load them, and type validation won't work for our core modules.
       {
-        src: '../dist/manifoldCAD.d.ts',
+        src: './node_modules/manifold-3d/dist/manifoldCAD.d.ts',
         dest: './',  // Targets are relative to 'dist'.
       },
       {
-        src: '../dist/manifoldCADGlobals.d.ts',
+        src: './node_modules/manifold-3d/dist/manifoldCADGlobals.d.ts',
         dest: './',
       }
     ],
@@ -41,9 +47,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),
-        makeManifold: resolve(__dirname, 'make-manifold.html'),
-        modelViewer: resolve(__dirname, 'model-viewer.html'),
-        three: resolve(__dirname, 'three.html'),
       },
       output: {
         entryFileNames: `assets/[name].js`,

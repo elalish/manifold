@@ -12,8 +12,7 @@ $CLANG_FORMAT -i bindings/*/*.cpp &
 $CLANG_FORMAT -i bindings/c/include/manifold/*.h &
 $CLANG_FORMAT -i bindings/wasm/*.{js,ts} &
 $CLANG_FORMAT -i bindings/wasm/lib/*.ts &
-$CLANG_FORMAT -i bindings/wasm/examples/*.{js,ts,html} &
-$CLANG_FORMAT -i bindings/wasm/examples/public/*.js &
+$CLANG_FORMAT -i bindings/wasm/examples/*/*.{js,ts,html} &
 $CLANG_FORMAT -i bindings/wasm/test/*.ts &
 $CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
 $CLANG_FORMAT -i bindings/wasm/types/*.ts &

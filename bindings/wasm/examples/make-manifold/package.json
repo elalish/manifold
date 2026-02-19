@@ -1,0 +1,26 @@
+{
+  "name": "manifold-examples-make-manifold",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "public": "cp -rv dist/* ../../public/"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "@google/model-viewer": "^4.1.0",
+    "manifold-3d": "file:../..",
+    "simple-dropzone": "0.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "typescript": "^5.9.3",
+    "vite": "7.3.1"
+  }
+}

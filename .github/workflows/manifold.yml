@@ -157,19 +157,30 @@ jobs:
         npx manifold-cad ./unitSphere.mjs ./unitSphere.glb && echo "Positive smoke test succeeded"
         # Negative case smoke test.
         npx manifold-cad ./unitSphereNoManifoldImport.mjs ./unitSphereNoManifoldImport.glb || echo "Negative smoke test failed as expected"
-    - name: Build examples
+    - name: Build manifoldCAD editor
+      if: matrix.parallelization == 'OFF'
+      run: |
+        cd bindings/wasm
+        npm run ci:editor
+        npm run build:editor
+    - name: Build WASM examples
       if: matrix.parallelization == 'OFF'
       run: |
         cd bindings/wasm/examples
-        npm ci
-        npm run build
-        cp ../manifold.* ./dist/
-    - name: Upload WASM files
+        npm run ci:examples
+        npm run build:examples
+    - name: Build WASM documentation and site
+      if: matrix.parallelization == 'OFF'
+      run: |
+        cd bindings/wasm
+        npm run docs
+        npm run public
+    - name: Upload manifoldCAD editor, examples and documentation
       uses: actions/upload-artifact@v4
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasm
-        path: bindings/wasm/examples/dist/
+        path: bindings/wasm/public/
         retention-days: 90
         overwrite: true
 

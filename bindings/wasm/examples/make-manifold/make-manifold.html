@@ -59,7 +59,9 @@
     <span id="poster" slot="poster">Drop a GLB here</span>
   </model-viewer>
 </body>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-<script type="module" src="make-manifold.ts"></script>
 
+<script type="module">
+import { ModelViewerElement } from '@google/model-viewer';
+</script>
+<script type="module" src="make-manifold.ts"></script>
 </html>
