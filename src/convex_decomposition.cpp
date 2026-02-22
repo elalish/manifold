@@ -896,7 +896,28 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
 
           auto [a, b] = piece.SplitByPlane(planeNormal, originOffset);
           if (!a.IsEmpty() && !b.IsEmpty()) {
-            // Successful split — queue both halves for further processing
+            // Snap split vertices back to original mesh positions to
+            // prevent floating-point drift from accumulating across splits.
+            auto snapToOriginal = [&](Manifold& m) {
+              double tol = shape.GetTolerance();
+              m = m.Warp([&](vec3& v) {
+                double bestDist = tol;
+                vec3 bestPos = v;
+                for (size_t vi = 0; vi < numVerts; vi++) {
+                  vec3 orig(verts[vi * 3], verts[vi * 3 + 1],
+                            verts[vi * 3 + 2]);
+                  double d = la::length(v - orig);
+                  if (d < bestDist) {
+                    bestDist = d;
+                    bestPos = orig;
+                  }
+                }
+                v = bestPos;
+              });
+            };
+            snapToOriginal(a);
+            snapToOriginal(b);
+
             auto aImpl = a.GetCsgLeafNode().GetImpl();
             auto bImpl = b.GetCsgLeafNode().GetImpl();
             if (aImpl->IsConvex())
