@@ -976,7 +976,10 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @return Vector of approximately convex manifold pieces.
  */
 std::vector<Manifold> Manifold::ConvexDecomposition(int maxClusterSize,
-                                                    int maxDepth) const {
+                                                    int maxDepth,
+                                                    bool carveOnly) const {
+  if (carveOnly)
+    return GetCsgLeafNode().GetImpl()->ConvexDecompositionCarveOnly();
   return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxClusterSize,
                                                          maxDepth);
 }

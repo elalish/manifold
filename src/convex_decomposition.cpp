@@ -911,4 +911,119 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
   return outputs;
 }
 
+/**
+ * Pure carve-only convex decomposition — no DT. Iteratively grows the
+ * largest convex surface patch, emits its hull, subtracts, and repeats.
+ */
+std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
+  constexpr double kTol = 1e-8;
+  std::vector<Manifold> outputs;
+
+  auto thisImpl = std::make_shared<Impl>(*this);
+  Manifold shape(std::make_shared<CsgLeafNode>(thisImpl));
+
+  if (shape.IsEmpty()) return outputs;
+  if (IsConvex()) {
+    outputs.push_back(shape.Hull());
+    return outputs;
+  }
+
+  for (int iteration = 0; iteration < 1000 && !shape.IsEmpty(); iteration++) {
+    auto sImpl = shape.GetCsgLeafNode().GetImpl();
+    if (sImpl->IsConvex()) {
+      outputs.push_back(shape.Hull());
+      break;
+    }
+
+    const auto& he = sImpl->halfedge_;
+    const auto& vp = sImpl->vertPos_;
+    size_t nv = vp.size();
+    if (nv < 4) {
+      outputs.push_back(shape);
+      break;
+    }
+
+    // Build vertex adjacency
+    std::vector<std::vector<int>> adj(nv);
+    for (size_t idx = 0; idx < he.size(); idx++) {
+      auto edge = he[idx];
+      if (!edge.IsForward()) continue;
+      adj[edge.startVert].push_back(edge.endVert);
+      adj[edge.endVert].push_back(edge.startVert);
+    }
+
+    // Find a valid convex hull — use first seed that produces a patch
+    Manifold bestHull;
+    for (size_t seed = 0; seed < nv; seed++) {
+      std::vector<int> patch = {(int)seed};
+      std::vector<bool> inPatch(nv, false);
+      inPatch[seed] = true;
+
+      std::vector<int> frontier;
+      for (int nb : adj[seed])
+        if (!inPatch[nb]) frontier.push_back(nb);
+
+      Manifold lastGoodHull;
+
+      while (!frontier.empty()) {
+        int c = frontier.back();
+        frontier.pop_back();
+        if (inPatch[c]) continue;
+        patch.push_back(c);
+        inPatch[c] = true;
+
+        if (patch.size() >= 4) {
+          std::vector<vec3> pts;
+          for (int v : patch) pts.push_back(vp[v]);
+          Manifold hull = Manifold::Hull(pts);
+          if (!hull.IsEmpty()) {
+            double hv = hull.Volume();
+            Manifold clipped = shape ^ hull;
+            if (!clipped.IsEmpty() && clipped.Volume() >= hv * (1.0 - kTol)) {
+              lastGoodHull = hull;
+              for (int nb : adj[c])
+                if (!inPatch[nb]) frontier.push_back(nb);
+              continue;
+            }
+          }
+        } else {
+          for (int nb : adj[c])
+            if (!inPatch[nb]) frontier.push_back(nb);
+          continue;
+        }
+        patch.pop_back();
+        inPatch[c] = false;
+      }
+
+      if (!lastGoodHull.IsEmpty()) {
+        bestHull = lastGoodHull;
+        break;  // use first valid patch, don't search all seeds
+      }
+    }
+
+    if (bestHull.IsEmpty()) {
+      outputs.push_back(shape);
+      break;
+    }
+
+    outputs.push_back(bestHull);
+    shape = shape - bestHull;
+
+    // Decompose remainder in case subtraction split it
+    if (!shape.IsEmpty()) {
+      auto parts = shape.Decompose();
+      if (parts.size() > 1) {
+        for (size_t i = 1; i < parts.size(); i++) {
+          auto pImpl = parts[i].GetCsgLeafNode().GetImpl();
+          auto sub = pImpl->ConvexDecompositionCarveOnly();
+          outputs.insert(outputs.end(), sub.begin(), sub.end());
+        }
+        shape = parts[0];
+      }
+    }
+  }
+
+  return outputs;
+}
+
 }  // namespace manifold

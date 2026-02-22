@@ -401,6 +401,7 @@ struct Manifold::Impl {
   // convex_decomposition.cpp
   std::vector<Manifold> ConvexDecomposition(int maxClusterSize,
                                             int maxDepth = 1) const;
+  std::vector<Manifold> ConvexDecompositionCarveOnly() const;
 };
 
 extern std::mutex dump_lock;
