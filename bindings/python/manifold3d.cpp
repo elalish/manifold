@@ -374,7 +374,10 @@ NB_MODULE(manifold3d, m) {
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
       .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
-           nb::arg("decompose") = false, manifold__minkowski_sum__other)
+           nb::arg("decompose") = false,
+           "Compute the Minkowski sum of this manifold with another. "
+           "Set decompose=true to first decompose non-convex inputs "
+           "into convex pieces for faster computation.")
       .def("minkowski_difference", &Manifold::MinkowskiDifference,
            nb::arg("other"), manifold__minkowski_difference__other)
       .def(
