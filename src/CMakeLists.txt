@@ -17,6 +17,7 @@ set(
   boolean3.cpp
   boolean_result.cpp
   constructors.cpp
+  convex_decomposition.cpp
   csg_tree.cpp
   edge_op.cpp
   face_op.cpp
@@ -40,6 +41,7 @@ set(
   MANIFOLD_PRIVATE_HDRS
   boolean3.h
   collider.h
+  convex_decomposition.h
   csg_tree.h
   hashtable.h
   impl.h

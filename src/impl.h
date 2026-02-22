@@ -396,6 +396,9 @@ struct Manifold::Impl {
 
   // minkowski.cpp
   Manifold Minkowski(const Impl& other, bool inset) const;
+
+  // convex_decomposition.cpp
+  std::vector<Manifold> ConvexDecomposition(int maxClusterSize) const;
 };
 
 extern std::mutex dump_lock;

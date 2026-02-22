@@ -360,6 +360,10 @@ NB_MODULE(manifold3d, m) {
       .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
+      .def("convex_decomposition", &Manifold::ConvexDecomposition,
+           nb::arg("max_cluster_size") = 2,
+           "Decompose into approximately convex pieces using Delaunay "
+           "tetrahedralization and greedy hull merge.")
       .def("split", &Manifold::Split, nb::arg("cutter"),
            manifold__split__cutter)
       .def("split_by_plane", &Manifold::SplitByPlane, nb::arg("normal"),

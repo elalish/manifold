@@ -435,6 +435,12 @@ class Manifold {
   static Manifold Hull(const std::vector<vec3>& pts);
   ///@}
 
+  /** @name Convex Decomposition
+   */
+  ///@{
+  std::vector<Manifold> ConvexDecomposition(int maxClusterSize = 2) const;
+  ///@}
+
   /** @name I/O
    * Self-contained mechanism for reading and writing high precision Manifold
    * data.  Write function creates special-purpose OBJ files, and Read function

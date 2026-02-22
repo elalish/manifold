@@ -959,6 +959,21 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
+ * Decompose this manifold into approximately convex pieces.
+ *
+ * Uses unconstrained Delaunay tetrahedralization of mesh vertices, clips each
+ * tet against the mesh, then greedily merges adjacent convex pieces by hull.
+ * No new dependencies are required.
+ *
+ * @param maxClusterSize Maximum cluster size for greedy merge (2-4). Higher
+ * values produce fewer pieces but take longer. Default is 2.
+ * @return Vector of approximately convex manifold pieces.
+ */
+std::vector<Manifold> Manifold::ConvexDecomposition(int maxClusterSize) const {
+  return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxClusterSize);
+}
+
+/**
  * Returns the minimum gap between two manifolds. Returns a double between
  * 0 and searchLength.
  *

@@ -145,6 +145,12 @@ ManifoldManifold* manifold_hull(void* mem, ManifoldManifold* m);
 ManifoldManifold* manifold_batch_hull(void* mem, ManifoldManifoldVec* ms);
 ManifoldManifold* manifold_hull_pts(void* mem, ManifoldVec3* ps, size_t length);
 
+// Convex Decomposition
+
+ManifoldManifoldVec* manifold_convex_decomposition(void* mem,
+                                                   ManifoldManifold* m,
+                                                   int max_cluster_size);
+
 // Manifold Transformations
 
 ManifoldManifold* manifold_translate(void* mem, ManifoldManifold* m, double x,

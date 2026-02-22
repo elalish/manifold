@@ -227,6 +227,13 @@ ManifoldManifold* manifold_hull_pts(void* mem, ManifoldVec3* ps,
   return to_c(new (mem) Manifold(hulled));
 }
 
+ManifoldManifoldVec* manifold_convex_decomposition(void* mem,
+                                                   ManifoldManifold* m,
+                                                   int max_cluster_size) {
+  auto pieces = from_c(m)->ConvexDecomposition(max_cluster_size);
+  return to_c(new (mem) std::vector<Manifold>(pieces));
+}
+
 ManifoldManifold* manifold_translate(void* mem, ManifoldManifold* m, double x,
                                      double y, double z) {
   auto v = vec3(x, y, z);
