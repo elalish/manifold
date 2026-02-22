@@ -337,10 +337,11 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
   return verts;
 }
 
-// Generate interior sample points for a non-convex piece by offsetting
-// triangle centroids inward along face normals. These points are guaranteed
-// to be inside the piece (for small enough offset) and help the DT create
-// tets that split reflex edges.
+// Generate interior Steiner points targeting reflex edges of a non-convex
+// piece. Uses three strategies inspired by CDT midpoint splitting:
+// 1. Midpoint of each reflex edge, offset inward
+// 2. Centroid of faces adjacent to reflex edges, offset inward
+// 3. Piece centroid as fallback
 std::vector<vec3> SampleInteriorPoints(const Manifold& piece) {
   MeshGL64 mesh = piece.GetMeshGL64();
   size_t nv = mesh.vertProperties.size() / mesh.numProp;
@@ -352,40 +353,78 @@ std::vector<vec3> SampleInteriorPoints(const Manifold& piece) {
                 mesh.vertProperties[vi * mesh.numProp + 2]);
   };
 
-  // Compute average edge length for offset scale
-  double avgEdge = 0;
-  int edgeCount = 0;
-  for (size_t t = 0; t < nt; t++) {
-    vec3 v0 = getVert(mesh.triVerts[3 * t]);
-    vec3 v1 = getVert(mesh.triVerts[3 * t + 1]);
-    vec3 v2 = getVert(mesh.triVerts[3 * t + 2]);
-    avgEdge += la::length(v1 - v0) + la::length(v2 - v1) + la::length(v0 - v2);
-    edgeCount += 3;
-  }
-  avgEdge /= std::max(edgeCount, 1);
-  double offset = avgEdge * 0.1;
-
-  // Centroid of the piece (fallback interior point)
+  // Centroid of the piece
   vec3 centroid(0, 0, 0);
   for (size_t i = 0; i < nv; i++) centroid += getVert(i);
   centroid /= std::max((double)nv, 1.0);
 
-  std::vector<vec3> pts;
+  // Compute face normals
+  std::vector<vec3> faceNormals(nt);
   for (size_t t = 0; t < nt; t++) {
     vec3 v0 = getVert(mesh.triVerts[3 * t]);
     vec3 v1 = getVert(mesh.triVerts[3 * t + 1]);
     vec3 v2 = getVert(mesh.triVerts[3 * t + 2]);
-    vec3 faceCentroid = (v0 + v1 + v2) / 3.0;
-    vec3 normal = la::cross(v1 - v0, v2 - v0);
-    double len = la::length(normal);
-    if (len < 1e-15) continue;
-    normal /= len;
-    // Offset inward: toward the centroid of the piece
-    vec3 toCentroid = centroid - faceCentroid;
-    if (la::dot(toCentroid, normal) < 0) normal = -normal;
-    pts.push_back(faceCentroid + normal * offset);
+    vec3 n = la::cross(v1 - v0, v2 - v0);
+    double len = la::length(n);
+    faceNormals[t] = len > 1e-15 ? n / len : vec3(0, 0, 0);
   }
-  // Also add the centroid itself
+
+  // Build edge→face adjacency to find reflex edges
+  // Key: sorted vertex pair → (face index, edge vertices)
+  struct HalfEdge {
+    size_t face;
+    uint64_t v0, v1;
+  };
+  std::unordered_map<uint64_t, HalfEdge> edgeMap;
+  auto edgeKey = [](uint64_t a, uint64_t b) -> uint64_t {
+    return a < b ? (a | (b << 32)) : (b | (a << 32));
+  };
+
+  std::vector<vec3> pts;
+
+  for (size_t t = 0; t < nt; t++) {
+    uint64_t vi[3] = {mesh.triVerts[3 * t], mesh.triVerts[3 * t + 1],
+                      mesh.triVerts[3 * t + 2]};
+    for (int e = 0; e < 3; e++) {
+      uint64_t a = vi[e], b = vi[(e + 1) % 3];
+      uint64_t key = edgeKey(a, b);
+      auto it = edgeMap.find(key);
+      if (it != edgeMap.end()) {
+        // Found paired halfedge — check dihedral angle
+        size_t otherFace = it->second.face;
+        vec3 n0 = faceNormals[t];
+        vec3 n1 = faceNormals[otherFace];
+        vec3 va = getVert(a), vb = getVert(b);
+        vec3 edgeVec = vb - va;
+        double dihedral = la::dot(edgeVec, la::cross(n0, n1));
+        if (dihedral < -1e-10) {
+          // Reflex edge! The inward direction is the average of the two
+          // face normals, negated (pointing into the concavity).
+          vec3 inwardDir = -(n0 + n1);
+          double idLen = la::length(inwardDir);
+          if (idLen < 1e-15) continue;
+          inwardDir /= idLen;
+
+          vec3 mid = (va + vb) * 0.5;
+          double edgeLen = la::length(edgeVec);
+          double offset = edgeLen * 0.1;
+
+          // 1. Midpoint offset inward along concavity bisector
+          pts.push_back(mid + inwardDir * offset);
+          // 2. Quarter points along edge, offset inward
+          pts.push_back(va * 0.75 + vb * 0.25 + inwardDir * offset);
+          pts.push_back(va * 0.25 + vb * 0.75 + inwardDir * offset);
+          // 3. Midpoint with larger offset
+          pts.push_back(mid + inwardDir * offset * 3.0);
+        }
+        edgeMap.erase(it);
+      } else {
+        edgeMap[key] = {t, a, b};
+      }
+    }
+  }
+
+  // Fallback: centroid
   pts.push_back(centroid);
   return pts;
 }
@@ -449,14 +488,26 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
-    // Perturb vertices for DT robustness — output uses original positions.
-    // Interior points are only added for non-convex sub-pieces in step 4.
+    // For small non-convex pieces (recursive sub-decomposition), add
+    // interior Steiner points at reflex edge midpoints to help the DT
+    // create tets that split reflex edges. For large shapes (initial call),
+    // surface vertices alone are sufficient.
+    std::vector<vec3> interiorPts;
+    // Interior points are not added here — they're added in step 4 only
+    // for irreducible non-convex sub-pieces that recursion can't split.
+
     std::vector<vec3> tetVerts;
-    tetVerts.reserve(numVerts + 4);
+    tetVerts.reserve(numVerts + interiorPts.size() + 4);
     for (size_t i = 0; i < numVerts; i++)
       tetVerts.push_back(vec3(verts[i * 3 + 0] + DeterministicEps(i, 0),
                               verts[i * 3 + 1] + DeterministicEps(i, 1),
                               verts[i * 3 + 2] + DeterministicEps(i, 2)));
+    for (size_t i = 0; i < interiorPts.size(); i++)
+      tetVerts.push_back(interiorPts[i] +
+                         vec3(DeterministicEps(numVerts + i, 0),
+                              DeterministicEps(numVerts + i, 1),
+                              DeterministicEps(numVerts + i, 2)));
+    size_t totalPts = numVerts + interiorPts.size();
 
     vec3 center(0, 0, 0);
     for (const auto& p : tetVerts) center += p;
@@ -487,13 +538,20 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     std::vector<Manifold> pieces(numTets);
     std::vector<bool> valid(numTets, false);
 
+    // Lookup original (unperturbed) position for a tet vertex index
+    auto getOrigPos = [&](uint32_t idx) -> vec3 {
+      if (idx < numVerts)
+        return vec3(verts[idx * 3], verts[idx * 3 + 1], verts[idx * 3 + 2]);
+      return interiorPts[idx - numVerts];
+    };
+
     for_each_n(ExecutionPolicy::Seq, countAt(0), numTets, [&](int i) {
       uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
                i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
-      vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
-      vec3 p1(verts[i1 * 3], verts[i1 * 3 + 1], verts[i1 * 3 + 2]);
-      vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
-      vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
+      if (i0 >= totalPts || i1 >= totalPts || i2 >= totalPts || i3 >= totalPts)
+        return;
+      vec3 p0 = getOrigPos(i0), p1 = getOrigPos(i1);
+      vec3 p2 = getOrigPos(i2), p3 = getOrigPos(i3);
 
       // Skip degenerate (coplanar) tets — they have zero volume and
       // would cause assertion failures in Hull() with MANIFOLD_DEBUG.
@@ -579,13 +637,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       std::vector<vec3> circumcenters(origTets);
       for (int i = 0; i < origTets; i++) {
         if (!valid[i]) continue;
-        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
-                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
         circumcenters[i] = GetCircumCenter(
-            vec3(verts[ci0 * 3], verts[ci0 * 3 + 1], verts[ci0 * 3 + 2]),
-            vec3(verts[ci1 * 3], verts[ci1 * 3 + 1], verts[ci1 * 3 + 2]),
-            vec3(verts[ci2 * 3], verts[ci2 * 3 + 1], verts[ci2 * 3 + 2]),
-            vec3(verts[ci3 * 3], verts[ci3 * 3 + 1], verts[ci3 * 3 + 2]));
+            getOrigPos(flatTets[4 * i]), getOrigPos(flatTets[4 * i + 1]),
+            getOrigPos(flatTets[4 * i + 2]), getOrigPos(flatTets[4 * i + 3]));
       }
 
       // Union-find to group adjacent INTERIOR tets with matching circumcenters.
@@ -809,10 +863,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect convex pieces; re-decompose non-convex ones.
-    // Each recursion adds interior sample points (via SampleInteriorPoints
-    // in the DT vertex set) to create splitting tets for pieces where all
-    // surface vertices lie on the convex hull.
+    // Step 4: Collect convex pieces; recursively decompose non-convex ones.
+    // If recursion returns the piece unchanged (1 non-convex piece), try
+    // adding interior Steiner points at reflex edge midpoints and retry.
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
       auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
@@ -824,9 +877,87 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         outputs.push_back(pieces[i]);
         continue;
       }
+      // Try recursive decomposition
       auto subPieces =
           pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
-      outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
+      // Check if recursion actually helped
+      bool allConvex = true;
+      bool unchanged = (subPieces.size() == 1);
+      for (auto& sp : subPieces) {
+        if (!sp.GetCsgLeafNode().GetImpl()->IsConvex()) allConvex = false;
+      }
+      if (allConvex || !unchanged) {
+        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
+        continue;
+      }
+      // Recursion returned same piece — try with interior Steiner points.
+      // Add points at reflex edge midpoints offset inward, then re-DT.
+      if (pieces[i].NumVert() <= 20) {
+        auto pts = SampleInteriorPoints(pieces[i]);
+        if (pts.size() > 3) pts.resize(3);
+        MeshGL64 pm = pieces[i].GetMeshGL64();
+        size_t pnv = pm.vertProperties.size() / pm.numProp;
+        std::vector<vec3> augVerts;
+        augVerts.reserve(pnv + pts.size() + 4);
+        for (size_t vi = 0; vi < pnv; vi++)
+          augVerts.push_back(vec3(
+              pm.vertProperties[vi * pm.numProp] + DeterministicEps(vi, 0),
+              pm.vertProperties[vi * pm.numProp + 1] + DeterministicEps(vi, 1),
+              pm.vertProperties[vi * pm.numProp + 2] +
+                  DeterministicEps(vi, 2)));
+        for (size_t vi = 0; vi < pts.size(); vi++)
+          augVerts.push_back(pts[vi] + vec3(DeterministicEps(pnv + vi, 0),
+                                            DeterministicEps(pnv + vi, 1),
+                                            DeterministicEps(pnv + vi, 2)));
+        vec3 ac(0, 0, 0);
+        for (auto& p : augVerts) ac += p;
+        ac /= (double)augVerts.size();
+        double ar = 0;
+        for (auto& p : augVerts) ar = std::max(ar, la::length(p - ac));
+        double as = 5.0 * ar;
+        augVerts.push_back(vec3(-as, 0, -as));
+        augVerts.push_back(vec3(as, 0, -as));
+        augVerts.push_back(vec3(0, as, as));
+        augVerts.push_back(vec3(0, -as, as));
+        size_t augTotal = pnv + pts.size();
+        auto augTets = CreateTetIds(augVerts, 0.0);
+        auto augGetPos = [&](uint32_t idx) -> vec3 {
+          if (idx < pnv)
+            return vec3(pm.vertProperties[idx * pm.numProp],
+                        pm.vertProperties[idx * pm.numProp + 1],
+                        pm.vertProperties[idx * pm.numProp + 2]);
+          return pts[idx - pnv];
+        };
+        std::vector<Manifold> augPieces;
+        for (size_t t = 0; t < augTets.size() / 4; t++) {
+          bool skip = false;
+          vec3 tv[4];
+          for (int v = 0; v < 4; v++) {
+            uint32_t idx = augTets[4 * t + v];
+            if (idx >= augTotal) {
+              skip = true;
+              break;
+            }
+            tv[v] = augGetPos(idx);
+          }
+          if (skip) continue;
+          double vol =
+              std::abs(la::dot(tv[1] - tv[0],
+                               la::cross(tv[2] - tv[0], tv[3] - tv[0]))) /
+              6.0;
+          if (vol < 1e-15) continue;
+          Manifold h = Manifold::Hull({tv[0], tv[1], tv[2], tv[3]});
+          if (h.IsEmpty()) continue;
+          Manifold c = pieces[i] ^ h;
+          if (!c.IsEmpty()) augPieces.push_back(c);
+        }
+        if (augPieces.size() > 1) {
+          outputs.insert(outputs.end(), augPieces.begin(), augPieces.end());
+          continue;
+        }
+      }
+      // Nothing worked — keep as-is
+      outputs.push_back(pieces[i]);
     }
   }
 
