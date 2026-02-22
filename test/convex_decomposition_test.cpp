@@ -68,15 +68,13 @@ TEST(ConvexDecomposition, LShape) {
   EXPECT_GE(pieces.size(), 2u);
   EXPECT_LE(pieces.size(), 5u);
 
-  // All pieces should be approximately convex
   for (const auto& p : pieces) {
     EXPECT_TRUE(IsApproxConvex(p))
         << "Non-convex piece with volume " << p.Volume();
   }
 
-  // Volume should be preserved within 1%
   double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.01);
+  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
 }
 
 TEST(ConvexDecomposition, CubeSphere) {
@@ -86,12 +84,9 @@ TEST(ConvexDecomposition, CubeSphere) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  // Volume preserved within 1%
   double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.01);
+  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
 
-  // Most pieces should be approximately convex (curved shapes may have
-  // small non-convex slivers from the DT clipping)
   int convexCount = 0;
   for (const auto& p : pieces)
     if (IsApproxConvex(p)) convexCount++;
@@ -106,11 +101,9 @@ TEST(ConvexDecomposition, TwoSpheres) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  // Volume preserved within 1%
   double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.01);
+  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
 
-  // Most pieces should be approximately convex
   int convexCount = 0;
   for (const auto& p : pieces)
     if (IsApproxConvex(p)) convexCount++;
@@ -132,7 +125,7 @@ TEST(ConvexDecomposition, CubeCube) {
   }
 
   double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.01);
+  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
 }
 
 TEST(ConvexDecomposition, ClusterSizeEffect) {

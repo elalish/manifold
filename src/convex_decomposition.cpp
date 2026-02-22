@@ -509,11 +509,11 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
 
     // Phase 0: Cospheric merge — using ORIGINAL (unperturbed) positions,
-    // compute circumcenters and merge adjacent tets that share one.
+    // compute circumcenters and merge groups of adjacent tets that share one.
     // This resolves ambiguity from cospheric vertices without perturbation
-    // artifacts in the output.
+    // artifacts in the output. Groups all connected cospheric tets and merges
+    // each group at once (handles 3+ tets sharing a circumcenter).
     {
-      // Compute circumcenters from original (unperturbed) vertex positions
       std::vector<vec3> circumcenters(origTets);
       for (int i = 0; i < origTets; i++) {
         if (!valid[i]) continue;
@@ -526,51 +526,64 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         circumcenters[i] = GetCircumCenter(p0, p1, p2, p3);
       }
 
-      // Find adjacent tets with matching circumcenters and merge them
+      // Union-find to group adjacent tets with matching circumcenters
       constexpr double ccEps = 1e-10;
-      bool cosphericalMerged = true;
-      while (cosphericalMerged) {
-        cosphericalMerged = false;
-        for (int i = 0; i < origTets; i++) {
-          if (!valid[i]) continue;
-          std::vector<int> nbrs(neighbors[i].begin(), neighbors[i].end());
-          for (int n : nbrs) {
-            if (!valid[n] || n >= origTets) continue;
-            // Check if circumcenters match (cospheric tets)
-            if (la::length(circumcenters[i] - circumcenters[n]) > ccEps)
-              continue;
-            // Cospheric pair: merge via hull (should always succeed)
-            double sumVol = volumes[i] + volumes[n];
-            std::vector<vec3> combined;
-            combined.reserve(pieceVerts[i].size() + pieceVerts[n].size());
-            combined.insert(combined.end(), pieceVerts[i].begin(),
-                            pieceVerts[i].end());
-            combined.insert(combined.end(), pieceVerts[n].begin(),
-                            pieceVerts[n].end());
-            Manifold hull = Manifold::Hull(combined);
-            if (hull.IsEmpty()) continue;
-            double hullVol = hull.Volume();
-            // Cospheric tets should merge cleanly, use wider tolerance
-            if (sumVol > 0.0 && std::abs(hullVol - sumVol) < sumVol * 0.01) {
-              pieces[i] = hull;
-              pieceVerts[i] = ExtractVertices(hull);
-              volumes[i] = hullVol;
-              // Update circumcenter to merged hull's centroid (no longer
-              // meaningful as circumcenter, but prevents re-matching)
-              circumcenters[i] = vec3(1e30, 1e30, 1e30);
-              valid[n] = false;
-              parent[n] = i;
-              for (int nb : neighbors[n]) {
-                if (nb != i && valid[nb]) {
-                  neighbors[i].insert(nb);
-                  neighbors[nb].erase(n);
-                  neighbors[nb].insert(i);
-                }
-              }
-              neighbors[n].clear();
-              cosphericalMerged = true;
+      std::vector<int> ccParent(origTets);
+      for (int i = 0; i < origTets; i++) ccParent[i] = i;
+      std::function<int(int)> ccFind = [&](int x) -> int {
+        return ccParent[x] == x ? x : (ccParent[x] = ccFind(ccParent[x]));
+      };
+
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        for (int n : neighbors[i]) {
+          if (n >= origTets || !valid[n]) continue;
+          if (la::length(circumcenters[i] - circumcenters[n]) < ccEps) {
+            int ri = ccFind(i), rn = ccFind(n);
+            if (ri != rn) ccParent[rn] = ri;
+          }
+        }
+      }
+
+      // Collect groups and merge each
+      std::unordered_map<int, std::vector<int>> groups;
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        groups[ccFind(i)].push_back(i);
+      }
+
+      for (auto& [root, members] : groups) {
+        if (members.size() < 2) continue;
+
+        // Merge all members into root
+        std::vector<vec3> combined;
+        double sumVol = 0;
+        for (int m : members) {
+          combined.insert(combined.end(), pieceVerts[m].begin(),
+                          pieceVerts[m].end());
+          sumVol += volumes[m];
+        }
+        Manifold hull = Manifold::Hull(combined);
+        if (hull.IsEmpty() || sumVol <= 0.0) continue;
+        double hullVol = hull.Volume();
+        if (std::abs(hullVol - sumVol) > sumVol * 0.01) continue;
+
+        // Apply merge: keep root, invalidate others
+        pieces[root] = hull;
+        pieceVerts[root] = ExtractVertices(hull);
+        volumes[root] = hullVol;
+        for (int m : members) {
+          if (m == root) continue;
+          valid[m] = false;
+          parent[m] = root;
+          for (int nb : neighbors[m]) {
+            if (nb != root && valid[nb]) {
+              neighbors[root].insert(nb);
+              neighbors[nb].erase(m);
+              neighbors[nb].insert(root);
             }
           }
+          neighbors[m].clear();
         }
       }
     }
