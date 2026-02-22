@@ -180,13 +180,20 @@ TEST(ConvexDecomposition, ThinWedge) {
 }
 
 TEST(ConvexDecomposition, FlatSlab) {
-  // 20:20:1 aspect ratio slab with a notch
+  // 20:20:1 slab with 5 notches on each side, rotated 90 degrees,
+  // creating long skinny triangular regions where they cross.
   Manifold slab = Manifold::Cube({20, 20, 1});
-  Manifold notch = Manifold::Cube({5, 5, 1}).Translate({7.5, 7.5, 0});
-  Manifold shape = slab - notch;
-  double origVol = shape.Volume();
+  // Top notches: long slots running in X direction
+  for (int i = 0; i < 5; i++) {
+    slab -= Manifold::Cube({14, 1, 0.6}).Translate({3, 2.0 + i * 3.5, 0.4});
+  }
+  // Bottom notches: long slots running in Y direction (rotated 90)
+  for (int i = 0; i < 5; i++) {
+    slab -= Manifold::Cube({1, 14, 0.6}).Translate({2.0 + i * 3.5, 3, 0});
+  }
+  double origVol = slab.Volume();
 
-  auto pieces = shape.ConvexDecomposition();
+  auto pieces = slab.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
   double totalVol = UnionVolume(pieces);
