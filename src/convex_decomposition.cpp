@@ -1088,4 +1088,128 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
   return filtered;
 }
 
+/**
+ * Onion-peel convex decomposition. Finds all reflex edges, hulls their
+ * vertices, intersects the hull with the shape to peel off a convex
+ * layer, subtracts it, and recurses on the remainder. If there's only
+ * one reflex edge, does a plane split instead.
+ */
+std::vector<Manifold> Manifold::Impl::ConvexDecompositionOnionPeel() const {
+  std::vector<Manifold> outputs;
+
+  auto thisImpl = std::make_shared<Impl>(*this);
+  Manifold shape(std::make_shared<CsgLeafNode>(thisImpl));
+
+  if (shape.IsEmpty() || shape.Volume() < 1e-12) return outputs;
+  if (IsConvex()) {
+    outputs.push_back(shape.Hull());
+    return outputs;
+  }
+
+  for (int iteration = 0; iteration < 1000 && !shape.IsEmpty(); iteration++) {
+    if (shape.Volume() < 1e-12) break;
+    auto sImpl = shape.GetCsgLeafNode().GetImpl();
+    if (sImpl->IsConvex()) {
+      outputs.push_back(shape.Hull());
+      break;
+    }
+
+    const auto& he = sImpl->halfedge_;
+    const auto& fn = sImpl->faceNormal_;
+    const auto& vp = sImpl->vertPos_;
+    size_t nEdges = he.size();
+
+    // Collect all reflex edge vertices
+    std::vector<vec3> reflexVerts;
+    int reflexCount = 0;
+    vec3 lastN0, lastN1, lastEdgeVec, lastEdgeMid;
+    for (size_t idx = 0; idx < nEdges; idx++) {
+      auto edge = he[idx];
+      if (!edge.IsForward()) continue;
+      vec3 n0 = fn[idx / 3];
+      vec3 n1 = fn[edge.pairedHalfedge / 3];
+      vec3 edgeVec = vp[edge.endVert] - vp[edge.startVert];
+      if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+      reflexVerts.push_back(vp[edge.startVert]);
+      reflexVerts.push_back(vp[edge.endVert]);
+      lastN0 = n0;
+      lastN1 = n1;
+      lastEdgeVec = edgeVec;
+      lastEdgeMid = (vp[edge.startVert] + vp[edge.endVert]) * 0.5;
+      reflexCount++;
+    }
+
+    if (reflexCount == 0) {
+      outputs.push_back(shape.Hull());
+      break;
+    }
+
+    // Single reflex edge — plane split
+    if (reflexCount == 1) {
+      vec3 bisector = la::normalize(lastN0 + lastN1);
+      vec3 planeNormal = la::cross(la::normalize(lastEdgeVec), bisector);
+      double pnLen = la::length(planeNormal);
+      if (pnLen < 1e-10) {
+        outputs.push_back(shape);
+        break;
+      }
+      planeNormal /= pnLen;
+      double originOffset = la::dot(planeNormal, lastEdgeMid);
+      auto [a, b] = shape.SplitByPlane(planeNormal, originOffset);
+      if (!a.IsEmpty() && a.Volume() > 1e-12) {
+        auto aSub =
+            a.GetCsgLeafNode().GetImpl()->ConvexDecompositionOnionPeel();
+        outputs.insert(outputs.end(), aSub.begin(), aSub.end());
+      }
+      if (!b.IsEmpty() && b.Volume() > 1e-12) {
+        auto bSub =
+            b.GetCsgLeafNode().GetImpl()->ConvexDecompositionOnionPeel();
+        outputs.insert(outputs.end(), bSub.begin(), bSub.end());
+      }
+      break;
+    }
+
+    // Multiple reflex edges — hull their vertices, intersect with shape
+    // to peel off the concave region, then subtract it
+    Manifold reflexHull = Manifold::Hull(reflexVerts);
+    if (reflexHull.IsEmpty()) {
+      outputs.push_back(shape);
+      break;
+    }
+
+    Manifold peel = shape ^ reflexHull;
+    if (peel.IsEmpty() || peel.Volume() < 1e-12) {
+      outputs.push_back(shape);
+      break;
+    }
+
+    // The "peel" is the concave region. The convex outer layer is
+    // shape - peel. Decompose both and recurse.
+    Manifold outer = shape - peel;
+
+    // Outer layer: decompose (may be multiple disconnected convex pieces)
+    if (!outer.IsEmpty() && outer.Volume() > 1e-12) {
+      for (auto& part : outer.Decompose()) {
+        if (part.Volume() < 1e-12) continue;
+        auto pImpl = part.GetCsgLeafNode().GetImpl();
+        if (pImpl->IsConvex()) {
+          outputs.push_back(part.Hull());
+        } else {
+          auto sub = pImpl->ConvexDecompositionOnionPeel();
+          outputs.insert(outputs.end(), sub.begin(), sub.end());
+        }
+      }
+    }
+
+    // Recurse on the peel (inner concave remainder)
+    shape = peel;
+  }
+
+  // Filter degenerates
+  std::vector<Manifold> filtered;
+  for (auto& p : outputs)
+    if (p.Volume() > 1e-10) filtered.push_back(p);
+  return filtered;
+}
+
 }  // namespace manifold

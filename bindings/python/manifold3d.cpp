@@ -362,9 +362,9 @@ NB_MODULE(manifold3d, m) {
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("convex_decomposition", &Manifold::ConvexDecomposition,
            nb::arg("max_cluster_size") = 2, nb::arg("max_depth") = 1,
-           "Decompose into approximately convex pieces using Delaunay "
-           "tetrahedralization and greedy hull merge. Non-convex pieces "
-           "are recursively decomposed up to max_depth levels.")
+           nb::arg("mode") = 0,
+           "Decompose into convex pieces. mode: 0=DT+carve (default), "
+           "1=carve-only (best for curved shapes), 2=onion-peel.")
       .def("split", &Manifold::Split, nb::arg("cutter"),
            manifold__split__cutter)
       .def("split_by_plane", &Manifold::SplitByPlane, nb::arg("normal"),

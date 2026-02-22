@@ -977,9 +977,11 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  */
 std::vector<Manifold> Manifold::ConvexDecomposition(int maxClusterSize,
                                                     int maxDepth,
-                                                    bool carveOnly) const {
-  if (carveOnly)
+                                                    int mode) const {
+  if (mode == 1)
     return GetCsgLeafNode().GetImpl()->ConvexDecompositionCarveOnly();
+  if (mode == 2)
+    return GetCsgLeafNode().GetImpl()->ConvexDecompositionOnionPeel();
   return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxClusterSize,
                                                          maxDepth);
 }
