@@ -1207,13 +1207,20 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionOnionPeel() const {
         }
         break;
       }
-      outputs.push_back(shape);
+      // Fall back to DT for insoluble shapes
+      auto fallback =
+          shape.GetCsgLeafNode().GetImpl()->ConvexDecomposition(2, 1);
+      outputs.insert(outputs.end(), fallback.begin(), fallback.end());
       break;
     }
 
     Manifold peel = shape ^ reflexHull;
-    if (peel.IsEmpty() || peel.Volume() < 1e-12) {
-      outputs.push_back(shape);
+    if (peel.IsEmpty() || std::abs(peel.Volume()) < 1e-12) {
+      // Peel is empty/degenerate — reflex hull is in negative space.
+      // Fall back to DT pipeline.
+      auto fallback =
+          shape.GetCsgLeafNode().GetImpl()->ConvexDecomposition(2, 1);
+      outputs.insert(outputs.end(), fallback.begin(), fallback.end());
       break;
     }
 
