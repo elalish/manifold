@@ -526,7 +526,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         circumcenters[i] = GetCircumCenter(p0, p1, p2, p3);
       }
 
-      // Union-find to group adjacent tets with matching circumcenters
+      // Union-find to group adjacent INTERIOR tets with matching circumcenters.
+      // Only valid (clipped, interior) tets participate — exterior tets have
+      // valid[i]=false and are excluded from both grouping and merging.
       constexpr double ccEps = 1e-10;
       std::vector<int> ccParent(origTets);
       for (int i = 0; i < origTets; i++) ccParent[i] = i;
