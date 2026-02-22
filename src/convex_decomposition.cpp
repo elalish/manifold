@@ -1002,42 +1002,61 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
     }
 
     if (bestHull.IsEmpty()) {
-      // Can't carve — split by reflex edge and recurse on halves
-      bool didSplit = false;
-      const auto& heS = sImpl->halfedge_;
-      const auto& fnS = sImpl->faceNormal_;
-      const auto& vpS = sImpl->vertPos_;
-      for (size_t idx = 0; idx < heS.size(); idx++) {
-        auto edge = heS[idx];
-        if (!edge.IsForward()) continue;
-        vec3 n0 = fnS[idx / 3];
-        vec3 n1 = fnS[edge.pairedHalfedge / 3];
-        vec3 edgeVec = vpS[edge.endVert] - vpS[edge.startVert];
-        if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
-        vec3 bisector = la::normalize(n0 + n1);
-        vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
-        double pnLen = la::length(planeNormal);
-        if (pnLen < 1e-10) continue;
-        planeNormal /= pnLen;
-        vec3 edgeMid = (vpS[edge.startVert] + vpS[edge.endVert]) * 0.5;
-        double originOffset = la::dot(planeNormal, edgeMid);
-        auto [a, b] = shape.SplitByPlane(planeNormal, originOffset);
-        if (!a.IsEmpty() && !b.IsEmpty()) {
-          auto aImpl = a.GetCsgLeafNode().GetImpl();
-          auto bImpl = b.GetCsgLeafNode().GetImpl();
-          auto aSub = aImpl->ConvexDecompositionCarveOnly();
-          auto bSub = bImpl->ConvexDecompositionCarveOnly();
-          outputs.insert(outputs.end(), aSub.begin(), aSub.end());
-          outputs.insert(outputs.end(), bSub.begin(), bSub.end());
-          didSplit = true;
-          break;
+      // Can't carve — iteratively split all reflex edges, then recurse
+      // on the resulting pieces (handles multiple reflex edges per piece).
+      std::vector<Manifold> work = {shape};
+      for (int splitIter = 0; splitIter < 100 && !work.empty(); splitIter++) {
+        std::vector<Manifold> next;
+        bool anySplit = false;
+        for (auto& piece : work) {
+          if (piece.Volume() < 1e-10) continue;
+          auto pImpl = piece.GetCsgLeafNode().GetImpl();
+          if (pImpl->IsConvex()) {
+            outputs.push_back(piece);
+            continue;
+          }
+          bool split = false;
+          const auto& heS = pImpl->halfedge_;
+          const auto& fnS = pImpl->faceNormal_;
+          const auto& vpS = pImpl->vertPos_;
+          for (size_t idx = 0; idx < heS.size(); idx++) {
+            auto edge = heS[idx];
+            if (!edge.IsForward()) continue;
+            vec3 n0 = fnS[idx / 3];
+            vec3 n1 = fnS[edge.pairedHalfedge / 3];
+            vec3 edgeVec = vpS[edge.endVert] - vpS[edge.startVert];
+            if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+            vec3 bisector = la::normalize(n0 + n1);
+            vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
+            double pnLen = la::length(planeNormal);
+            if (pnLen < 1e-10) continue;
+            planeNormal /= pnLen;
+            vec3 edgeMid = (vpS[edge.startVert] + vpS[edge.endVert]) * 0.5;
+            double originOffset = la::dot(planeNormal, edgeMid);
+            auto [a, b] = piece.SplitByPlane(planeNormal, originOffset);
+            if (!a.IsEmpty() && !b.IsEmpty()) {
+              next.push_back(a);
+              next.push_back(b);
+              split = true;
+              anySplit = true;
+              break;
+            }
+          }
+          if (!split) next.push_back(piece);
         }
+        work = std::move(next);
+        if (!anySplit) break;
       }
-      if (!didSplit && shape.Volume() > 1e-15) {
-        // Fall back to the DT pipeline for insoluble remainders
-        auto fallback =
-            shape.GetCsgLeafNode().GetImpl()->ConvexDecomposition(2, 1);
-        outputs.insert(outputs.end(), fallback.begin(), fallback.end());
+      // Recurse carve-only on split results, DT fallback for insoluble
+      for (auto& piece : work) {
+        if (piece.Volume() < 1e-10) continue;
+        auto pImpl = piece.GetCsgLeafNode().GetImpl();
+        if (pImpl->IsConvex()) {
+          outputs.push_back(piece);
+        } else {
+          auto fallback = pImpl->ConvexDecomposition(2, 1);
+          outputs.insert(outputs.end(), fallback.begin(), fallback.end());
+        }
       }
       break;
     }
