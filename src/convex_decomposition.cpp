@@ -1002,18 +1002,52 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
     }
 
     if (bestHull.IsEmpty()) {
-      outputs.push_back(shape);
+      // Can't carve — split by reflex edge and recurse on halves
+      bool didSplit = false;
+      const auto& heS = sImpl->halfedge_;
+      const auto& fnS = sImpl->faceNormal_;
+      const auto& vpS = sImpl->vertPos_;
+      for (size_t idx = 0; idx < heS.size(); idx++) {
+        auto edge = heS[idx];
+        if (!edge.IsForward()) continue;
+        vec3 n0 = fnS[idx / 3];
+        vec3 n1 = fnS[edge.pairedHalfedge / 3];
+        vec3 edgeVec = vpS[edge.endVert] - vpS[edge.startVert];
+        if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+        vec3 bisector = la::normalize(n0 + n1);
+        vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
+        double pnLen = la::length(planeNormal);
+        if (pnLen < 1e-10) continue;
+        planeNormal /= pnLen;
+        vec3 edgeMid = (vpS[edge.startVert] + vpS[edge.endVert]) * 0.5;
+        double originOffset = la::dot(planeNormal, edgeMid);
+        auto [a, b] = shape.SplitByPlane(planeNormal, originOffset);
+        if (!a.IsEmpty() && !b.IsEmpty()) {
+          auto aImpl = a.GetCsgLeafNode().GetImpl();
+          auto bImpl = b.GetCsgLeafNode().GetImpl();
+          auto aSub = aImpl->ConvexDecompositionCarveOnly();
+          auto bSub = bImpl->ConvexDecompositionCarveOnly();
+          outputs.insert(outputs.end(), aSub.begin(), aSub.end());
+          outputs.insert(outputs.end(), bSub.begin(), bSub.end());
+          didSplit = true;
+          break;
+        }
+      }
+      if (!didSplit && shape.Volume() > 1e-15) outputs.push_back(shape);
       break;
     }
 
     outputs.push_back(bestHull);
     shape = shape - bestHull;
+    // Skip degenerate remainders from boolean subtraction
+    if (shape.Volume() < bestHull.Volume() * 1e-10) break;
 
     // Decompose remainder in case subtraction split it
     if (!shape.IsEmpty()) {
       auto parts = shape.Decompose();
       if (parts.size() > 1) {
         for (size_t i = 1; i < parts.size(); i++) {
+          if (parts[i].Volume() < 1e-15) continue;
           auto pImpl = parts[i].GetCsgLeafNode().GetImpl();
           auto sub = pImpl->ConvexDecompositionCarveOnly();
           outputs.insert(outputs.end(), sub.begin(), sub.end());
