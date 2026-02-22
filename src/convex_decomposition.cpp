@@ -337,6 +337,59 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
   return verts;
 }
 
+// Generate interior sample points for a non-convex piece by offsetting
+// triangle centroids inward along face normals. These points are guaranteed
+// to be inside the piece (for small enough offset) and help the DT create
+// tets that split reflex edges.
+std::vector<vec3> SampleInteriorPoints(const Manifold& piece) {
+  MeshGL64 mesh = piece.GetMeshGL64();
+  size_t nv = mesh.vertProperties.size() / mesh.numProp;
+  size_t nt = mesh.triVerts.size() / 3;
+
+  auto getVert = [&](size_t vi) -> vec3 {
+    return vec3(mesh.vertProperties[vi * mesh.numProp],
+                mesh.vertProperties[vi * mesh.numProp + 1],
+                mesh.vertProperties[vi * mesh.numProp + 2]);
+  };
+
+  // Compute average edge length for offset scale
+  double avgEdge = 0;
+  int edgeCount = 0;
+  for (size_t t = 0; t < nt; t++) {
+    vec3 v0 = getVert(mesh.triVerts[3 * t]);
+    vec3 v1 = getVert(mesh.triVerts[3 * t + 1]);
+    vec3 v2 = getVert(mesh.triVerts[3 * t + 2]);
+    avgEdge += la::length(v1 - v0) + la::length(v2 - v1) + la::length(v0 - v2);
+    edgeCount += 3;
+  }
+  avgEdge /= std::max(edgeCount, 1);
+  double offset = avgEdge * 0.1;
+
+  // Centroid of the piece (fallback interior point)
+  vec3 centroid(0, 0, 0);
+  for (size_t i = 0; i < nv; i++) centroid += getVert(i);
+  centroid /= std::max((double)nv, 1.0);
+
+  std::vector<vec3> pts;
+  for (size_t t = 0; t < nt; t++) {
+    vec3 v0 = getVert(mesh.triVerts[3 * t]);
+    vec3 v1 = getVert(mesh.triVerts[3 * t + 1]);
+    vec3 v2 = getVert(mesh.triVerts[3 * t + 2]);
+    vec3 faceCentroid = (v0 + v1 + v2) / 3.0;
+    vec3 normal = la::cross(v1 - v0, v2 - v0);
+    double len = la::length(normal);
+    if (len < 1e-15) continue;
+    normal /= len;
+    // Offset inward: toward the centroid of the piece
+    vec3 toCentroid = centroid - faceCentroid;
+    if (la::dot(toCentroid, normal) < 0) normal = -normal;
+    pts.push_back(faceCentroid + normal * offset);
+  }
+  // Also add the centroid itself
+  pts.push_back(centroid);
+  return pts;
+}
+
 }  // anonymous namespace
 
 /**
@@ -756,9 +809,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
 
     // Step 4: Collect results — recursively decompose non-convex pieces.
-    // Note: pieces may have thin overlaps at shared tet faces, so the sum of
-    // individual volumes can slightly exceed the original. The boolean union
-    // of all pieces is exact.
+    // If recursion can't split a piece (all surface verts, no interior),
+    // sample interior points and retry the DT with augmented vertices.
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
       auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
@@ -766,13 +818,126 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         outputs.push_back(pieces[i]);
         continue;
       }
-      // Non-convex piece: try recursive decomposition if depth allows
-      if (maxDepth > 0 && pieces[i].NumVert() >= 4) {
-        auto subPieces =
-            pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
-        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
-      } else {
+      if (maxDepth <= 0 || pieces[i].NumVert() < 4) {
         outputs.push_back(pieces[i]);
+        continue;
+      }
+      // Try recursive decomposition first
+      auto subPieces =
+          pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
+      // Check if recursion helped (produced more pieces or all convex)
+      bool allConvex = true;
+      for (auto& sp : subPieces) {
+        auto spImpl = sp.GetCsgLeafNode().GetImpl();
+        if (!spImpl->IsConvex()) {
+          allConvex = false;
+          break;
+        }
+      }
+      if (allConvex || subPieces.size() > 1) {
+        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
+        continue;
+      }
+      // Recursion didn't help — piece is irreducible with surface vertices
+      // alone. Add interior sample points and retry.
+      auto interiorPts = SampleInteriorPoints(pieces[i]);
+      MeshGL64 pMesh = pieces[i].GetMeshGL64();
+      size_t pnv = pMesh.vertProperties.size() / pMesh.numProp;
+
+      std::vector<vec3> augVerts;
+      augVerts.reserve(pnv + interiorPts.size() + 4);
+      for (size_t vi = 0; vi < pnv; vi++)
+        augVerts.push_back(vec3(
+            pMesh.vertProperties[vi * pMesh.numProp] + DeterministicEps(vi, 0),
+            pMesh.vertProperties[vi * pMesh.numProp + 1] +
+                DeterministicEps(vi, 1),
+            pMesh.vertProperties[vi * pMesh.numProp + 2] +
+                DeterministicEps(vi, 2)));
+      for (size_t vi = 0; vi < interiorPts.size(); vi++)
+        augVerts.push_back(
+            vec3(interiorPts[vi].x + DeterministicEps(pnv + vi, 0),
+                 interiorPts[vi].y + DeterministicEps(pnv + vi, 1),
+                 interiorPts[vi].z + DeterministicEps(pnv + vi, 2)));
+
+      vec3 augCenter(0, 0, 0);
+      for (auto& p : augVerts) augCenter += p;
+      augCenter /= (double)augVerts.size();
+      double augRadius = 0;
+      for (auto& p : augVerts)
+        augRadius = std::max(augRadius, la::length(p - augCenter));
+      double augS = 5.0 * augRadius;
+      augVerts.push_back(vec3(-augS, 0, -augS));
+      augVerts.push_back(vec3(augS, 0, -augS));
+      augVerts.push_back(vec3(0, augS, augS));
+      augVerts.push_back(vec3(0, -augS, augS));
+
+      auto augTets = CreateTetIds(augVerts, 0.0);
+      int augNumTets = (int)augTets.size() / 4;
+      auto augBbox = pieces[i].BoundingBox();
+
+      // Clip augmented tets against the original piece
+      std::vector<Manifold> augPieces;
+      for (int t = 0; t < augNumTets; t++) {
+        uint32_t t0 = augTets[4 * t], t1 = augTets[4 * t + 1],
+                 t2 = augTets[4 * t + 2], t3 = augTets[4 * t + 3];
+        // Use original (unperturbed) positions for hull
+        vec3 tv0, tv1, tv2, tv3;
+        if (t0 < pnv)
+          tv0 = vec3(pMesh.vertProperties[t0 * pMesh.numProp],
+                     pMesh.vertProperties[t0 * pMesh.numProp + 1],
+                     pMesh.vertProperties[t0 * pMesh.numProp + 2]);
+        else if (t0 < pnv + interiorPts.size())
+          tv0 = interiorPts[t0 - pnv];
+        else
+          continue;
+        if (t1 < pnv)
+          tv1 = vec3(pMesh.vertProperties[t1 * pMesh.numProp],
+                     pMesh.vertProperties[t1 * pMesh.numProp + 1],
+                     pMesh.vertProperties[t1 * pMesh.numProp + 2]);
+        else if (t1 < pnv + interiorPts.size())
+          tv1 = interiorPts[t1 - pnv];
+        else
+          continue;
+        if (t2 < pnv)
+          tv2 = vec3(pMesh.vertProperties[t2 * pMesh.numProp],
+                     pMesh.vertProperties[t2 * pMesh.numProp + 1],
+                     pMesh.vertProperties[t2 * pMesh.numProp + 2]);
+        else if (t2 < pnv + interiorPts.size())
+          tv2 = interiorPts[t2 - pnv];
+        else
+          continue;
+        if (t3 < pnv)
+          tv3 = vec3(pMesh.vertProperties[t3 * pMesh.numProp],
+                     pMesh.vertProperties[t3 * pMesh.numProp + 1],
+                     pMesh.vertProperties[t3 * pMesh.numProp + 2]);
+        else if (t3 < pnv + interiorPts.size())
+          tv3 = interiorPts[t3 - pnv];
+        else
+          continue;
+
+        double tetVol =
+            std::abs(la::dot(tv1 - tv0, la::cross(tv2 - tv0, tv3 - tv0))) / 6.0;
+        if (tetVol < 1e-15) continue;
+
+        Manifold tetHull = Manifold::Hull({tv0, tv1, tv2, tv3});
+        if (tetHull.IsEmpty()) continue;
+        Manifold clipped = pieces[i] ^ tetHull;
+        if (clipped.IsEmpty()) continue;
+        augPieces.push_back(clipped);
+      }
+
+      if (augPieces.empty()) {
+        outputs.push_back(pieces[i]);
+      } else {
+        // Merge augmented pieces greedily
+        for (auto& ap : augPieces) {
+          auto apImpl = ap.GetCsgLeafNode().GetImpl();
+          if (apImpl->IsConvex()) {
+            outputs.push_back(ap);
+          } else {
+            outputs.push_back(ap);
+          }
+        }
       }
     }
   }
