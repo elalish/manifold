@@ -533,11 +533,11 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
       vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
 
-      // Skip degenerate (coplanar) tets — they have zero volume and
-      // would cause assertion failures in Hull() with MANIFOLD_DEBUG.
-      double tetVol =
-          std::abs(la::dot(p1 - p0, la::cross(p2 - p0, p3 - p0))) / 6.0;
-      if (tetVol < 1e-15) return;
+      // Skip near-degenerate tets using scale-invariant quality metric.
+      // TetQuality returns ~1.0 for regular tets, ~0.0 for degenerate.
+      // Threshold 0.001 catches slivers that cause Hull() assertion
+      // failures with MANIFOLD_DEBUG on all platforms.
+      if (std::abs(TetQuality(p0, p1, p2, p3)) < 0.001) return;
 
       vec3 tMin = la::min(la::min(p0, p1), la::min(p2, p3));
       vec3 tMax = la::max(la::max(p0, p1), la::max(p2, p3));
