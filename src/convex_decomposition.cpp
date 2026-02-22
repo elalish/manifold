@@ -407,6 +407,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
 
     // Step 2: Clip tets against mesh (parallel)
+    // Build a set of mesh surface triangles for fast lookup. If a tet has
+    // a face matching a mesh triangle and the 4th vertex is on the interior
+    // side, the tet is entirely inside — skip the expensive boolean.
     auto adj = BuildTetAdjacency(flatTets);
     double totalVol = shape.Volume();
     auto shapeBbox = shape.BoundingBox();
