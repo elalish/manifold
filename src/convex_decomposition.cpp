@@ -32,14 +32,6 @@ namespace {
 // Face indices for each of the 4 faces of a tetrahedron.
 const int kTetFaces[4][3] = {{2, 1, 0}, {0, 1, 3}, {1, 2, 3}, {2, 0, 3}};
 
-// Deterministic perturbation to avoid degenerate configurations.
-inline double DeterministicEps(size_t index, int component) {
-  constexpr double eps = 1e-10;
-  uint64_t h = index * 2654435761ULL + component * 40503ULL;
-  h = (h ^ (h >> 16)) * 0x45d9f3bULL;
-  return -eps + 2.0 * ((h & 0xFFFFFF) / double(0xFFFFFF)) * eps;
-}
-
 vec3 GetCircumCenter(const vec3& p0, const vec3& p1, const vec3& p2,
                      const vec3& p3) {
   vec3 b = p1 - p0;
@@ -77,6 +69,9 @@ struct Edge {
 };
 
 // Incremental Delaunay tetrahedralization.
+// No perturbation needed — strict circumsphere test (<) naturally handles
+// cospheric points by not flipping them, so they share a circumcenter.
+// The quality filter removes any degenerate tets produced.
 std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
                                    double minQuality) {
   std::vector<int> tetIds;
@@ -87,6 +82,9 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
   std::vector<vec3> planesN;
   std::vector<double> planesD;
   int firstBig = (int)verts.size() - 4;
+
+  // Safeguard: cap total tet storage to prevent OOM
+  const size_t maxTotalTets = (size_t)firstBig * 20;
 
   tetIds.push_back(firstBig);
   tetIds.push_back(firstBig + 1);
@@ -104,15 +102,34 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
     planesD.push_back(la::dot(p0, n));
   }
 
+  int skippedPoints = 0;
+
   for (int i = 0; i < firstBig; i++) {
     vec3 p = verts[i];
+
+    // Safeguard: abort if tet count is excessive
+    if ((size_t)tetIds.size() / 4 > maxTotalTets) {
+#ifdef MANIFOLD_DEBUG
+      printf(
+          "ConvexDecomposition DT: tet limit reached (%zu), "
+          "skipping remaining %d points\n",
+          tetIds.size() / 4, firstBig - i);
+#endif
+      break;
+    }
+
+    // Find non-deleted tet
     int tetNr = 0;
     while (tetIds[4 * tetNr] < 0) tetNr++;
 
+    // Walk to containing tet
     tetMark++;
     bool found = false;
+    int walkSteps = 0;
+    const int maxWalkSteps = (int)tetIds.size() / 4 + 100;
     while (!found) {
       if (tetNr < 0 || tetMarks[tetNr] == tetMark) break;
+      if (++walkSteps > maxWalkSteps) break;  // prevent infinite walk
       tetMarks[tetNr] = tetMark;
       vec3 center =
           (verts[tetIds[4 * tetNr]] + verts[tetIds[4 * tetNr + 1]] +
@@ -138,8 +155,13 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
       else
         tetNr = neighbors[4 * tetNr + minFaceNr];
     }
-    if (!found) continue;
+    if (!found) {
+      skippedPoints++;
+      continue;
+    }
 
+    // Find violating tets — strict < handles cospheric points by NOT
+    // flipping them, allowing multiple tets to share a circumcenter.
     tetMark++;
     std::vector<int> violatingTets;
     std::vector<int> stack = {tetNr};
@@ -156,6 +178,7 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
             GetCircumCenter(verts[tetIds[4 * n]], verts[tetIds[4 * n + 1]],
                             verts[tetIds[4 * n + 2]], verts[tetIds[4 * n + 3]]);
         double r = la::length(verts[tetIds[4 * n]] - c);
+        // Strict < : cospheric points (dist == r) are NOT violated
         if (la::length(p - c) < r) stack.push_back(n);
       }
     }
@@ -241,6 +264,12 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
       }
     }
   }
+
+#ifdef MANIFOLD_DEBUG
+  if (skippedPoints > 0)
+    printf("ConvexDecomposition DT: %d/%d points skipped (degenerate)\n",
+           skippedPoints, firstBig);
+#endif
 
   int numTets = (int)tetIds.size() / 4;
   std::vector<uint32_t> result;
@@ -364,9 +393,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     std::vector<vec3> tetVerts;
     tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
-      tetVerts.push_back(vec3(verts[i * 3 + 0] + DeterministicEps(i, 0),
-                              verts[i * 3 + 1] + DeterministicEps(i, 1),
-                              verts[i * 3 + 2] + DeterministicEps(i, 2)));
+      tetVerts.push_back(
+          vec3(verts[i * 3 + 0], verts[i * 3 + 1], verts[i * 3 + 2]));
 
     vec3 center(0, 0, 0);
     for (const auto& p : tetVerts) center += p;
