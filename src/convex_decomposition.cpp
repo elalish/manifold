@@ -364,7 +364,10 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
 
     constexpr double kMergeTol = 1e-8;
 
-    // Step 0: Greedy surface hull carving. Starting from each unclaimed
+    // Step 0: Greedy surface hull carving. Only for shapes with many vertices
+    // (curved surfaces). Simple shapes are handled optimally by DT+merge.
+    if (shapeImpl->NumVert() < 100)
+      goto skip_carving;  // NOLINT Starting from each unclaimed
     // vertex, incrementally grow a patch by adding neighbors one at a time,
     // checking that the hull of the patch stays inside the shape after each
     // addition. When the patch can't grow further, emit it as a convex piece
@@ -450,8 +453,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             inPatch[candidate] = false;
           }
 
-          // Emit the largest valid patch
-          if (!lastGoodHull.IsEmpty() && lastGoodPatch.size() >= 4) {
+          // Emit the largest valid patch (only if large enough to be worth
+          // carving — small patches are better handled by the DT+merge step)
+          if (!lastGoodHull.IsEmpty() && lastGoodPatch.size() >= 16) {
             outputs.push_back(lastGoodHull);
             for (int v : lastGoodPatch) claimed[v] = true;
             shape = shape - lastGoodHull;
@@ -472,6 +476,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
+  skip_carving:
     MeshGL64 meshGL = shape.GetMeshGL64();
     size_t numVerts = meshGL.vertProperties.size() / meshGL.numProp;
 
