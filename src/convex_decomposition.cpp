@@ -434,7 +434,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     std::vector<Manifold> pieces(numTets);
     std::vector<bool> valid(numTets, false);
 
-    for_each_n(autoPolicy(numTets, 16), countAt(0), numTets, [&](int i) {
+    for_each_n(ExecutionPolicy::Seq, countAt(0), numTets, [&](int i) {
       uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
                i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
       vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
