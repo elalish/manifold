@@ -438,7 +438,8 @@ class Manifold {
   /** @name Convex Decomposition
    */
   ///@{
-  std::vector<Manifold> ConvexDecomposition(int maxClusterSize = 2) const;
+  std::vector<Manifold> ConvexDecomposition(int maxClusterSize = 2,
+                                            int maxDepth = 1) const;
   ///@}
 
   /** @name I/O

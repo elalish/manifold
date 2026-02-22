@@ -577,9 +577,8 @@ TEST(Boolean, NonConvexConvexMinkowskiSumDecompose) {
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20), true);
-  // Curved surfaces produce non-convex DT-clipped pieces, so the
-  // vertex-addition Minkowski is approximate for curved geometry.
-  // Volume/area are close but genus may differ.
+  // Curved surfaces may have residual non-convex pieces from DT clipping,
+  // so vertex-addition Minkowski is approximate for curved geometry.
   EXPECT_NEAR(sum.Volume(), 4.841, 0.1);
   EXPECT_NEAR(sum.SurfaceArea(), 34.06, 0.5);
   EXPECT_GE(sum.Genus(), 0);

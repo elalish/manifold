@@ -971,10 +971,14 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  *
  * @param maxClusterSize Maximum cluster size for greedy merge (2-4). Higher
  * values produce fewer pieces but take longer. Default is 2.
+ * @param maxDepth Maximum recursion depth for decomposing non-convex pieces.
+ * Higher values produce more convex pieces at the cost of speed. Default is 1.
  * @return Vector of approximately convex manifold pieces.
  */
-std::vector<Manifold> Manifold::ConvexDecomposition(int maxClusterSize) const {
-  return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxClusterSize);
+std::vector<Manifold> Manifold::ConvexDecomposition(int maxClusterSize,
+                                                    int maxDepth) const {
+  return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxClusterSize,
+                                                         maxDepth);
 }
 
 /**

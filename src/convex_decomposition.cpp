@@ -312,7 +312,7 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
  * Follows the same Impl method pattern as Minkowski.
  */
 std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
-                                                          bool hullSnap) const {
+                                                          int maxDepth) const {
   std::vector<Manifold> outputs;
 
   // Wrap this Impl as a Manifold for boolean operations
@@ -628,27 +628,21 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect results
+    // Step 4: Collect results — recursively decompose non-convex pieces
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
-      if (!hullSnap) {
-        // No hull-snap: keep exact pieces (preserves topology for Minkowski)
+      auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
+      if (pieceImpl->IsConvex()) {
         outputs.push_back(pieces[i]);
         continue;
       }
-      // Hull-snap: replace with convex hull if close enough
-      auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
-      if (pieceImpl->IsConvex()) {
-        outputs.push_back(pieces[i].Hull());
-        continue;
-      }
-      Manifold hull = pieces[i].Hull();
-      double pVol = pieces[i].Volume();
-      double hVol = hull.Volume();
-      double diff = (pVol > 0) ? (hVol - pVol) / pVol : 0;
-      if (diff < 0.001) {
-        outputs.push_back(hull);
+      // Non-convex piece: try recursive decomposition if depth allows
+      if (maxDepth > 0 && pieces[i].NumVert() >= 4) {
+        auto subPieces =
+            pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
+        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
       } else {
+        // Max depth reached: keep as-is
         outputs.push_back(pieces[i]);
       }
     }

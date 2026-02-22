@@ -400,7 +400,7 @@ struct Manifold::Impl {
 
   // convex_decomposition.cpp
   std::vector<Manifold> ConvexDecomposition(int maxClusterSize,
-                                            bool hullSnap = true) const;
+                                            int maxDepth = 1) const;
 };
 
 extern std::mutex dump_lock;
