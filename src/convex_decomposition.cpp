@@ -668,7 +668,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         Manifold hull = Manifold::Hull(combined);
         if (hull.IsEmpty() || sumVol <= 0.0) continue;
         double hullVol = hull.Volume();
-        if (hullVol > sumVol * (1.0 + 1e-9)) continue;
+        if (hullVol > sumVol * (1.0 + 1e-8)) continue;
 
         // Apply merge: keep root, invalidate others
         pieces[root] = hull;
@@ -702,7 +702,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       Manifold hull = Manifold::Hull(combined);
       if (hull.IsEmpty()) return false;
       double hullVol = hull.Volume();
-      if (sumVol > 0.0 && hullVol <= sumVol * (1.0 + 1e-9)) {
+      if (sumVol > 0.0 && hullVol <= sumVol * (1.0 + 1e-8)) {
         pieces[root] = hull;
         pieceVerts[root] = ExtractVertices(hull);
         volumes[root] = hullVol;
@@ -820,7 +820,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             Manifold hull = Manifold::Hull(combined);
             if (!hull.IsEmpty() && sumVol > 0.0) {
               double ratio = hull.Volume() / sumVol;
-              if (ratio <= 1.0 + 1e-9 && ratio < bestRatio) {
+              if (ratio <= 1.0 + 1e-8 && ratio < bestRatio) {
                 bestRatio = ratio;
                 bestRoot = i;
                 bestOthers = others;
