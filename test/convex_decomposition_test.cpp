@@ -147,6 +147,84 @@ TEST(ConvexDecomposition, EmptyManifold) {
   EXPECT_EQ(pieces.size(), 0u);
 }
 
+// Long skinny shapes stress the DT with near-degenerate tets.
+TEST(ConvexDecomposition, ThinBeam) {
+  // 10:1 aspect ratio beam with an L-bend
+  Manifold beam = Manifold::Cube({10, 1, 1});
+  Manifold shape = beam + beam.Rotate(0, 0, 90).Translate({0, 10, 0});
+  double origVol = shape.Volume();
+
+  auto pieces = shape.ConvexDecomposition();
+  EXPECT_GE(pieces.size(), 2u);
+
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
+}
+
+TEST(ConvexDecomposition, ThinWedge) {
+  // Very thin wedge: cube sliced by a near-grazing plane
+  Manifold cube = Manifold::Cube({4, 4, 4}, true);
+  Manifold wedge = cube.TrimByPlane({0.1, 1, 0}, 0.5);
+  double origVol = wedge.Volume();
+
+  auto pieces = wedge.ConvexDecomposition();
+  EXPECT_GE(pieces.size(), 1u);
+
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
+
+  for (const auto& p : pieces) {
+    EXPECT_TRUE(IsApproxConvex(p))
+        << "Non-convex piece with volume " << p.Volume();
+  }
+}
+
+TEST(ConvexDecomposition, FlatSlab) {
+  // 20:20:1 aspect ratio slab with a notch
+  Manifold slab = Manifold::Cube({20, 20, 1});
+  Manifold notch = Manifold::Cube({5, 5, 1}).Translate({7.5, 7.5, 0});
+  Manifold shape = slab - notch;
+  double origVol = shape.Volume();
+
+  auto pieces = shape.ConvexDecomposition();
+  EXPECT_GE(pieces.size(), 2u);
+
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
+}
+
+TEST(ConvexDecomposition, HighAspectCylinder) {
+  // Tall thin cylinder (20:1 aspect ratio) with a chunk removed
+  Manifold cyl = Manifold::Cylinder(20, 1, 1, 24);
+  Manifold shape = cyl - Manifold::Cube({2, 2, 5}).Translate({-1, -1, 7.5});
+  double origVol = shape.Volume();
+
+  auto pieces = shape.ConvexDecomposition();
+  EXPECT_GE(pieces.size(), 2u);
+
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
+
+  int convexCount = 0;
+  for (const auto& p : pieces)
+    if (IsApproxConvex(p)) convexCount++;
+  EXPECT_GE(convexCount, (int)pieces.size() / 2);
+}
+
+TEST(ConvexDecomposition, ThinFin) {
+  // Very thin fin: 0.1 thick, 10 wide, 5 tall, with a V-notch
+  Manifold fin = Manifold::Cube({10, 0.1, 5});
+  Manifold notch = Manifold::Cube({3, 0.1, 3}).Translate({3.5, 0, 0});
+  Manifold shape = fin - notch;
+  double origVol = shape.Volume();
+
+  auto pieces = shape.ConvexDecomposition();
+  EXPECT_GE(pieces.size(), 2u);
+
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
+}
+
 TEST(ConvexDecomposition, Deterministic) {
   // Cube is fully deterministic (fast-path convexity check)
   Manifold cube = Manifold::Cube({2, 2, 2});
