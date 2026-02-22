@@ -922,7 +922,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
   auto thisImpl = std::make_shared<Impl>(*this);
   Manifold shape(std::make_shared<CsgLeafNode>(thisImpl));
 
-  if (shape.IsEmpty()) return outputs;
+  if (shape.IsEmpty() || shape.Volume() < 1e-12) return outputs;
   if (IsConvex()) {
     outputs.push_back(shape.Hull());
     return outputs;
@@ -1033,7 +1033,12 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
           break;
         }
       }
-      if (!didSplit && shape.Volume() > 1e-15) outputs.push_back(shape);
+      if (!didSplit && shape.Volume() > 1e-15) {
+        // Fall back to the DT pipeline for insoluble remainders
+        auto fallback =
+            shape.GetCsgLeafNode().GetImpl()->ConvexDecomposition(2, 1);
+        outputs.insert(outputs.end(), fallback.begin(), fallback.end());
+      }
       break;
     }
 
@@ -1057,7 +1062,11 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionCarveOnly() const {
     }
   }
 
-  return outputs;
+  // Filter degenerate zero-volume pieces from boolean artifacts
+  std::vector<Manifold> filtered;
+  for (auto& p : outputs)
+    if (p.Volume() > 1e-10) filtered.push_back(p);
+  return filtered;
 }
 
 }  // namespace manifold
