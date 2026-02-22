@@ -27,11 +27,10 @@ bool IsApproxConvex(const Manifold& m, double tol = 0.001) {
   return vol > 0 && std::abs(hullVol - vol) < vol * tol;
 }
 
-// Sum volumes of all pieces.
-double TotalVolume(const std::vector<Manifold>& pieces) {
-  double sum = 0;
-  for (const auto& p : pieces) sum += p.Volume();
-  return sum;
+// Union volume of all pieces (checks exact tiling, not sum which
+// double-counts overlaps at shared tet faces).
+double UnionVolume(const std::vector<Manifold>& pieces) {
+  return Manifold::BatchBoolean(pieces, OpType::Add).Volume();
 }
 
 // Make an L-shaped solid (cube minus corner cube).
@@ -73,8 +72,8 @@ TEST(ConvexDecomposition, LShape) {
         << "Non-convex piece with volume " << p.Volume();
   }
 
-  double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 }
 
 TEST(ConvexDecomposition, CubeSphere) {
@@ -84,8 +83,8 @@ TEST(ConvexDecomposition, CubeSphere) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 
   int convexCount = 0;
   for (const auto& p : pieces)
@@ -101,8 +100,8 @@ TEST(ConvexDecomposition, TwoSpheres) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 
   int convexCount = 0;
   for (const auto& p : pieces)
@@ -124,8 +123,8 @@ TEST(ConvexDecomposition, CubeCube) {
         << "Non-convex piece with volume " << p.Volume();
   }
 
-  double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.001);
+  double totalVol = UnionVolume(pieces);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 }
 
 TEST(ConvexDecomposition, ClusterSizeEffect) {

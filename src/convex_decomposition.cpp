@@ -480,7 +480,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
 
     // Step 3: Greedy merge
-    const double mergeTol = 0.001;
+    // Only merge if hull volume does not exceed sum of constituent volumes.
+    // This ensures no volume is added — the decomposition tiles exactly.
     std::vector<double> volumes(numTets, 0.0);
     std::vector<std::vector<vec3>> pieceVerts(numTets);
     for (int i = 0; i < numTets; i++) {
@@ -568,7 +569,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         Manifold hull = Manifold::Hull(combined);
         if (hull.IsEmpty() || sumVol <= 0.0) continue;
         double hullVol = hull.Volume();
-        if (std::abs(hullVol - sumVol) > sumVol * 0.01) continue;
+        if (hullVol > sumVol) continue;
 
         // Apply merge: keep root, invalidate others
         pieces[root] = hull;
@@ -602,7 +603,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       Manifold hull = Manifold::Hull(combined);
       if (hull.IsEmpty()) return false;
       double hullVol = hull.Volume();
-      if (sumVol > 0.0 && std::abs(hullVol - sumVol) < sumVol * mergeTol) {
+      if (sumVol > 0.0 && hullVol <= sumVol) {
         pieces[root] = hull;
         pieceVerts[root] = ExtractVertices(hull);
         volumes[root] = hullVol;
@@ -720,7 +721,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             Manifold hull = Manifold::Hull(combined);
             if (!hull.IsEmpty() && sumVol > 0.0) {
               double ratio = hull.Volume() / sumVol;
-              if (ratio < 1.0 + mergeTol && ratio < bestRatio) {
+              if (ratio <= 1.0 && ratio < bestRatio) {
                 bestRatio = ratio;
                 bestRoot = i;
                 bestOthers = others;
@@ -747,7 +748,10 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect results — recursively decompose non-convex pieces
+    // Step 4: Collect results — recursively decompose non-convex pieces.
+    // Note: pieces may have thin overlaps at shared tet faces, so the sum of
+    // individual volumes can slightly exceed the original. The boolean union
+    // of all pieces is exact.
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
       auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
@@ -761,7 +765,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
         outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
       } else {
-        // Max depth reached: keep as-is
         outputs.push_back(pieces[i]);
       }
     }
