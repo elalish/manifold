@@ -449,7 +449,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
-    // Perturb vertices for DT robustness — output uses original positions
+    // Perturb vertices for DT robustness — output uses original positions.
+    // Interior points are only added for non-convex sub-pieces in step 4.
     std::vector<vec3> tetVerts;
     tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
@@ -578,13 +579,13 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       std::vector<vec3> circumcenters(origTets);
       for (int i = 0; i < origTets; i++) {
         if (!valid[i]) continue;
-        uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
-                 i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
-        vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
-        vec3 p1(verts[i1 * 3], verts[i1 * 3 + 1], verts[i1 * 3 + 2]);
-        vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
-        vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
-        circumcenters[i] = GetCircumCenter(p0, p1, p2, p3);
+        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
+                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
+        circumcenters[i] = GetCircumCenter(
+            vec3(verts[ci0 * 3], verts[ci0 * 3 + 1], verts[ci0 * 3 + 2]),
+            vec3(verts[ci1 * 3], verts[ci1 * 3 + 1], verts[ci1 * 3 + 2]),
+            vec3(verts[ci2 * 3], verts[ci2 * 3 + 1], verts[ci2 * 3 + 2]),
+            vec3(verts[ci3 * 3], verts[ci3 * 3 + 1], verts[ci3 * 3 + 2]));
       }
 
       // Union-find to group adjacent INTERIOR tets with matching circumcenters.
@@ -808,9 +809,10 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect results — recursively decompose non-convex pieces.
-    // If recursion can't split a piece (all surface verts, no interior),
-    // sample interior points and retry the DT with augmented vertices.
+    // Step 4: Collect convex pieces; re-decompose non-convex ones.
+    // Each recursion adds interior sample points (via SampleInteriorPoints
+    // in the DT vertex set) to create splitting tets for pieces where all
+    // surface vertices lie on the convex hull.
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
       auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
@@ -822,123 +824,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         outputs.push_back(pieces[i]);
         continue;
       }
-      // Try recursive decomposition first
       auto subPieces =
           pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
-      // Check if recursion helped (produced more pieces or all convex)
-      bool allConvex = true;
-      for (auto& sp : subPieces) {
-        auto spImpl = sp.GetCsgLeafNode().GetImpl();
-        if (!spImpl->IsConvex()) {
-          allConvex = false;
-          break;
-        }
-      }
-      if (allConvex || subPieces.size() > 1) {
-        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
-        continue;
-      }
-      // Recursion didn't help — piece is irreducible with surface vertices
-      // alone. Add interior sample points and retry.
-      auto interiorPts = SampleInteriorPoints(pieces[i]);
-      MeshGL64 pMesh = pieces[i].GetMeshGL64();
-      size_t pnv = pMesh.vertProperties.size() / pMesh.numProp;
-
-      std::vector<vec3> augVerts;
-      augVerts.reserve(pnv + interiorPts.size() + 4);
-      for (size_t vi = 0; vi < pnv; vi++)
-        augVerts.push_back(vec3(
-            pMesh.vertProperties[vi * pMesh.numProp] + DeterministicEps(vi, 0),
-            pMesh.vertProperties[vi * pMesh.numProp + 1] +
-                DeterministicEps(vi, 1),
-            pMesh.vertProperties[vi * pMesh.numProp + 2] +
-                DeterministicEps(vi, 2)));
-      for (size_t vi = 0; vi < interiorPts.size(); vi++)
-        augVerts.push_back(
-            vec3(interiorPts[vi].x + DeterministicEps(pnv + vi, 0),
-                 interiorPts[vi].y + DeterministicEps(pnv + vi, 1),
-                 interiorPts[vi].z + DeterministicEps(pnv + vi, 2)));
-
-      vec3 augCenter(0, 0, 0);
-      for (auto& p : augVerts) augCenter += p;
-      augCenter /= (double)augVerts.size();
-      double augRadius = 0;
-      for (auto& p : augVerts)
-        augRadius = std::max(augRadius, la::length(p - augCenter));
-      double augS = 5.0 * augRadius;
-      augVerts.push_back(vec3(-augS, 0, -augS));
-      augVerts.push_back(vec3(augS, 0, -augS));
-      augVerts.push_back(vec3(0, augS, augS));
-      augVerts.push_back(vec3(0, -augS, augS));
-
-      auto augTets = CreateTetIds(augVerts, 0.0);
-      int augNumTets = (int)augTets.size() / 4;
-      auto augBbox = pieces[i].BoundingBox();
-
-      // Clip augmented tets against the original piece
-      std::vector<Manifold> augPieces;
-      for (int t = 0; t < augNumTets; t++) {
-        uint32_t t0 = augTets[4 * t], t1 = augTets[4 * t + 1],
-                 t2 = augTets[4 * t + 2], t3 = augTets[4 * t + 3];
-        // Use original (unperturbed) positions for hull
-        vec3 tv0, tv1, tv2, tv3;
-        if (t0 < pnv)
-          tv0 = vec3(pMesh.vertProperties[t0 * pMesh.numProp],
-                     pMesh.vertProperties[t0 * pMesh.numProp + 1],
-                     pMesh.vertProperties[t0 * pMesh.numProp + 2]);
-        else if (t0 < pnv + interiorPts.size())
-          tv0 = interiorPts[t0 - pnv];
-        else
-          continue;
-        if (t1 < pnv)
-          tv1 = vec3(pMesh.vertProperties[t1 * pMesh.numProp],
-                     pMesh.vertProperties[t1 * pMesh.numProp + 1],
-                     pMesh.vertProperties[t1 * pMesh.numProp + 2]);
-        else if (t1 < pnv + interiorPts.size())
-          tv1 = interiorPts[t1 - pnv];
-        else
-          continue;
-        if (t2 < pnv)
-          tv2 = vec3(pMesh.vertProperties[t2 * pMesh.numProp],
-                     pMesh.vertProperties[t2 * pMesh.numProp + 1],
-                     pMesh.vertProperties[t2 * pMesh.numProp + 2]);
-        else if (t2 < pnv + interiorPts.size())
-          tv2 = interiorPts[t2 - pnv];
-        else
-          continue;
-        if (t3 < pnv)
-          tv3 = vec3(pMesh.vertProperties[t3 * pMesh.numProp],
-                     pMesh.vertProperties[t3 * pMesh.numProp + 1],
-                     pMesh.vertProperties[t3 * pMesh.numProp + 2]);
-        else if (t3 < pnv + interiorPts.size())
-          tv3 = interiorPts[t3 - pnv];
-        else
-          continue;
-
-        double tetVol =
-            std::abs(la::dot(tv1 - tv0, la::cross(tv2 - tv0, tv3 - tv0))) / 6.0;
-        if (tetVol < 1e-15) continue;
-
-        Manifold tetHull = Manifold::Hull({tv0, tv1, tv2, tv3});
-        if (tetHull.IsEmpty()) continue;
-        Manifold clipped = pieces[i] ^ tetHull;
-        if (clipped.IsEmpty()) continue;
-        augPieces.push_back(clipped);
-      }
-
-      if (augPieces.empty()) {
-        outputs.push_back(pieces[i]);
-      } else {
-        // Merge augmented pieces greedily
-        for (auto& ap : augPieces) {
-          auto apImpl = ap.GetCsgLeafNode().GetImpl();
-          if (apImpl->IsConvex()) {
-            outputs.push_back(ap);
-          } else {
-            outputs.push_back(ap);
-          }
-        }
-      }
+      outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
     }
   }
 
