@@ -488,26 +488,13 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
-    // For small non-convex pieces (recursive sub-decomposition), add
-    // interior Steiner points at reflex edge midpoints to help the DT
-    // create tets that split reflex edges. For large shapes (initial call),
-    // surface vertices alone are sufficient.
-    std::vector<vec3> interiorPts;
-    // Interior points are not added here — they're added in step 4 only
-    // for irreducible non-convex sub-pieces that recursion can't split.
-
+    // Perturb vertices for DT robustness — output uses original positions
     std::vector<vec3> tetVerts;
-    tetVerts.reserve(numVerts + interiorPts.size() + 4);
+    tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
       tetVerts.push_back(vec3(verts[i * 3 + 0] + DeterministicEps(i, 0),
                               verts[i * 3 + 1] + DeterministicEps(i, 1),
                               verts[i * 3 + 2] + DeterministicEps(i, 2)));
-    for (size_t i = 0; i < interiorPts.size(); i++)
-      tetVerts.push_back(interiorPts[i] +
-                         vec3(DeterministicEps(numVerts + i, 0),
-                              DeterministicEps(numVerts + i, 1),
-                              DeterministicEps(numVerts + i, 2)));
-    size_t totalPts = numVerts + interiorPts.size();
 
     vec3 center(0, 0, 0);
     for (const auto& p : tetVerts) center += p;
@@ -538,20 +525,13 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     std::vector<Manifold> pieces(numTets);
     std::vector<bool> valid(numTets, false);
 
-    // Lookup original (unperturbed) position for a tet vertex index
-    auto getOrigPos = [&](uint32_t idx) -> vec3 {
-      if (idx < numVerts)
-        return vec3(verts[idx * 3], verts[idx * 3 + 1], verts[idx * 3 + 2]);
-      return interiorPts[idx - numVerts];
-    };
-
     for_each_n(ExecutionPolicy::Seq, countAt(0), numTets, [&](int i) {
       uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
                i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
-      if (i0 >= totalPts || i1 >= totalPts || i2 >= totalPts || i3 >= totalPts)
-        return;
-      vec3 p0 = getOrigPos(i0), p1 = getOrigPos(i1);
-      vec3 p2 = getOrigPos(i2), p3 = getOrigPos(i3);
+      vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
+      vec3 p1(verts[i1 * 3], verts[i1 * 3 + 1], verts[i1 * 3 + 2]);
+      vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
+      vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
 
       // Skip degenerate (coplanar) tets — they have zero volume and
       // would cause assertion failures in Hull() with MANIFOLD_DEBUG.
@@ -637,9 +617,13 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       std::vector<vec3> circumcenters(origTets);
       for (int i = 0; i < origTets; i++) {
         if (!valid[i]) continue;
+        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
+                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
         circumcenters[i] = GetCircumCenter(
-            getOrigPos(flatTets[4 * i]), getOrigPos(flatTets[4 * i + 1]),
-            getOrigPos(flatTets[4 * i + 2]), getOrigPos(flatTets[4 * i + 3]));
+            vec3(verts[ci0 * 3], verts[ci0 * 3 + 1], verts[ci0 * 3 + 2]),
+            vec3(verts[ci1 * 3], verts[ci1 * 3 + 1], verts[ci1 * 3 + 2]),
+            vec3(verts[ci2 * 3], verts[ci2 * 3 + 1], verts[ci2 * 3 + 2]),
+            vec3(verts[ci3 * 3], verts[ci3 * 3 + 1], verts[ci3 * 3 + 2]));
       }
 
       // Union-find to group adjacent INTERIOR tets with matching circumcenters.
@@ -863,102 +847,75 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect convex pieces; recursively decompose non-convex ones.
-    // If recursion returns the piece unchanged (1 non-convex piece), try
-    // adding interior Steiner points at reflex edge midpoints and retry.
+    // Step 4: Collect convex pieces. Split non-convex pieces by cutting
+    // through their reflex edges with SplitByPlane — no DT needed, exact
+    // tiling guaranteed. Iterate until all pieces are convex or max depth.
+    std::vector<Manifold> pending;
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
-      auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
-      if (pieceImpl->IsConvex()) {
+      auto impl = pieces[i].GetCsgLeafNode().GetImpl();
+      if (impl->IsConvex())
         outputs.push_back(pieces[i]);
-        continue;
-      }
-      if (maxDepth <= 0 || pieces[i].NumVert() < 4) {
-        outputs.push_back(pieces[i]);
-        continue;
-      }
-      // Try recursive decomposition
-      auto subPieces =
-          pieceImpl->ConvexDecomposition(maxClusterSize, maxDepth - 1);
-      // Check if recursion actually helped
-      bool allConvex = true;
-      bool unchanged = (subPieces.size() == 1);
-      for (auto& sp : subPieces) {
-        if (!sp.GetCsgLeafNode().GetImpl()->IsConvex()) allConvex = false;
-      }
-      if (allConvex || !unchanged) {
-        outputs.insert(outputs.end(), subPieces.begin(), subPieces.end());
-        continue;
-      }
-      // Recursion returned same piece — try with interior Steiner points.
-      // Add points at reflex edge midpoints offset inward, then re-DT.
-      if (pieces[i].NumVert() <= 20) {
-        auto pts = SampleInteriorPoints(pieces[i]);
-        if (pts.size() > 3) pts.resize(3);
-        MeshGL64 pm = pieces[i].GetMeshGL64();
-        size_t pnv = pm.vertProperties.size() / pm.numProp;
-        std::vector<vec3> augVerts;
-        augVerts.reserve(pnv + pts.size() + 4);
-        for (size_t vi = 0; vi < pnv; vi++)
-          augVerts.push_back(vec3(
-              pm.vertProperties[vi * pm.numProp] + DeterministicEps(vi, 0),
-              pm.vertProperties[vi * pm.numProp + 1] + DeterministicEps(vi, 1),
-              pm.vertProperties[vi * pm.numProp + 2] +
-                  DeterministicEps(vi, 2)));
-        for (size_t vi = 0; vi < pts.size(); vi++)
-          augVerts.push_back(pts[vi] + vec3(DeterministicEps(pnv + vi, 0),
-                                            DeterministicEps(pnv + vi, 1),
-                                            DeterministicEps(pnv + vi, 2)));
-        vec3 ac(0, 0, 0);
-        for (auto& p : augVerts) ac += p;
-        ac /= (double)augVerts.size();
-        double ar = 0;
-        for (auto& p : augVerts) ar = std::max(ar, la::length(p - ac));
-        double as = 5.0 * ar;
-        augVerts.push_back(vec3(-as, 0, -as));
-        augVerts.push_back(vec3(as, 0, -as));
-        augVerts.push_back(vec3(0, as, as));
-        augVerts.push_back(vec3(0, -as, as));
-        size_t augTotal = pnv + pts.size();
-        auto augTets = CreateTetIds(augVerts, 0.0);
-        auto augGetPos = [&](uint32_t idx) -> vec3 {
-          if (idx < pnv)
-            return vec3(pm.vertProperties[idx * pm.numProp],
-                        pm.vertProperties[idx * pm.numProp + 1],
-                        pm.vertProperties[idx * pm.numProp + 2]);
-          return pts[idx - pnv];
-        };
-        std::vector<Manifold> augPieces;
-        for (size_t t = 0; t < augTets.size() / 4; t++) {
-          bool skip = false;
-          vec3 tv[4];
-          for (int v = 0; v < 4; v++) {
-            uint32_t idx = augTets[4 * t + v];
-            if (idx >= augTotal) {
-              skip = true;
-              break;
-            }
-            tv[v] = augGetPos(idx);
-          }
-          if (skip) continue;
-          double vol =
-              std::abs(la::dot(tv[1] - tv[0],
-                               la::cross(tv[2] - tv[0], tv[3] - tv[0]))) /
-              6.0;
-          if (vol < 1e-15) continue;
-          Manifold h = Manifold::Hull({tv[0], tv[1], tv[2], tv[3]});
-          if (h.IsEmpty()) continue;
-          Manifold c = pieces[i] ^ h;
-          if (!c.IsEmpty()) augPieces.push_back(c);
-        }
-        if (augPieces.size() > 1) {
-          outputs.insert(outputs.end(), augPieces.begin(), augPieces.end());
+      else
+        pending.push_back(pieces[i]);
+    }
+
+    for (int iter = 0; iter < maxDepth && !pending.empty(); iter++) {
+      std::vector<Manifold> nextPending;
+      for (auto& piece : pending) {
+        auto pImpl = piece.GetCsgLeafNode().GetImpl();
+        if (pImpl->IsConvex()) {
+          outputs.push_back(piece);
           continue;
         }
+        // Find a reflex edge and split through it
+        bool didSplit = false;
+        const size_t nbEdges = pImpl->halfedge_.size();
+        for (size_t idx = 0; idx < nbEdges; idx++) {
+          auto edge = pImpl->halfedge_[idx];
+          if (!edge.IsForward()) continue;
+          vec3 n0 = pImpl->faceNormal_[idx / 3];
+          vec3 n1 = pImpl->faceNormal_[edge.pairedHalfedge / 3];
+          vec3 edgeVec =
+              pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
+          if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+
+          // Reflex edge found — split with a plane that contains the
+          // edge and bisects the dihedral angle. The plane normal is the
+          // cross product of the edge direction and the bisector of the
+          // two face normals.
+          vec3 bisector = la::normalize(n0 + n1);
+          vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
+          double pnLen = la::length(planeNormal);
+          if (pnLen < 1e-10) continue;
+          planeNormal /= pnLen;
+          vec3 edgeMid = (pImpl->vertPos_[edge.startVert] +
+                          pImpl->vertPos_[edge.endVert]) *
+                         0.5;
+          double originOffset = la::dot(planeNormal, edgeMid);
+
+          auto [a, b] = piece.SplitByPlane(planeNormal, originOffset);
+          if (!a.IsEmpty() && !b.IsEmpty()) {
+            // Successful split — queue both halves for further processing
+            auto aImpl = a.GetCsgLeafNode().GetImpl();
+            auto bImpl = b.GetCsgLeafNode().GetImpl();
+            if (aImpl->IsConvex())
+              outputs.push_back(a);
+            else
+              nextPending.push_back(a);
+            if (bImpl->IsConvex())
+              outputs.push_back(b);
+            else
+              nextPending.push_back(b);
+            didSplit = true;
+            break;
+          }
+        }
+        if (!didSplit) outputs.push_back(piece);
       }
-      // Nothing worked — keep as-is
-      outputs.push_back(pieces[i]);
+      pending = std::move(nextPending);
     }
+    for (auto& p : pending) outputs.push_back(p);
   }
 
   return outputs;
