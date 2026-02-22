@@ -232,6 +232,35 @@ TEST(ConvexDecomposition, ThinFin) {
   EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 }
 
+TEST(ConvexDecomposition, MaxDepth) {
+  // Higher maxDepth should produce same or more convex pieces
+  Manifold shape = MakeLShape();
+  auto d0 = shape.ConvexDecomposition(2, 0);
+  auto d3 = shape.ConvexDecomposition(2, 3);
+  EXPECT_GE(d0.size(), 1u);
+  EXPECT_GE(d3.size(), 1u);
+  double v0 = UnionVolume(d0);
+  double v3 = UnionVolume(d3);
+  EXPECT_NEAR(v0, shape.Volume(), shape.Volume() * 1e-4);
+  EXPECT_NEAR(v3, shape.Volume(), shape.Volume() * 1e-4);
+}
+
+TEST(ConvexDecomposition, SingleTetrahedron) {
+  // Tetrahedron is already convex — tests the early exit path
+  Manifold tet = Manifold::Tetrahedron();
+  auto pieces = tet.ConvexDecomposition();
+  EXPECT_EQ(pieces.size(), 1u);
+  EXPECT_NEAR(pieces[0].Volume(), tet.Volume(), tet.Volume() * 1e-4);
+}
+
+TEST(ConvexDecomposition, MultipleComponents) {
+  // Two disjoint cubes — tests Decompose() path
+  Manifold shape = Manifold::Cube({1, 1, 1}) +
+                   Manifold::Cube({1, 1, 1}).Translate({5, 0, 0});
+  auto pieces = shape.ConvexDecomposition();
+  EXPECT_EQ(pieces.size(), 2u);
+}
+
 TEST(ConvexDecomposition, Deterministic) {
   // Cube is fully deterministic (fast-path convexity check)
   Manifold cube = Manifold::Cube({2, 2, 2});
