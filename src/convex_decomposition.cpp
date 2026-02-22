@@ -379,6 +379,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
+    // Inject bounding-sphere centers of connected components as Steiner
     std::vector<vec3> tetVerts;
     tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
