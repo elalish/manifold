@@ -32,6 +32,15 @@ namespace {
 // Face indices for each of the 4 faces of a tetrahedron.
 const int kTetFaces[4][3] = {{2, 1, 0}, {0, 1, 3}, {1, 2, 3}, {2, 0, 3}};
 
+// Deterministic perturbation for DT robustness. Used only for computing
+// DT connectivity — all output uses original unperturbed positions.
+inline double DeterministicEps(size_t index, int component) {
+  constexpr double eps = 1e-10;
+  uint64_t h = index * 2654435761ULL + component * 40503ULL;
+  h = (h ^ (h >> 16)) * 0x45d9f3bULL;
+  return -eps + 2.0 * ((h & 0xFFFFFF) / double(0xFFFFFF)) * eps;
+}
+
 vec3 GetCircumCenter(const vec3& p0, const vec3& p1, const vec3& p2,
                      const vec3& p3) {
   vec3 b = p1 - p0;
@@ -69,9 +78,7 @@ struct Edge {
 };
 
 // Incremental Delaunay tetrahedralization.
-// No perturbation needed — strict circumsphere test (<) naturally handles
-// cospheric points by not flipping them, so they share a circumcenter.
-// The quality filter removes any degenerate tets produced.
+// Vertices should be perturbed before calling to avoid degeneracies.
 std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
                                    double minQuality) {
   std::vector<int> tetIds;
@@ -178,7 +185,6 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
             GetCircumCenter(verts[tetIds[4 * n]], verts[tetIds[4 * n + 1]],
                             verts[tetIds[4 * n + 2]], verts[tetIds[4 * n + 3]]);
         double r = la::length(verts[tetIds[4 * n]] - c);
-        // Strict < : cospheric points (dist == r) are NOT violated
         if (la::length(p - c) < r) stack.push_back(n);
       }
     }
@@ -390,11 +396,13 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
+    // Perturb vertices for DT robustness — output uses original positions
     std::vector<vec3> tetVerts;
     tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
-      tetVerts.push_back(
-          vec3(verts[i * 3 + 0], verts[i * 3 + 1], verts[i * 3 + 2]));
+      tetVerts.push_back(vec3(verts[i * 3 + 0] + DeterministicEps(i, 0),
+                              verts[i * 3 + 1] + DeterministicEps(i, 1),
+                              verts[i * 3 + 2] + DeterministicEps(i, 2)));
 
     vec3 center(0, 0, 0);
     for (const auto& p : tetVerts) center += p;
@@ -488,13 +496,81 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     };
 
     std::vector<std::unordered_set<int>> neighbors(numTets);
-    for (int i = 0; i < (int)adj.size() / 4; i++) {
+    int origTets = (int)adj.size() / 4;
+    for (int i = 0; i < origTets; i++) {
       if (!valid[i]) continue;
       for (int f = 0; f < 4; f++) {
         int j = adj[4 * i + f];
         if (j >= 0 && j < numTets && valid[j] && j != i) {
           neighbors[i].insert(j);
           neighbors[j].insert(i);
+        }
+      }
+    }
+
+    // Phase 0: Cospheric merge — using ORIGINAL (unperturbed) positions,
+    // compute circumcenters and merge adjacent tets that share one.
+    // This resolves ambiguity from cospheric vertices without perturbation
+    // artifacts in the output.
+    {
+      // Compute circumcenters from original (unperturbed) vertex positions
+      std::vector<vec3> circumcenters(origTets);
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
+                 i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
+        vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
+        vec3 p1(verts[i1 * 3], verts[i1 * 3 + 1], verts[i1 * 3 + 2]);
+        vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
+        vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
+        circumcenters[i] = GetCircumCenter(p0, p1, p2, p3);
+      }
+
+      // Find adjacent tets with matching circumcenters and merge them
+      constexpr double ccEps = 1e-10;
+      bool cosphericalMerged = true;
+      while (cosphericalMerged) {
+        cosphericalMerged = false;
+        for (int i = 0; i < origTets; i++) {
+          if (!valid[i]) continue;
+          std::vector<int> nbrs(neighbors[i].begin(), neighbors[i].end());
+          for (int n : nbrs) {
+            if (!valid[n] || n >= origTets) continue;
+            // Check if circumcenters match (cospheric tets)
+            if (la::length(circumcenters[i] - circumcenters[n]) > ccEps)
+              continue;
+            // Cospheric pair: merge via hull (should always succeed)
+            double sumVol = volumes[i] + volumes[n];
+            std::vector<vec3> combined;
+            combined.reserve(pieceVerts[i].size() + pieceVerts[n].size());
+            combined.insert(combined.end(), pieceVerts[i].begin(),
+                            pieceVerts[i].end());
+            combined.insert(combined.end(), pieceVerts[n].begin(),
+                            pieceVerts[n].end());
+            Manifold hull = Manifold::Hull(combined);
+            if (hull.IsEmpty()) continue;
+            double hullVol = hull.Volume();
+            // Cospheric tets should merge cleanly, use wider tolerance
+            if (sumVol > 0.0 && std::abs(hullVol - sumVol) < sumVol * 0.01) {
+              pieces[i] = hull;
+              pieceVerts[i] = ExtractVertices(hull);
+              volumes[i] = hullVol;
+              // Update circumcenter to merged hull's centroid (no longer
+              // meaningful as circumcenter, but prevents re-matching)
+              circumcenters[i] = vec3(1e30, 1e30, 1e30);
+              valid[n] = false;
+              parent[n] = i;
+              for (int nb : neighbors[n]) {
+                if (nb != i && valid[nb]) {
+                  neighbors[i].insert(nb);
+                  neighbors[nb].erase(n);
+                  neighbors[nb].insert(i);
+                }
+              }
+              neighbors[n].clear();
+              cosphericalMerged = true;
+            }
+          }
         }
       }
     }

@@ -106,10 +106,9 @@ TEST(ConvexDecomposition, TwoSpheres) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  // Volume preserved within 5% (spherical meshes may have skipped
-  // degenerate DT points, causing uncovered-region recovery to add volume)
+  // Volume preserved within 1%
   double totalVol = TotalVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.05);
+  EXPECT_NEAR(totalVol, origVol, origVol * 0.01);
 
   // Most pieces should be approximately convex
   int convexCount = 0;
