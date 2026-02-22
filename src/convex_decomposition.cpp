@@ -1172,7 +1172,41 @@ std::vector<Manifold> Manifold::Impl::ConvexDecompositionOnionPeel() const {
     // Multiple reflex edges — hull their vertices, intersect with shape
     // to peel off the concave region, then subtract it
     Manifold reflexHull = Manifold::Hull(reflexVerts);
-    if (reflexHull.IsEmpty()) {
+
+    // If reflex hull is degenerate (coplanar reflex vertices, e.g.
+    // intersection circle of two spheres), fit a plane and split instead
+    if (reflexHull.IsEmpty() || std::abs(reflexHull.Volume()) < 1e-12) {
+      // Fit plane through reflex vertices via centroid + normal from
+      // cross product of two edges
+      vec3 centroid(0, 0, 0);
+      for (auto& v : reflexVerts) centroid += v;
+      centroid /= (double)reflexVerts.size();
+      // Fit plane using Newell's method (robust for coplanar polygons)
+      vec3 planeNormal(0, 0, 0);
+      for (size_t i = 0; i < reflexVerts.size(); i++) {
+        vec3 cur = reflexVerts[i];
+        vec3 nxt = reflexVerts[(i + 1) % reflexVerts.size()];
+        planeNormal.x += (cur.y - nxt.y) * (cur.z + nxt.z);
+        planeNormal.y += (cur.z - nxt.z) * (cur.x + nxt.x);
+        planeNormal.z += (cur.x - nxt.x) * (cur.y + nxt.y);
+      }
+      double pnLen = la::length(planeNormal);
+      if (pnLen > 1e-10) {
+        planeNormal /= pnLen;
+        double originOffset = la::dot(planeNormal, centroid);
+        auto [a, b] = shape.SplitByPlane(planeNormal, originOffset);
+        if (!a.IsEmpty() && a.Volume() > 1e-12) {
+          auto aSub =
+              a.GetCsgLeafNode().GetImpl()->ConvexDecompositionOnionPeel();
+          outputs.insert(outputs.end(), aSub.begin(), aSub.end());
+        }
+        if (!b.IsEmpty() && b.Volume() > 1e-12) {
+          auto bSub =
+              b.GetCsgLeafNode().GetImpl()->ConvexDecompositionOnionPeel();
+          outputs.insert(outputs.end(), bSub.begin(), bSub.end());
+        }
+        break;
+      }
       outputs.push_back(shape);
       break;
     }
