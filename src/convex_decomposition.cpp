@@ -43,9 +43,7 @@ inline double DeterministicEps(size_t index, int component) {
 
 vec3 GetCircumCenter(const vec3& p0, const vec3& p1, const vec3& p2,
                      const vec3& p3) {
-  vec3 b = p1 - p0;
-  vec3 c = p2 - p0;
-  vec3 d = p3 - p0;
+  vec3 b = p1 - p0, c = p2 - p0, d = p3 - p0;
   double det =
       2.0 * (b.x * (c.y * d.z - c.z * d.y) - b.y * (c.x * d.z - c.z * d.x) +
              b.z * (c.x * d.y - c.y * d.x));
@@ -78,7 +76,6 @@ struct Edge {
 };
 
 // Incremental Delaunay tetrahedralization.
-// Vertices should be perturbed before calling to avoid degeneracies.
 std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
                                    double minQuality) {
   std::vector<int> tetIds;
@@ -89,8 +86,6 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
   std::vector<vec3> planesN;
   std::vector<double> planesD;
   int firstBig = (int)verts.size() - 4;
-
-  // Safeguard: cap total tet storage to prevent OOM
   const size_t maxTotalTets = (size_t)firstBig * 20;
 
   tetIds.push_back(firstBig);
@@ -113,30 +108,24 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
 
   for (int i = 0; i < firstBig; i++) {
     vec3 p = verts[i];
-
-    // Safeguard: abort if tet count is excessive
     if ((size_t)tetIds.size() / 4 > maxTotalTets) {
 #ifdef MANIFOLD_DEBUG
-      printf(
-          "ConvexDecomposition DT: tet limit reached (%zu), "
-          "skipping remaining %d points\n",
-          tetIds.size() / 4, firstBig - i);
+      printf("ConvexDecomposition DT: tet limit reached, skipping %d points\n",
+             firstBig - i);
 #endif
       break;
     }
 
-    // Find non-deleted tet
     int tetNr = 0;
     while (tetIds[4 * tetNr] < 0) tetNr++;
 
-    // Walk to containing tet
     tetMark++;
     bool found = false;
     int walkSteps = 0;
     const int maxWalkSteps = (int)tetIds.size() / 4 + 100;
     while (!found) {
       if (tetNr < 0 || tetMarks[tetNr] == tetMark) break;
-      if (++walkSteps > maxWalkSteps) break;  // prevent infinite walk
+      if (++walkSteps > maxWalkSteps) break;
       tetMarks[tetNr] = tetMark;
       vec3 center =
           (verts[tetIds[4 * tetNr]] + verts[tetIds[4 * tetNr + 1]] +
@@ -167,8 +156,6 @@ std::vector<uint32_t> CreateTetIds(std::vector<vec3>& verts,
       continue;
     }
 
-    // Find violating tets — strict < handles cospheric points by NOT
-    // flipping them, allowing multiple tets to share a circumcenter.
     tetMark++;
     std::vector<int> violatingTets;
     std::vector<int> stack = {tetNr};
@@ -337,124 +324,29 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
   return verts;
 }
 
-// Generate interior Steiner points targeting reflex edges of a non-convex
-// piece. Uses three strategies inspired by CDT midpoint splitting:
-// 1. Midpoint of each reflex edge, offset inward
-// 2. Centroid of faces adjacent to reflex edges, offset inward
-// 3. Piece centroid as fallback
-std::vector<vec3> SampleInteriorPoints(const Manifold& piece) {
-  MeshGL64 mesh = piece.GetMeshGL64();
-  size_t nv = mesh.vertProperties.size() / mesh.numProp;
-  size_t nt = mesh.triVerts.size() / 3;
-
-  auto getVert = [&](size_t vi) -> vec3 {
-    return vec3(mesh.vertProperties[vi * mesh.numProp],
-                mesh.vertProperties[vi * mesh.numProp + 1],
-                mesh.vertProperties[vi * mesh.numProp + 2]);
-  };
-
-  // Centroid of the piece
-  vec3 centroid(0, 0, 0);
-  for (size_t i = 0; i < nv; i++) centroid += getVert(i);
-  centroid /= std::max((double)nv, 1.0);
-
-  // Compute face normals
-  std::vector<vec3> faceNormals(nt);
-  for (size_t t = 0; t < nt; t++) {
-    vec3 v0 = getVert(mesh.triVerts[3 * t]);
-    vec3 v1 = getVert(mesh.triVerts[3 * t + 1]);
-    vec3 v2 = getVert(mesh.triVerts[3 * t + 2]);
-    vec3 n = la::cross(v1 - v0, v2 - v0);
-    double len = la::length(n);
-    faceNormals[t] = len > 1e-15 ? n / len : vec3(0, 0, 0);
-  }
-
-  // Build edge→face adjacency to find reflex edges
-  // Key: sorted vertex pair → (face index, edge vertices)
-  struct HalfEdge {
-    size_t face;
-    uint64_t v0, v1;
-  };
-  std::unordered_map<uint64_t, HalfEdge> edgeMap;
-  auto edgeKey = [](uint64_t a, uint64_t b) -> uint64_t {
-    return a < b ? (a | (b << 32)) : (b | (a << 32));
-  };
-
-  std::vector<vec3> pts;
-
-  for (size_t t = 0; t < nt; t++) {
-    uint64_t vi[3] = {mesh.triVerts[3 * t], mesh.triVerts[3 * t + 1],
-                      mesh.triVerts[3 * t + 2]};
-    for (int e = 0; e < 3; e++) {
-      uint64_t a = vi[e], b = vi[(e + 1) % 3];
-      uint64_t key = edgeKey(a, b);
-      auto it = edgeMap.find(key);
-      if (it != edgeMap.end()) {
-        // Found paired halfedge — check dihedral angle
-        size_t otherFace = it->second.face;
-        vec3 n0 = faceNormals[t];
-        vec3 n1 = faceNormals[otherFace];
-        vec3 va = getVert(a), vb = getVert(b);
-        vec3 edgeVec = vb - va;
-        double dihedral = la::dot(edgeVec, la::cross(n0, n1));
-        if (dihedral < -1e-10) {
-          // Reflex edge! The inward direction is the average of the two
-          // face normals, negated (pointing into the concavity).
-          vec3 inwardDir = -(n0 + n1);
-          double idLen = la::length(inwardDir);
-          if (idLen < 1e-15) continue;
-          inwardDir /= idLen;
-
-          vec3 mid = (va + vb) * 0.5;
-          double edgeLen = la::length(edgeVec);
-          double offset = edgeLen * 0.1;
-
-          // 1. Midpoint offset inward along concavity bisector
-          pts.push_back(mid + inwardDir * offset);
-          // 2. Quarter points along edge, offset inward
-          pts.push_back(va * 0.75 + vb * 0.25 + inwardDir * offset);
-          pts.push_back(va * 0.25 + vb * 0.75 + inwardDir * offset);
-          // 3. Midpoint with larger offset
-          pts.push_back(mid + inwardDir * offset * 3.0);
-        }
-        edgeMap.erase(it);
-      } else {
-        edgeMap[key] = {t, a, b};
-      }
-    }
-  }
-
-  // Fallback: centroid
-  pts.push_back(centroid);
-  return pts;
-}
-
 }  // anonymous namespace
 
 /**
  * Decompose into approximately convex pieces.
  *
- * Uses unconstrained Delaunay tetrahedralization of mesh vertices, clips each
- * tet against the mesh, then greedily merges adjacent convex pieces by hull.
- * Follows the same Impl method pattern as Minkowski.
+ * Algorithm: DT of mesh vertices → clip tets against mesh → recover
+ * uncovered regions → cospheric merge → greedy hull merge → reflex
+ * edge splitting of remaining non-convex pieces.
  */
 std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
                                                           int maxDepth) const {
   std::vector<Manifold> outputs;
 
-  // Wrap this Impl as a Manifold for boolean operations
   auto thisImpl = std::make_shared<Impl>(*this);
   Manifold curShape(std::make_shared<CsgLeafNode>(thisImpl));
 
   if (curShape.IsEmpty()) return outputs;
 
-  // Fast convexity check using halfedge dihedral angles (same as Minkowski)
   if (IsConvex()) {
     outputs.push_back(curShape.Hull());
     return outputs;
   }
 
-  // Decompose into connected components
   std::vector<Manifold> shapes = curShape.Decompose();
   if (shapes.empty()) {
     outputs.push_back(curShape);
@@ -464,7 +356,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
   for (auto& shape : shapes) {
     if (shape.IsEmpty()) continue;
 
-    // Per-component convexity check via halfedge dihedral angles
     auto shapeImpl = shape.GetCsgLeafNode().GetImpl();
     if (shapeImpl->IsConvex()) {
       outputs.push_back(shape.Hull());
@@ -488,7 +379,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
-    // Perturb vertices for DT robustness — output uses original positions
     std::vector<vec3> tetVerts;
     tetVerts.reserve(numVerts + 4);
     for (size_t i = 0; i < numVerts; i++)
@@ -508,7 +398,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     tetVerts.push_back(vec3(0.0, s, s));
     tetVerts.push_back(vec3(0.0, -s, s));
 
-    // Keep all tets (minQuality=0); degenerate ones are skipped at clip time.
     std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.0);
     int numTets = (int)flatTets.size() / 4;
     if (numTets == 0) {
@@ -516,16 +405,15 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       continue;
     }
 
-    // Step 2: Clip tets against mesh
+    // Step 2: Clip tets against mesh (parallel)
     auto adj = BuildTetAdjacency(flatTets);
     double totalVol = shape.Volume();
-    double minPieceVol = 0.0;  // keep all pieces, no matter how small
     auto shapeBbox = shape.BoundingBox();
 
     std::vector<Manifold> pieces(numTets);
     std::vector<bool> valid(numTets, false);
 
-    for_each_n(ExecutionPolicy::Seq, countAt(0), numTets, [&](int i) {
+    for_each_n(autoPolicy(numTets, 16), countAt(0), numTets, [&](int i) {
       uint32_t i0 = flatTets[4 * i], i1 = flatTets[4 * i + 1],
                i2 = flatTets[4 * i + 2], i3 = flatTets[4 * i + 3];
       vec3 p0(verts[i0 * 3], verts[i0 * 3 + 1], verts[i0 * 3 + 2]);
@@ -533,10 +421,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
       vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
 
-      // Skip near-degenerate tets using scale-invariant quality metric.
-      // TetQuality returns ~1.0 for regular tets, ~0.0 for degenerate.
-      // Threshold 0.001 catches slivers that cause Hull() assertion
-      // failures with MANIFOLD_DEBUG on all platforms.
       if (std::abs(TetQuality(p0, p1, p2, p3)) < 0.001) return;
 
       vec3 tMin = la::min(la::min(p0, p1), la::min(p2, p3));
@@ -549,12 +433,12 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       Manifold tetHull = Manifold::Hull({p0, p1, p2, p3});
       if (tetHull.IsEmpty()) return;
       Manifold clipped = shape ^ tetHull;
-      if (clipped.IsEmpty() || clipped.Volume() < minPieceVol) return;
+      if (clipped.IsEmpty()) return;
       pieces[i] = clipped;
       valid[i] = true;
     });
 
-    // Recover uncovered regions where degenerate tets were skipped
+    // Step 2b: Recover uncovered regions
     double step2Vol = 0;
     for (int i = 0; i < numTets; i++)
       if (valid[i]) step2Vol += pieces[i].Volume();
@@ -576,101 +460,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Build adjacency from DT
-    std::vector<std::unordered_set<int>> neighbors(numTets);
-    int origTets = (int)adj.size() / 4;
-    for (int i = 0; i < origTets; i++) {
-      if (!valid[i]) continue;
-      for (int f = 0; f < 4; f++) {
-        int j = adj[4 * i + f];
-        if (j >= 0 && j < numTets && valid[j] && j != i) {
-          neighbors[i].insert(j);
-          neighbors[j].insert(i);
-        }
-      }
-    }
-
-    // Step 2b: Split non-convex clipped pieces by reflex edge bisector
-    // planes BEFORE merging. This lets the convex sub-pieces participate
-    // in the greedy merge, reducing overall piece count.
-    // Only split pieces that were clipped (volume changed from tet hull)
-    // or that have reflex edges.
-    auto splitReflexEdges = [&](Manifold& piece) -> std::vector<Manifold> {
-      std::vector<Manifold> result;
-      std::vector<Manifold> work = {piece};
-      for (int iter = 0; iter < maxDepth * 4 && !work.empty(); iter++) {
-        std::vector<Manifold> next;
-        for (auto& p : work) {
-          auto pImpl = p.GetCsgLeafNode().GetImpl();
-          if (pImpl->IsConvex()) {
-            result.push_back(p);
-            continue;
-          }
-          bool didSplit = false;
-          const size_t nbEdges = pImpl->halfedge_.size();
-          for (size_t idx = 0; idx < nbEdges; idx++) {
-            auto edge = pImpl->halfedge_[idx];
-            if (!edge.IsForward()) continue;
-            vec3 n0 = pImpl->faceNormal_[idx / 3];
-            vec3 n1 = pImpl->faceNormal_[edge.pairedHalfedge / 3];
-            vec3 edgeVec =
-                pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
-            if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
-            vec3 bisector = la::normalize(n0 + n1);
-            vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
-            double pnLen = la::length(planeNormal);
-            if (pnLen < 1e-10) continue;
-            planeNormal /= pnLen;
-            vec3 edgeMid = (pImpl->vertPos_[edge.startVert] +
-                            pImpl->vertPos_[edge.endVert]) *
-                           0.5;
-            double originOffset = la::dot(planeNormal, edgeMid);
-            auto [a, b] = p.SplitByPlane(planeNormal, originOffset);
-            if (!a.IsEmpty() && !b.IsEmpty()) {
-              next.push_back(a);
-              next.push_back(b);
-              didSplit = true;
-              break;
-            }
-          }
-          if (!didSplit) result.push_back(p);
-        }
-        work = std::move(next);
-      }
-      for (auto& p : work) result.push_back(p);
-      return result;
-    };
-
-    // Replace non-convex pieces with their reflex-split sub-pieces
-    for (int i = 0; i < numTets; i++) {
-      if (!valid[i]) continue;
-      auto impl = pieces[i].GetCsgLeafNode().GetImpl();
-      if (impl->IsConvex()) continue;
-      auto subPieces = splitReflexEdges(pieces[i]);
-      if (subPieces.size() <= 1) continue;
-      // Replace piece i with first sub-piece, append rest
-      pieces[i] = subPieces[0];
-      for (size_t s = 1; s < subPieces.size(); s++) {
-        int newIdx = (int)pieces.size();
-        pieces.push_back(subPieces[s]);
-        valid.push_back(true);
-        // Add adjacency: new pieces are neighbors of the original's neighbors
-        std::unordered_set<int> newNbrs;
-        newNbrs.insert(i);
-        for (int nb : neighbors[i]) {
-          if (valid[nb]) {
-            newNbrs.insert(nb);
-            neighbors[nb].insert(newIdx);
-          }
-        }
-        neighbors.push_back(newNbrs);
-        numTets++;
-      }
-    }
-
-    // Step 3: Greedy merge
-    // Only merge if hull volume does not exceed sum of constituent volumes
-    // (within 1e-8 tolerance for floating-point-exact merges).
+    // Step 3: Greedy merge (1e-8 tolerance for FP-exact merges)
+    constexpr double kMergeTol = 1e-8;
     std::vector<double> volumes(numTets, 0.0);
     std::vector<std::vector<vec3>> pieceVerts(numTets);
     for (int i = 0; i < numTets; i++) {
@@ -685,9 +476,92 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       return parent[x] == x ? x : (parent[x] = find(parent[x]));
     };
 
-    // Ensure neighbors vector covers any new pieces from reflex splitting
-    if ((int)neighbors.size() < numTets) neighbors.resize(numTets);
+    std::vector<std::unordered_set<int>> neighbors(numTets);
+    int origTets = (int)adj.size() / 4;
+    for (int i = 0; i < origTets; i++) {
+      if (!valid[i]) continue;
+      for (int f = 0; f < 4; f++) {
+        int j = adj[4 * i + f];
+        if (j >= 0 && j < numTets && valid[j] && j != i) {
+          neighbors[i].insert(j);
+          neighbors[j].insert(i);
+        }
+      }
+    }
 
+    // Phase 0: Cospheric merge — group adjacent interior tets sharing a
+    // circumcenter (from original unperturbed positions) and merge by hull.
+    {
+      std::vector<vec3> circumcenters(origTets);
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
+                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
+        circumcenters[i] = GetCircumCenter(
+            vec3(verts[ci0 * 3], verts[ci0 * 3 + 1], verts[ci0 * 3 + 2]),
+            vec3(verts[ci1 * 3], verts[ci1 * 3 + 1], verts[ci1 * 3 + 2]),
+            vec3(verts[ci2 * 3], verts[ci2 * 3 + 1], verts[ci2 * 3 + 2]),
+            vec3(verts[ci3 * 3], verts[ci3 * 3 + 1], verts[ci3 * 3 + 2]));
+      }
+
+      constexpr double ccEps = 1e-10;
+      std::vector<int> ccParent(origTets);
+      for (int i = 0; i < origTets; i++) ccParent[i] = i;
+      std::function<int(int)> ccFind = [&](int x) -> int {
+        return ccParent[x] == x ? x : (ccParent[x] = ccFind(ccParent[x]));
+      };
+
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        for (int n : neighbors[i]) {
+          if (n >= origTets || !valid[n]) continue;
+          if (la::length(circumcenters[i] - circumcenters[n]) < ccEps) {
+            int ri = ccFind(i), rn = ccFind(n);
+            if (ri != rn) ccParent[rn] = ri;
+          }
+        }
+      }
+
+      std::unordered_map<int, std::vector<int>> groups;
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        groups[ccFind(i)].push_back(i);
+      }
+
+      for (auto& [root, members] : groups) {
+        if (members.size() < 2) continue;
+        std::vector<vec3> combined;
+        double sumVol = 0;
+        for (int m : members) {
+          combined.insert(combined.end(), pieceVerts[m].begin(),
+                          pieceVerts[m].end());
+          sumVol += volumes[m];
+        }
+        Manifold hull = Manifold::Hull(combined);
+        if (hull.IsEmpty() || sumVol <= 0.0) continue;
+        double hullVol = hull.Volume();
+        if (hullVol > sumVol * (1.0 + kMergeTol)) continue;
+
+        pieces[root] = hull;
+        pieceVerts[root] = ExtractVertices(hull);
+        volumes[root] = hullVol;
+        for (int m : members) {
+          if (m == root) continue;
+          valid[m] = false;
+          parent[m] = root;
+          for (int nb : neighbors[m]) {
+            if (nb != root && valid[nb]) {
+              neighbors[root].insert(nb);
+              neighbors[nb].erase(m);
+              neighbors[nb].insert(root);
+            }
+          }
+          neighbors[m].clear();
+        }
+      }
+    }
+
+    // Phase A: greedy pair merges via adjacency
     auto tryMerge = [&](int root, int other) -> bool {
       if (root == other || !valid[root] || !valid[other]) return false;
       double sumVol = volumes[root] + volumes[other];
@@ -700,7 +574,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       Manifold hull = Manifold::Hull(combined);
       if (hull.IsEmpty()) return false;
       double hullVol = hull.Volume();
-      if (sumVol > 0.0 && hullVol <= sumVol * (1.0 + 1e-8)) {
+      if (sumVol > 0.0 && hullVol <= sumVol * (1.0 + kMergeTol)) {
         pieces[root] = hull;
         pieceVerts[root] = ExtractVertices(hull);
         volumes[root] = hullVol;
@@ -738,7 +612,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     };
 
-    // Phase A: greedy pair merges via adjacency
     bool merged = true;
     while (merged) {
       merged = false;
@@ -818,7 +691,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             Manifold hull = Manifold::Hull(combined);
             if (!hull.IsEmpty() && sumVol > 0.0) {
               double ratio = hull.Volume() / sumVol;
-              if (ratio <= 1.0 + 1e-8 && ratio < bestRatio) {
+              if (ratio <= 1.0 + kMergeTol && ratio < bestRatio) {
                 bestRatio = ratio;
                 bestRoot = i;
                 bestOthers = others;
@@ -845,10 +718,68 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Collect all remaining valid pieces
+    // Step 4: Collect convex pieces. Split non-convex pieces by cutting
+    // through reflex edges with dihedral bisector planes.
+    std::vector<Manifold> pending;
     for (int i = 0; i < numTets; i++) {
-      if (valid[i] && !pieces[i].IsEmpty()) outputs.push_back(pieces[i]);
+      if (!valid[i] || pieces[i].IsEmpty()) continue;
+      auto impl = pieces[i].GetCsgLeafNode().GetImpl();
+      if (impl->IsConvex())
+        outputs.push_back(pieces[i]);
+      else
+        pending.push_back(pieces[i]);
     }
+
+    for (int iter = 0; iter < maxDepth * 4 && !pending.empty(); iter++) {
+      std::vector<Manifold> nextPending;
+      for (auto& piece : pending) {
+        auto pImpl = piece.GetCsgLeafNode().GetImpl();
+        if (pImpl->IsConvex()) {
+          outputs.push_back(piece);
+          continue;
+        }
+        bool didSplit = false;
+        const size_t nbEdges = pImpl->halfedge_.size();
+        for (size_t idx = 0; idx < nbEdges; idx++) {
+          auto edge = pImpl->halfedge_[idx];
+          if (!edge.IsForward()) continue;
+          vec3 n0 = pImpl->faceNormal_[idx / 3];
+          vec3 n1 = pImpl->faceNormal_[edge.pairedHalfedge / 3];
+          vec3 edgeVec =
+              pImpl->vertPos_[edge.endVert] - pImpl->vertPos_[edge.startVert];
+          if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+
+          vec3 bisector = la::normalize(n0 + n1);
+          vec3 planeNormal = la::cross(la::normalize(edgeVec), bisector);
+          double pnLen = la::length(planeNormal);
+          if (pnLen < 1e-10) continue;
+          planeNormal /= pnLen;
+          vec3 edgeMid = (pImpl->vertPos_[edge.startVert] +
+                          pImpl->vertPos_[edge.endVert]) *
+                         0.5;
+          double originOffset = la::dot(planeNormal, edgeMid);
+
+          auto [a, b] = piece.SplitByPlane(planeNormal, originOffset);
+          if (!a.IsEmpty() && !b.IsEmpty()) {
+            auto aImpl = a.GetCsgLeafNode().GetImpl();
+            auto bImpl = b.GetCsgLeafNode().GetImpl();
+            if (aImpl->IsConvex())
+              outputs.push_back(a);
+            else
+              nextPending.push_back(a);
+            if (bImpl->IsConvex())
+              outputs.push_back(b);
+            else
+              nextPending.push_back(b);
+            didSplit = true;
+            break;
+          }
+        }
+        if (!didSplit) outputs.push_back(piece);
+      }
+      pending = std::move(nextPending);
+    }
+    for (auto& p : pending) outputs.push_back(p);
   }
 
   return outputs;
