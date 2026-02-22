@@ -399,7 +399,8 @@ struct Manifold::Impl {
                      bool decompose = false) const;
 
   // convex_decomposition.cpp
-  std::vector<Manifold> ConvexDecomposition(int maxClusterSize) const;
+  std::vector<Manifold> ConvexDecomposition(int maxClusterSize,
+                                            bool hullSnap = true) const;
 };
 
 extern std::mutex dump_lock;

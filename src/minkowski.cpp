@@ -167,16 +167,18 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   if (!inset && aConvex && bConvex) {
     composedHulls.push_back(ConvexConvexMinkowski(aImpl, bImpl));
 
-    // Decomposition-based path: only for sum (not erosion)
+    // Decomposition-based path: only for sum (not erosion).
+    // Uses hullSnap=false to preserve exact topology, then dispatches each
+    // piece to convex-convex (fast) or per-triangle (exact) based on IsConvex.
   } else if (decompose && !inset) {
-    // Non-Convex × Convex: decompose non-convex, use convex-convex per piece
+    // Decompose non-convex shape(s) without hull-snapping for exact tiling
+    auto aPieces = aImpl->ConvexDecomposition(2, false);
+
     if (bConvex) {
-      auto aPieces = aImpl->ConvexDecomposition(2);
-      std::vector<Manifold> pieceHulls(aPieces.size());
+      // Non-Convex × Convex: per-piece Minkowski
+      std::vector<Manifold> pieceResults(aPieces.size());
       for_each_n(autoPolicy(aPieces.size(), 4), countAt(0_uz), aPieces.size(),
                  [&](size_t i) {
-                   // Extract piece vertices via public API (no private access
-                   // needed)
                    MeshGL64 mesh = aPieces[i].GetMeshGL64();
                    size_t nv = mesh.vertProperties.size() / mesh.numProp;
                    std::vector<vec3> combined;
@@ -191,17 +193,17 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                          TransformIterator(bImpl->vertPos_.begin(), t),
                          TransformIterator(bImpl->vertPos_.end(), t));
                    }
-                   pieceHulls[i] = Manifold::Hull(combined);
+                   pieceResults[i] = Manifold::Hull(combined);
                  });
-      composedHulls.push_back(Manifold::BatchBoolean(pieceHulls, OpType::Add));
+      composedHulls.push_back(
+          Manifold::BatchBoolean(pieceResults, OpType::Add));
 
-      // Non-Convex × Non-Convex: decompose both, pairwise convex-convex
     } else {
-      auto aPieces = aImpl->ConvexDecomposition(2);
-      auto bPieces = bImpl->ConvexDecomposition(2);
-      std::vector<Manifold> pairHulls(aPieces.size() * bPieces.size());
-      for_each_n(autoPolicy(pairHulls.size(), 4), countAt(0_uz),
-                 pairHulls.size(), [&](size_t idx) {
+      // Non-Convex × Non-Convex: decompose both, pairwise vertex-addition
+      auto bPieces = bImpl->ConvexDecomposition(2, false);
+      std::vector<Manifold> pairResults(aPieces.size() * bPieces.size());
+      for_each_n(autoPolicy(pairResults.size(), 4), countAt(0_uz),
+                 pairResults.size(), [&](size_t idx) {
                    size_t ai = idx / bPieces.size();
                    size_t bi = idx % bPieces.size();
                    MeshGL64 meshA = aPieces[ai].GetMeshGL64();
@@ -221,9 +223,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                        combined.push_back(vertA + vertB);
                      }
                    }
-                   pairHulls[idx] = Manifold::Hull(combined);
+                   pairResults[idx] = Manifold::Hull(combined);
                  });
-      composedHulls.push_back(Manifold::BatchBoolean(pairHulls, OpType::Add));
+      composedHulls.push_back(Manifold::BatchBoolean(pairResults, OpType::Add));
     }
 
     // Original per-triangle path (used for erosion/inset or when

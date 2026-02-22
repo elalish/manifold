@@ -577,10 +577,11 @@ TEST(Boolean, NonConvexConvexMinkowskiSumDecompose) {
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20), true);
-  // Decomposition-based Minkowski produces slightly different topology
-  // (approximate convex pieces) but volume/area should be close
-  EXPECT_NEAR(sum.Volume(), 4.841, 0.2);
-  EXPECT_NEAR(sum.SurfaceArea(), 34.06, 2.0);
+  // Curved surfaces produce non-convex DT-clipped pieces, so the
+  // vertex-addition Minkowski is approximate for curved geometry.
+  // Volume/area are close but genus may differ.
+  EXPECT_NEAR(sum.Volume(), 4.841, 0.1);
+  EXPECT_NEAR(sum.SurfaceArea(), 34.06, 0.5);
   EXPECT_GE(sum.Genus(), 0);
 }
 
@@ -625,8 +626,9 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSumDecompose) {
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
   Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)), true);
-  EXPECT_NEAR(sum.Volume(), 8.65625, 0.1);
-  EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 0.5);
+  // Without hull-snapping, decomposition preserves exact topology
+  EXPECT_NEAR(sum.Volume(), 8.65625, 1e-5);
+  EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 1e-5);
   EXPECT_EQ(sum.Genus(), 0);
 }
 

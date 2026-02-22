@@ -311,8 +311,8 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
  * tet against the mesh, then greedily merges adjacent convex pieces by hull.
  * Follows the same Impl method pattern as Minkowski.
  */
-std::vector<Manifold> Manifold::Impl::ConvexDecomposition(
-    int maxClusterSize) const {
+std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
+                                                          bool hullSnap) const {
   std::vector<Manifold> outputs;
 
   // Wrap this Impl as a Manifold for boolean operations
@@ -628,16 +628,20 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(
       }
     }
 
-    // Step 4: Hull-snap and collect
+    // Step 4: Collect results
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
-      // Use fast halfedge convexity check (same as Minkowski)
+      if (!hullSnap) {
+        // No hull-snap: keep exact pieces (preserves topology for Minkowski)
+        outputs.push_back(pieces[i]);
+        continue;
+      }
+      // Hull-snap: replace with convex hull if close enough
       auto pieceImpl = pieces[i].GetCsgLeafNode().GetImpl();
       if (pieceImpl->IsConvex()) {
         outputs.push_back(pieces[i].Hull());
         continue;
       }
-      // Fallback: volume-based snap for near-convex pieces
       Manifold hull = pieces[i].Hull();
       double pVol = pieces[i].Volume();
       double hVol = hull.Volume();
