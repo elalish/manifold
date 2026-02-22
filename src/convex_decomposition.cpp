@@ -438,7 +438,15 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       if (tetHull.IsEmpty()) return;
       Manifold clipped = shape ^ tetHull;
       if (clipped.IsEmpty()) return;
-      pieces[i] = clipped;
+      // If clipped volume ≈ hull volume, the tet is fully inside the mesh.
+      // Use the hull directly to preserve original DT vertex positions
+      // (the boolean intersection introduces new vertices at boundaries).
+      double hullVol = tetHull.Volume();
+      if (clipped.Volume() >= hullVol * (1.0 - 1e-9)) {
+        pieces[i] = tetHull;
+      } else {
+        pieces[i] = clipped;
+      }
       valid[i] = true;
     });
 
