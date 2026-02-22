@@ -416,9 +416,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     tetVerts.push_back(vec3(0.0, s, s));
     tetVerts.push_back(vec3(0.0, -s, s));
 
-    // Use quality threshold > 0 to exclude degenerate tets that cause
-    // assertion failures in Hull() with MANIFOLD_DEBUG enabled.
-    std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.001);
+    // Keep all tets (minQuality=0); degenerate ones are skipped at clip time.
+    std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.0);
     int numTets = (int)flatTets.size() / 4;
     if (numTets == 0) {
       outputs.push_back(shape);
@@ -428,7 +427,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     // Step 2: Clip tets against mesh
     auto adj = BuildTetAdjacency(flatTets);
     double totalVol = shape.Volume();
-    double minPieceVol = totalVol * 0.00001;
+    double minPieceVol = 0.0;  // keep all pieces, no matter how small
     auto shapeBbox = shape.BoundingBox();
 
     std::vector<Manifold> pieces(numTets);
@@ -441,6 +440,12 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       vec3 p1(verts[i1 * 3], verts[i1 * 3 + 1], verts[i1 * 3 + 2]);
       vec3 p2(verts[i2 * 3], verts[i2 * 3 + 1], verts[i2 * 3 + 2]);
       vec3 p3(verts[i3 * 3], verts[i3 * 3 + 1], verts[i3 * 3 + 2]);
+
+      // Skip degenerate (coplanar) tets — they have zero volume and
+      // would cause assertion failures in Hull() with MANIFOLD_DEBUG.
+      double tetVol =
+          std::abs(la::dot(p1 - p0, la::cross(p2 - p0, p3 - p0))) / 6.0;
+      if (tetVol < 1e-15) return;
 
       vec3 tMin = la::min(la::min(p0, p1), la::min(p2, p3));
       vec3 tMax = la::max(la::max(p0, p1), la::max(p2, p3));
@@ -457,21 +462,23 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       valid[i] = true;
     });
 
-    // Recover uncovered regions
+    // Recover uncovered regions. The DT may not fully tile curved surfaces
+    // where tets are discarded as degenerate. Recovery computes shape-covered
+    // and decomposes the result into additional pieces.
     double step2Vol = 0;
     for (int i = 0; i < numTets; i++)
       if (valid[i]) step2Vol += pieces[i].Volume();
 
-    if (std::abs(totalVol - step2Vol) > totalVol * 0.001) {
+    if (step2Vol < totalVol * 0.999) {
       Manifold covered;
       for (int i = 0; i < numTets; i++) {
         if (!valid[i]) continue;
         covered = covered.IsEmpty() ? pieces[i] : (covered + pieces[i]);
       }
       Manifold uncovered = shape - covered;
-      if (!uncovered.IsEmpty() && uncovered.Volume() > minPieceVol) {
+      if (!uncovered.IsEmpty()) {
         for (auto& part : uncovered.Decompose()) {
-          if (part.IsEmpty() || part.Volume() < minPieceVol) continue;
+          if (part.IsEmpty()) continue;
           pieces.push_back(part);
           valid.push_back(true);
           numTets++;
