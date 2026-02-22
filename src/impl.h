@@ -395,7 +395,8 @@ struct Manifold::Impl {
   void Hull(VecView<const vec3> vertPos);
 
   // minkowski.cpp
-  Manifold Minkowski(const Impl& other, bool inset) const;
+  Manifold Minkowski(const Impl& other, bool inset,
+                     bool decompose = false) const;
 
   // convex_decomposition.cpp
   std::vector<Manifold> ConvexDecomposition(int maxClusterSize) const;

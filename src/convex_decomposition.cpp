@@ -380,7 +380,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(
     tetVerts.push_back(vec3(0.0, s, s));
     tetVerts.push_back(vec3(0.0, -s, s));
 
-    std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.0);
+    // Use quality threshold > 0 to exclude degenerate tets that cause
+    // assertion failures in Hull() with MANIFOLD_DEBUG enabled.
+    std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.001);
     int numTets = (int)flatTets.size() / 4;
     if (numTets == 0) {
       outputs.push_back(shape);
@@ -481,7 +483,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(
       Manifold hull = Manifold::Hull(combined);
       if (hull.IsEmpty()) return false;
       double hullVol = hull.Volume();
-      if (std::abs(hullVol - sumVol) < sumVol * mergeTol) {
+      if (sumVol > 0.0 && std::abs(hullVol - sumVol) < sumVol * mergeTol) {
         pieces[root] = hull;
         pieceVerts[root] = ExtractVertices(hull);
         volumes[root] = hullVol;
@@ -597,7 +599,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(
               others.push_back(j);
             }
             Manifold hull = Manifold::Hull(combined);
-            if (!hull.IsEmpty()) {
+            if (!hull.IsEmpty() && sumVol > 0.0) {
               double ratio = hull.Volume() / sumVol;
               if (ratio < 1.0 + mergeTol && ratio < bestRatio) {
                 bestRatio = ratio;

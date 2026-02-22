@@ -870,13 +870,17 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  *
  * @note Performance is best when using convex objects. For non-convex inputs,
  * performance scales with the product of face counts, so keep face counts low.
+ * Set decompose=true to first decompose non-convex inputs into convex pieces,
+ * enabling the fast convex-convex vertex-addition path for each piece pair.
  *
  * @param other The other manifold to minkowski sum to this one.
+ * @param decompose If true, decompose non-convex inputs into convex pieces
+ *                  before computing the sum (faster for complex shapes).
  */
-Manifold Manifold::MinkowskiSum(const Manifold& other) const {
+Manifold Manifold::MinkowskiSum(const Manifold& other, bool decompose) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
   auto bImpl = other.GetCsgLeafNode().GetImpl();
-  return aImpl->Minkowski(*bImpl, false);
+  return aImpl->Minkowski(*bImpl, false, decompose);
 }
 
 /**
