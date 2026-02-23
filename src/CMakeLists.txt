@@ -41,7 +41,6 @@ set(
   MANIFOLD_PRIVATE_HDRS
   boolean3.h
   collider.h
-  convex_decomposition.h
   csg_tree.h
   hashtable.h
   impl.h
