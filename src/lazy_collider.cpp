@@ -23,6 +23,7 @@ LazyCollider::LazyCollider(LeafData&& leafData)
 LazyCollider::LazyCollider(std::shared_ptr<const LazyCollider> base,
                            const mat3x4& transform) {
   DEBUG_ASSERT(base != nullptr, logicErr, "invalid base ptr");
+  // keeps as an optimization
   mat3x4 composed = transform;
   // attempt to unwrap one level, if the base is also a transformed collider
   // we do not unwrap if the base has updatedLeafBox
@@ -103,9 +104,11 @@ const LazyCollider::Built& LazyCollider::EnsureBuilt() const {
 
   if (base_) {
     const Built& baseBuilt = base_->base->EnsureBuilt();
-    // no need to propagate transform from built, we already computed the
-    // composed transform in the constructor
-    built_ = {baseBuilt.collider, base_->transform};
+    // propagate transform when collider was built after construct
+    built_ = {baseBuilt.collider,
+              baseBuilt.transform
+                  ? base_->transform * Mat4(*baseBuilt.transform)
+                  : base_->transform};
     if (base_->updatedLeafBox) {
       auto leafBox = std::move(base_->updatedLeafBox.value());
       base_ = std::nullopt;
