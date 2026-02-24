@@ -105,10 +105,9 @@ const LazyCollider::Built& LazyCollider::EnsureBuilt() const {
   if (base_) {
     const Built& baseBuilt = base_->base->EnsureBuilt();
     // propagate transform when collider was built after construct
-    built_ = {baseBuilt.collider,
-              baseBuilt.transform
-                  ? base_->transform * Mat4(*baseBuilt.transform)
-                  : base_->transform};
+    mat3x4 composed = base_->transform;
+    if (baseBuilt.transform) composed = composed * Mat4(*baseBuilt.transform);
+    built_ = {baseBuilt.collider, composed};
     if (base_->updatedLeafBox) {
       auto leafBox = std::move(base_->updatedLeafBox.value());
       base_ = std::nullopt;
