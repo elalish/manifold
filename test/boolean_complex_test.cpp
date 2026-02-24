@@ -1519,6 +1519,24 @@ TEST(BooleanComplex, HullMask) {
   MeshGL mesh = ret.GetMeshGL();
 }
 
+TEST(BooleanComplex, LazyCollider) {
+  Manifold ele1 = Manifold::Cylinder(50, 50);
+  Manifold ele2 = Manifold::Cylinder(60, 30);
+  Manifold ele3 = Manifold::Cylinder(60, 40).Mirror(vec3{0, 0, 1});
+
+  Manifold ele4 = (ele1 + ele2).Mirror(vec3{0, 0, 1});
+
+  EXPECT_NEAR(ele4.Volume(), 418839, 1);
+
+  Manifold r1 = ele4 - ele2.Translate(vec3{0, 0, -20});
+
+  EXPECT_NEAR(r1.Volume(), 362577, 1);
+
+  Manifold r2 = ele4.Translate(vec3{0, 0, 1}) - ele3;
+
+  EXPECT_NEAR(r2.Volume(), 145656, 1);
+}
+
 #ifdef MANIFOLD_DEBUG
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   ManifoldParamGuard guard;
