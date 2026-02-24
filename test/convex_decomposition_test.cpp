@@ -98,16 +98,16 @@ TEST(ConvexDecomposition, TwoSpheres) {
   double origVol = shape.Volume();
 
   auto pieces = shape.ConvexDecomposition();
-  EXPECT_GE(pieces.size(), 2u);
+  // Pre-pass detects the coplanar reflex ring and splits perfectly into 2.
+  EXPECT_EQ(pieces.size(), 2u);
 
-  // Curved shapes lose small volume from convex hulling of DT pieces
+  for (const auto& p : pieces) {
+    EXPECT_TRUE(IsApproxConvex(p))
+        << "Non-convex piece with volume " << p.Volume();
+  }
+
   double totalVol = UnionVolume(pieces);
-  EXPECT_NEAR(totalVol, origVol, origVol * 0.005);
-
-  int convexCount = 0;
-  for (const auto& p : pieces)
-    if (IsApproxConvex(p)) convexCount++;
-  EXPECT_GE(convexCount, (int)pieces.size() / 2);
+  EXPECT_NEAR(totalVol, origVol, origVol * 1e-4);
 }
 
 TEST(ConvexDecomposition, ThreeSpheres) {
@@ -119,7 +119,8 @@ TEST(ConvexDecomposition, ThreeSpheres) {
   auto pieces = shape.ConvexDecomposition();
   EXPECT_GE(pieces.size(), 2u);
 
-  // Curved shapes lose small volume from convex hulling of DT pieces
+  // Curved shapes lose small volume (~0.002%) from convex hulling of DT
+  // pieces on curved surfaces (chord vs arc).
   double totalVol = UnionVolume(pieces);
   EXPECT_NEAR(totalVol, origVol, origVol * 0.005);
 
