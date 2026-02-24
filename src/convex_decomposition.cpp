@@ -548,14 +548,34 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
                         meshGL.vertProperties[i * meshGL.numProp + 2]);
 
     // Step 2: Unconstrained Delaunay tetrahedralization with deterministic
-    // perturbation for cospheric robustness. Four super-tet corners are
-    // added outside the bounding sphere and filtered after.
+    // perturbation for cospheric robustness.
     std::vector<vec3> tetVerts(numVerts);
     for (size_t i = 0; i < numVerts; i++)
       tetVerts[i] =
           origPos[i] + vec3(DeterministicEps(i, 0), DeterministicEps(i, 1),
                             DeterministicEps(i, 2));
 
+    // Add 8 expanded bounding box corners as DT vertices. This creates
+    // tets near the mesh surface that capture thin features (e.g. notches
+    // in FlatSlab) which would otherwise fall between degenerate tets
+    // formed only by the distant super-tet corners.
+    auto bbox = shape.BoundingBox();
+    vec3 bMin(bbox.min.x, bbox.min.y, bbox.min.z);
+    vec3 bMax(bbox.max.x, bbox.max.y, bbox.max.z);
+    vec3 bCenter = (bMin + bMax) * 0.5;
+    vec3 bHalf = (bMax - bMin) * 0.75;  // 50% expansion
+    bMin = bCenter - bHalf;
+    bMax = bCenter + bHalf;
+    for (int i = 0; i < 8; i++) {
+      vec3 corner(i & 1 ? bMax.x : bMin.x, i & 2 ? bMax.y : bMin.y,
+                  i & 4 ? bMax.z : bMin.z);
+      origPos.push_back(corner);
+      tetVerts.push_back(corner + vec3(DeterministicEps(tetVerts.size(), 0),
+                                       DeterministicEps(tetVerts.size(), 1),
+                                       DeterministicEps(tetVerts.size(), 2)));
+    }
+
+    // Super-tet corners must encompass everything including bbox corners.
     vec3 center(0, 0, 0);
     for (const auto& p : tetVerts) center += p;
     center /= (double)tetVerts.size();
@@ -668,7 +688,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       vec3 p0 = origPos[i0], p1 = origPos[i1], p2 = origPos[i2],
            p3 = origPos[i3];
 
-      if (std::abs(TetQuality(p0, p1, p2, p3)) < 0.001) return;
+      if (std::abs(TetQuality(p0, p1, p2, p3)) < 1e-6) return;
 
       // Bounding box overlap test.
       vec3 tMin = la::min(la::min(p0, p1), la::min(p2, p3));
@@ -690,28 +710,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         pieces[i] = clipped;
       valid[i] = true;
     });
-
-    // Step 3b: Recover any regions not covered by clipped tets.
-    double step3Vol = 0;
-    for (int i = 0; i < numTets; i++)
-      if (valid[i]) step3Vol += pieces[i].Volume();
-
-    if (step3Vol < totalVol * 0.999) {
-      Manifold covered;
-      for (int i = 0; i < numTets; i++) {
-        if (!valid[i]) continue;
-        covered = covered.IsEmpty() ? pieces[i] : (covered + pieces[i]);
-      }
-      Manifold uncovered = shape - covered;
-      if (!uncovered.IsEmpty()) {
-        for (auto& part : uncovered.Decompose()) {
-          if (part.IsEmpty()) continue;
-          pieces.push_back(part);
-          valid.push_back(true);
-          numTets++;
-        }
-      }
-    }
 
     // Step 4: Cospheric merge — group adjacent tets sharing a circumcenter
     // (computed from unperturbed positions). This undoes the arbitrary tet
