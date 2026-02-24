@@ -569,6 +569,83 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     tetVerts.push_back(vec3(0.0, -s, s));
 
     std::vector<uint32_t> flatTets = CreateTetIds(tetVerts, 0.0);
+
+    // Step 2b: Reflex edge recovery. Check which reflex edges are missing
+    // from the DT and insert Steiner midpoints to bias the DT toward
+    // including them. This aligns tet boundaries with concavity boundaries.
+    {
+      const auto& he = shapeImpl->halfedge_;
+      const auto& fn = shapeImpl->faceNormal_;
+
+      // Build set of DT edges for fast lookup.
+      std::unordered_set<uint64_t> dtEdges;
+      int nt = (int)flatTets.size() / 4;
+      for (int i = 0; i < nt; i++) {
+        uint32_t v[4] = {flatTets[4 * i], flatTets[4 * i + 1],
+                         flatTets[4 * i + 2], flatTets[4 * i + 3]};
+        for (int a = 0; a < 4; a++)
+          for (int b = a + 1; b < 4; b++) {
+            uint32_t lo = std::min(v[a], v[b]);
+            uint32_t hi = std::max(v[a], v[b]);
+            if (lo < numVerts && hi < numVerts)
+              dtEdges.insert((uint64_t)lo | ((uint64_t)hi << 32));
+          }
+      }
+
+      // Find missing reflex edges and collect Steiner midpoints.
+      std::vector<vec3> steinerPoints;
+      int missingCount = 0, totalReflex = 0;
+      for (size_t idx = 0; idx < he.size(); idx++) {
+        auto edge = he[idx];
+        if (!edge.IsForward()) continue;
+        vec3 n0 = fn[idx / 3];
+        vec3 n1 = fn[edge.pairedHalfedge / 3];
+        vec3 edgeVec = origPos[edge.endVert] - origPos[edge.startVert];
+        if (la::dot(edgeVec, la::cross(n0, n1)) >= 0) continue;
+        totalReflex++;
+
+        uint32_t lo =
+            std::min((uint32_t)edge.startVert, (uint32_t)edge.endVert);
+        uint32_t hi =
+            std::max((uint32_t)edge.startVert, (uint32_t)edge.endVert);
+        if (dtEdges.count((uint64_t)lo | ((uint64_t)hi << 32)) == 0) {
+          missingCount++;
+          steinerPoints.push_back(
+              (origPos[edge.startVert] + origPos[edge.endVert]) * 0.5);
+        }
+      }
+
+      // If any reflex edges are missing, add Steiner points and rebuild DT.
+      if (!steinerPoints.empty()) {
+#ifdef MANIFOLD_DEBUG
+        printf(
+            "ConvexDecomposition: %d/%d reflex edges missing from DT, "
+            "adding %d Steiner points\n",
+            missingCount, totalReflex, (int)steinerPoints.size());
+#endif
+        size_t oldSize = tetVerts.size();
+        // Remove the 4 super-tet corners before appending.
+        tetVerts.resize(oldSize - 4);
+        origPos.resize(origPos.size());  // origPos doesn't have super-tet
+
+        for (size_t i = 0; i < steinerPoints.size(); i++) {
+          origPos.push_back(steinerPoints[i]);
+          tetVerts.push_back(steinerPoints[i] +
+                             vec3(DeterministicEps(tetVerts.size(), 0),
+                                  DeterministicEps(tetVerts.size(), 1),
+                                  DeterministicEps(tetVerts.size(), 2)));
+        }
+
+        // Re-add super-tet corners.
+        tetVerts.push_back(vec3(-s, 0.0, -s));
+        tetVerts.push_back(vec3(s, 0.0, -s));
+        tetVerts.push_back(vec3(0.0, s, s));
+        tetVerts.push_back(vec3(0.0, -s, s));
+
+        flatTets = CreateTetIds(tetVerts, 0.0);
+      }
+    }
+
     int numTets = (int)flatTets.size() / 4;
     if (numTets == 0) {
       outputs.push_back(shape);
