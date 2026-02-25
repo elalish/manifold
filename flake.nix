@@ -1,6 +1,6 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.gtest-src = {
     url = "github:google/googletest/v1.14.0";
     flake = false;
@@ -61,9 +61,9 @@
               cmake
               ninja
               (python3.withPackages
-                (ps: with ps; [ nanobind trimesh pytest ]))
+                (ps: with ps; [ nanobind pip pytest setuptools trimesh wheel ]))
               gtest
-            ]) ++ (if parallel then [ pkgs.tbb_2021_11 ] else [ ]);
+            ]) ++ (if parallel then [ pkgs.onetbb ] else [ ]);
             buildInputs = with pkgs; [
               clipper2
             ];
@@ -84,7 +84,7 @@
           name = "manifold-js";
           version = manifold-version;
           src = self;
-          nativeBuildInputs = (with pkgs; [ cmake python39 ]);
+          nativeBuildInputs = (with pkgs; [ cmake python310 ]);
           buildInputs = [ pkgs.nodejs ];
           configurePhase = ''
             cp -r ${clipper2-src} clipper2
@@ -127,23 +127,31 @@
               false;
           };
           # but how should we make it work with other python versions?
-          manifold3d = with pkgs.python3Packages; buildPythonPackage {
+          manifold3d =  pkgs.stdenv.mkDerivation {
             pname = "manifold3d";
             version = manifold-version;
             src = self;
-            propagatedBuildInputs = [ numpy ];
-            buildInputs = with pkgs; [ clipper2 tbb_2021_11 ];
-            nativeBuildInputs = with pkgs; [
+            propagatedBuildInputs = with pkgs; [ 
+              clipper2
+              onetbb 
+              (python3.withPackages
+                (ps: with ps; [ numpy pip pytest setuptools types-setuptools wheel ]))
+            ];
+            propagatedNativeBuildInputs = (with pkgs; [
+              assimp
               cmake
               ninja
-              setuptools
-              scikit-build-core
-              pyproject-metadata
-              pathspec
+              (python3.withPackages
+                (ps: with ps; [ nanobind numpy pip pytest setuptools types-setuptools trimesh wheel]))
+            ]);
+            cmakeFlags = [
+              "-DMANIFOLD_CBIND=ON"
+              "-DMANIFOLD_TEST=OFF"
+              "-DMANIFOLD_EXPORT=ON"
+              "-DBUILD_SHARED_LIBS=ON"
+              "-DMANIFOLD_PAR=ON"
+              "-DMANIFOLD_PYBIND=ON"
             ];
-            checkInputs = [ nanobind trimesh pytest ];
-            format = "pyproject";
-            dontUseCmakeConfigure = true;
             doCheck = true;
             checkPhase = ''
               python3 bindings/python/examples/run_all.py
@@ -154,6 +162,11 @@
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             (python3.withPackages (ps: with ps; [
+              # wheel build
+              setuptools
+              pip
+              wheel
+
               # test dependencies
               trimesh
               numpy
@@ -169,7 +182,7 @@
 
             ninja
             cmake
-            tbb_2021_11
+            onetbb
             gtest
             assimp
             clipper2

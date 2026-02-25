@@ -225,6 +225,11 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(${PROJECT_SOURCE_DIR}/cmake/manifoldDeps.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/configHelper.cmake)
 
+if(MANIFOLD_PYBIND)
+  configure_file("LICENSE" "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/LICENSE" COPYONLY)
+  configure_file("README.md" "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/README.md" COPYONLY)
+endif()
+
 add_subdirectory(src)
 add_subdirectory(bindings)
 if(MANIFOLD_TEST)
