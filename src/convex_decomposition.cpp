@@ -481,9 +481,9 @@ bool TrySplitByCoplanarReflexPlane(
  *   1. Pre-pass: detect coplanar reflex edge chains and split by plane
  *   2. Delaunay tetrahedralization of mesh vertices
  *   3. Clip each DT tet against the mesh surface
- *   4a. Cospheric merge: group tets sharing a circumcenter
- *   4b. Priority-queue merge: biggest-first pairwise convex merges
- *   5. Reflex edge splitting of remaining non-convex pieces
+ *   4. Cospheric merge: group tets sharing a circumcenter
+ *   5. Priority-queue merge: biggest-first pairwise convex merges
+ *   6. Reflex edge splitting of remaining non-convex pieces
  */
 std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
   std::vector<Manifold> outputs;
