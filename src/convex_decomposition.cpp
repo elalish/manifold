@@ -435,8 +435,12 @@ bool TrySplitByCoplanarReflexPlane(
             std::abs(la::dot(n, vp[b]) - d) < tol)
           edges++;
       }
-      // Only consider planes containing >= 75% of all reflex edges.
-      if (edges >= 2 && edges * 4 >= (int)reflexEdges.size() * 3)
+      // Accept planes where coplanar reflex edges form a significant
+      // fraction of all reflex edges (>= 25%) and there are at least 6
+      // edges (a proper ring, not scattered noise). This catches
+      // individual cylinder seams in multi-hole shapes like CubeSphereHole
+      // where each hole accounts for ~33% of reflex edges.
+      if (edges >= 6 && edges * 4 >= (int)reflexEdges.size())
         candidates.push_back({n, d, edges});
     }
   }
@@ -449,16 +453,16 @@ bool TrySplitByCoplanarReflexPlane(
               return a.edgesOnPlane > b.edgesOnPlane;
             });
 
-  // Try top candidates (up to 5). Accept the first that produces a valid
-  // split with both halves > 10% volume.
+  // Try top candidates. Accept the first that produces a valid split
+  // where the smaller half has > 1% of the original volume.
   double origVol = shape.Volume();
-  int maxTry = std::min((int)candidates.size(), 5);
+  int maxTry = std::min((int)candidates.size(), 10);
   for (int i = 0; i < maxTry; i++) {
     auto& cand = candidates[i];
     auto [a, b] = shape.SplitByPlane(cand.normal, cand.offset);
     double aVol = a.Volume(), bVol = b.Volume();
     double minRatio = std::min(aVol, bVol) / origVol;
-    if (a.IsEmpty() || b.IsEmpty() || minRatio <= 0.1 ||
+    if (a.IsEmpty() || b.IsEmpty() || minRatio <= 0.01 ||
         std::abs(aVol + bVol - origVol) >= origVol * 0.01)
       continue;
     outA = a;
@@ -916,7 +920,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
       }
     }
 
-    // Step 5: Split remaining non-convex pieces by cutting through reflex
+    // Step 6: Split remaining non-convex pieces by cutting through reflex
     // edges with dihedral bisector planes. Keep iterating until all pieces
     // are convex or no further progress is made.
     std::vector<Manifold> pending;
