@@ -361,7 +361,7 @@ NB_MODULE(manifold3d, m) {
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("convex_decomposition", &Manifold::ConvexDecomposition,
-           nb::arg("max_cluster_size") = 2, nb::arg("max_depth") = 1,
+           nb::arg("max_depth") = 1,
            "Decompose into approximately convex pieces.")
       .def("split", &Manifold::Split, nb::arg("cutter"),
            manifold__split__cutter)

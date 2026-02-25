@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -335,140 +336,6 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
   return verts;
 }
 
-// ---------------------------------------------------------------------------
-// Coplanar reflex plane detection (pre-pass)
-// ---------------------------------------------------------------------------
-
-// Scan all reflex edges for a coplanar chain (>= 6 connected edges on one
-// plane). When found, return the two halves from splitting. This resolves
-// sphere intersection seams perfectly: e.g. TwoSpheres goes from 271 to 2
-// pieces.
-bool TrySplitByCoplanarReflexPlane(
-    const Manifold& shape,
-    const std::shared_ptr<const Manifold::Impl>& shapeImpl, Manifold& outA,
-    Manifold& outB) {
-  const auto& he = shapeImpl->halfedge_;
-  const auto& fn = shapeImpl->faceNormal_;
-  const auto& vp = shapeImpl->vertPos_;
-  const size_t nbEdges = he.size();
-
-  // Collect reflex edges.
-  std::vector<std::pair<int, int>> reflexEdges;
-  for (size_t idx = 0; idx < nbEdges; idx++) {
-    auto edge = he[idx];
-    if (!edge.IsForward()) continue;
-    vec3 n0 = fn[idx / 3];
-    vec3 n1 = fn[edge.pairedHalfedge / 3];
-    vec3 edgeVec = vp[edge.endVert] - vp[edge.startVert];
-    if (la::dot(edgeVec, la::cross(n0, n1)) < 0)
-      reflexEdges.push_back({edge.startVert, edge.endVert});
-  }
-
-  if (reflexEdges.size() < 2) return false;
-
-  // Build vertex adjacency among reflex edges and compute bounding spread.
-  std::unordered_map<int, std::unordered_set<int>> adj;
-  std::unordered_set<int> reflexVertSet;
-  for (auto& [sv, ev] : reflexEdges) {
-    adj[sv].insert(ev);
-    adj[ev].insert(sv);
-    reflexVertSet.insert(sv);
-    reflexVertSet.insert(ev);
-  }
-  std::vector<int> allReflexVerts(reflexVertSet.begin(), reflexVertSet.end());
-
-  vec3 centroid(0, 0, 0);
-  for (int v : allReflexVerts) centroid += vp[v];
-  centroid /= (double)allReflexVerts.size();
-  double spread = 0;
-  for (int v : allReflexVerts)
-    spread = std::max(spread, la::length(vp[v] - centroid));
-  if (spread < 1e-10) return false;
-
-  // For each pair of adjacent reflex edges, compute a candidate plane and
-  // count how many reflex vertices lie on it (within 2% of spread).
-  // Collect candidate planes ranked by how many reflex edges they contain.
-  // Each candidate is defined by a pair of adjacent reflex edges.
-  constexpr double kCoplanarTol = 0.02;
-  double tol = kCoplanarTol * spread;
-
-  struct Candidate {
-    vec3 normal;
-    double offset;
-    int edgesOnPlane;
-  };
-  std::vector<Candidate> candidates;
-
-  // To avoid duplicates, track seen plane normals (quantized).
-  auto planeKey = [](vec3 n, double d) -> uint64_t {
-    auto qi = [](double v) -> int { return (int)std::round(v * 1000); };
-    // Canonicalize sign: first nonzero component positive.
-    if (n.x < -1e-6 || (std::abs(n.x) < 1e-6 && n.y < -1e-6) ||
-        (std::abs(n.x) < 1e-6 && std::abs(n.y) < 1e-6 && n.z < -1e-6)) {
-      n = -n;
-      d = -d;
-    }
-    uint64_t h = (uint64_t)(qi(n.x) + 2000) * 4001 * 4001 * 10001 +
-                 (uint64_t)(qi(n.y) + 2000) * 4001 * 10001 +
-                 (uint64_t)(qi(n.z) + 2000) * 10001 + (uint64_t)(qi(d) + 5000);
-    return h;
-  };
-  std::unordered_set<uint64_t> seenPlanes;
-
-  for (auto& [sv, ev] : reflexEdges) {
-    vec3 p0 = vp[sv], p1 = vp[ev];
-    vec3 v1 = p1 - p0;
-    for (int c : adj[sv]) {
-      if (c == ev) continue;
-      vec3 v2 = vp[c] - p0;
-      vec3 n = la::cross(v1, v2);
-      double nl = la::length(n);
-      if (nl < 1e-10) continue;
-      n /= nl;
-      double d = la::dot(n, p0);
-
-      uint64_t key = planeKey(n, d);
-      if (!seenPlanes.insert(key).second) continue;
-
-      int edges = 0;
-      for (auto& [a, b] : reflexEdges) {
-        if (std::abs(la::dot(n, vp[a]) - d) < tol &&
-            std::abs(la::dot(n, vp[b]) - d) < tol)
-          edges++;
-      }
-      // Only consider planes containing >= 75% of all reflex edges.
-      if (edges >= 2 && edges * 4 >= (int)reflexEdges.size() * 3)
-        candidates.push_back({n, d, edges});
-    }
-  }
-
-  if (candidates.empty()) return false;
-
-  // Sort by most edges on plane (best candidates first).
-  std::sort(candidates.begin(), candidates.end(),
-            [](const Candidate& a, const Candidate& b) {
-              return a.edgesOnPlane > b.edgesOnPlane;
-            });
-
-  // Try top candidates (up to 5). Accept the first that produces a valid
-  // split with both halves > 10% volume.
-  double origVol = shape.Volume();
-  int maxTry = std::min((int)candidates.size(), 5);
-  for (int i = 0; i < maxTry; i++) {
-    auto& cand = candidates[i];
-    auto [a, b] = shape.SplitByPlane(cand.normal, cand.offset);
-    double aVol = a.Volume(), bVol = b.Volume();
-    double minRatio = std::min(aVol, bVol) / origVol;
-    if (a.IsEmpty() || b.IsEmpty() || minRatio <= 0.1 ||
-        std::abs(aVol + bVol - origVol) >= origVol * 0.01)
-      continue;
-    outA = a;
-    outB = b;
-    return true;
-  }
-  return false;
-}
-
 }  // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -479,16 +346,13 @@ bool TrySplitByCoplanarReflexPlane(
  * Decompose into approximately convex pieces.
  *
  * Algorithm overview:
- *   1. Pre-pass: detect coplanar reflex edge chains and split by plane
- *   2. Delaunay tetrahedralization of mesh vertices
- *   3. Clip each DT tet against the mesh surface
- *   4. Recover any uncovered regions
- *   5. Cospheric merge: group tets sharing a circumcenter
- *   6. Greedy hull merge: pairwise then cluster
- *   7. Reflex edge splitting of remaining non-convex pieces
+ *   1. Delaunay tetrahedralization of mesh vertices
+ *   2. Clip each DT tet against the mesh surface
+ *   3. Recover any uncovered regions
+ *   4. Priority-queue merge: biggest-first pairwise convex merges
+ *   5. Reflex edge splitting of remaining non-convex pieces
  */
-std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
-                                                          int maxDepth) const {
+std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
   std::vector<Manifold> outputs;
 
   auto thisImpl = std::make_shared<Impl>(*this);
@@ -514,21 +378,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     if (shapeImpl->IsConvex()) {
       outputs.push_back(shape.Hull());
       continue;
-    }
-
-    // Step 1: Try splitting by a coplanar reflex edge plane. This resolves
-    // sphere intersection seams without DT seam vertex poisoning.
-    {
-      Manifold halfA, halfB;
-      if (TrySplitByCoplanarReflexPlane(shape, shapeImpl, halfA, halfB)) {
-        auto aSub = halfA.GetCsgLeafNode().GetImpl()->ConvexDecomposition(
-            maxClusterSize, maxDepth);
-        outputs.insert(outputs.end(), aSub.begin(), aSub.end());
-        auto bSub = halfB.GetCsgLeafNode().GetImpl()->ConvexDecomposition(
-            maxClusterSize, maxDepth);
-        outputs.insert(outputs.end(), bSub.begin(), bSub.end());
-        continue;
-      }
     }
 
     constexpr double kMergeTol = 1e-8;
@@ -735,10 +584,10 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    // Step 4: Cospheric merge — group adjacent tets sharing a circumcenter
-    // (computed from unperturbed positions). This undoes the arbitrary tet
-    // assignments that DT perturbation introduces for cospheric point sets
-    // (e.g. cube vertices).
+    // Step 4: Priority-queue merge — biggest-first pairwise convex merges.
+    // Uses a max-heap keyed by merged volume. Union-find detects stale
+    // entries. Only neighbors of newly merged pieces are re-evaluated,
+    // giving O(P * D * log P) instead of O(P^2 * H).
     std::vector<double> volumes(numTets, 0.0);
     std::vector<std::vector<vec3>> pieceVerts(numTets);
     for (int i = 0; i < numTets; i++) {
@@ -767,233 +616,86 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       }
     }
 
-    {
-      std::vector<vec3> circumcenters(origTets);
-      for (int i = 0; i < origTets; i++) {
-        if (!valid[i]) continue;
-        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
-                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
-        circumcenters[i] = GetCircumCenter(origPos[ci0], origPos[ci1],
-                                           origPos[ci2], origPos[ci3]);
+    struct MergeCandidate {
+      double mergedVolume;
+      int pieceA, pieceB;
+      bool operator<(const MergeCandidate& o) const {
+        return mergedVolume < o.mergedVolume;  // max-heap
       }
+    };
+    std::priority_queue<MergeCandidate> pq;
 
-      constexpr double ccEps = 1e-10;
-      std::vector<int> ccParent(origTets);
-      for (int i = 0; i < origTets; i++) ccParent[i] = i;
-      auto ccFind = [&](int x) -> int {
-        while (ccParent[x] != x) x = ccParent[x] = ccParent[ccParent[x]];
-        return x;
-      };
-
-      for (int i = 0; i < origTets; i++) {
-        if (!valid[i]) continue;
-        for (int n : neighbors[i]) {
-          if (n >= origTets || !valid[n]) continue;
-          if (la::length(circumcenters[i] - circumcenters[n]) < ccEps) {
-            int ri = ccFind(i), rn = ccFind(n);
-            if (ri != rn) ccParent[rn] = ri;
-          }
-        }
-      }
-
-      std::unordered_map<int, std::vector<int>> groups;
-      for (int i = 0; i < origTets; i++) {
-        if (!valid[i]) continue;
-        groups[ccFind(i)].push_back(i);
-      }
-
-      for (auto& [root, members] : groups) {
-        if (members.size() < 2) continue;
-        std::vector<vec3> combined;
-        double sumVol = 0;
-        for (int m : members) {
-          combined.insert(combined.end(), pieceVerts[m].begin(),
-                          pieceVerts[m].end());
-          sumVol += volumes[m];
-        }
-        Manifold hull = Manifold::Hull(combined);
-        if (hull.IsEmpty() || sumVol <= 0.0) continue;
-        double hullVol = hull.Volume();
-        if (hullVol > sumVol * (1.0 + kMergeTol)) continue;
-
-        pieces[root] = hull;
-        pieceVerts[root] = ExtractVertices(hull);
-        volumes[root] = hullVol;
-        for (int m : members) {
-          if (m == root) continue;
-          valid[m] = false;
-          parent[m] = root;
-          for (int nb : neighbors[m]) {
-            if (nb != root && valid[nb]) {
-              neighbors[root].insert(nb);
-              neighbors[nb].erase(m);
-              neighbors[nb].insert(root);
-            }
-          }
-          neighbors[m].clear();
-        }
-      }
-    }
-
-    // Step 5: Greedy hull merge.
-    // Phase A: pairwise merges via DT adjacency.
-    auto tryMerge = [&](int root, int other) -> bool {
-      if (root == other || !valid[root] || !valid[other]) return false;
-      double sumVol = volumes[root] + volumes[other];
+    // Try merging a pair and push onto PQ if convex.
+    auto tryPush = [&](int a, int b) {
+      if (a == b || !valid[a] || !valid[b]) return;
+      double sumVol = volumes[a] + volumes[b];
+      if (sumVol <= 0.0) return;
       std::vector<vec3> combined;
-      combined.reserve(pieceVerts[root].size() + pieceVerts[other].size());
-      combined.insert(combined.end(), pieceVerts[root].begin(),
-                      pieceVerts[root].end());
-      combined.insert(combined.end(), pieceVerts[other].begin(),
-                      pieceVerts[other].end());
+      combined.reserve(pieceVerts[a].size() + pieceVerts[b].size());
+      combined.insert(combined.end(), pieceVerts[a].begin(),
+                      pieceVerts[a].end());
+      combined.insert(combined.end(), pieceVerts[b].begin(),
+                      pieceVerts[b].end());
       Manifold hull = Manifold::Hull(combined);
-      if (hull.IsEmpty()) return false;
+      if (hull.IsEmpty()) return;
       double hullVol = hull.Volume();
-      if (sumVol > 0.0 && hullVol <= sumVol * (1.0 + kMergeTol)) {
-        pieces[root] = hull;
-        pieceVerts[root] = ExtractVertices(hull);
-        volumes[root] = hullVol;
-        valid[other] = false;
-        parent[other] = root;
-        for (int n : neighbors[other]) {
-          if (n != root && valid[n]) {
-            neighbors[root].insert(n);
-            neighbors[n].erase(other);
-            neighbors[n].insert(root);
-          }
-        }
-        neighbors[other].clear();
-        return true;
-      }
-      return false;
+      if (hullVol <= sumVol * (1.0 + kMergeTol))
+        pq.push({hullVol, a, b});
     };
 
-    auto applyMerge = [&](int root, const std::vector<int>& others,
-                          const Manifold& hull) {
-      pieces[root] = hull;
-      pieceVerts[root] = ExtractVertices(hull);
-      volumes[root] = hull.Volume();
-      for (int o : others) {
-        valid[o] = false;
-        parent[o] = root;
-        for (int nb : neighbors[o]) {
-          if (nb != root && valid[nb]) {
-            neighbors[root].insert(nb);
-            neighbors[nb].erase(o);
-            neighbors[nb].insert(root);
-          }
-        }
-        neighbors[o].clear();
-      }
-    };
-
-    bool merged = true;
-    while (merged) {
-      merged = false;
-      for (int i = 0; i < numTets; i++) {
-        if (!valid[i]) continue;
-        std::vector<int> nbrs(neighbors[i].begin(), neighbors[i].end());
-        for (int n : nbrs) {
-          int rn = find(n);
-          if (rn == i || !valid[rn]) continue;
-          if (tryMerge(i, rn)) merged = true;
-        }
+    // Seed PQ with all adjacent valid pairs.
+    for (int i = 0; i < numTets; i++) {
+      if (!valid[i]) continue;
+      for (int n : neighbors[i]) {
+        if (n > i && valid[n]) tryPush(i, n);
       }
     }
 
-    // Phase B: cluster merges with bbox overlap pruning, tightest-fit-first.
-    struct AABB {
-      vec3 mn, mx;
-    };
-    std::vector<AABB> bboxes(numTets);
-    std::vector<int> validIds;
+    // Drain PQ — biggest merges first.
+    while (!pq.empty()) {
+      auto [vol, a, b] = pq.top();
+      pq.pop();
+      int ra = find(a), rb = find(b);
+      if (ra == rb || !valid[ra] || !valid[rb]) continue;
+      if (ra != a || rb != b) continue;  // stale entry
 
-    for (int clusterSize = 2; clusterSize <= maxClusterSize; clusterSize++) {
-      validIds.clear();
-      for (int i = 0; i < numTets; i++)
-        if (valid[i]) validIds.push_back(i);
-      constexpr double bboxEps = 1e-10;
-      for (int i : validIds) {
-        auto bb = pieces[i].BoundingBox();
-        bboxes[i] = {
-            vec3(bb.min.x - bboxEps, bb.min.y - bboxEps, bb.min.z - bboxEps),
-            vec3(bb.max.x + bboxEps, bb.max.y + bboxEps, bb.max.z + bboxEps)};
+      // Re-verify hull (vertices may have changed from prior merges).
+      double sumVol = volumes[ra] + volumes[rb];
+      std::vector<vec3> combined;
+      combined.reserve(pieceVerts[ra].size() + pieceVerts[rb].size());
+      combined.insert(combined.end(), pieceVerts[ra].begin(),
+                      pieceVerts[ra].end());
+      combined.insert(combined.end(), pieceVerts[rb].begin(),
+                      pieceVerts[rb].end());
+      Manifold hull = Manifold::Hull(combined);
+      if (hull.IsEmpty()) continue;
+      double hullVol = hull.Volume();
+      if (sumVol <= 0.0 || hullVol > sumVol * (1.0 + kMergeTol)) continue;
+
+      // Commit merge: ra absorbs rb.
+      pieces[ra] = hull;
+      pieceVerts[ra] = ExtractVertices(hull);
+      volumes[ra] = hullVol;
+      valid[rb] = false;
+      parent[rb] = ra;
+
+      // Inherit rb's neighbors.
+      for (int nb : neighbors[rb]) {
+        if (nb != ra && valid[nb]) {
+          neighbors[ra].insert(nb);
+          neighbors[nb].erase(rb);
+          neighbors[nb].insert(ra);
+        }
       }
+      neighbors[rb].clear();
 
-      merged = true;
-      while (merged && (int)validIds.size() >= clusterSize) {
-        merged = false;
-        int bestRoot = -1;
-        std::vector<int> bestOthers;
-        double bestRatio = 1e18;
-        Manifold bestHull;
-
-        for (int i : validIds) {
-          if (!valid[i]) continue;
-          std::vector<int> nbrs;
-          if (clusterSize == 2) {
-            for (int j : validIds) {
-              if (j == i || !valid[j]) continue;
-              if (bboxes[i].mx.x < bboxes[j].mn.x ||
-                  bboxes[j].mx.x < bboxes[i].mn.x ||
-                  bboxes[i].mx.y < bboxes[j].mn.y ||
-                  bboxes[j].mx.y < bboxes[i].mn.y ||
-                  bboxes[i].mx.z < bboxes[j].mn.z ||
-                  bboxes[j].mx.z < bboxes[i].mn.z)
-                continue;
-              nbrs.push_back(j);
-            }
-          } else {
-            for (int n : neighbors[i])
-              if (valid[n]) nbrs.push_back(n);
-          }
-          if ((int)nbrs.size() < clusterSize - 1) continue;
-
-          int pick = clusterSize - 1;
-          std::vector<int> idx(pick);
-          for (int p = 0; p < pick; p++) idx[p] = p;
-          while (true) {
-            std::vector<vec3> combined = pieceVerts[i];
-            double sumVol = volumes[i];
-            std::vector<int> others;
-            for (int p = 0; p < pick; p++) {
-              int j = nbrs[idx[p]];
-              combined.insert(combined.end(), pieceVerts[j].begin(),
-                              pieceVerts[j].end());
-              sumVol += volumes[j];
-              others.push_back(j);
-            }
-            Manifold hull = Manifold::Hull(combined);
-            if (!hull.IsEmpty() && sumVol > 0.0) {
-              double ratio = hull.Volume() / sumVol;
-              if (ratio <= 1.0 + kMergeTol && ratio < bestRatio) {
-                bestRatio = ratio;
-                bestRoot = i;
-                bestOthers = others;
-                bestHull = hull;
-              }
-            }
-            int p = pick - 1;
-            while (p >= 0 && idx[p] == (int)nbrs.size() - pick + p) p--;
-            if (p < 0) break;
-            idx[p]++;
-            for (int q = p + 1; q < pick; q++) idx[q] = idx[q - 1] + 1;
-          }
-        }
-        if (bestRoot >= 0) {
-          applyMerge(bestRoot, bestOthers, bestHull);
-          auto bb = bestHull.BoundingBox();
-          bboxes[bestRoot] = {vec3(bb.min.x, bb.min.y, bb.min.z),
-                              vec3(bb.max.x, bb.max.y, bb.max.z)};
-          merged = true;
-          validIds.clear();
-          for (int i = 0; i < numTets; i++)
-            if (valid[i]) validIds.push_back(i);
-        }
+      // Push new merge candidates for all neighbors of the merged piece.
+      for (int nb : neighbors[ra]) {
+        if (valid[nb]) tryPush(ra, nb);
       }
     }
 
-    // Step 6: Split remaining non-convex pieces by cutting through reflex
+    // Step 5: Split remaining non-convex pieces by cutting through reflex
     // edges with dihedral bisector planes. Keep iterating until all pieces
     // are convex or no further progress is made.
     std::vector<Manifold> pending;

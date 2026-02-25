@@ -172,7 +172,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // piece to convex-convex (fast) or per-triangle (exact) based on IsConvex.
   } else if (decompose && !inset) {
     // Decompose non-convex shape(s) without hull-snapping for exact tiling
-    auto aPieces = aImpl->ConvexDecomposition(2, 3);
+    auto aPieces = aImpl->ConvexDecomposition(3);
 
     if (bConvex) {
       // Non-Convex × Convex: per-piece Minkowski
@@ -200,7 +200,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
     } else {
       // Non-Convex × Non-Convex: decompose both, pairwise vertex-addition
-      auto bPieces = bImpl->ConvexDecomposition(2, 3);
+      auto bPieces = bImpl->ConvexDecomposition(3);
       std::vector<Manifold> pairResults(aPieces.size() * bPieces.size());
       for_each_n(autoPolicy(pairResults.size(), 4), countAt(0_uz),
                  pairResults.size(), [&](size_t idx) {
