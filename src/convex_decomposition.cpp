@@ -1065,13 +1065,58 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
   }
 
-  // Filter degenerate slivers from output. Any piece with volume < 1e-6
-  // of the total is numerical noise from tet clipping.
+  // Post-process: fix remaining non-convex pieces.
+  // 1. Simplify to remove numerical noise vertices (fixes barely-NC pieces)
+  // 2. Decompose self-intersecting pieces (genus < 0) into convex components
+  // 3. Filter degenerate slivers
+  std::vector<Manifold> postProcessed;
+  for (auto& p : outputs) {
+    if (p.IsEmpty() || p.Volume() <= 0) continue;
+    auto impl = p.GetCsgLeafNode().GetImpl();
+    if (impl->IsConvex()) {
+      postProcessed.push_back(p);
+      continue;
+    }
+
+    // Try simplify first — removes noise vertices from boolean operations.
+    double tol = p.GetTolerance();
+    Manifold simplified = p.AsOriginal().Simplify(tol);
+    auto simpImpl = simplified.GetCsgLeafNode().GetImpl();
+    if (simpImpl->IsConvex()) {
+      postProcessed.push_back(simplified);
+      continue;
+    }
+
+    // Decompose self-intersecting pieces (genus < 0) into components.
+    // Recovery booleans can create overlapping convex regions that
+    // Decompose() cleanly separates.
+    auto parts = simplified.Decompose();
+    if ((int)parts.size() > 1) {
+      bool allConvex = true;
+      for (auto& part : parts) {
+        if (part.IsEmpty() || part.Volume() <= 0) continue;
+        auto partImpl = part.GetCsgLeafNode().GetImpl();
+        if (!partImpl->IsConvex()) allConvex = false;
+      }
+      if (allConvex) {
+        for (auto& part : parts)
+          if (!part.IsEmpty() && part.Volume() > 0)
+            postProcessed.push_back(part);
+        continue;
+      }
+    }
+
+    // Still non-convex — keep as-is.
+    postProcessed.push_back(simplified);
+  }
+
+  // Filter degenerate slivers. Any piece with volume < 1e-6 of the total
+  // is numerical noise from tet clipping or boolean operations.
   double totalOutputVol = 0;
-  for (auto& p : outputs) totalOutputVol += p.Volume();
+  for (auto& p : postProcessed) totalOutputVol += p.Volume();
   double minPieceVol = std::max(1e-10, totalOutputVol * 1e-6);
   std::vector<Manifold> filtered;
-  for (auto& p : outputs)
+  for (auto& p : postProcessed)
     if (p.Volume() > minPieceVol) filtered.push_back(p);
   return filtered;
 }
