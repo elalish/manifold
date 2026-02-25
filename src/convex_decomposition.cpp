@@ -711,6 +711,30 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
       valid[i] = true;
     });
 
+    // Step 3b: Recover any regions not covered by clipped tets. The bbox
+    // corners ensure most coverage, but thin features or degenerate tets
+    // can leave gaps. Recover these as additional pieces.
+    double step3Vol = 0;
+    for (int i = 0; i < numTets; i++)
+      if (valid[i]) step3Vol += pieces[i].Volume();
+
+    if (step3Vol < totalVol * 0.999) {
+      Manifold covered;
+      for (int i = 0; i < numTets; i++) {
+        if (!valid[i]) continue;
+        covered = covered.IsEmpty() ? pieces[i] : (covered + pieces[i]);
+      }
+      Manifold uncovered = shape - covered;
+      if (!uncovered.IsEmpty()) {
+        for (auto& part : uncovered.Decompose()) {
+          if (part.IsEmpty() || part.Volume() < 1e-10) continue;
+          pieces.push_back(part);
+          valid.push_back(true);
+          numTets++;
+        }
+      }
+    }
+
     // Step 4: Cospheric merge — group adjacent tets sharing a circumcenter
     // (computed from unperturbed positions). This undoes the arbitrary tet
     // assignments that DT perturbation introduces for cospheric point sets
@@ -970,10 +994,12 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
     }
 
     // Step 6: Split remaining non-convex pieces by cutting through reflex
-    // edges with dihedral bisector planes.
+    // edges with dihedral bisector planes. Keep iterating until all pieces
+    // are convex or no further progress is made.
     std::vector<Manifold> pending;
     for (int i = 0; i < numTets; i++) {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
+      if (pieces[i].Volume() < 1e-10) continue;  // skip degenerate slivers
       auto impl = pieces[i].GetCsgLeafNode().GetImpl();
       if (impl->IsConvex())
         outputs.push_back(pieces[i]);
@@ -981,8 +1007,9 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
         pending.push_back(pieces[i]);
     }
 
-    for (int iter = 0; iter < maxDepth * 4 && !pending.empty(); iter++) {
+    while (!pending.empty()) {
       std::vector<Manifold> nextPending;
+      bool anyProgress = false;
       for (auto& piece : pending) {
         auto pImpl = piece.GetCsgLeafNode().GetImpl();
         if (pImpl->IsConvex()) {
@@ -1011,7 +1038,8 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
           double originOffset = la::dot(planeNormal, edgeMid);
 
           auto [a, b] = piece.SplitByPlane(planeNormal, originOffset);
-          if (!a.IsEmpty() && !b.IsEmpty()) {
+          if (!a.IsEmpty() && !b.IsEmpty() && a.Volume() > 1e-10 &&
+              b.Volume() > 1e-10) {
             auto aImpl = a.GetCsgLeafNode().GetImpl();
             auto bImpl = b.GetCsgLeafNode().GetImpl();
             if (aImpl->IsConvex())
@@ -1023,17 +1051,29 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxClusterSize,
             else
               nextPending.push_back(b);
             didSplit = true;
+            anyProgress = true;
             break;
           }
         }
         if (!didSplit) outputs.push_back(piece);
       }
       pending = std::move(nextPending);
+      if (!anyProgress) {
+        for (auto& p : pending) outputs.push_back(p);
+        break;
+      }
     }
-    for (auto& p : pending) outputs.push_back(p);
   }
 
-  return outputs;
+  // Filter degenerate slivers from output. Any piece with volume < 1e-6
+  // of the total is numerical noise from tet clipping.
+  double totalOutputVol = 0;
+  for (auto& p : outputs) totalOutputVol += p.Volume();
+  double minPieceVol = std::max(1e-10, totalOutputVol * 1e-6);
+  std::vector<Manifold> filtered;
+  for (auto& p : outputs)
+    if (p.Volume() > minPieceVol) filtered.push_back(p);
+  return filtered;
 }
 
 }  // namespace manifold
