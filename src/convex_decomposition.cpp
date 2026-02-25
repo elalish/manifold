@@ -840,7 +840,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
       }
     }
 
-    // Step 4b: Priority-queue merge — biggest-first pairwise convex merges.
+    // Step 5: Priority-queue merge — biggest-first pairwise convex merges.
     struct MergeCandidate {
       double mergedVolume;
       int pieceA, pieceB;
@@ -868,6 +868,7 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
         pq.push({hullVol, a, b});
     };
 
+    // Seed PQ with all adjacent valid pairs.
     // Seed PQ with all adjacent valid pairs.
     for (int i = 0; i < numTets; i++) {
       if (!valid[i]) continue;
@@ -928,10 +929,22 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
       if (!valid[i] || pieces[i].IsEmpty()) continue;
       if (pieces[i].Volume() < 1e-10) continue;  // skip degenerate slivers
       auto impl = pieces[i].GetCsgLeafNode().GetImpl();
-      if (impl->IsConvex())
+      if (impl->IsConvex()) {
         outputs.push_back(pieces[i]);
-      else
-        pending.push_back(pieces[i]);
+      } else {
+        // Hull non-convex pieces directly if the absolute volume error
+        // is small relative to the total shape volume. This avoids the
+        // reflex splitter fragmenting tiny curved-surface pieces into
+        // 3-4 sub-pieces each (e.g. CubeSphereHole: 191 NC pieces
+        // would reflex-split into 626 — hulling keeps them at 191).
+        Manifold hull = pieces[i].Hull();
+        double absError = hull.Volume() - pieces[i].Volume();
+        if (!hull.IsEmpty() && absError <= totalVol * 0.001) {
+          outputs.push_back(hull);
+        } else {
+          pending.push_back(pieces[i]);
+        }
+      }
     }
 
     while (!pending.empty()) {
@@ -1015,8 +1028,6 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
     }
 
     // Decompose self-intersecting pieces (genus < 0) into components.
-    // Recovery booleans can create overlapping convex regions that
-    // Decompose() cleanly separates.
     auto parts = simplified.Decompose();
     if ((int)parts.size() > 1) {
       bool allConvex = true;
