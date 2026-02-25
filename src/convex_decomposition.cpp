@@ -336,6 +336,138 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
   return verts;
 }
 
+// ---------------------------------------------------------------------------
+// Coplanar reflex plane detection (pre-pass)
+// ---------------------------------------------------------------------------
+
+// Scan all reflex edges for a coplanar chain (>= 6 connected edges on one
+// plane). When found, return the two halves from splitting. This resolves
+// sphere intersection seams perfectly: e.g. TwoSpheres goes from 271 to 2
+// pieces.
+bool TrySplitByCoplanarReflexPlane(
+    const Manifold& shape,
+    const std::shared_ptr<const Manifold::Impl>& shapeImpl, Manifold& outA,
+    Manifold& outB) {
+  const auto& he = shapeImpl->halfedge_;
+  const auto& fn = shapeImpl->faceNormal_;
+  const auto& vp = shapeImpl->vertPos_;
+  const size_t nbEdges = he.size();
+
+  // Collect reflex edges.
+  std::vector<std::pair<int, int>> reflexEdges;
+  for (size_t idx = 0; idx < nbEdges; idx++) {
+    auto edge = he[idx];
+    if (!edge.IsForward()) continue;
+    vec3 n0 = fn[idx / 3];
+    vec3 n1 = fn[edge.pairedHalfedge / 3];
+    vec3 edgeVec = vp[edge.endVert] - vp[edge.startVert];
+    if (la::dot(edgeVec, la::cross(n0, n1)) < 0)
+      reflexEdges.push_back({edge.startVert, edge.endVert});
+  }
+
+  if (reflexEdges.size() < 2) return false;
+
+  // Build vertex adjacency among reflex edges and compute bounding spread.
+  std::unordered_map<int, std::unordered_set<int>> adj;
+  std::unordered_set<int> reflexVertSet;
+  for (auto& [sv, ev] : reflexEdges) {
+    adj[sv].insert(ev);
+    adj[ev].insert(sv);
+    reflexVertSet.insert(sv);
+    reflexVertSet.insert(ev);
+  }
+  std::vector<int> allReflexVerts(reflexVertSet.begin(), reflexVertSet.end());
+
+  vec3 centroid(0, 0, 0);
+  for (int v : allReflexVerts) centroid += vp[v];
+  centroid /= (double)allReflexVerts.size();
+  double spread = 0;
+  for (int v : allReflexVerts)
+    spread = std::max(spread, la::length(vp[v] - centroid));
+  if (spread < 1e-10) return false;
+
+  // For each pair of adjacent reflex edges, compute a candidate plane and
+  // count how many reflex vertices lie on it (within 2% of spread).
+  constexpr double kCoplanarTol = 0.02;
+  double tol = kCoplanarTol * spread;
+
+  struct Candidate {
+    vec3 normal;
+    double offset;
+    int edgesOnPlane;
+  };
+  std::vector<Candidate> candidates;
+
+  // To avoid duplicates, track seen plane normals (quantized).
+  auto planeKey = [](vec3 n, double d) -> uint64_t {
+    auto qi = [](double v) -> int { return (int)std::round(v * 1000); };
+    // Canonicalize sign: first nonzero component positive.
+    if (n.x < -1e-6 || (std::abs(n.x) < 1e-6 && n.y < -1e-6) ||
+        (std::abs(n.x) < 1e-6 && std::abs(n.y) < 1e-6 && n.z < -1e-6)) {
+      n = -n;
+      d = -d;
+    }
+    uint64_t h = (uint64_t)(qi(n.x) + 2000) * 4001 * 4001 * 10001 +
+                 (uint64_t)(qi(n.y) + 2000) * 4001 * 10001 +
+                 (uint64_t)(qi(n.z) + 2000) * 10001 + (uint64_t)(qi(d) + 5000);
+    return h;
+  };
+  std::unordered_set<uint64_t> seenPlanes;
+
+  for (auto& [sv, ev] : reflexEdges) {
+    vec3 p0 = vp[sv], p1 = vp[ev];
+    vec3 v1 = p1 - p0;
+    for (int c : adj[sv]) {
+      if (c == ev) continue;
+      vec3 v2 = vp[c] - p0;
+      vec3 n = la::cross(v1, v2);
+      double nl = la::length(n);
+      if (nl < 1e-10) continue;
+      n /= nl;
+      double d = la::dot(n, p0);
+
+      uint64_t key = planeKey(n, d);
+      if (!seenPlanes.insert(key).second) continue;
+
+      int edges = 0;
+      for (auto& [a, b] : reflexEdges) {
+        if (std::abs(la::dot(n, vp[a]) - d) < tol &&
+            std::abs(la::dot(n, vp[b]) - d) < tol)
+          edges++;
+      }
+      // Only consider planes containing >= 75% of all reflex edges.
+      if (edges >= 2 && edges * 4 >= (int)reflexEdges.size() * 3)
+        candidates.push_back({n, d, edges});
+    }
+  }
+
+  if (candidates.empty()) return false;
+
+  // Sort by most edges on plane (best candidates first).
+  std::sort(candidates.begin(), candidates.end(),
+            [](const Candidate& a, const Candidate& b) {
+              return a.edgesOnPlane > b.edgesOnPlane;
+            });
+
+  // Try top candidates (up to 5). Accept the first that produces a valid
+  // split with both halves > 10% volume.
+  double origVol = shape.Volume();
+  int maxTry = std::min((int)candidates.size(), 5);
+  for (int i = 0; i < maxTry; i++) {
+    auto& cand = candidates[i];
+    auto [a, b] = shape.SplitByPlane(cand.normal, cand.offset);
+    double aVol = a.Volume(), bVol = b.Volume();
+    double minRatio = std::min(aVol, bVol) / origVol;
+    if (a.IsEmpty() || b.IsEmpty() || minRatio <= 0.1 ||
+        std::abs(aVol + bVol - origVol) >= origVol * 0.01)
+      continue;
+    outA = a;
+    outB = b;
+    return true;
+  }
+  return false;
+}
+
 }  // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -346,10 +478,11 @@ std::vector<vec3> ExtractVertices(const Manifold& m) {
  * Decompose into approximately convex pieces.
  *
  * Algorithm overview:
- *   1. Delaunay tetrahedralization of mesh vertices
- *   2. Clip each DT tet against the mesh surface
- *   3. Recover any uncovered regions
- *   4. Priority-queue merge: biggest-first pairwise convex merges
+ *   1. Pre-pass: detect coplanar reflex edge chains and split by plane
+ *   2. Delaunay tetrahedralization of mesh vertices
+ *   3. Clip each DT tet against the mesh surface
+ *   4a. Cospheric merge: group tets sharing a circumcenter
+ *   4b. Priority-queue merge: biggest-first pairwise convex merges
  *   5. Reflex edge splitting of remaining non-convex pieces
  */
 std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
@@ -378,6 +511,21 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
     if (shapeImpl->IsConvex()) {
       outputs.push_back(shape.Hull());
       continue;
+    }
+
+    // Step 1: Try splitting by a coplanar reflex edge plane. This resolves
+    // sphere intersection seams without DT seam vertex poisoning.
+    {
+      Manifold halfA, halfB;
+      if (TrySplitByCoplanarReflexPlane(shape, shapeImpl, halfA, halfB)) {
+        auto aSub =
+            halfA.GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxDepth);
+        outputs.insert(outputs.end(), aSub.begin(), aSub.end());
+        auto bSub =
+            halfB.GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxDepth);
+        outputs.insert(outputs.end(), bSub.begin(), bSub.end());
+        continue;
+      }
     }
 
     constexpr double kMergeTol = 1e-8;
@@ -616,6 +764,79 @@ std::vector<Manifold> Manifold::Impl::ConvexDecomposition(int maxDepth) const {
       }
     }
 
+    // Step 4a: Cospheric merge — group adjacent tets sharing a circumcenter
+    // (computed from unperturbed positions). This undoes the arbitrary tet
+    // assignments that DT perturbation introduces for cospheric point sets
+    // (e.g. cube vertices).
+    {
+      std::vector<vec3> circumcenters(origTets);
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        uint32_t ci0 = flatTets[4 * i], ci1 = flatTets[4 * i + 1],
+                 ci2 = flatTets[4 * i + 2], ci3 = flatTets[4 * i + 3];
+        circumcenters[i] = GetCircumCenter(origPos[ci0], origPos[ci1],
+                                           origPos[ci2], origPos[ci3]);
+      }
+
+      constexpr double ccEps = 1e-10;
+      std::vector<int> ccParent(origTets);
+      for (int i = 0; i < origTets; i++) ccParent[i] = i;
+      auto ccFind = [&](int x) -> int {
+        while (ccParent[x] != x) x = ccParent[x] = ccParent[ccParent[x]];
+        return x;
+      };
+
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        for (int n : neighbors[i]) {
+          if (n >= origTets || !valid[n]) continue;
+          if (la::length(circumcenters[i] - circumcenters[n]) < ccEps) {
+            int ri = ccFind(i), rn = ccFind(n);
+            if (ri != rn) ccParent[rn] = ri;
+          }
+        }
+      }
+
+      std::unordered_map<int, std::vector<int>> groups;
+      for (int i = 0; i < origTets; i++) {
+        if (!valid[i]) continue;
+        groups[ccFind(i)].push_back(i);
+      }
+
+      for (auto& [root, members] : groups) {
+        if (members.size() < 2) continue;
+        std::vector<vec3> combined;
+        double sumVol = 0;
+        for (int m : members) {
+          combined.insert(combined.end(), pieceVerts[m].begin(),
+                          pieceVerts[m].end());
+          sumVol += volumes[m];
+        }
+        Manifold hull = Manifold::Hull(combined);
+        if (hull.IsEmpty() || sumVol <= 0.0) continue;
+        double hullVol = hull.Volume();
+        if (hullVol > sumVol * (1.0 + kMergeTol)) continue;
+
+        pieces[root] = hull;
+        pieceVerts[root] = ExtractVertices(hull);
+        volumes[root] = hullVol;
+        for (int m : members) {
+          if (m == root) continue;
+          valid[m] = false;
+          parent[m] = root;
+          for (int nb : neighbors[m]) {
+            if (nb != root && valid[nb]) {
+              neighbors[root].insert(nb);
+              neighbors[nb].erase(m);
+              neighbors[nb].insert(root);
+            }
+          }
+          neighbors[m].clear();
+        }
+      }
+    }
+
+    // Step 4b: Priority-queue merge — biggest-first pairwise convex merges.
     struct MergeCandidate {
       double mergedVolume;
       int pieceA, pieceB;
