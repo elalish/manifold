@@ -294,6 +294,22 @@ TEST(Manifold, Cylinder) {
   EXPECT_EQ(cylinder.NumTri(), 4 * n - 4);
 }
 
+TEST(Manifold, CylinderZeroRadiusLow) {
+  // cylinder(h, 0, r) should produce a cone with apex at z=0 and base at z=h,
+  // mirroring cylinder(h, r, 0) which has base at z=0 and apex at z=h.
+  const int n = 32;
+  const double h = 5.0, r = 3.0;
+  Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n);
+  Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n);
+  EXPECT_TRUE(coneApexBottom.IsEmpty() == false);
+  EXPECT_EQ(coneApexBottom.Status(), Manifold::Error::NoError);
+  EXPECT_FLOAT_EQ(coneApexBottom.Volume(), coneApexTop.Volume());
+  auto bb = coneApexBottom.BoundingBox();
+  EXPECT_NEAR(bb.min.z, 0.0, 1e-8);
+  EXPECT_NEAR(bb.max.z, h, 1e-8);
+  EXPECT_NEAR(bb.max.x, r, 1e-3);
+}
+
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0, 3);
@@ -813,6 +829,8 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Sphere(0).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(2, -5).Status(), invalid);
+  EXPECT_EQ(Manifold::Cylinder(2, 0).Status(), invalid);
+  EXPECT_EQ(Manifold::Cylinder(2, 0, 0).Status(), invalid);
   EXPECT_EQ(Manifold::Cube(vec3(0.0)).Status(), invalid);
   EXPECT_EQ(Manifold::Cube({-1, 1, 1}).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(circ.ToPolygons(), 0.).Status(), invalid);

@@ -148,7 +148,8 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * form cones if both radii are specified.
  *
  * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be positive.
+ * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
+ * radiusHigh must be positive and a cone with apex at the bottom is created.
  * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
  * radiusLow.
  * @param circularSegments How many line segments to use around the circle.
@@ -158,8 +159,21 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
                             int circularSegments, bool center) {
-  if (height <= 0.0 || radiusLow <= 0.0) {
+  if (height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
+  }
+  if (radiusLow == 0.0) {
+    if (radiusHigh <= 0.0) {
+      return Invalid();
+    }
+    // Cone with apex at bottom: create the apex-at-top version and mirror it.
+    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, false);
+    cone = cone.Mirror(vec3(0.0, 0.0, 1.0))
+               .Translate(vec3(0.0, 0.0, height))
+               .AsOriginal();
+    if (center)
+      cone = cone.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
+    return cone;
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
