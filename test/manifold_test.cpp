@@ -295,19 +295,27 @@ TEST(Manifold, Cylinder) {
 }
 
 TEST(Manifold, CylinderZeroRadiusLow) {
-  // cylinder(h, 0, r) should produce a cone with apex at z=0 and base at z=h,
-  // mirroring cylinder(h, r, 0) which has base at z=0 and apex at z=h.
-  const int n = 32;
+  // cylinder(h, 0, r) should produce a cone with apex at z=0 and base at z=h.
+  // Use enough segments for accurate volume.
+  const int n = 256;
   const double h = 5.0, r = 3.0;
   Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n);
   Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n);
-  EXPECT_TRUE(coneApexBottom.IsEmpty() == false);
+
   EXPECT_EQ(coneApexBottom.Status(), Manifold::Error::NoError);
-  EXPECT_FLOAT_EQ(coneApexBottom.Volume(), coneApexTop.Volume());
-  auto bb = coneApexBottom.BoundingBox();
-  EXPECT_NEAR(bb.min.z, 0.0, 1e-8);
-  EXPECT_NEAR(bb.max.z, h, 1e-8);
-  EXPECT_NEAR(bb.max.x, r, 1e-3);
+  EXPECT_FALSE(coneApexBottom.IsEmpty());
+
+  // Both cones must have equal total volume.
+  const double totalVol = coneApexTop.Volume();
+  EXPECT_NEAR(coneApexBottom.Volume(), totalVol, 1e-6);
+
+  // Differentiate orientation by intersecting with the bottom half (z in
+  // [0, h/2]). A sub-cone scaled by 1/2 in all dimensions has 1/8 the volume,
+  // so apex-at-bottom gives V/8 and apex-at-top gives 7*V/8.
+  Manifold slicer = Manifold::Cube(vec3(2 * r + 1, 2 * r + 1, h / 2))
+                        .Translate(vec3(-(r + 0.5), -(r + 0.5), 0.0));
+  EXPECT_NEAR((coneApexBottom ^ slicer).Volume(), totalVol / 8.0, 0.01);
+  EXPECT_NEAR((coneApexTop ^ slicer).Volume(), 7.0 * totalVol / 8.0, 0.01);
 }
 
 TEST(Manifold, Extrude) {

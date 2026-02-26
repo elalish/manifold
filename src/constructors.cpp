@@ -166,14 +166,14 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
     if (radiusHigh <= 0.0) {
       return Invalid();
     }
-    // Cone with apex at bottom: create the apex-at-top version and mirror it.
-    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, false);
-    cone = cone.Mirror(vec3(0.0, 0.0, 1.0))
-               .Translate(vec3(0.0, 0.0, height))
-               .AsOriginal();
-    if (center)
-      cone = cone.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
-    return cone;
+    // Cone with apex at bottom: create the centered apex-at-top version and
+    // mirror it
+    Manifold cone =
+        Cylinder(height, radiusHigh, 0.0, circularSegments, true);
+    cone = cone.Mirror(vec3(0.0, 0.0, 1.0));
+    if (!center)
+      cone = cone.Translate(vec3(0.0, 0.0, height / 2.0));
+    return cone.AsOriginal();
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
