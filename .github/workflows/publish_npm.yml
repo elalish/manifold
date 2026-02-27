@@ -18,20 +18,25 @@ jobs:
         node-version: 20
         registry-url: 'https://registry.npmjs.org'
 
-    - name: Download built examples
-      uses: dawidd6/action-download-artifact@v6
-      with:
-        workflow: manifold.yml
-        workflow_conclusion: completed
-        branch: master
-        check_artifacts: true
-        name: wasm
-        path: ./bindings/wasm/
+    - name: Setup WASM build toolchain
+      run: |
+        git clone https://github.com/emscripten-core/emsdk.git
+        cd emsdk
+        ./emsdk install 3.1.64
+        ./emsdk activate 3.1.64
+
+    - name: Build WASM runtime for npm package
+      run: |
+        source ./emsdk/emsdk_env.sh
+        mkdir build
+        cd build
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_STRICT=ON -DMANIFOLD_PAR=OFF -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=OFF -DMANIFOLD_ASSERT=OFF ..
+        emmake make
 
     - name: Publish to npm
       run: |
         cd ./bindings/wasm/
-        npm install
+        npm ci
         npm publish
       env:
         NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
