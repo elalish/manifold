@@ -499,7 +499,7 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
 }
 
 /**
- * Same as Manifold::Warp but calls warpFunc with with
+ * Same as Manifold::Warp but calls warpFunc with
  * a VecView which is roughly equivalent to std::span
  * pointing to all vec3 elements to be modified in-place
  *
