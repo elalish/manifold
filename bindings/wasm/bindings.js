@@ -333,6 +333,10 @@ Module.setup = function() {
     };
   };
 
+  Module.Manifold.prototype.simplify = function(tolerance = 0) {
+    return this._Simplify(tolerance);
+  }
+
   class Mesh {
     constructor({
       numProp = 3,
