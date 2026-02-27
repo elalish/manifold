@@ -37,5 +37,5 @@ suite('Manifold Bindings', () => {
   test('Simplify supports default argument', () => {
     const manifold = manifoldModule.Manifold.sphere(1).simplify();
     expect(manifold.volume()).toBeGreaterThan(0);
-  })
-})
+  });
+});
