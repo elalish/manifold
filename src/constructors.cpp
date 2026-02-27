@@ -241,7 +241,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   scaleTop.y = std::max(scaleTop.y, 0.0);
 
   auto pImpl_ = std::make_shared<Impl>();
-  ++nDivisions;
+  int layersAboveBottom = nDivisions + 1;
   auto& vertPos = pImpl_->vertPos_;
   Vec<ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
@@ -258,8 +258,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
-  for (int i = 1; i < nDivisions + 1; ++i) {
-    double alpha = i / double(nDivisions);
+  for (int i = 1; i < layersAboveBottom + 1; ++i) {
+    double alpha = i / double(layersAboveBottom);
     double phi = alpha * twistDegrees;
     vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
     mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
@@ -270,18 +270,39 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
       for (size_t vert = 0; vert < poly.size(); ++vert) {
         size_t offset = idx + nCrossSection * i;
         size_t thisVert = vert + offset;
+        size_t thisVertLower = thisVert - nCrossSection;
         size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
-        if (i == nDivisions && isCone) {
-          triVerts.push_back(ivec3(nCrossSection * i + j,
-                                   lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
+        size_t lastVertLower = lastVert - nCrossSection;
+
+        if (i == layersAboveBottom && isCone) {
+          // The single vertex is added afterward so the index is easy to
+          // calculate.
+          triVerts.push_back(
+              ivec3(nCrossSection * i + j, lastVertLower, thisVertLower));
         } else {
           vec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back(
-              ivec3(thisVert, lastVert, thisVert - nCrossSection));
-          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
+
+          // If it's the first vertex of this level, the last one hasn't been
+          // created yet, so we can't reference an already-calculated position.
+          vec3 lastVertPos;
+          if (vert > 0) {
+            lastVertPos = vertPos[lastVert];
+          } else {
+            vec2 pos = transform * poly.back();
+            lastVertPos = {pos.x, pos.y, height * alpha};
+          }
+
+          // OpenSCAD chooses the shorter diagonal because it "works well in
+          // most cases".
+          if (la::distance2(vertPos[thisVert], vertPos[lastVertLower]) >=
+              la::distance2(lastVertPos, vertPos[thisVertLower])) {
+            triVerts.push_back(ivec3(thisVert, lastVert, thisVertLower));
+            triVerts.push_back(ivec3(lastVert, lastVertLower, thisVertLower));
+          } else {
+            triVerts.push_back(ivec3(thisVert, lastVert, lastVertLower));
+            triVerts.push_back(ivec3(thisVert, lastVertLower, thisVertLower));
+          }
         }
       }
       ++j;
@@ -295,7 +316,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
-    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+    if (!isCone) triVerts.push_back(tri + nCrossSection * layersAboveBottom);
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
