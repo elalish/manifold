@@ -153,8 +153,7 @@ if(MSVC)
   list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
 else()
   list(
-    APPEND
-    WARNING_FLAGS
+    APPEND WARNING_FLAGS
     -Wall
     -Wno-unknown-warning-option
     -Wno-unused
@@ -196,8 +195,7 @@ else()
   endif()
   if(CODE_COVERAGE)
     list(
-      APPEND
-      MANIFOLD_FLAGS
+      APPEND MANIFOLD_FLAGS
       -coverage
       -fno-inline-small-functions
       -fkeep-inline-functions
@@ -213,8 +211,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 list(
-  FIND
-  CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
+  FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
   ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
   isSystemDir
 )
@@ -295,8 +292,7 @@ set(
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 list(
-  APPEND
-  MANIFOLD_PUBLIC_HDRS
+  APPEND MANIFOLD_PUBLIC_HDRS
   ${CMAKE_CURRENT_BINARY_DIR}/include/manifold/version.h
 )
 
