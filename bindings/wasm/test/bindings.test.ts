@@ -38,4 +38,15 @@ suite('Manifold Bindings', () => {
     const manifold = manifoldModule.Manifold.sphere(1).simplify();
     expect(manifold.volume()).toBeGreaterThan(0);
   });
+
+  test('refineToTolerance does not throw (issue#1545)', () => {
+    // integer divide-by-zero crash path in WASM.
+    const sphere = manifoldModule.Manifold.sphere(1, 4).smoothOut();
+    const numTriBefore = sphere.numTri();
+    const refined = sphere.refineToTolerance(10);
+    // Tolerance too large to subdivide anything: triangle count must be unchanged,
+    // confirming the longest==0 path was exercised (not bypassed).
+    expect(refined.numTri()).toEqual(numTriBefore);
+    expect(refined.volume()).toBeGreaterThan(0);
+  });
 });
