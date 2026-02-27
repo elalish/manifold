@@ -450,6 +450,8 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Kernel02<expandP, forward> k02{a, b};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
+    // note that i is distinct on each thread, and verts contains unique
+    // elements, so this does not require atomics
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);
   };
   auto recorder = MakeSimpleRecorder(recorderf);
