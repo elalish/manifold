@@ -552,7 +552,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
             }
             const int minExtra = longest * 0.2 + 1;
             const int extra = 2 * longest + minExtra - total;
-            return extra > 0 ? (extra * (longest - thisAdded)) / longest : 0;
+            return (extra > 0 && longest > 0)
+                       ? (extra * (longest - thisAdded)) / longest
+                       : 0;
           };
 
           tmp[i] += la::max(Added(hIdx), Added(halfedge_[hIdx].pairedHalfedge));
