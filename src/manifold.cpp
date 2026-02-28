@@ -870,13 +870,17 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  *
  * @note Performance is best when using convex objects. For non-convex inputs,
  * performance scales with the product of face counts, so keep face counts low.
+ * Set decompose=true to first decompose non-convex inputs into convex pieces,
+ * enabling the fast convex-convex vertex-addition path for each piece pair.
  *
  * @param other The other manifold to minkowski sum to this one.
+ * @param decompose If true, decompose non-convex inputs into convex pieces
+ *                  before computing the sum (faster for complex shapes).
  */
-Manifold Manifold::MinkowskiSum(const Manifold& other) const {
+Manifold Manifold::MinkowskiSum(const Manifold& other, bool decompose) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
   auto bImpl = other.GetCsgLeafNode().GetImpl();
-  return aImpl->Minkowski(*bImpl, false);
+  return aImpl->Minkowski(*bImpl, false, decompose);
 }
 
 /**
@@ -956,6 +960,21 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
   impl->Hull(VecView<const vec3>(vertPos));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
+}
+
+/**
+ * Decompose this manifold into approximately convex pieces.
+ *
+ * Uses unconstrained Delaunay tetrahedralization of mesh vertices, clips each
+ * tet against the mesh, then greedily merges adjacent convex pieces by hull.
+ * No new dependencies are required.
+ *
+ * @param maxDepth Maximum recursion depth for decomposing non-convex pieces.
+ * Higher values produce more convex pieces at the cost of speed. Default is 1.
+ * @return Vector of approximately convex manifold pieces.
+ */
+std::vector<Manifold> Manifold::ConvexDecomposition(int maxDepth) const {
+  return GetCsgLeafNode().GetImpl()->ConvexDecomposition(maxDepth);
 }
 
 /**

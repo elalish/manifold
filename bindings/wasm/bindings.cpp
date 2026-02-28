@@ -173,6 +173,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Mirror", &Manifold::Mirror)
       .function("_Decompose", select_overload<std::vector<Manifold>() const>(
                                   &Manifold::Decompose))
+      .function("_ConvexDecomposition", &Manifold::ConvexDecomposition)
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
       .function("numVert", &Manifold::NumVert)

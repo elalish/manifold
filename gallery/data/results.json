@@ -1,0 +1,447 @@
+{
+  "shapes": [
+    {
+      "name": "LShape",
+      "volume": 6.0,
+      "surfaceArea": 22.0,
+      "numVerts": 12,
+      "numTris": 20,
+      "genus": 0,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "LShape_mode0.glb",
+          "pieces": 3,
+          "convex": 3,
+          "nonConvex": 0,
+          "timeMs": 2.28,
+          "volumeSum": 6.0,
+          "volumeError": 0.0,
+          "unionVolume": 6.0,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "CubeSphere",
+      "volume": 7.737905913549548,
+      "surfaceArea": 23.494768157412306,
+      "numVerts": 52,
+      "numTris": 100,
+      "genus": 0,
+      "isCurved": true,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "CubeSphere_mode0.glb",
+          "pieces": 67,
+          "convex": 67,
+          "nonConvex": 0,
+          "timeMs": 15.63,
+          "volumeSum": 7.737906,
+          "volumeError": 0.0,
+          "unionVolume": 7.737906,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "CubeSphereHole",
+      "volume": 4.7184589754605435,
+      "surfaceArea": 29.692700789730264,
+      "numVerts": 292,
+      "numTris": 600,
+      "genus": 5,
+      "isCurved": true,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "CubeSphereHole_mode0.glb",
+          "pieces": 356,
+          "convex": 356,
+          "nonConvex": 0,
+          "timeMs": 182.66,
+          "volumeSum": 4.834063,
+          "volumeError": 0.0245,
+          "unionVolume": 4.764229,
+          "unionError": 0.0097
+        }
+      ]
+    },
+    {
+      "name": "TwoSpheres",
+      "volume": 7.726649209496216,
+      "surfaceArea": 21.63699779935017,
+      "numVerts": 278,
+      "numTris": 552,
+      "genus": 0,
+      "isCurved": true,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "TwoSpheres_mode0.glb",
+          "pieces": 2,
+          "convex": 2,
+          "nonConvex": 0,
+          "timeMs": 2.12,
+          "volumeSum": 7.726649,
+          "volumeError": 0.0,
+          "unionVolume": 7.726649,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "ThreeSpheres",
+      "volume": 11.149981709640373,
+      "surfaceArea": 28.788368475803306,
+      "numVerts": 442,
+      "numTris": 880,
+      "genus": 0,
+      "isCurved": true,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "ThreeSpheres_mode0.glb",
+          "pieces": 753,
+          "convex": 753,
+          "nonConvex": 0,
+          "timeMs": 330.92,
+          "volumeSum": 11.149736,
+          "volumeError": 2.2e-05,
+          "unionVolume": 11.149736,
+          "unionError": 2.2e-05
+        }
+      ]
+    },
+    {
+      "name": "CubeCube",
+      "volume": 7.0,
+      "surfaceArea": 28.0,
+      "numVerts": 16,
+      "numTris": 28,
+      "genus": 0,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "CubeCube_mode0.glb",
+          "pieces": 5,
+          "convex": 5,
+          "nonConvex": 0,
+          "timeMs": 5.38,
+          "volumeSum": 7.0,
+          "volumeError": 0.0,
+          "unionVolume": 7.0,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "FlatSlab",
+      "volume": 319.2,
+      "surfaceArea": 1012.0,
+      "numVerts": 200,
+      "numTris": 492,
+      "genus": 24,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "FlatSlab_mode0.glb",
+          "pieces": 56,
+          "convex": 56,
+          "nonConvex": 0,
+          "timeMs": 75.95,
+          "volumeSum": 319.2,
+          "volumeError": 0.0,
+          "unionVolume": 319.2,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "ThinBeam",
+      "volume": 20.0,
+      "surfaceArea": 84.0,
+      "numVerts": 16,
+      "numTris": 24,
+      "genus": -1,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "ThinBeam_mode0.glb",
+          "pieces": 2,
+          "convex": 2,
+          "nonConvex": 0,
+          "timeMs": 0.03,
+          "volumeSum": 20.0,
+          "volumeError": 0.0,
+          "unionVolume": 20.0,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "ThinWedge",
+      "volume": 23.96009950310328,
+      "surfaceArea": 56.0399004968967,
+      "numVerts": 8,
+      "numTris": 12,
+      "genus": 0,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "ThinWedge_mode0.glb",
+          "pieces": 1,
+          "convex": 1,
+          "nonConvex": 0,
+          "timeMs": 0.01,
+          "volumeSum": 23.9601,
+          "volumeError": 0.0,
+          "unionVolume": 23.9601,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "ThinFin",
+      "volume": 4.1000000000000005,
+      "surfaceArea": 85.6,
+      "numVerts": 16,
+      "numTris": 28,
+      "genus": 0,
+      "isCurved": false,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "ThinFin_mode0.glb",
+          "pieces": 3,
+          "convex": 3,
+          "nonConvex": 0,
+          "timeMs": 2.44,
+          "volumeSum": 4.1,
+          "volumeError": 0.0,
+          "unionVolume": 4.1,
+          "unionError": 0.0
+        }
+      ]
+    },
+    {
+      "name": "HighAspectCylinder",
+      "volume": 46.58742811845374,
+      "surfaceArea": 106.40217256335814,
+      "numVerts": 96,
+      "numTris": 184,
+      "genus": -1,
+      "isCurved": true,
+      "modes": [
+        {
+          "mode": 0,
+          "modeName": "DT",
+          "glbFile": "HighAspectCylinder_mode0.glb",
+          "pieces": 2,
+          "convex": 2,
+          "nonConvex": 0,
+          "timeMs": 0.19,
+          "volumeSum": 46.587428,
+          "volumeError": 0.0,
+          "unionVolume": 46.587428,
+          "unionError": 0.0
+        }
+      ]
+    }
+  ],
+  "minkowski": [
+    {
+      "name": "LShape_sphere",
+      "shapeVolume": 6.0,
+      "kernelVolume": 0.003577,
+      "shapeGenus": 0,
+      "noDecompose": {
+        "volume": 8.378228,
+        "genus": 0,
+        "numVerts": 122,
+        "numTris": 240,
+        "glbFile": "LShape_sphere_mink_nodec.glb",
+        "timeMs": 28.4,
+        "simplified": {
+          "volume": 8.378228,
+          "genus": 0,
+          "numVerts": 108,
+          "numTris": 212,
+          "glbFile": "LShape_sphere_mink_nodec_simp.glb"
+        }
+      },
+      "withDecompose": {
+        "volume": 8.378228,
+        "genus": 0,
+        "numVerts": 108,
+        "numTris": 212,
+        "glbFile": "LShape_sphere_mink_dec.glb",
+        "timeMs": 7.68,
+        "simplified": {
+          "volume": 8.378228,
+          "genus": 0,
+          "numVerts": 108,
+          "numTris": 212,
+          "glbFile": "LShape_sphere_mink_dec_simp.glb"
+        }
+      }
+    },
+    {
+      "name": "Cube_sphere",
+      "shapeVolume": 8.0,
+      "kernelVolume": 0.003577,
+      "shapeGenus": 0,
+      "noDecompose": {
+        "volume": 10.583577,
+        "genus": 0,
+        "numVerts": 80,
+        "numTris": 156,
+        "glbFile": "Cube_sphere_mink_nodec.glb",
+        "timeMs": 0.4,
+        "simplified": {
+          "volume": 10.583577,
+          "genus": 0,
+          "numVerts": 80,
+          "numTris": 156,
+          "glbFile": "Cube_sphere_mink_nodec_simp.glb"
+        }
+      },
+      "withDecompose": {
+        "volume": 10.583577,
+        "genus": 0,
+        "numVerts": 80,
+        "numTris": 156,
+        "glbFile": "Cube_sphere_mink_dec.glb",
+        "timeMs": 0.34,
+        "simplified": {
+          "volume": 10.583577,
+          "genus": 0,
+          "numVerts": 80,
+          "numTris": 156,
+          "glbFile": "Cube_sphere_mink_dec_simp.glb"
+        }
+      }
+    },
+    {
+      "name": "CubeSphereHole_sphere",
+      "shapeVolume": 4.718459,
+      "kernelVolume": 0.003577,
+      "shapeGenus": 5,
+      "noDecompose": {
+        "volume": 7.941525,
+        "genus": 5,
+        "numVerts": 1866,
+        "numTris": 3748,
+        "glbFile": "CubeSphereHole_sphere_mink_nodec.glb",
+        "timeMs": 700.87,
+        "simplified": {
+          "volume": 7.941525,
+          "genus": 5,
+          "numVerts": 1432,
+          "numTris": 2880,
+          "glbFile": "CubeSphereHole_sphere_mink_nodec_simp.glb"
+        }
+      },
+      "withDecompose": {
+        "volume": 7.988553,
+        "genus": 5,
+        "numVerts": 1778,
+        "numTris": 3572,
+        "glbFile": "CubeSphereHole_sphere_mink_dec.glb",
+        "timeMs": 687.13,
+        "simplified": {
+          "volume": 7.988553,
+          "genus": 5,
+          "numVerts": 1652,
+          "numTris": 3320,
+          "glbFile": "CubeSphereHole_sphere_mink_dec_simp.glb"
+        }
+      }
+    },
+    {
+      "name": "TetTet_self",
+      "shapeVolume": 9.0,
+      "kernelVolume": 9.0,
+      "shapeGenus": 0,
+      "noDecompose": {
+        "volume": 72.0,
+        "genus": 0,
+        "numVerts": 4,
+        "numTris": 4,
+        "glbFile": "TetTet_self_mink_nodec.glb",
+        "timeMs": 0.12,
+        "simplified": {
+          "volume": 72.0,
+          "genus": 0,
+          "numVerts": 4,
+          "numTris": 4,
+          "glbFile": "TetTet_self_mink_nodec_simp.glb"
+        }
+      },
+      "withDecompose": {
+        "volume": 72.0,
+        "genus": 0,
+        "numVerts": 4,
+        "numTris": 4,
+        "glbFile": "TetTet_self_mink_dec.glb",
+        "timeMs": 0.05,
+        "simplified": {
+          "volume": 72.0,
+          "genus": 0,
+          "numVerts": 4,
+          "numTris": 4,
+          "glbFile": "TetTet_self_mink_dec_simp.glb"
+        }
+      }
+    }
+  ],
+  "cgal": [
+    {
+      "name": "LShape",
+      "pieces": 2,
+      "timeMs": 16
+    },
+    {
+      "name": "CubeSphere",
+      "pieces": 71,
+      "timeMs": 481
+    },
+    {
+      "name": "TwoSpheres",
+      "pieces": 57,
+      "timeMs": 2583
+    },
+    {
+      "name": "ThreeSpheres",
+      "pieces": 235,
+      "timeMs": 7310
+    },
+    {
+      "name": "CubeCube",
+      "pieces": 5,
+      "timeMs": 28
+    },
+    {
+      "name": "FlatSlab",
+      "pieces": -1,
+      "timeMs": -1,
+      "error": "CRASH (assertion failure in SM_walls.h)"
+    }
+  ]
+}
