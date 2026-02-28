@@ -521,7 +521,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
 
-  if (ManifoldParams().verbose) {
+  if (ManifoldParams().verbose >= 2) {
     intersections.Print("Intersections");
   }
 #endif

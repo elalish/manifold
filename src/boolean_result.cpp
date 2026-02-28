@@ -882,7 +882,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
 #ifdef MANIFOLD_DEBUG
   sort.Stop();
-  if (ManifoldParams().verbose) {
+  if (ManifoldParams().verbose >= 2) {
     assemble.Print("Assembly");
     triangulate.Print("Triangulation");
     simplify.Print("Simplification");
