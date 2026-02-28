@@ -279,7 +279,7 @@ struct DualTraversal {
         Box bb1 = std::get<2>(toCheck[i]);
         Box bb2 = std::get<3>(toCheck[i]);
 #if MANIFOLD_PAR == 1
-        if (splitDepth < 5 && toCheckLength > 1)
+        if (splitDepth < 9 && toCheckLength > 1)
           group.run([n1, n2, bb1, bb2, splitDepth, this]() {
             check(n1, n2, bb1, bb2, recorder.local(), splitDepth + 1);
           });
@@ -396,7 +396,7 @@ class Collider {
                     nodeBBox_.size() > kSeqThreshold &&
                             collider2.nodeBBox_.size() > kSeqThreshold
                         ? 0
-                        : 7);
+                        : 20);
 #if MANIFOLD_PAR == 1
     traversal.group.wait();
 #endif
