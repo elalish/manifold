@@ -41,11 +41,12 @@ void print_usage() {
   printf("  -e: Export OBJ models of samples\n");
   printf("  -c: Enable self-intersection checks (needs MANIFOLD_DEBUG)\n");
   printf(
-      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
-      "flag)\n");
+      "  -v: Enable Boolean debug dumps (only works if compiled with "
+      "MANIFOLD_DEBUG flag)\n");
   printf(
-      "  -vv: Enable extra verbose output for triangulator (only works if "
-      "compiled with MANIFOLD_DEBUG flag)\n");
+      "  -vv: Enable Boolean stats and extra triangulator output (only works "
+      "if compiled with MANIFOLD_DEBUG "
+      "flag)\n");
 }
 
 int main(int argc, char** argv) {

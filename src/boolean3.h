@@ -17,7 +17,7 @@
 
 #ifdef MANIFOLD_DEBUG
 #define PRINT(msg) \
-  if (ManifoldParams().verbose > 0) std::cout << msg << std::endl;
+  if (ManifoldParams().verbose >= 2) std::cout << msg << std::endl;
 #else
 #define PRINT(msg)
 #endif

@@ -276,7 +276,7 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   });
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+  if (ManifoldParams().verbose >= 2 && numFlagged > 0) {
     std::cout << "collapsed " << numFlagged << " short edges" << std::endl;
   }
 #endif
@@ -306,7 +306,7 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+    if (ManifoldParams().verbose >= 2 && numFlagged > 0) {
       std::cout << "collapsed " << numFlagged << " colinear edges" << std::endl;
     }
 #endif
@@ -337,7 +337,7 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   });
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose > 0 && numFlagged > 0) {
+  if (ManifoldParams().verbose >= 2 && numFlagged > 0) {
     std::cout << "swapped " << numFlagged << " edges" << std::endl;
   }
 #endif
@@ -962,7 +962,7 @@ void Manifold::Impl::DedupeEdges() {
     if (numFlagged == 0) break;
 
 #ifdef MANIFOLD_DEBUG
-    if (ManifoldParams().verbose > 0) {
+    if (ManifoldParams().verbose >= 2) {
       std::cout << "found " << numFlagged << " duplicate edges to split"
                 << std::endl;
     }
