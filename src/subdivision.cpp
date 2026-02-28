@@ -552,6 +552,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
             }
             const int minExtra = longest * 0.2 + 1;
             const int extra = 2 * longest + minExtra - total;
+            if (longest == 0) return 0;
             return extra > 0 ? (extra * (longest - thisAdded)) / longest : 0;
           };
 

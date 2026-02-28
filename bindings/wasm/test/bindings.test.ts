@@ -38,4 +38,19 @@ suite('Manifold Bindings', () => {
     const manifold = manifoldModule.Manifold.sphere(1).simplify();
     expect(manifold.volume()).toBeGreaterThan(0);
   });
+
+  test('refineToTolerance does not throw (issue #1545)', () => {
+    // Reproduces the original failing geometry from issue #1545: a flat-faced
+    // mesh with normals set via calculateNormals + smoothByNormals. On flat
+    // faces, tangents are parallel to the edges so d == 0 exactly, making
+    // edgeDivisions return 0 for *any* tolerance. This triggers longest == 0 in
+    // the keepInterior block — the integer divide-by-zero that traps in WASM.
+    const cube =
+        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(0, 30);
+    const smooth =
+        manifoldModule.Manifold.ofMesh(cube.getMesh(0)).smoothByNormals(0);
+    // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
+    const refined = smooth.refineToTolerance(0.1);
+    expect(refined.volume()).toBeGreaterThan(0);
+  });
 });
