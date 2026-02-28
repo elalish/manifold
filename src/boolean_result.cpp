@@ -64,17 +64,14 @@ struct DuplicateVerts {
   }
 };
 
-template <bool atomic>
 struct CountVerts {
   VecView<Halfedge> halfedges;
   VecView<int> count;
   VecView<const int> inclusion;
 
   void operator()(size_t i) {
-    if (atomic)
-      AtomicAdd(count[i / 3], std::abs(inclusion[halfedges[i].startVert]));
-    else
-      count[i / 3] += std::abs(inclusion[halfedges[i].startVert]);
+    for (size_t j : {0, 1, 2})
+      count[i] += std::abs(inclusion[halfedges[3 * i + j].startVert]);
   }
 };
 
@@ -117,17 +114,11 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
-  if (inP.halfedge_.size() >= 1e5) {
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<true>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<true>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  } else {
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<false>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<false>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  }
+  auto policy = autoPolicy(inP.halfedge_.size());
+  for_each(policy, countAt(0_uz), countAt(inP.halfedge_.size() / 3),
+           CountVerts({inP.halfedge_, sidesPerFaceP, i03}));
+  for_each(policy, countAt(0_uz), countAt(inQ.halfedge_.size() / 3),
+           CountVerts({inQ.halfedge_, sidesPerFaceQ, i30}));
 
   if (i12.size() >= 1e5) {
     for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(),

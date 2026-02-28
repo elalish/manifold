@@ -168,10 +168,11 @@ struct FindCollision {
 
   using Local = typename Recorder::Local;
 
-  inline int RecordCollision(int node, const int queryIdx, Local& local) {
+  inline int RecordCollision(std::invoke_result_t<F, const int> query, int node,
+                             const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
     if (hasTransform) box = box.Transform(transform);
-    bool overlaps = box.DoesOverlap(f(queryIdx));
+    bool overlaps = box.DoesOverlap(query);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
@@ -182,6 +183,13 @@ struct FindCollision {
   }
 
   void operator()(const int queryIdx) {
+    auto query = f(queryIdx);
+
+    // early exit for empty boxes
+    if constexpr (std::is_same_v<std::remove_cv_t<decltype(query)>, Box>) {
+      if (query.min.x == std::numeric_limits<double>::infinity()) return;
+    }
+
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
@@ -194,8 +202,8 @@ struct FindCollision {
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
 
-      int traverse1 = RecordCollision(child1, queryIdx, local);
-      int traverse2 = RecordCollision(child2, queryIdx, local);
+      int traverse1 = RecordCollision(query, child1, queryIdx, local);
+      int traverse2 = RecordCollision(query, child2, queryIdx, local);
 
       if (!traverse1 && !traverse2) {
         if (top < 0) break;   // done
