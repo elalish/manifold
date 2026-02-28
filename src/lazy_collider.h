@@ -61,6 +61,13 @@ class LazyCollider {
     built.collider->Collisions<false>(recorder, built.transform, args...);
   }
 
+  template<typename Recorder>
+  void DualTraversal(Recorder& recorder, const LazyCollider& other) const {
+    const Built& built = EnsureBuilt();
+    const Built& built2 = other.EnsureBuilt();
+    built.collider->DualTraversal(recorder, built.transform, *built2.collider, built2.transform);
+  }
+
   static bool IsAxisAligned(const mat3x4& transform);
 
  private:

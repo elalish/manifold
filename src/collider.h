@@ -184,12 +184,6 @@ struct FindCollision {
 
   void operator()(const int queryIdx) {
     auto query = f(queryIdx);
-
-    // early exit for empty boxes
-    if constexpr (std::is_same_v<std::remove_cv_t<decltype(query)>, Box>) {
-      if (query.min.x == std::numeric_limits<double>::infinity()) return;
-    }
-
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
@@ -213,6 +207,85 @@ struct FindCollision {
         if (traverse1 && traverse2) {
           stack[++top] = child2;  // save the other for later
         }
+      }
+    }
+  }
+};
+
+template <typename Recorder>
+struct DualTraversal {
+  using Local = typename Recorder::Local;
+
+  VecView<const Box> nodeBBox1;
+  VecView<const std::pair<int, int>> internalChildren1;
+  const std::optional<mat3x4>& transform1;
+
+  VecView<const Box> nodeBBox2;
+  VecView<const std::pair<int, int>> internalChildren2;
+  const std::optional<mat3x4>& transform2;
+
+  Recorder& recorder;
+
+#if MANIFOLD_PAR == 1
+  tbb::task_group group;
+#endif
+
+  void populateChildren(bool isCollider1, int node, Box b,
+                        std::array<std::pair<int, Box>, 2>& children,
+                        int& length) const {
+    if (IsLeaf(node)) {
+      children[length++] = std::make_pair(node, b);
+    } else {
+      int internal = Node2Internal(node);
+      const VecView<const Box>& nodeBBox = isCollider1 ? nodeBBox1 : nodeBBox2;
+      const VecView<const std::pair<int, int>>& internalChildren =
+          isCollider1 ? internalChildren1 : internalChildren2;
+      const std::optional<mat3x4>& transform =
+          isCollider1 ? transform1 : transform2;
+      auto [child1, child2] = internalChildren[internal];
+      for (int c : {child1, child2}) {
+        Box bb = nodeBBox[c];
+        if (transform) bb = bb.Transform(transform.value());
+        children[length++] = std::make_pair(c, bb);
+      }
+    }
+  }
+
+  void check(int node1, int node2, Box b1, Box b2, Local& local,
+             int splitDepth = 0) {
+    if (IsLeaf(node1) && IsLeaf(node2)) {
+      recorder.record(Node2Leaf(node1), Node2Leaf(node2), b1, b2, local);
+    } else {
+      std::array<std::pair<int, Box>, 2> children1;
+      std::array<std::pair<int, Box>, 2> children2;
+      std::array<std::tuple<int, int, Box, Box>, 4> toCheck;
+      int children1Length = 0;
+      int children2Length = 0;
+      int toCheckLength = 0;
+
+      populateChildren(true, node1, b1, children1, children1Length);
+      populateChildren(false, node2, b2, children2, children2Length);
+      for (int i = 0; i < children1Length; i++) {
+        for (int j = 0; j < children2Length; j++) {
+          auto [c1, bb1] = children1[i];
+          auto [c2, bb2] = children2[j];
+          if (bb1.DoesOverlap(bb2))
+            toCheck[toCheckLength++] = std::make_tuple(c1, c2, bb1, bb2);
+        }
+      }
+      for (int i = 0; i < toCheckLength; i++) {
+        int n1 = std::get<0>(toCheck[i]);
+        int n2 = std::get<1>(toCheck[i]);
+        Box bb1 = std::get<2>(toCheck[i]);
+        Box bb2 = std::get<3>(toCheck[i]);
+#if MANIFOLD_PAR == 1
+        if (splitDepth < 9 && toCheckLength > 1)
+          group.run([n1, n2, bb1, bb2, splitDepth, this]() {
+            check(n1, n2, bb1, bb2, recorder.local(), splitDepth + 1);
+          });
+        else
+#endif
+          check(n1, n2, bb1, bb2, local, splitDepth);
       }
     }
   }
@@ -297,6 +370,36 @@ class Collider {
     for_each_n(autoPolicy(NumInternal(), 1e3), countAt(0), NumLeaves(),
                collider_internal::BuildInternalBoxes(
                    {nodeBBox_, counter, nodeParent_, internalChildren_}));
+  }
+
+  template <typename Recorder>
+  void DualTraversal(Recorder& recorder,
+                     const std::optional<mat3x4>& transform1,
+                     const Collider& collider2,
+                     const std::optional<mat3x4>& transform2) const {
+    using collider_internal::DualTraversal;
+    using collider_internal::kRoot;
+    if (internalChildren_.empty() || collider2.internalChildren_.empty())
+      return;
+    DualTraversal<Recorder> traversal{nodeBBox_,
+                                      internalChildren_,
+                                      transform1,
+                                      collider2.nodeBBox_,
+                                      collider2.internalChildren_,
+                                      transform2,
+                                      recorder};
+    Box b1 = nodeBBox_[kRoot];
+    Box b2 = collider2.nodeBBox_[kRoot];
+    if (transform1) b1 = b1.Transform(transform1.value());
+    if (transform2) b2 = b2.Transform(transform2.value());
+    traversal.check(kRoot, kRoot, b1, b2, recorder.local(),
+                    nodeBBox_.size() > kSeqThreshold &&
+                            collider2.nodeBBox_.size() > kSeqThreshold
+                        ? 0
+                        : 20);
+#if MANIFOLD_PAR == 1
+    traversal.group.wait();
+#endif
   }
 
   template <const bool selfCollision = false, typename F, typename Recorder>

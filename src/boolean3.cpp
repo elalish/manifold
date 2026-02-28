@@ -297,107 +297,132 @@ struct Kernel12 {
   }
 };
 
-template <bool expandP, bool forward>
-struct Kernel12Recorder {
-  using Local = Intersections;
-  Kernel12<expandP, forward>& k12;
+template <bool expandP>
+struct DualTraversalRecorder {
+  using Local = std::array<Intersections, 2>;
+
+  const Manifold::Impl& inP;
+  const Manifold::Impl& inQ;
+  Kernel11<expandP> k11;
+  Kernel02<expandP, true> k02;
+  Kernel12<expandP, true> k12;
+  Kernel02<expandP, false> k20;
+  Kernel12<expandP, false> k21;
 
 #if MANIFOLD_PAR == 1
-  tbb::combinable<Intersections> store;
+  tbb::combinable<Local> store;
   Local& local() { return store.local(); }
 #else
-  Intersections localStore;
+  Local localStore;
   Local& local() { return localStore; }
 #endif
 
-  void record(int queryIdx, int leafIdx, Local& tmp) {
-    const auto [x12, v12] = k12(queryIdx, leafIdx);
-    if (std::isfinite(v12[0])) {
-      if (forward)
-        tmp.p1q2.push_back({queryIdx, leafIdx});
-      else
-        tmp.p1q2.push_back({leafIdx, queryIdx});
-      tmp.x12.push_back(x12);
-      tmp.v12.push_back(v12);
+  DualTraversalRecorder(const Manifold::Impl& inP, const Manifold::Impl& inQ)
+      : inP(inP),
+        inQ(inQ),
+        k11{inP, inQ},
+        k02{inP, inQ},
+        k12{inP, inQ, k02, k11},
+        k20{inQ, inP},
+        k21{inQ, inP, k20, k11} {}
+
+  void record(int fp, int fq, Box bp, Box bq, Local& local) {
+    Intersections& i12 = local[0];
+    Intersections& i21 = local[1];
+    for (int i = 0; i < 3; i++) {
+      const int ep = 3 * fp + i;
+      if (inP.halfedge_[ep].IsForward()) {
+        Box b = Box(inP.vertPos_[inP.halfedge_[ep].startVert],
+                    inP.vertPos_[inP.halfedge_[ep].endVert]);
+        if (b.DoesOverlap(bq)) {
+          const auto [x12, v12] = k12(ep, fq);
+          if (std::isfinite(v12[0])) {
+            i12.p1q2.push_back({ep, fq});
+            i12.x12.push_back(x12);
+            i12.v12.push_back(v12);
+          }
+        }
+      }
+
+      const int eq = 3 * fq + i;
+      if (inQ.halfedge_[eq].IsForward()) {
+        Box b = Box(inQ.vertPos_[inQ.halfedge_[eq].startVert],
+                    inQ.vertPos_[inQ.halfedge_[eq].endVert]);
+        if (b.DoesOverlap(bp)) {
+          const auto [x21, v21] = k21(eq, fp);
+          if (std::isfinite(v21[0])) {
+            i21.p1q2.push_back({fp, eq});
+            i21.x12.push_back(x21);
+            i21.v12.push_back(v21);
+          }
+        }
+      }
     }
   }
 
-  Intersections get() {
+  Local get() {
 #if MANIFOLD_PAR == 1
-    Intersections result;
-    std::vector<Intersections> tmps;
-    store.combine_each(
-        [&](Intersections& data) { tmps.emplace_back(std::move(data)); });
-    std::vector<size_t> sizes;
-    size_t total_size = 0;
+    Local result;
+    std::vector<Local> tmps;
+    store.combine_each([&](auto& data) { tmps.emplace_back(std::move(data)); });
+    std::vector<std::array<size_t, 2>> sizes;
+    std::array<size_t, 2> totalSizes = {0, 0};
     for (const auto& tmp : tmps) {
-      sizes.push_back(total_size);
-      total_size += tmp.x12.size();
+      sizes.push_back(totalSizes);
+      for (int i : {0, 1}) totalSizes[i] += tmp[i].x12.size();
     }
-    result.p1q2.resize(total_size);
-    result.x12.resize(total_size);
-    result.v12.resize(total_size);
-    for_each_n(ExecutionPolicy::Seq, countAt(0), tmps.size(), [&](size_t i) {
-      std::copy(tmps[i].p1q2.begin(), tmps[i].p1q2.end(),
-                result.p1q2.begin() + sizes[i]);
-      std::copy(tmps[i].x12.begin(), tmps[i].x12.end(),
-                result.x12.begin() + sizes[i]);
-      std::copy(tmps[i].v12.begin(), tmps[i].v12.end(),
-                result.v12.begin() + sizes[i]);
+    for (int i : {0, 1}) {
+      result[i].p1q2.resize_nofill(totalSizes[i]);
+      result[i].x12.resize_nofill(totalSizes[i]);
+      result[i].v12.resize_nofill(totalSizes[i]);
+    }
+    for_each_n(ExecutionPolicy::Par, countAt(0), tmps.size(), [&](size_t i) {
+      for (size_t j : {0, 1}) {
+        std::copy(tmps[i][j].p1q2.begin(), tmps[i][j].p1q2.end(),
+                  result[j].p1q2.begin() + sizes[i][j]);
+        std::copy(tmps[i][j].x12.begin(), tmps[i][j].x12.end(),
+                  result[j].x12.begin() + sizes[i][j]);
+        std::copy(tmps[i][j].v12.begin(), tmps[i][j].v12.end(),
+                  result[j].v12.begin() + sizes[i][j]);
+      }
     });
-    return result;
 #else
-    return localStore;
+    Local result = std::move(localStore);
 #endif
+
+    // sort p1q2
+    for (size_t index : {0, 1}) {
+      auto& p1q2 = result[index].p1q2;
+      Vec<size_t> i12(p1q2.size());
+      sequence(i12.begin(), i12.end());
+      stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
+        return p1q2[a][index] < p1q2[b][index] ||
+               (p1q2[a][index] == p1q2[b][index] &&
+                p1q2[a][1 - index] < p1q2[b][1 - index]);
+      });
+      Permute(result[index].p1q2, i12);
+      Permute(result[index].x12, i12);
+      Permute(result[index].v12, i12);
+    }
+
+    return result;
   }
 };
 
-template <bool expandP, bool forward>
-Intersections Intersect12_(const Manifold::Impl& inP,
-                           const Manifold::Impl& inQ) {
+template <bool expandP>
+std::pair<Intersections, Intersections> Intersect(const Manifold::Impl& inP,
+                                                  const Manifold::Impl& inQ) {
   ZoneScoped;
-  // a: 1 (edge), b: 2 (face)
-  const Manifold::Impl& a = forward ? inP : inQ;
-  const Manifold::Impl& b = forward ? inQ : inP;
+  DualTraversalRecorder<expandP> recorder(inP, inQ);
+  inP.collider_->DualTraversal(recorder, *inQ.collider_);
+  auto results = recorder.get();
+  return std::make_pair(std::move(results[0]), std::move(results[1]));
+}
 
-  Kernel02<expandP, forward> k02{a, b};
-  Kernel11<expandP> k11{inP, inQ};
-
-  Kernel12<expandP, forward> k12{a, b, k02, k11};
-  Kernel12Recorder<expandP, forward> recorder{k12, {}};
-  auto f = [&a](int i) {
-    return a.halfedge_[i].IsForward()
-               ? Box(a.vertPos_[a.halfedge_[i].startVert],
-                     a.vertPos_[a.halfedge_[i].endVert])
-               : Box();
-  };
-  b.collider_->Collisions<false>(recorder, f, a.halfedge_.size());
-
-  Intersections result = recorder.get();
-  auto& p1q2 = result.p1q2;
-  // sort p1q2 according to edges
-  Vec<size_t> i12(p1q2.size());
-  sequence(i12.begin(), i12.end());
-
-  int index = forward ? 0 : 1;
-  stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
-    return p1q2[a][index] < p1q2[b][index] ||
-           (p1q2[a][index] == p1q2[b][index] &&
-            p1q2[a][1 - index] < p1q2[b][1 - index]);
-  });
-  Permute(p1q2, i12);
-  Permute(result.x12, i12);
-  Permute(result.v12, i12);
-  return result;
-};
-
-template <bool forward>
-Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                          bool expandP) {
-  if (expandP)
-    return Intersect12_<true, forward>(inP, inQ);
-  else
-    return Intersect12_<false, forward>(inP, inQ);
+std::pair<Intersections, Intersections> Intersect(const Manifold::Impl& inP,
+                                                  const Manifold::Impl& inQ,
+                                                  bool expandP) {
+  return expandP ? Intersect<true>(inP, inQ) : Intersect<false>(inP, inQ);
 }
 
 template <bool expandP, bool forward>
@@ -507,8 +532,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  xv12_ = Intersect12<true>(inP, inQ, expandP_);
-  xv21_ = Intersect12<false>(inP, inQ, expandP_);
+  std::tie(xv12_, xv21_) = Intersect(inP, inQ, expandP_);
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
