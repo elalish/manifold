@@ -31,7 +31,7 @@ jobs:
     - name: Publish to npm
       run: |
         cd ./bindings/wasm/
-        npm install
+        npm ci
         npm publish
       env:
         NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

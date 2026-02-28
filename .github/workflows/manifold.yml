@@ -179,8 +179,16 @@ jobs:
       uses: actions/upload-artifact@v4
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
-        name: wasm
+        name: wasmpublic
         path: bindings/wasm/public/
+        retention-days: 90
+        overwrite: true
+    - name: Upload complete wasm build.
+      uses: actions/upload-artifact@v4
+      if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
+      with:
+        name: wasm
+        path: bindings/wasm/
         retention-days: 90
         overwrite: true
 
