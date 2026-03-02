@@ -307,6 +307,7 @@ async function createEditor() {
   editor = monaco.editor.create(document.getElementById('editor'), {
     language: 'typescript',
     automaticLayout: true,
+    minimap: {enabled: false},
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -333,16 +334,24 @@ async function createEditor() {
   }
 
   // Initialize auto typing on monaco editor.
+  const typeIndicator = document.getElementById('type-indicator');
   self.window.typecache = new LocalStorageCache();
+
   const autoTypings = await AutoTypings.create(editor, {
     sourceCache: self.window.typecache,
-    onError: e => {console.error(e)},
-    onUpdate: (update, text) => {console.debug(text)},
+    onError: e => {
+      console.error(e);
+      if (typeIndicator) typeIndicator.textContent = '';
+    },
+    onUpdate: (update, text) => {
+      if (typeIndicator) typeIndicator.textContent = 'Fetching types...';
+      console.debug(text);
+    },
     onUpdateVersions: (versions) => {
-      console.debug(versions)
+      if (typeIndicator) typeIndicator.textContent = '';
+      console.debug(versions);
     }
   });
-
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
@@ -609,7 +618,7 @@ runButton.onclick = function() {
   }
 };
 
-function clickSave(saveButton, filename, outputName) {
+function clickSave(saveButton, extension, outputName) {
   const container = saveButton.parentElement;
   return () => {
     const oldSave = saveContainer.firstElementChild;
@@ -619,14 +628,17 @@ function clickSave(saveButton, filename, outputName) {
       container.appendChild(saveArrow.parentElement);
     }
     const link = document.createElement('a');
-    link.download = filename;
+
+    const scriptName = currentFileElement.textContent.trim() || 'manifold';
+    link.download = `${scriptName}.${extension}`;
+
     link.href = output[outputName];
     link.click();
   };
 }
 
 const glbButton = document.querySelector('#glb');
-glbButton.onclick = clickSave(glbButton, 'manifold.glb', 'glbURL');
+glbButton.onclick = clickSave(glbButton, 'glb', 'glbURL');
 
 const threemfButton = document.querySelector('#threemf');
-threemfButton.onclick = clickSave(threemfButton, 'manifold.3mf', 'threeMFURL');
+threemfButton.onclick = clickSave(threemfButton, '3mf', 'threeMFURL');
