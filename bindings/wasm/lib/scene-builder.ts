@@ -68,6 +68,34 @@ function log(...args: any[]) {
   }
 }
 
+function formatLength(mm: number): string {
+  if (Math.abs(mm) >= 10000) {
+    return `${
+        (mm / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} m`;
+  }
+  return `${mm.toLocaleString(undefined, {maximumFractionDigits: 2})} mm`;
+}
+
+function formatArea(mm2: number): string {
+  const cm2 = mm2 / 100;
+  if (Math.abs(cm2) >= 10000) {
+    return `${(cm2 / 10000).toLocaleString(undefined, {
+      maximumFractionDigits: 2
+    })} m^2`;
+  }
+  return `${cm2.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^2`;
+}
+
+function formatVolume(mm3: number): string {
+  const cm3 = mm3 / 1000;
+  if (Math.abs(cm3) >= 1_000_000) {
+    return `${(cm3 / 1_000_000).toLocaleString(undefined, {
+      maximumFractionDigits: 2
+    })} m^3`;
+  }
+  return `${cm3.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^3`;
+}
+
 function applyTransformation(
     doc: Document, sourceNode: BaseGLTFNode, targetNode: Node) {
   // Animation Motion
@@ -101,13 +129,12 @@ function writeManifold(
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
-    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+    size[i] = box.max[i] - box.min[i];
   }
-  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
-      size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
+  log(`  Bounding Box: X = ${formatLength(size[0])}, Y = ${
+      formatLength(size[1])}, Z = ${formatLength(size[2])}`);
   log(`  Genus: ${manifold.genus().toLocaleString()}`);
-  const volume = Math.round(manifold.volume() / 10);
-  log(`  Volume: ${(volume / 100).toLocaleString()} cm^3`);
+  log(`  Volume: ${formatVolume(manifold.volume())}`);
 
   // Material
   const id2properties = new Map<number, Properties>();
@@ -156,12 +183,11 @@ function writeCrossSection(
   const box = cs.bounds();
   const size = [0, 0];
   for (let i = 0; i < 2; i++) {
-    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+    size[i] = box.max[i] - box.min[i];
   }
-  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
-      size[1].toLocaleString()} mm`);
-  const area = Math.round(cs.area());
-  log(`  Area: ${(area / 100).toLocaleString()} cm^2`);
+  log(`  Bounding Box: X = ${formatLength(size[0])}, Y = ${
+      formatLength(size[1])}`);
+  log(`  Area: ${formatArea(cs.area())}`);
 
   // Material.
   const id2properties = new Map<number, Properties>();
