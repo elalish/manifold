@@ -131,15 +131,15 @@ ManifoldTriangulation* to_c(std::vector<ivec3>* m) {
   return reinterpret_cast<ManifoldTriangulation*>(m);
 }
 
-const manifold::Manifold* from_c(ManifoldManifold* m) {
-  return reinterpret_cast<manifold::Manifold const*>(m);
+manifold::Manifold* from_c(ManifoldManifold* m) {
+  return reinterpret_cast<manifold::Manifold*>(m);
 }
 
 ManifoldVec* from_c(ManifoldManifoldVec* ms) {
   return reinterpret_cast<ManifoldVec*>(ms);
 }
 
-const manifold::CrossSection* from_c(ManifoldCrossSection* cs) {
+manifold::CrossSection* from_c(ManifoldCrossSection* cs) {
   return reinterpret_cast<manifold::CrossSection*>(cs);
 }
 
@@ -147,20 +147,20 @@ CrossSectionVec* from_c(ManifoldCrossSectionVec* csv) {
   return reinterpret_cast<CrossSectionVec*>(csv);
 }
 
-const manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m) {
-  return reinterpret_cast<manifold::SimplePolygon const*>(m);
+manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m) {
+  return reinterpret_cast<manifold::SimplePolygon*>(m);
 }
 
-const manifold::Polygons* from_c(ManifoldPolygons* m) {
-  return reinterpret_cast<manifold::Polygons const*>(m);
+manifold::Polygons* from_c(ManifoldPolygons* m) {
+  return reinterpret_cast<manifold::Polygons*>(m);
 }
 
-const manifold::MeshGL* from_c(ManifoldMeshGL* m) {
-  return reinterpret_cast<manifold::MeshGL const*>(m);
+manifold::MeshGL* from_c(ManifoldMeshGL* m) {
+  return reinterpret_cast<manifold::MeshGL*>(m);
 }
 
-const manifold::MeshGL64* from_c(ManifoldMeshGL64* m) {
-  return reinterpret_cast<manifold::MeshGL64 const*>(m);
+manifold::MeshGL64* from_c(ManifoldMeshGL64* m) {
+  return reinterpret_cast<manifold::MeshGL64*>(m);
 }
 
 OpType from_c(ManifoldOpType optype) {
@@ -214,12 +214,12 @@ CrossSection::JoinType from_c(ManifoldJoinType join_type) {
   return jt;
 }
 
-const manifold::Box* from_c(ManifoldBox* m) {
-  return reinterpret_cast<manifold::Box const*>(m);
+manifold::Box* from_c(ManifoldBox* m) {
+  return reinterpret_cast<manifold::Box*>(m);
 }
 
-const manifold::Rect* from_c(ManifoldRect* m) {
-  return reinterpret_cast<manifold::Rect const*>(m);
+manifold::Rect* from_c(ManifoldRect* m) {
+  return reinterpret_cast<manifold::Rect*>(m);
 }
 
 vec2 from_c(ManifoldVec2 v) { return vec2(v.x, v.y); }
@@ -230,8 +230,8 @@ ivec3 from_c(ManifoldIVec3 v) { return ivec3(v.x, v.y, v.z); }
 
 vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
 
-const std::vector<ivec3>* from_c(ManifoldTriangulation* m) {
-  return reinterpret_cast<std::vector<ivec3> const*>(m);
+std::vector<ivec3>* from_c(ManifoldTriangulation* m) {
+  return reinterpret_cast<std::vector<ivec3>*>(m);
 }
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length) {
