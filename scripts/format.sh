@@ -10,15 +10,17 @@ $CLANG_FORMAT -i samples/*/*.{h,cpp} &
 $CLANG_FORMAT -i test/*.{h,cpp} &
 $CLANG_FORMAT -i bindings/*/*.cpp &
 $CLANG_FORMAT -i bindings/c/include/manifold/*.h &
-$CLANG_FORMAT -i bindings/wasm/*.{js,ts} &
-$CLANG_FORMAT -i bindings/wasm/lib/*.ts &
-$CLANG_FORMAT -i bindings/wasm/examples/*/*.{js,ts,html} &
-$CLANG_FORMAT -i bindings/wasm/test/*.ts &
-$CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
-$CLANG_FORMAT -i bindings/wasm/types/*.ts &
 $CLANG_FORMAT -i src/*.{h,cpp} &
 $CLANG_FORMAT -i src/*/*.cpp &
 $CLANG_FORMAT -i include/manifold/*.h &
+
+npx prettier --write \
+  "bindings/wasm/*.{js,ts}" \
+  "bindings/wasm/lib/*.ts" \
+  "bindings/wasm/examples/*/*.{js,ts,html}" \
+  "bindings/wasm/test/*.ts" \
+  "bindings/wasm/test/fixtures/*.{ts,mjs}" \
+  "bindings/wasm/types/*.ts" &
 
 black --quiet bindings/python/examples/*.py &
 
