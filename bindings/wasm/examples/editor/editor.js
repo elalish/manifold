@@ -14,35 +14,36 @@
 
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
-import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
-import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
-import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
+import esbuildWasmUrl from "esbuild-wasm/esbuild.wasm?url";
+import ManifoldWorker from "manifold-3d/lib/worker.bundled.js?worker";
+import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
+import { AutoTypings, LocalStorageCache } from "monaco-editor-auto-typings";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.main";
 // '?worker' is vite convention to load a module as a web worker.
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 
-const CODE_START = '<code>';
+const CODE_START = "<code>";
 // Loaded globally by examples.js
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register(
-      '/service-worker.js', {scope: './index.html'});
+  navigator.serviceWorker.register("/service-worker.js", {
+    scope: "./index.html",
+  });
 }
 
 let editor = undefined;
 
 // Edit UI ------------------------------------------------------------
 
-const undoButton = document.querySelector('#undo');
-const redoButton = document.querySelector('#redo');
-const formatButton = document.querySelector('#format');
-const shareButton = document.querySelector('#share');
+const undoButton = document.querySelector("#undo");
+const redoButton = document.querySelector("#redo");
+const formatButton = document.querySelector("#format");
+const shareButton = document.querySelector("#share");
 
-undoButton.onclick = () => editor.trigger('ignored', 'undo');
-redoButton.onclick = () => editor.trigger('ignored', 'redo');
+undoButton.onclick = () => editor.trigger("ignored", "undo");
+redoButton.onclick = () => editor.trigger("ignored", "redo");
 formatButton.onclick = async () => {
   if (!editor) return;
 
@@ -50,51 +51,50 @@ formatButton.onclick = async () => {
   if (!model) return;
 
   const originalCode = model.getValue();
-  const language = (model.getModeId?.() || '').toLowerCase();
+  const language = (model.getModeId?.() || "").toLowerCase();
   const tabSize = model.getOptions?.().tabSize ?? 2;
 
-  let parser = 'babel';
-  if (language.includes('typescript')) parser = 'typescript';
+  let parser = "babel";
+  if (language.includes("typescript")) parser = "typescript";
 
- 
   const viewState = editor.saveViewState();
   editor.pushUndoStop();
 
   try {
     const [{ format }, estree, babel, typescript] = await Promise.all([
-      import('prettier/standalone'),
-      import('prettier/plugins/estree'),
-      import('prettier/plugins/babel'),
-      import('prettier/plugins/typescript'),
+      import("prettier/standalone"),
+      import("prettier/plugins/estree"),
+      import("prettier/plugins/babel"),
+      import("prettier/plugins/typescript"),
     ]);
 
     const plugins =
-      parser === 'typescript'
-        ? [typescript, estree]
-        : [babel, estree];
+      parser === "typescript" ? [typescript, estree] : [babel, estree];
 
     const formatted = await format(originalCode, {
       parser,
       plugins,
       tabWidth: tabSize,
       singleQuote: true,
-      trailingComma: 'all',
+      trailingComma: "all",
     });
 
     if (formatted !== originalCode) {
-      editor.executeEdits('prettier-format', [{
-        range: model.getFullModelRange(),
-        text: formatted,
-        forceMoveMarkers: true,
-      }]);
+      editor.executeEdits("prettier-format", [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+          forceMoveMarkers: true,
+        },
+      ]);
     }
 
     editor.pushUndoStop();
     if (viewState) editor.restoreViewState(viewState);
 
-    console.log('Formatted with Prettier 3.8.1');
+    console.log("Formatted with Prettier 3.8.1");
   } catch (err) {
-    console.error('Prettier formatting failed:', err);
+    console.error("Prettier formatting failed:", err);
     consoleElement.textContent += `Prettier formatting failed: ${err.message}\r\n`;
     consoleElement.scrollTop = consoleElement.scrollHeight;
   }
@@ -102,44 +102,45 @@ formatButton.onclick = async () => {
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
   url.hash =
-      '#' +
-      encodeURIComponent(
-          currentFileElement.textContent + CODE_START + editor.getValue());
+    "#" +
+    encodeURIComponent(
+      currentFileElement.textContent + CODE_START + editor.getValue(),
+    );
   navigator.clipboard.writeText(url.toString());
-  console.log('Shareable link copied to clipboard!');
-  console.log('Consider shortening this URL using tinyURL.com');
+  console.log("Shareable link copied to clipboard!");
+  console.log("Consider shortening this URL using tinyURL.com");
 };
 
 // File UI ------------------------------------------------------------
-const fileButton = document.querySelector('#file');
-const currentFileElement = document.querySelector('#current');
-const fileArrow = document.querySelector('#file .uparrow');
-const fileDropdown = document.querySelector('#fileDropdown');
-const saveContainer = document.querySelector('#save');
-const saveDropdown = document.querySelector('#saveDropdown');
-const saveArrow = document.querySelector('#save .uparrow');
+const fileButton = document.querySelector("#file");
+const currentFileElement = document.querySelector("#current");
+const fileArrow = document.querySelector("#file .uparrow");
+const fileDropdown = document.querySelector("#fileDropdown");
+const saveContainer = document.querySelector("#save");
+const saveDropdown = document.querySelector("#saveDropdown");
+const saveArrow = document.querySelector("#save .uparrow");
 
-const hideDropdown = function() {
-  fileDropdown.classList.remove('show');
-  saveDropdown.classList.remove('show');
-  fileArrow.classList.remove('down');
-  saveArrow.classList.remove('down');
+const hideDropdown = function () {
+  fileDropdown.classList.remove("show");
+  saveDropdown.classList.remove("show");
+  fileArrow.classList.remove("down");
+  saveArrow.classList.remove("down");
 };
-const toggleFileDropdown = function(event) {
+const toggleFileDropdown = function (event) {
   event.stopPropagation();
-  fileDropdown.classList.toggle('show');
-  fileArrow.classList.toggle('down');
+  fileDropdown.classList.toggle("show");
+  fileArrow.classList.toggle("down");
 };
-const toggleSaveDropdown = function(event) {
+const toggleSaveDropdown = function (event) {
   event.stopPropagation();
-  saveDropdown.classList.toggle('show');
-  saveArrow.classList.toggle('down');
+  saveDropdown.classList.toggle("show");
+  saveArrow.classList.toggle("down");
 };
 fileButton.onclick = toggleFileDropdown;
 saveArrow.parentElement.onclick = toggleSaveDropdown;
 document.body.onclick = hideDropdown;
 
-const prefix = 'ManifoldCAD';
+const prefix = "ManifoldCAD";
 function getScript(name) {
   return window.localStorage.getItem(prefix + name);
 }
@@ -165,17 +166,18 @@ function getAllScripts() {
 
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
-    if (!key || key === 'currentName' || key === 'safe') continue;
-    files[key] = getScript(key)
+    if (!key || key === "currentName" || key === "safe") continue;
+    files[key] = getScript(key);
   }
   return files;
 }
 
 function getModelForScript(filename) {
   const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
-  const model = monaco.editor.getModel(uri) ||
-      monaco.editor.createModel('', 'typescript', uri);
-  model.updateOptions({tabSize: 2});
+  const model =
+    monaco.editor.getModel(uri) ||
+    monaco.editor.createModel("", "typescript", uri);
+  model.updateOptions({ tabSize: 2 });
   return model;
 }
 
@@ -186,7 +188,7 @@ function saveCurrent() {
       setScript(currentName, editor.getValue());
     }
   }
-};
+}
 
 window.onpagehide = saveCurrent;
 window.beforeunload = saveCurrent;
@@ -197,11 +199,12 @@ function switchTo(scriptName) {
   if (editor) {
     switching = true;
     currentFileElement.textContent = scriptName;
-    setScript('currentName', scriptName);
+    setScript("currentName", scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
-    const code = isExample ? exampleFunctions.get(scriptName) :
-                             getScript(scriptName) ?? '';
-    window.location.hash = '#' + scriptName;
+    const code = isExample
+      ? exampleFunctions.get(scriptName)
+      : (getScript(scriptName) ?? "");
+    window.location.hash = "#" + scriptName;
     const model = getModelForScript(scriptName);
     editor.setModel(model);
 
@@ -213,30 +216,30 @@ function switchTo(scriptName) {
 }
 
 function createDropdownItem(name) {
-  const container = document.createElement('div');
-  container.classList.add('item');
-  const button = document.createElement('button');
+  const container = document.createElement("div");
+  container.classList.add("item");
+  const button = document.createElement("button");
   container.appendChild(button);
-  button.type = 'button';
-  button.classList.add('blue', 'item');
-  const label = document.createElement('span');
+  button.type = "button";
+  button.classList.add("blue", "item");
+  const label = document.createElement("span");
   button.appendChild(label);
   label.textContent = name;
 
-  button.onclick = function() {
+  button.onclick = function () {
     saveCurrent();
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
-  button.onkeyup = function(event) {
+  button.onkeyup = function (event) {
     event.preventDefault();
   };
   return button;
 }
 
 function addIcon(button) {
-  const icon = document.createElement('button');
-  icon.classList.add('icon');
+  const icon = document.createElement("button");
+  icon.classList.add("icon");
   button.parentElement.appendChild(icon);
   return icon;
 }
@@ -245,7 +248,7 @@ function uniqueName(name) {
   let num = 1;
   let newName = name;
   while (getScript(newName) != null || exampleFunctions.get(newName) != null) {
-    newName = name + ' ' + num++;
+    newName = name + " " + num++;
   }
   return newName;
 }
@@ -253,17 +256,17 @@ function uniqueName(name) {
 function addEdit(button) {
   const label = button.firstChild;
   const edit = addIcon(button);
-  edit.classList.add('edit');
+  edit.classList.add("edit");
 
-  edit.onclick = function(event) {
+  edit.onclick = function (event) {
     event.stopPropagation();
     const oldName = label.textContent;
     const code = getScript(oldName);
-    const form = document.createElement('form');
-    const inputElement = document.createElement('input');
-    inputElement.classList.add('name');
+    const form = document.createElement("form");
+    const inputElement = document.createElement("input");
+    inputElement.classList.add("name");
     inputElement.value = oldName;
-    label.textContent = '';
+    label.textContent = "";
     button.appendChild(form);
     form.appendChild(inputElement);
     inputElement.focus();
@@ -283,34 +286,38 @@ function addEdit(button) {
     }
 
     form.onsubmit = rename;
-    inputElement.onclick = function(event) {
+    inputElement.onclick = function (event) {
       event.stopPropagation();
     };
 
-    inputElement.onblur = function() {
+    inputElement.onblur = function () {
       button.removeChild(form);
       label.textContent = oldName;
     };
   };
 
   const trash = addIcon(button);
-  trash.classList.add('trash');
+  trash.classList.add("trash");
   let lastClick = 0;
 
-  trash.onclick = function(event) {
+  trash.onclick = function (event) {
     event.stopPropagation();
-    if (button.classList.contains('blue')) {
+    if (button.classList.contains("blue")) {
       lastClick = performance.now();
-      button.classList.remove('blue');
-      button.classList.add('red');
-      document.body.addEventListener('click', function() {
-        button.classList.add('blue');
-        button.classList.remove('red');
-      }, {once: true});
+      button.classList.remove("blue");
+      button.classList.add("red");
+      document.body.addEventListener(
+        "click",
+        function () {
+          button.classList.add("blue");
+          button.classList.remove("red");
+        },
+        { once: true },
+      );
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
-        switchTo('Intro');
+        switchTo("Intro");
       }
       const container = button.parentElement;
       container.parentElement.removeChild(container);
@@ -318,21 +325,21 @@ function addEdit(button) {
   };
 }
 
-const newButton = document.querySelector('#new');
+const newButton = document.querySelector("#new");
 function newItem(code, scriptName = undefined) {
-  const name = uniqueName(scriptName ?? 'New Script');
+  const name = uniqueName(scriptName ?? "New Script");
   setScript(name, code);
   const nextButton = createDropdownItem(name);
-  newButton.insertAdjacentElement('afterend', nextButton.parentElement);
+  newButton.insertAdjacentElement("afterend", nextButton.parentElement);
   addEdit(nextButton);
-  return {button: nextButton, name};
-};
-newButton.onclick = function() {
-  newItem('').button.click();
+  return { button: nextButton, name };
+}
+newButton.onclick = function () {
+  newItem("").button.click();
 };
 
-const runButton = document.querySelector('#compile');
-const poster = document.querySelector('#poster');
+const runButton = document.querySelector("#compile");
+const poster = document.querySelector("#poster");
 let manifoldInitialized = false;
 let autoExecute = true;
 
@@ -341,7 +348,7 @@ function initializeRun() {
   if (autoExecute) {
     runButton.click();
   } else {
-    poster.textContent = 'Auto-run disabled';
+    poster.textContent = "Auto-run disabled";
   }
 }
 
@@ -350,16 +357,16 @@ function initializeRun() {
 async function createEditor() {
   self.MonacoEnvironment = {
     getWorker: (_, label) => {
-      if (label === 'typescript' || label === 'javascript') {
+      if (label === "typescript" || label === "javascript") {
         return new tsWorker();
       } else {
         return new editorWorker();
       }
-    }
+    },
   };
 
-  editor = monaco.editor.create(document.getElementById('editor'), {
-    language: 'typescript',
+  editor = monaco.editor.create(document.getElementById("editor"), {
+    language: "typescript",
     automaticLayout: true,
   });
 
@@ -371,15 +378,19 @@ async function createEditor() {
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await (await fetch('/manifoldCAD.d.ts')).text(),
-      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+    await (await fetch("/manifoldCAD.d.ts")).text(),
+    "inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts",
+  );
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
   // global variables, so another tool may be a better fit.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      (await (await fetch('/manifoldCADGlobals.d.ts')).text())
-          .replace(/^export /gm, ''));
+    (await (await fetch("/manifoldCADGlobals.d.ts")).text()).replace(
+      /^export /gm,
+      "",
+    ),
+  );
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {
@@ -390,11 +401,15 @@ async function createEditor() {
   self.window.typecache = new LocalStorageCache();
   const autoTypings = await AutoTypings.create(editor, {
     sourceCache: self.window.typecache,
-    onError: e => {console.error(e)},
-    onUpdate: (update, text) => {console.debug(text)},
+    onError: (e) => {
+      console.error(e);
+    },
+    onUpdate: (update, text) => {
+      console.debug(text);
+    },
     onUpdateVersions: (versions) => {
-      console.debug(versions)
-    }
+      console.debug(versions);
+    },
   });
 
   for (const [name] of exampleFunctions) {
@@ -407,13 +422,13 @@ async function createEditor() {
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key) continue;
-    if (key === 'currentName') {
+    if (key === "currentName") {
       currentName = getScript(key);
-    } else if (key === 'safe') {
-      autoExecute = getScript(key) !== 'false';
+    } else if (key === "safe") {
+      autoExecute = getScript(key) !== "false";
     } else {
       const button = createDropdownItem(key);
-      newButton.insertAdjacentElement('afterend', button.parentElement);
+      newButton.insertAdjacentElement("afterend", button.parentElement);
       addEdit(button);
     }
   }
@@ -425,7 +440,8 @@ async function createEditor() {
       autoExecute = true;
       const name = fragment.substring(0, codeIdx);
       switchTo(
-          newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
+        newItem(fragment.substring(codeIdx + CODE_START.length), name).name,
+      );
     } else {
       if (fragment != currentName) {
         autoExecute = true;
@@ -440,7 +456,7 @@ async function createEditor() {
     initializeRun();
   }
 
-  editor.onDidChangeModelContent(e => {
+  editor.onDidChangeModelContent((e) => {
     // The user switched models.
     if (switching) {
       switching = false;
@@ -471,20 +487,20 @@ async function createEditor() {
   window.onresize = () => {
     editor.layout({});
   };
-};
+}
 
 createEditor();
 
 // Animation ------------------------------------------------------------
-const mv = document.querySelector('model-viewer');
-const animationContainer = document.querySelector('#animation');
-const playButton = document.querySelector('#play');
-const scrubber = document.querySelector('#scrubber');
+const mv = document.querySelector("model-viewer");
+const animationContainer = document.querySelector("#animation");
+const playButton = document.querySelector("#play");
+const scrubber = document.querySelector("#scrubber");
 let paused = false;
 
-mv.addEventListener('load', () => {
+mv.addEventListener("load", () => {
   const hasAnimation = mv.availableAnimations.length > 0;
-  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
+  animationContainer.style.display = hasAnimation ? "flex" : "none";
   if (hasAnimation) {
     play();
   }
@@ -492,23 +508,23 @@ mv.addEventListener('load', () => {
 
 function play() {
   mv.play();
-  playButton.classList.remove('play');
-  playButton.classList.add('pause');
+  playButton.classList.remove("play");
+  playButton.classList.add("pause");
   paused = false;
-  scrubber.classList.add('hide');
+  scrubber.classList.add("hide");
 }
 
 function pause() {
   mv.pause();
-  playButton.classList.remove('pause');
-  playButton.classList.add('play');
+  playButton.classList.remove("pause");
+  playButton.classList.add("play");
   paused = true;
   scrubber.max = mv.duration;
   scrubber.value = mv.currentTime;
-  scrubber.classList.remove('hide');
+  scrubber.classList.remove("hide");
 }
 
-playButton.onclick = function() {
+playButton.onclick = function () {
   if (paused) {
     play();
   } else {
@@ -516,43 +532,43 @@ playButton.onclick = function() {
   }
 };
 
-scrubber.oninput = function() {
+scrubber.oninput = function () {
   mv.currentTime = scrubber.value;
 };
 
 // Execution ------------------------------------------------------------
-const consoleElement = document.querySelector('#console');
+const consoleElement = document.querySelector("#console");
 const oldLog = console.log;
-console.log = function(message) {
-  consoleElement.textContent += message + '\r\n';
+console.log = function (message) {
+  consoleElement.textContent += message + "\r\n";
   consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
 };
 
 function clearConsole() {
-  consoleElement.textContent = '';
+  consoleElement.textContent = "";
 }
 
 function enableCancel() {
-  runButton.firstChild.style.visibility = 'hidden';
-  runButton.classList.add('red', 'cancel');
+  runButton.firstChild.style.visibility = "hidden";
+  runButton.classList.add("red", "cancel");
 }
 
 function disableCancel() {
-  runButton.firstChild.style.visibility = 'visible';
-  runButton.classList.remove('red', 'cancel');
+  runButton.firstChild.style.visibility = "visible";
+  runButton.classList.remove("red", "cancel");
 }
 
 function finishRun() {
   disableCancel();
   const log = consoleElement.textContent;
   // Remove "Running..."
-  consoleElement.textContent = log.substring(log.indexOf('\n') + 1);
+  consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
 }
 
 const output = {
   glbURL: null,
-  threeMFURL: null
+  threeMFURL: null,
 };
 let manifoldWorker = null;
 
@@ -562,27 +578,26 @@ function createWorker() {
   manifoldWorker.onmessage = (e) => {
     const message = e.data;
 
-    if (message?.type === 'ready') {
+    if (message?.type === "ready") {
       if (tsWorker != null && !manifoldInitialized) {
         initializeRun();
       }
       manifoldInitialized = true;
-
-    } else if (message?.type === 'error') {
+    } else if (message?.type === "error") {
       // Clean up.
-      setScript('safe', 'false');
+      setScript("safe", "false");
       finishRun();
 
       // Show errors.  If the stack trace makes more sense, show that.
       const errorText = `${message.name}: ${message.message}`;
       if (message.stack && message.stack.startsWith(errorText)) {
-        consoleElement.textContent += message.stack + '\r\n';
+        consoleElement.textContent += message.stack + "\r\n";
       } else {
-        consoleElement.textContent += errorText + '\r\n';
+        consoleElement.textContent += errorText + "\r\n";
       }
       consoleElement.scrollTop = consoleElement.scrollHeight;
       mv.showPoster();
-      poster.textContent = 'Error';
+      poster.textContent = "Error";
 
       // Clear models.
       if (output.glbURL) URL.revokeObjectURL(output.glbURL);
@@ -593,26 +608,23 @@ function createWorker() {
 
       // Start all over again.
       createWorker();
-
-    } else if (message?.type === 'log') {
-      consoleElement.textContent += message.message + '\r\n';
+    } else if (message?.type === "log") {
+      consoleElement.textContent += message.message + "\r\n";
       consoleElement.scrollTop = consoleElement.scrollHeight;
-
-    } else if (message?.type === 'done') {
-      setScript('safe', 'true');
-      manifoldWorker.postMessage({type: 'export', extension: 'glb'});
-      manifoldWorker.postMessage({type: 'export', extension: '3mf'});
+    } else if (message?.type === "done") {
+      setScript("safe", "true");
+      manifoldWorker.postMessage({ type: "export", extension: "glb" });
+      manifoldWorker.postMessage({ type: "export", extension: "3mf" });
 
       finishRun();
       runButton.disabled = true;
-
-    } else if (message?.type === 'blob') {
-      if (message.extension === 'glb') {
+    } else if (message?.type === "blob") {
+      if (message.extension === "glb") {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
         output.glbURL = message.blobURL;
 
         mv.src = output.glbURL;
-      } else if (message?.extension === '3mf') {
+      } else if (message?.extension === "3mf") {
         if (output.threeMFURL) URL.revokeObjectURL(output.threeMFURL);
         output.threeMFURL = message.blobURL;
         threemfButton.disabled = false;
@@ -620,18 +632,21 @@ function createWorker() {
     }
   };
 
-  manifoldWorker.postMessage(
-      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
+  manifoldWorker.postMessage({
+    type: "initialize",
+    esbuildWasmUrl,
+    manifoldWasmUrl,
+  });
 }
 
 createWorker();
 
 async function run() {
   saveCurrent();
-  setScript('safe', 'false');
+  setScript("safe", "false");
   enableCancel();
   clearConsole();
-  console.log('Running...');
+  console.log("Running...");
   const files = {};
   for (const [filename, contents] of Object.entries(getAllScripts())) {
     files[`./${filename}`] = contents;
@@ -639,12 +654,12 @@ async function run() {
   const filename = currentFileElement.textContent;
   const code = editor.getValue();
   manifoldWorker.postMessage({
-    type: 'evaluate',
+    type: "evaluate",
     code,
     filename,
     files,
-    jsCDN: 'jsDelivr',
-    baseUrl: window.location.href
+    jsCDN: "jsDelivr",
+    baseUrl: window.location.href,
   });
 }
 
@@ -652,11 +667,11 @@ function cancel() {
   manifoldWorker.terminate();
   createWorker();
   finishRun();
-  console.log('Run canceled');
+  console.log("Run canceled");
 }
 
-runButton.onclick = function() {
-  if (runButton.classList.contains('cancel')) {
+runButton.onclick = function () {
+  if (runButton.classList.contains("cancel")) {
     cancel();
   } else {
     run();
@@ -672,15 +687,15 @@ function clickSave(saveButton, filename, outputName) {
       saveContainer.insertBefore(container, saveDropdown);
       container.appendChild(saveArrow.parentElement);
     }
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.download = filename;
     link.href = output[outputName];
     link.click();
   };
 }
 
-const glbButton = document.querySelector('#glb');
-glbButton.onclick = clickSave(glbButton, 'manifold.glb', 'glbURL');
+const glbButton = document.querySelector("#glb");
+glbButton.onclick = clickSave(glbButton, "manifold.glb", "glbURL");
 
-const threemfButton = document.querySelector('#threemf');
-threemfButton.onclick = clickSave(threemfButton, 'manifold.3mf', 'threeMFURL');
+const threemfButton = document.querySelector("#threemf");
+threemfButton.onclick = clickSave(threemfButton, "manifold.3mf", "threeMFURL");
