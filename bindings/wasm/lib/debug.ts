@@ -26,6 +26,7 @@ import type {Manifold, Mesh} from '../manifold.d.ts';
 
 import type {Properties} from './gltf-io.ts';
 import {writeMesh} from './gltf-io.ts';
+import {BaseGLTFNode} from './gltf-node.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
 import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
 
@@ -33,6 +34,8 @@ import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './m
 let ghost = false;
 const shown = new Map<number, Mesh>();
 const singles = new Map<number, Mesh>();
+const shownNodes = new Set<BaseGLTFNode>();
+const singleNodes = new Set<BaseGLTFNode>();
 
 const SHOW = {
   baseColorFactor: [1, 0, 0],
@@ -52,6 +55,8 @@ export function cleanup() {
   ghost = false;
   shown.clear();
   singles.clear();
+  shownNodes.clear();
+  singleNodes.clear();
 }
 
 const getDebugMeshByID = (id: number):
@@ -101,16 +106,71 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
   return result;
 };
 
+function hasDebugAncestor(
+    node: BaseGLTFNode, debugRoots: Set<BaseGLTFNode>): boolean {
+  let current: BaseGLTFNode|undefined = node;
+  while (current) {
+    if (debugRoots.has(current)) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export type NodeDebugMode = 'show'|'single'|undefined;
+
+/**
+ * @internal
+ */
+export function getNodeDebugMode(node: BaseGLTFNode): NodeDebugMode {
+  if (hasDebugAncestor(node, shownNodes)) return 'show';
+  if (hasDebugAncestor(node, singleNodes)) return 'single';
+  return undefined;
+}
+
+/**
+ * @internal
+ */
+export function getNodeMaterialByID(
+    id: number, debugMode: NodeDebugMode,
+    backupMaterial: GLTFMaterial = {}): GLTFMaterial {
+  if (debugMode === 'show') {
+    return SHOW;
+  }
+  if (debugMode === 'single') {
+    return getOriginalMaterialByID(id) || backupMaterial;
+  }
+  return getMaterialByID(id) || backupMaterial;
+}
+
+/**
+ * @internal
+ */
+export function getNodeMaterialOverride(
+    debugMode: NodeDebugMode): GLTFMaterial|undefined {
+  if (debugMode === 'show') {
+    return SHOW;
+  }
+  if (debugMode === 'single') {
+    return undefined;
+  }
+  return ghost ? GHOST : undefined;
+}
+
 /**
  * Wrap any shape object with this method to display it and any copies in
  * transparent red. This is particularly useful for debugging `subtract()` as it
  * will allow you find the object even if it doesn't currently intersect the
  * result.
  *
- * @param manifold The object to show - returned for chaining.
+ * @param object The object to show - returned for chaining.
  */
-export function show(manifold: Manifold) {
-  return debug(manifold, shown);
+export function show<T extends Manifold|BaseGLTFNode>(object: T): T {
+  if (object instanceof BaseGLTFNode) {
+    shownNodes.add(object);
+    return object;
+  }
+
+  return debug(object, shown) as T;
 };
 
 /**
@@ -119,11 +179,16 @@ export function show(manifold: Manifold) {
  * debugging as it allows you to see objects that may be hidden in the interior
  * of the result. Multiple objects marked `only()` will all be shown.
  *
- * @param manifold The object to show - returned for chaining.
+ * @param object The object to show - returned for chaining.
  */
-export function only(manifold: Manifold) {
+export function only<T extends Manifold|BaseGLTFNode>(object: T): T {
   ghost = true;
-  return debug(manifold, singles);
+  if (object instanceof BaseGLTFNode) {
+    singleNodes.add(object);
+    return object;
+  }
+
+  return debug(object, singles) as T;
 };
 
 /**

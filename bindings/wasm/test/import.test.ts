@@ -27,6 +27,21 @@ const countVertices = (doc: Document) => {
   return getSceneVertexCount(scene, VertexCountMethod.UPLOAD_NAIVE);
 };
 
+const getNodeColor = (doc: Document, name: string): [number, number, number, number] => {
+  const node = doc.getRoot().listNodes().find((node) => node.getName() === name);
+  expect(node).toBeTruthy();
+
+  const mesh = node!.getMesh();
+  expect(mesh).toBeTruthy();
+
+  const primitive = mesh!.listPrimitives()[0];
+  expect(primitive).toBeTruthy();
+
+  const material = primitive.getMaterial();
+  expect(material).toBeTruthy();
+  return material!.getBaseColorFactor();
+};
+
 beforeEach(() => worker.cleanup());
 
 suite('From a string, the worker will', () => {
@@ -50,6 +65,54 @@ suite('From a string, the worker will', () => {
     const code = await readFile(filename, 'utf-8');
     const result = await worker.evaluate(code, {filename});
     expect(result).toBeInstanceOf(Document);
+  });
+
+  test('Apply show() to GLTFNode descendants', async () => {
+    const code = `
+      import {Manifold, GLTFNode, getGLTFNodes, show} from 'manifold-3d/manifoldCAD';
+      const root = new GLTFNode();
+      root.name = 'root';
+      root.manifold = Manifold.cube([10, 10, 10], true);
+      root.material = {baseColorFactor: [0, 1, 0]};
+      const child = new GLTFNode(root);
+      child.name = 'child';
+      child.manifold = Manifold.cube([6, 6, 6], true);
+      child.material = {baseColorFactor: [0, 0, 1]};
+      const sibling = new GLTFNode();
+      sibling.name = 'sibling';
+      sibling.manifold = Manifold.cube([4, 4, 4], true);
+      sibling.material = {baseColorFactor: [1, 1, 0]};
+      show(root);
+      export default getGLTFNodes();
+    `;
+    const result = await worker.evaluate(code);
+    expect(getNodeColor(result, 'root')).toEqual([1, 0, 0, 0.25]);
+    expect(getNodeColor(result, 'child')).toEqual([1, 0, 0, 0.25]);
+    expect(getNodeColor(result, 'sibling')).toEqual([1, 1, 0, 1]);
+  });
+
+  test('Apply only() to GLTFNode descendants', async () => {
+    const code = `
+      import {Manifold, GLTFNode, getGLTFNodes, only} from 'manifold-3d/manifoldCAD';
+      const root = new GLTFNode();
+      root.name = 'root';
+      root.manifold = Manifold.cube([10, 10, 10], true);
+      root.material = {baseColorFactor: [0, 1, 0]};
+      const child = new GLTFNode(root);
+      child.name = 'child';
+      child.manifold = Manifold.cube([6, 6, 6], true);
+      child.material = {baseColorFactor: [0, 0, 1]};
+      const sibling = new GLTFNode();
+      sibling.name = 'sibling';
+      sibling.manifold = Manifold.cube([4, 4, 4], true);
+      sibling.material = {baseColorFactor: [1, 1, 0]};
+      only(root);
+      export default getGLTFNodes();
+    `;
+    const result = await worker.evaluate(code);
+    expect(getNodeColor(result, 'root')).toEqual([0, 1, 0, 1]);
+    expect(getNodeColor(result, 'child')).toEqual([0, 0, 1, 1]);
+    expect(getNodeColor(result, 'sibling')).toEqual([0.5, 0.5, 0.5, 0.25]);
   });
 
   test('Build a model with local imports', async () => {

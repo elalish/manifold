@@ -101,7 +101,9 @@ export const garbageCollectFunction = (originalFn: any): any => {
   return (...args: any) => {
     //@ts-ignore
     const result = originalFn(...args);
-    memoryRegistry.push(result);
+    if (Array.isArray(result) || typeof result?.delete === 'function') {
+      memoryRegistry.push(result);
+    }
     return result;
   };
 };
