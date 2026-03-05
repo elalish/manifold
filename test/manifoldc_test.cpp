@@ -11,6 +11,8 @@ void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
 
 void* alloc_box_buffer() { return malloc(manifold_box_size()); }
 
+void* alloc_rect_buffer() { return malloc(manifold_rect_size()); }
+
 void* alloc_meshgl_buffer() { return malloc(manifold_meshgl_size()); }
 
 void* alloc_meshgl64_buffer() { return malloc(manifold_meshgl64_size()); }
@@ -111,6 +113,31 @@ TEST(CBIND, warp_translation) {
   free(warpedcontext);
   free(diffcontext);
   free(context);
+}
+
+TEST(CBIND, include_pt_mutates_bounds) {
+  ManifoldRect* rect = manifold_rect(alloc_rect_buffer(), 0.0, 0.0, 1.0, 1.0);
+  manifold_rect_include_pt(rect, 2.0, 3.0);
+
+  EXPECT_TRUE(manifold_rect_contains_pt(rect, 2.0, 3.0));
+  ManifoldVec2 rect_max = manifold_rect_max(rect);
+  EXPECT_FLOAT_EQ(rect_max.x, 2.0);
+  EXPECT_FLOAT_EQ(rect_max.y, 3.0);
+
+  ManifoldBox* box =
+      manifold_box(alloc_box_buffer(), 0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+  manifold_box_include_pt(box, 2.0, 3.0, 4.0);
+
+  EXPECT_TRUE(manifold_box_contains_pt(box, 2.0, 3.0, 4.0));
+  ManifoldVec3 box_max = manifold_box_max(box);
+  EXPECT_FLOAT_EQ(box_max.x, 2.0);
+  EXPECT_FLOAT_EQ(box_max.y, 3.0);
+  EXPECT_FLOAT_EQ(box_max.z, 4.0);
+
+  manifold_destruct_rect(rect);
+  manifold_destruct_box(box);
+  free(rect);
+  free(box);
 }
 
 TEST(CBIND, obj_round_trip) {
