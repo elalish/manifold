@@ -145,8 +145,8 @@ export function getNodeMaterialByID(
 /**
  * @internal
  */
-export function getNodeMaterialOverride(
-    debugMode: NodeDebugMode): GLTFMaterial|undefined {
+export function getNodeMaterialOverride(debugMode: NodeDebugMode): GLTFMaterial|
+    undefined {
   if (debugMode === 'show') {
     return SHOW;
   }

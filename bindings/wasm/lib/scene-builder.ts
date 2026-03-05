@@ -276,7 +276,8 @@ function createNodeFromCache(
       writeManifold(doc, node, nodeDef as GLTFNode, material, nodeDebugMode);
     }
 
-    const nodeCache = cachedNodeDefs ?? new Map<NodeDebugMode, Map<GLTFMaterial, Node>>();
+    const nodeCache =
+        cachedNodeDefs ?? new Map<NodeDebugMode, Map<GLTFMaterial, Node>>();
     const materialCache = new Map<GLTFMaterial, Node>();
     materialCache.set(material, node);
     nodeCache.set(nodeDebugMode, materialCache);

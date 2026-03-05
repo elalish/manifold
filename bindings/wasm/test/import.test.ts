@@ -27,20 +27,22 @@ const countVertices = (doc: Document) => {
   return getSceneVertexCount(scene, VertexCountMethod.UPLOAD_NAIVE);
 };
 
-const getNodeColor = (doc: Document, name: string): [number, number, number, number] => {
-  const node = doc.getRoot().listNodes().find((node) => node.getName() === name);
-  expect(node).toBeTruthy();
+const getNodeColor =
+    (doc: Document, name: string): [number, number, number, number] => {
+      const node =
+          doc.getRoot().listNodes().find((node) => node.getName() === name);
+      expect(node).toBeTruthy();
 
-  const mesh = node!.getMesh();
-  expect(mesh).toBeTruthy();
+      const mesh = node!.getMesh();
+      expect(mesh).toBeTruthy();
 
-  const primitive = mesh!.listPrimitives()[0];
-  expect(primitive).toBeTruthy();
+      const primitive = mesh!.listPrimitives()[0];
+      expect(primitive).toBeTruthy();
 
-  const material = primitive.getMaterial();
-  expect(material).toBeTruthy();
-  return material!.getBaseColorFactor();
-};
+      const material = primitive.getMaterial();
+      expect(material).toBeTruthy();
+      return material!.getBaseColorFactor();
+    };
 
 beforeEach(() => worker.cleanup());
 
