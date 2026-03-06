@@ -37,6 +37,7 @@ import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} fro
 import {cleanup as cleanupImport} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
+import {formatArea, formatLength, formatVolume} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
@@ -66,34 +67,6 @@ function log(...args: any[]) {
   if (typeof self !== 'undefined' && self.console) {
     self.console.log(...args);
   }
-}
-
-function formatLength(mm: number): string {
-  if (Math.abs(mm) >= 10000) {
-    return `${
-        (mm / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} m`;
-  }
-  return `${mm.toLocaleString(undefined, {maximumFractionDigits: 2})} mm`;
-}
-
-function formatArea(mm2: number): string {
-  const cm2 = mm2 / 100;
-  if (Math.abs(cm2) >= 10000) {
-    return `${(cm2 / 10000).toLocaleString(undefined, {
-      maximumFractionDigits: 2
-    })} m^2`;
-  }
-  return `${cm2.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^2`;
-}
-
-function formatVolume(mm3: number): string {
-  const cm3 = mm3 / 1000;
-  if (Math.abs(cm3) >= 1_000_000) {
-    return `${(cm3 / 1_000_000).toLocaleString(undefined, {
-      maximumFractionDigits: 2
-    })} m^3`;
-  }
-  return `${cm3.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^3`;
 }
 
 function applyTransformation(
