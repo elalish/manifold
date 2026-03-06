@@ -25,8 +25,7 @@ const csg = async () => {
   // Models can be imported by URL on manifoldCAD.org, or by path with the CLI.
   // `new URL(relativeURL, import.meta.url)` resolves paths relative to this
   // file on disk, or relative to the tab URL in a browser.
-  const moon =
-      await importModel(new URL('./models/moon.glb', import.meta.url));
+  const moon = await importModel(new URL('./models/moon.glb', import.meta.url));
 
   // Give the imported model a name so it appears clearly in scene viewers.
   moon.name = 'Moon (display only)';
