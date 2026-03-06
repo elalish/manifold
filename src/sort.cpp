@@ -159,7 +159,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     return uf.unite(openVerts[a], openVerts[b]);
   };
   auto recorder = MakeSimpleRecorder(f);
-  collider.Collisions<true>(recorder, std::nullopt, vertBox.cview(), false);
+  collider.Collisions<true>(recorder, vertBox.cview(), false);
 
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     uf.unite(static_cast<int>(mesh.mergeFromVert[i]),
@@ -189,20 +189,21 @@ namespace manifold {
  */
 void Manifold::Impl::SortGeometry() {
   if (halfedge_.size() == 0) {
-    collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+    collider_ = {};
     return;
   }
 
   halfedge_.MakeUnique();
   SortVerts();
-  LazyCollider::LeafData leafData;
-  GetFaceBoxMorton(leafData.leafBox, leafData.leafMorton);
-  SortFaces(leafData.leafBox, leafData.leafMorton);
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
+  GetFaceBoxMorton(faceBox, faceMorton);
+  SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) {
-    collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+    collider_ = {};
     return;
   }
-  collider_ = std::make_shared<LazyCollider>(std::move(leafData));
+  collider_ = Collider(faceBox, faceMorton);
   CompactProps();
 
   DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
