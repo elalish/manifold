@@ -629,7 +629,8 @@ function clickSave(saveButton, extension, outputName) {
     }
     const link = document.createElement('a');
 
-    link.download = `${currentFileElement.textContent.trim() || 'manifold'}.${extension}`;
+    link.download =
+        `${currentFileElement.textContent.trim() || 'manifold'}.${extension}`;
 
     link.href = output[outputName];
     link.click();
