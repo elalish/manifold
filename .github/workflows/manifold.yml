@@ -59,34 +59,47 @@ jobs:
         url: https://github.com/wjakob/nanobind.git
         rev: 2a61ad2494d09fecb2e13322c1383342c299900d
 
-    - name: Build ${{matrix.parallelization}}
-      if: matrix.parallelization != 'OFF'
+    - name: Configure
       run: |
-        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind -DBUILD_SHARED_LIBS=ON -DMANIFOLD_STRICT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DASSIMP_ENABLE=ON -DMANIFOLD_PAR=${{matrix.parallelization}} . -B build
+        cmake \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DBUILD_SHARED_LIBS=ON \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PYBIND=ON \
+          -DMANIFOLD_DEBUG=ON \
+          -DMANIFOLD_ASSERT=ON \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
+          -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} \
+          -DASSIMP_ENABLE=ON \
+          -DMANIFOLD_PAR=${{matrix.parallelization}} \
+          . -B build
+    - name: Configure code coverage check
+      if: matrix.cross_section == 'ON' && matrix.gcc == '14'
+      run: |
+        cmake -DCODE_COVERAGE=ON . -B build
+    - name: Build
+      run: |
         cmake --build build
-    - name: Test ${{matrix.parallelization}}
-      if: matrix.parallelization != 'OFF'
+    - name: Test
+      if: matrix.cross_section == 'ON'
       run: |
         ./build/test/manifold_test
-    - name: Test Python bindings ${{matrix.parallelization}}
-      if: matrix.parallelization != 'OFF' && matrix.cross_section == 'ON'
-      run: |
+        # python tests
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         python3 bindings/python/examples/run_all.py -e
         python3 -m pytest
     - name: Coverage Report
-      if: matrix.parallelization == 'OFF'
+      if: matrix.cross_section == 'ON' && matrix.gcc == '14'
       run: |
-        mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=ON -DMANIFOLD_STRICT=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_PAR=${{matrix.parallelization}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
         test/manifold_test
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --extract ./code_coverage_total.info "/*/manifold/src/*" --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v5
-      if: matrix.parallelization == 'OFF'
+      if: matrix.cross_section == 'ON'
       with:
         disable_search: true
         files: build/code_coverage.info
@@ -123,11 +136,32 @@ jobs:
       uses: mymindstorm/setup-emsdk@v14
       with:
         version: 5.0.2
+    - uses: ./.github/actions/git-clone
+      with:
+        name: tbb
+        url: https://github.com/oneapi-src/oneTBB.git
+        rev: f1862f38f83568d96e814e469ab61f88336cc595
+    - uses: ./.github/actions/git-clone
+      with:
+        name: clipper2
+        url: https://github.com/AngusJohnson/Clipper2.git
+        rev: 46f639177fe418f9689e8ddb74f08a870c71f5b4
+
     - name: Build WASM ${{matrix.parallelization}}
       run: |
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_STRICT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=${{matrix.debug}} -DMANIFOLD_ASSERT=${{matrix.debug}} .. && emmake make
+        emcmake cmake \
+          -DCMAKE_BUILD_TYPE=MinSizeRel \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PAR=${{matrix.parallelization}} \
+          -DMANIFOLD_USE_BUILTIN_TBB=ON \
+          -DMANIFOLD_DEBUG=${{matrix.debug}} \
+          -DMANIFOLD_ASSERT=${{matrix.debug}} \
+          -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          ..
+        emmake make
     - name: Test WASM
       if: matrix.parallelization == 'OFF'
       run: |
@@ -239,11 +273,38 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v2
       with:
         cmake-version: 4.0.2
+    - uses: ./.github/actions/git-clone
+      with:
+        name: tbb
+        url: https://github.com/oneapi-src/oneTBB.git
+        rev: f1862f38f83568d96e814e469ab61f88336cc595
+    - uses: ./.github/actions/git-clone
+      with:
+        name: clipper2
+        url: https://github.com/AngusJohnson/Clipper2.git
+        rev: 46f639177fe418f9689e8ddb74f08a870c71f5b4
+    - uses: ./.github/actions/git-clone
+      with:
+        name: nanobind
+        url: https://github.com/wjakob/nanobind.git
+        rev: 2a61ad2494d09fecb2e13322c1383342c299900d
     - uses: ilammy/msvc-dev-cmd@v1
+
     - name: Build ${{matrix.parallelization}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{matrix.shared}} -DMANIFOLD_STRICT=ON -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -A x64 -B build
+        cmake . \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=${{matrix.shared}} \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_USE_BUILTIN_TBB=ON \
+          -DMANIFOLD_DEBUG=ON \
+          -DMANIFOLD_ASSERT=ON \
+          -DMANIFOLD_PAR=${{matrix.parallelization}} \
+          -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
+          -A x64 -B build
         cmake --build build --target ALL_BUILD --config Release
     - name: Test dll location
       if: matrix.shared == 'ON'
@@ -256,14 +317,10 @@ jobs:
       shell: bash
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
-        cd build/bin/Release
-        ./manifold_test.exe
-        cd ../../
+        ./build/bin/Release/manifold_test.exe
     - name: test cmake consumer
       run: |
-        cd build
-        cmake --install .
-        cd ..
+        cmake --install build
         ./scripts/test-cmake.sh
 
   build_mxe:
@@ -276,6 +333,11 @@ jobs:
     container: openscad/mxe-x86_64-gui:latest
     steps:
     - uses: actions/checkout@v4
+    - uses: ./.github/actions/git-clone
+      with:
+        name: clipper2
+        url: https://github.com/AngusJohnson/Clipper2.git
+        rev: 46f639177fe418f9689e8ddb74f08a870c71f5b4
     - name: Build
       run: |
         mkdir build
@@ -286,7 +348,17 @@ jobs:
         export MXETARGETDIR=$MXEDIR/usr/$MXE_TARGETS
         export PATH=/mxe/usr/bin:$PATH
         export CMAKE=$MXE_TARGETS-cmake
-        $CMAKE -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_STRICT=ON -DMANIFOLD_PYBIND=OFF -DMANIFOLD_CBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallelization}} .. && make
+        $CMAKE \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PYBIND=OFF \
+          -DMANIFOLD_CBIND=ON \
+          -DMANIFOLD_DEBUG=ON \
+          -DMANIFOLD_PAR=${{matrix.parallelization}} \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          ..
+        make
 
   build_mac:
     name: MacOS (TBB:${{matrix.parallelization == 'ON'}}, shared lib:${{matrix.shared == 'ON'}}, ${{matrix.os}})
@@ -324,9 +396,7 @@ jobs:
         cd ../../
     - name: test cmake consumer
       run: |
-        cd build
-        sudo cmake --install .
-        cd ..
+        sudo cmake --install build
         ./scripts/test-cmake.sh
     - name: test pkg-config consumer
       if: matrix.shared == 'ON'
