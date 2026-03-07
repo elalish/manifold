@@ -445,8 +445,8 @@ jobs:
     - *clone-clipper2
     - name: test cmake consumer subdir
       run: |
-        expor CLIPPER2=${pwd}/clipper2
-        expor TBB=${pwd}/tbb
+        export CLIPPER2=${pwd}/clipper2
+        export TBB=${pwd}/tbb
         cd ..
         ./manifold/scripts/test-cmake-subdir.sh
     - name: Build
