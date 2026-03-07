@@ -28,3 +28,4 @@ runs:
         git remote add origin ${{inputs.url}}
         git fetch --depth 1 origin ${{inputs.rev}}
         git checkout ${{inputs.rev}}
+        git submodule update --init --recursive
