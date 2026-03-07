@@ -111,7 +111,7 @@ jobs:
       with:
         node-version: 24
         cache: 'npm'
-        cache-dependency-path: [bindings/wasm/package-lock.json, bindings/wasm/examples/*/package-lock.json]
+        cache-dependency-path: bindings/**/package-lock.json
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
