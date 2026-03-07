@@ -147,27 +147,27 @@ jobs:
         sudo cmake --install build
         ./scripts/test-cmake.sh
 
-  build_gcc_codecov:
+  build_codecov:
     name: code coverage
     timeout-minutes: 45
     strategy:
       matrix:
         parallelization: [OFF, ON]
     env:
-      CC: gcc-14
-      CXX: g++-14
+      CC: clang
+      CXX: clang++
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev git libtbb-dev pkg-config lcov cmake
+        packages: libgtest-dev git libtbb-dev pkg-config cmake clang ninja
     - *clone-clipper2
     - name: build clipper2
       run: |
         cd clipper2/CPP
-        cmake -DCMAKE_BUILD_TYPE=Release . -B build
+        cmake -DCMAKE_BUILD_TYPE=Release -GNinja . -B build
         cmake --build build
         sudo cmake --install build
 
@@ -175,7 +175,7 @@ jobs:
       run: |
         cmake \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DBUILD_SHARED_LIBS=ON \
+          -DBUILD_SHARED_LIBS=OFF \
           -DMANIFOLD_STRICT=ON \
           -DMANIFOLD_PYBIND=OFF \
           -DMANIFOLD_DEBUG=ON \
@@ -183,16 +183,14 @@ jobs:
           -DMANIFOLD_CROSS_SECTION=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           -DCODE_COVERAGE=ON \
-          . -B build
+          . -GNinja -B build
         cmake --build build
     - name: Coverage Report
       run: |
         cd build
-        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
         test/manifold_test
-        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
-        lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --extract ./code_coverage_total.info "/*/manifold/src/*" --output-file ./code_coverage.info
+        llvm-profdata merge -sparse *.profraw -o manifold.profdata
+        llvm-cov export -format=lcov --instr-profile manifold.profdata test/manifold_test -sources ../src/* > code_coverage.info
     - uses: codecov/codecov-action@v5
       with:
         disable_search: true
