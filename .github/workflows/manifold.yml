@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-2025
     steps:
     - uses: actions/checkout@v4
-    - uses: lukka/get-cmake@4.2.3
+    - uses: lukka/get-cmake@v4.2.3
       with:
         cmakeVersion: 4.0.2
     - &clone-tbb
@@ -239,7 +239,7 @@ jobs:
           -DMANIFOLD_ASSERT=${{matrix.debug}} \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
-          .. -B build
+          . -B build
         cd build
         emmake make
     - name: Test WASM
@@ -322,6 +322,7 @@ jobs:
         packages: libgtest-dev clang cmake
         version: 1
     - name: Install brew packages
+      if: matrix.os == 'macos-latest'
       run: |
         brew install googletest cmake
     - *clone-clipper2
@@ -373,7 +374,7 @@ jobs:
           -DMANIFOLD_DEBUG=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
-          .. -B build
+          . -B build
         $CMAKE --build build
 
   build_mac:
