@@ -115,8 +115,8 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
         packages: libgtest-dev libassimp-dev git libtbb-dev pkg-config cmake
-    - <<: *clone-clipper2
-    - <<: *clone-nanobind
+    - *clone-clipper2
+    - *clone-nanobind
 
     - name: Build
       run: |
@@ -163,7 +163,7 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
         packages: libgtest-dev git libtbb-dev pkg-config lcov cmake
-    - <<: *clone-clipper2
+    - *clone-clipper2
     - name: build clipper2
       run: |
         cd clipper2/CPP
@@ -226,8 +226,8 @@ jobs:
       uses: mymindstorm/setup-emsdk@v14
       with:
         version: 5.0.2
-    - <<: *clone-tbb
-    - <<: *clone-clipper2
+    - *clone-tbb
+    - *clone-clipper2
     - name: Build WASM ${{matrix.parallelization}}
       run: |
         emcmake cmake \
@@ -324,7 +324,7 @@ jobs:
     - name: Install brew packages
       run: |
         brew install googletest cmake
-    - <<: *clone-clipper2
+    - *clone-clipper2
     - uses: ./.github/actions/git-clone
       with:
         name: fuzztest
@@ -355,7 +355,7 @@ jobs:
     container: openscad/mxe-x86_64-gui:latest
     steps:
     - uses: actions/checkout@v4
-    - <<: *clone-clipper2
+    - *clone-clipper2
     - name: Build
       run: |
         export MXEDIR=/mxe
@@ -400,7 +400,7 @@ jobs:
     - name: Install TBB
       if: matrix.parallelization == 'ON'
       run: brew install tbb
-    - <<: *clone-clipper2
+    - *clone-clipper2
     - name: Build
       run: |
         cmake \
@@ -440,8 +440,8 @@ jobs:
       run: |
         brew install googletest cmake
         pip install trimesh pytest
-    - <<: *clone-tbb
-    - <<: *clone-clipper2
+    - *clone-tbb
+    - *clone-clipper2
     - name: test cmake consumer subdir
       run: |
         expor CLIPPER2=${pwd}/clipper2
