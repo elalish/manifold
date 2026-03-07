@@ -19,7 +19,7 @@ runs:
         key: ${{inputs.url}}@${{inputs.rev}}
 
     - name: download
-      if: steps.cacherestore.outputs.cache-hit != 'true'
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         mkdir ${{inputs.name}}
