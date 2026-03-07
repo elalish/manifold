@@ -55,25 +55,42 @@
 // The TypeDoc comments are important, and clang-format will stomp on them.
 // clang-format off
 /** @group Animation */
-export type {AnimationMode} from '../lib/animation';
+export type { AnimationMode } from '../lib/animation';
 /** @group Animation */
-export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from '../lib/animation';
+export {
+  getAnimationDuration,
+  getAnimationFPS,
+  getAnimationMode,
+  setMorphEnd,
+  setMorphStart,
+} from '../lib/animation';
 /** @group Material */
-export {only, show} from '../lib/debug';
+export { only, show } from '../lib/debug';
 /** @group Material */
-export type {GLTFAttribute, GLTFMaterial} from '../lib/gltf-node';
+export type { GLTFAttribute, GLTFMaterial } from '../lib/gltf-node';
 /** @group Scene Graph */
-export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode, CrossSectionGLTFNode} from '../lib/gltf-node';
+export {
+  BaseGLTFNode,
+  getGLTFNodes,
+  GLTFNode,
+  resetGLTFNodes,
+  VisualizationGLTFNode,
+  CrossSectionGLTFNode,
+} from '../lib/gltf-node';
 /** @group Input & Output */
-export {importManifold, importModel} from '../lib/import-model';
+export { importManifold, importModel } from '../lib/import-model';
 /** @group Level of Detail */
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail'
+export {
+  getCircularSegments,
+  getMinCircularAngle,
+  getMinCircularEdgeLength,
+} from '../lib/level-of-detail';
 /** @group Material */
-export {setMaterial} from '../lib/material';
+export { setMaterial } from '../lib/material';
 /** @group Basics */
-export {CrossSection, Manifold} from '../manifold';
+export { CrossSection, Manifold } from '../manifold';
 /** @group Polygons */
-export {triangulate} from '../manifold';
+export { triangulate } from '../manifold';
 // clang-format on
 
 /**
@@ -82,22 +99,30 @@ export {triangulate} from '../manifold';
  * @returns boolean
  * @group Information
  */
-export declare function isManifoldCAD(): boolean
+export declare function isManifoldCAD(): boolean;
 
 /* Type Aliases */
 export type {
-  Mat3, Mat4, Vec2, Vec3,
-  Polygons, SimplePolygon, FillRule, JoinType,
-  Box, Rect, Smoothness,
-  ErrorStatus
+  Mat3,
+  Mat4,
+  Vec2,
+  Vec3,
+  Polygons,
+  SimplePolygon,
+  FillRule,
+  JoinType,
+  Box,
+  Rect,
+  Smoothness,
+  ErrorStatus,
 } from '../manifold';
 
 /* See the Developer Guide for more detail on these: */
 /** @internal */
-export type {SealedFloat32Array, SealedUint32Array} from '../manifold';
+export type { SealedFloat32Array, SealedUint32Array } from '../manifold';
 /** @internal */
-export type {ImportOptions} from '../lib/import-model';
+export type { ImportOptions } from '../lib/import-model';
 /** @internal */
-export type {MeshOptions} from '../manifold';
+export type { MeshOptions } from '../manifold';
 /** @internal */
-export {Mesh} from '../manifold';
+export { Mesh } from '../manifold';

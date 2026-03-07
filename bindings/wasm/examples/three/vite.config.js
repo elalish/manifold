@@ -1,15 +1,15 @@
 // vite.config.js
-import {resolve} from 'path'
-import {defineConfig} from 'vite'
+import { resolve } from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  worker: {format: 'es'},
+  worker: { format: 'es' },
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
-    fs: {allow: [resolve(__dirname, '../..')]}
+    fs: { allow: [resolve(__dirname, '../..')] },
   },
   build: {
     target: 'esnext',
@@ -21,8 +21,8 @@ export default defineConfig({
       output: {
         entryFileNames: `assets/three/[name].js`,
         chunkFileNames: `assets/three/[name].js`,
-        assetFileNames: `assets/three/[name].[ext]`
-      }
-    }
+        assetFileNames: `assets/three/[name].[ext]`,
+      },
+    },
   },
-})
+});

@@ -20,12 +20,12 @@
  * @category Core
  */
 
-import type {ManifoldToplevel} from '../manifold.d.ts';
+import type { ManifoldToplevel } from '../manifold.d.ts';
 import Module from '../manifold.js';
 
 // Instantiate Manifold WASM
-let manifoldwasm: ManifoldToplevel|null = null;
-let wasmUrl: string|null = null;
+let manifoldwasm: ManifoldToplevel | null = null;
+let wasmUrl: string | null = null;
 
 /**
  * Tell us how to find `manifold.wasm`.
@@ -43,9 +43,9 @@ export function setWasmUrl(url: string) {
  * @returns The newly created instance.
  */
 export async function instantiateManifold(): Promise<ManifoldToplevel> {
-  let module: ManifoldToplevel|null = null;
+  let module: ManifoldToplevel | null = null;
   if (typeof wasmUrl === 'string' && !!wasmUrl) {
-    module = await Module({locateFile : () => wasmUrl!});
+    module = await Module({ locateFile: () => wasmUrl! });
   } else {
     module = await Module();
   }
@@ -68,6 +68,6 @@ export async function getManifoldModule(): Promise<ManifoldToplevel> {
  *
  * @returns A manifold instance.
  */
-export function getManifoldModuleSync(): ManifoldToplevel|null {
+export function getManifoldModuleSync(): ManifoldToplevel | null {
   return manifoldwasm;
 }

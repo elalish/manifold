@@ -1,6 +1,6 @@
-import {beforeAll, expect, suite, test} from 'vitest';
+import { beforeAll, expect, suite, test } from 'vitest';
 
-import Module, {type ManifoldToplevel} from '../manifold'
+import Module, { type ManifoldToplevel } from '../manifold';
 
 let manifoldModule: ManifoldToplevel;
 
@@ -45,10 +45,13 @@ suite('Manifold Bindings', () => {
     // faces, tangents are parallel to the edges so d == 0 exactly, making
     // edgeDivisions return 0 for *any* tolerance. This triggers longest == 0 in
     // the keepInterior block — the integer divide-by-zero that traps in WASM.
-    const cube =
-        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(0, 30);
-    const smooth =
-        manifoldModule.Manifold.ofMesh(cube.getMesh(0)).smoothByNormals(0);
+    const cube = manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(
+      0,
+      30,
+    );
+    const smooth = manifoldModule.Manifold.ofMesh(
+      cube.getMesh(0),
+    ).smoothByNormals(0);
     // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
     const refined = smooth.refineToTolerance(0.1);
     expect(refined.volume()).toBeGreaterThan(0);

@@ -264,7 +264,7 @@ inline SimpleRecorder<F> MakeSimpleRecorder(F& f) {
 /** @ingroup Private */
 class Collider {
  public:
-  Collider() {};
+  Collider(){};
 
   Collider(const VecView<const Box>& leafBB,
            const VecView<const uint32_t>& leafMorton) {

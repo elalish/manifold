@@ -17,7 +17,7 @@
  * @packageDocumentation
  */
 
-import {originalPositionFor, TraceMap} from '@jridgewell/trace-mapping';
+import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import convert from 'convert-source-map';
 
 /**
@@ -26,7 +26,7 @@ import convert from 'convert-source-map';
  * @returns A boolean.
  */
 export const isWebWorker = (): boolean =>
-    typeof self !== 'undefined' && typeof self.document == 'undefined';
+  typeof self !== 'undefined' && typeof self.document == 'undefined';
 
 /**
  * Are we in Node?
@@ -34,10 +34,13 @@ export const isWebWorker = (): boolean =>
  * @returns A boolean.
  */
 export const isNode = (): boolean =>
-    typeof process !== 'undefined' && !!process?.versions?.node;
+  typeof process !== 'undefined' && !!process?.versions?.node;
 
 const parseV8StackTrace = (stack: string) =>
-    stack.split('\n').filter(frame => frame.match(/<anonymous>/)).map(frame => {
+  stack
+    .split('\n')
+    .filter((frame) => frame.match(/<anonymous>/))
+    .map((frame) => {
       const matches = frame.matchAll(/:([0-9]+):([0-9]+)\)$/g).next().value;
       const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
       const methodName = frame.match(/^\s+at\s([^\s]+)/)![1];
@@ -45,25 +48,27 @@ const parseV8StackTrace = (stack: string) =>
         line,
         column,
         // In Node or Chrome, a function constructor shows as 'eval'.
-        methodName: methodName === 'eval' ? null : methodName
+        methodName: methodName === 'eval' ? null : methodName,
       };
     });
 
 const parseSpiderMonkeyStackTrace = (stack: string) =>
-    stack.split('\n')
-        .filter(frame => frame.match(/AsyncFunction/))
-        .map(frame => {
-          const matches =
-              frame.matchAll(/AsyncFunction:([0-9]+):([0-9]+)/g).next().value;
-          const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
-          const methodName = frame.match(/^[^@]+/)![0];
-          return {
-            line,
-            column,
-            // In Firefox, a function constructor shows as 'anonymous'.
-            methodName: methodName === 'anonymous' ? null : methodName
-          };
-        });
+  stack
+    .split('\n')
+    .filter((frame) => frame.match(/AsyncFunction/))
+    .map((frame) => {
+      const matches = frame
+        .matchAll(/AsyncFunction:([0-9]+):([0-9]+)/g)
+        .next().value;
+      const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
+      const methodName = frame.match(/^[^@]+/)![0];
+      return {
+        line,
+        column,
+        // In Firefox, a function constructor shows as 'anonymous'.
+        methodName: methodName === 'anonymous' ? null : methodName,
+      };
+    });
 
 /**
  * Attempt to parse a stack trace from a dynamically created function.
@@ -80,64 +85,76 @@ export const parseStackTrace = (stack: string) => {
   } else if (stack.match(/^([^@]+)@/gm)) {
     // SpiderMonkey -- Firefox
     return parseSpiderMonkeyStackTrace(stack);
-  } else
-    return [];
+  } else return [];
 };
 
-export const getSourceMappedStackTrace =
-    (code: string, error: Error, lineOffset: number = 0): string|undefined => {
-      const converter = convert.fromSource(code);
-      if (!converter || !error.stack) {
-        // No inline source map.  We can't do anything.
-        return error.stack
+export const getSourceMappedStackTrace = (
+  code: string,
+  error: Error,
+  lineOffset: number = 0,
+): string | undefined => {
+  const converter = convert.fromSource(code);
+  if (!converter || !error.stack) {
+    // No inline source map.  We can't do anything.
+    return error.stack;
+  }
+  const parsed = parseStackTrace(error.stack);
+  if (!parsed.length) {
+    // We can't parse this.  Chances are, it's someone in Safari.
+    return error.stack;
+  }
+  const tracer = new TraceMap(converter!.toObject());
+  const stack = parsed.map((frame) => {
+    if (frame.line! + lineOffset < 1) {
+      return frame; // Line number is out of range.
+    }
+    const {
+      line,
+      column,
+      source: file,
+    } = originalPositionFor(tracer, {
+      line: frame.line! + lineOffset,
+      column: frame.column!,
+    });
+    const { methodName } = frame;
+    // column numbers should be 1 indexed.  Results are 0 indexed.
+    return { line, column: column! + 1, file, methodName };
+  });
+
+  return [
+    error.toString(),
+    ...stack.map((frame: any) => {
+      const location = `${frame.file}:${frame.line}:${frame.column}`;
+      if (frame.methodName) {
+        return `    at ${frame.methodName} (${location})`;
+      } else {
+        return `    at ${location}`;
       }
-      const parsed = parseStackTrace(error.stack);
-      if (!parsed.length) {
-        // We can't parse this.  Chances are, it's someone in Safari.
-        return error.stack
-      }
-      const tracer = new TraceMap(converter!.toObject());
-      const stack = parsed.map(frame => {
-        if ((frame.line! + lineOffset) < 1) {
-          return frame;  // Line number is out of range.
-        }
-        const {line, column, source: file} = originalPositionFor(
-            tracer, {line: frame.line! + lineOffset, column: frame.column!});
-        const {methodName} = frame;
-        // column numbers should be 1 indexed.  Results are 0 indexed.
-        return {line, column: column! + 1, file, methodName};
-      });
+    }),
+  ].reduce((acc, cur) => `${acc}\n${cur}`);
+};
 
-      return [
-        error.toString(), ...stack.map((frame: any) => {
-          const location = `${frame.file}:${frame.line}:${frame.column}`;
-          if (frame.methodName) {
-            return `    at ${frame.methodName} (${location})`;
-          } else {
-            return `    at ${location}`;
-          }
-        })
-      ].reduce((acc, cur) => `${acc}\n${cur}`);
-    };
+export const findExtension = (
+  extension: string,
+  list: Array<{ extension: string }>,
+) => {
+  let match = list.find((entry) => entry.extension === extension);
+  if (match) return match;
+  match = list.find((entry) => `.${entry.extension}` === extension);
+  if (match) return match;
 
-export const findExtension =
-    (extension: string, list: Array<{extension: string}>) => {
-      let match = list.find(entry => entry.extension === extension);
-      if (match) return match;
-      match = list.find(entry => `.${entry.extension}` === extension);
-      if (match) return match;
+  // Do we have a filename instead of just an extension?
+  const fileExt = extension.match(/(\.[^\.]+)$/);
+  if (!fileExt) return null;
 
-      // Do we have a filename instead of just an extension?
-      const fileExt = extension.match(/(\.[^\.]+)$/);
-      if (!fileExt) return null;
+  const [ext] = fileExt;
+  match = list.find((entry) => entry.extension === ext);
+  if (match) return match;
+  match = list.find((entry) => `.${entry.extension}` === ext);
+  return match;
+};
 
-      const [ext] = fileExt;
-      match = list.find(entry => entry.extension === ext);
-      if (match) return match;
-      match = list.find(entry => `.${entry.extension}` === ext);
-      return match;
-    };
-
-export const findMimeType =
-    (mimetype: string, list: Array<{mimetype: string}>) =>
-        list.find(entry => entry.mimetype === mimetype);
+export const findMimeType = (
+  mimetype: string,
+  list: Array<{ mimetype: string }>,
+) => list.find((entry) => entry.mimetype === mimetype);

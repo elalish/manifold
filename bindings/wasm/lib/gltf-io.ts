@@ -31,15 +31,15 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
-import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
 
-import type {Mesh as ManifoldMesh, MeshOptions} from '../manifold.d.ts';
+import type { Mesh as ManifoldMesh, MeshOptions } from '../manifold.d.ts';
 
-import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
+import { EXTManifold, ManifoldPrimitive } from './manifold-gltf.ts';
 
 const binaryFormat = {
   extension: 'glb',
-  mimetype: 'model/gltf-binary'
+  mimetype: 'model/gltf-binary',
 };
 
 /**
@@ -54,23 +54,22 @@ export const importFormats = [binaryFormat];
  */
 export const exportFormats = [binaryFormat];
 
-
 export const attributeDefs = {
-  'POSITION': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
-  'NORMAL': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
-  'TANGENT': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
-  'TEXCOORD_0': {type: GLTFTransform.Accessor.Type.VEC2, components: 2},
-  'TEXCOORD_1': {type: GLTFTransform.Accessor.Type.VEC2, components: 2},
-  'COLOR_0': {type: GLTFTransform.Accessor.Type.VEC3, components: 3},
-  'JOINTS_0': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
-  'WEIGHTS_0': {type: GLTFTransform.Accessor.Type.VEC4, components: 4},
-  'SKIP_1': {type: null, components: 1},
-  'SKIP_2': {type: null, components: 2},
-  'SKIP_3': {type: null, components: 3},
-  'SKIP_4': {type: null, components: 4},
+  POSITION: { type: GLTFTransform.Accessor.Type.VEC3, components: 3 },
+  NORMAL: { type: GLTFTransform.Accessor.Type.VEC3, components: 3 },
+  TANGENT: { type: GLTFTransform.Accessor.Type.VEC4, components: 4 },
+  TEXCOORD_0: { type: GLTFTransform.Accessor.Type.VEC2, components: 2 },
+  TEXCOORD_1: { type: GLTFTransform.Accessor.Type.VEC2, components: 2 },
+  COLOR_0: { type: GLTFTransform.Accessor.Type.VEC3, components: 3 },
+  JOINTS_0: { type: GLTFTransform.Accessor.Type.VEC4, components: 4 },
+  WEIGHTS_0: { type: GLTFTransform.Accessor.Type.VEC4, components: 4 },
+  SKIP_1: { type: null, components: 1 },
+  SKIP_2: { type: null, components: 2 },
+  SKIP_3: { type: null, components: 3 },
+  SKIP_4: { type: null, components: 4 },
 };
 
-export type Attribute = keyof(typeof attributeDefs);
+export type Attribute = keyof typeof attributeDefs;
 
 export interface Properties {
   material: GLTFTransform.Material;
@@ -106,8 +105,9 @@ export function setupIO(io: GLTFTransform.WebIO) {
  *     primitive and those requested in the attributes input.
  */
 export function readMesh(
-    mesh: GLTFTransform.Mesh, attributes: Attribute[] = []):
-    {mesh: MeshOptions, runProperties: Properties[]}|null {
+  mesh: GLTFTransform.Mesh,
+  attributes: Attribute[] = [],
+): { mesh: MeshOptions; runProperties: Properties[] } | null {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
     return null;
@@ -137,14 +137,18 @@ export function readMesh(
     throw new Error('First attribute must be "POSITION".');
 
   let numProp = 0;
-  const attributeOffsets = attributes.map((numProp = 0, def => {
-    const last = numProp;
-    numProp += attributeDefs[def].components;
-    return last;
-  }));
+  const attributeOffsets = attributes.map(
+    ((numProp = 0),
+    (def) => {
+      const last = numProp;
+      numProp += attributeDefs[def].components;
+      return last;
+    }),
+  );
 
-  const manifoldPrimitive =
-      mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
+  const manifoldPrimitive = mesh.getExtension(
+    'EXT_mesh_manifold',
+  ) as ManifoldPrimitive;
 
   let vertPropArray = Array<number>();
   let triVertArray = Array<number>();
@@ -175,7 +179,11 @@ export function readMesh(
             foundAttribute[idx] = true;
             const accessor = primitive.getAttribute(attributeIn)!;
             writeProperties(
-                vertPropArray, accessor, numProp, attributeOffsets[idx]);
+              vertPropArray,
+              accessor,
+              numProp,
+              attributeOffsets[idx],
+            );
           }
         }
       });
@@ -184,7 +192,7 @@ export function readMesh(
       runIndexArray.push(triVertArray.length);
       runProperties.push({
         material: primitive.getMaterial()!,
-        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+        attributes: attributesIn.filter((b) => attributes.some((a) => a == b)),
       });
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
@@ -205,16 +213,20 @@ export function readMesh(
         continue;
       }
       const numVert = vertPropArray.length / numProp;
-      vertPropArray =
-          [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
-      triVertArray =
-          [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
+      vertPropArray = [
+        ...vertPropArray,
+        ...readPrimitive(primitive, numProp, attributes),
+      ];
+      triVertArray = [
+        ...triVertArray,
+        ...indices.getArray()!.map((i) => i + numVert),
+      ];
       runIndexArray.push(triVertArray.length);
 
       const attributesIn = primitive.listSemantics() as Attribute[];
       runProperties.push({
         material: primitive.getMaterial()!,
-        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+        attributes: attributesIn.filter((b) => attributes.some((a) => a == b)),
       });
     }
   }
@@ -224,10 +236,16 @@ export function readMesh(
   const mergeFromVert = new Uint32Array(mergeFromVertArray);
   const mergeToVert = new Uint32Array(mergeToVertArray);
 
-  const meshOut =
-      {numProp, triVerts, vertProperties, runIndex, mergeFromVert, mergeToVert};
+  const meshOut = {
+    numProp,
+    triVerts,
+    vertProperties,
+    runIndex,
+    mergeFromVert,
+    mergeToVert,
+  };
 
-  return {mesh: meshOut, runProperties};
+  return { mesh: meshOut, runProperties };
 }
 
 /**
@@ -251,9 +269,11 @@ export function readMesh(
  * @returns The glTF Mesh to add to the Document.
  */
 export function writeMesh(
-    doc: GLTFTransform.Document, manifoldMesh: ManifoldMesh,
-    id2properties: Map<number, Properties>,
-    EXT_mesh_manifold: boolean = true): GLTFTransform.Mesh {
+  doc: GLTFTransform.Document,
+  manifoldMesh: ManifoldMesh,
+  id2properties: Map<number, Properties>,
+  EXT_mesh_manifold: boolean = true,
+): GLTFTransform.Mesh {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
@@ -278,20 +298,23 @@ export function writeMesh(
  * will exist and have positions, but will not have visible geometry.
  */
 function writePrimitiveAttributes(
-    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
-    manifoldMesh: ManifoldMesh, id2properties: Map<number, Properties>) {
+  doc: GLTFTransform.Document,
+  mesh: GLTFTransform.Mesh,
+  manifoldMesh: ManifoldMesh,
+  id2properties: Map<number, Properties>,
+) {
   const attributeUnion = Array<Attribute>();
   const primitive2attributes = new Map<GLTFTransform.Primitive, Attribute[]>();
 
   // For each run, create a primitive, set material and collate attributes.
   const buffer = doc.getRoot().listBuffers()[0];
-  for (let run = 0; run < (manifoldMesh.runIndex.length - 1); run++) {
+  for (let run = 0; run < manifoldMesh.runIndex.length - 1; run++) {
     const id = manifoldMesh.runOriginalID[run];
     const primitive = doc.createPrimitive();
 
     const properties = id2properties.get(id);
     if (properties) {
-      const {material, attributes} = properties;
+      const { material, attributes } = properties;
       if (attributes.length < 1 || attributes[0] !== 'POSITION')
         throw new Error('First attribute must be "POSITION".');
 
@@ -306,8 +329,11 @@ function writePrimitiveAttributes(
           const unionSize = attributeDefs[attributeUnion[i]].components;
           if (size != unionSize) {
             throw new Error(
-                'Attribute sizes do not correspond: ' + attribute + ' and ' +
-                attributeUnion[i]);
+              'Attribute sizes do not correspond: ' +
+                attribute +
+                ' and ' +
+                attributeUnion[i],
+            );
           }
           if (attributeDefs[attributeUnion[i]].type == null) {
             attributeUnion[i] = attribute;
@@ -350,15 +376,18 @@ function writePrimitiveAttributes(
       }
     }
 
-    const accessor = doc.createAccessor(attribute)
-                         .setBuffer(buffer)
-                         .setType(def.type)
-                         .setArray(array);
+    const accessor = doc
+      .createAccessor(attribute)
+      .setBuffer(buffer)
+      .setType(def.type)
+      .setArray(array);
 
     for (const primitive of mesh.listPrimitives()) {
       const attributes = primitive2attributes.get(primitive)!;
-      if (attributes.length > aIdx &&
-          attributeDefs[attributes[aIdx]].type != null) {
+      if (
+        attributes.length > aIdx &&
+        attributeDefs[attributes[aIdx]].type != null
+      ) {
         primitive.setAttribute(attribute, accessor);
       }
     }
@@ -367,30 +396,33 @@ function writePrimitiveAttributes(
 }
 
 function writeExtMeshManifoldIndices(
-    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
-    manifoldMesh: ManifoldMesh) {
+  doc: GLTFTransform.Document,
+  mesh: GLTFTransform.Mesh,
+  manifoldMesh: ManifoldMesh,
+) {
   const manifoldExtension = doc.createExtension(EXTManifold);
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_mesh_manifold', manifoldPrimitive);
 
   const buffer = doc.getRoot().listBuffers()[0];
-  const {runIndex} = manifoldMesh;
+  const { runIndex } = manifoldMesh;
 
   mesh.listPrimitives().forEach((primitive, n) => {
     // These indices will be populated by `manifold-gtlf` when the
     // document is written out by glTF transform.
-    const indices = doc.createAccessor('primitive indices of ID ' + runIndex[n])
-                        .setBuffer(buffer)
-                        .setType(GLTFTransform.Accessor.Type.SCALAR)
-                        .setArray(new Uint32Array(1));
+    const indices = doc
+      .createAccessor('primitive indices of ID ' + runIndex[n])
+      .setBuffer(buffer)
+      .setType(GLTFTransform.Accessor.Type.SCALAR)
+      .setArray(new Uint32Array(1));
     primitive.setIndices(indices);
   });
 
-  const indices =
-      doc.createAccessor('manifold indices')
-          .setBuffer(buffer)
-          .setType(GLTFTransform.Accessor.Type.SCALAR)
-          .setArray(manifoldMesh.triVerts as Uint32Array<ArrayBuffer>);
+  const indices = doc
+    .createAccessor('manifold indices')
+    .setBuffer(buffer)
+    .setType(GLTFTransform.Accessor.Type.SCALAR)
+    .setArray(manifoldMesh.triVerts as Uint32Array<ArrayBuffer>);
   manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(runIndex);
 
@@ -411,30 +443,34 @@ function writeExtMeshManifoldIndices(
     }
   }
   if (ind.length > 0) {
-    const indicesAccessor = doc.createAccessor('merge from')
-                                .setBuffer(buffer)
-                                .setType(GLTFTransform.Accessor.Type.SCALAR)
-                                .setArray(new Uint32Array(ind));
-    const valuesAccessor = doc.createAccessor('merge to')
-                               .setBuffer(buffer)
-                               .setType(GLTFTransform.Accessor.Type.SCALAR)
-                               .setArray(new Uint32Array(val));
+    const indicesAccessor = doc
+      .createAccessor('merge from')
+      .setBuffer(buffer)
+      .setType(GLTFTransform.Accessor.Type.SCALAR)
+      .setArray(new Uint32Array(ind));
+    const valuesAccessor = doc
+      .createAccessor('merge to')
+      .setBuffer(buffer)
+      .setType(GLTFTransform.Accessor.Type.SCALAR)
+      .setArray(new Uint32Array(val));
     manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
   }
 }
 
 function writePlainIndices(
-    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
-    manifoldMesh: ManifoldMesh) {
+  doc: GLTFTransform.Document,
+  mesh: GLTFTransform.Mesh,
+  manifoldMesh: ManifoldMesh,
+) {
   const buffer = doc.getRoot().listBuffers()[0];
-  const {runIndex} = manifoldMesh;
+  const { runIndex } = manifoldMesh;
 
   mesh.listPrimitives().forEach((primitive, n) => {
-    const indices = doc.createAccessor('primitive indices of ID ' + runIndex[n])
-                        .setBuffer(buffer)
-                        .setType(GLTFTransform.Accessor.Type.SCALAR)
-                        .setArray(manifoldMesh.triVerts.slice(
-                            runIndex[n], runIndex[n + 1]));
+    const indices = doc
+      .createAccessor('primitive indices of ID ' + runIndex[n])
+      .setBuffer(buffer)
+      .setType(GLTFTransform.Accessor.Type.SCALAR)
+      .setArray(manifoldMesh.triVerts.slice(runIndex[n], runIndex[n + 1]));
     primitive.setIndices(indices);
   });
 }
@@ -453,8 +489,9 @@ export function disposeMesh(mesh: GLTFTransform.Mesh) {
     }
   }
 
-  const manifoldPrimitive =
-      mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
+  const manifoldPrimitive = mesh.getExtension(
+    'EXT_mesh_manifold',
+  ) as ManifoldPrimitive;
   if (manifoldPrimitive) {
     manifoldPrimitive.getIndices()?.dispose();
     manifoldPrimitive.getMergeIndices()?.dispose();
@@ -478,8 +515,11 @@ export async function loadTexture(texture: GLTFTransform.Texture, uri: string) {
 }
 
 function writeProperties(
-    vertProperties: number[], accessor: GLTFTransform.Accessor, numProp: number,
-    offset: number) {
+  vertProperties: number[],
+  accessor: GLTFTransform.Accessor,
+  numProp: number,
+  offset: number,
+) {
   const array = accessor.getArray()!;
   const size = accessor.getElementSize();
   const numVert = accessor.getCount();
@@ -491,8 +531,10 @@ function writeProperties(
 }
 
 function readPrimitive(
-    primitive: GLTFTransform.Primitive, numProp: number,
-    attributes: Attribute[]) {
+  primitive: GLTFTransform.Primitive,
+  numProp: number,
+  attributes: Attribute[],
+) {
   const vertProperties: number[] = [];
   let offset = 0;
   for (const attribute of attributes) {
@@ -510,7 +552,7 @@ function readPrimitive(
   return vertProperties;
 }
 
-let _io: GLTFTransform.PlatformIO|null = null;
+let _io: GLTFTransform.PlatformIO | null = null;
 
 /**
  * Return an appropriate PlatformIO object.
@@ -527,8 +569,9 @@ const getIO = (): GLTFTransform.PlatformIO => {
 /**
  * @group Export
  */
-export async function toArrayBuffer(doc: GLTFTransform.Document):
-    Promise<ArrayBuffer> {
+export async function toArrayBuffer(
+  doc: GLTFTransform.Document,
+): Promise<ArrayBuffer> {
   return (await getIO().writeBinary(doc)).buffer as ArrayBuffer;
 }
 

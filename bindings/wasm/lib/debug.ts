@@ -20,14 +20,17 @@
  * @category Modelling
  */
 
-import {Document} from '@gltf-transform/core';
+import { Document } from '@gltf-transform/core';
 
-import type {Manifold, Mesh} from '../manifold.d.ts';
+import type { Manifold, Mesh } from '../manifold.d.ts';
 
-import type {Properties} from './gltf-io.ts';
-import {writeMesh} from './gltf-io.ts';
-import type {GLTFMaterial} from './gltf-node.ts';
-import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
+import type { Properties } from './gltf-io.ts';
+import { writeMesh } from './gltf-io.ts';
+import type { GLTFMaterial } from './gltf-node.ts';
+import {
+  getCachedMaterial,
+  getMaterialByID as getOriginalMaterialByID,
+} from './material.ts';
 
 // Debug setup to show source meshes
 let ghost = false;
@@ -38,14 +41,14 @@ const SHOW = {
   baseColorFactor: [1, 0, 0],
   alpha: 0.25,
   roughness: 1,
-  metallic: 0
+  metallic: 0,
 } as GLTFMaterial;
 
 const GHOST = {
   baseColorFactor: [0.5, 0.5, 0.5],
   alpha: 0.25,
   roughness: 1,
-  metallic: 0
+  metallic: 0,
 } as GLTFMaterial;
 
 export function cleanup() {
@@ -54,10 +57,9 @@ export function cleanup() {
   singles.clear();
 }
 
-const getDebugMeshByID = (id: number):
-    Mesh|undefined => {
-      return shown.has(id) ? shown.get(id) : singles.get(id);
-    }
+const getDebugMeshByID = (id: number): Mesh | undefined => {
+  return shown.has(id) ? shown.get(id) : singles.get(id);
+};
 
 /**
  * Material for a debug visualization.
@@ -72,16 +74,15 @@ const getDebugMeshByID = (id: number):
  *
  * @param id The `originalID` of the mesh.
  */
-const getDebugMaterialByID = (id: number):
-    GLTFMaterial|undefined => {
-      const show = shown.has(id);
-      const inMesh = show ? shown.get(id) : singles.get(id);
-      if (show && inMesh) {
-        return SHOW;
-      }
+const getDebugMaterialByID = (id: number): GLTFMaterial | undefined => {
+  const show = shown.has(id);
+  const inMesh = show ? shown.get(id) : singles.get(id);
+  if (show && inMesh) {
+    return SHOW;
+  }
 
-      return getOriginalMaterialByID(id);
-    }
+  return getOriginalMaterialByID(id);
+};
 
 /**
  * Override materials when debugging.
@@ -92,8 +93,8 @@ const getDebugMaterialByID = (id: number):
  *
  * @param id The `originalID` of the mesh.
  */
-export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
-    ghost ? GHOST : getOriginalMaterialByID(id);
+export const getMaterialByID = (id: number): GLTFMaterial | undefined =>
+  ghost ? GHOST : getOriginalMaterialByID(id);
 
 const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
   let result = manifold.asOriginal();
@@ -111,7 +112,7 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
  */
 export function show(manifold: Manifold) {
   return debug(manifold, shown);
-};
+}
 
 /**
  * Wrap any shape object with this method to display it and any copies as the
@@ -124,32 +125,36 @@ export function show(manifold: Manifold) {
 export function only(manifold: Manifold) {
   ghost = true;
   return debug(manifold, singles);
-};
+}
 
 /**
  *
  * @internal
  */
-export const getDebugGLTFMesh =
-    (doc: Document, manifoldMesh: Mesh, id2properties: Map<number, Properties>,
-     backupMaterial: GLTFMaterial = {}) => {
-      const debugNodes = [];
+export const getDebugGLTFMesh = (
+  doc: Document,
+  manifoldMesh: Mesh,
+  id2properties: Map<number, Properties>,
+  backupMaterial: GLTFMaterial = {},
+) => {
+  const debugNodes = [];
 
-      for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
-        const debugMesh = getDebugMeshByID(id);
-        if (!debugMesh) {
-          continue;
-        }
+  for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
+    const debugMesh = getDebugMeshByID(id);
+    if (!debugMesh) {
+      continue;
+    }
 
-        // Here, we'll get back either a debug material (like SHOW),
-        // or the original mesh material.
-        const material = getDebugMaterialByID(id) || backupMaterial;
-        id2properties.get(id)!.material = getCachedMaterial(doc, material);
+    // Here, we'll get back either a debug material (like SHOW),
+    // or the original mesh material.
+    const material = getDebugMaterialByID(id) || backupMaterial;
+    id2properties.get(id)!.material = getCachedMaterial(doc, material);
 
-        const debugNode = doc.createNode('debug')
-                              .setMesh(writeMesh(doc, debugMesh, id2properties))
-                              .setMatrix(manifoldMesh.transform(run));
-        debugNodes.push(debugNode);
-      }
-      return debugNodes;
-    };
+    const debugNode = doc
+      .createNode('debug')
+      .setMesh(writeMesh(doc, debugMesh, id2properties))
+      .setMatrix(manifoldMesh.transform(run));
+    debugNodes.push(debugNode);
+  }
+  return debugNodes;
+};

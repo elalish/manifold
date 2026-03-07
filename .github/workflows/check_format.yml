@@ -16,8 +16,12 @@ jobs:
       with:
         source: '.'
         exclude: '*/third_party'
-        extensions: 'h,cpp,js,ts,html'
+        extensions: 'h,cpp'
         clangFormatVersion: 20
+    - name: Run Prettier check
+      run: |
+        npm install -g prettier@3.8.1
+        prettier --check "bindings/wasm/**/*.{js,ts,html}"
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12' 

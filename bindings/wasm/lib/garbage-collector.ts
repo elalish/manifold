@@ -22,15 +22,30 @@
  * @category Core
  */
 
-import type {CrossSection, Manifold} from '../manifold-encapsulated-types.d.ts';
-import type {ManifoldToplevel} from '../manifold.d.ts';
+import type {
+  CrossSection,
+  Manifold,
+} from '../manifold-encapsulated-types.d.ts';
+import type { ManifoldToplevel } from '../manifold.d.ts';
 
-const memoryRegistry = Array<Manifold|CrossSection>();
+const memoryRegistry = Array<Manifold | CrossSection>();
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
-  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh', 'hull'
+  'cube',
+  'cylinder',
+  'sphere',
+  'tetrahedron',
+  'extrude',
+  'revolve',
+  'compose',
+  'union',
+  'difference',
+  'intersection',
+  'levelSet',
+  'smooth',
+  'ofMesh',
+  'hull',
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
@@ -60,18 +75,35 @@ const manifoldMemberFunctions = [
   'splitByPlane',
   'slice',
   'project',
-  'hull'
+  'hull',
 ];
 
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
-  'square', 'circle', 'union', 'difference', 'intersection', 'compose',
-  'ofPolygons', 'hull'
+  'square',
+  'circle',
+  'union',
+  'difference',
+  'intersection',
+  'compose',
+  'ofPolygons',
+  'hull',
 ];
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
-  'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
+  'add',
+  'subtract',
+  'intersect',
+  'rectClip',
+  'decompose',
+  'transform',
+  'translate',
+  'rotate',
+  'scale',
+  'mirror',
+  'simplify',
+  'offset',
+  'hull',
 ];
 
 /**
@@ -80,10 +112,8 @@ const crossSectionMemberFunctions = [
 export const cleanup = () => {
   for (const obj of memoryRegistry) {
     // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
+    if (obj instanceof Array) for (const elem of obj) elem.delete();
+    else obj.delete();
   }
   memoryRegistry.length = 0;
 };
@@ -117,13 +147,13 @@ const interceptMethods = (target: any, methodNames: Array<string>) => {
  * Set up garbage collection for a white listed set of methods belonging
  * to the Manifold WASM module.
  */
-export const garbageCollectManifold =
-    (target: ManifoldToplevel): ManifoldToplevel => {
-      interceptMethods(target.Manifold, manifoldStaticFunctions);
-      interceptMethods(target.Manifold.prototype, manifoldMemberFunctions);
-      interceptMethods(target.CrossSection, crossSectionStaticFunctions);
-      interceptMethods(
-          target.CrossSection.prototype, crossSectionMemberFunctions);
+export const garbageCollectManifold = (
+  target: ManifoldToplevel,
+): ManifoldToplevel => {
+  interceptMethods(target.Manifold, manifoldStaticFunctions);
+  interceptMethods(target.Manifold.prototype, manifoldMemberFunctions);
+  interceptMethods(target.CrossSection, crossSectionStaticFunctions);
+  interceptMethods(target.CrossSection.prototype, crossSectionMemberFunctions);
 
-      return target;
-    };
+  return target;
+};

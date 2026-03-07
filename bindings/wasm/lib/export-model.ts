@@ -31,10 +31,10 @@
 
 import * as GLTFTransform from '@gltf-transform/core';
 
-import {UnsupportedFormatError} from './error.ts';
+import { UnsupportedFormatError } from './error.ts';
 import * as export3MF from './export-3mf.ts';
 import * as gltfIO from './gltf-io.ts';
-import {findExtension, findMimeType, isNode} from './util.ts';
+import { findExtension, findMimeType, isNode } from './util.ts';
 
 /**
  * @group Management
@@ -53,9 +53,10 @@ export interface ExportFormat {
  */
 export interface Exporter {
   exportFormats: Array<ExportFormat>;
-  toArrayBuffer:
-      (doc: GLTFTransform.Document,
-       options?: ExportOptions) => Promise<ArrayBuffer>;
+  toArrayBuffer: (
+    doc: GLTFTransform.Document,
+    options?: ExportOptions,
+  ) => Promise<ArrayBuffer>;
 }
 
 /**
@@ -83,17 +84,17 @@ register(gltfIO);
 register(export3MF);
 
 function getFormat(identifier: string): ExportFormat {
-  const formats = exporters.flatMap(ex => ex.exportFormats);
+  const formats = exporters.flatMap((ex) => ex.exportFormats);
   const format = (findMimeType(identifier, formats) ??
-                  findExtension(identifier, formats)) as ExportFormat;
+    findExtension(identifier, formats)) as ExportFormat;
   if (!format) throw new UnsupportedFormatError(identifier, formats);
   return format;
 }
 
-function getExporter(identifier: ExportFormat|string) {
+function getExporter(identifier: ExportFormat | string) {
   const format =
-      typeof identifier === 'string' ? getFormat(identifier) : identifier;
-  return exporters.find(ex => ex.exportFormats.includes(format))!;
+    typeof identifier === 'string' ? getFormat(identifier) : identifier;
+  return exporters.find((ex) => ex.exportFormats.includes(format))!;
 }
 
 /**
@@ -133,14 +134,17 @@ export function register(exporter: Exporter) {
  * @group Low Level Functions
  */
 export async function toBlob(
-    doc: GLTFTransform.Document, options: ExportOptions = {}): Promise<Blob> {
+  doc: GLTFTransform.Document,
+  options: ExportOptions = {},
+): Promise<Blob> {
   if (!(options.mimetype || options.extension)) {
     throw new Error(
-        'Must specify a mimetype or extension when exporting to a Blob.');
+      'Must specify a mimetype or extension when exporting to a Blob.',
+    );
   }
   const format = getFormat((options.mimetype || options.extension)!);
   const buffer = await getExporter(format).toArrayBuffer(doc, options);
-  return new Blob([buffer], {type: format.mimetype});
+  return new Blob([buffer], { type: format.mimetype });
 }
 
 /**
@@ -151,11 +155,13 @@ export async function toBlob(
  * @group Low Level Functions
  */
 export async function toArrayBuffer(
-    doc: GLTFTransform.Document,
-    options: ExportOptions = {}): Promise<ArrayBuffer> {
+  doc: GLTFTransform.Document,
+  options: ExportOptions = {},
+): Promise<ArrayBuffer> {
   if (!(options.mimetype || options.extension)) {
     throw new Error(
-        'Must specify a mimetype or extension when exporting to a Buffer.');
+      'Must specify a mimetype or extension when exporting to a Buffer.',
+    );
   }
   const format = getFormat((options.mimetype || options.extension)!);
   return await getExporter(format).toArrayBuffer(doc, options);
@@ -166,15 +172,18 @@ export async function toArrayBuffer(
  * @group Low Level Functions
  */
 export async function writeFile(
-    filename: string, doc: GLTFTransform.Document,
-    options: ExportOptions = {}) {
+  filename: string,
+  doc: GLTFTransform.Document,
+  options: ExportOptions = {},
+) {
   if (!isNode()) {
     throw new Error('Must have a filesystem to write files.');
   }
   const fs = await import('node:fs/promises');
 
-  const exporter =
-      getExporter(options.mimetype ?? options.extension ?? filename);
+  const exporter = getExporter(
+    options.mimetype ?? options.extension ?? filename,
+  );
   const buffer = await exporter.toArrayBuffer(doc, options);
   return await fs.writeFile(filename, new Uint8Array(buffer));
 }

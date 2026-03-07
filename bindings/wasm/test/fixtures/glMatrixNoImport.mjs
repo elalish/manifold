@@ -1,3 +1,3 @@
-const {vec3} = glMatrix;
+const { vec3 } = glMatrix;
 
 export default vec3;

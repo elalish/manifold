@@ -23,11 +23,26 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, triangulate, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
-export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
+export type {
+  MeshOptions,
+  triangulate,
+  setMinCircularAngle,
+  setMinCircularEdgeLength,
+  setCircularSegments,
+  getCircularSegments,
+  resetToCircularDefaults,
+} from './manifold-encapsulated-types';
+export { CrossSection, Manifold, Mesh } from './manifold-encapsulated-types';
 
-import type {triangulate, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
-import {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
+import type {
+  triangulate,
+  setMinCircularAngle,
+  setMinCircularEdgeLength,
+  setCircularSegments,
+  getCircularSegments,
+  resetToCircularDefaults,
+} from './manifold-encapsulated-types';
+import { CrossSection, Manifold, Mesh } from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
   CrossSection: typeof CrossSection;
@@ -42,5 +57,6 @@ export interface ManifoldToplevel {
   setup: () => void;
 }
 
-export default function Module(config?: {locateFile: () => string}):
-    Promise<ManifoldToplevel>;
+export default function Module(config?: {
+  locateFile: () => string;
+}): Promise<ManifoldToplevel>;

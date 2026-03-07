@@ -17,7 +17,7 @@
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
+import { AutoTypings, LocalStorageCache } from 'monaco-editor-auto-typings';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
@@ -28,8 +28,9 @@ const CODE_START = '<code>';
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register(
-      '/service-worker.js', {scope: './index.html'});
+  navigator.serviceWorker.register('/service-worker.js', {
+    scope: './index.html',
+  });
 }
 
 let editor = undefined;
@@ -43,14 +44,68 @@ const shareButton = document.querySelector('#share');
 
 undoButton.onclick = () => editor.trigger('ignored', 'undo');
 redoButton.onclick = () => editor.trigger('ignored', 'redo');
-formatButton.onclick = () =>
-    editor.trigger('ignored', 'editor.action.formatDocument');
+let prettierCache = null;
+const loadPrettier = async () => {
+  if (!prettierCache) {
+    const [{ format }, estree, typescript] = await Promise.all([
+      import('prettier/standalone'),
+      import('prettier/plugins/estree'),
+      import('prettier/plugins/typescript'),
+    ]);
+    prettierCache = { format, estree, typescript };
+  }
+  return prettierCache;
+};
+
+formatButton.onclick = async () => {
+  if (!editor) return;
+
+  const model = editor.getModel();
+  if (!model) return;
+
+  const originalCode = model.getValue();
+  const tabSize = model.getOptions?.().tabSize ?? 2;
+
+  const viewState = editor.saveViewState();
+  editor.pushUndoStop();
+
+  try {
+    const { format, estree, typescript } = await loadPrettier();
+
+    const formatted = await format(originalCode, {
+      parser: 'typescript',
+      plugins: [typescript, estree],
+      tabWidth: tabSize,
+      singleQuote: true,
+      trailingComma: 'all',
+    });
+
+    if (formatted !== originalCode) {
+      editor.executeEdits('prettier-format', [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+          forceMoveMarkers: true,
+        },
+      ]);
+    }
+
+    editor.pushUndoStop();
+    if (viewState) editor.restoreViewState(viewState);
+
+    console.log('Formatted with Prettier 3.8.1');
+  } catch (err) {
+    console.error('Prettier formatting failed:', err);
+    console.log(`Prettier formatting failed: ${err.message}`);
+  }
+};
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
   url.hash =
-      '#' +
-      encodeURIComponent(
-          currentFileElement.textContent + CODE_START + editor.getValue());
+    '#' +
+    encodeURIComponent(
+      currentFileElement.textContent + CODE_START + editor.getValue(),
+    );
   navigator.clipboard.writeText(url.toString());
   console.log('Shareable link copied to clipboard!');
   console.log('Consider shortening this URL using tinyURL.com');
@@ -65,18 +120,18 @@ const saveContainer = document.querySelector('#save');
 const saveDropdown = document.querySelector('#saveDropdown');
 const saveArrow = document.querySelector('#save .uparrow');
 
-const hideDropdown = function() {
+const hideDropdown = function () {
   fileDropdown.classList.remove('show');
   saveDropdown.classList.remove('show');
   fileArrow.classList.remove('down');
   saveArrow.classList.remove('down');
 };
-const toggleFileDropdown = function(event) {
+const toggleFileDropdown = function (event) {
   event.stopPropagation();
   fileDropdown.classList.toggle('show');
   fileArrow.classList.toggle('down');
 };
-const toggleSaveDropdown = function(event) {
+const toggleSaveDropdown = function (event) {
   event.stopPropagation();
   saveDropdown.classList.toggle('show');
   saveArrow.classList.toggle('down');
@@ -112,16 +167,17 @@ function getAllScripts() {
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key || key === 'currentName' || key === 'safe') continue;
-    files[key] = getScript(key)
+    files[key] = getScript(key);
   }
   return files;
 }
 
 function getModelForScript(filename) {
   const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
-  const model = monaco.editor.getModel(uri) ||
-      monaco.editor.createModel('', 'typescript', uri);
-  model.updateOptions({tabSize: 2});
+  const model =
+    monaco.editor.getModel(uri) ||
+    monaco.editor.createModel('', 'typescript', uri);
+  model.updateOptions({ tabSize: 2 });
   return model;
 }
 
@@ -132,7 +188,7 @@ function saveCurrent() {
       setScript(currentName, editor.getValue());
     }
   }
-};
+}
 
 window.onpagehide = saveCurrent;
 window.beforeunload = saveCurrent;
@@ -145,8 +201,9 @@ function switchTo(scriptName) {
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
-    const code = isExample ? exampleFunctions.get(scriptName) :
-                             getScript(scriptName) ?? '';
+    const code = isExample
+      ? exampleFunctions.get(scriptName)
+      : (getScript(scriptName) ?? '');
     window.location.hash = '#' + scriptName;
     const model = getModelForScript(scriptName);
     editor.setModel(model);
@@ -169,12 +226,12 @@ function createDropdownItem(name) {
   button.appendChild(label);
   label.textContent = name;
 
-  button.onclick = function() {
+  button.onclick = function () {
     saveCurrent();
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
-  button.onkeyup = function(event) {
+  button.onkeyup = function (event) {
     event.preventDefault();
   };
   return button;
@@ -201,7 +258,7 @@ function addEdit(button) {
   const edit = addIcon(button);
   edit.classList.add('edit');
 
-  edit.onclick = function(event) {
+  edit.onclick = function (event) {
     event.stopPropagation();
     const oldName = label.textContent;
     const code = getScript(oldName);
@@ -229,11 +286,11 @@ function addEdit(button) {
     }
 
     form.onsubmit = rename;
-    inputElement.onclick = function(event) {
+    inputElement.onclick = function (event) {
       event.stopPropagation();
     };
 
-    inputElement.onblur = function() {
+    inputElement.onblur = function () {
       button.removeChild(form);
       label.textContent = oldName;
     };
@@ -243,16 +300,20 @@ function addEdit(button) {
   trash.classList.add('trash');
   let lastClick = 0;
 
-  trash.onclick = function(event) {
+  trash.onclick = function (event) {
     event.stopPropagation();
     if (button.classList.contains('blue')) {
       lastClick = performance.now();
       button.classList.remove('blue');
       button.classList.add('red');
-      document.body.addEventListener('click', function() {
-        button.classList.add('blue');
-        button.classList.remove('red');
-      }, {once: true});
+      document.body.addEventListener(
+        'click',
+        function () {
+          button.classList.add('blue');
+          button.classList.remove('red');
+        },
+        { once: true },
+      );
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
@@ -271,9 +332,9 @@ function newItem(code, scriptName = undefined) {
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
-  return {button: nextButton, name};
-};
-newButton.onclick = function() {
+  return { button: nextButton, name };
+}
+newButton.onclick = function () {
   newItem('').button.click();
 };
 
@@ -301,7 +362,7 @@ async function createEditor() {
       } else {
         return new editorWorker();
       }
-    }
+    },
   };
 
   editor = monaco.editor.create(document.getElementById('editor'), {
@@ -317,15 +378,19 @@ async function createEditor() {
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await (await fetch('/manifoldCAD.d.ts')).text(),
-      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+    await (await fetch('/manifoldCAD.d.ts')).text(),
+    'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts',
+  );
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
   // global variables, so another tool may be a better fit.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      (await (await fetch('/manifoldCADGlobals.d.ts')).text())
-          .replace(/^export /gm, ''));
+    (await (await fetch('/manifoldCADGlobals.d.ts')).text()).replace(
+      /^export /gm,
+      '',
+    ),
+  );
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {
@@ -336,11 +401,15 @@ async function createEditor() {
   self.window.typecache = new LocalStorageCache();
   const autoTypings = await AutoTypings.create(editor, {
     sourceCache: self.window.typecache,
-    onError: e => {console.error(e)},
-    onUpdate: (update, text) => {console.debug(text)},
+    onError: (e) => {
+      console.error(e);
+    },
+    onUpdate: (update, text) => {
+      console.debug(text);
+    },
     onUpdateVersions: (versions) => {
-      console.debug(versions)
-    }
+      console.debug(versions);
+    },
   });
 
   for (const [name] of exampleFunctions) {
@@ -371,7 +440,8 @@ async function createEditor() {
       autoExecute = true;
       const name = fragment.substring(0, codeIdx);
       switchTo(
-          newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
+        newItem(fragment.substring(codeIdx + CODE_START.length), name).name,
+      );
     } else {
       if (fragment != currentName) {
         autoExecute = true;
@@ -386,7 +456,7 @@ async function createEditor() {
     initializeRun();
   }
 
-  editor.onDidChangeModelContent(e => {
+  editor.onDidChangeModelContent((e) => {
     // The user switched models.
     if (switching) {
       switching = false;
@@ -417,7 +487,7 @@ async function createEditor() {
   window.onresize = () => {
     editor.layout({});
   };
-};
+}
 
 createEditor();
 
@@ -454,7 +524,7 @@ function pause() {
   scrubber.classList.remove('hide');
 }
 
-playButton.onclick = function() {
+playButton.onclick = function () {
   if (paused) {
     play();
   } else {
@@ -462,14 +532,14 @@ playButton.onclick = function() {
   }
 };
 
-scrubber.oninput = function() {
+scrubber.oninput = function () {
   mv.currentTime = scrubber.value;
 };
 
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
-console.log = function(message) {
+console.log = function (message) {
   consoleElement.textContent += message + '\r\n';
   consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
@@ -498,7 +568,7 @@ function finishRun() {
 
 const output = {
   glbURL: null,
-  threeMFURL: null
+  threeMFURL: null,
 };
 let manifoldWorker = null;
 
@@ -513,7 +583,6 @@ function createWorker() {
         initializeRun();
       }
       manifoldInitialized = true;
-
     } else if (message?.type === 'error') {
       // Clean up.
       setScript('safe', 'false');
@@ -539,19 +608,16 @@ function createWorker() {
 
       // Start all over again.
       createWorker();
-
     } else if (message?.type === 'log') {
       consoleElement.textContent += message.message + '\r\n';
       consoleElement.scrollTop = consoleElement.scrollHeight;
-
     } else if (message?.type === 'done') {
       setScript('safe', 'true');
-      manifoldWorker.postMessage({type: 'export', extension: 'glb'});
-      manifoldWorker.postMessage({type: 'export', extension: '3mf'});
+      manifoldWorker.postMessage({ type: 'export', extension: 'glb' });
+      manifoldWorker.postMessage({ type: 'export', extension: '3mf' });
 
       finishRun();
       runButton.disabled = true;
-
     } else if (message?.type === 'blob') {
       if (message.extension === 'glb') {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
@@ -566,8 +632,11 @@ function createWorker() {
     }
   };
 
-  manifoldWorker.postMessage(
-      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
+  manifoldWorker.postMessage({
+    type: 'initialize',
+    esbuildWasmUrl,
+    manifoldWasmUrl,
+  });
 }
 
 createWorker();
@@ -590,7 +659,7 @@ async function run() {
     filename,
     files,
     jsCDN: 'jsDelivr',
-    baseUrl: window.location.href
+    baseUrl: window.location.href,
   });
 }
 
@@ -601,7 +670,7 @@ function cancel() {
   console.log('Run canceled');
 }
 
-runButton.onclick = function() {
+runButton.onclick = function () {
   if (runButton.classList.contains('cancel')) {
     cancel();
   } else {

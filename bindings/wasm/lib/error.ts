@@ -20,7 +20,7 @@
  * @category Core
  */
 
-import type {BuildFailure, Location, Message} from 'esbuild-wasm';
+import type { BuildFailure, Location, Message } from 'esbuild-wasm';
 
 export class BundlerError extends Error {
   location?: Location;
@@ -33,12 +33,11 @@ export class BundlerError extends Error {
     this.error = failure.errors[0];
 
     if (this.error.location) {
-      let {file, line, column} = this.error.location!;
+      let { file, line, column } = this.error.location!;
       // FIXME Given that we insert metadata into each file, we need to run this
       // through sourcemap.
       line--;
-      this.manifoldStack =
-          `${this.toString()}\n    at ${file}:${line}:${column}`;
+      this.manifoldStack = `${this.toString()}\n    at ${file}:${line}:${column}`;
     }
   }
 
@@ -49,7 +48,7 @@ export class BundlerError extends Error {
   get message(): string {
     return this.error.text;
   }
-};
+}
 
 export class RuntimeError extends Error {
   manifoldStack?: string;
@@ -67,17 +66,18 @@ export class RuntimeError extends Error {
 
 export class UnsupportedFormatError extends Error {
   constructor(
-      identifier: string,
-      supported: Array<{mimetype: string, extension: string}>) {
-    const typeList =
-        supported
-            .map(entry => `\`${entry.mimetype}\` (\`.${entry.extension}\`)`)
-            .reduceRight(
-                (prev, cur, index, arr) => cur +
-                    ((index > 0 || arr.length <= 2) ? ', or ' : ', ') + prev);
+    identifier: string,
+    supported: Array<{ mimetype: string; extension: string }>,
+  ) {
+    const typeList = supported
+      .map((entry) => `\`${entry.mimetype}\` (\`.${entry.extension}\`)`)
+      .reduceRight(
+        (prev, cur, index, arr) =>
+          cur + (index > 0 || arr.length <= 2 ? ', or ' : ', ') + prev,
+      );
     super(
-        `Unsupported format \`${identifier}\`.  ` +
-        `Must be one of ${typeList}`);
+      `Unsupported format \`${identifier}\`.  ` + `Must be one of ${typeList}`,
+    );
   }
 }
 

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document} from '@gltf-transform/core';
-import {getSceneVertexCount, VertexCountMethod} from '@gltf-transform/functions';
-import {resolve} from 'node:path';
-import {beforeEach, expect, suite, test} from 'vitest';
+import { Document } from '@gltf-transform/core';
+import {
+  getSceneVertexCount,
+  VertexCountMethod,
+} from '@gltf-transform/functions';
+import { resolve } from 'node:path';
+import { beforeEach, expect, suite, test } from 'vitest';
 
-import {bundleFile} from '../lib/bundler.ts';
+import { bundleFile } from '../lib/bundler.ts';
 import * as worker from '../lib/worker.ts';
 
 const countVertices = (doc: Document) => {
@@ -31,22 +34,22 @@ beforeEach(() => worker.cleanup());
 suite('Import remote modules from', () => {
   test.skip('esm.sh', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
-    const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const bundle = await bundleFile(entrypoint, { jsCDN: 'esm.sh' });
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('jsDelivr', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
-    const bundle = await bundleFile(entrypoint, {jsCDN: 'jsDelivr'});
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const bundle = await bundleFile(entrypoint, { jsCDN: 'jsDelivr' });
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test.skip('skypack', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
-    const bundle = await bundleFile(entrypoint, {jsCDN: 'skypack'});
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const bundle = await bundleFile(entrypoint, { jsCDN: 'skypack' });
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 });

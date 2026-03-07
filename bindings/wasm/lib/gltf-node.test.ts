@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {afterEach, beforeAll, describe, expect, suite, test} from 'vitest';
+import { afterEach, beforeAll, describe, expect, suite, test } from 'vitest';
 
-import type {Vec3} from '../manifold.d.ts';
-import {equalsVec3Array, meshToVec3Array} from '../test/util.ts';
+import type { Vec3 } from '../manifold.d.ts';
+import { equalsVec3Array, meshToVec3Array } from '../test/util.ts';
 
-import {toArrayBuffer} from './export-model.ts';
-import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, GLTFNodeTracked, VisualizationGLTFNode} from './gltf-node.ts';
+import { toArrayBuffer } from './export-model.ts';
+import {
+  BaseGLTFNode,
+  CrossSectionGLTFNode,
+  GLTFNode,
+  GLTFNodeTracked,
+  VisualizationGLTFNode,
+} from './gltf-node.ts';
 import * as importer from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
@@ -28,25 +34,30 @@ afterEach(async () => worker.cleanup());
 
 suite('Ensure manifold and glTF rotations match', () => {
   // Here's an asymmetric shape, and scripts that rotate it in 0-3 axes.
-  const pts: Array<Vec3> =
-      [[-1, 0, 0], [4, 0, 0], [0, -2, 0], [0, 3, 0], [0, 0, 5]];
+  const pts: Array<Vec3> = [
+    [-1, 0, 0],
+    [4, 0, 0],
+    [0, -2, 0],
+    [0, 3, 0],
+    [0, 0, 5],
+  ];
   const getManifoldScript = (rotX: number, rotY: number, rotZ: number) =>
-      `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
-      `export default Manifold\n` +
-      `  .hull(${JSON.stringify(pts)})\n` +
-      `  .rotate(${rotX}, ${rotY}, ${rotZ});\n`;
+    `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
+    `export default Manifold\n` +
+    `  .hull(${JSON.stringify(pts)})\n` +
+    `  .rotate(${rotX}, ${rotY}, ${rotZ});\n`;
   const getGltfScript = (rotX: number, rotY: number, rotZ: number) =>
-      `import {Manifold, GLTFNode} from \'manifold-3d/manifoldCAD\';\n` +
-      `const node = new GLTFNode();` +
-      `node.manifold = Manifold\n` +
-      `  .hull(${JSON.stringify(pts)});\n` +
-      `node.rotation = [${rotX}, ${rotY}, ${rotZ}];\n` +
-      `export default node;`;
+    `import {Manifold, GLTFNode} from \'manifold-3d/manifoldCAD\';\n` +
+    `const node = new GLTFNode();` +
+    `node.manifold = Manifold\n` +
+    `  .hull(${JSON.stringify(pts)});\n` +
+    `node.rotation = [${rotX}, ${rotY}, ${rotZ}];\n` +
+    `export default node;`;
 
   const getPoints = async (script: string) => {
     // Evaluate, export it and re-import the model.
     // This ensures that glTF transformations are applied.
-    const options = {mimetype: 'model/gltf-binary'};
+    const options = { mimetype: 'model/gltf-binary' };
     const doc = await worker.evaluate(script);
     const buffer = await toArrayBuffer(doc, options);
     const model = await importer.importManifold(buffer, options);
@@ -154,7 +165,7 @@ suite('VisualizationGLTFNode', () => {
 suite('CrossSectionGTLFNode', () => {
   test('clone()', async () => {
     const parent = new GLTFNode();
-    const node = new CrossSectionGLTFNode(parent)
+    const node = new CrossSectionGLTFNode(parent);
     const clone = node.clone();
 
     expect(clone).toBeInstanceOf(BaseGLTFNode);
@@ -164,7 +175,7 @@ suite('CrossSectionGTLFNode', () => {
 
   test('clone(newParent)', async () => {
     const parent = new GLTFNode();
-    const node = new CrossSectionGLTFNode(parent)
+    const node = new CrossSectionGLTFNode(parent);
     const cloneParent = new GLTFNode();
     const clone = node.clone(cloneParent);
 
@@ -190,24 +201,27 @@ suite('anyToGLTFNodeList()', () => {
   });
 
   test('Accepts CrossSection objects', async () => {
-    const script = `import {CrossSection} from 'manifold-3d/manifoldCAD';\n` +
-        `export default CrossSection.circle(1.0);`;
+    const script =
+      `import {CrossSection} from 'manifold-3d/manifoldCAD';\n` +
+      `export default CrossSection.circle(1.0);`;
 
     const fn = async () => await worker.evaluate(script);
     await expect(fn()).resolves.toBeDefined();
   });
 
   test('Accepts Manifold objects', async () => {
-    const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-        `export default Manifold.cube(1.0);`;
+    const script =
+      `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
+      `export default Manifold.cube(1.0);`;
 
     const fn = async () => await worker.evaluate(script);
     await expect(fn()).resolves.toBeDefined();
   });
 
   test('Accepts empty Manifold objects', async () => {
-    const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-        `export default Manifold.hull([]);`;
+    const script =
+      `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
+      `export default Manifold.hull([]);`;
 
     const fn = async () => await worker.evaluate(script);
     await expect(fn()).resolves.toBeDefined();
@@ -215,9 +229,9 @@ suite('anyToGLTFNodeList()', () => {
 
   test('Throws when .crossSection is empty', async () => {
     const script =
-        `import {CrossSectionGLTFNode} from 'manifold-3d/manifoldCAD';\n` +
-        `const node = new CrossSectionGLTFNode()` +
-        `export default node;`;
+      `import {CrossSectionGLTFNode} from 'manifold-3d/manifoldCAD';\n` +
+      `const node = new CrossSectionGLTFNode()` +
+      `export default node;`;
 
     const fn = async () => await worker.evaluate(script);
     await expect(fn()).rejects.toThrow();

@@ -21,14 +21,14 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
-import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
-import {copyToDocument} from '@gltf-transform/functions';
+import { KHRMaterialsUnlit } from '@gltf-transform/extensions';
+import { copyToDocument } from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold.d.ts';
+import type { Manifold } from '../manifold.d.ts';
 
-import type {GLTFMaterial} from './gltf-node.ts';
-import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode} from './gltf-node.ts';
-import {getDocumentByID} from './import-model.ts';
+import type { GLTFMaterial } from './gltf-node.ts';
+import { BaseGLTFNode, CrossSectionGLTFNode, GLTFNode } from './gltf-node.ts';
+import { getDocumentByID } from './import-model.ts';
 
 const defaultMaterial = {
   roughness: 0.2,
@@ -36,7 +36,7 @@ const defaultMaterial = {
   baseColorFactor: [1, 1, 0] as [number, number, number],
   alpha: 1,
   unlit: false,
-  doubleSided: false
+  doubleSided: false,
 };
 
 const id2material = new Map<number, GLTFMaterial>();
@@ -55,7 +55,9 @@ export function cleanup() {
  * @param material A set of material properties to apply to this manifold.
  */
 export function setMaterial(
-    manifold: Manifold, material: GLTFMaterial): Manifold {
+  manifold: Manifold,
+  material: GLTFMaterial,
+): Manifold {
   const out = manifold.asOriginal();
   id2material.set(out.originalID(), material);
   return out;
@@ -64,7 +66,7 @@ export function setMaterial(
 /**
  * @internal
  */
-export const getMaterialByID = (id: number): GLTFMaterial|undefined => {
+export const getMaterialByID = (id: number): GLTFMaterial | undefined => {
   return id2material.get(id);
 };
 
@@ -80,19 +82,22 @@ export const setMaterialByID = (id: number, material: GLTFMaterial) => {
  * @internal
  */
 export function getBackupMaterial(node?: BaseGLTFNode): GLTFMaterial {
-  if (node != null &&
-      (node instanceof GLTFNode || node instanceof CrossSectionGLTFNode)) {
+  if (
+    node != null &&
+    (node instanceof GLTFNode || node instanceof CrossSectionGLTFNode)
+  ) {
     if (node.material == null) {
-      return getBackupMaterial((node.parent as GLTFNode));
+      return getBackupMaterial(node.parent as GLTFNode);
     }
     return node.material;
   }
-  return {}
+  return {};
 }
 
 function copyImportedMaterial(
-    doc: GLTFTransform.Document,
-    matIn: GLTFMaterial = {}): GLTFTransform.Material|null {
+  doc: GLTFTransform.Document,
+  matIn: GLTFMaterial = {},
+): GLTFTransform.Material | null {
   if (!matIn.sourceMaterial || !matIn.sourceRunID) {
     return null;
   }
@@ -105,14 +110,15 @@ function copyImportedMaterial(
 }
 
 function makeDefaultMaterial(
-    doc: GLTFTransform.Document,
-    matIn: GLTFMaterial = {}): GLTFTransform.Material {
-  const {roughness, metallic, baseColorFactor, alpha, unlit, doubleSided} = {
+  doc: GLTFTransform.Document,
+  matIn: GLTFMaterial = {},
+): GLTFTransform.Material {
+  const { roughness, metallic, baseColorFactor, alpha, unlit, doubleSided } = {
     ...defaultMaterial,
-    ...matIn
+    ...matIn,
   };
   const material =
-      copyImportedMaterial(doc, matIn) ?? doc.createMaterial(matIn.name ?? '');
+    copyImportedMaterial(doc, matIn) ?? doc.createMaterial(matIn.name ?? '');
 
   if (unlit) {
     const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
@@ -120,14 +126,16 @@ function makeDefaultMaterial(
   }
 
   if (alpha < 1) {
-    material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND)
-        .setDoubleSided(true);
+    material
+      .setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND)
+      .setDoubleSided(true);
   }
 
-  return material.setRoughnessFactor(roughness)
-      .setMetallicFactor(metallic)
-      .setBaseColorFactor([...baseColorFactor, alpha])
-      .setDoubleSided(!!doubleSided);
+  return material
+    .setRoughnessFactor(roughness)
+    .setMetallicFactor(metallic)
+    .setBaseColorFactor([...baseColorFactor, alpha])
+    .setDoubleSided(!!doubleSided);
 }
 
 /**
@@ -135,7 +143,9 @@ function makeDefaultMaterial(
  * @internal
  */
 export function getCachedMaterial(
-    doc: GLTFTransform.Document, matDef: GLTFMaterial): GLTFTransform.Material {
+  doc: GLTFTransform.Document,
+  matDef: GLTFMaterial,
+): GLTFTransform.Material {
   if (!materialCache.has(matDef)) {
     materialCache.set(matDef, makeDefaultMaterial(doc, matDef));
   }

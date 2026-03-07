@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {resolve} from 'node:path';
+import { resolve } from 'node:path';
 import * as stackTraceParser from 'stacktrace-parser';
-import {beforeEach, expect, suite, test} from 'vitest';
+import { beforeEach, expect, suite, test } from 'vitest';
 
-import {bundleFile} from '../lib/bundler.ts';
-import {BundlerError, RuntimeError} from '../lib/error.ts';
-import {parseStackTrace} from '../lib/util.ts';
+import { bundleFile } from '../lib/bundler.ts';
+import { BundlerError, RuntimeError } from '../lib/error.ts';
+import { parseStackTrace } from '../lib/util.ts';
 import * as worker from '../lib/worker.ts';
 
 beforeEach(() => worker.cleanup());
@@ -32,14 +32,13 @@ suite('Parses stacktraces from', () => {
     at async handleEvaluate (http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module:232:23)`;
 
     expect(parseStackTrace(stack)).deep.equals([
-      {line: 28, column: 3, methodName: 'dostuff'},
-      {line: 30, column: 26, methodName: null}
+      { line: 28, column: 3, methodName: 'dostuff' },
+      { line: 30, column: 26, methodName: null },
     ]);
   });
 
   test('Spidermonkey', () => {
-    const stack =
-        `dostuff@http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module line 96 > AsyncFunction:28:3
+    const stack = `dostuff@http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module line 96 > AsyncFunction:28:3
 anonymous@http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module line 96 > AsyncFunction:30:26
 evaluate@http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module:97:15
 async*handleEvaluate@http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module:232:29
@@ -48,44 +47,50 @@ EventHandlerNonNull*initializeWebWorker@http://localhost:5173/@fs/Users/default/
 @http://localhost:5173/@fs/Users/default/manifold/bindings/wasm/lib/worker.js?worker_file&type=module:265:5`;
 
     expect(parseStackTrace(stack)).deep.equals([
-      {line: 28, column: 3, methodName: 'dostuff'},
-      {line: 30, column: 26, methodName: null}
+      { line: 28, column: 3, methodName: 'dostuff' },
+      { line: 30, column: 26, methodName: null },
     ]);
   });
   test('JavaScriptCore', () => {
     const stack = `dostuff@
 @
 anonymous@
-@http://localhost:5173/@fs/Users/tony.thompson/dev/manifold/bindings/wasm/lib/worker.js:97:21`
+@http://localhost:5173/@fs/Users/tony.thompson/dev/manifold/bindings/wasm/lib/worker.js:97:21`;
 
     expect(parseStackTrace(stack).length).toBe(0);
   });
-})
+});
 
 suite('Build a model with the worker', () => {
   test('Exceptions should throw', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/generateReferenceError.mjs',
+    );
     let code = await bundleFile(filepath);
-    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
-    await expect(ev()).rejects.toThrowError()
+    const ev = async () => await worker.evaluate(code, { doNotBundle: true });
+    await expect(ev()).rejects.toThrowError();
   });
 
   test('Runtime exceptions should be wrapped', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/generateReferenceError.mjs',
+    );
     let code = await bundleFile(filepath);
-    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
+    const ev = async () => await worker.evaluate(code, { doNotBundle: true });
     await expect(ev()).rejects.toThrowError(RuntimeError);
   });
 
   test('Stack trace (manifoldStack) should be accurate', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/generateReferenceError.mjs');
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/generateReferenceError.mjs',
+    );
     let code = await bundleFile(filepath);
-    let error: RuntimeError|null = null;
+    let error: RuntimeError | null = null;
     try {
-      await worker.evaluate(code, {doNotBundle: true});
+      await worker.evaluate(code, { doNotBundle: true });
     } catch (e) {
       error = e as RuntimeError;
     }
@@ -98,12 +103,14 @@ suite('Build a model with the worker', () => {
   });
 
   test('Stack traces should descend through imports', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/importReferenceError.mjs');
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/importReferenceError.mjs',
+    );
     let code = await bundleFile(filepath);
-    let error: RuntimeError|null = null;
+    let error: RuntimeError | null = null;
     try {
-      await worker.evaluate(code, {doNotBundle: true});
+      await worker.evaluate(code, { doNotBundle: true });
     } catch (e) {
       error = e as RuntimeError;
     }
@@ -117,16 +124,20 @@ suite('Build a model with the worker', () => {
   });
 
   test('Bundler exceptions should be wrapped', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/bundlerError.mjs');
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/bundlerError.mjs',
+    );
     const ev = async () => await bundleFile(filepath);
     await expect(ev()).rejects.toThrowError(BundlerError);
   });
 
   test('Bundler exceptions should have accurate stack traces.', async () => {
-    const filepath =
-        resolve(import.meta.dirname, './fixtures/bundlerError.mjs');
-    let error: RuntimeError|null = null;
+    const filepath = resolve(
+      import.meta.dirname,
+      './fixtures/bundlerError.mjs',
+    );
+    let error: RuntimeError | null = null;
     try {
       await bundleFile(filepath);
     } catch (e) {
@@ -143,18 +154,18 @@ suite('Build a model with the worker', () => {
 suite('Build a model without the worker', () => {
   test('Exceptions should throw', async () => {
     const imp = async () =>
-        await import('./fixtures/generateReferenceError.mjs');
-    await expect(imp()).rejects.toThrowError()
+      await import('./fixtures/generateReferenceError.mjs');
+    await expect(imp()).rejects.toThrowError();
   });
 
   test('Exceptions should be native', async () => {
     const imp = async () =>
-        await import('./fixtures/generateReferenceError.mjs');
+      await import('./fixtures/generateReferenceError.mjs');
     await expect(imp()).rejects.not.toThrowError(RuntimeError);
   });
 
   test('Stack trace (stack) should be accurate', async () => {
-    let error: Error|null = null;
+    let error: Error | null = null;
     try {
       await import('./fixtures/generateReferenceError.mjs');
     } catch (e) {

@@ -20,8 +20,18 @@
 /**
  * @group Global State
  */
-export {AnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode} from '../lib/animation.ts';
+export {
+  AnimationMode,
+  setAnimationDuration,
+  setAnimationFPS,
+  setAnimationMode,
+} from '../lib/animation.ts';
 /**
  * @group Global State
  */
-export {resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from '../lib/level-of-detail.ts';
+export {
+  resetToCircularDefaults,
+  setCircularSegments,
+  setMinCircularAngle,
+  setMinCircularEdgeLength,
+} from '../lib/level-of-detail.ts';

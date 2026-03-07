@@ -1,9 +1,9 @@
 // vite.config.js
-import {resolve} from 'path'
-import {defineConfig} from 'vite'
+import { resolve } from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  worker: {format: 'es'},
+  worker: { format: 'es' },
   build: {
     target: 'esnext',
     sourcemap: 'hidden',
@@ -14,8 +14,8 @@ export default defineConfig({
       output: {
         entryFileNames: `assets/make-manifold/[name].js`,
         chunkFileNames: `assets/make-manifold/[name].js`,
-        assetFileNames: `assets/make-manifold/[name].[ext]`
-      }
-    }
+        assetFileNames: `assets/make-manifold/[name].[ext]`,
+      },
+    },
   },
-})
+});

@@ -1,9 +1,9 @@
 // vite.config.js
-import {resolve} from 'path'
-import {defineConfig} from 'vite'
+import { resolve } from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  worker: {format: 'es'},
+  worker: { format: 'es' },
   build: {
     target: 'esnext',
     sourcemap: 'hidden',
@@ -14,8 +14,8 @@ export default defineConfig({
       output: {
         entryFileNames: `assets/model-viewer/[name].js`,
         chunkFileNames: `assets/model-viewer/[name].js`,
-        assetFileNames: `assets/model-viewer/[name].[ext]`
-      }
-    }
+        assetFileNames: `assets/model-viewer/[name].[ext]`,
+      },
+    },
   },
-})
+});
