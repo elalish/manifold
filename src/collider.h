@@ -225,6 +225,11 @@ struct DualTraversal {
   tbb::task_group group;
 #endif
 
+  struct NodePair {
+    int n1, n2;
+    Box b1, b2;
+  };
+
   void populateChildren(bool isCollider1, int node, Box b,
                         std::array<std::pair<int, Box>, 2>& children,
                         int& length) const {
@@ -243,42 +248,85 @@ struct DualTraversal {
     }
   }
 
-  void check(int node1, int node2, Box b1, Box b2, Local& local,
-             int splitDepth = 0) {
-    if (IsLeaf(node1) && IsLeaf(node2)) {
-      recorder.record(Node2Leaf(node1), Node2Leaf(node2), b1, b2, local);
-    } else {
-      std::array<std::pair<int, Box>, 2> children1;
-      std::array<std::pair<int, Box>, 2> children2;
-      std::array<std::tuple<int, int, Box, Box>, 4> toCheck;
-      int children1Length = 0;
-      int children2Length = 0;
-      int toCheckLength = 0;
+  int findOverlaps(const NodePair& pair, std::array<NodePair, 4>& overlaps) {
+    std::array<std::pair<int, Box>, 2> children1;
+    std::array<std::pair<int, Box>, 2> children2;
+    int length1 = 0;
+    int length2 = 0;
+    int count = 0;
 
-      populateChildren(true, node1, b1, children1, children1Length);
-      populateChildren(false, node2, b2, children2, children2Length);
-      for (int i = 0; i < children1Length; i++) {
-        for (int j = 0; j < children2Length; j++) {
-          auto [c1, bb1] = children1[i];
-          auto [c2, bb2] = children2[j];
-          if (bb1.DoesOverlap(bb2))
-            toCheck[toCheckLength++] = std::make_tuple(c1, c2, bb1, bb2);
+    populateChildren(true, pair.n1, pair.b1, children1, length1);
+    populateChildren(false, pair.n2, pair.b2, children2, length2);
+
+    for (int i = 0; i < length1; i++) {
+      for (int j = 0; j < length2; j++) {
+        auto& c1 = children1[i];
+        auto& c2 = children2[j];
+        if (c1.second.DoesOverlap(c2.second)) {
+          overlaps[count++] = {c1.first, c2.first, c1.second, c2.second};
         }
       }
-      for (int i = 0; i < toCheckLength; i++) {
-        int n1 = std::get<0>(toCheck[i]);
-        int n2 = std::get<1>(toCheck[i]);
-        Box bb1 = std::get<2>(toCheck[i]);
-        Box bb2 = std::get<3>(toCheck[i]);
-#if MANIFOLD_PAR == 1
-        if (splitDepth < 9 && toCheckLength > 1)
-          group.run([n1, n2, bb1, bb2, splitDepth, this]() {
-            check(n1, n2, bb1, bb2, recorder.local(), splitDepth + 1);
-          });
-        else
-#endif
-          check(n1, n2, bb1, bb2, local, splitDepth);
+    }
+    return count;
+  }
+
+  void checkSequential(NodePair pair, Local& local) {
+    // Stack size 256 is enough for a tree height of 64:
+    // (branching factor 4 - 1) * 64 + 1 = 193
+    NodePair stack[256];
+    int top = 0;
+    stack[0] = pair;
+
+    while (top >= 0) {
+      pair = stack[top--];
+
+      if (IsLeaf(pair.n1) && IsLeaf(pair.n2)) {
+        recorder.record(Node2Leaf(pair.n1), Node2Leaf(pair.n2), local);
+      } else {
+        std::array<NodePair, 4> overlaps;
+        int count = findOverlaps(pair, overlaps);
+        for (int i = 0; i < count; i++) {
+          stack[++top] = overlaps[i];
+        }
       }
+    }
+  }
+
+  void check(int node1, int node2, Box b1, Box b2, Local& local,
+             int splitDepth = 0) {
+    NodePair pair{node1, node2, b1, b2};
+
+    while (1) {
+      if (IsLeaf(pair.n1) && IsLeaf(pair.n2)) {
+        recorder.record(Node2Leaf(pair.n1), Node2Leaf(pair.n2), local);
+        return;
+      }
+
+      std::array<NodePair, 4> overlaps;
+      int count = findOverlaps(pair, overlaps);
+
+      if (count == 0) return;
+
+      if (count == 1) {
+        pair = overlaps[0];
+        continue;
+      }
+
+#if MANIFOLD_PAR == 1
+      if (splitDepth < 9) {
+        for (int i = 0; i < count; i++) {
+          NodePair p = overlaps[i];
+          group.run([p, splitDepth, this]() {
+            check(p.n1, p.n2, p.b1, p.b2, recorder.local(), splitDepth + 1);
+          });
+        }
+        return;
+      }
+#endif
+      for (int i = 0; i < count; i++) {
+        checkSequential(overlaps[i], local);
+      }
+      return;
     }
   }
 };

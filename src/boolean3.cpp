@@ -326,35 +326,27 @@ struct DualTraversalRecorder {
         k20{inQ, inP},
         k21{inQ, inP, k20, k11} {}
 
-  void record(int fp, int fq, Box bp, Box bq, Local& local) {
+  void record(int fp, int fq, Local& local) {
     Intersections& i12 = local[0];
     Intersections& i21 = local[1];
     for (int i = 0; i < 3; i++) {
       const int ep = 3 * fp + i;
       if (inP.halfedge_[ep].IsForward()) {
-        Box b = Box(inP.vertPos_[inP.halfedge_[ep].startVert],
-                    inP.vertPos_[inP.halfedge_[ep].endVert]);
-        if (b.DoesOverlap(bq)) {
-          const auto [x12, v12] = k12(ep, fq);
-          if (std::isfinite(v12[0])) {
-            i12.p1q2.push_back({ep, fq});
-            i12.x12.push_back(x12);
-            i12.v12.push_back(v12);
-          }
+        const auto [x12, v12] = k12(ep, fq);
+        if (std::isfinite(v12[0])) {
+          i12.p1q2.push_back({ep, fq});
+          i12.x12.push_back(x12);
+          i12.v12.push_back(v12);
         }
       }
 
       const int eq = 3 * fq + i;
       if (inQ.halfedge_[eq].IsForward()) {
-        Box b = Box(inQ.vertPos_[inQ.halfedge_[eq].startVert],
-                    inQ.vertPos_[inQ.halfedge_[eq].endVert]);
-        if (b.DoesOverlap(bp)) {
-          const auto [x21, v21] = k21(eq, fp);
-          if (std::isfinite(v21[0])) {
-            i21.p1q2.push_back({fp, eq});
-            i21.x12.push_back(x21);
-            i21.v12.push_back(v21);
-          }
+        const auto [x21, v21] = k21(eq, fp);
+        if (std::isfinite(v21[0])) {
+          i21.p1q2.push_back({fp, eq});
+          i21.x12.push_back(x21);
+          i21.v12.push_back(v21);
         }
       }
     }
