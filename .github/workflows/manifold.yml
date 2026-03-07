@@ -343,7 +343,7 @@ jobs:
           -DMANIFOLD_CROSS_SECTION=ON \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_FUZZTEST=fuzztest \
-          .. -B build
+          . -B build
         ASAN_OPTIONS=detect_container_overflow=0 cmake --build build
 
   build_mxe:
@@ -414,7 +414,7 @@ jobs:
           -DASSIMP_ENABLE=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
-          .. -B build
+          . -B build
         cmake --build build
     - name: Test
       run: |
@@ -462,7 +462,7 @@ jobs:
           -DMANIFOLD_PAR=ON \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
-          .. -B build
+          . -B build
         cmake --build build
     - name: Test
       run: |
