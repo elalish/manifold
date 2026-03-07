@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: C++",
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 dependencies = [
     "numpy; python_version<'3.12'",
@@ -55,7 +55,7 @@ test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts
 manylinux-x86_64-image = "manylinux_2_28"
 musllinux-x86_64-image = "musllinux_1_2"
-skip = ["*-win32", "*_i686", "pp*", "*-musllinux*"]
+skip = ["*-win32", "*_i686", "*-musllinux*"]
 
 # only clone TBB once
 before-all = "git clone --depth 1 --branch v2022.3.0 https://github.com/oneapi-src/oneTBB.git"

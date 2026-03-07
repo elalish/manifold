@@ -24,7 +24,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 | [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
-| [Bracket Engineer](https://bracket.engineer) | | |
+| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | |
 
 ### Bindings & Packages
 

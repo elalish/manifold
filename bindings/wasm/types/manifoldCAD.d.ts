@@ -45,6 +45,8 @@
  *
  * {@include ../documents/using-manifoldcad.md}
  *
+ * {@include ../documents/tips.md}
+ *
  * @packageDocumentation
  * @module manifoldCAD
  */

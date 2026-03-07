@@ -55,7 +55,7 @@ int manifold_box_contains_box(ManifoldBox* a, ManifoldBox* b) {
 }
 
 void manifold_box_include_pt(ManifoldBox* b, double x, double y, double z) {
-  auto box = *from_c(b);
+  auto& box = *from_c(b);
   auto p = vec3(x, y, z);
   box.Union(p);
 }

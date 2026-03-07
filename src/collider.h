@@ -157,21 +157,18 @@ struct CreateRadixTree {
   }
 };
 
-template <typename F, const bool selfCollision, const bool hasTransform,
-          typename Recorder>
+template <typename F, const bool selfCollision, typename Recorder>
 struct FindCollision {
   F& f;
   VecView<const Box> nodeBBox_;
   VecView<const std::pair<int, int>> internalChildren_;
   Recorder& recorder;
-  mat3x4 transform;
 
   using Local = typename Recorder::Local;
 
   inline int RecordCollision(std::invoke_result_t<F, const int> query, int node,
                              const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
-    if (hasTransform) box = box.Transform(transform);
     bool overlaps = box.DoesOverlap(query);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
@@ -218,11 +215,9 @@ struct DualTraversal {
 
   VecView<const Box> nodeBBox1;
   VecView<const std::pair<int, int>> internalChildren1;
-  const std::optional<mat3x4>& transform1;
 
   VecView<const Box> nodeBBox2;
   VecView<const std::pair<int, int>> internalChildren2;
-  const std::optional<mat3x4>& transform2;
 
   Recorder& recorder;
 
@@ -240,12 +235,9 @@ struct DualTraversal {
       const VecView<const Box>& nodeBBox = isCollider1 ? nodeBBox1 : nodeBBox2;
       const VecView<const std::pair<int, int>>& internalChildren =
           isCollider1 ? internalChildren1 : internalChildren2;
-      const std::optional<mat3x4>& transform =
-          isCollider1 ? transform1 : transform2;
       auto [child1, child2] = internalChildren[internal];
       for (int c : {child1, child2}) {
         Box bb = nodeBBox[c];
-        if (transform) bb = bb.Transform(transform.value());
         children[length++] = std::make_pair(c, bb);
       }
     }
@@ -372,26 +364,27 @@ class Collider {
                    {nodeBBox_, counter, nodeParent_, internalChildren_}));
   }
 
+  void Transform(const mat3x4& transform) {
+    ZoneScoped;
+    DEBUG_ASSERT(IsAxisAligned(transform), userErr,
+                 "transform must be axis-aligned");
+    for_each(autoPolicy(nodeBBox_.size()), countAt(0),
+             countAt(nodeBBox_.size()), [&transform, this](size_t i) {
+               nodeBBox_[i] = nodeBBox_[i].Transform(transform);
+             });
+  }
+
   template <typename Recorder>
-  void DualTraversal(Recorder& recorder,
-                     const std::optional<mat3x4>& transform1,
-                     const Collider& collider2,
-                     const std::optional<mat3x4>& transform2) const {
+  void DualTraversal(Recorder& recorder, const Collider& collider2) const {
     using collider_internal::DualTraversal;
     using collider_internal::kRoot;
     if (internalChildren_.empty() || collider2.internalChildren_.empty())
       return;
-    DualTraversal<Recorder> traversal{nodeBBox_,
-                                      internalChildren_,
-                                      transform1,
+    DualTraversal<Recorder> traversal{nodeBBox_, internalChildren_,
                                       collider2.nodeBBox_,
-                                      collider2.internalChildren_,
-                                      transform2,
-                                      recorder};
+                                      collider2.internalChildren_, recorder};
     Box b1 = nodeBBox_[kRoot];
     Box b2 = collider2.nodeBBox_[kRoot];
-    if (transform1) b1 = b1.Transform(transform1.value());
-    if (transform2) b2 = b2.Transform(transform2.value());
     traversal.check(kRoot, kRoot, b1, b2, recorder.local(),
                     nodeBBox_.size() > kSeqThreshold &&
                             collider2.nodeBBox_.size() > kSeqThreshold
@@ -403,26 +396,15 @@ class Collider {
   }
 
   template <const bool selfCollision = false, typename F, typename Recorder>
-  void Collisions(Recorder& recorder, std::optional<mat3x4> transform, F f,
-                  int n, bool parallel = true) const {
+  void Collisions(Recorder& recorder, F f, int n, bool parallel = true) const {
     ZoneScoped;
     using collider_internal::FindCollision;
     if (internalChildren_.empty()) return;
-    if (transform) {
-      for_each_n(
-          parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                   : ExecutionPolicy::Seq,
-          countAt(0), n,
-          FindCollision<decltype(f), selfCollision, true, Recorder>{
-              f, nodeBBox_, internalChildren_, recorder, transform.value()});
-    } else {
-      for_each_n(parallel
-                     ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                     : ExecutionPolicy::Seq,
-                 countAt(0), n,
-                 FindCollision<decltype(f), selfCollision, false, Recorder>{
-                     f, nodeBBox_, internalChildren_, recorder, la::identity});
-    }
+    for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
+                        : ExecutionPolicy::Seq,
+               countAt(0), n,
+               FindCollision<decltype(f), selfCollision, Recorder>{
+                   f, nodeBBox_, internalChildren_, recorder});
   }
 
   // This function iterates over queriesIn and calls recorder.record(queryIdx,
@@ -435,12 +417,10 @@ class Collider {
   //
   // If thread local storage is not needed, use SimpleRecorder.
   template <const bool selfCollision = false, typename T, typename Recorder>
-  void Collisions(Recorder& recorder, std::optional<mat3x4> transform,
-                  const VecView<const T>& queriesIn,
+  void Collisions(Recorder& recorder, const VecView<const T>& queriesIn,
                   bool parallel = true) const {
     auto f = [queriesIn](const int i) { return queriesIn[i]; };
-    Collisions<selfCollision>(recorder, transform, f, queriesIn.size(),
-                              parallel);
+    Collisions<selfCollision>(recorder, f, queriesIn.size(), parallel);
   }
 
   static uint32_t MortonCode(vec3 position, Box bBox) {
@@ -451,6 +431,17 @@ class Collider {
     uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
     uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
     return x * 4 + y * 2 + z;
+  }
+
+  static bool IsAxisAligned(const mat3x4& transform) {
+    for (int row : {0, 1, 2}) {
+      int count = 0;
+      for (int col : {0, 1, 2}) {
+        if (transform[col][row] == 0.0) ++count;
+      }
+      if (count != 2) return false;
+    }
+    return true;
   }
 
  private:

@@ -414,7 +414,7 @@ std::pair<Intersections, Intersections> Intersect(const Manifold::Impl& inP,
                                                   const Manifold::Impl& inQ) {
   ZoneScoped;
   DualTraversalRecorder<expandP> recorder(inP, inQ);
-  inP.collider_->DualTraversal(recorder, *inQ.collider_);
+  inP.collider_.DualTraversal(recorder, inQ.collider_);
   auto results = recorder.get();
   return std::make_pair(std::move(results[0]), std::move(results[1]));
 }
@@ -481,7 +481,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&](int i) { return a.vertPos_[verts[i]]; };
-  b.collider_->Collisions<false>(recorder, f, verts.size());
+  b.collider_.Collisions<false>(recorder, f, verts.size());
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
            [&](size_t i) {
@@ -547,7 +547,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
 
-  if (ManifoldParams().verbose) {
+  if (ManifoldParams().verbose >= 2) {
     intersections.Print("Intersections");
   }
 #endif
