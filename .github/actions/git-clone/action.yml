@@ -20,6 +20,7 @@ runs:
 
     - name: download
       if: steps.cacherestore.outputs.cache-hit != 'true'
+      shell: bash
       run: |
         mkdir ${{inputs.name}}
         cd ${{inputs.name}}
