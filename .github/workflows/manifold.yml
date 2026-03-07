@@ -75,7 +75,9 @@ jobs:
         python3 bindings/python/examples/run_all.py -e
         python3 -m pytest
     - name: Coverage Report
+      if: matrix.parallelization == 'OFF'
       run: |
+        mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=ON -DMANIFOLD_STRICT=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DMANIFOLD_PAR=${{matrix.parallelization}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --gcov-tool gcov-${{ matrix.gcc }} --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
