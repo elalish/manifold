@@ -49,7 +49,7 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
 
     - name: Build ${{matrix.parallelization}}
-      shell: powershell
+      shell: bash
       run: |
         cmake . \
           -DCMAKE_BUILD_TYPE=Release \
