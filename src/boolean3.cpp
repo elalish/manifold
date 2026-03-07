@@ -326,7 +326,7 @@ struct DualTraversalRecorder {
         k20{inQ, inP},
         k21{inQ, inP, k20, k11} {}
 
-  void record(int fp, int fq, Local& local) {
+  inline void record(int fp, int fq, Local& local) {
     Intersections& i12 = local[0];
     Intersections& i21 = local[1];
     for (int i = 0; i < 3; i++) {

@@ -227,7 +227,6 @@ struct DualTraversal {
 
   struct NodePair {
     int n1, n2;
-    Box b1, b2;
   };
 
   void populateChildren(bool isCollider1, int node, Box b,
@@ -248,43 +247,47 @@ struct DualTraversal {
     }
   }
 
-  int findOverlaps(const NodePair& pair, std::array<NodePair, 4>& overlaps) {
+  int findOverlaps(int n1, int n2, Box b1, Box b2,
+                   std::array<NodePair, 4>& overlaps) {
     std::array<std::pair<int, Box>, 2> children1;
     std::array<std::pair<int, Box>, 2> children2;
     int length1 = 0;
     int length2 = 0;
     int count = 0;
 
-    populateChildren(true, pair.n1, pair.b1, children1, length1);
-    populateChildren(false, pair.n2, pair.b2, children2, length2);
+    populateChildren(true, n1, b1, children1, length1);
+    populateChildren(false, n2, b2, children2, length2);
 
     for (int i = 0; i < length1; i++) {
       for (int j = 0; j < length2; j++) {
         auto& c1 = children1[i];
         auto& c2 = children2[j];
         if (c1.second.DoesOverlap(c2.second)) {
-          overlaps[count++] = {c1.first, c2.first, c1.second, c2.second};
+          overlaps[count++] = {c1.first, c2.first};
         }
       }
     }
     return count;
   }
 
-  void checkSequential(NodePair pair, Local& local) {
+  void checkSequential(int n1, int n2, const Box& b1, const Box& b2,
+                       Local& local) {
     // Stack size 256 is enough for a tree height of 64:
     // (branching factor 4 - 1) * 64 + 1 = 193
     NodePair stack[256];
     int top = 0;
-    stack[0] = pair;
+    stack[0] = {n1, n2};
 
     while (top >= 0) {
-      pair = stack[top--];
+      NodePair pair = stack[top--];
+      const Box& pb1 = (pair.n1 == n1) ? b1 : nodeBBox1[pair.n1];
+      const Box& pb2 = (pair.n2 == n2) ? b2 : nodeBBox2[pair.n2];
 
       if (IsLeaf(pair.n1) && IsLeaf(pair.n2)) {
         recorder.record(Node2Leaf(pair.n1), Node2Leaf(pair.n2), local);
       } else {
         std::array<NodePair, 4> overlaps;
-        int count = findOverlaps(pair, overlaps);
+        int count = findOverlaps(pair.n1, pair.n2, pb1, pb2, overlaps);
         for (int i = 0; i < count; i++) {
           stack[++top] = overlaps[i];
         }
@@ -292,9 +295,9 @@ struct DualTraversal {
     }
   }
 
-  void check(int node1, int node2, Box b1, Box b2, Local& local,
+  void check(int node1, int node2, const Box* b1, const Box* b2, Local& local,
              int splitDepth = 0) {
-    NodePair pair{node1, node2, b1, b2};
+    NodePair pair{node1, node2};
 
     while (1) {
       if (IsLeaf(pair.n1) && IsLeaf(pair.n2)) {
@@ -303,12 +306,14 @@ struct DualTraversal {
       }
 
       std::array<NodePair, 4> overlaps;
-      int count = findOverlaps(pair, overlaps);
+      int count = findOverlaps(pair.n1, pair.n2, *b1, *b2, overlaps);
 
       if (count == 0) return;
 
       if (count == 1) {
         pair = overlaps[0];
+        b1 = &nodeBBox1[pair.n1];
+        b2 = &nodeBBox2[pair.n2];
         continue;
       }
 
@@ -317,14 +322,19 @@ struct DualTraversal {
         for (int i = 0; i < count; i++) {
           NodePair p = overlaps[i];
           group.run([p, splitDepth, this]() {
-            check(p.n1, p.n2, p.b1, p.b2, recorder.local(), splitDepth + 1);
+            const Box& pb1 = nodeBBox1[p.n1];
+            const Box& pb2 = nodeBBox2[p.n2];
+            check(p.n1, p.n2, &pb1, &pb2, recorder.local(), splitDepth + 1);
           });
         }
         return;
       }
 #endif
       for (int i = 0; i < count; i++) {
-        checkSequential(overlaps[i], local);
+        NodePair p = overlaps[i];
+        const Box& pb1 = nodeBBox1[p.n1];
+        const Box& pb2 = nodeBBox2[p.n2];
+        checkSequential(p.n1, p.n2, pb1, pb2, local);
       }
       return;
     }
@@ -431,9 +441,9 @@ class Collider {
     DualTraversal<Recorder> traversal{nodeBBox_, internalChildren_,
                                       collider2.nodeBBox_,
                                       collider2.internalChildren_, recorder};
-    Box b1 = nodeBBox_[kRoot];
-    Box b2 = collider2.nodeBBox_[kRoot];
-    traversal.check(kRoot, kRoot, b1, b2, recorder.local(),
+    const Box& b1 = nodeBBox_[kRoot];
+    const Box& b2 = collider2.nodeBBox_[kRoot];
+    traversal.check(kRoot, kRoot, &b1, &b2, recorder.local(),
                     nodeBBox_.size() > kSeqThreshold &&
                             collider2.nodeBBox_.size() > kSeqThreshold
                         ? 0
