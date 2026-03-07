@@ -164,6 +164,11 @@ suite('Examples', () => {
     expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
   });
 
+  test('Import Model', async () => {
+    const result = await runExample('Import Model');
+    expect(result).toBeDefined();
+  });
+
   test('Import Manifold', async () => {
     const result = await runExample('Import Manifold');
     expect(result?.genus).to.equal(3, 'Genus');
