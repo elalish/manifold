@@ -62,7 +62,7 @@ jobs:
     - name: Build ${{matrix.parallelization}}
       if: matrix.parallelization != 'OFF'
       run: |
-        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMANIFOLD_DOWNLOADS=OFF -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind -DBUILD_SHARED_LIBS=ON -DMANIFOLD_STRICT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DASSIMP_ENABLE=ON -DMANIFOLD_PAR=${{matrix.parallelization}} . -B build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind -DBUILD_SHARED_LIBS=ON -DMANIFOLD_STRICT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} -DASSIMP_ENABLE=ON -DMANIFOLD_PAR=${{matrix.parallelization}} . -B build
         cmake --build build
     - name: Test ${{matrix.parallelization}}
       if: matrix.parallelization != 'OFF'
