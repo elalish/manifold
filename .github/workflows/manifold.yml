@@ -162,7 +162,7 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev git libtbb-dev pkg-config cmake clang ninja
+        packages: libgtest-dev git libtbb-dev pkg-config cmake clang ninja-build
     - *clone-clipper2
     - name: build clipper2
       run: |
