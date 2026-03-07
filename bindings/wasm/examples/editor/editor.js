@@ -44,6 +44,19 @@ const shareButton = document.querySelector("#share");
 
 undoButton.onclick = () => editor.trigger("ignored", "undo");
 redoButton.onclick = () => editor.trigger("ignored", "redo");
+let prettierCache = null;
+const loadPrettier = async () => {
+  if (!prettierCache) {
+    const [{ format }, estree, typescript] = await Promise.all([
+      import('prettier/standalone'),
+      import('prettier/plugins/estree'),
+      import('prettier/plugins/typescript'),
+    ]);
+    prettierCache = { format, estree, typescript };
+  }
+  return prettierCache;
+};
+
 formatButton.onclick = async () => {
   if (!editor) return;
 
@@ -51,52 +64,37 @@ formatButton.onclick = async () => {
   if (!model) return;
 
   const originalCode = model.getValue();
-  const language = (model.getModeId?.() || "").toLowerCase();
   const tabSize = model.getOptions?.().tabSize ?? 2;
-
-  let parser = "babel";
-  if (language.includes("typescript")) parser = "typescript";
 
   const viewState = editor.saveViewState();
   editor.pushUndoStop();
 
   try {
-    const [{ format }, estree, babel, typescript] = await Promise.all([
-      import("prettier/standalone"),
-      import("prettier/plugins/estree"),
-      import("prettier/plugins/babel"),
-      import("prettier/plugins/typescript"),
-    ]);
-
-    const plugins =
-      parser === "typescript" ? [typescript, estree] : [babel, estree];
+    const { format, estree, typescript } = await loadPrettier();
 
     const formatted = await format(originalCode, {
-      parser,
-      plugins,
+      parser: 'typescript', 
+      plugins: [typescript, estree],
       tabWidth: tabSize,
       singleQuote: true,
-      trailingComma: "all",
+      trailingComma: 'all',
     });
 
     if (formatted !== originalCode) {
-      editor.executeEdits("prettier-format", [
-        {
-          range: model.getFullModelRange(),
-          text: formatted,
-          forceMoveMarkers: true,
-        },
-      ]);
+      editor.executeEdits('prettier-format', [{
+        range: model.getFullModelRange(),
+        text: formatted,
+        forceMoveMarkers: true,
+      }]);
     }
 
     editor.pushUndoStop();
     if (viewState) editor.restoreViewState(viewState);
 
-    console.log("Formatted with Prettier 3.8.1");
+    console.log('Formatted with Prettier 3.8.1');
   } catch (err) {
-    console.error("Prettier formatting failed:", err);
-    consoleElement.textContent += `Prettier formatting failed: ${err.message}\r\n`;
-    consoleElement.scrollTop = consoleElement.scrollHeight;
+    console.error('Prettier formatting failed:', err);
+    console.log(`Prettier formatting failed: ${err.message}`);
   }
 };
 shareButton.onclick = () => {
