@@ -165,8 +165,12 @@ suite('Examples', () => {
   });
 
   test('Import Model', async () => {
-    const result = await runExample('Import Model');
-    expect(result).toBeDefined();
+    const filename = await resolveExample('Import Model');
+    const code = await fs.readFile(filename, 'utf-8');
+    const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
+    const glbURL = await exportBlobURL(doc, 'glb');
+    cleanup();
+    expect(glbURL).toBeTruthy();
   });
 
   test('Import Manifold', async () => {
