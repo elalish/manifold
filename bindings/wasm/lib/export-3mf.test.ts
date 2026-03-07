@@ -178,30 +178,29 @@ suite('toArrayBuffer with manifold models', () => {
     expect(modelXml).toContain('<component');
   });
 
-  test('dispatches through export-model.toArrayBuffer with extension',
-       async () => {
-         const script =
-             `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-             `export default Manifold.cube([1,1,1]);`;
-         const doc = await worker.evaluate(script);
-         const result =
-             await exportModel.toArrayBuffer(doc, {extension: '3mf'});
-         expect(result).toBeInstanceOf(ArrayBuffer);
-         const bytes = new Uint8Array(result);
-         expect(bytes[0]).toBe(0x50);  // ZIP magic 'P'
-         expect(bytes[1]).toBe(0x4b);  // ZIP magic 'K'
-       });
+  test(
+      'dispatches through export-model.toArrayBuffer with extension',
+      async () => {
+        const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
+            `export default Manifold.cube([1,1,1]);`;
+        const doc = await worker.evaluate(script);
+        const result = await exportModel.toArrayBuffer(doc, {extension: '3mf'});
+        expect(result).toBeInstanceOf(ArrayBuffer);
+        const bytes = new Uint8Array(result);
+        expect(bytes[0]).toBe(0x50);  // ZIP magic 'P'
+        expect(bytes[1]).toBe(0x4b);  // ZIP magic 'K'
+      });
 
-  test('dispatches through export-model.toArrayBuffer with mimetype',
-       async () => {
-         const script =
-             `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-             `export default Manifold.cube([1,1,1]);`;
-         const doc = await worker.evaluate(script);
-         const result =
-             await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
-         expect(result).toBeInstanceOf(ArrayBuffer);
-         const files = unzipSync(new Uint8Array(result));
-         expect(files['3D/3dmodel.model']).toBeDefined();
-       });
+  test(
+      'dispatches through export-model.toArrayBuffer with mimetype',
+      async () => {
+        const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
+            `export default Manifold.cube([1,1,1]);`;
+        const doc = await worker.evaluate(script);
+        const result =
+            await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
+        expect(result).toBeInstanceOf(ArrayBuffer);
+        const files = unzipSync(new Uint8Array(result));
+        expect(files['3D/3dmodel.model']).toBeDefined();
+      });
 });
