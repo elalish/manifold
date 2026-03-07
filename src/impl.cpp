@@ -601,7 +601,7 @@ void Manifold::Impl::MakeEmpty(Error status) {
   faceNormal_.clear();
   halfedgeTangent_.clear();
   meshRelation_ = MeshRelationD();
-  collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+  collider_ = {};
   status_ = status;
 }
 
@@ -683,16 +683,17 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   // Maximum of inherited epsilon loss and translational epsilon loss.
   result.SetEpsilon(result.epsilon_);
 
-  if (LazyCollider::IsAxisAligned(transform_)) {
-    result.collider_ = std::make_shared<LazyCollider>(collider_, transform_);
-  } else if (!result.IsEmpty()) {
-    Vec<Box> faceBox;
-    Vec<uint32_t> faceMorton;
-    result.GetFaceBoxMorton(faceBox, faceMorton);
-    result.collider_ =
-        std::make_shared<LazyCollider>(collider_, std::move(faceBox));
-  } else {
-    result.collider_ = std::make_shared<LazyCollider>(LazyCollider::Empty());
+  if (!result.IsEmpty()) {
+    if (Collider::IsAxisAligned(transform_)) {
+      result.collider_ = collider_;
+      result.collider_.Transform(transform_);
+    } else if (!result.IsEmpty()) {
+      result.collider_ = collider_;
+      Vec<Box> faceBox;
+      Vec<uint32_t> faceMorton;
+      result.GetFaceBoxMorton(faceBox, faceMorton);
+      result.collider_.UpdateBoxes(faceBox);
+    }
   }
   return result;
 }
