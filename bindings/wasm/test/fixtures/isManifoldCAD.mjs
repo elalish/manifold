@@ -1,5 +1,5 @@
-import {isManifoldCAD, Manifold} from '../../lib/manifoldCAD';
-const {cube, sphere} = Manifold;
+import { isManifoldCAD, Manifold } from '../../lib/manifoldCAD';
+const { cube, sphere } = Manifold;
 
 export const isManifoldCADReturns = isManifoldCAD();
 

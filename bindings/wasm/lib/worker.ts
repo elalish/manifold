@@ -27,23 +27,34 @@
  * @category Core
  */
 
-import {Document} from '@gltf-transform/core';
+import { Document } from '@gltf-transform/core';
 
 import * as animation from './animation.ts';
-import {bundleCode, setHasOwnWorker, setWasmUrl as setEsbuildWasmUrl} from './bundler.ts';
-import {RuntimeError} from './error.ts';
+import {
+  bundleCode,
+  setHasOwnWorker,
+  setWasmUrl as setEsbuildWasmUrl,
+} from './bundler.ts';
+import { RuntimeError } from './error.ts';
 import * as exportModel from './export-model.ts';
 import * as garbageCollector from './garbage-collector.ts';
-import * as gltfNode from './gltf-node.ts'
+import * as gltfNode from './gltf-node.ts';
 import * as levelOfDetail from './level-of-detail.ts';
 import * as scenebuilder from './scene-builder.ts';
-import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
-import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
+import { getSourceMappedStackTrace, isWebWorker } from './util.ts';
+import { getManifoldModule, setWasmUrl as setManifoldWasmUrl } from './wasm.ts';
 
-const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 export type MessageType =
-    'initialize'|'evaluate'|'export'|'ready'|'done'|'error'|'log'|'blob';
+  | 'initialize'
+  | 'evaluate'
+  | 'export'
+  | 'ready'
+  | 'done'
+  | 'error'
+  | 'log'
+  | 'blob';
 
 export interface Message {
   type: MessageType;
@@ -191,13 +202,15 @@ export interface evaluateOptions {
  * @returns A gltf-transform Document.
  */
 export async function evaluate(
-    code: string, options: evaluateOptions = {}): Promise<Document> {
+  code: string,
+  options: evaluateOptions = {},
+): Promise<Document> {
   cleanup();
   const t0 = performance.now();
 
-  const {doNotBundle, ...bundleOpt} = options;
+  const { doNotBundle, ...bundleOpt } = options;
   const bundled =
-      doNotBundle === true ? code : await bundleCode(code, bundleOpt);
+    doNotBundle === true ? code : await bundleCode(code, bundleOpt);
 
   const t1 = performance.now();
   if (doNotBundle !== true) {
@@ -210,7 +223,7 @@ export async function evaluate(
   const manifoldImport = {
     ...manifoldCAD,
     isManifoldCAD: () => true,
-  }
+  };
 
   // If a top level script imports manifoldCAD, track GLTF nodes.
   // Libraries are expected to manage this on their own; if a
@@ -249,7 +262,7 @@ export async function evaluate(
     // CommonJS expects 'exports' to exist:
     exports: {},
     // This is where we expect results after running the script.
-    module: {exports: {default: null}},
+    module: { exports: { default: null } },
   };
 
   let result: any = null;
@@ -270,23 +283,29 @@ export async function evaluate(
     // constructor always prefixes the source with additional 2 lines."
     // https://github.com/nodejs/node/issues/43047#issuecomment-1564068099
     const stacktrace = getSourceMappedStackTrace(bundled, error, -2);
-    let newError: RuntimeError|null = null;
+    let newError: RuntimeError | null = null;
 
-    const missing =
-        Object.keys(toplevelImport).find((x: string) => error.message.match(x));
+    const missing = Object.keys(toplevelImport).find((x: string) =>
+      error.message.match(x),
+    );
     if (error.name === 'ReferenceError' && missing) {
       newError = new RuntimeError(
-          error,
-          error.message + '.  Import it by adding \`' +
-              `import {${missing}} from 'manifold-3d/manifoldCAD';` +
-              '\` to the top of your model.');
+        error,
+        error.message +
+          '.  Import it by adding \`' +
+          `import {${missing}} from 'manifold-3d/manifoldCAD';` +
+          '\` to the top of your model.',
+      );
     } else if (
-        error.name === 'ReferenceError' && error.message.match(/glMatrix/)) {
+      error.name === 'ReferenceError' &&
+      error.message.match(/glMatrix/)
+    ) {
       newError = new RuntimeError(
-          error,
-          'ManifoldCAD no longer includes gl-matrix directly.  ' +
-              'Import it by adding `import * as glMatrix from \'gl-matrix\';` ' +
-              'to the top of your model.');
+        error,
+        'ManifoldCAD no longer includes gl-matrix directly.  ' +
+          "Import it by adding `import * as glMatrix from 'gl-matrix';` " +
+          'to the top of your model.',
+      );
     } else {
       newError = new RuntimeError(error);
     }
@@ -298,16 +317,18 @@ export async function evaluate(
   if (!result || (Array.isArray(result) && !result.length)) {
     if (gltfNode.getGLTFNodes().length) {
       throw new Error(
-          'GLTF Nodes were created, but not exported.  ' +
+        'GLTF Nodes were created, but not exported.  ' +
           'Add `const nodes = getGLTFNodes();` and `export default nodes;` ' +
-          'to the end of your model.');
+          'to the end of your model.',
+      );
     }
     throw new Error(
-        'No output as no model was exported.  Add a default export ' +
+      'No output as no model was exported.  Add a default export ' +
         '(e.g.: `export default result;`) to the bottom of your model.  ' +
         'The default export must be a `Manifold` or `GLTFNode` object, ' +
         'an array of `Manifold` or `GLTFNode` objects, ' +
-        'or a function that returns any of the above.');
+        'or a function that returns any of the above.',
+    );
   }
 
   // Create a gltf-transform document.
@@ -326,16 +347,21 @@ export async function evaluate(
  * @param extension The target file extension.
  * @returns A URL encoded blob.
  */
-export const exportBlobURL =
-    async(doc: Document, extension: string): Promise<string> => {
+export const exportBlobURL = async (
+  doc: Document,
+  extension: string,
+): Promise<string> => {
   const t0 = performance.now();
 
-  const blob = await exportModel.toBlob(doc, {extension});
+  const blob = await exportModel.toBlob(doc, { extension });
   const blobURL = URL.createObjectURL(blob);
 
   const t1 = performance.now();
-  log(`Exporting ${extension.toUpperCase()} took ${
-      (Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+  log(
+    `Exporting ${extension.toUpperCase()} took ${(
+      Math.round((t1 - t0) / 10) / 100
+    ).toLocaleString()} seconds`,
+  );
   return blobURL;
 };
 
@@ -347,7 +373,7 @@ const initializeWebWorker = (): void => {
     console.debug('Intercepting console.log() in manifoldCAD worker.');
     if (self.console) {
       const oldLog = self.console.log;
-      self.console.log = function(...args) {
+      self.console.log = function (...args) {
         let message = '';
         for (const arg of args) {
           if (arg == null) {
@@ -358,10 +384,10 @@ const initializeWebWorker = (): void => {
             message += arg.toString();
           }
         }
-        self.postMessage({type: 'log', message} as MessageFromWorker.Log);
+        self.postMessage({ type: 'log', message } as MessageFromWorker.Log);
         oldLog(...args);
       };
-    };
+    }
   };
 
   const sendError = (error: Error) => {
@@ -375,7 +401,7 @@ const initializeWebWorker = (): void => {
       type: 'error',
       name: error.name,
       message: error.message,
-      stack: (error as any).manifoldStack ?? error.stack
+      stack: (error as any).manifoldStack ?? error.stack,
     } as MessageFromWorker.Error);
   };
 
@@ -389,20 +415,20 @@ const initializeWebWorker = (): void => {
       await getManifoldModule();
       interceptConsole();
 
-      self.postMessage({type: 'ready'} as MessageFromWorker.Ready);
+      self.postMessage({ type: 'ready' } as MessageFromWorker.Ready);
       console.debug('Successfully initialized ManifoldCAD worker!');
     } catch (error) {
       sendError(error as Error);
     }
   };
 
-  let gltfdoc: Document|null = null;
+  let gltfdoc: Document | null = null;
 
   const handleEvaluate = async (message: MessageToWorker.Evaluate) => {
     try {
-      const {code, ...options} = message;
+      const { code, ...options } = message;
       gltfdoc = await evaluate(message.code, options as evaluateOptions);
-      self.postMessage({type: 'done'} as MessageFromWorker.Done);
+      self.postMessage({ type: 'done' } as MessageFromWorker.Done);
     } catch (error) {
       sendError(error as Error);
     }
@@ -413,7 +439,7 @@ const initializeWebWorker = (): void => {
       self.postMessage({
         type: 'blob',
         extension: message.extension,
-        blobURL: await exportBlobURL(gltfdoc!, message.extension)
+        blobURL: await exportBlobURL(gltfdoc!, message.extension),
       } as MessageFromWorker.Blob);
     } catch (error) {
       sendError(error as Error);
@@ -427,8 +453,8 @@ const initializeWebWorker = (): void => {
     } else if (message.type === 'evaluate') {
       handleEvaluate(message as MessageToWorker.Evaluate);
     } else if (message.type === 'export') {
-      handleExport(message as MessageToWorker.Export)
+      handleExport(message as MessageToWorker.Export);
     }
-  }
+  };
 };
 if (isWebWorker()) initializeWebWorker();

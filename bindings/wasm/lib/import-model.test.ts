@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import * as fs from 'node:fs/promises';
-import {afterEach, beforeAll, expect, suite, test} from 'vitest';
+import { afterEach, beforeAll, expect, suite, test } from 'vitest';
 
-import type {Vec3} from '../manifold.d.ts';
-import {equalsVec3Array, meshToVec3Array} from '../test/util.ts';
+import type { Vec3 } from '../manifold.d.ts';
+import { equalsVec3Array, meshToVec3Array } from '../test/util.ts';
 
-import {toArrayBuffer} from './export-model.ts';
+import { toArrayBuffer } from './export-model.ts';
 import * as importer from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
@@ -44,61 +44,76 @@ suite('supports()', () => {
   });
 
   test('Throws on demand', () => {
-    expect(() => importer.supports('model/not-a-real-3d-format', true))
-        .to.throw();
+    expect(() =>
+      importer.supports('model/not-a-real-3d-format', true),
+    ).to.throw();
   });
 });
 
 suite('importManifold()', () => {
   test('imports a model with EXT_mesh_manifold', async () => {
-    const model = await importer.importManifold(new URL(
-        '../test/fixtures/models/boxExtMeshManifold.glb', import.meta.url));
+    const model = await importer.importManifold(
+      new URL(
+        '../test/fixtures/models/boxExtMeshManifold.glb',
+        import.meta.url,
+      ),
+    );
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('imports a model without EXT_mesh_manifold', async () => {
     const model = await importer.importManifold(
-        new URL('../test/fixtures/models/box.glb', import.meta.url));
+      new URL('../test/fixtures/models/box.glb', import.meta.url),
+    );
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('throws when model is not manifold', async () => {
-    const fn = async () => await importer.importManifold(
-        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url));
+    const fn = async () =>
+      await importer.importManifold(
+        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
+      );
     await expect(fn).rejects.toThrowError();
   });
 
   test('succeeds when tolerance permits a non-manifold model', async () => {
     const model = await importer.importManifold(
-        new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
-        {tolerance: 0.005});
+      new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
+      { tolerance: 0.005 },
+    );
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('throws when tolerance is insufficient', async () => {
-    const fn = async () => await importer.importManifold(
+    const fn = async () =>
+      await importer.importManifold(
         new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
-        {tolerance: 0.001});
+        { tolerance: 0.001 },
+      );
     await expect(fn).rejects.toThrowError();
   });
 
   test('import a model by file URL', async () => {
     const model = await importer.importManifold(
-        new URL('../test/fixtures/models/box.glb', import.meta.url));
+      new URL('../test/fixtures/models/box.glb', import.meta.url),
+    );
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('import a model by absolute path', async () => {
     const model = await importer.importManifold(
-        import.meta.dirname + '/../test/fixtures/models/box.glb');
+      import.meta.dirname + '/../test/fixtures/models/box.glb',
+    );
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('import a model from a Blob (with mimetype)', async () => {
     const buffer = await fs.readFile(
-        import.meta.dirname + '/../test/fixtures/models/box.glb');
-    const blob =
-        new Blob([buffer.buffer as ArrayBuffer], {type: 'model/gltf-binary'});
+      import.meta.dirname + '/../test/fixtures/models/box.glb',
+    );
+    const blob = new Blob([buffer.buffer as ArrayBuffer], {
+      type: 'model/gltf-binary',
+    });
 
     const model = await importer.importManifold(blob);
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
@@ -106,20 +121,24 @@ suite('importManifold()', () => {
 
   test('import a model from a Blob (specifying mimetype)', async () => {
     const buffer = await fs.readFile(
-        import.meta.dirname + '/../test/fixtures/models/box.glb');
+      import.meta.dirname + '/../test/fixtures/models/box.glb',
+    );
     const blob = new Blob([buffer.buffer as ArrayBuffer]);
 
-    const model =
-        await importer.importManifold(blob, {mimetype: 'model/gltf-binary'});
+    const model = await importer.importManifold(blob, {
+      mimetype: 'model/gltf-binary',
+    });
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
   test('import a model from an ArrayBuffer', async () => {
     const buffer = await fs.readFile(
-        import.meta.dirname + '/../test/fixtures/models/box.glb');
+      import.meta.dirname + '/../test/fixtures/models/box.glb',
+    );
 
-    const model = await importer.importManifold(
-        buffer.buffer as ArrayBuffer, {mimetype: 'model/gltf-binary'});
+    const model = await importer.importManifold(buffer.buffer as ArrayBuffer, {
+      mimetype: 'model/gltf-binary',
+    });
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
@@ -129,13 +148,19 @@ suite('importManifold()', () => {
     // glTF and +Z in manifold.
 
     // Here's an asymmetric shape.
-    const before: Array<Vec3> =
-        [[-1, 0, 0], [4, 0, 0], [0, -2, 0], [0, 3, 0], [0, 0, 5]];
-    const script = `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
-        `export default Manifold.hull(${JSON.stringify(before)});\n`;
+    const before: Array<Vec3> = [
+      [-1, 0, 0],
+      [4, 0, 0],
+      [0, -2, 0],
+      [0, 3, 0],
+      [0, 0, 5],
+    ];
+    const script =
+      `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
+      `export default Manifold.hull(${JSON.stringify(before)});\n`;
 
     // Evaluate, export it and re-import the model.
-    const options = {mimetype: 'model/gltf-binary'};
+    const options = { mimetype: 'model/gltf-binary' };
     const doc = await worker.evaluate(script);
     const buffer = await toArrayBuffer(doc, options);
     const model = await importer.importManifold(buffer, options);

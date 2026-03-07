@@ -37,20 +37,29 @@
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
+import type { CrossSection, Manifold, Vec3 } from '../manifold.d.ts';
 
-import {getManifoldModuleSync} from './wasm.ts';
+import { getManifoldModuleSync } from './wasm.ts';
 
 const nodes = new Array<BaseGLTFNode>();
-
 
 /**
  * @inline
  * @internal
  */
 export type GLTFAttribute =
-    'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|'COLOR_0'|
-    'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
+  | 'POSITION'
+  | 'NORMAL'
+  | 'TANGENT'
+  | 'TEXCOORD_0'
+  | 'TEXCOORD_1'
+  | 'COLOR_0'
+  | 'JOINTS_0'
+  | 'WEIGHTS_0'
+  | 'SKIP_1'
+  | 'SKIP_2'
+  | 'SKIP_3'
+  | 'SKIP_4';
 
 /**
  * Define a material using the glTF metallic-roughness physically-based
@@ -173,7 +182,7 @@ export abstract class BaseGLTFNode {
   // Internally, gltf-transform stores transformations as separate translation,
   // rotation and scale vectors.  It can convert those vectors to and from a
   // transformation matrix as needed.
-  translation?: Vec3|((t: number) => Vec3);
+  translation?: Vec3 | ((t: number) => Vec3);
 
   /**
    * From the reference frame of the model being rotated, rotations are applied
@@ -184,8 +193,8 @@ export abstract class BaseGLTFNode {
    *
    * This matches the behaviour of `Manifold.rotate()`.
    */
-  rotation?: Vec3|((t: number) => Vec3);
-  scale?: Vec3|((t: number) => Vec3);
+  rotation?: Vec3 | ((t: number) => Vec3);
+  scale?: Vec3 | ((t: number) => Vec3);
 
   constructor(parent?: BaseGLTFNode) {
     this._parent = parent;
@@ -342,7 +351,7 @@ export class CrossSectionGLTFNode extends BaseGLTFNode {
  */
 export function getGLTFNodes() {
   return nodes;
-};
+}
 
 /**
  * Clear the list of cached GLTF nodes.
@@ -353,7 +362,7 @@ export function getGLTFNodes() {
  */
 export function resetGLTFNodes() {
   nodes.length = 0;
-};
+}
 
 /**
  * @internal
@@ -369,13 +378,19 @@ export const cleanup = () => {
  * @returns An array of GLTFNodes.
  */
 export async function anyToGLTFNodeList(
-    any: Manifold|BaseGLTFNode|CrossSection|
-    Array<Manifold|BaseGLTFNode|CrossSection>): Promise<Array<BaseGLTFNode>> {
+  any:
+    | Manifold
+    | BaseGLTFNode
+    | CrossSection
+    | Array<Manifold | BaseGLTFNode | CrossSection>,
+): Promise<Array<BaseGLTFNode>> {
   if (Array.isArray(any)) {
-    return await any.map(anyToGLTFNodeList)
-        .reduce(
-            async (acc, cur) => ([...(await acc), ...(await cur)]),
-            new Promise(resolve => resolve([])));
+    return await any
+      .map(anyToGLTFNodeList)
+      .reduce(
+        async (acc, cur) => [...(await acc), ...(await cur)],
+        new Promise((resolve) => resolve([])),
+      );
   } else if (any instanceof BaseGLTFNode) {
     return [any];
   } else if (any.constructor.name === 'Manifold') {

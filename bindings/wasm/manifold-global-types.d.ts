@@ -75,15 +75,15 @@ export type Mat4 = [
   number,
 ];
 export type SimplePolygon = Vec2[];
-export type Polygons = SimplePolygon|SimplePolygon[];
+export type Polygons = SimplePolygon | SimplePolygon[];
 
 /**
  * A two dimensional rectangle, aligned to the coordinate system.
  * @see {@link CrossSection.bounds}
  */
 export type Rect = {
-  min: Vec2,
-  max: Vec2
+  min: Vec2;
+  max: Vec2;
 };
 
 /**
@@ -93,24 +93,32 @@ export type Rect = {
  * @see {@link Manifold.levelSet}
  */
 export type Box = {
-  min: Vec3,
-  max: Vec3
+  min: Vec3;
+  max: Vec3;
 };
 
 export type Smoothness = {
-  halfedge: number,
-  smoothness: number
+  halfedge: number;
+  smoothness: number;
 };
 
-export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
+export type FillRule = 'EvenOdd' | 'NonZero' | 'Positive' | 'Negative';
 
-export type JoinType = 'Square'|'Round'|'Miter';
+export type JoinType = 'Square' | 'Round' | 'Miter';
 
 /**
  * @see {@link Manifold.status}
  */
-export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
-    'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
-    'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
-    'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
-    'InvalidConstruction';
+export type ErrorStatus =
+  | 'NoError'
+  | 'NonFiniteVertex'
+  | 'NotManifold'
+  | 'VertexOutOfBounds'
+  | 'PropertiesWrongLength'
+  | 'MissingPositionProperties'
+  | 'MergeVectorsDifferentLengths'
+  | 'MergeIndexOutOfBounds'
+  | 'TransformWrongLength'
+  | 'RunIndexWrongLength'
+  | 'FaceIDWrongLength'
+  | 'InvalidConstruction';

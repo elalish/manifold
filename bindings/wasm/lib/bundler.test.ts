@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {expect, suite, test} from 'vitest';
+import { expect, suite, test } from 'vitest';
 
 import * as worker from './worker.ts';
 
@@ -24,22 +24,22 @@ suite('Bundler', () => {
     // Metaprogramming like this works in a test, but the bundler doesn't have
     // (and shouldn't need) an instantiated copy of manifoldCAD.
     const manifoldCAD = await import('./manifoldCAD.ts');
-    const keys = Object
-                     .keys(manifoldCAD)
-                     // @ts-ignore
-                     .filter(key => 'undefined' !== typeof manifoldCAD[key]);
+    const keys = Object.keys(manifoldCAD)
+      // @ts-ignore
+      .filter((key) => 'undefined' !== typeof manifoldCAD[key]);
 
-    const script = `import * as manifoldCAD from 'manifold-3d/manifoldCAD';` +
-        `const check = () => {` +
-        `  const keys=${JSON.stringify(keys)};` +
-        `  for (const key of keys) {` +
-        `    if ('undefined' === typeof manifoldCAD[key]) {` +
-        `      throw new Error(\`manifoldCAD.\${key} is not defined inside manifoldCAD.\`);` +
-        `    }` +
-        `  }` +
-        `  return manifoldCAD.Manifold.sphere(1);` +
-        `};` +
-        `export default check;`;
+    const script =
+      `import * as manifoldCAD from 'manifold-3d/manifoldCAD';` +
+      `const check = () => {` +
+      `  const keys=${JSON.stringify(keys)};` +
+      `  for (const key of keys) {` +
+      `    if ('undefined' === typeof manifoldCAD[key]) {` +
+      `      throw new Error(\`manifoldCAD.\${key} is not defined inside manifoldCAD.\`);` +
+      `    }` +
+      `  }` +
+      `  return manifoldCAD.Manifold.sphere(1);` +
+      `};` +
+      `export default check;`;
     await expect(worker.evaluate(script)).to.resolves.not.toBeNull();
   });
 });

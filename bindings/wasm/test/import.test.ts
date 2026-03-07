@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document} from '@gltf-transform/core';
-import {getSceneVertexCount, VertexCountMethod} from '@gltf-transform/functions';
-import {readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {afterEach, beforeEach, expect, suite, test, vi} from 'vitest';
+import { Document } from '@gltf-transform/core';
+import {
+  getSceneVertexCount,
+  VertexCountMethod,
+} from '@gltf-transform/functions';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { afterEach, beforeEach, expect, suite, test, vi } from 'vitest';
 
-import {bundleFile} from '../lib/bundler.ts';
+import { bundleFile } from '../lib/bundler.ts';
 import * as worker from '../lib/worker.ts';
 
 const countVertices = (doc: Document) => {
@@ -33,36 +36,42 @@ suite('From a string, the worker will', () => {
   test('Build a model', async () => {
     const filename = resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Convert a Manifold object into a GLTF Document', async () => {
     const filename = resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(result).toBeInstanceOf(Document);
   });
 
   test('Collect GLTFNodes into a GLTF Document', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/unitSphereGLTF.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/unitSphereGLTF.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(result).toBeInstanceOf(Document);
   });
 
   test('Build a model with local imports', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/importUnitSphere.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Fail to find local imports without a filename', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/importUnitSphere.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
     const ev = async () => await worker.evaluate(code);
     await expect(ev()).rejects.toThrowError();
@@ -71,66 +80,81 @@ suite('From a string, the worker will', () => {
   test('Bundle npm imports from a CDN', async () => {
     const filename = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename, jsCDN: 'jsDelivr'});
+    const result = await worker.evaluate(code, { filename, jsCDN: 'jsDelivr' });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Bundle npm imports from a CDN without a filename', async () => {
     const filename = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {jsCDN: 'jsDelivr'});
+    const result = await worker.evaluate(code, { jsCDN: 'jsDelivr' });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Fails if missing a top-level manifoldCAD import', async () => {
     const filename = resolve(
-        import.meta.dirname, './fixtures/unitSphereNoManifoldImport.mjs');
+      import.meta.dirname,
+      './fixtures/unitSphereNoManifoldImport.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const ev = async () => await worker.evaluate(code, {filename});
+    const ev = async () => await worker.evaluate(code, { filename });
     await expect(ev()).rejects.toThrowError(
-        /Import it by adding.*manifold-3d\/manifoldCAD/);
+      /Import it by adding.*manifold-3d\/manifoldCAD/,
+    );
   });
 
   test('Have a specific error when missing gl-matrix', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/glMatrixNoImport.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/glMatrixNoImport.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const ev = async () => await worker.evaluate(code, {filename});
+    const ev = async () => await worker.evaluate(code, { filename });
     await expect(ev()).rejects.toThrowError(
-        /ManifoldCAD no longer includes gl-matrix directly/);
+      /ManifoldCAD no longer includes gl-matrix directly/,
+    );
   });
 
   test('Throw when no geometry is exported', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/noGeometryExport.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/noGeometryExport.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const ev = async () => await worker.evaluate(code, {filename});
+    const ev = async () => await worker.evaluate(code, { filename });
     await expect(ev()).rejects.toThrowError(/no model was exported/);
   });
 
   test('Throw when GLTF nodes are created but not exported', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/unitSphereGLTFNoExport.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/unitSphereGLTFNoExport.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const ev = async () => await worker.evaluate(code, {filename});
+    const ev = async () => await worker.evaluate(code, { filename });
     await expect(ev()).rejects.toThrowError(
-        /GLTF Nodes were created, but not exported/);
+      /GLTF Nodes were created, but not exported/,
+    );
     await expect(ev()).rejects.not.toThrowError(/no model was exported/);
   });
 
   test('Accept TypeScript syntax', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/typeScriptSphere.ts');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/typeScriptSphere.ts',
+    );
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Make isManifoldCAD() return true', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/isManifoldCAD.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/isManifoldCAD.mjs',
+    );
     const code = await readFile(filename, 'utf-8');
-    const result = await worker.evaluate(code, {filename});
+    const result = await worker.evaluate(code, { filename });
     expect(countVertices(result)).toBe(8);
   });
 });
@@ -139,120 +163,139 @@ suite('From the filesystem, the worker will', () => {
   test('Build a model', async () => {
     const filename = resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Convert a Manifold object into a GLTF Document', async () => {
     const filename = resolve(import.meta.dirname, './fixtures/unitSphere.mjs');
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(result).toBeInstanceOf(Document);
   });
 
   test('Collect GLTFNodes into a GLTF Document', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/unitSphereGLTF.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/unitSphereGLTF.mjs',
+    );
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(result).toBeInstanceOf(Document);
   });
 
   test('Build a model with local imports', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/importUnitSphere.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/importUnitSphere.mjs',
+    );
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Fail if missing a top-level manifoldCAD import', async () => {
     const filename = resolve(
-        import.meta.dirname, './fixtures/unitSphereNoManifoldImport.mjs');
+      import.meta.dirname,
+      './fixtures/unitSphereNoManifoldImport.mjs',
+    );
     const bundle = await bundleFile(filename);
-    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    const ev = async () => await worker.evaluate(bundle, { doNotBundle: true });
     await expect(ev()).rejects.toThrowError(
-        /Import it by adding.*manifold-3d\/manifoldCAD/);
+      /Import it by adding.*manifold-3d\/manifoldCAD/,
+    );
   });
 
   test('Bundle npm imports from a CDN', async () => {
     const filename = resolve(import.meta.dirname, './examples/voronoi.mjs');
-    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const bundle = await bundleFile(filename, { jsCDN: 'jsDelivr' });
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Have a specific error when missing gl-matrix', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/glMatrixNoImport.mjs');
-    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
-    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/glMatrixNoImport.mjs',
+    );
+    const bundle = await bundleFile(filename, { jsCDN: 'jsDelivr' });
+    const ev = async () => await worker.evaluate(bundle, { doNotBundle: true });
     await expect(ev()).rejects.toThrowError(
-        /ManifoldCAD no longer includes gl-matrix directly/);
+      /ManifoldCAD no longer includes gl-matrix directly/,
+    );
   });
 
   test('Throw when no geometry is exported', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/noGeometryExport.mjs');
-    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
-    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/noGeometryExport.mjs',
+    );
+    const bundle = await bundleFile(filename, { jsCDN: 'jsDelivr' });
+    const ev = async () => await worker.evaluate(bundle, { doNotBundle: true });
     await expect(ev()).rejects.toThrowError(/no model was exported/);
   });
 
   test('Throw when GLTF nodes are created but not exported', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/unitSphereGLTFNoExport.mjs');
-    const bundle = await bundleFile(filename, {jsCDN: 'jsDelivr'});
-    const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/unitSphereGLTFNoExport.mjs',
+    );
+    const bundle = await bundleFile(filename, { jsCDN: 'jsDelivr' });
+    const ev = async () => await worker.evaluate(bundle, { doNotBundle: true });
     await expect(ev()).rejects.toThrowError(
-        /GLTF Nodes were created, but not exported/);
+      /GLTF Nodes were created, but not exported/,
+    );
     await expect(ev()).rejects.not.toThrowError(/no model was exported/);
   });
 
   test('Accept TypeScript syntax', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/typeScriptSphere.ts');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/typeScriptSphere.ts',
+    );
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBeGreaterThan(0);
   });
 
   test('Make isManifoldCAD() return true', async () => {
-    const filename =
-        resolve(import.meta.dirname, './fixtures/isManifoldCAD.mjs');
+    const filename = resolve(
+      import.meta.dirname,
+      './fixtures/isManifoldCAD.mjs',
+    );
     const bundle = await bundleFile(filename);
-    const result = await worker.evaluate(bundle, {doNotBundle: true});
+    const result = await worker.evaluate(bundle, { doNotBundle: true });
     expect(countVertices(result)).toBe(8);
   });
 });
 
 suite('Without a worker, an import will', () => {
   test('Build a model', async () => {
-    const {default: result} = await import('./fixtures/unitSphere.mjs');
+    const { default: result } = await import('./fixtures/unitSphere.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 
   test('Not convert Manifold objects', async () => {
-    const {default: result} = await import('./fixtures/unitSphere.mjs');
+    const { default: result } = await import('./fixtures/unitSphere.mjs');
     expect(result).not.toBeInstanceOf(Document);
     expect(result.constructor.name).toBe('Manifold');
   });
 
   test('Not convert GLTFNode objects', async () => {
-    const {default: result} = await import('./fixtures/unitSphereGLTF.mjs');
+    const { default: result } = await import('./fixtures/unitSphereGLTF.mjs');
 
     expect(result.constructor.name).toBe('GLTFNode');
   });
 
   test('Build a model with local imports', async () => {
-    const {default: result} = await import('./fixtures/importUnitSphere.mjs');
+    const { default: result } = await import('./fixtures/importUnitSphere.mjs');
     expect(result.volume()).toBeCloseTo(2.9428, 0.1);
   });
 
   test('Throw if missing a top-level manifoldCAD import', async () => {
     const ev = async () => {
-      const {default: result} =
-          await import('./fixtures/unitSphereNoManifoldImport.mjs');
+      const { default: result } =
+        await import('./fixtures/unitSphereNoManifoldImport.mjs');
       return result;
     };
     await expect(ev()).rejects.toThrowError();
@@ -260,7 +303,7 @@ suite('Without a worker, an import will', () => {
 
   test('Throw if imports are not present', async () => {
     const ev = async () => {
-      const {default: result} = await import('./examples/voronoi.mjs');
+      const { default: result } = await import('./examples/voronoi.mjs');
       return result;
     };
     await expect(ev()).rejects.toThrowError();
@@ -270,12 +313,14 @@ suite('Without a worker, an import will', () => {
     const ev = async () => await import('./fixtures/glMatrixNoImport.mjs');
     await expect(ev()).rejects.toThrowError();
     await expect(ev()).rejects.not.toThrowError(
-        /ManifoldCAD no longer includes gl-matrix directly/);
+      /ManifoldCAD no longer includes gl-matrix directly/,
+    );
   });
 
   test('Not throw when no geometry is exported', async () => {
     const ev = async () => {
-      const {default: result} = await import('./fixtures/noGeometryExport.mjs');
+      const { default: result } =
+        await import('./fixtures/noGeometryExport.mjs');
       return result;
     };
     await expect(ev()).resolves.toBeFalsy();
@@ -284,18 +329,18 @@ suite('Without a worker, an import will', () => {
   test('Not throw when GLTF nodes are not exported', async () => {
     const ev = async () => {
       //@ts-ignore
-      const {default: result} =
-          await import('./fixtures/unitSphereGLTFNoExport.mjs');
+      const { default: result } =
+        await import('./fixtures/unitSphereGLTFNoExport.mjs');
       return result;
     };
     await expect(ev()).resolves.toBeFalsy();
   });
 
   test('Make isManifoldCAD() return false', async () => {
-    const {isManifoldCADReturns, default: result} =
-        await import('./fixtures/isManifoldCAD.mjs');
+    const { isManifoldCADReturns, default: result } =
+      await import('./fixtures/isManifoldCAD.mjs');
     expect(isManifoldCADReturns).toBeFalsy();
     expect(isManifoldCADReturns).toBeTypeOf('boolean');
     expect(result.numVert()).toBeGreaterThan(8);
-  })
+  });
 });

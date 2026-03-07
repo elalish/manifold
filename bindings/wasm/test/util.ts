@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {distanceVec3} from '../lib/math.ts';
-import type {Mesh, Vec3} from '../manifold.d.ts';
+import { distanceVec3 } from '../lib/math.ts';
+import type { Mesh, Vec3 } from '../manifold.d.ts';
 
 export function inVec3Array(
-    haystack: Array<Vec3>, needle: Vec3, margin: number = 1.0e-6): boolean {
-  return !!haystack.find(x => distanceVec3(needle, x) <= margin);
+  haystack: Array<Vec3>,
+  needle: Vec3,
+  margin: number = 1.0e-6,
+): boolean {
+  return !!haystack.find((x) => distanceVec3(needle, x) <= margin);
 }
 
 export function equalsVec3Array(
-    a: Array<Vec3>, b: Array<Vec3>, margin: number = 1.0e-6): boolean {
+  a: Array<Vec3>,
+  b: Array<Vec3>,
+  margin: number = 1.0e-6,
+): boolean {
   if (a.length != b.length) return false;
 
   for (const pt of a) {

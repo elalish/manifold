@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, WebIO} from '@gltf-transform/core';
-import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
-import {prune} from '@gltf-transform/functions';
+import { Document, WebIO } from '@gltf-transform/core';
+import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
+import { prune } from '@gltf-transform/functions';
 import Module from 'manifold-3d';
-import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-3d/lib/gltf-io';
-import {EXTManifold} from 'manifold-3d/manifold-gltf';
-import {SimpleDropzone} from 'simple-dropzone';
+import {
+  disposeMesh,
+  Properties,
+  readMesh,
+  writeMesh,
+} from 'manifold-3d/lib/gltf-io';
+import { EXTManifold } from 'manifold-3d/manifold-gltf';
+import { SimpleDropzone } from 'simple-dropzone';
 
 // Set up gltf-transform
 const io = new WebIO();
@@ -28,7 +33,7 @@ io.registerExtensions(KHRONOS_EXTENSIONS);
 // Set up Manifold WASM library
 const wasm = await Module();
 wasm.setup();
-const {Manifold, Mesh} = wasm;
+const { Manifold, Mesh } = wasm;
 
 // UX elements
 const mv = document.querySelector('model-viewer');
@@ -45,7 +50,7 @@ let allManifold = true;
 let anyManifold = false;
 
 // The processing is run when a glTF is drag-and-dropped onto this element.
-dropCtrl.on('drop', async ({files}: {files: Map<string, File>}) => {
+dropCtrl.on('drop', async ({ files }: { files: Map<string, File> }) => {
   for (const [_path, file] of files) {
     const filename = file.name.toLowerCase();
     if (filename.match(/\.(gltf|glb)$/)) {
@@ -79,7 +84,7 @@ checkbox.onclick = onClick;
 function onClick() {
   (mv as any).src = checkbox.checked ? outputGLBurl : inputGLBurl;
   downloadButton.disabled = !checkbox.checked;
-};
+}
 
 downloadButton.onclick = () => {
   const link = document.createElement('a');
@@ -97,8 +102,9 @@ async function writeGLB(doc: Document): Promise<void> {
   }
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob(
-      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
+  const blob = new Blob([glb as Uint8Array<ArrayBuffer>], {
+    type: 'application/octet-stream',
+  });
   outputGLBurl = URL.createObjectURL(blob);
 }
 

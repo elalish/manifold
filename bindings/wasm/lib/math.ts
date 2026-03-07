@@ -17,9 +17,9 @@
  * @packageDocumentation
  */
 
-import type {Vec3} from '../manifold.d.ts';
+import type { Vec3 } from '../manifold.d.ts';
 
-const {cos, sin, sqrt, PI} = Math;
+const { cos, sin, sqrt, PI } = Math;
 
 /**
  * A quaternion in `XYZW` order.
@@ -45,14 +45,14 @@ export type Vec4 = Quat;
  * @param rotation [X, Y, Z] rotation in degrees.
  */
 export function euler2quat(rotation: Vec3): Quat {
-  const [cx, cy, cz] = rotation.map(r => cos(r * PI / 360));
-  const [sx, sy, sz] = rotation.map(r => sin(r * PI / 360));
+  const [cx, cy, cz] = rotation.map((r) => cos((r * PI) / 360));
+  const [sx, sy, sz] = rotation.map((r) => sin((r * PI) / 360));
 
   return [
-    sx * cy * cz - cx * sy * sz,  // X
-    cx * sy * cz + sx * cy * sz,  // Y
-    cx * cy * sz - sx * sy * cz,  // Z
-    cx * cy * cz + sx * sy * sz   // W
+    sx * cy * cz - cx * sy * sz, // X
+    cx * sy * cz + sx * cy * sz, // Y
+    cx * cy * sz - sx * sy * cz, // Z
+    cx * cy * cz + sx * sy * sz, // W
   ];
 }
 
@@ -64,10 +64,10 @@ export function multiplyQuat(a: Quat, b: Quat): Quat {
   const [bx, by, bz, bw] = b;
 
   return [
-    ax * bw + aw * bx + ay * bz - az * by,  // X
-    ay * bw + aw * by + az * bx - ax * bz,  // Y
-    az * bw + aw * bz + ax * by - ay * bx,  // Z
-    aw * bw - ax * bx - ay * by - az * bz   // W
+    ax * bw + aw * bx + ay * bz - az * by, // X
+    ay * bw + aw * by + az * bx - ax * bz, // Y
+    az * bw + aw * bz + ax * by - ay * bx, // Z
+    aw * bw - ax * bx - ay * by - az * bz, // W
   ];
 }
 

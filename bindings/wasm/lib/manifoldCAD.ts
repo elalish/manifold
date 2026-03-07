@@ -35,23 +35,41 @@
  * @module manifoldCAD
  */
 
-import type {ManifoldToplevel} from '../manifold.d.ts';
+import type { ManifoldToplevel } from '../manifold.d.ts';
 
 import * as debug from './debug.ts';
-import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
+import {
+  garbageCollectFunction,
+  garbageCollectManifold,
+} from './garbage-collector.ts';
 import * as material from './material.ts';
-import {getManifoldModule} from './wasm.ts';
+import { getManifoldModule } from './wasm.ts';
 
-export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
-export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
-export {CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
-export {importManifold, importModel} from './import-model.ts';
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
+export {
+  getAnimationDuration,
+  getAnimationFPS,
+  getAnimationMode,
+  setMorphEnd,
+  setMorphStart,
+} from './animation.ts';
+export type { GLTFAttribute, GLTFMaterial } from './gltf-node.ts';
+export {
+  CrossSectionGLTFNode,
+  GLTFNode,
+  VisualizationGLTFNode,
+} from './gltf-node.ts';
+export { importManifold, importModel } from './import-model.ts';
+export {
+  getCircularSegments,
+  getMinCircularAngle,
+  getMinCircularEdgeLength,
+} from './level-of-detail.ts';
 
-const manifoldWasm: ManifoldToplevel =
-    garbageCollectManifold(await getManifoldModule());
+const manifoldWasm: ManifoldToplevel = garbageCollectManifold(
+  await getManifoldModule(),
+);
 
-const {Mesh, Manifold, CrossSection, triangulate} = manifoldWasm;
+const { Mesh, Manifold, CrossSection, triangulate } = manifoldWasm;
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
 // builder.
@@ -75,5 +93,5 @@ export {
   setMaterial,
   getGLTFNodes,
   resetGLTFNodes,
-  isManifoldCAD
+  isManifoldCAD,
 };

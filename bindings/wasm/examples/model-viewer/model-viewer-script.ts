@@ -12,22 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, WebIO} from '@gltf-transform/core';
-import {clearNodeTransform, flatten, mergeDocuments, prune} from '@gltf-transform/functions';
-import type {Manifold as ManifoldType} from 'manifold-3d';
+import { Document, WebIO } from '@gltf-transform/core';
+import {
+  clearNodeTransform,
+  flatten,
+  mergeDocuments,
+  prune,
+} from '@gltf-transform/functions';
+import type { Manifold as ManifoldType } from 'manifold-3d';
 import Module from 'manifold-3d';
-import type {Properties} from 'manifold-3d/lib/gltf-io';
-import {disposeMesh, readMesh, setupIO, writeMesh} from 'manifold-3d/lib/gltf-io';
+import type { Properties } from 'manifold-3d/lib/gltf-io';
+import {
+  disposeMesh,
+  readMesh,
+  setupIO,
+  writeMesh,
+} from 'manifold-3d/lib/gltf-io';
 
 // Set up gltf-transform
 const io = setupIO(new WebIO());
 const doc = new Document();
 
-
 // Set up Manifold WASM library
 const wasm = await Module();
 wasm.setup();
-const {Manifold, Mesh} = wasm;
+const { Manifold, Mesh } = wasm;
 
 // Map of OriginalID to glTF material and attributes
 const id2properties = new Map<number, Properties>();
@@ -62,9 +71,18 @@ async function readGLB(url: string) {
   // pull in materials, TODO: replace with transfer() when available
   const startIdx = doc.getRoot().listMaterials().length;
   mergeDocuments(doc, docIn);
-  doc.getRoot().listScenes().forEach((s) => s.dispose());
-  doc.getRoot().listBuffers().forEach((s) => s.dispose());
-  doc.getRoot().listAccessors().forEach((s) => s.dispose());
+  doc
+    .getRoot()
+    .listScenes()
+    .forEach((s) => s.dispose());
+  doc
+    .getRoot()
+    .listBuffers()
+    .forEach((s) => s.dispose());
+  doc
+    .getRoot()
+    .listAccessors()
+    .forEach((s) => s.dispose());
   for (const [i, id] of ids.entries()) {
     const material = doc.getRoot().listMaterials()[startIdx + i];
     id2properties.get(id)!.material = material;
@@ -81,7 +99,7 @@ const node = doc.createNode();
 doc.createScene().addChild(node);
 
 // Set up UI for operations
-type BooleanOp = 'union'|'difference'|'intersection';
+type BooleanOp = 'union' | 'difference' | 'intersection';
 
 function csg(operation: BooleanOp) {
   push2MV(Manifold[operation](space, moon));
@@ -89,7 +107,7 @@ function csg(operation: BooleanOp) {
 
 csg('difference');
 const selectElement = document.querySelector('select')!;
-selectElement.onchange = function() {
+selectElement.onchange = function () {
   csg(selectElement.value as BooleanOp);
 };
 
@@ -98,7 +116,7 @@ let objectURL = '';
 
 // Set up download UI
 const downloadButton = document.querySelector('#download') as HTMLButtonElement;
-downloadButton.onclick = function() {
+downloadButton.onclick = function () {
   const link = document.createElement('a');
   link.download = 'manifold.glb';
   link.href = objectURL;
@@ -118,8 +136,9 @@ async function push2MV(manifold: ManifoldType) {
 
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob(
-      [glb as Uint8Array<ArrayBuffer>], {type: 'application/octet-stream'});
+  const blob = new Blob([glb as Uint8Array<ArrayBuffer>], {
+    type: 'application/octet-stream',
+  });
   URL.revokeObjectURL(objectURL);
   objectURL = URL.createObjectURL(blob);
   (mv as any).src = objectURL;

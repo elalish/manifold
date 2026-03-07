@@ -27,7 +27,7 @@
  * @category Modelling
  */
 
-import {getManifoldModuleSync} from './wasm.ts';
+import { getManifoldModuleSync } from './wasm.ts';
 
 let minCircularAngle: number = 10.0;
 let minCircularEdgeLength: number = 1.0;
@@ -57,7 +57,7 @@ export function setMinCircularAngle(angle: number) {
 export function setMinCircularEdgeLength(length: number) {
   minCircularEdgeLength = length;
   getManifoldModuleSync()?.setMinCircularEdgeLength(length);
-};
+}
 
 /**
  * Set the default number of segments in a circle.
@@ -80,7 +80,7 @@ export function resetToCircularDefaults() {
   getManifoldModuleSync()?.resetToCircularDefaults();
   minCircularAngle = 10;
   minCircularEdgeLength = 1;
-};
+}
 
 /**
  * Get the current angle constraint.

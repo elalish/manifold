@@ -12,63 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {strict as assert} from 'assert';
-import {glob} from 'glob';
+import { strict as assert } from 'assert';
+import { glob } from 'glob';
 import * as fs from 'node:fs/promises';
-import {resolve} from 'path';
-import {afterEach, expect, suite, test} from 'vitest';
+import { resolve } from 'path';
+import { afterEach, expect, suite, test } from 'vitest';
 
 // @ts-ignore
-import {Mesh} from '../manifold';
+import { Mesh } from '../manifold';
 
-import {gltfDocToManifold, importModel} from './import-model.ts';
-import {cleanup, evaluate, exportBlobURL} from './worker.ts';
+import { gltfDocToManifold, importModel } from './import-model.ts';
+import { cleanup, evaluate, exportBlobURL } from './worker.ts';
 
 async function resolveExample(name: string) {
-  const [filepath] =
-      await glob(name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}', {
-        cwd: resolve(import.meta.dirname, '../test/examples/'),
-        withFileTypes: true
-      });
+  const [filepath] = await glob(
+    name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}',
+    {
+      cwd: resolve(import.meta.dirname, '../test/examples/'),
+      withFileTypes: true,
+    },
+  );
   if (!filepath) {
     throw new Error(`Could not find example '${name}'.`);
   }
-  return filepath.fullpath()
+  return filepath.fullpath();
 }
 
 async function runExample(name: string, firstMeshOnly: boolean = true) {
   const filename = await resolveExample(name);
   const code = await fs.readFile(filename, 'utf-8');
-  const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
-  const glbURL = await exportBlobURL(doc, 'glb')
+  const doc = await evaluate(code, { jsCDN: 'jsDelivr', filename });
+  const glbURL = await exportBlobURL(doc, 'glb');
   cleanup();
   assert.ok(glbURL);
 
   // These tests are agains the first glTF node containing meshes in a given
   // model.
-  const node = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const node = await importModel(glbURL, { mimetype: 'model/gltf-binary' });
   const document = node.document!;
   URL.revokeObjectURL(glbURL);
 
-  const firstMesh =
-      document.getRoot().listNodes().find(node => !!node.getMesh());
-  const manifold =
-      await (firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
-                             gltfDocToManifold(document))
+  const firstMesh = document
+    .getRoot()
+    .listNodes()
+    .find((node) => !!node.getMesh());
+  const manifold = await (firstMeshOnly
+    ? gltfDocToManifold(document, firstMesh)
+    : gltfDocToManifold(document));
 
   if (manifold) {
     const volume = manifold.volume();
     const surfaceArea = manifold.surfaceArea();
     const genus = manifold.genus();
     cleanup();
-    return {volume, surfaceArea, genus};
+    return { volume, surfaceArea, genus };
   }
   assert.ok(false);
 }
 
 // allow vitest to report progress after each test
 // before going into heavy computation which blocks main thread
-afterEach(async () => {await new Promise(resolve => setTimeout(resolve, 500))})
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+});
 
 suite('Examples', () => {
   test('Intro', async () => {
@@ -169,7 +175,7 @@ suite('Examples', () => {
     expect(result?.genus).to.equal(3, 'Genus');
     // There are a 1e9 cubic millimeters in a cubic metre.
     // They add up fast.
-    expect(result?.volume).to.be.closeTo(2.10e15, 1e13, 'Volume');
+    expect(result?.volume).to.be.closeTo(2.1e15, 1e13, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(1.67e11, 1e9, 'Surface Area');
   });
 

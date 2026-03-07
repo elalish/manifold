@@ -12,27 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {exec as execSync} from 'child_process';
-import {glob} from 'glob';
+import { exec as execSync } from 'child_process';
+import { glob } from 'glob';
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
-import {promisify} from 'util';
-import {beforeAll, expect, suite, test} from 'vitest';
+import { promisify } from 'util';
+import { beforeAll, expect, suite, test } from 'vitest';
 
 const exec = promisify(execSync);
 
-const resultPath = path.resolve(import.meta.dirname, './results/cli/')
+const resultPath = path.resolve(import.meta.dirname, './results/cli/');
 
 beforeAll(async () => {
-  await fs.mkdir(resultPath, {recursive: true});
+  await fs.mkdir(resultPath, { recursive: true });
 });
 
-const execCLI =
-    async (infile: string, outfile: string = `${resultPath}/${infile}.glb`) => {
+const execCLI = async (
+  infile: string,
+  outfile: string = `${resultPath}/${infile}.glb`,
+) => {
   const cmd = [
-    '../bin/manifold-cad', `"./fixtures/${infile}"`, `"${outfile}"`
+    '../bin/manifold-cad',
+    `"./fixtures/${infile}"`,
+    `"${outfile}"`,
   ].join(' ');
-  return await exec(cmd, {cwd: import.meta.dirname});
+  return await exec(cmd, { cwd: import.meta.dirname });
 };
 
 suite('When executed, the CLI will', () => {

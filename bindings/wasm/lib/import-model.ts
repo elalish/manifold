@@ -33,15 +33,15 @@
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
+import type { Manifold, Mesh, Vec3 } from '../manifold.d.ts';
 
-import {ImportError, UnsupportedFormatError} from './error.ts';
+import { ImportError, UnsupportedFormatError } from './error.ts';
 import * as gltfIO from './gltf-io.ts';
-import {VisualizationGLTFNode} from './gltf-node.ts';
-import {setMaterialByID} from './material.ts';
-import {euler2quat, multiplyQuat} from './math.ts';
-import {findExtension, findMimeType, isNode} from './util.ts';
-import {getManifoldModuleSync} from './wasm.ts';
+import { VisualizationGLTFNode } from './gltf-node.ts';
+import { setMaterialByID } from './material.ts';
+import { euler2quat, multiplyQuat } from './math.ts';
+import { findExtension, findMimeType, isNode } from './util.ts';
+import { getManifoldModuleSync } from './wasm.ts';
 
 /**
  * @group Management
@@ -69,9 +69,10 @@ export interface Importer {
    * Given a buffer, return a glTF-transform document.
    * @function
    */
-  fromArrayBuffer:
-      (buffer: ArrayBuffer,
-       options?: ImportOptions) => Promise<GLTFTransform.Document>;
+  fromArrayBuffer: (
+    buffer: ArrayBuffer,
+    options?: ImportOptions,
+  ) => Promise<GLTFTransform.Document>;
 }
 
 /**
@@ -110,7 +111,9 @@ export const cleanup = () => {
 /**
  * @internal
  */
-export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
+export const getDocumentByID = (
+  runID: number,
+): GLTFTransform.Document | null => {
   const mesh = id2mesh.get(runID);
   if (!mesh) return null;
   const node = mesh2node.get(mesh);
@@ -119,17 +122,17 @@ export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
 };
 
 function getFormat(identifier: string): ImportFormat {
-  const formats = importers.flatMap(im => im.importFormats);
+  const formats = importers.flatMap((im) => im.importFormats);
   const format = (findMimeType(identifier, formats) ??
-                  findExtension(identifier, formats)) as ImportFormat;
+    findExtension(identifier, formats)) as ImportFormat;
   if (!format) throw new UnsupportedFormatError(identifier, formats);
   return format;
 }
 
-function getImporter(identifier: ImportFormat|string) {
+function getImporter(identifier: ImportFormat | string) {
   const format =
-      typeof identifier === 'string' ? getFormat(identifier) : identifier;
-  return importers.find(im => im.importFormats.includes(format))!;
+    typeof identifier === 'string' ? getFormat(identifier) : identifier;
+  return importers.find((im) => im.importFormats.includes(format))!;
 }
 
 /**
@@ -141,7 +144,9 @@ function getImporter(identifier: ImportFormat|string) {
  * @group Management
  */
 export function supports(
-    filetype: string, throwOnFailure: boolean = false): boolean {
+  filetype: string,
+  throwOnFailure: boolean = false,
+): boolean {
   if (throwOnFailure) return !!getFormat(filetype);
 
   try {
@@ -165,17 +170,19 @@ export function register(importer: Importer) {
  * Import a model, for display only.
  */
 export async function importModel(
-    source: string|Blob|URL|ArrayBuffer,
-    options: ImportOptions = {}): Promise<VisualizationGLTFNode> {
+  source: string | Blob | URL | ArrayBuffer,
+  options: ImportOptions = {},
+): Promise<VisualizationGLTFNode> {
   const sourceDoc = await readModel(source, options);
   const sourceNodes = sourceDoc.getRoot().listNodes();
   if (!sourceNodes.length) {
     throw new ImportError(
-        `Model imported from \`${source}\` contains no nodes.`);
+      `Model imported from \`${source}\` contains no nodes.`,
+    );
   }
 
   const targetNode = new VisualizationGLTFNode();
-  targetNode.document = sourceDoc
+  targetNode.document = sourceDoc;
   if (sourceNodes.length == 1) {
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
@@ -196,15 +203,17 @@ export async function importModel(
  * silently excluded.
  */
 export async function importManifold(
-    source: string|Blob|URL|ArrayBuffer,
-    options: ImportOptions = {}): Promise<Manifold> {
-  const {document, node} = await importModel(source, options);
+  source: string | Blob | URL | ArrayBuffer,
+  options: ImportOptions = {},
+): Promise<Manifold> {
+  const { document, node } = await importModel(source, options);
   try {
     return gltfDocToManifold(document!, node, options.tolerance);
   } catch (e) {
     if (e instanceof ImportError) {
       const newError = new Error(
-          `Model imported from \`${source}\` contains no manifold geometry.`);
+        `Model imported from \`${source}\` contains no manifold geometry.`,
+      );
       newError.cause = e;
       throw newError;
     }
@@ -218,8 +227,9 @@ export async function importManifold(
  * @group Low Level Functions
  */
 export async function readModel(
-    source: string|Blob|URL|ArrayBuffer,
-    options: ImportOptions = {}): Promise<GLTFTransform.Document> {
+  source: string | Blob | URL | ArrayBuffer,
+  options: ImportOptions = {},
+): Promise<GLTFTransform.Document> {
   if (source instanceof Blob) {
     return await fromBlob(source, options);
   }
@@ -227,7 +237,7 @@ export async function readModel(
     return await fromArrayBuffer(source, options.mimetype!);
   }
 
-  let path: string|null = null;
+  let path: string | null = null;
   if (source instanceof URL) {
     path = source.href;
   } else if ('string' === typeof source) {
@@ -238,22 +248,18 @@ export async function readModel(
     if (path.startsWith('data:') || path.startsWith('blob:')) {
       // Fetch can probably handle this.
       return await fetchModel(path, options);
-
     } else if (/^https?:\/\//.test(path)) {
       // Absolute URL.
       return await fetchModel(path, options);
-
     } else if (path.startsWith('file:')) {
       // File URL.
       return readFile(path, options);
-
     } else {
       // Relative URL.
       if (isNode()) {
         // In node, assume it's relative to the current working directory.
         // That may not be the same as relative to the source file.
         return await readFile(path, options);
-
       } else {
         // In the browser, it's relative to the current URL.
         return await fetchModel(path, options);
@@ -270,12 +276,15 @@ export async function readModel(
  * @group Low Level Functions
  */
 export async function fetchModel(
-    uri: string, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
+  uri: string,
+  options: ImportOptions = {},
+): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? uri);
   const response = await fetch(uri);
   const blob = await response.blob();
   return importTransform(
-      await importer.fromArrayBuffer(await blob.arrayBuffer(), options));
+    await importer.fromArrayBuffer(await blob.arrayBuffer(), options),
+  );
 }
 
 /**
@@ -284,13 +293,16 @@ export async function fetchModel(
  * @group Low Level Functions
  */
 export async function fromBlob(
-    blob: Blob, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
+  blob: Blob,
+  options: ImportOptions = {},
+): Promise<GLTFTransform.Document> {
   if (!blob.type && !options.mimetype) {
     throw new ImportError('Could not infer format of Blob');
   }
   const importer = getImporter(options.mimetype ?? blob.type);
   return importTransform(
-      await importer.fromArrayBuffer(await blob.arrayBuffer(), options));
+    await importer.fromArrayBuffer(await blob.arrayBuffer(), options),
+  );
 }
 
 /**
@@ -299,11 +311,14 @@ export async function fromBlob(
  * @group Low Level Functions
  */
 export async function fromArrayBuffer(
-    // FIXME consistency
-    buffer: ArrayBuffer, identifier: string): Promise<GLTFTransform.Document> {
+  // FIXME consistency
+  buffer: ArrayBuffer,
+  identifier: string,
+): Promise<GLTFTransform.Document> {
   if (!identifier) {
     throw new ImportError(
-        'Must specify a mime type when reading an ArrayBuffer');
+      'Must specify a mime type when reading an ArrayBuffer',
+    );
   }
   const importer = getImporter(identifier);
   return importTransform(await importer.fromArrayBuffer(buffer));
@@ -319,10 +334,11 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
   }
   const importer = getImporter(options.mimetype ?? filename);
   const fs = await import('node:fs/promises');
-  const {fileURLToPath} = await import('node:url');
+  const { fileURLToPath } = await import('node:url');
 
-  const path =
-      filename.startsWith('file:') ? fileURLToPath(filename) : filename;
+  const path = filename.startsWith('file:')
+    ? fileURLToPath(filename)
+    : filename;
   const buffer = (await fs.readFile(path)).buffer as ArrayBuffer;
   return importTransform(await importer.fromArrayBuffer(buffer, options));
 }
@@ -365,14 +381,16 @@ function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
  * @group Low Level Functions
  */
 export function gltfDocToManifold(
-    document: GLTFTransform.Document, node?: GLTFTransform.Node,
-    tolerance?: number): Manifold {
+  document: GLTFTransform.Document,
+  node?: GLTFTransform.Node,
+  tolerance?: number,
+): Manifold {
   const meshes = gltfNodeToMeshes(document, node);
   if (!meshes.length) {
     throw new ImportError(`Model contains no meshes!`);
   }
   return meshesToManifold(meshes, tolerance);
-};
+}
 
 /**
  * Extract meshes from a gltf-transform node (and its descendants), or from all
@@ -381,10 +399,12 @@ export function gltfDocToManifold(
  *
  */
 function gltfNodeToMeshes(
-    document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
+  document: GLTFTransform.Document,
+  node?: GLTFTransform.Node,
+): Array<Mesh> {
   const descendants: Array<GLTFTransform.Node> = [];
   const getDescendants = (root: GLTFTransform.Node) =>
-      root.traverse(node => descendants.push(node));
+    root.traverse((node) => descendants.push(node));
 
   if (node) {
     getDescendants(node);
@@ -396,32 +416,34 @@ function gltfNodeToMeshes(
   }
 
   return descendants
-      .map(descendant => {
-        const gltfmesh = descendant.getMesh();
-        if (!gltfmesh) return null;
+    .map((descendant) => {
+      const gltfmesh = descendant.getMesh();
+      if (!gltfmesh) return null;
 
-        node2doc.set(descendant, document);
-        mesh2node.set(gltfmesh, descendant);
+      node2doc.set(descendant, document);
+      mesh2node.set(gltfmesh, descendant);
 
-        return gltfMeshToMesh(gltfmesh);
-      })
-      .filter(mesh => !!mesh);
+      return gltfMeshToMesh(gltfmesh);
+    })
+    .filter((mesh) => !!mesh);
 }
 
 /**
  * Convert a Mesh into a Manifold.  Returns null if the result is not manifold
  * or is empty.  All other exceptions will be re-thrown.
  */
-const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
-  const {Manifold} = getManifoldModuleSync()!;
+const tryToMakeManifold = (mesh: Mesh): Manifold | null => {
+  const { Manifold } = getManifoldModuleSync()!;
   try {
     const manifold = new Manifold(mesh);
     if (manifold && !manifold.isEmpty()) {
       return manifold;
     }
   } catch (e) {
-    if ((e as any)?.name === 'ManifoldError' ||
-        (e as any)?.code === 'NotManifold') {
+    if (
+      (e as any)?.name === 'ManifoldError' ||
+      (e as any)?.code === 'NotManifold'
+    ) {
     } else {
       throw e;
     }
@@ -436,7 +458,7 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  *
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
-  const {Manifold} = getManifoldModuleSync()!;
+  const { Manifold } = getManifoldModuleSync()!;
 
   const manifolds = [];
   for (const mesh of meshes) {
@@ -487,9 +509,9 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
  *
  */
 function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
-  const {Manifold, Mesh} = getManifoldModuleSync()!;
+  const { Manifold, Mesh } = getManifoldModuleSync()!;
 
-  const {mesh, runProperties} = gltfIO.readMesh(gltfmesh)!;
+  const { mesh, runProperties } = gltfIO.readMesh(gltfmesh)!;
 
   // Get a a reserved ID from manifold for each run.
   const numID = runProperties.length;
@@ -501,16 +523,16 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
     // Set the manifold runID.  This will be parsed by `new Mesh()`.
     const runID = firstID + primitiveID;
     mesh.runOriginalID[primitiveID] = runID;
-    const {attributes, material} = runProperties[primitiveID]
+    const { attributes, material } = runProperties[primitiveID];
 
     // Save these for later lookup.
-    id2mesh.set(runID, gltfmesh)
+    id2mesh.set(runID, gltfmesh);
 
     // Import what we can as a manifoldCAD material.
     // We'll leave the original material attached for export.
     setMaterialByID(runID, {
       // 'POSITION' is always present; we don't need to specify it.
-      attributes: attributes.filter(x => x !== 'POSITION'),
+      attributes: attributes.filter((x) => x !== 'POSITION'),
       alpha: material.getAlpha(),
       baseColorFactor: material.getBaseColorFactor() as any as Vec3,
       metallic: material.getMetallicFactor(),

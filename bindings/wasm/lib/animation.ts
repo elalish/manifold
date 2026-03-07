@@ -19,18 +19,25 @@
  * @category Modelling
  */
 
-import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
+import {
+  Accessor,
+  Animation,
+  AnimationSampler,
+  Document,
+  Mesh as GLTFMesh,
+  Node,
+} from '@gltf-transform/core';
 
-import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
+import type { Manifold, Mesh, Vec3 } from '../manifold.d.ts';
 
-import {BaseGLTFNode} from './gltf-node.ts';
-import {euler2quat} from './math.ts';
+import { BaseGLTFNode } from './gltf-node.ts';
+import { euler2quat } from './math.ts';
 
 /**
  * @hidden
  * @inline
  */
-export type AnimationMode = 'loop'|'ping-pong';
+export type AnimationMode = 'loop' | 'ping-pong';
 
 let animationMode: AnimationMode = 'loop';
 let animationDuration: number = 1;
@@ -42,7 +49,7 @@ let animationFPS: number = 30;
  * @param mode 'loop' or 'ping-pong'
  */
 export function setAnimationMode(mode: AnimationMode): void {
-  animationMode = mode
+  animationMode = mode;
 }
 
 /**
@@ -59,7 +66,7 @@ export function getAnimationMode(): AnimationMode {
  */
 export function setAnimationDuration(duration: number): void {
   animationDuration = duration;
-};
+}
 
 /**
  * Get the current duruation of the animation, in seconds.
@@ -75,7 +82,7 @@ export function getAnimationDuration(): number {
  */
 export function setAnimationFPS(fps: number): void {
   animationFPS = fps;
-};
+}
 
 /**
  * Get the current animation frame rate.
@@ -112,8 +119,11 @@ export function cleanup() {
  * @internal
  */
 export function addMotion(
-    doc: Document, type: 'translation'|'rotation'|'scale', node: BaseGLTFNode,
-    out: Node): Vec3|null {
+  doc: Document,
+  type: 'translation' | 'rotation' | 'scale',
+  node: BaseGLTFNode,
+  out: Node,
+): Vec3 | null {
   const motion = node[type];
   if (motion == null) {
     return null;
@@ -128,24 +138,26 @@ export function addMotion(
   for (let i = 0; i < nFrames; ++i) {
     const x = i / (nFrames - 1);
     const m = motion(
-        animationMode !== 'ping-pong' ? x :
-                                        (1 - Math.cos(x * 2 * Math.PI)) / 2);
+      animationMode !== 'ping-pong' ? x : (1 - Math.cos(x * 2 * Math.PI)) / 2,
+    );
     frames.set(nEl === 4 ? euler2quat(m) : m, nEl * i);
   }
 
-  const framesAccessor =
-      doc.createAccessor(node.name + ' ' + type + ' frames')
-          .setBuffer(doc.getRoot().listBuffers()[0])
-          .setArray(frames)
-          .setType(nEl === 4 ? Accessor.Type.VEC4 : Accessor.Type.VEC3);
-  const sampler = doc.createAnimationSampler()
-                      .setInput(timesAccessor)
-                      .setOutput(framesAccessor)
-                      .setInterpolation('LINEAR');
-  const channel = doc.createAnimationChannel()
-                      .setTargetPath(type)
-                      .setTargetNode(out)
-                      .setSampler(sampler);
+  const framesAccessor = doc
+    .createAccessor(node.name + ' ' + type + ' frames')
+    .setBuffer(doc.getRoot().listBuffers()[0])
+    .setArray(frames)
+    .setType(nEl === 4 ? Accessor.Type.VEC4 : Accessor.Type.VEC3);
+  const sampler = doc
+    .createAnimationSampler()
+    .setInput(timesAccessor)
+    .setOutput(framesAccessor)
+    .setInterpolation('LINEAR');
+  const channel = doc
+    .createAnimationChannel()
+    .setTargetPath(type)
+    .setTargetNode(out)
+    .setSampler(sampler);
   animation.addSampler(sampler);
   animation.addChannel(channel);
   hasAnimation = true;
@@ -158,10 +170,11 @@ export function addMotion(
  */
 export function setMorph(doc: Document, node: Node, manifold: Manifold) {
   if (manifold2morph.has(manifold)) {
-    const channel = doc.createAnimationChannel()
-                        .setTargetPath('weights')
-                        .setTargetNode(node)
-                        .setSampler(weightsSampler);
+    const channel = doc
+      .createAnimationChannel()
+      .setTargetPath('weights')
+      .setTargetNode(node)
+      .setSampler(weightsSampler);
     animation.addChannel(channel);
     hasAnimation = true;
   }
@@ -171,43 +184,46 @@ export function setMorph(doc: Document, node: Node, manifold: Manifold) {
  *
  * @internal
  */
-export const getMorph = (manifold: Manifold) => manifold2morph.get(manifold)
+export const getMorph = (manifold: Manifold) => manifold2morph.get(manifold);
 
 /**
  *
  * @internal
  */
-export function morphStart(manifoldMesh: Mesh, morph?: Morph):
-    number[] {
-      const inputPositions: number[] = [];
-      if (morph == null) {
-        return inputPositions;
-      }
+export function morphStart(manifoldMesh: Mesh, morph?: Morph): number[] {
+  const inputPositions: number[] = [];
+  if (morph == null) {
+    return inputPositions;
+  }
 
-      for (let i = 0; i < manifoldMesh.numVert; ++i) {
-        for (let j = 0; j < 3; ++j)
-          inputPositions[i * 3 + j] =
-              manifoldMesh.vertProperties[i * manifoldMesh.numProp + j];
-      }
-      if (morph.start) {
-        for (let i = 0; i < manifoldMesh.numVert; ++i) {
-          const vertProp = manifoldMesh.vertProperties;
-          const offset = i * manifoldMesh.numProp;
-          const pos = inputPositions.slice(offset, offset + 3) as Vec3;
-          morph.start(pos);
-          for (let j = 0; j < 3; ++j) vertProp[offset + j] = pos[j];
-        }
-      }
-      return inputPositions;
+  for (let i = 0; i < manifoldMesh.numVert; ++i) {
+    for (let j = 0; j < 3; ++j)
+      inputPositions[i * 3 + j] =
+        manifoldMesh.vertProperties[i * manifoldMesh.numProp + j];
+  }
+  if (morph.start) {
+    for (let i = 0; i < manifoldMesh.numVert; ++i) {
+      const vertProp = manifoldMesh.vertProperties;
+      const offset = i * manifoldMesh.numProp;
+      const pos = inputPositions.slice(offset, offset + 3) as Vec3;
+      morph.start(pos);
+      for (let j = 0; j < 3; ++j) vertProp[offset + j] = pos[j];
     }
+  }
+  return inputPositions;
+}
 
 /**
  *
  * @internal
  */
 export function morphEnd(
-    doc: Document, manifoldMesh: Mesh, mesh: GLTFMesh, inputPositions: number[],
-    morph?: Morph) {
+  doc: Document,
+  manifoldMesh: Mesh,
+  mesh: GLTFMesh,
+  inputPositions: number[],
+  morph?: Morph,
+) {
   if (morph == null) {
     return;
   }
@@ -231,12 +247,14 @@ export function morphEnd(
       array[j] = inputPositions[offset + j] - startPosition[j];
     }
 
-    const morphAccessor = doc.createAccessor(mesh.getName() + ' morph target')
-                              .setBuffer(doc.getRoot().listBuffers()[0])
-                              .setArray(array)
-                              .setType(Accessor.Type.VEC3);
-    const morphTarget =
-        doc.createPrimitiveTarget().setAttribute('POSITION', morphAccessor);
+    const morphAccessor = doc
+      .createAccessor(mesh.getName() + ' morph target')
+      .setBuffer(doc.getRoot().listBuffers()[0])
+      .setArray(array)
+      .setType(Accessor.Type.VEC3);
+    const morphTarget = doc
+      .createPrimitiveTarget()
+      .setAttribute('POSITION', morphAccessor);
     primitive.addTarget(morphTarget);
   });
 }
@@ -250,15 +268,17 @@ export function morphEnd(
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the first animation frame.
  */
-export function setMorphStart(manifold: Manifold, func: (v: Vec3) => void):
-    void {
-      const morph = manifold2morph.get(manifold);
-      if (morph != null) {
-        morph.start = func;
-      } else {
-        manifold2morph.set(manifold, {start: func});
-      }
-    }
+export function setMorphStart(
+  manifold: Manifold,
+  func: (v: Vec3) => void,
+): void {
+  const morph = manifold2morph.get(manifold);
+  if (morph != null) {
+    morph.start = func;
+  } else {
+    manifold2morph.set(manifold, { start: func });
+  }
+}
 
 /**
  * Apply a morphing animation to the input manifold. Specify the end
@@ -269,15 +289,14 @@ export function setMorphStart(manifold: Manifold, func: (v: Vec3) => void):
  * @param manifold The object to add morphing animation to.
  * @param func A warping function to apply to the last animation frame.
  */
-export function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void):
-    void {
-      const morph = manifold2morph.get(manifold);
-      if (morph != null) {
-        morph.end = func;
-      } else {
-        manifold2morph.set(manifold, {end: func});
-      }
-    }
+export function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void {
+  const morph = manifold2morph.get(manifold);
+  if (morph != null) {
+    morph.end = func;
+  } else {
+    manifold2morph.set(manifold, { end: func });
+  }
+}
 
 /**
  *
@@ -294,20 +313,23 @@ export function addAnimationToDoc(doc: Document) {
     const x = i / (nFrames - 1);
     times[i] = x * animationDuration;
     weights[i] =
-        animationMode !== 'ping-pong' ? x : (1 - Math.cos(x * 2 * Math.PI)) / 2;
+      animationMode !== 'ping-pong' ? x : (1 - Math.cos(x * 2 * Math.PI)) / 2;
   }
-  timesAccessor = doc.createAccessor('animation times')
-                      .setBuffer(buffer)
-                      .setArray(times)
-                      .setType(Accessor.Type.SCALAR);
-  weightsAccessor = doc.createAccessor('animation weights')
-                        .setBuffer(buffer)
-                        .setArray(weights)
-                        .setType(Accessor.Type.SCALAR);
-  weightsSampler = doc.createAnimationSampler()
-                       .setInput(timesAccessor)
-                       .setOutput(weightsAccessor)
-                       .setInterpolation('LINEAR');
+  timesAccessor = doc
+    .createAccessor('animation times')
+    .setBuffer(buffer)
+    .setArray(times)
+    .setType(Accessor.Type.SCALAR);
+  weightsAccessor = doc
+    .createAccessor('animation weights')
+    .setBuffer(buffer)
+    .setArray(weights)
+    .setType(Accessor.Type.SCALAR);
+  weightsSampler = doc
+    .createAnimationSampler()
+    .setInput(timesAccessor)
+    .setOutput(weightsAccessor)
+    .setInterpolation('LINEAR');
   animation.addSampler(weightsSampler);
 }
 

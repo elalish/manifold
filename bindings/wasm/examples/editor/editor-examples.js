@@ -29,7 +29,7 @@ examples.set('Gear Bearing', gearBearing);
 examples.set('involute-gear-library', involuteGearLibrary);
 examples.set('Voronoi', voronoi);
 examples.set('Import Manifold', importManifold);
-examples.set('Gödel, Escher, Bach', godelEscherBach)
+examples.set('Gödel, Escher, Bach', godelEscherBach);
 
 if (typeof self !== 'undefined') {
   self.examples = examples;
