@@ -57,7 +57,7 @@ jobs:
       with:
         name: nanobind
         url: https://github.com/wjakob/nanobind.git
-        rev: v2.12.0
+        rev: 2a61ad2494d09fecb2e13322c1383342c299900d
 
     - name: Build ${{matrix.parallelization}}
       if: matrix.parallelization != 'OFF'
