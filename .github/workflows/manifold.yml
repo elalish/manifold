@@ -123,7 +123,6 @@ jobs:
         version: 5.0.2
     - name: Build WASM ${{matrix.parallelization}}
       run: |
-        source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DMANIFOLD_STRICT=ON -DMANIFOLD_PAR=${{matrix.parallelization}} -DMANIFOLD_USE_BUILTIN_TBB=ON -DMANIFOLD_DEBUG=${{matrix.debug}} -DMANIFOLD_ASSERT=${{matrix.debug}} .. && emmake make
