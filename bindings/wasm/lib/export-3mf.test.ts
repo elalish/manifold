@@ -18,6 +18,8 @@ import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
 import {exportFormats, toArrayBuffer} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
+import * as import3mf from './import-3mf.ts';
+import {gltfDocToManifold} from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
 
@@ -30,81 +32,48 @@ suite('exportFormats', () => {
 });
 
 suite('export-model integration', () => {
-  test('supports 3mf extension', () => {
+  test('supports 3mf extension and mimetype, rejects unknown', () => {
     expect(exportModel.supports('3mf', false)).toBe(true);
-  });
-
-  test('supports model/3mf mimetype', () => {
     expect(exportModel.supports('model/3mf', false)).toBe(true);
-  });
-
-  test('does not support unknown format', () => {
     expect(exportModel.supports('xyz', false)).toBe(false);
   });
 });
 
 suite('toArrayBuffer with empty document', () => {
-  test('returns an ArrayBuffer', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    expect(result).toBeInstanceOf(ArrayBuffer);
-    expect(result.byteLength).toBeGreaterThan(0);
-  });
-
-  test('output starts with ZIP magic bytes', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    const bytes = new Uint8Array(result);
-    expect(bytes[0]).toBe(0x50);  // 'P'
-    expect(bytes[1]).toBe(0x4b);  // 'K'
-  });
-
-  test('ZIP contains 3D/3dmodel.model', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    expect(files['3D/3dmodel.model']).toBeDefined();
-  });
-
-  test('ZIP contains [Content_Types].xml', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    expect(files['[Content_Types].xml']).toBeDefined();
-  });
+  test('output is a valid ZIP containing 3D/3dmodel.model and content types',
+      async () => {
+        const doc = new GLTFTransform.Document();
+        const result = await toArrayBuffer(doc);
+        expect(result).toBeInstanceOf(ArrayBuffer);
+        const bytes = new Uint8Array(result);
+        // ZIP magic bytes
+        expect(bytes[0]).toBe(0x50);  // 'P'
+        expect(bytes[1]).toBe(0x4b);  // 'K'
+        const files = unzipSync(bytes);
+        expect(files['3D/3dmodel.model']).toBeDefined();
+        expect(files['[Content_Types].xml']).toBeDefined();
+      });
 });
 
 suite('toArrayBuffer header options', () => {
-  test('default header contains ManifoldCAD.org application', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
-    expect(modelXml).toContain('ManifoldCAD.org');
-  });
+  test('default header contains ManifoldCAD.org application and millimeter unit',
+      async () => {
+        const doc = new GLTFTransform.Document();
+        const result = await toArrayBuffer(doc);
+        const files = unzipSync(new Uint8Array(result));
+        const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
+        expect(modelXml).toContain('ManifoldCAD.org');
+        expect(modelXml).toContain('millimeter');
+      });
 
-  test('custom title appears in model XML', async () => {
+  test('custom title and unit appear in model XML', async () => {
     const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc, {header: {title: 'MyTestModel'}});
+    const result = await toArrayBuffer(
+        doc, {header: {title: 'MyTestModel', unit: 'inch'}});
     const files = unzipSync(new Uint8Array(result));
     const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
     expect(modelXml).toContain('MyTestModel');
-  });
-
-  test('custom unit appears in model XML', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc, {header: {unit: 'inch'}});
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
     expect(modelXml).toContain('inch');
-  });
-
-  test('default unit is millimeter', async () => {
-    const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
-    expect(modelXml).toContain('millimeter');
   });
 });
 
@@ -112,95 +81,80 @@ suite('toArrayBuffer with manifold models', () => {
   beforeAll(async () => await wasm.getManifoldModule());
   afterEach(async () => worker.cleanup());
 
-  test('exports a cube', async () => {
-    const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-        `export default Manifold.cube([1,1,1]);`;
-    const doc = await worker.evaluate(script);
-    const result = await toArrayBuffer(doc);
-    expect(result).toBeInstanceOf(ArrayBuffer);
-    expect(result.byteLength).toBeGreaterThan(0);
-    const files = unzipSync(new Uint8Array(result));
-    expect(files['3D/3dmodel.model']).toBeDefined();
-  });
-
-  test('cube model XML contains vertices and triangles', async () => {
-    const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-        `export default Manifold.cube([1,1,1]);`;
-    const doc = await worker.evaluate(script);
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
-    expect(modelXml).toContain('<vertices>');
-    expect(modelXml).toContain('<triangles>');
-  });
-
-  test('exports a sphere', async () => {
-    const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-        `export default Manifold.sphere(10, 64);`;
-    const doc = await worker.evaluate(script);
-    const result = await toArrayBuffer(doc);
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
-    expect(modelXml).toContain('<vertices>');
-    expect(modelXml).toContain('<triangles>');
-  });
-
-  test('exports a GLTFNode scene', async () => {
-    const script =
-        `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
-        `const node = new GLTFNode();\n` +
-        `node.manifold = Manifold.cube([1,1,1]);\n` +
-        `export default node;`;
-    const doc = await worker.evaluate(script);
-    const result = await toArrayBuffer(doc);
-    expect(result).toBeInstanceOf(ArrayBuffer);
-    const files = unzipSync(new Uint8Array(result));
-    expect(files['3D/3dmodel.model']).toBeDefined();
-  });
-
-  test('exports a parent-child node hierarchy', async () => {
-    const script =
-        `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
-        `const parent = new GLTFNode();\n` +
-        `parent.manifold = Manifold.cube([2,2,2]);\n` +
-        `const child = new GLTFNode(parent);\n` +
-        `child.manifold = Manifold.cube([1,1,1]);\n` +
-        `export default parent;`;
-    const doc = await worker.evaluate(script);
-    const result = await toArrayBuffer(doc);
-    expect(result).toBeInstanceOf(ArrayBuffer);
-    const files = unzipSync(new Uint8Array(result));
-    const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
-    // Both parent and child meshes should appear in the output
-    expect(modelXml).toContain('<vertices>');
-    expect(modelXml).toContain('<triangles>');
-    // A component referencing a child should be present
-    expect(modelXml).toContain('<component');
-  });
-
-  test(
-      'dispatches through export-model.toArrayBuffer with extension',
+  test('cube: exports to valid 3MF and round-trips to correct geometry',
       async () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-            `export default Manifold.cube([1,1,1]);`;
+            `export default Manifold.cube([100,100,100]);`;
         const doc = await worker.evaluate(script);
-        const result = await exportModel.toArrayBuffer(doc, {extension: '3mf'});
+        const result = await toArrayBuffer(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
-        const bytes = new Uint8Array(result);
-        expect(bytes[0]).toBe(0x50);  // ZIP magic 'P'
-        expect(bytes[1]).toBe(0x4b);  // ZIP magic 'K'
+        expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
+            .toBeDefined();
+
+        // Reimport the exported 3MF and verify geometry via the JS API.
+        // Note: 3MF stores geometry in mm/+Z-up (manifoldCAD's native space),
+        // so gltfDocToManifold is used directly rather than importManifold,
+        // which would incorrectly apply a GLTF coordinate-system conversion.
+        const doc3mf = await import3mf.fromArrayBuffer(result);
+        const model = gltfDocToManifold(doc3mf);
+        worker.cleanup();
+        expect(model.volume()).toBeCloseTo(100 * 100 * 100, 1);
+        expect(model.genus()).toBe(0);
       });
 
-  test(
-      'dispatches through export-model.toArrayBuffer with mimetype',
+  test('sphere: exports to valid 3MF and round-trips to correct geometry',
       async () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
-            `export default Manifold.cube([1,1,1]);`;
+            `export default Manifold.sphere(10, 64);`;
         const doc = await worker.evaluate(script);
-        const result =
-            await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
+        const result = await toArrayBuffer(doc);
+
+        const doc3mf = await import3mf.fromArrayBuffer(result);
+        const model = gltfDocToManifold(doc3mf);
+        worker.cleanup();
+        expect(model.volume())
+            .toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
+        expect(model.genus()).toBe(0);
+      });
+
+  test('GLTFNode scene: dispatches correctly via extension and mimetype',
+      async () => {
+        const script =
+            `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
+            `const node = new GLTFNode();\n` +
+            `node.manifold = Manifold.cube([1,1,1]);\n` +
+            `export default node;`;
+        const doc = await worker.evaluate(script);
+
+        const result = await toArrayBuffer(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
+        expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
+            .toBeDefined();
+
+        // Verify dispatch through export-model works for both identifiers.
+        const byExt =
+            await exportModel.toArrayBuffer(doc, {extension: '3mf'});
+        const byMime =
+            await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
+        expect(new Uint8Array(byExt)[0]).toBe(0x50);
+        expect(new Uint8Array(byMime)[0]).toBe(0x50);
+      });
+
+  test('parent-child node hierarchy is exported with component references',
+      async () => {
+        const script =
+            `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
+            `const parent = new GLTFNode();\n` +
+            `parent.manifold = Manifold.cube([2,2,2]);\n` +
+            `const child = new GLTFNode(parent);\n` +
+            `child.manifold = Manifold.cube([1,1,1]);\n` +
+            `export default parent;`;
+        const doc = await worker.evaluate(script);
+        const result = await toArrayBuffer(doc);
         const files = unzipSync(new Uint8Array(result));
-        expect(files['3D/3dmodel.model']).toBeDefined();
+        const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
+        expect(modelXml).toContain('<vertices>');
+        expect(modelXml).toContain('<triangles>');
+        expect(modelXml).toContain('<component');
       });
 });
