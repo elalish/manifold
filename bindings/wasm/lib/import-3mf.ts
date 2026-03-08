@@ -23,8 +23,7 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {unzipSync} from 'fflate';
 
-export const importFormats =
-    [{extension: '3mf', mimetype: 'model/3mf'}];
+export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
 
 /**
  * Parse a 3MF ArrayBuffer into a gltf-transform Document.
@@ -104,7 +103,8 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
                      .setAttribute('POSITION', posAcc)
                      .setIndices(indAcc)
                      .setMaterial(defaultMaterial);
-    scene.addChild(doc.createNode().setMesh(doc.createMesh().addPrimitive(prim)));
+    scene.addChild(
+        doc.createNode().setMesh(doc.createMesh().addPrimitive(prim)));
   }
 
   return doc;

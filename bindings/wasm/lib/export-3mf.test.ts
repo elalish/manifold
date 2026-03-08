@@ -40,7 +40,8 @@ suite('export-model integration', () => {
 });
 
 suite('toArrayBuffer with empty document', () => {
-  test('output is a valid ZIP containing 3D/3dmodel.model and content types',
+  test(
+      'output is a valid ZIP containing 3D/3dmodel.model and content types',
       async () => {
         const doc = new GLTFTransform.Document();
         const result = await toArrayBuffer(doc);
@@ -56,7 +57,8 @@ suite('toArrayBuffer with empty document', () => {
 });
 
 suite('toArrayBuffer header options', () => {
-  test('default header contains ManifoldCAD.org application and millimeter unit',
+  test(
+      'default header contains ManifoldCAD.org application and millimeter unit',
       async () => {
         const doc = new GLTFTransform.Document();
         const result = await toArrayBuffer(doc);
@@ -81,7 +83,8 @@ suite('toArrayBuffer with manifold models', () => {
   beforeAll(async () => await wasm.getManifoldModule());
   afterEach(async () => worker.cleanup());
 
-  test('cube: exports to valid 3MF and round-trips to correct geometry',
+  test(
+      'cube: exports to valid 3MF and round-trips to correct geometry',
       async () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.cube([100,100,100]);`;
@@ -102,7 +105,8 @@ suite('toArrayBuffer with manifold models', () => {
         expect(model.genus()).toBe(0);
       });
 
-  test('sphere: exports to valid 3MF and round-trips to correct geometry',
+  test(
+      'sphere: exports to valid 3MF and round-trips to correct geometry',
       async () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.sphere(10, 64);`;
@@ -112,12 +116,12 @@ suite('toArrayBuffer with manifold models', () => {
         const doc3mf = await import3mf.fromArrayBuffer(result);
         const model = gltfDocToManifold(doc3mf);
         worker.cleanup();
-        expect(model.volume())
-            .toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
+        expect(model.volume()).toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
         expect(model.genus()).toBe(0);
       });
 
-  test('GLTFNode scene: dispatches correctly via extension and mimetype',
+  test(
+      'GLTFNode scene: dispatches correctly via extension and mimetype',
       async () => {
         const script =
             `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
@@ -132,15 +136,15 @@ suite('toArrayBuffer with manifold models', () => {
             .toBeDefined();
 
         // Verify dispatch through export-model works for both identifiers.
-        const byExt =
-            await exportModel.toArrayBuffer(doc, {extension: '3mf'});
+        const byExt = await exportModel.toArrayBuffer(doc, {extension: '3mf'});
         const byMime =
             await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
         expect(new Uint8Array(byExt)[0]).toBe(0x50);
         expect(new Uint8Array(byMime)[0]).toBe(0x50);
       });
 
-  test('parent-child node hierarchy is exported with component references',
+  test(
+      'parent-child node hierarchy is exported with component references',
       async () => {
         const script =
             `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
