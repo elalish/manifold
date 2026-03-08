@@ -132,6 +132,33 @@ function getImporter(identifier: ImportFormat|string) {
   return importers.find(im => im.importFormats.includes(format))!;
 }
 
+function getSourceFilename(
+    source: string|Blob|URL|ArrayBuffer): string|undefined {
+  let path: string|undefined;
+  if (source instanceof URL) {
+    if (source.protocol === 'blob:' || source.protocol === 'data:') return;
+    path = source.pathname;
+  } else if (typeof source === 'string') {
+    if (source.startsWith('blob:') || source.startsWith('data:')) return;
+    try {
+      const url = new URL(source);
+      if (url.protocol === 'blob:' || url.protocol === 'data:') return;
+      path = url.pathname;
+    } catch {
+      path = source;
+    }
+  }
+  if (!path) return;
+
+  const filename = path.split(/[\/\\]/).pop();
+  if (!filename) return;
+  try {
+    return decodeURIComponent(filename);
+  } catch {
+    return filename;
+  }
+}
+
 /**
  * Returns true if a given extension or mimetype can be imported.
  *
@@ -179,7 +206,9 @@ export async function importModel(
   if (sourceNodes.length == 1) {
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
-    targetNode.name = sourceNode.getName();
+    targetNode.name = sourceNode.getName() || getSourceFilename(source);
+  } else {
+    targetNode.name = getSourceFilename(source);
   }
   if (typeof source === 'string') targetNode.uri = source;
 
