@@ -132,8 +132,8 @@ function getImporter(identifier: ImportFormat|string) {
   return importers.find(im => im.importFormats.includes(format))!;
 }
 
-function getSourceFilename(
-    source: string|Blob|URL|ArrayBuffer): string|undefined {
+function getSourceFilename(source: string|Blob|URL|ArrayBuffer): string|
+    undefined {
   let path: string|undefined;
   if (source instanceof URL) {
     if (source.protocol === 'blob:' || source.protocol === 'data:') return;
@@ -207,7 +207,8 @@ export async function importModel(
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
     targetNode.name = sourceNode.getName() || getSourceFilename(source);
-  } else {
+  }
+  else {
     targetNode.name = getSourceFilename(source);
   }
   if (typeof source === 'string') targetNode.uri = source;
