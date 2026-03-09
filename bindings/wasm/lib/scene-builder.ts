@@ -296,6 +296,7 @@ function copyNodeToDocument(
       targetNode.addChild(map.get(sourceNode) as Node);
     }
   }
+  if (nodeDef.name) targetNode.setName(nodeDef.name);
   applyTransformation(doc, nodeDef, targetNode);
   return targetNode;
 }
