@@ -198,12 +198,11 @@ else()
     list(
       APPEND
       MANIFOLD_FLAGS
-      -coverage
-      -fno-inline-small-functions
-      -fkeep-inline-functions
-      -fkeep-static-functions
+      -fprofile-instr-generate
+      -fcoverage-mapping
+      -fprofile-update=atomic
     )
-    add_link_options(-coverage)
+    add_link_options(-fprofile-instr-generate -fcoverage-mapping -fprofile-update=atomic)
   endif()
 endif()
 
