@@ -518,6 +518,20 @@ TEST(Boolean, ConvexConvexMinkowski) {
   if (options.exportModels) WriteTestOBJ("minkowski-convex-convex.obj", sum);
 }
 
+TEST(Boolean, ConvexConvexMinkowskiDecompose) {
+  double r = 0.1;
+  double w = 2.0;
+  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold cube = Manifold::Cube({w, w, w});
+  Manifold sum = cube.MinkowskiSum(sphere, true);
+  double analyticalVolume = w * w * w + 6 * w * w * r + 3 * kPi * w * r * r +
+                            (4.0 / 3) * kPi * r * r * r;
+  double analyticalArea = 6 * w * w + 6 * kPi * w * r + 4 * kPi * r * r;
+  EXPECT_NEAR(sum.Volume(), analyticalVolume, 0.15);
+  EXPECT_NEAR(sum.SurfaceArea(), analyticalArea, 0.5);
+  EXPECT_EQ(sum.Genus(), 0);
+}
+
 TEST(Boolean, ConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
@@ -555,6 +569,21 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
     WriteTestOBJ("minkowski-nonconvex-convex-sum.obj", sum);
 }
 
+TEST(Boolean, NonConvexConvexMinkowskiSumDecompose) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20), true);
+  // Curved surfaces may have residual non-convex pieces from DT clipping,
+  // so vertex-addition Minkowski is approximate for curved geometry.
+  EXPECT_NEAR(sum.Volume(), 4.841, 0.1);
+  EXPECT_NEAR(sum.SurfaceArea(), 34.06, 0.5);
+  EXPECT_GE(sum.Genus(), 0);
+}
+
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
@@ -586,6 +615,21 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
 
   if (options.exportModels)
     WriteTestOBJ("minkowski-nonconvex-nonconvex-sum.obj", sum);
+}
+
+TEST(Boolean, NonConvexNonConvexMinkowskiSumDecompose) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
+
+  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)), true);
+  // Zero-tolerance merge produces more pieces; Minkowski result is close
+  // but not identical to per-triangle approach
+  EXPECT_NEAR(sum.Volume(), 8.65625, 0.1);
+  EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 0.5);
+  EXPECT_EQ(sum.Genus(), 0);
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {

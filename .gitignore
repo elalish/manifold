@@ -135,3 +135,6 @@ CMakeSettings.json
 # Benchmark stl files
 extras/ember_tests/testfiles/raw_meshes
 
+# Claude Code context
+CLAUDE.md
+

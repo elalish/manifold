@@ -396,7 +396,7 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(vec3 normal,
                                              double originOffset) const;
   Manifold TrimByPlane(vec3 normal, double originOffset) const;
-  Manifold MinkowskiSum(const Manifold&) const;
+  Manifold MinkowskiSum(const Manifold&, bool decompose = false) const;
   Manifold MinkowskiDifference(const Manifold&) const;
   ///@}
 
@@ -433,6 +433,12 @@ class Manifold {
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<vec3>& pts);
+  ///@}
+
+  /** @name Convex Decomposition
+   */
+  ///@{
+  std::vector<Manifold> ConvexDecomposition(int maxDepth = 1) const;
   ///@}
 
   /** @name I/O

@@ -360,6 +360,9 @@ NB_MODULE(manifold3d, m) {
       .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
+      .def("convex_decomposition", &Manifold::ConvexDecomposition,
+           nb::arg("max_depth") = 1,
+           "Decompose into approximately convex pieces.")
       .def("split", &Manifold::Split, nb::arg("cutter"),
            manifold__split__cutter)
       .def("split_by_plane", &Manifold::SplitByPlane, nb::arg("normal"),
@@ -369,7 +372,10 @@ NB_MODULE(manifold3d, m) {
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
       .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
-           manifold__minkowski_sum__other)
+           nb::arg("decompose") = false,
+           "Compute the Minkowski sum of this manifold with another. "
+           "Set decompose=true to first decompose non-convex inputs "
+           "into convex pieces for faster computation.")
       .def("minkowski_difference", &Manifold::MinkowskiDifference,
            nb::arg("other"), manifold__minkowski_difference__other)
       .def(
