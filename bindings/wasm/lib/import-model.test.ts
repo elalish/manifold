@@ -136,7 +136,8 @@ suite('importManifold()', () => {
         `export default Manifold.cube([100,100,100]);\n`;
     const doc = await worker.evaluate(script);
     const buffer = await toArrayBuffer(doc, {mimetype: 'model/3mf'});
-    const model = await importer.importManifold(buffer, {mimetype: 'model/3mf'});
+    const model =
+        await importer.importManifold(buffer, {mimetype: 'model/3mf'});
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 

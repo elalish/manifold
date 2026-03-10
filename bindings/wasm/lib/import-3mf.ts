@@ -62,12 +62,8 @@ interface Triangle3MF {
 }
 
 interface Mesh3MF {
-  vertices?: {
-    vertex?: Vertex3MF|Array<Vertex3MF>;
-  };
-  triangles?: {
-    triangle?: Triangle3MF|Array<Triangle3MF>;
-  };
+  vertices?: {vertex?: Vertex3MF|Array<Vertex3MF>;};
+  triangles?: {triangle?: Triangle3MF|Array<Triangle3MF>;};
 }
 
 interface ComponentRef3MF {
@@ -79,19 +75,13 @@ interface ObjectNode3MF {
   id?: number|string;
   name?: string;
   mesh?: Mesh3MF;
-  components?: {
-    component?: ComponentRef3MF|Array<ComponentRef3MF>;
-  };
+  components?: {component?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
 interface Model3MF {
   unit?: string;
-  resources?: {
-    object?: ObjectNode3MF|Array<ObjectNode3MF>;
-  };
-  build?: {
-    item?: ComponentRef3MF|Array<ComponentRef3MF>;
-  };
+  resources?: {object?: ObjectNode3MF|Array<ObjectNode3MF>;};
+  build?: {item?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
 interface Object3MF {
@@ -101,10 +91,7 @@ interface Object3MF {
   name?: string;
 }
 
-const identityMatrix = [1, 0, 0, 0,
-                        0, 1, 0, 0,
-                        0, 0, 1, 0,
-                        0, 0, 0, 1];
+const identityMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 function asArray<T>(value?: T|Array<T>): Array<T> {
   if (value == null) return [];
@@ -162,8 +149,7 @@ function parseTransform(value?: string): number[] {
 
 function parseMesh(
     mesh: Mesh3MF|undefined, doc: GLTFTransform.Document,
-    buf: GLTFTransform.Buffer,
-    defaultMaterial: GLTFTransform.Material,
+    buf: GLTFTransform.Buffer, defaultMaterial: GLTFTransform.Material,
     unitToMeters: number): GLTFTransform.Mesh|null {
   if (!mesh) return null;
 
@@ -231,8 +217,8 @@ function parseBuildRefs(model: Model3MF): Array<ObjectRef3MF> {
 }
 
 function instantiateObjectNode(
-    doc: GLTFTransform.Document, objects: Map<string, Object3MF>, ref: ObjectRef3MF,
-    visiting: Set<string>): GLTFTransform.Node|null {
+    doc: GLTFTransform.Document, objects: Map<string, Object3MF>,
+    ref: ObjectRef3MF, visiting: Set<string>): GLTFTransform.Node|null {
   const object = objects.get(ref.objectID);
   if (!object) return null;
   if (visiting.has(object.id)) return null;
