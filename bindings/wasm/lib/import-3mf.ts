@@ -28,11 +28,10 @@ export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
 /**
  * Parse a 3MF ArrayBuffer into a gltf-transform Document.
  *
- * Note: 3MF files store geometry in millimetres with +Z up, matching
- * manifoldCAD's native coordinate system.  Unlike GLTF importers, the
- * returned Document does NOT need the `importTransform` coordinate-system
- * conversion; use {@link gltfDocToManifold} directly rather than
- * `importManifold` to avoid that conversion being applied.
+ * Note: 3MF files store geometry in millimetres with +Z up, while glTF uses
+ * metres with +Y up. This importer normalizes geometry to glTF conventions so
+ * the shared import pipeline can apply `importTransform()` consistently across
+ * all formats.
  */
 export async function fromArrayBuffer(buffer: ArrayBuffer):
     Promise<GLTFTransform.Document> {
@@ -75,7 +74,14 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
       const x = tag.match(/\bx="([^"]+)"/)?.[1];
       const y = tag.match(/\by="([^"]+)"/)?.[1];
       const z = tag.match(/\bz="([^"]+)"/)?.[1];
-      if (x && y && z) positions.push(+x, +y, +z);
+      if (x && y && z) {
+        // 3MF is mm/+Z-up. Convert to glTF m/+Y-up by applying:
+        // scale = 1/1000 and rotation = -90 degrees around X.
+        const xf = +x / 1000;
+        const yf = +y / 1000;
+        const zf = +z / 1000;
+        positions.push(xf, zf, -yf);
+      }
     }
     if (!positions.length) continue;
 

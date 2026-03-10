@@ -38,6 +38,7 @@ import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
+import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
@@ -94,6 +95,7 @@ export interface ImportOptions {
 
 const importers: Array<Importer> = [];
 register(gltfIO);
+register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
 const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();

@@ -18,8 +18,7 @@ import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
 import {exportFormats, toArrayBuffer} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
-import * as import3mf from './import-3mf.ts';
-import {gltfDocToManifold} from './import-model.ts';
+import {importManifold} from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
 
@@ -94,12 +93,7 @@ suite('toArrayBuffer with manifold models', () => {
         expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
             .toBeDefined();
 
-        // Reimport the exported 3MF and verify geometry via the JS API.
-        // Note: 3MF stores geometry in mm/+Z-up (manifoldCAD's native space),
-        // so gltfDocToManifold is used directly rather than importManifold,
-        // which would incorrectly apply a GLTF coordinate-system conversion.
-        const doc3mf = await import3mf.fromArrayBuffer(result);
-        const model = gltfDocToManifold(doc3mf);
+        const model = await importManifold(result, {mimetype: 'model/3mf'});
         worker.cleanup();
         expect(model.volume()).toBeCloseTo(100 * 100 * 100, 1);
         expect(model.genus()).toBe(0);
@@ -113,8 +107,7 @@ suite('toArrayBuffer with manifold models', () => {
         const doc = await worker.evaluate(script);
         const result = await toArrayBuffer(doc);
 
-        const doc3mf = await import3mf.fromArrayBuffer(result);
-        const model = gltfDocToManifold(doc3mf);
+        const model = await importManifold(result, {mimetype: 'model/3mf'});
         worker.cleanup();
         expect(model.volume()).toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
         expect(model.genus()).toBe(0);
