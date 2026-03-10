@@ -137,14 +137,17 @@ suite('toArrayBuffer with manifold models', () => {
       });
 
   test(
-      'parent-child node hierarchy is exported with component references',
+      'shared-manifold instances round-trip with component transforms',
       async () => {
         const script =
             `import {Manifold, GLTFNode} from 'manifold-3d/manifoldCAD';\n` +
+            `const shared = Manifold.cube([2,2,2]);\n` +
             `const parent = new GLTFNode();\n` +
-            `parent.manifold = Manifold.cube([2,2,2]);\n` +
+            `parent.manifold = shared;\n` +
+            `parent.translation = [7,0,0];\n` +
             `const child = new GLTFNode(parent);\n` +
-            `child.manifold = Manifold.cube([1,1,1]);\n` +
+            `child.manifold = shared;\n` +
+            `child.translation = [5,0,0];\n` +
             `export default parent;`;
         const doc = await worker.evaluate(script);
         const result = await toArrayBuffer(doc);
@@ -153,5 +156,8 @@ suite('toArrayBuffer with manifold models', () => {
         expect(modelXml).toContain('<vertices>');
         expect(modelXml).toContain('<triangles>');
         expect(modelXml).toContain('<component');
+
+        const model = await importManifold(result, {mimetype: 'model/3mf'});
+        expect(model.volume()).toBeCloseTo(16, 1);
       });
 });
