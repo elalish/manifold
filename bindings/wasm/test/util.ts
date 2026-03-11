@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {expect} from 'vitest';
+
 import {distanceVec3} from '../lib/math.ts';
 import type {Mesh, Vec3} from '../manifold.d.ts';
-import {expect} from 'vitest';
 
 export function inVec3Array(
     haystack: Array<Vec3>, needle: Vec3, margin: number = 1.0e-6): boolean {
