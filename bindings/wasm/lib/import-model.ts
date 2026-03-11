@@ -100,12 +100,14 @@ register(import3MF);
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
 const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
 const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
+const mesh2sourceNode = new Map<Mesh, GLTFTransform.Node>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
 
 export const cleanup = () => {
   id2mesh.clear();
   mesh2node.clear();
   mesh2mesh.clear();
+  mesh2sourceNode.clear();
   node2doc.clear();
 };
 
@@ -405,7 +407,9 @@ function gltfNodeToMeshes(
         node2doc.set(descendant, document);
         mesh2node.set(gltfmesh, descendant);
 
-        return gltfMeshToMesh(gltfmesh);
+        const mesh = gltfMeshToMesh(gltfmesh);
+        mesh2sourceNode.set(mesh, descendant);
+        return mesh;
       })
       .filter(mesh => !!mesh);
 }
@@ -460,8 +464,7 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     // We have a manifold object, but it is in the local coordinate system of
     // the original glTF-transform node.  Find that node, and transform it back
     // if possible.
-    const sourceMesh = mesh2mesh.get(mesh);
-    const sourceNode = sourceMesh ? mesh2node.get(sourceMesh) : null;
+    const sourceNode = mesh2sourceNode.get(mesh) ?? null;
     if (sourceNode) {
       manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
     } else {

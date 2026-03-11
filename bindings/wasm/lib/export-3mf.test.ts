@@ -20,7 +20,7 @@ import {meshToVec3Array} from '../test/util.ts';
 
 import {exportFormats as exportFormats3MF, toArrayBuffer as toArrayBuffer3MF} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
-import {gltfDocToManifold, importManifold as importManifold3MF} from './import-model.ts';
+import {importManifold as importManifold3MF} from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
 
@@ -90,8 +90,8 @@ suite('toArrayBuffer with manifold models', () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.cube([100,100,100]);`;
         const doc = await worker.evaluate(script);
-        const sourceModel = gltfDocToManifold(doc);
-        const sourceMesh = sourceModel.getMesh();
+        const {Manifold} = wasm.getManifoldModuleSync()!;
+        const sourceMesh = Manifold.cube([100, 100, 100]).getMesh();
         const result = await toArrayBuffer3MF(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
         expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
@@ -122,11 +122,24 @@ suite('toArrayBuffer with manifold models', () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.sphere(10, 64);`;
         const doc = await worker.evaluate(script);
+        const {Manifold} = wasm.getManifoldModuleSync()!;
+        const sourceMesh = Manifold.sphere(10, 64).getMesh();
         const result = await toArrayBuffer3MF(doc);
 
         const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
-        expect(model.volume()).toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
-        expect(model.genus()).toBe(0);
+        const roundTripMesh = model.getMesh();
+        expect(Array.from(roundTripMesh.triVerts))
+            .toEqual(Array.from(sourceMesh.triVerts));
+
+        const sourcePositions = meshToVec3Array(sourceMesh);
+        const roundTripPositions = meshToVec3Array(roundTripMesh);
+        expect(roundTripPositions.length).toBe(sourcePositions.length);
+        for (let i = 0; i < sourcePositions.length; ++i) {
+          for (let j = 0; j < 3; ++j) {
+            expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
+                .toBeLessThan(1.0e-5);
+          }
+        }
       });
 
   test(
