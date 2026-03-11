@@ -17,15 +17,10 @@ import {unzipSync} from 'fflate';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
 import {meshToVec3Array} from '../test/util.ts';
-import {
-  exportFormats as exportFormats3MF,
-  toArrayBuffer as toArrayBuffer3MF
-} from './export-3mf.ts';
+
+import {exportFormats as exportFormats3MF, toArrayBuffer as toArrayBuffer3MF} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
-import {
-  gltfDocToManifold,
-  importManifold as importManifold3MF
-} from './import-model.ts';
+import {gltfDocToManifold, importManifold as importManifold3MF} from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
 

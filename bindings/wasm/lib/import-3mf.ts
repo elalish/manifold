@@ -23,6 +23,7 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {XMLParser} from 'fast-xml-parser';
 import {unzipSync} from 'fflate';
+
 import {euler2quat} from './math.ts';
 
 export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
