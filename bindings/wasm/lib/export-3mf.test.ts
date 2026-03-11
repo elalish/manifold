@@ -177,7 +177,7 @@ suite('toArrayBuffer with manifold models', () => {
             `const child = new GLTFNode(parent);\n` +
             `child.manifold = shared;\n` +
             `child.translation = [5,0,0];\n` +
-            `export default parent;`;
+            `export default [parent, child];`;
         const doc = await worker.evaluate(script);
         const result = await toArrayBuffer3MF(doc);
         const files = unzipSync(new Uint8Array(result));
