@@ -14,6 +14,7 @@
 
 import {distanceVec3} from '../lib/math.ts';
 import type {Mesh, Vec3} from '../manifold.d.ts';
+import {expect} from 'vitest';
 
 export function inVec3Array(
     haystack: Array<Vec3>, needle: Vec3, margin: number = 1.0e-6): boolean {
@@ -44,4 +45,21 @@ export function meshToVec3Array(mesh: Mesh): Array<Vec3> {
     pts.push(mesh.position(i) as unknown as Vec3);
   }
   return pts;
+}
+
+export function expectMeshesMatch(
+    sourceMesh: Mesh, roundTripMesh: Mesh, margin: number = 1.0e-5) {
+  expect(Array.from(roundTripMesh.triVerts))
+      .toEqual(Array.from(sourceMesh.triVerts));
+
+  const sourcePositions = meshToVec3Array(sourceMesh);
+  const roundTripPositions = meshToVec3Array(roundTripMesh);
+  expect(roundTripPositions.length).toBe(sourcePositions.length);
+
+  for (let i = 0; i < sourcePositions.length; ++i) {
+    for (let j = 0; j < 3; ++j) {
+      expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
+          .toBeLessThan(margin);
+    }
+  }
 }

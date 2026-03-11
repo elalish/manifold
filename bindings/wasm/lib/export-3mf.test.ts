@@ -16,7 +16,7 @@ import * as GLTFTransform from '@gltf-transform/core';
 import {unzipSync} from 'fflate';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
-import {meshToVec3Array} from '../test/util.ts';
+import {expectMeshesMatch} from '../test/util.ts';
 
 import {exportFormats as exportFormats3MF, toArrayBuffer as toArrayBuffer3MF} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
@@ -99,18 +99,7 @@ suite('toArrayBuffer with manifold models', () => {
 
         const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
         const roundTripMesh = model.getMesh();
-        expect(Array.from(roundTripMesh.triVerts))
-            .toEqual(Array.from(sourceMesh.triVerts));
-
-        const sourcePositions = meshToVec3Array(sourceMesh);
-        const roundTripPositions = meshToVec3Array(roundTripMesh);
-        expect(roundTripPositions.length).toBe(sourcePositions.length);
-        for (let i = 0; i < sourcePositions.length; ++i) {
-          for (let j = 0; j < 3; ++j) {
-            expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
-                .toBeLessThan(1.0e-5);
-          }
-        }
+        expectMeshesMatch(sourceMesh, roundTripMesh);
 
         expect(model.volume()).toBeCloseTo(100 * 100 * 100, 1);
         expect(model.genus()).toBe(0);
@@ -128,18 +117,7 @@ suite('toArrayBuffer with manifold models', () => {
 
         const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
         const roundTripMesh = model.getMesh();
-        expect(Array.from(roundTripMesh.triVerts))
-            .toEqual(Array.from(sourceMesh.triVerts));
-
-        const sourcePositions = meshToVec3Array(sourceMesh);
-        const roundTripPositions = meshToVec3Array(roundTripMesh);
-        expect(roundTripPositions.length).toBe(sourcePositions.length);
-        for (let i = 0; i < sourcePositions.length; ++i) {
-          for (let j = 0; j < 3; ++j) {
-            expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
-                .toBeLessThan(1.0e-5);
-          }
-        }
+        expectMeshesMatch(sourceMesh, roundTripMesh);
       });
 
   test(
