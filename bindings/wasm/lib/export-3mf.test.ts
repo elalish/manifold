@@ -16,17 +16,24 @@ import * as GLTFTransform from '@gltf-transform/core';
 import {unzipSync} from 'fflate';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
-import {exportFormats, toArrayBuffer} from './export-3mf.ts';
+import {meshToVec3Array} from '../test/util.ts';
+import {
+  exportFormats as exportFormats3MF,
+  toArrayBuffer as toArrayBuffer3MF
+} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
-import {importManifold} from './import-model.ts';
+import {
+  gltfDocToManifold,
+  importManifold as importManifold3MF
+} from './import-model.ts';
 import * as wasm from './wasm.ts';
 import * as worker from './worker.ts';
 
 suite('exportFormats', () => {
   test('contains a single 3mf format entry', () => {
-    expect(exportFormats).toHaveLength(1);
-    expect(exportFormats[0].extension).toBe('3mf');
-    expect(exportFormats[0].mimetype).toBe('model/3mf');
+    expect(exportFormats3MF).toHaveLength(1);
+    expect(exportFormats3MF[0].extension).toBe('3mf');
+    expect(exportFormats3MF[0].mimetype).toBe('model/3mf');
   });
 });
 
@@ -43,7 +50,7 @@ suite('toArrayBuffer with empty document', () => {
       'output is a valid ZIP containing 3D/3dmodel.model and content types',
       async () => {
         const doc = new GLTFTransform.Document();
-        const result = await toArrayBuffer(doc);
+        const result = await toArrayBuffer3MF(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
         const bytes = new Uint8Array(result);
         // ZIP magic bytes
@@ -60,7 +67,7 @@ suite('toArrayBuffer header options', () => {
       'default header contains ManifoldCAD.org application and millimeter unit',
       async () => {
         const doc = new GLTFTransform.Document();
-        const result = await toArrayBuffer(doc);
+        const result = await toArrayBuffer3MF(doc);
         const files = unzipSync(new Uint8Array(result));
         const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
         expect(modelXml).toContain('ManifoldCAD.org');
@@ -69,7 +76,7 @@ suite('toArrayBuffer header options', () => {
 
   test('custom title and unit appear in model XML', async () => {
     const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer(
+    const result = await toArrayBuffer3MF(
         doc, {header: {title: 'MyTestModel', unit: 'inch'}});
     const files = unzipSync(new Uint8Array(result));
     const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
@@ -88,13 +95,28 @@ suite('toArrayBuffer with manifold models', () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.cube([100,100,100]);`;
         const doc = await worker.evaluate(script);
-        const result = await toArrayBuffer(doc);
+        const sourceModel = gltfDocToManifold(doc);
+        const sourceMesh = sourceModel.getMesh();
+        const result = await toArrayBuffer3MF(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
         expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
             .toBeDefined();
 
-        const model = await importManifold(result, {mimetype: 'model/3mf'});
-        worker.cleanup();
+        const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
+        const roundTripMesh = model.getMesh();
+        expect(Array.from(roundTripMesh.triVerts))
+            .toEqual(Array.from(sourceMesh.triVerts));
+
+        const sourcePositions = meshToVec3Array(sourceMesh);
+        const roundTripPositions = meshToVec3Array(roundTripMesh);
+        expect(roundTripPositions.length).toBe(sourcePositions.length);
+        for (let i = 0; i < sourcePositions.length; ++i) {
+          for (let j = 0; j < 3; ++j) {
+            expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
+                .toBeLessThan(1.0e-5);
+          }
+        }
+
         expect(model.volume()).toBeCloseTo(100 * 100 * 100, 1);
         expect(model.genus()).toBe(0);
       });
@@ -105,10 +127,9 @@ suite('toArrayBuffer with manifold models', () => {
         const script = `import {Manifold} from 'manifold-3d/manifoldCAD';\n` +
             `export default Manifold.sphere(10, 64);`;
         const doc = await worker.evaluate(script);
-        const result = await toArrayBuffer(doc);
+        const result = await toArrayBuffer3MF(doc);
 
-        const model = await importManifold(result, {mimetype: 'model/3mf'});
-        worker.cleanup();
+        const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
         expect(model.volume()).toBeCloseTo((4 / 3) * Math.PI * 10 ** 3, 0);
         expect(model.genus()).toBe(0);
       });
@@ -123,7 +144,7 @@ suite('toArrayBuffer with manifold models', () => {
             `export default node;`;
         const doc = await worker.evaluate(script);
 
-        const result = await toArrayBuffer(doc);
+        const result = await toArrayBuffer3MF(doc);
         expect(result).toBeInstanceOf(ArrayBuffer);
         expect(unzipSync(new Uint8Array(result))['3D/3dmodel.model'])
             .toBeDefined();
@@ -150,14 +171,14 @@ suite('toArrayBuffer with manifold models', () => {
             `child.translation = [5,0,0];\n` +
             `export default parent;`;
         const doc = await worker.evaluate(script);
-        const result = await toArrayBuffer(doc);
+        const result = await toArrayBuffer3MF(doc);
         const files = unzipSync(new Uint8Array(result));
         const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
         expect(modelXml).toContain('<vertices>');
         expect(modelXml).toContain('<triangles>');
         expect(modelXml).toContain('<component');
 
-        const model = await importManifold(result, {mimetype: 'model/3mf'});
+        const model = await importManifold3MF(result, {mimetype: 'model/3mf'});
         expect(model.volume()).toBeCloseTo(16, 1);
       });
 });

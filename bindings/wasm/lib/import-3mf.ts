@@ -23,6 +23,7 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {XMLParser} from 'fast-xml-parser';
 import {unzipSync} from 'fflate';
+import {euler2quat} from './math.ts';
 
 export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
 
@@ -149,8 +150,8 @@ function parseTransform(value?: string): number[] {
 
 function parseMesh(
     mesh: Mesh3MF|undefined, doc: GLTFTransform.Document,
-    buf: GLTFTransform.Buffer, defaultMaterial: GLTFTransform.Material,
-    unitToMeters: number): GLTFTransform.Mesh|null {
+    buf: GLTFTransform.Buffer,
+    defaultMaterial: GLTFTransform.Material): GLTFTransform.Mesh|null {
   if (!mesh) return null;
 
   // --- vertices ---
@@ -161,12 +162,7 @@ function parseMesh(
     const z = toFiniteNumber(vertex.z);
     if (x == null || y == null || z == null) continue;
 
-    // 3MF is mm/+Z-up. Convert to glTF m/+Y-up by applying:
-    // scale = unitToMeters and rotation = -90 degrees around X.
-    const xf = x * unitToMeters;
-    const yf = y * unitToMeters;
-    const zf = z * unitToMeters;
-    positions.push(xf, zf, -yf);
+    positions.push(x, y, z);
   }
   if (!positions.length) return null;
 
@@ -258,6 +254,13 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   const unitToMeters = parseUnitMeters(model.unit);
   const objects = new Map<string, Object3MF>();
 
+  // Keep vertex data untouched and normalize once at the root:
+  // 3MF (unit/+Z-up) -> glTF (m/+Y-up).
+  const rootTransform = doc.createNode('3mf-import-root');
+  rootTransform.setRotation(euler2quat([-90, 0, 0]));
+  rootTransform.setScale([unitToMeters, unitToMeters, unitToMeters]);
+  scene.addChild(rootTransform);
+
   // Parse all resource objects first (mesh objects and component objects).
   for (const object of asArray(model.resources?.object)) {
     const id = object.id?.toString();
@@ -266,7 +269,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
     objects.set(id, {
       id,
       name: object.name,
-      mesh: parseMesh(object.mesh, doc, buf, defaultMaterial, unitToMeters),
+      mesh: parseMesh(object.mesh, doc, buf, defaultMaterial),
       children: parseComponentRefs(object)
     });
   }
@@ -275,14 +278,14 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   const buildRefs = parseBuildRefs(model);
   for (const ref of buildRefs) {
     const node = instantiateObjectNode(doc, objects, ref, new Set());
-    if (node) scene.addChild(node);
+    if (node) rootTransform.addChild(node);
   }
 
   // Fallback for malformed 3MF files missing <build>: show all mesh objects.
   if (!buildRefs.length) {
     for (const object of objects.values()) {
       if (!object.mesh) continue;
-      scene.addChild(doc.createNode(object.name).setMesh(object.mesh));
+      rootTransform.addChild(doc.createNode(object.name).setMesh(object.mesh));
     }
   }
 
