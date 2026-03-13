@@ -28,8 +28,9 @@ const CODE_START = '<code>';
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register(
-      '/service-worker.js', {scope: './index.html'});
+  // Resolve against the current module URL so registration works on subpaths.
+  const serviceWorkerUrl = new URL('./service-worker.js', import.meta.url);
+  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'});
 }
 
 let editor = undefined;
