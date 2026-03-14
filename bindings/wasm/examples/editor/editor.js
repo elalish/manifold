@@ -17,11 +17,7 @@
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import {
-  AutoTypings,
-  JsDelivrSourceResolver,
-  LocalStorageCache
-} from 'monaco-editor-auto-typings';
+import {AutoTypings, JsDelivrSourceResolver, LocalStorageCache} from 'monaco-editor-auto-typings';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
@@ -35,8 +31,8 @@ if (navigator.serviceWorker) {
   // Resolve against the current page URL so production asset paths don't
   // redirect registration into /assets.
   const serviceWorkerUrl = new URL('./service-worker.js', window.location.href);
-  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'}).catch(
-      error => {
+  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'})
+      .catch(error => {
         console.error('Service worker registration failed:', error);
       });
 }
@@ -326,11 +322,12 @@ async function createEditor() {
   });
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
-    const manifoldCADTypesUrl = new URL('./manifoldCAD.d.ts', window.location.href);
-    const manifoldCADGlobalsTypesUrl =
+  const manifoldCADTypesUrl =
+      new URL('./manifoldCAD.d.ts', window.location.href);
+  const manifoldCADGlobalsTypesUrl =
       new URL('./manifoldCADGlobals.d.ts', window.location.href);
 
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await (await fetch(manifoldCADTypesUrl)).text(),
       'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
 
