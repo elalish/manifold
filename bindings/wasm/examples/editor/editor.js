@@ -346,6 +346,35 @@ async function createEditor() {
   // Initialize auto typing on monaco editor.
   const typeIndicator = document.getElementById('type-indicator');
   self.window.typecache = new LocalStorageCache();
+  let typeIndicatorFrame = 0;
+
+  const syncTypeIndicator = () => {
+    if (!typeIndicator) return;
+
+    if (autoTypings?.isResolving) {
+      typeIndicator.textContent = 'Fetching types...';
+      if (typeIndicatorFrame !== 0) return;
+
+      const waitForResolve = () => {
+        if (autoTypings?.isResolving) {
+          typeIndicatorFrame = requestAnimationFrame(waitForResolve);
+          return;
+        }
+
+        typeIndicator.textContent = '';
+        typeIndicatorFrame = 0;
+      };
+
+      typeIndicatorFrame = requestAnimationFrame(waitForResolve);
+      return;
+    }
+
+    if (typeIndicatorFrame !== 0) {
+      cancelAnimationFrame(typeIndicatorFrame);
+      typeIndicatorFrame = 0;
+    }
+    typeIndicator.textContent = '';
+  };
 
   // We inject manifold-3d typings locally above, so avoid extra CDN probes for
   // that package path. This prevents noisy 404s in production logs.
@@ -366,14 +395,16 @@ async function createEditor() {
     sourceCache: self.window.typecache,
     onError: e => {
       console.error(e);
-      if (typeIndicator) typeIndicator.textContent = '';
+      syncTypeIndicator();
     },
     onUpdate: (update, text) => {
-      if (typeIndicator) typeIndicator.textContent = 'Fetching types...';
+      if (update.type === 'ResolveNewImports') {
+        syncTypeIndicator();
+      }
       console.debug(text);
     },
     onUpdateVersions: (versions) => {
-      if (typeIndicator) typeIndicator.textContent = '';
+      syncTypeIndicator();
       console.debug(versions);
     }
   });
