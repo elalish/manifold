@@ -346,7 +346,8 @@ async function createEditor() {
   // Initialize auto typing on monaco editor.
   let typeIndicator = document.getElementById('type-indicator');
   if (!typeIndicator) {
-    console.warn('[AutoTypings] #type-indicator not found; creating fallback element.');
+    console.warn(
+        '[AutoTypings] #type-indicator not found; creating fallback element.');
     const headerTitle = document.querySelector('.header p');
     if (headerTitle) {
       const createdIndicator = document.createElement('span');
@@ -370,8 +371,8 @@ async function createEditor() {
   const setTypeIndicator = (resolving, reason = '') => {
     if (!typeIndicator) return;
     typeIndicator.textContent = resolving ? 'Fetching Types...' : '';
-    console.log(
-        `[AutoTypings] indicator ${resolving ? 'ON' : 'OFF'}${reason ? ` (${reason})` : ''}`);
+    console.log(`[AutoTypings] indicator ${resolving ? 'ON' : 'OFF'}${
+        reason ? ` (${reason})` : ''}`);
   };
 
   const syncTypeIndicator = (reason = '', update = null) => {
@@ -384,7 +385,8 @@ async function createEditor() {
     }
 
     const now = performance.now();
-    const resolving = Boolean(autoTypings?.isResolving) || now < resolveEventUntil;
+    const resolving =
+        Boolean(autoTypings?.isResolving) || now < resolveEventUntil;
 
     if (resolving) {
       if (resolvingSince === 0) {
@@ -395,8 +397,8 @@ async function createEditor() {
 
       const waitForResolve = () => {
         const frameNow = performance.now();
-        const stillResolving = Boolean(autoTypings?.isResolving) ||
-            frameNow < resolveEventUntil;
+        const stillResolving =
+            Boolean(autoTypings?.isResolving) || frameNow < resolveEventUntil;
 
         if (stillResolving) {
           typeIndicatorFrame = requestAnimationFrame(waitForResolve);

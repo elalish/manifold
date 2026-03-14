@@ -20,44 +20,44 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then((keyList) => {
-    return Promise.all(keyList.map((key) => {
-      if (key !== cacheName) {
-        return caches.delete(key);
-      }
-    }));
-  }).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys()
+                  .then((keyList) => {
+                    return Promise.all(keyList.map((key) => {
+                      if (key !== cacheName) {
+                        return caches.delete(key);
+                      }
+                    }));
+                  })
+                  .then(() => self.clients.claim()));
 });
 
 // Serves from cache, then updates the cache in the background from the network,
 // if available. Update available on refresh.
-self.addEventListener(
-    'fetch',
-    e => {
-      if (e.request.method !== 'GET') {
-        return;
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') {
+    return;
+  }
+
+  e.respondWith((async () => {
+    const cachedResponse = await caches.match(e.request);
+
+    try {
+      const response = await fetch(e.request);
+
+      // Only cache successful basic and opaque responses.
+      if (response.ok || response.type === 'opaque') {
+        const cache = await caches.open(cacheName);
+        await cache.put(e.request, response.clone());
       }
 
-      e.respondWith((async () => {
-        const cachedResponse = await caches.match(e.request);
+      return response;
+    } catch (error) {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
 
-        try {
-          const response = await fetch(e.request);
-
-          // Only cache successful basic and opaque responses.
-          if (response.ok || response.type === 'opaque') {
-            const cache = await caches.open(cacheName);
-            await cache.put(e.request, response.clone());
-          }
-
-          return response;
-        } catch (error) {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-
-          console.debug('Service worker fetch failed:', e.request.url, error);
-          return Response.error();
-        }
-      })());
-    });
+      console.debug('Service worker fetch failed:', e.request.url, error);
+      return Response.error();
+    }
+  })());
+});
