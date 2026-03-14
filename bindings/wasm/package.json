@@ -4,7 +4,7 @@
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
   "bin": {
-    "manifold-cad": "./bin/manifold-cad"
+    "manifold-cad": "bin/manifold-cad"
   },
   "scripts": {
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
@@ -154,6 +154,5 @@
     "convert-source-map": "^2.0.0",
     "fflate": "^0.8.0",
     "magic-string": "^0.30.21"
-
   }
 }
