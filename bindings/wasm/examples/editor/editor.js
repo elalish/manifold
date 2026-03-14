@@ -344,25 +344,75 @@ async function createEditor() {
   }
 
   // Initialize auto typing on monaco editor.
-  const typeIndicator = document.getElementById('type-indicator');
+  let typeIndicator = document.getElementById('type-indicator');
+  if (!typeIndicator) {
+    console.warn('[AutoTypings] #type-indicator not found; creating fallback element.');
+    const headerTitle = document.querySelector('.header p');
+    if (headerTitle) {
+      const createdIndicator = document.createElement('span');
+      createdIndicator.id = 'type-indicator';
+      createdIndicator.style.fontSize = '14px';
+      createdIndicator.style.marginLeft = '12px';
+      createdIndicator.style.fontWeight = 'normal';
+      createdIndicator.style.opacity = '0.8';
+      headerTitle.appendChild(createdIndicator);
+      typeIndicator = createdIndicator;
+    }
+  }
   self.window.typecache = new LocalStorageCache();
   let typeIndicatorFrame = 0;
+  let autoTypings;
+  let resolvingSince = 0;
+  let resolveEventUntil = 0;
 
-  const syncTypeIndicator = () => {
+  const MIN_INDICATOR_MS = 350;
+
+  const setTypeIndicator = (resolving, reason = '') => {
+    if (!typeIndicator) return;
+    typeIndicator.textContent = resolving ? 'Fetching Types...' : '';
+    console.log(
+        `[AutoTypings] indicator ${resolving ? 'ON' : 'OFF'}${reason ? ` (${reason})` : ''}`);
+  };
+
+  const syncTypeIndicator = (reason = '', update = null) => {
     if (!typeIndicator) return;
 
-    if (autoTypings?.isResolving) {
-      typeIndicator.textContent = 'Fetching types...';
+    if (update?.type === 'ResolveNewImports') {
+      // Keep indicator on briefly even if this event arrives before
+      // autoTypings is assigned from AutoTypings.create(...).
+      resolveEventUntil = performance.now() + MIN_INDICATOR_MS;
+    }
+
+    const now = performance.now();
+    const resolving = Boolean(autoTypings?.isResolving) || now < resolveEventUntil;
+
+    if (resolving) {
+      if (resolvingSince === 0) {
+        resolvingSince = now;
+      }
+      setTypeIndicator(true, reason);
       if (typeIndicatorFrame !== 0) return;
 
       const waitForResolve = () => {
-        if (autoTypings?.isResolving) {
+        const frameNow = performance.now();
+        const stillResolving = Boolean(autoTypings?.isResolving) ||
+            frameNow < resolveEventUntil;
+
+        if (stillResolving) {
           typeIndicatorFrame = requestAnimationFrame(waitForResolve);
           return;
         }
 
-        typeIndicator.textContent = '';
+        const visibleFor = frameNow - resolvingSince;
+        if (visibleFor < MIN_INDICATOR_MS) {
+          typeIndicatorFrame = requestAnimationFrame(waitForResolve);
+          return;
+        }
+
+        setTypeIndicator(false, `${reason} -> resolved`);
         typeIndicatorFrame = 0;
+        resolvingSince = 0;
+        resolveEventUntil = 0;
       };
 
       typeIndicatorFrame = requestAnimationFrame(waitForResolve);
@@ -373,7 +423,9 @@ async function createEditor() {
       cancelAnimationFrame(typeIndicatorFrame);
       typeIndicatorFrame = 0;
     }
-    typeIndicator.textContent = '';
+    setTypeIndicator(false, reason);
+    resolvingSince = 0;
+    resolveEventUntil = 0;
   };
 
   // We inject manifold-3d typings locally above, so avoid extra CDN probes for
@@ -390,24 +442,23 @@ async function createEditor() {
     }
   };
 
-  const autoTypings = await AutoTypings.create(editor, {
+  autoTypings = await AutoTypings.create(editor, {
     sourceResolver,
     sourceCache: self.window.typecache,
     onError: e => {
-      console.error(e);
-      syncTypeIndicator();
+      console.error('[AutoTypings] error', e);
+      syncTypeIndicator('onError');
     },
     onUpdate: (update, text) => {
-      if (update.type === 'ResolveNewImports') {
-        syncTypeIndicator();
-      }
-      console.debug(text);
+      console.debug('[AutoTypings] onUpdate', update?.type, text || '');
+      syncTypeIndicator(`onUpdate:${update?.type ?? 'unknown'}`, update);
     },
     onUpdateVersions: (versions) => {
-      syncTypeIndicator();
-      console.debug(versions);
+      console.debug('[AutoTypings] onUpdateVersions', versions);
+      syncTypeIndicator('onUpdateVersions');
     }
   });
+  syncTypeIndicator('post-create');
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
