@@ -31,8 +31,16 @@ suite('supports()', () => {
     expect(importer.supports('model/gltf-binary')).to.be.true;
   });
 
+  test('returns true for 3mf mimetype', () => {
+    expect(importer.supports('model/3mf')).to.be.true;
+  });
+
   test('returns true for a known good mimetype', () => {
     expect(importer.supports('.glb')).to.be.true;
+  });
+
+  test('returns true for 3mf extension', () => {
+    expect(importer.supports('.3mf')).to.be.true;
   });
 
   test('returns false for a known bad mimetype', () => {
@@ -122,6 +130,16 @@ suite('importManifold()', () => {
 
     const model = await importer.importManifold(
         buffer.buffer as ArrayBuffer, {mimetype: 'model/gltf-binary'});
+    expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+  });
+
+  test('imports 3mf through the main importer path', async () => {
+    const script = `import {Manifold} from \'manifold-3d/manifoldCAD\';\n` +
+        `export default Manifold.cube([100,100,100]);\n`;
+    const doc = await worker.evaluate(script);
+    const buffer = await toArrayBuffer(doc, {mimetype: 'model/3mf'});
+    const model =
+        await importer.importManifold(buffer, {mimetype: 'model/3mf'});
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
   });
 
