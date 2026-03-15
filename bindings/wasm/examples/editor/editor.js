@@ -344,7 +344,6 @@ async function createEditor() {
   }
 
   // Initialize auto typing on monaco editor.
-  const typeIndicator = document.getElementById('type-indicator');
   self.window.typecache = new LocalStorageCache();
 
   // We inject manifold-3d typings locally above, so avoid extra CDN probes for
@@ -366,15 +365,6 @@ async function createEditor() {
     sourceCache: self.window.typecache,
     onError: e => {
       console.error(e);
-      if (typeIndicator) typeIndicator.textContent = '';
-    },
-    onUpdate: (_, text) => {
-      if (typeIndicator) typeIndicator.textContent = 'Fetching types...';
-      console.debug(text);
-    },
-    onUpdateVersions: (versions) => {
-      if (typeIndicator) typeIndicator.textContent = '';
-      console.debug(versions);
     }
   });
   for (const [name] of exampleFunctions) {
