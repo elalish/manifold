@@ -164,6 +164,15 @@ suite('Examples', () => {
     expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
   });
 
+  test('Import Model', async () => {
+    const filename = await resolveExample('Import Model');
+    const code = await fs.readFile(filename, 'utf-8');
+    const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
+    const glbURL = await exportBlobURL(doc, 'glb');
+    cleanup();
+    expect(glbURL).toBeTruthy();
+  });
+
   test('Import Manifold', async () => {
     const result = await runExample('Import Manifold');
     expect(result?.genus).to.equal(3, 'Genus');

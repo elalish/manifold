@@ -15,7 +15,6 @@ jobs:
     - uses: DoozyX/clang-format-lint-action@v0.20
       with:
         source: '.'
-        exclude: '*/third_party'
         extensions: 'h,cpp,js,ts,html'
         clangFormatVersion: 20
     - uses: actions/setup-python@v5

@@ -15,7 +15,7 @@
   <meta property="og:image:width" content="850">
   <meta property="og:image:height" content="850">
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="./manifest.json">
   <link type="text/css" href="editor.css" rel="stylesheet">
   <script type="application/ld+json">
     {
@@ -39,13 +39,14 @@
   <div class="page">
     <div class="container header" style="background-color: #A288B3;">
       <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD
-        &nbsp;&nbsp;<span class="top-edit blue">
-          <button type="button" id="undo" class="top-icon undo squish"></button>
-          <button type="button" id="redo" class="top-icon redo squish"></button>
-          <button type="button" id="format" class="top-icon star squish"></button>
-          <button type="button" id="share" class="top-icon share squish"></button>
-          <a target="_blank" href="https://manifoldcad.org/docs/jsuser/" class="top-icon docs"></a>
+       &nbsp;&nbsp;<span class="top-edit blue">
+          <button type="button" id="undo" class="top-icon undo squish" title="Undo"></button>
+          <button type="button" id="redo" class="top-icon redo squish" title="Redo"></button>
+          <button type="button" id="format" class="top-icon star squish" title="Format Code"></button>
+          <button type="button" id="share" class="top-icon share squish" title="Copy Shareable Link"></button>
+          <a target="_blank" href="https://manifoldcad.org/docs/jsuser/" class="top-icon docs" title="Documentation"></a>
         </span>
+        <span id="type-indicator" style="font-size: 14px; margin-left: 12px; font-weight: normal; opacity: 0.8;"></span>
       </p>
       <div class="margin" id="file-margin">
         <button type="button" id="file" class="blue item"><b class="uparrow"></b>&nbsp;&nbsp;<span

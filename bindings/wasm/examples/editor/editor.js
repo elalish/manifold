@@ -17,7 +17,7 @@
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import {AutoTypings, LocalStorageCache} from 'monaco-editor-auto-typings';
+import {AutoTypings, JsDelivrSourceResolver, LocalStorageCache} from 'monaco-editor-auto-typings';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
@@ -28,8 +28,13 @@ const CODE_START = '<code>';
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register(
-      '/service-worker.js', {scope: './index.html'});
+  // Resolve against the current page URL so production asset paths don't
+  // redirect registration into /assets.
+  const serviceWorkerUrl = new URL('./service-worker.js', window.location.href);
+  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'})
+      .catch(error => {
+        console.error('Service worker registration failed:', error);
+      });
 }
 
 let editor = undefined;
@@ -307,6 +312,7 @@ async function createEditor() {
   editor = monaco.editor.create(document.getElementById('editor'), {
     language: 'typescript',
     automaticLayout: true,
+    minimap: {enabled: false},
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -316,15 +322,20 @@ async function createEditor() {
   });
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
+  const manifoldCADTypesUrl =
+      new URL('./manifoldCAD.d.ts', window.location.href);
+  const manifoldCADGlobalsTypesUrl =
+      new URL('./manifoldCADGlobals.d.ts', window.location.href);
+
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await (await fetch('/manifoldCAD.d.ts')).text(),
+      await (await fetch(manifoldCADTypesUrl)).text(),
       'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
   // global variables, so another tool may be a better fit.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      (await (await fetch('/manifoldCADGlobals.d.ts')).text())
+      (await (await fetch(manifoldCADGlobalsTypesUrl)).text())
           .replace(/^export /gm, ''));
 
   // Load up all scripts so that monaco can check types of multi-file models.
@@ -333,16 +344,39 @@ async function createEditor() {
   }
 
   // Initialize auto typing on monaco editor.
+  const typeIndicator = document.getElementById('type-indicator');
   self.window.typecache = new LocalStorageCache();
+
+  // We inject manifold-3d typings locally above, so avoid extra CDN probes for
+  // that package path. This prevents noisy 404s in production logs.
+  const jsDelivrResolver = new JsDelivrSourceResolver();
+  const sourceResolver = {
+    resolvePackageJson: async (packageName, version, subPath) => {
+      if (packageName === 'manifold-3d') return '';
+      return jsDelivrResolver.resolvePackageJson(packageName, version, subPath);
+    },
+    resolveSourceFile: async (packageName, version, path) => {
+      if (packageName === 'manifold-3d') return '';
+      return jsDelivrResolver.resolveSourceFile(packageName, version, path);
+    }
+  };
+
   const autoTypings = await AutoTypings.create(editor, {
+    sourceResolver,
     sourceCache: self.window.typecache,
-    onError: e => {console.error(e)},
-    onUpdate: (update, text) => {console.debug(text)},
+    onError: e => {
+      console.error(e);
+      if (typeIndicator) typeIndicator.textContent = '';
+    },
+    onUpdate: (_, text) => {
+      if (typeIndicator) typeIndicator.textContent = 'Fetching types...';
+      console.debug(text);
+    },
     onUpdateVersions: (versions) => {
-      console.debug(versions)
+      if (typeIndicator) typeIndicator.textContent = '';
+      console.debug(versions);
     }
   });
-
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
@@ -609,7 +643,7 @@ runButton.onclick = function() {
   }
 };
 
-function clickSave(saveButton, filename, outputName) {
+function clickSave(saveButton, extension, outputName) {
   const container = saveButton.parentElement;
   return () => {
     const oldSave = saveContainer.firstElementChild;
@@ -619,14 +653,17 @@ function clickSave(saveButton, filename, outputName) {
       container.appendChild(saveArrow.parentElement);
     }
     const link = document.createElement('a');
-    link.download = filename;
+
+    link.download =
+        `${currentFileElement.textContent.trim() || 'manifold'}.${extension}`;
+
     link.href = output[outputName];
     link.click();
   };
 }
 
 const glbButton = document.querySelector('#glb');
-glbButton.onclick = clickSave(glbButton, 'manifold.glb', 'glbURL');
+glbButton.onclick = clickSave(glbButton, 'glb', 'glbURL');
 
 const threemfButton = document.querySelector('#threemf');
-threemfButton.onclick = clickSave(threemfButton, 'manifold.3mf', 'threeMFURL');
+threemfButton.onclick = clickSave(threemfButton, '3mf', 'threeMFURL');

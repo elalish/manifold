@@ -141,3 +141,31 @@ export const findExtension =
 export const findMimeType =
     (mimetype: string, list: Array<{mimetype: string}>) =>
         list.find(entry => entry.mimetype === mimetype);
+
+export function formatLength(mm: number): string {
+  if (Math.abs(mm) >= 10000) {
+    return `${
+        (mm / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} m`;
+  }
+  return `${mm.toLocaleString(undefined, {maximumFractionDigits: 2})} mm`;
+}
+
+export function formatArea(mm2: number): string {
+  const cm2 = mm2 / 100;
+  if (Math.abs(cm2) >= 10000) {
+    return `${(cm2 / 10000).toLocaleString(undefined, {
+      maximumFractionDigits: 2
+    })} m^2`;
+  }
+  return `${cm2.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^2`;
+}
+
+export function formatVolume(mm3: number): string {
+  const cm3 = mm3 / 1000;
+  if (Math.abs(cm3) >= 1_000_000) {
+    return `${(cm3 / 1_000_000).toLocaleString(undefined, {
+      maximumFractionDigits: 2
+    })} m^3`;
+  }
+  return `${cm3.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^3`;
+}

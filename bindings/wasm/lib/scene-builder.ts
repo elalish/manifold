@@ -37,6 +37,7 @@ import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} fro
 import {cleanup as cleanupImport} from './import-model.ts';
 import {cleanup as cleanupMaterial, getBackupMaterial, getCachedMaterial} from './material.ts';
 import {euler2quat} from './math.ts';
+import {formatArea, formatLength, formatVolume} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode, setMorphEnd, setMorphStart} from './animation.ts';
@@ -101,13 +102,12 @@ function writeManifold(
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
-    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+    size[i] = box.max[i] - box.min[i];
   }
-  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
-      size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
+  log(`  Bounding Box: X = ${formatLength(size[0])}, Y = ${
+      formatLength(size[1])}, Z = ${formatLength(size[2])}`);
   log(`  Genus: ${manifold.genus().toLocaleString()}`);
-  const volume = Math.round(manifold.volume() / 10);
-  log(`  Volume: ${(volume / 100).toLocaleString()} cm^3`);
+  log(`  Volume: ${formatVolume(manifold.volume())}`);
 
   // Material
   const id2properties = new Map<number, Properties>();
@@ -156,12 +156,11 @@ function writeCrossSection(
   const box = cs.bounds();
   const size = [0, 0];
   for (let i = 0; i < 2; i++) {
-    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
+    size[i] = box.max[i] - box.min[i];
   }
-  log(`  Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
-      size[1].toLocaleString()} mm`);
-  const area = Math.round(cs.area());
-  log(`  Area: ${(area / 100).toLocaleString()} cm^2`);
+  log(`  Bounding Box: X = ${formatLength(size[0])}, Y = ${
+      formatLength(size[1])}`);
+  log(`  Area: ${formatArea(cs.area())}`);
 
   // Material.
   const id2properties = new Map<number, Properties>();
@@ -297,6 +296,7 @@ function copyNodeToDocument(
       targetNode.addChild(map.get(sourceNode) as Node);
     }
   }
+  if (nodeDef.name) targetNode.setName(nodeDef.name);
   applyTransformation(doc, nodeDef, targetNode);
   return targetNode;
 }
