@@ -344,7 +344,26 @@ async function createEditor() {
   }
 
   // Initialize auto typing on monaco editor.
-  const typeIndicator = document.getElementById('type-indicator');
+  const typeIndicator = document.querySelector('#type-indicator');
+  let typeIndicatorFrame = 0;
+  let autoTypings = undefined;
+
+  const syncTypeIndicator = () => {
+    if (!typeIndicator || !autoTypings) return;
+    typeIndicator.textContent =
+        autoTypings.isResolving ? 'Fetching types...' : '';
+    typeIndicatorFrame =
+        autoTypings.isResolving ? requestAnimationFrame(syncTypeIndicator) : 0;
+  };
+
+  const showTypeIndicator = () => {
+    if (!typeIndicator) return;
+    typeIndicator.textContent = 'Fetching types...';
+    if (autoTypings && typeIndicatorFrame === 0) {
+      typeIndicatorFrame = requestAnimationFrame(syncTypeIndicator);
+    }
+  };
+
   self.window.typecache = new LocalStorageCache();
 
   // We inject manifold-3d typings locally above, so avoid extra CDN probes for
@@ -361,22 +380,21 @@ async function createEditor() {
     }
   };
 
-  const autoTypings = await AutoTypings.create(editor, {
+  autoTypings = await AutoTypings.create(editor, {
     sourceResolver,
     sourceCache: self.window.typecache,
+    onUpdate: update => {
+      if (update.type === 'ResolveNewImports') {
+        showTypeIndicator();
+      }
+    },
     onError: e => {
       console.error(e);
-      if (typeIndicator) typeIndicator.textContent = '';
-    },
-    onUpdate: (_, text) => {
-      if (typeIndicator) typeIndicator.textContent = 'Fetching types...';
-      console.debug(text);
-    },
-    onUpdateVersions: (versions) => {
-      if (typeIndicator) typeIndicator.textContent = '';
-      console.debug(versions);
     }
   });
+  if (typeIndicator?.textContent) {
+    syncTypeIndicator();
+  }
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
