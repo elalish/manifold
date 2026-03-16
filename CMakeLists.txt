@@ -150,7 +150,7 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
 endif()
 
 if(MSVC)
-  list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
+  list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj /fp:precise)
 else()
   list(
     APPEND
