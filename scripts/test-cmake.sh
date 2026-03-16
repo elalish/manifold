@@ -21,8 +21,5 @@ cat <<EOT > test.cpp
 int main() { manifold::Manifold foo; return 0; }
 EOT
 
-mkdir build
-cd build
-cmake ..
-make
-./testing
+cmake . -B build
+cmake --build build
