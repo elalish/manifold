@@ -1,0 +1,161 @@
+name: Cross-platform determinism check
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  export_linux:
+    name: Export (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 4.0.2
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libgtest-dev git
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DMANIFOLD_PAR=OFF \
+                -DMANIFOLD_DEBUG=ON \
+                -DMANIFOLD_ASSERT=ON \
+                -DMANIFOLD_CROSS_SECTION=OFF \
+                -DMANIFOLD_PYBIND=OFF \
+                .. && make manifold_test
+      - name: Export meshes
+        run: |
+          cd build/test
+          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meshes-linux
+          path: |
+            build/test/nastyGear.obj
+            build/test/coplanar.obj
+
+  export_mac:
+    name: Export (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 4.0.2
+      - name: Install dependencies
+        run: brew install googletest
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DMANIFOLD_PAR=OFF \
+                -DMANIFOLD_DEBUG=ON \
+                -DMANIFOLD_ASSERT=ON \
+                -DMANIFOLD_CROSS_SECTION=OFF \
+                -DMANIFOLD_PYBIND=OFF \
+                .. && make manifold_test
+      - name: Export meshes
+        run: |
+          cd build/test
+          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meshes-mac
+          path: |
+            build/test/nastyGear.obj
+            build/test/coplanar.obj
+
+  export_windows:
+    name: Export (Windows)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 4.0.2
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        shell: powershell
+        run: |
+          cmake . -DCMAKE_BUILD_TYPE=Release `
+                  -DMANIFOLD_PAR=OFF `
+                  -DMANIFOLD_DEBUG=ON `
+                  -DMANIFOLD_ASSERT=ON `
+                  -DMANIFOLD_CROSS_SECTION=OFF `
+                  -DMANIFOLD_PYBIND=OFF `
+                  -DMANIFOLD_USE_BUILTIN_TBB=ON `
+                  -A x64 -B build
+          cd build
+          cmake --build . --target manifold_test --config Release
+      - name: Export meshes
+        shell: bash
+        run: |
+          cp ./build/lib/Release/* ./build/bin/Release
+          cd build/bin/Release
+          ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meshes-windows
+          path: |
+            build/bin/Release/nastyGear.obj
+            build/bin/Release/coplanar.obj
+
+  compare:
+    name: Compare outputs
+    needs: [export_linux, export_mac, export_windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download Linux meshes
+        uses: actions/download-artifact@v4
+        with:
+          name: meshes-linux
+          path: meshes/linux
+      - name: Download macOS meshes
+        uses: actions/download-artifact@v4
+        with:
+          name: meshes-mac
+          path: meshes/mac
+      - name: Download Windows meshes
+        uses: actions/download-artifact@v4
+        with:
+          name: meshes-windows
+          path: meshes/windows
+      - name: Compare
+        run: |
+          set -e
+          failed=0
+          for file in nastyGear.obj coplanar.obj; do
+            echo "--- $file ---"
+            h_linux=$(sha256sum meshes/linux/$file | awk '{print $1}')
+            h_mac=$(sha256sum meshes/mac/$file | awk '{print $1}')
+            h_windows=$(sha256sum meshes/windows/$file | awk '{print $1}')
+            echo "linux:   $h_linux"
+            echo "mac:     $h_mac"
+            echo "windows: $h_windows"
+            if [ "$h_linux" != "$h_mac" ] || [ "$h_linux" != "$h_windows" ]; then
+              echo "MISMATCH detected in $file"
+              echo "linux vs mac diff:"
+              diff meshes/linux/$file meshes/mac/$file || true
+              echo "linux vs windows diff:"
+              diff meshes/linux/$file meshes/windows/$file || true
+              failed=1
+            else
+              echo "OK: all platforms match"
+            fi
+          done
+          exit $failed
