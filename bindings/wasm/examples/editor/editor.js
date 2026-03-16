@@ -350,7 +350,8 @@ async function createEditor() {
 
   const syncTypeIndicator = () => {
     if (!typeIndicator || !autoTypings) return;
-    typeIndicator.textContent = autoTypings.isResolving ? 'Fetching types...' : '';
+    typeIndicator.textContent =
+        autoTypings.isResolving ? 'Fetching types...' : '';
     typeIndicatorFrame =
         autoTypings.isResolving ? requestAnimationFrame(syncTypeIndicator) : 0;
   };
