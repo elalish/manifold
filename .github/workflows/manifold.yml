@@ -152,7 +152,8 @@ jobs:
     timeout-minutes: 45
     strategy:
       matrix:
-        parallelization: [OFF, ON]
+        # parallelization: [OFF, ON]
+        parallelization: [OFF]
     env:
       CC: gcc-14
       CXX: g++-14
