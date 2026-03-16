@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {expect} from 'vitest';
+
 import {distanceVec3} from '../lib/math.ts';
 import type {Mesh, Vec3} from '../manifold.d.ts';
 
@@ -44,4 +46,21 @@ export function meshToVec3Array(mesh: Mesh): Array<Vec3> {
     pts.push(mesh.position(i) as unknown as Vec3);
   }
   return pts;
+}
+
+export function expectMeshesMatch(
+    sourceMesh: Mesh, roundTripMesh: Mesh, margin: number = 1.0e-5) {
+  expect(Array.from(roundTripMesh.triVerts))
+      .toEqual(Array.from(sourceMesh.triVerts));
+
+  const sourcePositions = meshToVec3Array(sourceMesh);
+  const roundTripPositions = meshToVec3Array(roundTripMesh);
+  expect(roundTripPositions.length).toBe(sourcePositions.length);
+
+  for (let i = 0; i < sourcePositions.length; ++i) {
+    for (let j = 0; j < 3; ++j) {
+      expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
+          .toBeLessThan(margin);
+    }
+  }
 }

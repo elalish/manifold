@@ -4,7 +4,7 @@
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
   "bin": {
-    "manifold-cad": "./bin/manifold-cad"
+    "manifold-cad": "bin/manifold-cad"
   },
   "scripts": {
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
@@ -132,7 +132,7 @@
   },
   "devDependencies": {
     "@chialab/esbuild-plugin-meta-url": "^0.19.0",
-    "@microsoft/api-extractor": "^7.55.2",
+    "@microsoft/api-extractor": "^7.57.7",
     "@types/convert-source-map": "^2.0.3",
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^4.0.17",
@@ -152,8 +152,8 @@
     "@jscadui/3mf-export": "^0.5.0",
     "commander": "^13.1.0",
     "convert-source-map": "^2.0.0",
+    "fast-xml-parser": "^5.4.2",
     "fflate": "^0.8.0",
     "magic-string": "^0.30.21"
-
   }
 }

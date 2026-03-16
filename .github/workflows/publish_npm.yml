@@ -13,10 +13,13 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Setup Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
-        node-version: 20
+        node-version: 25
         registry-url: 'https://registry.npmjs.org'
+
+    - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
+      run: npm install -g npm@latest
 
     - name: Download built examples
       uses: dawidd6/action-download-artifact@v6

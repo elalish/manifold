@@ -38,6 +38,7 @@ import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
+import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
@@ -94,9 +95,10 @@ export interface ImportOptions {
 
 const importers: Array<Importer> = [];
 register(gltfIO);
+register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
-const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
+const mesh2node = new Map<GLTFTransform.Mesh, Array<GLTFTransform.Node>>();
 const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
 
@@ -113,7 +115,7 @@ export const cleanup = () => {
 export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
   const mesh = id2mesh.get(runID);
   if (!mesh) return null;
-  const node = mesh2node.get(mesh);
+  const [node] = mesh2node.get(mesh) ?? [];
   if (!node) return null;
   return node2doc.get(node) ?? null;
 };
@@ -431,9 +433,12 @@ function gltfNodeToMeshes(
         if (!gltfmesh) return null;
 
         node2doc.set(descendant, document);
-        mesh2node.set(gltfmesh, descendant);
+        const nodes = mesh2node.get(gltfmesh) ?? [];
+        nodes.push(descendant);
+        mesh2node.set(gltfmesh, nodes);
 
-        return gltfMeshToMesh(gltfmesh);
+        const mesh = gltfMeshToMesh(gltfmesh);
+        return mesh;
       })
       .filter(mesh => !!mesh);
 }
@@ -467,6 +472,7 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
+  const mesh2nextNode = new Map<GLTFTransform.Mesh, number>();
 
   const manifolds = [];
   for (const mesh of meshes) {
@@ -489,7 +495,10 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     // the original glTF-transform node.  Find that node, and transform it back
     // if possible.
     const sourceMesh = mesh2mesh.get(mesh);
-    const sourceNode = sourceMesh ? mesh2node.get(sourceMesh) : null;
+    const sourceNodes = sourceMesh ? mesh2node.get(sourceMesh) : null;
+    const nextNode = sourceMesh ? (mesh2nextNode.get(sourceMesh) ?? 0) : 0;
+    const sourceNode = sourceNodes?.[nextNode] ?? null;
+    if (sourceMesh && sourceNode) mesh2nextNode.set(sourceMesh, nextNode + 1);
     if (sourceNode) {
       manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
     } else {
