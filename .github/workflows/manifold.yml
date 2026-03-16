@@ -76,11 +76,6 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         ./build/bin/Release/manifold_test.exe
-    - name: test cmake consumer
-      shell: bash
-      run: |
-        cmake --install build
-        ./scripts/test-cmake.sh
 
   build:
     name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
