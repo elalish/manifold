@@ -194,22 +194,6 @@ ManifoldCrossSection* manifold_cross_section_warp_context(
   return to_c(new (mem) CrossSection(warped));
 }
 
-ManifoldCrossSection* manifold_cross_section_warp(
-    void* mem, ManifoldCrossSection* cs,
-    ManifoldVec2 (*fun)(double, double)) {
-  struct Ctx {
-    ManifoldVec2 (*fun)(double, double);
-  };
-  Ctx ctx = {fun};
-
-  auto thunk = [](double x, double y, void* vctx) -> ManifoldVec2 {
-    auto* ctx = static_cast<Ctx*>(vctx);
-    return ctx->fun(x, y);
-  };
-
-  return manifold_cross_section_warp_context(mem, cs, thunk, &ctx);
-}
-
 ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
                                                       ManifoldCrossSection* cs,
                                                       double epsilon) {
