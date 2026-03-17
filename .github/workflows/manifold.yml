@@ -83,6 +83,21 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         ./build/bin/Release/manifold_test.exe
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      shell: bash
+      run: |
+        cp ./build/lib/Release/* ./build/bin/Release
+        cd build/bin/Release
+        ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        mkdir -p ../../../meshes-windows
+        cp nastyGear.obj coplanar.obj ../../../meshes-windows/
+    - name: Upload determinism meshes (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-windows
+        path: meshes-windows/
 
   build:
     name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
@@ -145,6 +160,18 @@ jobs:
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         python3 bindings/python/examples/run_all.py -e
         python3 -m pytest
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      run: |
+        ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        mkdir -p meshes-linux
+        cp nastyGear.obj coplanar.obj meshes-linux/
+    - name: Upload determinism meshes (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-linux
+        path: meshes-linux/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -425,6 +452,18 @@ jobs:
     - name: Test
       run: |
         build/test/manifold_test
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      run: |
+        build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        mkdir -p meshes-mac
+        cp nastyGear.obj coplanar.obj meshes-mac/
+    - name: Upload determinism meshes (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-mac
+        path: meshes-mac/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -490,4 +529,46 @@ jobs:
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
+
+  determinism_check:
+    name: Cross-platform determinism check
+    needs: [build, build_windows, build_mac]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Linux meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-linux
+        path: meshes/linux
+    - name: Download macOS meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-mac
+        path: meshes/mac
+    - name: Download Windows meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-windows
+        path: meshes/windows
+    - name: Compare meshes across platforms
+      run: |
+        echo "=== SHA256 hashes ==="
+        for f in nastyGear.obj coplanar.obj; do
+          echo "--- $f ---"
+          sha256sum meshes/linux/$f meshes/mac/$f meshes/windows/$f
+        done
+
+        failed=0
+        for f in nastyGear.obj coplanar.obj; do
+          linux_hash=$(sha256sum meshes/linux/$f | awk '{print $1}')
+          mac_hash=$(sha256sum meshes/mac/$f | awk '{print $1}')
+          win_hash=$(sha256sum meshes/windows/$f | awk '{print $1}')
+          if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
+            echo "MISMATCH in $f"
+            diff meshes/linux/$f meshes/mac/$f || true
+            diff meshes/linux/$f meshes/windows/$f || true
+            failed=1
+          fi
+        done
+        exit $failed
 
