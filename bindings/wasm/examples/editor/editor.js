@@ -79,6 +79,95 @@ if (navigator.serviceWorker) {
 
 let editor = undefined;
 
+// Pane resizing - draggable pane dividers ---------------------
+
+// Keep percentages within practical bounds so panes stay usable.
+function clampToRange(value, minValue, maxValue) {
+  return Math.min(maxValue, Math.max(minValue, value));
+}
+
+// Attach pointer-drag behavior to a splitter element.
+// The callback receives pointer-move events and applies the layout update.
+function attachSplitterDrag(splitterElement, handleDragMove) {
+  if (!splitterElement) return;
+
+  splitterElement.addEventListener('pointerdown', pointerDownEvent => {
+    const isMobileLayout = window.matchMedia('(max-width: 820px)').matches;
+    if (isMobileLayout) return;
+
+    pointerDownEvent.preventDefault();
+    splitterElement.setPointerCapture(pointerDownEvent.pointerId);
+
+    const onPointerMove = moveEvent => handleDragMove(moveEvent);
+    const onPointerEnd = endEvent => {
+      splitterElement.releasePointerCapture(endEvent.pointerId);
+      splitterElement.removeEventListener('pointermove', onPointerMove);
+      splitterElement.removeEventListener('pointerup', onPointerEnd);
+      splitterElement.removeEventListener('pointercancel', onPointerEnd);
+    };
+
+    splitterElement.addEventListener('pointermove', onPointerMove);
+    splitterElement.addEventListener('pointerup', onPointerEnd);
+    splitterElement.addEventListener('pointercancel', onPointerEnd);
+  });
+}
+
+function setupPaneSplitters() {
+  const pageElement = document.querySelector('.page');
+  const workbenchElement = document.getElementById('workbench');
+  const rightPaneElement = document.getElementById('rightPane');
+  const horizontalSplitterElement = document.getElementById('split-x');
+  const verticalSplitterElement = document.getElementById('split-y');
+  const leftPaneStorageKey = 'ManifoldCAD:leftPanePercent';
+  const viewerPaneStorageKey = 'ManifoldCAD:viewerPanePercent';
+
+  if (!pageElement || !workbenchElement || !rightPaneElement) return;
+
+  // Restore saved pane percentages on refresh when they are valid numbers.
+  const savedLeftPane = Number(window.localStorage.getItem(leftPaneStorageKey));
+  if (Number.isFinite(savedLeftPane)) {
+    const clampedLeftPanePercent = clampToRange(savedLeftPane, 20, 80);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+  }
+
+  const savedViewerPane =
+      Number(window.localStorage.getItem(viewerPaneStorageKey));
+  if (Number.isFinite(savedViewerPane)) {
+    const clampedViewerPanePercent = clampToRange(savedViewerPane, 35, 90);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+  }
+
+  attachSplitterDrag(horizontalSplitterElement, moveEvent => {
+    // Convert pointer X position to a percentage of the full workbench width.
+    const workbenchBounds = workbenchElement.getBoundingClientRect();
+    const leftPanePercent =
+        ((moveEvent.clientX - workbenchBounds.left) / workbenchBounds.width) *
+        100;
+    const clampedLeftPanePercent = clampToRange(leftPanePercent, 20, 80);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+    window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
+
+    // Monaco reacts to container size changes, but an explicit layout keeps
+    // drag updates immediate and smooth.
+    editor?.layout({});
+  });
+
+  attachSplitterDrag(verticalSplitterElement, moveEvent => {
+    // Convert pointer Y position to a percentage of the right pane height.
+    const rightPaneBounds = rightPaneElement.getBoundingClientRect();
+    const viewerPanePercent =
+        ((moveEvent.clientY - rightPaneBounds.top) / rightPaneBounds.height) *
+        100;
+    const clampedViewerPanePercent = clampToRange(viewerPanePercent, 35, 90);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+    window.localStorage.setItem(viewerPaneStorageKey, clampedViewerPanePercent);
+  });
+}
+
+setupPaneSplitters();
+
 // Edit UI ------------------------------------------------------------
 
 const undoButton = document.querySelector('#undo');

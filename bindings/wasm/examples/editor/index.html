@@ -70,10 +70,12 @@
         </div>
       </div>
     </div>
-    <div class="container" style="flex: 2;">
-      <div id="editor" class="col"></div>
-      <div class="col container" style="flex-direction: column;">
-        <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
+    <!-- Draggable pane dividers-start -->
+    <div id="workbench" class="container workbench" style="flex: 2;">
+      <div id="editor" class="col pane-left"></div>
+      <div id="split-x" class="splitter splitter-x" aria-hidden="true"></div>
+      <div id="rightPane" class="col container pane-right" style="flex-direction: column;">
+        <model-viewer id="viewer" camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
           shadow-intensity="1" tone-mapping="neutral" interaction-prompt="none" alt="Editor 3D output">
           <div class="center" slot="poster">
             <p id="poster" style="text-align: center; line-height: 36px;"> Loading... </p>
@@ -83,6 +85,8 @@
             <input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="scrubber">
           </div>
         </model-viewer>
+        <div id="split-y" class="splitter splitter-y" aria-hidden="true"></div>
+        <!-- Draggable pane dividers-end -->
         <div id="console"></div>
       </div>
     </div>
