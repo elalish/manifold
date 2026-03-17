@@ -14,6 +14,8 @@
 
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
+import '@google/model-viewer';
+
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
@@ -28,13 +30,50 @@ const CODE_START = '<code>';
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  // Resolve against the current page URL so production asset paths don't
-  // redirect registration into /assets.
-  const serviceWorkerUrl = new URL('./service-worker.js', window.location.href);
-  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'})
-      .catch(error => {
-        console.error('Service worker registration failed:', error);
-      });
+  const params = new URLSearchParams(window.location.search);
+  const disableServiceWorker = params.has('no-sw');
+
+  if (window.caches) {
+    window.caches.keys().then(keys => {
+      keys.filter(
+              key => key.startsWith('manifoldCAD-cache-') &&
+                  key !== 'manifoldCAD-cache-v4')
+          .forEach(key => window.caches.delete(key));
+    });
+  }
+
+  if (disableServiceWorker) {
+    // Explicit escape hatch for debugging cache-related issues.
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      registrations.forEach(registration => registration.unregister());
+    });
+  } else {
+    // Resolve against the current page URL so production asset paths don't
+    // redirect registration into /assets.
+    const serviceWorkerUrl =
+        new URL('./service-worker.js', window.location.href);
+    navigator.serviceWorker
+        .register(serviceWorkerUrl, {scope: './', updateViaCache: 'none'})
+        .then(async registration => {
+          await navigator.serviceWorker.ready;
+          if (!navigator.serviceWorker.controller) {
+            const key = 'manifoldcad-sw-controller-refresh';
+            if (!window.sessionStorage.getItem(key)) {
+              // One-time marker for this tab to avoid a reload loop.
+              window.sessionStorage.setItem(key, '1');
+              window.location.reload();
+              return;
+            }
+          } else {
+            window.sessionStorage.removeItem(
+                'manifoldcad-sw-controller-refresh');
+          }
+          registration.update();
+        })
+        .catch(error => {
+          console.error('Service worker registration failed:', error);
+        });
+  }
 }
 
 let editor = undefined;
@@ -366,16 +405,24 @@ async function createEditor() {
 
   self.window.typecache = new LocalStorageCache();
 
-  // We inject manifold-3d typings locally above, so avoid extra CDN probes for
-  // that package path. This prevents noisy 404s in production logs.
+  // We inject manifold-3d typings locally above, and text-shaper publishes
+  // broken declaration re-exports to non-existent source files. Avoid CDN
+  // probes for those packages to keep refreshes quiet.
+  // This skip list only affects Monaco auto-typing CDN lookups, not runtime
+  // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
+  const skippedTypingPackages =
+      new Set(['manifold-3d', 'text-shaper', '@types/require']);
+  const shouldSkipTypingPackage = packageName => {
+    return skippedTypingPackages.has(packageName);
+  };
   const sourceResolver = {
     resolvePackageJson: async (packageName, version, subPath) => {
-      if (packageName === 'manifold-3d') return '';
+      if (shouldSkipTypingPackage(packageName)) return '';
       return jsDelivrResolver.resolvePackageJson(packageName, version, subPath);
     },
     resolveSourceFile: async (packageName, version, path) => {
-      if (packageName === 'manifold-3d') return '';
+      if (shouldSkipTypingPackage(packageName)) return '';
       return jsDelivrResolver.resolveSourceFile(packageName, version, path);
     }
   };
@@ -383,12 +430,19 @@ async function createEditor() {
   autoTypings = await AutoTypings.create(editor, {
     sourceResolver,
     sourceCache: self.window.typecache,
+    // Conservative limits: resolve shallow imports while avoiding deep fetch
+    // fan-out that adds noise and slows editor/offline workflows.
+    packageRecursionDepth: 1,
+    fileRecursionDepth: 2,
     onUpdate: update => {
       if (update.type === 'ResolveNewImports') {
         showTypeIndicator();
       }
     },
     onError: e => {
+      if (String(e?.message ?? e).includes('Not implemented yet')) {
+        return;
+      }
       console.error(e);
     }
   });
@@ -439,6 +493,8 @@ async function createEditor() {
   }
 
   editor.onDidChangeModelContent(e => {
+    const activeName = currentFileElement.textContent;
+
     // The user switched models.
     if (switching) {
       switching = false;
@@ -447,18 +503,18 @@ async function createEditor() {
       return;
     }
 
+    // monaco-editor-auto-typings loaded types.  Do nothing.
+    if (autoTypings.isResolving && e.changes.isFlush) {
+      return;
+    }
+
     // The user edited an example.
     // Copy it into a new script.
-    if (isExample && exampleFunctions.get(currentName) != editor.getValue()) {
+    if (isExample && exampleFunctions.get(activeName) != editor.getValue()) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
       runButton.disabled = false;
-      return;
-    }
-
-    // monaco-editor-auto-typings loaded types.  Do nothing.
-    if (autoTypings.isResolving && e.changes.isFlush) {
       return;
     }
 
@@ -593,8 +649,12 @@ function createWorker() {
       createWorker();
 
     } else if (message?.type === 'log') {
-      consoleElement.textContent += message.message + '\r\n';
-      consoleElement.scrollTop = consoleElement.scrollHeight;
+      const logMessage = String(message.message ?? '');
+      // Hide noisy per-module CDN fetch traces, keep other worker logs.
+      if (!logMessage.startsWith('Fetching http')) {
+        consoleElement.textContent += logMessage + '\r\n';
+        consoleElement.scrollTop = consoleElement.scrollHeight;
+      }
 
     } else if (message?.type === 'done') {
       setScript('safe', 'true');
