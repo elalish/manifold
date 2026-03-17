@@ -313,8 +313,6 @@ ManifoldCrossSection* manifold_cross_section_transform(void* mem,
                                                        double x1, double y1,
                                                        double x2, double y2,
                                                        double x3, double y3);
-ManifoldCrossSection* manifold_cross_section_warp(
-    void* mem, ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double));
 ManifoldCrossSection* manifold_cross_section_warp_context(
     void* mem, ManifoldCrossSection* cs,
     ManifoldVec2 (*fun)(double, double, void*), void* ctx);

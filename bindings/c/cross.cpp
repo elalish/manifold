@@ -181,7 +181,7 @@ ManifoldCrossSection* manifold_cross_section_transform(void* mem,
   return to_c(new (mem) CrossSection(transformed));
 }
 
-ManifoldCrossSection* manifold_cross_section_warp(
+ManifoldCrossSection* manifold_cross_section_warp_context(
     void* mem, ManifoldCrossSection* cs,
     ManifoldVec2 (*fun)(double, double, void*), void* ctx) {
   // Bind function with context argument to one without
