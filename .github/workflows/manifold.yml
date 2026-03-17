@@ -89,9 +89,9 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
-        ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
+        ./manifold_test.exe -e --gtest_filter=Boolean.Cubes:Boolean.Coplanar
         mkdir -p ../../../meshes-windows
-        cp nastyGear.obj coplanar.obj ../../../meshes-windows/
+        cp cubes.obj coplanar.obj ../../../meshes-windows/
     - name: Upload determinism meshes (Windows)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
       uses: actions/upload-artifact@v4
@@ -163,9 +163,9 @@ jobs:
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       run: |
-        ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
+        ./build/test/manifold_test -e --gtest_filter=Boolean.Cubes:Boolean.Coplanar
         mkdir -p meshes-linux
-        cp nastyGear.obj coplanar.obj meshes-linux/
+        cp cubes.obj coplanar.obj meshes-linux/
     - name: Upload determinism meshes (Linux)
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       uses: actions/upload-artifact@v4
@@ -455,9 +455,9 @@ jobs:
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       run: |
-        build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
+        build/test/manifold_test -e --gtest_filter=Boolean.Cubes:Boolean.Coplanar
         mkdir -p meshes-mac
-        cp nastyGear.obj coplanar.obj meshes-mac/
+        cp cubes.obj coplanar.obj meshes-mac/
     - name: Upload determinism meshes (macOS)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
@@ -552,21 +552,33 @@ jobs:
         path: meshes/windows
     - name: Compare meshes across platforms
       run: |
-        echo "=== SHA256 hashes ==="
-        for f in nastyGear.obj coplanar.obj; do
-          echo "--- $f ---"
-          sha256sum meshes/linux/$f meshes/mac/$f meshes/windows/$f
-        done
-
+        set -euo pipefail
         failed=0
-        for f in nastyGear.obj coplanar.obj; do
+        for f in cubes.obj coplanar.obj; do
+          echo "--- $f ---"
+          file_missing=0
+          for os in linux mac windows; do
+            if [ ! -f "meshes/$os/$f" ]; then
+              echo "Missing file: meshes/$os/$f"
+              failed=1
+              file_missing=1
+            fi
+          done
+          if [ "$file_missing" -ne 0 ]; then
+            continue
+          fi
           linux_hash=$(sha256sum meshes/linux/$f | awk '{print $1}')
           mac_hash=$(sha256sum meshes/mac/$f | awk '{print $1}')
           win_hash=$(sha256sum meshes/windows/$f | awk '{print $1}')
+          echo "linux:   $linux_hash"
+          echo "mac:     $mac_hash"
+          echo "windows: $win_hash"
           if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
             echo "MISMATCH in $f"
-            diff meshes/linux/$f meshes/mac/$f || true
-            diff meshes/linux/$f meshes/windows/$f || true
+            echo "linux vs mac diff:"
+            diff meshes/linux/$f meshes/mac/$f | sed -n '1,200p' || true
+            echo "linux vs windows diff:"
+            diff meshes/linux/$f meshes/windows/$f | sed -n '1,200p' || true
             failed=1
           fi
         done
