@@ -50,9 +50,8 @@ if (navigator.serviceWorker) {
   } else {
     // Resolve against the current page URL so production asset paths don't
     // redirect registration into /assets.
-    // v=4 is only a URL cache-bust for the worker script fetch path.
     const serviceWorkerUrl =
-        new URL('./service-worker.js?v=4', window.location.href);
+        new URL('./service-worker.js', window.location.href);
     navigator.serviceWorker
         .register(serviceWorkerUrl, {scope: './', updateViaCache: 'none'})
         .then(async registration => {
@@ -410,13 +409,12 @@ async function createEditor() {
   // broken declaration re-exports to non-existent source files. Avoid CDN
   // probes for those packages to keep refreshes quiet.
   // This skip list only affects Monaco auto-typing CDN lookups, not runtime
-  // imports; scoped @thi.ng entries are included to suppress noisy probes.
+  // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
   const skippedTypingPackages =
       new Set(['manifold-3d', 'text-shaper', '@types/require']);
   const shouldSkipTypingPackage = packageName => {
-    return skippedTypingPackages.has(packageName) ||
-        packageName.startsWith('@thi.ng/');
+    return skippedTypingPackages.has(packageName);
   };
   const sourceResolver = {
     resolvePackageJson: async (packageName, version, subPath) => {
