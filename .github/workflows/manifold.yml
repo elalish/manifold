@@ -33,7 +33,7 @@ jobs:
       with:
         name: tbb
         url: https://github.com/oneapi-src/oneTBB.git
-        rev: f1862f38f83568d96e814e469ab61f88336cc595
+        tag: v2022.3.0
     - &clone-clipper2
       uses: ./.github/actions/git-clone
       with:
@@ -45,7 +45,13 @@ jobs:
       with:
         name: nanobind
         url: https://github.com/wjakob/nanobind.git
-        rev: 2a61ad2494d09fecb2e13322c1383342c299900d
+        tag: v2.12.0
+    - &clone-gtest
+      uses: ./.github/actions/git-clone
+      with:
+        name: gtest
+        url: https://github.com/google/googletest.git
+        rev: v1.17.0
     - uses: ilammy/msvc-dev-cmd@v1
 
     - name: Build ${{matrix.parallelization}}
@@ -62,6 +68,7 @@ jobs:
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
+          -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
           -A x64 -B build
         cmake --build build --target ALL_BUILD --config Release
     - name: Test dll location
@@ -211,7 +218,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v6
       with:
-        node-version: 24
+        node-version: 25
         cache: 'npm'
         cache-dependency-path: bindings/**/package-lock.json
     - name: Install apt packages
@@ -225,6 +232,7 @@ jobs:
         version: 5.0.2
     - *clone-tbb
     - *clone-clipper2
+    - *clone-gtest
     - name: Build WASM ${{matrix.parallelization}}
       run: |
         emcmake cmake \
@@ -236,6 +244,7 @@ jobs:
           -DMANIFOLD_ASSERT=${{matrix.debug}} \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
           . -B build
         cd build
         emmake make

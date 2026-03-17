@@ -6,7 +6,9 @@ inputs:
   url:
     required: true
   rev:
-    required: true
+    default: ''
+  tag:
+    default: ''
 
 runs:
   using: "composite"
@@ -16,10 +18,10 @@ runs:
       uses: actions/cache@v5
       with:
         path: ${{inputs.name}}
-        key: ${{inputs.url}}@${{inputs.rev}}
+        key: ${{inputs.url}}@${{inputs.rev}}${{inputs.tag}}
 
-    - name: download
-      if: steps.cache.outputs.cache-hit != 'true'
+    - name: download rev
+      if: steps.cache.outputs.cache-hit != 'true' && inputs.rev != ''
       shell: bash
       run: |
         mkdir ${{inputs.name}}
@@ -28,4 +30,12 @@ runs:
         git remote add origin ${{inputs.url}}
         git fetch --depth 1 origin ${{inputs.rev}}
         git checkout ${{inputs.rev}}
+        git submodule update --init --recursive
+
+    - name: download tag
+      if: steps.cache.outputs.cache-hit != 'true' && inputs.tag != ''
+      shell: bash
+      run: |
+        git clone --branch ${{inputs.tag}} --depth 1 ${{inputs.url}} ${{inputs.name}}
+        cd ${{inputs.name}}
         git submodule update --init --recursive
