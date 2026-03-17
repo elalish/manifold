@@ -89,7 +89,7 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
-        ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
         mkdir -p ../../../meshes-windows
         cp nastyGear.obj coplanar.obj ../../../meshes-windows/
     - name: Upload determinism meshes (Windows)
@@ -163,7 +163,7 @@ jobs:
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       run: |
-        ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
         mkdir -p meshes-linux
         cp nastyGear.obj coplanar.obj meshes-linux/
     - name: Upload determinism meshes (Linux)
@@ -455,7 +455,7 @@ jobs:
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       run: |
-        build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+        build/test/manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
         mkdir -p meshes-mac
         cp nastyGear.obj coplanar.obj meshes-mac/
     - name: Upload determinism meshes (macOS)
@@ -571,4 +571,3 @@ jobs:
           fi
         done
         exit $failed
-
