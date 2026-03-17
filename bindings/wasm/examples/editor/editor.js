@@ -50,6 +50,7 @@ if (navigator.serviceWorker) {
   } else {
     // Resolve against the current page URL so production asset paths don't
     // redirect registration into /assets.
+    // v=4 is only a URL cache-bust for the worker script fetch path.
     const serviceWorkerUrl =
         new URL('./service-worker.js?v=4', window.location.href);
     navigator.serviceWorker
@@ -59,6 +60,7 @@ if (navigator.serviceWorker) {
           if (!navigator.serviceWorker.controller) {
             const key = 'manifoldcad-sw-controller-refresh';
             if (!window.sessionStorage.getItem(key)) {
+              // One-time marker for this tab to avoid a reload loop.
               window.sessionStorage.setItem(key, '1');
               window.location.reload();
               return;
@@ -407,6 +409,8 @@ async function createEditor() {
   // We inject manifold-3d typings locally above, and text-shaper publishes
   // broken declaration re-exports to non-existent source files. Avoid CDN
   // probes for those packages to keep refreshes quiet.
+  // This skip list only affects Monaco auto-typing CDN lookups, not runtime
+  // imports; scoped @thi.ng entries are included to suppress noisy probes.
   const jsDelivrResolver = new JsDelivrSourceResolver();
   const skippedTypingPackages =
       new Set(['manifold-3d', 'text-shaper', '@types/require']);
@@ -428,6 +432,8 @@ async function createEditor() {
   autoTypings = await AutoTypings.create(editor, {
     sourceResolver,
     sourceCache: self.window.typecache,
+    // Conservative limits: resolve shallow imports while avoiding deep fetch
+    // fan-out that adds noise and slows editor/offline workflows.
     packageRecursionDepth: 1,
     fileRecursionDepth: 2,
     onUpdate: update => {
