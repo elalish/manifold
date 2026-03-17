@@ -37,7 +37,7 @@ jobs:
       - name: Export meshes
         run: |
           cd build/test
-          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -70,7 +70,7 @@ jobs:
       - name: Export meshes
         run: |
           cd build/test
-          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+          ./manifold_test -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -106,7 +106,7 @@ jobs:
         run: |
           cp ./build/lib/Release/* ./build/bin/Release
           cd build/bin/Release
-          ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.MultiCoplanar
+          ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3:Boolean.Coplanar
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -137,10 +137,19 @@ jobs:
           path: meshes/windows
       - name: Compare
         run: |
-          set -e
+          set -euo pipefail
           failed=0
           for file in nastyGear.obj coplanar.obj; do
             echo "--- $file ---"
+            for os in linux mac windows; do
+              if [ ! -f "meshes/$os/$file" ]; then
+                echo "Missing file: meshes/$os/$file"
+                failed=1
+              fi
+            done
+            if [ "$failed" -ne 0 ]; then
+              continue
+            fi
             h_linux=$(sha256sum meshes/linux/$file | awk '{print $1}')
             h_mac=$(sha256sum meshes/mac/$file | awk '{print $1}')
             h_windows=$(sha256sum meshes/windows/$file | awk '{print $1}')
@@ -150,9 +159,9 @@ jobs:
             if [ "$h_linux" != "$h_mac" ] || [ "$h_linux" != "$h_windows" ]; then
               echo "MISMATCH detected in $file"
               echo "linux vs mac diff:"
-              diff meshes/linux/$file meshes/mac/$file || true
+              diff meshes/linux/$file meshes/mac/$file | sed -n '1,200p' || true
               echo "linux vs windows diff:"
-              diff meshes/linux/$file meshes/windows/$file || true
+              diff meshes/linux/$file meshes/windows/$file | sed -n '1,200p' || true
               failed=1
             else
               echo "OK: all platforms match"
