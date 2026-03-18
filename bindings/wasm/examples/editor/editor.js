@@ -80,6 +80,11 @@ let editor = undefined;
 
 // Pane resizing - draggable pane dividers ---------------------
 
+const LEFT_PANE_MIN_PERCENT = 20;
+const LEFT_PANE_MAX_PERCENT = 80;
+const VIEWER_PANE_MIN_PERCENT = 35;
+const VIEWER_PANE_MAX_PERCENT = 90;
+
 // Keep percentages within practical bounds so panes stay usable.
 function clampToRange(value, minValue, maxValue) {
   return Math.min(maxValue, Math.max(minValue, value));
@@ -125,14 +130,16 @@ function setupPaneSplitters() {
   // Restore saved pane percentages on refresh when they are valid numbers.
   const savedLeftPane = Number(window.localStorage.getItem(leftPaneStorageKey));
   if (Number.isFinite(savedLeftPane)) {
-    const clampedLeftPanePercent = clampToRange(savedLeftPane, 20, 80);
+    const clampedLeftPanePercent = clampToRange(
+        savedLeftPane, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
   }
 
   const savedViewerPane =
       Number(window.localStorage.getItem(viewerPaneStorageKey));
   if (Number.isFinite(savedViewerPane)) {
-    const clampedViewerPanePercent = clampToRange(savedViewerPane, 35, 90);
+    const clampedViewerPanePercent = clampToRange(
+        savedViewerPane, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
     pageElement.style.setProperty(
         '--viewer-pane', `${clampedViewerPanePercent}%`);
   }
@@ -143,7 +150,8 @@ function setupPaneSplitters() {
     const leftPanePercent =
         ((moveEvent.clientX - workbenchBounds.left) / workbenchBounds.width) *
         100;
-    const clampedLeftPanePercent = clampToRange(leftPanePercent, 20, 80);
+    const clampedLeftPanePercent = clampToRange(
+        leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
     window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
 
@@ -158,7 +166,8 @@ function setupPaneSplitters() {
     const viewerPanePercent =
         ((moveEvent.clientY - rightPaneBounds.top) / rightPaneBounds.height) *
         100;
-    const clampedViewerPanePercent = clampToRange(viewerPanePercent, 35, 90);
+    const clampedViewerPanePercent = clampToRange(
+        viewerPanePercent, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
     pageElement.style.setProperty(
         '--viewer-pane', `${clampedViewerPanePercent}%`);
     window.localStorage.setItem(viewerPaneStorageKey, clampedViewerPanePercent);
