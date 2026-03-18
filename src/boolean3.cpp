@@ -14,7 +14,14 @@
 
 #include "boolean3.h"
 
+#include <atomic>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <limits>
+#include <sstream>
 #include <unordered_set>
 
 #include "disjoint_sets.h"
@@ -27,6 +34,71 @@
 using namespace manifold;
 
 namespace {
+
+bool BooleanDumpEnabled() {
+  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP");
+  if (v == nullptr) return false;
+  return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
+         std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
+         std::strcmp(v, "ON") == 0;
+}
+
+std::filesystem::path BooleanDumpDir() {
+  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR");
+  if (v == nullptr || *v == '\0') return ".";
+  return v;
+}
+
+const char* OpName(const OpType op) {
+  switch (op) {
+    case OpType::Add:
+      return "add";
+    case OpType::Subtract:
+      return "subtract";
+    case OpType::Intersect:
+      return "intersect";
+  }
+  return "unknown";
+}
+
+std::atomic<uint64_t> gBoolean3DumpCounter{0};
+
+void DumpBoolean3State(const char* stage, const OpType op,
+                       const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                       const size_t x12, const size_t x21, const size_t w03,
+                       const size_t w30, const bool valid) {
+  if (!BooleanDumpEnabled()) return;
+
+  const auto id = gBoolean3DumpCounter.fetch_add(1);
+  std::ostringstream prefix;
+  prefix << "boolean3_" << std::setw(6) << std::setfill('0') << id << "_"
+         << stage << "_" << OpName(op);
+
+  std::error_code ec;
+  const auto dir = BooleanDumpDir();
+  std::filesystem::create_directories(dir, ec);
+
+  {
+    std::ofstream out(dir / (prefix.str() + "_inP.obj"));
+    if (out.good()) out << inP;
+  }
+  {
+    std::ofstream out(dir / (prefix.str() + "_inQ.obj"));
+    if (out.good()) out << inQ;
+  }
+  {
+    std::ofstream out(dir / (prefix.str() + "_meta.txt"));
+    if (out.good()) {
+      out << "stage=" << stage << "\n";
+      out << "op=" << OpName(op) << "\n";
+      out << "valid=" << (valid ? 1 : 0) << "\n";
+      out << "xv12_size=" << x12 << "\n";
+      out << "xv21_size=" << x21 << "\n";
+      out << "w03_size=" << w03 << "\n";
+      out << "w30_size=" << w30 << "\n";
+    }
+  }
+}
 
 // These two functions (Interpolate and Intersect) are the only places where
 // floating-point operations take place in the whole Boolean function. These
@@ -495,6 +567,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
+    DumpBoolean3State("early_out", op, inP_, inQ_, xv12_.x12.size(),
+                      xv21_.x12.size(), w03_.size(), w30_.size(), valid);
     return;
   }
 
@@ -512,6 +586,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
+    DumpBoolean3State("too_large", op, inP_, inQ_, xv12_.x12.size(),
+                      xv21_.x12.size(), w03_.size(), w30_.size(), valid);
     return;
   }
 
@@ -519,6 +595,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Vertices on the same connected component have the same winding number
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
+  DumpBoolean3State("post_winding", op, inP_, inQ_, xv12_.x12.size(),
+                    xv21_.x12.size(), w03_.size(), w30_.size(), valid);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
