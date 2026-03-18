@@ -130,6 +130,45 @@ TEST(Boolean, Cubes) {
   if (options.exportModels) WriteTestOBJ("cubes.obj", result);
 }
 
+TEST(Boolean, DeterminismSimpleSubtract) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a - b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_subtract.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleUnion) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a + b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 1.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_union.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleIntersect) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a ^ b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_intersect.obj", out);
+}
+
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
