@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/utils.h"
+#include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -81,6 +82,15 @@ TEST(Boolean, Normals) {
   Manifold roundTrip(output);
 
   RelatedGL(roundTrip, {cubeGL, sphereGL}, true, false);
+}
+
+TEST(Boolean, MissingNormals) {
+  const Manifold noNormals = Manifold::Cube(vec3(1), true);
+  const Manifold hasNormals =
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+  Manifold result(combo);
+  EXPECT_FALSE(result.IsEmpty());
 }
 
 TEST(Boolean, EmptyOriginal) {

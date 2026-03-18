@@ -542,7 +542,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + 3 + normalIdx + i];
           }
-          normal = la::normalize(runNormalTransform[run] * normal);
+          normal = SafeNormalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
             out.vertProperties[start + 3 + normalIdx + i] = normal[i];
           }
