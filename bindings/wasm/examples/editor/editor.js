@@ -442,6 +442,22 @@ async function createEditor() {
     language: 'typescript',
     automaticLayout: true,
     minimap: {enabled: false},
+
+
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----start----:
+
+    // make text wrap to the next line when it exceeds the width of the editor:
+    wordWrap: 'on',
+
+    // remove horizontal scrollbar:
+    scrollbar: {
+      horizontal: 'hidden',
+    },
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----end-------.
+
+
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
