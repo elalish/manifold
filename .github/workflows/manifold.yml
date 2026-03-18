@@ -561,6 +561,7 @@ jobs:
         set -euo pipefail
         failed=0
         normalized_dir="$(mktemp -d)"
+        canonical_dir="$(mktemp -d)"
         for f in det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj; do
           echo "--- $f ---"
           file_missing=0
@@ -576,19 +577,23 @@ jobs:
           fi
           for os in linux mac windows; do
             tr -d '\r' < "meshes/$os/$f" > "$normalized_dir/$os-$f"
+            # Canonicalize hex-float spellings across toolchains:
+            # 0x1.0000000000000p-1 -> 0x1p-1
+            perl -pe 's/([0-9A-Fa-f])\.0+p([+-]?[0-9]+)/$1p$2/g' \
+              "$normalized_dir/$os-$f" > "$canonical_dir/$os-$f"
           done
-          linux_hash=$(sha256sum "$normalized_dir/linux-$f" | awk '{print $1}')
-          mac_hash=$(sha256sum "$normalized_dir/mac-$f" | awk '{print $1}')
-          win_hash=$(sha256sum "$normalized_dir/windows-$f" | awk '{print $1}')
+          linux_hash=$(sha256sum "$canonical_dir/linux-$f" | awk '{print $1}')
+          mac_hash=$(sha256sum "$canonical_dir/mac-$f" | awk '{print $1}')
+          win_hash=$(sha256sum "$canonical_dir/windows-$f" | awk '{print $1}')
           echo "linux:   $linux_hash"
           echo "mac:     $mac_hash"
           echo "windows: $win_hash"
           if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
             echo "MISMATCH in $f"
             echo "linux vs mac diff:"
-            diff "$normalized_dir/linux-$f" "$normalized_dir/mac-$f" | sed -n '1,200p' || true
+            diff "$canonical_dir/linux-$f" "$canonical_dir/mac-$f" | sed -n '1,200p' || true
             echo "linux vs windows diff:"
-            diff "$normalized_dir/linux-$f" "$normalized_dir/windows-$f" | sed -n '1,200p' || true
+            diff "$canonical_dir/linux-$f" "$canonical_dir/windows-$f" | sed -n '1,200p' || true
             failed=1
           fi
         done
