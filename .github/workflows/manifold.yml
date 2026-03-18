@@ -554,6 +554,7 @@ jobs:
       run: |
         set -euo pipefail
         failed=0
+        normalized_dir="$(mktemp -d)"
         for f in det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj; do
           echo "--- $f ---"
           file_missing=0
@@ -567,18 +568,21 @@ jobs:
           if [ "$file_missing" -ne 0 ]; then
             continue
           fi
-          linux_hash=$(sha256sum meshes/linux/$f | awk '{print $1}')
-          mac_hash=$(sha256sum meshes/mac/$f | awk '{print $1}')
-          win_hash=$(sha256sum meshes/windows/$f | awk '{print $1}')
+          for os in linux mac windows; do
+            tr -d '\r' < "meshes/$os/$f" > "$normalized_dir/$os-$f"
+          done
+          linux_hash=$(sha256sum "$normalized_dir/linux-$f" | awk '{print $1}')
+          mac_hash=$(sha256sum "$normalized_dir/mac-$f" | awk '{print $1}')
+          win_hash=$(sha256sum "$normalized_dir/windows-$f" | awk '{print $1}')
           echo "linux:   $linux_hash"
           echo "mac:     $mac_hash"
           echo "windows: $win_hash"
           if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
             echo "MISMATCH in $f"
             echo "linux vs mac diff:"
-            diff meshes/linux/$f meshes/mac/$f | sed -n '1,200p' || true
+            diff "$normalized_dir/linux-$f" "$normalized_dir/mac-$f" | sed -n '1,200p' || true
             echo "linux vs windows diff:"
-            diff meshes/linux/$f meshes/windows/$f | sed -n '1,200p' || true
+            diff "$normalized_dir/linux-$f" "$normalized_dir/windows-$f" | sed -n '1,200p' || true
             failed=1
           fi
         done
