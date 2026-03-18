@@ -91,8 +91,8 @@ void DumpBooleanResultState(const char* stage, const OpType op,
 
   const auto id = gBooleanResultDumpCounter.fetch_add(1);
   std::ostringstream prefix;
-  prefix << "boolean_result_" << std::setw(6) << std::setfill('0') << id
-         << "_" << stage << "_" << OpName(op);
+  prefix << "boolean_result_" << std::setw(6) << std::setfill('0') << id << "_"
+         << stage << "_" << OpName(op);
 
   std::error_code ec;
   const auto dir = BooleanDumpDir();
@@ -970,8 +970,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
-  DumpBooleanResultState("final", op, inP_, inQ_, &outR, i03.size(),
-                         i30.size(), i12.size(), i21.size());
+  DumpBooleanResultState("final", op, inP_, inQ_, &outR, i03.size(), i30.size(),
+                         i12.size(), i21.size());
   return outR;
 }
 
