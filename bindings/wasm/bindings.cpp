@@ -15,6 +15,8 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <vector>
+
 #include "helpers.cpp"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
