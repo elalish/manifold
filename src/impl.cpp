@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <map>
@@ -790,9 +791,25 @@ void Manifold::Impl::IncrementMeshIDs() {
 static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
                                          const MeshGL64& mesh,
                                          std::optional<double> epsilon) {
+  auto useHexFloat = []() {
+    const char* v = std::getenv("MANIFOLD_OBJ_HEX_FLOAT");
+    if (v == nullptr) return false;
+    return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
+           std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
+           std::strcmp(v, "ON") == 0;
+  };
+  const bool hexFloat = useHexFloat();
+
   stream << std::setprecision(19);  // for double precision
-  stream << std::fixed;             // for uniformity in output numbers
+  if (hexFloat) {
+    // Optional deterministic debug format: exact hexadecimal floating-point.
+    stream << std::hexfloat;
+  } else {
+    stream << std::fixed;  // for uniformity in output numbers
+  }
   stream << "# ======= begin mesh ======" << std::endl;
+  stream << "# float_format = " << (hexFloat ? "hexfloat" : "fixed")
+         << std::endl;
   stream << "# tolerance = " << mesh.tolerance << std::endl;
   if (epsilon.has_value())
     stream << "# epsilon = " << epsilon.value() << std::endl;

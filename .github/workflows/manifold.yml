@@ -86,6 +86,8 @@ jobs:
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
       shell: bash
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
@@ -162,6 +164,8 @@ jobs:
         python3 -m pytest
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
         ./build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect
         mkdir -p meshes-linux
@@ -454,6 +458,8 @@ jobs:
         build/test/manifold_test
     - name: Export determinism meshes
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
         build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect
         mkdir -p meshes-mac
