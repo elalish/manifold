@@ -40,6 +40,10 @@ inline mat3 NormalTransform(const mat3x4& transform) {
   return la::inverse(la::transpose(mat3(transform)));
 }
 
+inline mat3 InverseNormalTransform(const mat3x4& transform) {
+  return la::inverse(la::transpose(la::inverse(mat3(transform))));
+}
+
 /**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.

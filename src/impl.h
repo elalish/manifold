@@ -29,6 +29,14 @@ struct Manifold::Impl {
     int originalID = -1;
     mat3x4 transform = la::identity;
     bool backSide = false;
+
+    mat3 GetNormalTransform() const {
+      return NormalTransform(transform) * (backSide ? -1.0 : 1.0);
+    }
+
+    mat3 GetInverseNormalTransform() const {
+      return InverseNormalTransform(transform) * (backSide ? -1.0 : 1.0);
+    }
   };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
@@ -454,10 +462,10 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
     if (updateNormals) {
-      runNormalTransform.push_back(NormalTransform(rel.transform) *
-                                   (rel.backSide ? -1.0 : 1.0));
+      runNormalTransform.push_back(rel.GetNormalTransform());
     }
-    if (!isOriginal) {
+    // clear transforms if applying them to normals
+    if (!isOriginal && !updateNormals) {
       for (const int col : {0, 1, 2, 3}) {
         for (const int row : {0, 1, 2}) {
           out.runTransform.push_back(rel.transform[col][row]);
