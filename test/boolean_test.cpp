@@ -415,9 +415,8 @@ TEST(Boolean, Perturb3) {
   // small prefixes before the full 16-shape reduction.
   Manifold gear3Seq = outerCubes[0] + outerCubes[1];
   gear3Seq = gear3Seq + outerCubes[2];
-  Manifold gear3Batch =
-      Manifold::BatchBoolean({outerCubes[0], outerCubes[1], outerCubes[2]},
-                             OpType::Add);
+  Manifold gear3Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2]}, OpType::Add);
   if (options.exportModels) {
     WriteTestOBJ("perturb3_gear3_seq.obj", gear3Seq);
     WriteTestOBJ("perturb3_gear3_batch.obj", gear3Batch);

@@ -756,6 +756,9 @@ jobs:
 
         # Discovery lane is intentionally non-blocking.
         exit 0
+    - name: Compare discovery boolean debug dumps
+      run: |
+        bash ./scripts/compare_boolean_dumps.sh boolean-dumps
     - name: Upload discovery debug dumps bundle
       if: always()
       uses: actions/upload-artifact@v4
