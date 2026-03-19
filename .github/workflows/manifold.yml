@@ -105,6 +105,8 @@ jobs:
       shell: bash
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: ../../../boolean-dumps-perturb3-windows
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
@@ -117,6 +119,12 @@ jobs:
       with:
         name: meshes-perturb3-windows
         path: meshes-perturb3-windows/
+    - name: Upload determinism discovery debug dumps (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-windows
+        path: boolean-dumps-perturb3-windows/
 
   build:
     name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
@@ -197,6 +205,8 @@ jobs:
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: boolean-dumps-perturb3-linux
       run: |
         ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3
         mkdir -p meshes-perturb3-linux
@@ -207,6 +217,12 @@ jobs:
       with:
         name: meshes-perturb3-linux
         path: meshes-perturb3-linux/
+    - name: Upload determinism discovery debug dumps (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-linux
+        path: boolean-dumps-perturb3-linux/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -505,6 +521,8 @@ jobs:
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: boolean-dumps-perturb3-mac
       run: |
         build/test/manifold_test -e --gtest_filter=Boolean.Perturb3
         mkdir -p meshes-perturb3-mac
@@ -515,6 +533,12 @@ jobs:
       with:
         name: meshes-perturb3-mac
         path: meshes-perturb3-mac/
+    - name: Upload determinism discovery debug dumps (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-mac
+        path: boolean-dumps-perturb3-mac/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -660,6 +684,21 @@ jobs:
       with:
         name: meshes-perturb3-windows
         path: meshes/windows
+    - name: Download Linux discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-linux
+        path: boolean-dumps/linux
+    - name: Download macOS discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-mac
+        path: boolean-dumps/mac
+    - name: Download Windows discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-windows
+        path: boolean-dumps/windows
     - name: Compare discovery meshes across platforms
       run: |
         set -euo pipefail
@@ -717,3 +756,12 @@ jobs:
 
         # Discovery lane is intentionally non-blocking.
         exit 0
+    - name: Upload discovery debug dumps bundle
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3
+        path: |
+          boolean-dumps/linux/
+          boolean-dumps/mac/
+          boolean-dumps/windows/
