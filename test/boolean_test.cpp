@@ -412,6 +412,16 @@ TEST(Boolean, Perturb3) {
     outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
 
+  // Binary-tree probes for the first 4 shapes.
+  Manifold pair01 = outerCubes[0] + outerCubes[1];
+  Manifold pair23 = outerCubes[2] + outerCubes[3];
+  Manifold gear4BalancedSeq = pair01 + pair23;
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_pair01.obj", pair01);
+    WriteTestOBJ("perturb3_pair23.obj", pair23);
+    WriteTestOBJ("perturb3_gear4_balanced_seq.obj", gear4BalancedSeq);
+  }
+
   // small prefixes before the full 16-shape reduction.
   Manifold gear3Seq = outerCubes[0] + outerCubes[1];
   gear3Seq = gear3Seq + outerCubes[2];
