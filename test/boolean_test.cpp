@@ -411,6 +411,27 @@ TEST(Boolean, Perturb3) {
   for (int i = 0; i < N; i++) {
     outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
+
+  // small prefixes before the full 16-shape reduction.
+  Manifold gear3Seq = outerCubes[0] + outerCubes[1];
+  gear3Seq = gear3Seq + outerCubes[2];
+  Manifold gear3Batch =
+      Manifold::BatchBoolean({outerCubes[0], outerCubes[1], outerCubes[2]},
+                             OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear3_seq.obj", gear3Seq);
+    WriteTestOBJ("perturb3_gear3_batch.obj", gear3Batch);
+  }
+
+  Manifold gear4Seq = gear3Seq + outerCubes[3];
+  Manifold gear4Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2], outerCubes[3]},
+      OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear4_seq.obj", gear4Seq);
+    WriteTestOBJ("perturb3_gear4_batch.obj", gear4Batch);
+  }
+
   Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
   if (options.exportModels) WriteTestOBJ("perturb3_gear.obj", gear);
   Manifold outerGear = gear.Scale({2, 2, 1});
