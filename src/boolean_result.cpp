@@ -81,12 +81,18 @@ const char* OpName(const OpType op) {
 
 std::atomic<uint64_t> gBooleanResultDumpCounter{0};
 
+void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
+  std::ofstream out(path);
+  if (!out.good()) return;
+  for (const int value : data) out << value << "\n";
+}
+
 void DumpBooleanResultState(const char* stage, const OpType op,
                             const Manifold::Impl& inP,
                             const Manifold::Impl& inQ,
-                            const Manifold::Impl* outR, const size_t i03,
-                            const size_t i30, const size_t i12,
-                            const size_t i21) {
+                            const Manifold::Impl* outR, const Vec<int>& i03,
+                            const Vec<int>& i30, const Vec<int>& i12,
+                            const Vec<int>& i21) {
   if (!BooleanDumpEnabled()) return;
 
   const auto id = gBooleanResultDumpCounter.fetch_add(1);
@@ -115,16 +121,20 @@ void DumpBooleanResultState(const char* stage, const OpType op,
     if (out.good()) {
       out << "stage=" << stage << "\n";
       out << "op=" << OpName(op) << "\n";
-      out << "i03_size=" << i03 << "\n";
-      out << "i30_size=" << i30 << "\n";
-      out << "i12_size=" << i12 << "\n";
-      out << "i21_size=" << i21 << "\n";
+      out << "i03_size=" << i03.size() << "\n";
+      out << "i30_size=" << i30.size() << "\n";
+      out << "i12_size=" << i12.size() << "\n";
+      out << "i21_size=" << i21.size() << "\n";
       if (outR != nullptr) {
         out << "out_num_vert=" << outR->NumVert() << "\n";
         out << "out_num_tri=" << outR->NumTri() << "\n";
       }
     }
   }
+  DumpIntVector(dir / (prefix.str() + "_i03.txt"), i03);
+  DumpIntVector(dir / (prefix.str() + "_i30.txt"), i30);
+  DumpIntVector(dir / (prefix.str() + "_i12.txt"), i12);
+  DumpIntVector(dir / (prefix.str() + "_i21.txt"), i21);
 }
 
 struct AbsSum {
@@ -792,8 +802,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
             [c1, c3](int v) { return c1 + c3 * v; });
   transform(w30_.begin(), w30_.end(), i30.begin(),
             [c2, c3](int v) { return c2 + c3 * v; });
-  DumpBooleanResultState("inclusion", op, inP_, inQ_, nullptr, i03.size(),
-                         i30.size(), i12.size(), i21.size());
+  DumpBooleanResultState("inclusion", op, inP_, inQ_, nullptr, i03, i30, i12,
+                         i21);
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
@@ -823,9 +833,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Manifold::Impl outR;
 
   if (numVertR == 0) {
-    DumpBooleanResultState("empty", op, inP_, inQ_, &outR, i03.size(),
-                           i30.size(), i12.size(), i21.size());
+    DumpBooleanResultState("empty", op, inP_, inQ_, &outR, i03, i30, i12, i21);
     return outR;
+  }
+
+  const bool doDump = BooleanDumpEnabled();
+  Vec<int> dumpI03, dumpI30, dumpI12, dumpI21;
+  if (doDump) {
+    dumpI03 = i03;
+    dumpI30 = i30;
+    dumpI12 = i12;
+    dumpI21 = i21;
   }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
@@ -970,8 +988,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
-  DumpBooleanResultState("final", op, inP_, inQ_, &outR, i03.size(), i30.size(),
-                         i12.size(), i21.size());
+  DumpBooleanResultState("final", op, inP_, inQ_, &outR,
+                         doDump ? dumpI03 : i03, doDump ? dumpI30 : i30,
+                         doDump ? dumpI12 : i12, doDump ? dumpI21 : i21);
   return outR;
 }
 

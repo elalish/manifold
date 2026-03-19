@@ -401,14 +401,20 @@ TEST(Boolean, Perturb3) {
   const int N = 16;  // Number of rotations for the gear pattern
   const double alpha = 90.0 / N;
 
+  // First decomposition step: a single union operation from the same setup.
+  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  const Manifold pairUnion = cube + cube.Rotate(0, 0, alpha);
+  if (options.exportModels) WriteTestOBJ("perturb3_pair_union.obj", pairUnion);
+
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
-  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
   for (int i = 0; i < N; i++) {
     outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
   Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  if (options.exportModels) WriteTestOBJ("perturb3_gear.obj", gear);
   Manifold outerGear = gear.Scale({2, 2, 1});
+  if (options.exportModels) WriteTestOBJ("perturb3_outerGear.obj", outerGear);
 
   // Subtract inner from outer to create the nasty gear with slivers
   Manifold nastyGear = outerGear - gear;
@@ -425,7 +431,10 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
-  if (options.exportModels) WriteTestOBJ("nastyGear.obj", nastyGear);
+  if (options.exportModels) {
+    WriteTestOBJ("nastyGear.obj", nastyGear);
+    WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
+  }
 }
 
 TEST(Boolean, Coplanar) {

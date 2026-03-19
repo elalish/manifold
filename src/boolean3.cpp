@@ -15,6 +15,7 @@
 #include "boolean3.h"
 
 #include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -63,10 +64,39 @@ const char* OpName(const OpType op) {
 
 std::atomic<uint64_t> gBoolean3DumpCounter{0};
 
+const char* HexValue(double value) {
+  static thread_local char buf[128];
+  std::snprintf(buf, sizeof(buf), "%.13a", value);
+  return buf;
+}
+
+void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
+  std::ofstream out(path);
+  if (!out.good()) return;
+  for (const int value : data) out << value << "\n";
+}
+
+void DumpPairVector(const std::filesystem::path& path,
+                    const Vec<std::array<int, 2>>& data) {
+  std::ofstream out(path);
+  if (!out.good()) return;
+  for (const auto& value : data) out << value[0] << " " << value[1] << "\n";
+}
+
+void DumpVec3Vector(const std::filesystem::path& path, const Vec<vec3>& data) {
+  std::ofstream out(path);
+  if (!out.good()) return;
+  for (const auto& value : data) {
+    out << HexValue(value.x) << " " << HexValue(value.y) << " "
+        << HexValue(value.z) << "\n";
+  }
+}
+
 void DumpBoolean3State(const char* stage, const OpType op,
                        const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                       const size_t x12, const size_t x21, const size_t w03,
-                       const size_t w30, const bool valid) {
+                       const Intersections& xv12, const Intersections& xv21,
+                       const Vec<int>& w03, const Vec<int>& w30,
+                       const bool valid) {
   if (!BooleanDumpEnabled()) return;
 
   const auto id = gBoolean3DumpCounter.fetch_add(1);
@@ -92,12 +122,20 @@ void DumpBoolean3State(const char* stage, const OpType op,
       out << "stage=" << stage << "\n";
       out << "op=" << OpName(op) << "\n";
       out << "valid=" << (valid ? 1 : 0) << "\n";
-      out << "xv12_size=" << x12 << "\n";
-      out << "xv21_size=" << x21 << "\n";
-      out << "w03_size=" << w03 << "\n";
-      out << "w30_size=" << w30 << "\n";
+      out << "xv12_size=" << xv12.x12.size() << "\n";
+      out << "xv21_size=" << xv21.x12.size() << "\n";
+      out << "w03_size=" << w03.size() << "\n";
+      out << "w30_size=" << w30.size() << "\n";
     }
   }
+  DumpIntVector(dir / (prefix.str() + "_xv12_x12.txt"), xv12.x12);
+  DumpIntVector(dir / (prefix.str() + "_xv21_x12.txt"), xv21.x12);
+  DumpPairVector(dir / (prefix.str() + "_xv12_p1q2.txt"), xv12.p1q2);
+  DumpPairVector(dir / (prefix.str() + "_xv21_p1q2.txt"), xv21.p1q2);
+  DumpVec3Vector(dir / (prefix.str() + "_xv12_v12.txt"), xv12.v12);
+  DumpVec3Vector(dir / (prefix.str() + "_xv21_v12.txt"), xv21.v12);
+  DumpIntVector(dir / (prefix.str() + "_w03.txt"), w03);
+  DumpIntVector(dir / (prefix.str() + "_w30.txt"), w30);
 }
 
 // These two functions (Interpolate and Intersect) are the only places where
@@ -567,8 +605,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
-    DumpBoolean3State("early_out", op, inP_, inQ_, xv12_.x12.size(),
-                      xv21_.x12.size(), w03_.size(), w30_.size(), valid);
+    DumpBoolean3State("early_out", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
+                      valid);
     return;
   }
 
@@ -586,8 +624,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
-    DumpBoolean3State("too_large", op, inP_, inQ_, xv12_.x12.size(),
-                      xv21_.x12.size(), w03_.size(), w30_.size(), valid);
+    DumpBoolean3State("too_large", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
+                      valid);
     return;
   }
 
@@ -595,8 +633,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Vertices on the same connected component have the same winding number
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
-  DumpBoolean3State("post_winding", op, inP_, inQ_, xv12_.x12.size(),
-                    xv21_.x12.size(), w03_.size(), w30_.size(), valid);
+  DumpBoolean3State("post_winding", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
+                    valid);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
