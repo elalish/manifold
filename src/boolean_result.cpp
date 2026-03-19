@@ -988,9 +988,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
-  DumpBooleanResultState("final", op, inP_, inQ_, &outR,
-                         doDump ? dumpI03 : i03, doDump ? dumpI30 : i30,
-                         doDump ? dumpI12 : i12, doDump ? dumpI21 : i21);
+  DumpBooleanResultState("final", op, inP_, inQ_, &outR, doDump ? dumpI03 : i03,
+                         doDump ? dumpI30 : i30, doDump ? dumpI12 : i12,
+                         doDump ? dumpI21 : i21);
   return outR;
 }
 
