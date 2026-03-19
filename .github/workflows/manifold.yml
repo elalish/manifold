@@ -669,6 +669,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+    - uses: actions/checkout@v4
     - name: Download Linux discovery meshes
       uses: actions/download-artifact@v4
       with:
