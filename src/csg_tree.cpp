@@ -17,6 +17,7 @@
 #endif
 
 #include <algorithm>
+#include <cstdint>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -28,10 +29,14 @@ namespace {
 using namespace manifold;
 
 struct MeshCompare {
-  bool operator()(const std::shared_ptr<CsgLeafNode>& a,
-                  const std::shared_ptr<CsgLeafNode>& b) {
+  bool operator()(const std::pair<std::shared_ptr<CsgLeafNode>, uint64_t>& a,
+                  const std::pair<std::shared_ptr<CsgLeafNode>, uint64_t>& b) {
     // Use NumVert() which doesn't trigger transform application.
-    return a->NumVert() < b->NumVert();
+    const size_t aVert = a.first->NumVert();
+    const size_t bVert = b.first->NumVert();
+    if (aVert != bVert) return aVert < bVert;
+    // Tie-break by insertion order so heap behavior is deterministic across
+    return a.second < b.second;
   }
 };
 
@@ -384,47 +389,59 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   if (results.size() == 2)
     return SimpleBoolean(*results[0]->GetImpl(), *results[1]->GetImpl(),
                          operation);
+  std::vector<std::pair<std::shared_ptr<CsgLeafNode>, uint64_t>> heapNodes;
+  heapNodes.reserve(results.size());
+  for (size_t i = 0; i < results.size(); ++i) {
+    heapNodes.emplace_back(std::move(results[i]), i);
+  }
+  results.clear();
+  uint64_t nextSerial = heapNodes.size();
+
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
   auto cmpFn = MeshCompare();
-  std::make_heap(results.begin(), results.end(), cmpFn);
-  std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+  std::make_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
+  std::vector<std::pair<std::shared_ptr<CsgLeafNode>, uint64_t>> tmp;
 #if MANIFOLD_PAR == 1
   tbb::task_group group;
   // make sure the order of result is deterministic
   std::vector<std::shared_ptr<CsgLeafNode>> parallelTmp;
-  for (int i = 0; i < 1; i++) parallelTmp.push_back(nullptr);
+  std::vector<uint64_t> parallelSerial;
+  for (int i = 0; i < 4; i++) parallelTmp.push_back(nullptr);
+  for (int i = 0; i < 4; i++) parallelSerial.push_back(0);
 #endif
-  while (results.size() > 1) {
-    for (size_t i = 0; i < 1 && results.size() > 1; i++) {
-      std::pop_heap(results.begin(), results.end(), cmpFn);
-      auto a = std::move(results.back());
-      results.pop_back();
-      std::pop_heap(results.begin(), results.end(), cmpFn);
-      auto b = std::move(results.back());
-      results.pop_back();
+  while (heapNodes.size() > 1) {
+    for (size_t i = 0; i < 4 && heapNodes.size() > 1; i++) {
+      std::pop_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
+      auto a = std::move(heapNodes.back());
+      heapNodes.pop_back();
+      std::pop_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
+      auto b = std::move(heapNodes.back());
+      heapNodes.pop_back();
 #if MANIFOLD_PAR == 1
-      group.run([&, i, a, b]() {
+      parallelSerial[i] = nextSerial++;
+      group.run([&, i, a = std::move(a.first), b = std::move(b.first)]() {
         parallelTmp[i] = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
       });
 #else
-      auto result = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
-      tmp.push_back(result);
+      auto result = SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(),
+                                  operation);
+      tmp.emplace_back(std::move(result), nextSerial++);
 #endif
     }
 #if MANIFOLD_PAR == 1
     group.wait();
-    for (int i = 0; i < 1 && parallelTmp[i]; i++)
-      tmp.emplace_back(std::move(parallelTmp[i]));
+    for (int i = 0; i < 4 && parallelTmp[i]; i++)
+      tmp.emplace_back(std::move(parallelTmp[i]), parallelSerial[i]);
 #endif
-    for (auto result : tmp) {
-      results.push_back(result);
-      std::push_heap(results.begin(), results.end(), cmpFn);
+    for (auto& result : tmp) {
+      heapNodes.push_back(std::move(result));
+      std::push_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
     }
     tmp.clear();
   }
-  return results.front();
+  return heapNodes.front().first;
 }
 
 /**
