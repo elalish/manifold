@@ -394,10 +394,10 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   tbb::task_group group;
   // make sure the order of result is deterministic
   std::vector<std::shared_ptr<CsgLeafNode>> parallelTmp;
-  for (int i = 0; i < 4; i++) parallelTmp.push_back(nullptr);
+  for (int i = 0; i < 1; i++) parallelTmp.push_back(nullptr);
 #endif
   while (results.size() > 1) {
-    for (size_t i = 0; i < 4 && results.size() > 1; i++) {
+    for (size_t i = 0; i < 1 && results.size() > 1; i++) {
       std::pop_heap(results.begin(), results.end(), cmpFn);
       auto a = std::move(results.back());
       results.pop_back();
@@ -415,7 +415,7 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
     }
 #if MANIFOLD_PAR == 1
     group.wait();
-    for (int i = 0; i < 4 && parallelTmp[i]; i++)
+    for (int i = 0; i < 1 && parallelTmp[i]; i++)
       tmp.emplace_back(std::move(parallelTmp[i]));
 #endif
     for (auto result : tmp) {
