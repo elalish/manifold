@@ -425,8 +425,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
         parallelTmp[i] = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
       });
 #else
-      auto result = SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(),
-                                  operation);
+      auto result =
+          SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(), operation);
       tmp.emplace_back(std::move(result), nextSerial++);
 #endif
     }
