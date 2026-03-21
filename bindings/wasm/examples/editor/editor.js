@@ -14,6 +14,8 @@
 
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
+import '@google/model-viewer';
+
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
@@ -28,16 +30,151 @@ const CODE_START = '<code>';
 const exampleFunctions = self.examples;
 
 if (navigator.serviceWorker) {
-  // Resolve against the current page URL so production asset paths don't
-  // redirect registration into /assets.
-  const serviceWorkerUrl = new URL('./service-worker.js', window.location.href);
-  navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'})
-      .catch(error => {
-        console.error('Service worker registration failed:', error);
-      });
+  const params = new URLSearchParams(window.location.search);
+  const disableServiceWorker = params.has('no-sw');
+
+  if (window.caches) {
+    window.caches.keys().then(keys => {
+      keys.filter(
+              key => key.startsWith('manifoldCAD-cache-') &&
+                  key !== 'manifoldCAD-cache-v4')
+          .forEach(key => window.caches.delete(key));
+    });
+  }
+
+  if (disableServiceWorker) {
+    // Explicit escape hatch for debugging cache-related issues.
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      registrations.forEach(registration => registration.unregister());
+    });
+  } else {
+    // Resolve against the current page URL so production asset paths don't
+    // redirect registration into /assets.
+    const serviceWorkerUrl =
+        new URL('./service-worker.js', window.location.href);
+    navigator.serviceWorker
+        .register(serviceWorkerUrl, {scope: './', updateViaCache: 'none'})
+        .then(async registration => {
+          await navigator.serviceWorker.ready;
+          if (!navigator.serviceWorker.controller) {
+            const key = 'manifoldcad-sw-controller-refresh';
+            if (!window.sessionStorage.getItem(key)) {
+              // One-time marker for this tab to avoid a reload loop.
+              window.sessionStorage.setItem(key, '1');
+              window.location.reload();
+              return;
+            }
+          } else {
+            window.sessionStorage.removeItem(
+                'manifoldcad-sw-controller-refresh');
+          }
+          registration.update();
+        })
+        .catch(error => {
+          console.error('Service worker registration failed:', error);
+        });
+  }
 }
 
 let editor = undefined;
+
+// Pane resizing - draggable pane dividers ---------------------
+
+const LEFT_PANE_MIN_PERCENT = 20;
+const LEFT_PANE_MAX_PERCENT = 80;
+const VIEWER_PANE_MIN_PERCENT = 35;
+const VIEWER_PANE_MAX_PERCENT = 90;
+
+// Keep percentages within practical bounds so panes stay usable.
+function clampToRange(value, minValue, maxValue) {
+  return Math.min(maxValue, Math.max(minValue, value));
+}
+
+// Attach pointer-drag behavior to a splitter element.
+// The callback receives pointer-move events and applies the layout update.
+function attachSplitterDrag(splitterElement, handleDragMove) {
+  if (!splitterElement) return;
+
+  splitterElement.addEventListener('pointerdown', pointerDownEvent => {
+    const isMobileLayout = window.matchMedia('(max-width: 820px)').matches;
+    if (isMobileLayout) return;
+
+    pointerDownEvent.preventDefault();
+    splitterElement.setPointerCapture(pointerDownEvent.pointerId);
+
+    const onPointerMove = moveEvent => handleDragMove(moveEvent);
+    const onPointerEnd = endEvent => {
+      splitterElement.releasePointerCapture(endEvent.pointerId);
+      splitterElement.removeEventListener('pointermove', onPointerMove);
+      splitterElement.removeEventListener('pointerup', onPointerEnd);
+      splitterElement.removeEventListener('pointercancel', onPointerEnd);
+    };
+
+    splitterElement.addEventListener('pointermove', onPointerMove);
+    splitterElement.addEventListener('pointerup', onPointerEnd);
+    splitterElement.addEventListener('pointercancel', onPointerEnd);
+  });
+}
+
+function setupPaneSplitters() {
+  const pageElement = document.querySelector('.page');
+  const workbenchElement = document.getElementById('workbench');
+  const rightPaneElement = document.getElementById('rightPane');
+  const horizontalSplitterElement = document.getElementById('split-x');
+  const verticalSplitterElement = document.getElementById('split-y');
+  const leftPaneStorageKey = 'ManifoldCAD:leftPanePercent';
+  const viewerPaneStorageKey = 'ManifoldCAD:viewerPanePercent';
+
+  if (!pageElement || !workbenchElement || !rightPaneElement) return;
+
+  // Restore saved pane percentages on refresh when they are valid numbers.
+  const savedLeftPane = Number(window.localStorage.getItem(leftPaneStorageKey));
+  if (Number.isFinite(savedLeftPane)) {
+    const clampedLeftPanePercent = clampToRange(
+        savedLeftPane, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+  }
+
+  const savedViewerPane =
+      Number(window.localStorage.getItem(viewerPaneStorageKey));
+  if (Number.isFinite(savedViewerPane)) {
+    const clampedViewerPanePercent = clampToRange(
+        savedViewerPane, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+  }
+
+  attachSplitterDrag(horizontalSplitterElement, moveEvent => {
+    // Convert pointer X position to a percentage of the full workbench width.
+    const workbenchBounds = workbenchElement.getBoundingClientRect();
+    const leftPanePercent =
+        ((moveEvent.clientX - workbenchBounds.left) / workbenchBounds.width) *
+        100;
+    const clampedLeftPanePercent = clampToRange(
+        leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+    window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
+
+    // Monaco reacts to container size changes, but an explicit layout keeps
+    // drag updates immediate and smooth.
+    editor?.layout({});
+  });
+
+  attachSplitterDrag(verticalSplitterElement, moveEvent => {
+    // Convert pointer Y position to a percentage of the right pane height.
+    const rightPaneBounds = rightPaneElement.getBoundingClientRect();
+    const viewerPanePercent =
+        ((moveEvent.clientY - rightPaneBounds.top) / rightPaneBounds.height) *
+        100;
+    const clampedViewerPanePercent = clampToRange(
+        viewerPanePercent, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+    window.localStorage.setItem(viewerPaneStorageKey, clampedViewerPanePercent);
+  });
+}
+
+setupPaneSplitters();
 
 // Edit UI ------------------------------------------------------------
 
@@ -313,6 +450,22 @@ async function createEditor() {
     language: 'typescript',
     automaticLayout: true,
     minimap: {enabled: false},
+
+
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----start----:
+
+    // make text wrap to the next line when it exceeds the width of the editor:
+    wordWrap: 'on',
+
+    // remove horizontal scrollbar:
+    scrollbar: {
+      horizontal: 'hidden',
+    },
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----end-------.
+
+
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -366,16 +519,24 @@ async function createEditor() {
 
   self.window.typecache = new LocalStorageCache();
 
-  // We inject manifold-3d typings locally above, so avoid extra CDN probes for
-  // that package path. This prevents noisy 404s in production logs.
+  // We inject manifold-3d typings locally above, and text-shaper publishes
+  // broken declaration re-exports to non-existent source files. Avoid CDN
+  // probes for those packages to keep refreshes quiet.
+  // This skip list only affects Monaco auto-typing CDN lookups, not runtime
+  // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
+  const skippedTypingPackages =
+      new Set(['manifold-3d', 'text-shaper', '@types/require']);
+  const shouldSkipTypingPackage = packageName => {
+    return skippedTypingPackages.has(packageName);
+  };
   const sourceResolver = {
     resolvePackageJson: async (packageName, version, subPath) => {
-      if (packageName === 'manifold-3d') return '';
+      if (shouldSkipTypingPackage(packageName)) return '';
       return jsDelivrResolver.resolvePackageJson(packageName, version, subPath);
     },
     resolveSourceFile: async (packageName, version, path) => {
-      if (packageName === 'manifold-3d') return '';
+      if (shouldSkipTypingPackage(packageName)) return '';
       return jsDelivrResolver.resolveSourceFile(packageName, version, path);
     }
   };
@@ -383,12 +544,19 @@ async function createEditor() {
   autoTypings = await AutoTypings.create(editor, {
     sourceResolver,
     sourceCache: self.window.typecache,
+    // Conservative limits: resolve shallow imports while avoiding deep fetch
+    // fan-out that adds noise and slows editor/offline workflows.
+    packageRecursionDepth: 1,
+    fileRecursionDepth: 2,
     onUpdate: update => {
       if (update.type === 'ResolveNewImports') {
         showTypeIndicator();
       }
     },
     onError: e => {
+      if (String(e?.message ?? e).includes('Not implemented yet')) {
+        return;
+      }
       console.error(e);
     }
   });
@@ -439,6 +607,8 @@ async function createEditor() {
   }
 
   editor.onDidChangeModelContent(e => {
+    const activeName = currentFileElement.textContent;
+
     // The user switched models.
     if (switching) {
       switching = false;
@@ -447,18 +617,18 @@ async function createEditor() {
       return;
     }
 
+    // monaco-editor-auto-typings loaded types.  Do nothing.
+    if (autoTypings.isResolving && e.changes.isFlush) {
+      return;
+    }
+
     // The user edited an example.
     // Copy it into a new script.
-    if (isExample && exampleFunctions.get(currentName) != editor.getValue()) {
+    if (isExample && exampleFunctions.get(activeName) != editor.getValue()) {
       const cursor = editor.getPosition();
       newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
       runButton.disabled = false;
-      return;
-    }
-
-    // monaco-editor-auto-typings loaded types.  Do nothing.
-    if (autoTypings.isResolving && e.changes.isFlush) {
       return;
     }
 
@@ -593,8 +763,12 @@ function createWorker() {
       createWorker();
 
     } else if (message?.type === 'log') {
-      consoleElement.textContent += message.message + '\r\n';
-      consoleElement.scrollTop = consoleElement.scrollHeight;
+      const logMessage = String(message.message ?? '');
+      // Hide noisy per-module CDN fetch traces, keep other worker logs.
+      if (!logMessage.startsWith('Fetching http')) {
+        consoleElement.textContent += logMessage + '\r\n';
+        consoleElement.scrollTop = consoleElement.scrollHeight;
+      }
 
     } else if (message?.type === 'done') {
       setScript('safe', 'true');

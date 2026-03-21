@@ -31,7 +31,7 @@ import type {CrossSection, Manifold, Vec2, Vec3} from '../manifold.d.ts';
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import type {Properties} from './gltf-io.ts';
-import {writeMesh} from './gltf-io.ts';
+import {attributeDefs, writeMesh} from './gltf-io.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
 import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupImport} from './import-model.ts';
@@ -93,7 +93,19 @@ function writeManifold(
     backupMaterial: GLTFMaterial = {}) {
   if (nodeDef.name) node.setName(nodeDef.name);
   const manifold = nodeDef.manifold!;
-  const manifoldMesh = manifold.getMesh();
+
+  var normalIdx = -1;
+  if (nodeDef.material?.attributes != null) {
+    const {attributes} = nodeDef.material;
+    if (attributes.includes('NORMAL')) {
+      normalIdx = 0;
+      for (const attribute of attributes) {
+        if (attribute === 'NORMAL') break;
+        normalIdx += attributeDefs[attribute].components;
+      }
+    }
+  }
+  const manifoldMesh = manifold.getMesh(normalIdx);
 
   // Log this conversion
   const name = nodeDef.name ? `"${nodeDef.name}"` : 'object';

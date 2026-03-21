@@ -14,8 +14,8 @@
   <meta property="og:image" content="https://elalish.github.io/manifold/samples/models/mengerSpongeSquare.png">
   <meta property="og:image:width" content="850">
   <meta property="og:image:height" content="850">
-  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png">
-  <link rel="manifest" href="./manifest.json">
+  <link rel="shortcut icon" type="image/png" href="/icons/ManifoldIcon.png">
+  <link rel="manifest" href="/manifest.json">
   <link type="text/css" href="editor.css" rel="stylesheet">
   <script type="application/ld+json">
     {
@@ -70,10 +70,12 @@
         </div>
       </div>
     </div>
-    <div class="container" style="flex: 2;">
-      <div id="editor" class="col"></div>
-      <div class="col container" style="flex-direction: column;">
-        <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
+    <!-- Draggable pane dividers-start -->
+    <div id="workbench" class="container workbench" style="flex: 2;">
+      <div id="editor" class="col pane-left"></div>
+      <div id="split-x" class="splitter splitter-x" aria-hidden="true"></div>
+      <div id="rightPane" class="col container pane-right" style="flex-direction: column;">
+        <model-viewer id="viewer" camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
           shadow-intensity="1" tone-mapping="neutral" interaction-prompt="none" alt="Editor 3D output">
           <div class="center" slot="poster">
             <p id="poster" style="text-align: center; line-height: 36px;"> Loading... </p>
@@ -83,14 +85,13 @@
             <input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="scrubber">
           </div>
         </model-viewer>
+        <div id="split-y" class="splitter splitter-y" aria-hidden="true"></div>
+        <!-- Draggable pane dividers-end -->
         <div id="console"></div>
       </div>
     </div>
   </div>
 </body>
-<script type="module">
-import { ModelViewerElement } from '@google/model-viewer';
-</script>
 <script type="module" src="editor-examples.js"></script>
 <script type="module" src="editor.js"></script>
 </html>

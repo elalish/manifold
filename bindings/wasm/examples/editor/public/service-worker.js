@@ -13,7 +13,54 @@
 // limitations under the License.
 
 // Increment version when updating CDN URLs to clean up cache.
-const cacheName = 'manifoldCAD-cache-v1';
+const cacheName = 'manifoldCAD-cache-v4';
+
+const appShellAssets = [
+  '/',
+  '/index.html',
+  '/editor.css',
+  '/editor.js',
+  '/editor-examples.js',
+  '/manifest.json',
+  '/fonts/orbitron-black-webfont.ttf',
+  '/icons/close.png',
+  '/icons/docs.png',
+  '/icons/manifoldCAD.png',
+  '/icons/manifoldCADonly.png',
+  '/icons/ManifoldIcon.png',
+  '/icons/mengerSponge192.png',
+  '/icons/mengerSponge512.png',
+  '/icons/mengerSponge64.png',
+  '/icons/pause.png',
+  '/icons/pencil.png',
+  '/icons/play.png',
+  '/icons/redo.png',
+  '/icons/share.png',
+  '/icons/star.png',
+  '/icons/trash.png',
+  '/icons/undo.png'
+];
+
+const shouldHandleRequest = request => {
+  if (request.method !== 'GET') return false;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return false;
+
+  // Skip transient HTML proxy requests only.
+  // Caching this can cause stale proxy-module lookup issues.
+  if (url.searchParams.has('html-proxy')) return false;
+
+  return true;
+};
+
+self.addEventListener('install', e => {
+  e.waitUntil((async () => {
+    const cache = await caches.open(cacheName);
+    await cache.addAll(appShellAssets);
+    await self.skipWaiting();
+  })());
+});
 
 self.addEventListener('install', e => {
   e.waitUntil(self.skipWaiting());
@@ -34,7 +81,7 @@ self.addEventListener('activate', e => {
 // Serves from cache, then updates the cache in the background from the network,
 // if available. Update available on refresh.
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') {
+  if (!shouldHandleRequest(e.request)) {
     return;
   }
 

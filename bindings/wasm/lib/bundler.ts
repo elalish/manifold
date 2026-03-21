@@ -63,13 +63,6 @@ export interface BundlerOptions {
   resolveDir?: string;
 }
 
-// Swallow informational logs in testing framework
-function log(...args: any[]) {
-  if (typeof self !== 'undefined' && self.console) {
-    self.console.log(...args);
-  }
-}
-
 const insertMetaData =
     (text: string, sourceUrl?: string) => {
       if (sourceUrl) {
@@ -255,7 +248,6 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
         const response = await fetch(args.path);
         if (response.ok) {
-          log(`Fetching ${args.path}.`);
           return {contents: await response.text()};
         } else {
           return {errors: [{text: await response.text()}]};
