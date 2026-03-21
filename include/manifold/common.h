@@ -94,12 +94,15 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  */
 inline double CanonicalizeTrig(double x) {
   if (!la::isfinite(x)) return x;
-  // Snap to a fixed binary grid so tiny platform/libm ULP differences don't
-  // propagate into geometry/topology divergence.
-  constexpr int kSnapBits = 50;
-  const double snapped =
-      std::ldexp(std::nearbyint(std::ldexp(x, kSnapBits)), -kSnapBits);
-  return la::clamp(snapped, -1.0, 1.0);
+  x = la::clamp(x, -1.0, 1.0);
+  // The current cross-platform divergence is a 1-ULP drift around sqrt(1/2)
+  // (45-degree rotations). Snap only this neighborhood to avoid changing
+  // unrelated trigonometric outputs used elsewhere.
+  constexpr double kSqrtHalf = 0x1.6a09e667f3bccp-1;
+  constexpr double kTol = 8 * std::numeric_limits<double>::epsilon();
+  if (std::abs(x - kSqrtHalf) <= kTol) return kSqrtHalf;
+  if (std::abs(x + kSqrtHalf) <= kTol) return -kSqrtHalf;
+  return x;
 }
 
 inline double sind(double x) {
