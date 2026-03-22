@@ -477,6 +477,20 @@ TEST(Boolean, Split) {
                   cube.Volume());
 }
 
+TEST(Boolean, SplitByPlaneEmpty) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+
+  std::pair<Manifold, Manifold> split =
+      empty.SplitByPlane({1.0, 0.0, 0.0}, 0.0);
+
+  EXPECT_EQ(split.first.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(split.second.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(split.first.IsEmpty());
+  EXPECT_TRUE(split.second.IsEmpty());
+}
+
 TEST(Boolean, SplitByPlane) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
   cube = cube.Translate({0.0, 1.0, 0.0});
