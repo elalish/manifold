@@ -111,10 +111,15 @@ class CsgLeafNode;
  */
 template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
+  struct Flags {
+    bool backside : 1;
+  };
   /// Number of property vertices
   I NumVert() const { return vertProperties.size() / numProp; };
   /// Number of triangles
   I NumTri() const { return triVerts.size() / 3; };
+  /// Number of triangle runs
+  I NumRun() const { return runOriginalID.size(); };
   /// Number of properties per vertex, always >= 3.
   I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
@@ -150,6 +155,10 @@ struct MeshGLP {
   /// This matrix is stored in column-major order and the length of the overall
   /// vector is 12 * runOriginalID.size().
   std::vector<Precision> runTransform;
+  /// Optional: For each run, defines a set of flags giving extra information
+  /// about the run. See the corresponding getter functions for details on the
+  /// specific flags. These are primarily used on output.
+  std::vector<Flags> runFlags;
   /// Optional: Length NumTri, contains the source face ID this triangle comes
   /// from. Simplification will maintain all edges between triangles with
   /// different faceIDs. Input faceIDs will be maintained to the outputs, but if
@@ -170,18 +179,30 @@ struct MeshGLP {
   MeshGLP() = default;
 
   /**
-   * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, no change will occur and
-   * the function will return false. Otherwise, this will merge verts along open
-   * edges within tolerance (the maximum of the MeshGL tolerance and the
-   * baseline bounding-box tolerance), keeping any from the existing merge
-   * vectors, and return true.
+   * Updates the normals of the mesh based on the runTransform matrices and
+   * backside flags, which are then cleared to avoid double-applying them when
+   * round-tripping.
    *
-   * There is no guarantee the result will be manifold - this is a best-effort
-   * helper function designed primarily to aid in the case where a manifold
-   * multi-material MeshGL was produced, but its merge vectors were lost due to
-   * a round-trip through a file format. Constructing a Manifold from the result
-   * will report an error status if it is not manifold.
+   * @param normalIdx Specifies the first of the three consecutive property
+   * channels forming the (x, y, z) normals to update. NumProp must be at least
+   * normalIdx + 3 and normalIdx must be >= 3.
+   */
+  void UpdateNormals(int normalIdx);
+
+  /**
+   * Updates the mergeFromVert and mergeToVert vectors in order to create a
+   * manifold solid. If the MeshGL is already manifold, no change will occur
+   * and the function will return false. Otherwise, this will merge verts
+   * along open edges within tolerance (the maximum of the MeshGL tolerance
+   * and the baseline bounding-box tolerance), keeping any from the existing
+   * merge vectors, and return true.
+   *
+   * There is no guarantee the result will be manifold - this is a
+   * best-effort helper function designed primarily to aid in the case where
+   * a manifold multi-material MeshGL was produced, but its merge vectors
+   * were lost due to a round-trip through a file format. Constructing a
+   * Manifold from the result will report an error status if it is not
+   * manifold.
    */
   bool Merge();
 
@@ -218,6 +239,30 @@ struct MeshGLP {
     return la::vec<Precision, 4>(
         halfedgeTangent[offset], halfedgeTangent[offset + 1],
         halfedgeTangent[offset + 2], halfedgeTangent[offset + 3]);
+  }
+
+  /**
+   * Returns the transformation matrix for the specified run.
+   *
+   * @param run The index of the triangle run (0 <= run < runOriginalID.size()).
+   */
+  mat3x4 GetRunTransform(size_t run) const {
+    size_t offset = 12 * run;
+    if (offset + 12 > runTransform.size()) {
+      return la::identity;
+    }
+    return mat3x4(la::mat<Precision, 3, 4>(&runTransform[offset]));
+  }
+
+  /**
+   * Returns true if this triangle run is on the backside compared to the
+   * original mesh, e.g. from a subtraction. In this case vertex normals will
+   * need to be flipped. UpdateNormals() will take care of this.
+   *
+   * @param run The index of the triangle run (0 <= run < runFlags.size()).
+   */
+  bool Backside(I run) const {
+    return run < runFlags.size() && runFlags[run].backside;
   }
 };
 

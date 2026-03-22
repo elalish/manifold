@@ -192,6 +192,7 @@ struct Manifold::Impl {
     for (size_t i = 0; i < runOriginalID.size(); ++i) {
       const int meshID = startID + i;
       const int originalID = runOriginalID[i];
+      const bool backside = meshGL.Backside(i);
       for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
         TriRef& ref = triRef[tri];
         ref.meshID = meshID;
@@ -208,7 +209,8 @@ struct Manifold::Impl {
                                                  {{m[0], m[1], m[2]},
                                                   {m[3], m[4], m[5]},
                                                   {m[6], m[7], m[8]},
-                                                  {m[9], m[10], m[11]}}};
+                                                  {m[9], m[10], m[11]}},
+                                                 backside};
       }
     }
 
@@ -461,6 +463,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
+    out.runFlags.push_back({rel.backSide});
     if (updateNormals) {
       runNormalTransform.push_back(rel.GetNormalTransform());
     }
