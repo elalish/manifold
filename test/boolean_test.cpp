@@ -491,6 +491,8 @@ TEST(Boolean, MultiCoplanar) {
   EXPECT_EQ(out.Genus(), -1);
   EXPECT_NEAR(out.Volume(), 0.18, 1e-5);
   EXPECT_NEAR(out.SurfaceArea(), 2.76, 1e-5);
+
+  if (options.exportModels) WriteTestOBJ("det_multi_coplanar.obj", out);
 }
 
 TEST(Boolean, AlmostCoplanar) {
