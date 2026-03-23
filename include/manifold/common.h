@@ -91,20 +91,57 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  *
  * @param x Angle in degrees.
  */
+// Deterministic reduced-range kernels adapted from musl libc (MIT):
+// - https://git.musl-libc.org/cgit/musl/plain/src/math/__sin.c
+// - https://git.musl-libc.org/cgit/musl/plain/src/math/__cos.c
+// The files originate from FreeBSD msun code with the permissive Sun notice.
+inline double LibmKernelSin(double x) {
+  constexpr double S1 = -1.66666666666666324348e-01;
+  constexpr double S2 = 8.33333333332248946124e-03;
+  constexpr double S3 = -1.98412698298579493134e-04;
+  constexpr double S4 = 2.75573137070700676789e-06;
+  constexpr double S5 = -2.50507602534068634195e-08;
+  constexpr double S6 = 1.58969099521155010221e-10;
+
+  const double z = x * x;
+  const double w = z * z;
+  const double r = S2 + z * (S3 + z * S4) + z * w * (S5 + z * S6);
+  const double v = z * x;
+  return x + v * (S1 + z * r);
+}
+
+inline double LibmKernelCos(double x) {
+  constexpr double C1 = 4.16666666666666019037e-02;
+  constexpr double C2 = -1.38888888888741095749e-03;
+  constexpr double C3 = 2.48015872894767294178e-05;
+  constexpr double C4 = -2.75573143513906633035e-07;
+  constexpr double C5 = 2.08757232129817482790e-09;
+  constexpr double C6 = -1.13596475577881948265e-11;
+
+  const double z = x * x;
+  const double w = z * z;
+  const double r =
+      z * (C1 + z * (C2 + z * C3)) + w * w * (C4 + z * (C5 + z * C6));
+  const double hz = 0.5 * z;
+  const double t = 1.0 - hz;
+  return t + (((1.0 - t) - hz) + z * r);
+}
+
 inline double sind(double x) {
   if (!la::isfinite(x)) return sin(x);
   if (x < 0.0) return -sind(-x);
   int quo;
   x = remquo(fabs(x), 90.0, &quo);
+  const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return sin(radians(x));
+      return LibmKernelSin(xr);
     case 1:
-      return cos(radians(x));
+      return LibmKernelCos(xr);
     case 2:
-      return -sin(radians(x));
+      return -LibmKernelSin(xr);
     case 3:
-      return -cos(radians(x));
+      return -LibmKernelCos(xr);
   }
   return 0.0;
 }
