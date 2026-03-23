@@ -96,7 +96,9 @@ model-viewer {
 #console {
   flex: 1;
   min-height: 0;
-  max-height: 25vh;
+  /* draggable pane dividers */
+  max-height: none;
+  /* draggable pane dividers-end */
   overflow-y: scroll;
   background-color: #eee;
   white-space: pre-wrap;
@@ -107,10 +109,24 @@ model-viewer {
 }
 
 .page {
+  /* draggable pane dividers */
+  --left-pane: 50%;
+  --viewer-pane: 75%;
+  /* draggable pane dividers-end */
+
+  
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
+
+
+/* draggable pane dividers */
+.workbench {
+  min-height: 0;
+}
+ /* draggable pane dividers-end */
+
 
 .container {
   display: flex;
@@ -120,6 +136,45 @@ model-viewer {
   position: relative;
   width: 50vw;
 }
+/* draggable pane dividers-start */
+.pane-left {
+  width: auto;
+  flex: 0 0 var(--left-pane);
+  min-width: 220px;
+}
+
+.pane-right {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 220px;
+  min-height: 0;
+}
+
+#viewer {
+  flex: 0 0 var(--viewer-pane);
+  min-height: 140px;
+}
+
+.splitter {
+  flex: 0 0 8px;
+  background: #d0d0d0;
+  touch-action: none;
+}
+
+.splitter:hover {
+  background: #bcbcbc;
+}
+
+.splitter-x {
+  cursor: col-resize;
+}
+
+.splitter-y {
+  cursor: row-resize;
+}
+/* draggable pane dividers-end */
+
+
 
 .center {
   position: absolute;
@@ -327,16 +382,25 @@ model-viewer {
   cursor: pointer;
 }
 
+/* draggable pane dividers */
 @media only screen and (max-width: 820px) {
   .container {
     flex-direction: column;
     width: 100%;
   }
-
+  .splitter {
+    display: none;
+  }
   .col {
     width: 100%;
     height: 50%;
   }
+  .pane-left,
+  .pane-right {
+    min-width: 0;
+  }
+  /* draggable pane dividers-end */
+
 
   #file-margin {
     width: calc(100% - 32px);
