@@ -159,6 +159,7 @@ else()
     -Wno-unknown-warning-option
     -Wno-unused
     -Wno-shorten-64-to-32
+    -Wno-sign-compare
     -Wno-alloc-size-larger-than
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
