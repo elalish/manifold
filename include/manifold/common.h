@@ -103,7 +103,7 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  * granted, provided that this notice is preserved.
  */
 namespace math {
-inline double sin(double x) {
+constexpr inline double sin(double x) {
   constexpr double S1 = -1.66666666666666324348e-01;
   constexpr double S2 = 8.33333333332248946124e-03;
   constexpr double S3 = -1.98412698298579493134e-04;
@@ -118,7 +118,7 @@ inline double sin(double x) {
   return x + v * (S1 + z * r);
 }
 
-inline double cos(double x) {
+constexpr inline double cos(double x) {
   constexpr double C1 = 4.16666666666666019037e-02;
   constexpr double C2 = -1.38888888888741095749e-03;
   constexpr double C3 = 2.48015872894767294178e-05;
@@ -195,7 +195,7 @@ inline double acos(double x) {
  * @param x Angle in degrees.
  */
 inline double sind(double x) {
-  if (!la::isfinite(x)) return std::sin(x);
+  if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
   int quo;
   x = std::remquo(std::fabs(x), 90.0, &quo);
