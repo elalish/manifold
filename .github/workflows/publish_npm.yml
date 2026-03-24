@@ -5,6 +5,10 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   publish_npm:
     runs-on: ubuntu-22.04
@@ -36,5 +40,3 @@ jobs:
         cd ./bindings/wasm/
         npm ci
         npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
