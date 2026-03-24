@@ -293,6 +293,17 @@ function switchTo(scriptName) {
     const model = getModelForScript(scriptName);
     editor.setModel(model);
 
+    // Remove all edit and trash icons
+    document.querySelectorAll('.dropdown .item > .icon.edit')
+        .forEach(e => e.remove());
+    document.querySelectorAll('.dropdown .item > .icon.trash')
+        .forEach(e => e.remove());
+    // Add edit and trash icons only to the current script's button
+    const currentBtn =
+        Array.from(document.querySelectorAll('.dropdown .item > button'))
+            .find(btn => btn.dataset.scriptName === scriptName);
+    if (currentBtn) addEdit(currentBtn);
+
     // Either editor.setValue() or model.setValue() will trigger
     // onDidChangeModelContent.  This will cause some UI updates, but will also
     // get monaco-editor-auto-typings to update types.
@@ -319,6 +330,8 @@ function createDropdownItem(name) {
   button.onkeyup = function(event) {
     event.preventDefault();
   };
+  // Mark the button with its script name for easy lookup
+  button.dataset.scriptName = name;
   return button;
 }
 
@@ -357,27 +370,48 @@ function addEdit(button) {
     inputElement.focus();
     inputElement.setSelectionRange(0, oldName.length);
 
-    function rename() {
-      const input = inputElement.value;
-      inputElement.blur();
-      if (!input) return;
-      const newName = uniqueName(input);
-      label.textContent = newName;
+    function doRename() {
+      const input = inputElement.value.trim();
+      // Prevent empty name
+      if (!input) {
+        inputElement.classList.add('error');
+        inputElement.placeholder = 'Name required';
+        inputElement.value = '';
+        inputElement.focus();
+        return;
+      }
+      // Prevent duplicate name (case-insensitive)
+      const exists =
+          (getScript(input) != null || exampleFunctions.get(input) != null) &&
+          input !== oldName;
+      if (exists) {
+        inputElement.classList.add('error');
+        inputElement.value = '';
+        inputElement.placeholder = 'Name exists';
+        inputElement.focus();
+        return;
+      }
+      label.textContent = input;
+      button.dataset.scriptName = input;
       if (currentFileElement.textContent == oldName) {
-        currentFileElement.textContent = newName;
+        currentFileElement.textContent = input;
+        setScript('currentName', input);
       }
       removeScript(oldName);
-      setScript(newName, code);
+      setScript(input, code);
+      button.removeChild(form);
     }
 
-    form.onsubmit = rename;
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      doRename();
+    };
     inputElement.onclick = function(event) {
       event.stopPropagation();
     };
-
     inputElement.onblur = function() {
-      button.removeChild(form);
-      label.textContent = oldName;
+      // Only rename if not showing error
+      if (!inputElement.classList.contains('error')) doRename();
     };
   };
 
@@ -412,7 +446,7 @@ function newItem(code, scriptName = undefined) {
   setScript(name, code);
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
-  addEdit(nextButton);
+  // Edit icon will be added by switchTo when this script becomes current
   return {button: nextButton, name};
 };
 newButton.onclick = function() {
@@ -580,7 +614,8 @@ async function createEditor() {
     } else {
       const button = createDropdownItem(key);
       newButton.insertAdjacentElement('afterend', button.parentElement);
-      addEdit(button);
+      // Only add edit icon for the current script
+      if (key === currentName) addEdit(button);
     }
   }
 
