@@ -140,6 +140,7 @@ model-viewer {
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .show {
@@ -196,8 +197,8 @@ model-viewer {
   background-color: transparent;
   position: absolute;
   width: 36px;
-  top: 0px;
-  right: 0px;
+  top: 20%;
+  right: 5%;
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
@@ -238,7 +239,15 @@ model-viewer {
 
 .edit {
   background-image: url(/icons/pencil.png);
-  right: 30px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  border: none;
+  background-color: transparent;
+ 
 }
 
 .trash {
@@ -363,3 +372,17 @@ model-viewer {
     margin: 8px;
   }
 }
+
+@media (width <= 885px){
+  .icon{
+    top: 10%;
+  }
+}
+
+
+@media (width <= 820px){
+  .icon{
+    top: 15%;
+    right: 2%;
+  }
+} 
