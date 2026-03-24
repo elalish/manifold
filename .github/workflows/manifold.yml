@@ -24,7 +24,7 @@ jobs:
         shared: [OFF, ON]
     runs-on: windows-2025
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: lukka/get-cmake@v4.2.3
       with:
         cmakeVersion: 4.0.2
@@ -107,7 +107,7 @@ jobs:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - &setup-python
       uses: actions/setup-python@v5
       with:
@@ -162,7 +162,7 @@ jobs:
       CXX: g++-14
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
@@ -215,7 +215,7 @@ jobs:
         parallelization: [OFF, ON]
         debug: [OFF, ON]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions/setup-node@v6
       with:
         node-version: 25
@@ -320,7 +320,7 @@ jobs:
         os: [ubuntu-24.04, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Install apt packages
       if: matrix.os == 'ubuntu-24.04'
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
@@ -361,7 +361,7 @@ jobs:
     runs-on: ubuntu-latest
     container: openscad/mxe-x86_64-gui:latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - *clone-clipper2
     - name: Build
       run: |
@@ -395,7 +395,7 @@ jobs:
         os: [macos-15-intel, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
@@ -438,7 +438,7 @@ jobs:
     timeout-minutes: 30
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
@@ -486,7 +486,7 @@ jobs:
         variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
