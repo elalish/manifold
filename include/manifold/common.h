@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #pragma once
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -87,15 +90,20 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
 }
 
 /**
- * Sine function where multiples of 90 degrees come out exact.
+ * Deterministic trigonometric helpers.
  *
- * @param x Angle in degrees.
+ * Adapted from FreeBSD msun implementations via musl libc sources:
+ * - https://git.musl-libc.org/cgit/musl/plain/src/math/__sin.c
+ * - https://git.musl-libc.org/cgit/musl/plain/src/math/__cos.c
+ * - https://git.musl-libc.org/cgit/musl/plain/src/math/e_acos.c
+ *
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ * Developed at SunPro/SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this software is freely
+ * granted, provided that this notice is preserved.
  */
-// Deterministic reduced-range kernels adapted from musl libc (MIT):
-// - https://git.musl-libc.org/cgit/musl/plain/src/math/__sin.c
-// - https://git.musl-libc.org/cgit/musl/plain/src/math/__cos.c
-// The files originate from FreeBSD msun code with the permissive Sun notice.
-inline double LibmKernelSin(double x) {
+namespace math {
+inline double sin(double x) {
   constexpr double S1 = -1.66666666666666324348e-01;
   constexpr double S2 = 8.33333333332248946124e-03;
   constexpr double S3 = -1.98412698298579493134e-04;
@@ -110,7 +118,7 @@ inline double LibmKernelSin(double x) {
   return x + v * (S1 + z * r);
 }
 
-inline double LibmKernelCos(double x) {
+inline double cos(double x) {
   constexpr double C1 = 4.16666666666666019037e-02;
   constexpr double C2 = -1.38888888888741095749e-03;
   constexpr double C3 = 2.48015872894767294178e-05;
@@ -127,21 +135,80 @@ inline double LibmKernelCos(double x) {
   return t + (((1.0 - t) - hz) + z * r);
 }
 
+inline double acos(double x) {
+  constexpr double pio2_hi = 1.57079632679489655800e+00;
+  constexpr double pio2_lo = 6.12323399573676603587e-17;
+  constexpr double pS0 = 1.66666666666666657415e-01;
+  constexpr double pS1 = -3.25565818622400915405e-01;
+  constexpr double pS2 = 2.01212532134862925881e-01;
+  constexpr double pS3 = -4.00555345006794114027e-02;
+  constexpr double pS4 = 7.91534994289814532176e-04;
+  constexpr double pS5 = 3.47933107596021167570e-05;
+  constexpr double qS1 = -2.40339491173441421878e+00;
+  constexpr double qS2 = 2.02094576023350569471e+00;
+  constexpr double qS3 = -6.88283971605453293030e-01;
+  constexpr double qS4 = 7.70381505559019352791e-02;
+  auto R = [=](double z) {
+    const double p =
+        z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
+    const double q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
+    return p / q;
+  };
+  double z, w, s, c, df;
+  uint64_t xx;
+  uint32_t hx, lx, ix;
+  std::memcpy(&xx, &x, sizeof(xx));
+  hx = xx >> 32;
+  ix = hx & 0x7fffffff;
+  if (ix >= 0x3ff00000) {
+    lx = xx;
+    if (((ix - 0x3ff00000) | lx) == 0) {
+      if (hx >> 31) return 2 * pio2_hi + 0x1p-120f;
+      return 0;
+    }
+    return 0 / (x - x);
+  }
+  if (ix < 0x3fe00000) {
+    if (ix <= 0x3c600000) return pio2_hi + 0x1p-120f;
+    return pio2_hi - (x - (pio2_lo - x * R(x * x)));
+  }
+  if (hx >> 31) {
+    z = (1.0 + x) * 0.5;
+    s = std::sqrt(z);
+    w = R(z) * s - pio2_lo;
+    return 2 * (pio2_hi - (s + w));
+  }
+  z = (1.0 - x) * 0.5;
+  s = std::sqrt(z);
+  std::memcpy(&xx, &s, sizeof(xx));
+  xx &= 0xffffffff00000000;
+  std::memcpy(&df, &xx, sizeof(xx));
+  c = (z - df * df) / (s + df);
+  w = R(z) * s + c;
+  return 2 * (df + w);
+}
+}  // namespace math
+
+/**
+ * Sine function where multiples of 90 degrees come out exact.
+ *
+ * @param x Angle in degrees.
+ */
 inline double sind(double x) {
-  if (!la::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return std::sin(x);
   if (x < 0.0) return -sind(-x);
   int quo;
-  x = remquo(fabs(x), 90.0, &quo);
+  x = std::remquo(std::fabs(x), 90.0, &quo);
   const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return LibmKernelSin(xr);
+      return math::sin(xr);
     case 1:
-      return LibmKernelCos(xr);
+      return math::cos(xr);
     case 2:
-      return -LibmKernelSin(xr);
+      return -math::sin(xr);
     case 3:
-      return -LibmKernelCos(xr);
+      return -math::cos(xr);
   }
   return 0.0;
 }
