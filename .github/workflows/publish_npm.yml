@@ -5,14 +5,12 @@ on:
     types: [published]
   workflow_dispatch:
 
-permissions:
-  id-token: write  # Required for OIDC
-  contents: read
-
 jobs:
   publish_npm:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
     steps:
     - uses: actions/checkout@v6
 
@@ -20,7 +18,10 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: 25
-        registry-url: 'https://registry.npmjs.org'
+        registry-url: 'https://registry.npmjs.org/'
+
+    - name: Verify npm auth
+      run: npm whoami
 
     - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
       run: npm install -g npm@latest
