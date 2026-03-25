@@ -103,7 +103,7 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  * granted, provided that this notice is preserved.
  */
 namespace math {
-constexpr inline double sin(double x) {
+constexpr inline double SinKernel(double x) {
   constexpr double S1 = -1.66666666666666324348e-01;
   constexpr double S2 = 8.33333333332248946124e-03;
   constexpr double S3 = -1.98412698298579493134e-04;
@@ -118,7 +118,7 @@ constexpr inline double sin(double x) {
   return x + v * (S1 + z * r);
 }
 
-constexpr inline double cos(double x) {
+constexpr inline double CosKernel(double x) {
   constexpr double C1 = 4.16666666666666019037e-02;
   constexpr double C2 = -1.38888888888741095749e-03;
   constexpr double C3 = 2.48015872894767294178e-05;
@@ -186,6 +186,49 @@ inline double acos(double x) {
   c = (z - df * df) / (s + df);
   w = R(z) * s + c;
   return 2 * (df + w);
+}
+
+inline double sin(double x) {
+  if (!la::isfinite(x)) return NAN;
+  if (x < 0.0) return -sin(-x);
+  int quo;
+  x = std::remquo(std::fabs(x), kHalfPi, &quo);
+  switch (quo % 4) {
+    case 0:
+      return SinKernel(x);
+    case 1:
+      return CosKernel(x);
+    case 2:
+      return -SinKernel(x);
+    case 3:
+      return -CosKernel(x);
+  }
+  return 0.0;
+}
+
+inline double cos(double x) {
+  if (!la::isfinite(x)) return NAN;
+  x = std::fabs(x);
+  int quo;
+  x = std::remquo(x, kHalfPi, &quo);
+  switch (quo % 4) {
+    case 0:
+      return CosKernel(x);
+    case 1:
+      return -SinKernel(x);
+    case 2:
+      return -CosKernel(x);
+    case 3:
+      return SinKernel(x);
+  }
+  return 0.0;
+}
+
+inline double asin(double x) {
+  if (!la::isfinite(x) || x < -1.0 || x > 1.0) return NAN;
+  if (x == 1.0) return kHalfPi;
+  if (x == -1.0) return -kHalfPi;
+  return kHalfPi - acos(x);
 }
 }  // namespace math
 
