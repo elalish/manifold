@@ -21,7 +21,9 @@ jobs:
         registry-url: 'https://registry.npmjs.org/'
 
     - name: Verify npm auth
-      run: npm whoami
+      run: |
+        unset NODE_AUTH_TOKEN
+        npm whoami
 
     - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
       run: npm install -g npm@latest
