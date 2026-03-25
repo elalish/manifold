@@ -724,6 +724,12 @@ export class Manifold {
   warp(warpFunc: (vert: Vec3) => void): Manifold;
 
   /**
+   * Batch version of warp(). The callback receives a flat array of xyzxyz...
+   * (length = count * 3) and may modify it in-place.
+   */
+  warpBatch(warpFunc: (verts: Float64Array, count: number) => void): Manifold;
+
+  /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
    * geometry will remain unchanged until Refine or RefineToLength is called to
    * interpolate the surface. This version uses the supplied vertex normal

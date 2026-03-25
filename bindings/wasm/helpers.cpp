@@ -204,6 +204,15 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
   return manifold.Warp(f);
 }
 
+Manifold WarpBatch(Manifold& manifold, uintptr_t funcPtr) {
+  void (*f)(uintptr_t, size_t) =
+      reinterpret_cast<void (*)(uintptr_t, size_t)>(funcPtr);
+
+  return manifold.WarpBatch([&](manifold::VecView<manifold::vec3> vecs) {
+    f(reinterpret_cast<uintptr_t>(vecs.data()), vecs.size());
+  });
+}
+
 Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
   void (*f)(double*, vec3, const double*) =
       reinterpret_cast<void (*)(double*, vec3, const double*)>(funcPtr);

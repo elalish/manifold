@@ -230,6 +230,23 @@ Module.setup = function() {
     return out;
   };
 
+  Module.Manifold.prototype.warpBatch = function(func) {
+    const wasmFuncPtr = addFunction(function(ptr, count) {
+      const verts = new Float64Array(Module.HEAPF64.buffer, ptr, count * 3);
+
+      func(verts, count);
+    }, 'vii');
+
+    const out = this._WarpBatch(wasmFuncPtr);
+    removeFunction(wasmFuncPtr);
+
+    const status = out.status();
+    if (status !== 'NoError') {
+      throw new Module.ManifoldError(status);
+    }
+    return out;
+  };
+
   Module.Manifold.prototype.calculateNormals = function(
       normalIdx, minSharpAngle = 60) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
