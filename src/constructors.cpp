@@ -210,9 +210,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
   pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
-               v = vec3(math::cos(kHalfPi * (1.0 - v.x)),
-                        math::cos(kHalfPi * (1.0 - v.y)),
-                        math::cos(kHalfPi * (1.0 - v.z)));
+               v = la::cos(kHalfPi * (1.0 - v));
                v = radius * la::normalize(v);
                if (std::isnan(v.x)) v = vec3(0.0);
              });
