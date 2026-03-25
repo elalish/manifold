@@ -1,5 +1,5 @@
-import {expect, test} from 'vitest';
 import {join} from 'node:path';
+import {expect, test} from 'vitest';
 
 import Module, {type ManifoldToplevel} from '../manifold';
 
@@ -72,7 +72,8 @@ test('warp vs warpBatch benchmark', async () => {
     const batchAvg = batchTotal / iters;
 
     console.log(`warp():      avg ${warpAvg.toFixed(2)} ms over ${iters} runs`);
-    console.log(`warpBatch(): avg ${batchAvg.toFixed(2)} ms over ${iters} runs`);
+    console.log(
+        `warpBatch(): avg ${batchAvg.toFixed(2)} ms over ${iters} runs`);
     console.log(`speedup:     ${(warpAvg / batchAvg).toFixed(2)}x`);
 
     expect(warpAvg).toBeGreaterThan(0);

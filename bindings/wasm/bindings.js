@@ -232,7 +232,11 @@ Module.setup = function() {
 
   Module.Manifold.prototype.warpBatch = function(func) {
     const wasmFuncPtr = addFunction(function(ptr, count) {
-      const verts = new Float64Array(Module.HEAPF64.buffer, ptr, count * 3);
+      const heapF64 = Module.HEAPF64 ?? HEAPF64;
+      if (!heapF64) {
+        throw new Error('WASM heap is not initialized (HEAPF64 unavailable)');
+      }
+      const verts = new Float64Array(heapF64.buffer, ptr, count * 3);
 
       func(verts, count);
     }, 'vii');
