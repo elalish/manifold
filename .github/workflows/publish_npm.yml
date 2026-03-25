@@ -7,16 +7,21 @@ on:
 
 jobs:
   publish_npm:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Setup Node
       uses: actions/setup-node@v6
       with:
         node-version: 25
-        registry-url: 'https://registry.npmjs.org'
+        registry-url: 'https://registry.npmjs.org/'
+
+    - name: Verify npm auth
+      run: npm whoami
 
     - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
       run: npm install -g npm@latest
@@ -36,5 +41,3 @@ jobs:
         cd ./bindings/wasm/
         npm ci
         npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
