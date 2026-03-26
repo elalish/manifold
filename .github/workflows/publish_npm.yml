@@ -37,4 +37,4 @@ jobs:
       run: |
         cd ./bindings/wasm/
         npm ci
-        npm publish --dry-run
+        npm publish
