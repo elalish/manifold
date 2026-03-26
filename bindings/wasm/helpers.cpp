@@ -209,7 +209,27 @@ Manifold WarpBatch(Manifold& manifold, uintptr_t funcPtr) {
       reinterpret_cast<void (*)(uintptr_t, size_t)>(funcPtr);
 
   return manifold.WarpBatch([&](manifold::VecView<manifold::vec3> vecs) {
-    f(reinterpret_cast<uintptr_t>(vecs.data()), vecs.size());
+    const size_t n = vecs.size();
+
+    // Flatten
+    std::vector<double> flat;
+    flat.resize(n * 3);
+    for (size_t i = 0; i < n; ++i) {
+      const manifold::vec3& v = vecs[i];
+      flat[i * 3 + 0] = v[0];
+      flat[i * 3 + 1] = v[1];
+      flat[i * 3 + 2] = v[2];
+    }
+
+    f(reinterpret_cast<uintptr_t>(flat.data()), n);
+
+    // Copy back to vecs
+    for (size_t i = 0; i < n; ++i) {
+      manifold::vec3& v = vecs[i];
+      v[0] = flat[i * 3 + 0];
+      v[1] = flat[i * 3 + 1];
+      v[2] = flat[i * 3 + 2];
+    }
   });
 }
 
