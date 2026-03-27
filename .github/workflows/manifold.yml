@@ -83,6 +83,48 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         ./build/bin/Release/manifold_test.exe
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      shell: bash
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+      run: |
+        cp ./build/lib/Release/* ./build/bin/Release
+        cd build/bin/Release
+        ./manifold_test.exe -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        mkdir -p ../../../meshes-windows
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj ../../../meshes-windows/
+    - name: Upload determinism meshes (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-windows
+        path: meshes-windows/
+    - name: Export determinism discovery meshes (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      shell: bash
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: ../../../boolean-dumps-perturb3-windows
+      run: |
+        cp ./build/lib/Release/* ./build/bin/Release
+        cd build/bin/Release
+        ./manifold_test.exe -e --gtest_filter=Boolean.Perturb3
+        mkdir -p ../../../meshes-perturb3-windows
+        cp perturb3_pair_union.obj perturb3_pair01.obj perturb3_pair23.obj perturb3_gear3_seq.obj perturb3_gear3_batch.obj perturb3_gear4_seq.obj perturb3_gear4_batch.obj perturb3_gear4_balanced_seq.obj perturb3_gear.obj perturb3_outerGear.obj perturb3_nastyGear.obj ../../../meshes-perturb3-windows/
+    - name: Upload determinism discovery meshes (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-perturb3-windows
+        path: meshes-perturb3-windows/
+    - name: Upload determinism discovery debug dumps (Windows)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-windows
+        path: boolean-dumps-perturb3-windows/
 
   build:
     name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
@@ -145,6 +187,42 @@ jobs:
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         python3 bindings/python/examples/run_all.py -e
         python3 -m pytest
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+      run: |
+        ./build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        mkdir -p meshes-linux
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj meshes-linux/
+    - name: Upload determinism meshes (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-linux
+        path: meshes-linux/
+    - name: Export determinism discovery meshes (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: boolean-dumps-perturb3-linux
+      run: |
+        ./build/test/manifold_test -e --gtest_filter=Boolean.Perturb3
+        mkdir -p meshes-perturb3-linux
+        cp perturb3_pair_union.obj perturb3_pair01.obj perturb3_pair23.obj perturb3_gear3_seq.obj perturb3_gear3_batch.obj perturb3_gear4_seq.obj perturb3_gear4_batch.obj perturb3_gear4_balanced_seq.obj perturb3_gear.obj perturb3_outerGear.obj perturb3_nastyGear.obj meshes-perturb3-linux/
+    - name: Upload determinism discovery meshes (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-perturb3-linux
+        path: meshes-perturb3-linux/
+    - name: Upload determinism discovery debug dumps (Linux)
+      if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-linux
+        path: boolean-dumps-perturb3-linux/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -425,6 +503,42 @@ jobs:
     - name: Test
       run: |
         build/test/manifold_test
+    - name: Export determinism meshes
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+      run: |
+        build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        mkdir -p meshes-mac
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj meshes-mac/
+    - name: Upload determinism meshes (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-mac
+        path: meshes-mac/
+    - name: Export determinism discovery meshes (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      env:
+        MANIFOLD_OBJ_HEX_FLOAT: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP: 1
+        MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR: boolean-dumps-perturb3-mac
+      run: |
+        build/test/manifold_test -e --gtest_filter=Boolean.Perturb3
+        mkdir -p meshes-perturb3-mac
+        cp perturb3_pair_union.obj perturb3_pair01.obj perturb3_pair23.obj perturb3_gear3_seq.obj perturb3_gear3_batch.obj perturb3_gear4_seq.obj perturb3_gear4_batch.obj perturb3_gear4_balanced_seq.obj perturb3_gear.obj perturb3_outerGear.obj perturb3_nastyGear.obj meshes-perturb3-mac/
+    - name: Upload determinism discovery meshes (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: meshes-perturb3-mac
+        path: meshes-perturb3-mac/
+    - name: Upload determinism discovery debug dumps (macOS)
+      if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-mac
+        path: boolean-dumps-perturb3-mac/
     - name: test cmake consumer
       run: |
         sudo cmake --install build
@@ -491,3 +605,167 @@ jobs:
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
 
+  determinism_check:
+    name: Cross-platform determinism check
+    needs: [build, build_windows, build_mac]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Linux meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-linux
+        path: meshes/linux
+    - name: Download macOS meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-mac
+        path: meshes/mac
+    - name: Download Windows meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-windows
+        path: meshes/windows
+    - name: Compare meshes across platforms
+      run: |
+        set -euo pipefail
+        failed=0
+        normalized_dir="$(mktemp -d)"
+        for f in det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj; do
+          echo "--- $f ---"
+          file_missing=0
+          for os in linux mac windows; do
+            if [ ! -f "meshes/$os/$f" ]; then
+              echo "Missing file: meshes/$os/$f"
+              failed=1
+              file_missing=1
+            fi
+          done
+          if [ "$file_missing" -ne 0 ]; then
+            continue
+          fi
+          for os in linux mac windows; do
+            tr -d '\r' < "meshes/$os/$f" > "$normalized_dir/$os-$f"
+          done
+          linux_hash=$(sha256sum "$normalized_dir/linux-$f" | awk '{print $1}')
+          mac_hash=$(sha256sum "$normalized_dir/mac-$f" | awk '{print $1}')
+          win_hash=$(sha256sum "$normalized_dir/windows-$f" | awk '{print $1}')
+          echo "linux:   $linux_hash"
+          echo "mac:     $mac_hash"
+          echo "windows: $win_hash"
+          if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
+            echo "MISMATCH in $f"
+            echo "linux vs mac diff:"
+            diff "$normalized_dir/linux-$f" "$normalized_dir/mac-$f" | sed -n '1,200p' || true
+            echo "linux vs windows diff:"
+            diff "$normalized_dir/linux-$f" "$normalized_dir/windows-$f" | sed -n '1,200p' || true
+            failed=1
+          fi
+        done
+        exit $failed
+
+  determinism_discovery:
+    name: Cross-platform determinism discovery (non-blocking)
+    needs: [build, build_windows, build_mac]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download Linux discovery meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-perturb3-linux
+        path: meshes/linux
+    - name: Download macOS discovery meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-perturb3-mac
+        path: meshes/mac
+    - name: Download Windows discovery meshes
+      uses: actions/download-artifact@v4
+      with:
+        name: meshes-perturb3-windows
+        path: meshes/windows
+    - name: Download Linux discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-linux
+        path: boolean-dumps/linux
+    - name: Download macOS discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-mac
+        path: boolean-dumps/mac
+    - name: Download Windows discovery debug dumps
+      uses: actions/download-artifact@v4
+      with:
+        name: boolean-dumps-perturb3-windows
+        path: boolean-dumps/windows
+    - name: Compare discovery meshes across platforms
+      run: |
+        set -euo pipefail
+        failed=0
+        mismatches=""
+        normalized_dir="$(mktemp -d)"
+        for f in perturb3_pair_union.obj perturb3_pair01.obj perturb3_pair23.obj perturb3_gear3_seq.obj perturb3_gear3_batch.obj perturb3_gear4_seq.obj perturb3_gear4_batch.obj perturb3_gear4_balanced_seq.obj perturb3_gear.obj perturb3_outerGear.obj perturb3_nastyGear.obj; do
+          echo "--- $f ---"
+          file_missing=0
+          for os in linux mac windows; do
+            if [ ! -f "meshes/$os/$f" ]; then
+              echo "Missing file: meshes/$os/$f"
+              failed=1
+              file_missing=1
+            fi
+          done
+          if [ "$file_missing" -ne 0 ]; then
+            mismatches="$mismatches $f(missing)"
+            continue
+          fi
+          for os in linux mac windows; do
+            tr -d '\r' < "meshes/$os/$f" > "$normalized_dir/$os-$f"
+          done
+          linux_hash=$(sha256sum "$normalized_dir/linux-$f" | awk '{print $1}')
+          mac_hash=$(sha256sum "$normalized_dir/mac-$f" | awk '{print $1}')
+          win_hash=$(sha256sum "$normalized_dir/windows-$f" | awk '{print $1}')
+          echo "linux:   $linux_hash"
+          echo "mac:     $mac_hash"
+          echo "windows: $win_hash"
+          if [ "$linux_hash" != "$mac_hash" ] || [ "$linux_hash" != "$win_hash" ]; then
+            echo "MISMATCH in $f"
+            echo "linux vs mac diff:"
+            diff "$normalized_dir/linux-$f" "$normalized_dir/mac-$f" | sed -n '1,200p' || true
+            echo "linux vs windows diff:"
+            diff "$normalized_dir/linux-$f" "$normalized_dir/windows-$f" | sed -n '1,200p' || true
+            failed=1
+            mismatches="$mismatches $f"
+          fi
+        done
+
+        if [ "$failed" -ne 0 ]; then
+          echo "::warning::Determinism discovery found cross-platform mismatches:$mismatches"
+          {
+            echo "### Determinism discovery mismatches"
+            echo ""
+            echo "$mismatches"
+          } >> "$GITHUB_STEP_SUMMARY"
+        else
+          {
+            echo "### Determinism discovery"
+            echo ""
+            echo "No cross-platform mismatches detected for the current Perturb3 decomposition set."
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        # Discovery lane is intentionally non-blocking.
+        exit 0
+    - name: Compare discovery boolean debug dumps
+      run: |
+        bash ./scripts/compare_boolean_dumps.sh boolean-dumps
+    - name: Upload discovery debug dumps bundle
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: boolean-dumps-perturb3
+        path: |
+          boolean-dumps/linux/
+          boolean-dumps/mac/
+          boolean-dumps/windows/
