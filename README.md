@@ -24,7 +24,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 | [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
-| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | |
+| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
 
 ### Bindings & Packages
 
@@ -36,7 +36,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
-| Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
+| Java | Maven | [manifold3d](https://github.com/CommonWealthRobotics/manifold3d-java/blob/development/bindings/java/README.md) | external |
 | Clojure | N/A | [clj-manifold3d](https://github.com/SovereignShop/clj-manifold3d) | external |
 | C# | NuGet | [ManifoldNET](https://www.nuget.org/packages/ManifoldNET) | external |
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
