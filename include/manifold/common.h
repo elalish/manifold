@@ -125,9 +125,7 @@ inline uint32_t HighWord(double x) {
   return static_cast<uint32_t>(AsUint64(x) >> 32);
 }
 
-inline uint32_t LowWord(double x) {
-  return static_cast<uint32_t>(AsUint64(x));
-}
+inline uint32_t LowWord(double x) { return static_cast<uint32_t>(AsUint64(x)); }
 
 inline double WithLowWord(double x, uint32_t low) {
   uint64_t u = AsUint64(x);
@@ -170,12 +168,12 @@ constexpr inline double CosKernel(double x, double y) {
 
 inline double TanKernel(double x, double y, int odd) {
   constexpr double T[] = {
-      3.33333333333334091986e-01,  1.33333333333201242699e-01,
-      5.39682539762260521377e-02,  2.18694882948595424599e-02,
-      8.86323982359930005737e-03,  3.59207910759131235356e-03,
-      1.45620945432529025516e-03,  5.88041240820264096874e-04,
-      2.46463134818469906812e-04,  7.81794442939557092300e-05,
-      7.14072491382608190305e-05,  -1.85586374855275456654e-05,
+      3.33333333333334091986e-01, 1.33333333333201242699e-01,
+      5.39682539762260521377e-02, 2.18694882948595424599e-02,
+      8.86323982359930005737e-03, 3.59207910759131235356e-03,
+      1.45620945432529025516e-03, 5.88041240820264096874e-04,
+      2.46463134818469906812e-04, 7.81794442939557092300e-05,
+      7.14072491382608190305e-05, -1.85586374855275456654e-05,
       2.59073051863633712884e-05,
   };
   constexpr double pio4 = 7.85398163397448278999e-01;
@@ -199,7 +197,8 @@ inline double TanKernel(double x, double y, int odd) {
   const double r =
       T[1] + w * (T[3] + w * (T[5] + w * (T[7] + w * (T[9] + w * T[11]))));
   const double v =
-      z * (T[2] + w * (T[4] + w * (T[6] + w * (T[8] + w * (T[10] + w * T[12])))));
+      z *
+      (T[2] + w * (T[4] + w * (T[6] + w * (T[8] + w * (T[10] + w * T[12])))));
   const double s = z * x;
   const double rr = y + z * (s * (r + v) + y) + s * T[0];
   const double ww = x + rr;
@@ -311,7 +310,7 @@ inline int RemPio2(double x, double y[2]) {
     y[1] = (z - y[0]) + 2 * pio2_1t;
     return -2;
   }
-  if (ix <= 0x401c463b) {  // |x| ~<= 9pi/4
+  if (ix <= 0x401c463b) {    // |x| ~<= 9pi/4
     if (ix <= 0x4015fdbc) {  // |x| ~<= 7pi/4
       if (ix == 0x4012d97c) goto medium;
       if (!sign) {
@@ -464,11 +463,11 @@ inline double atan(double x) {
       2.26987774529616870924e-17, 3.06161699786838301793e-17,
       1.39033110312309984516e-17, 6.12323399573676603587e-17};
   constexpr double aT[] = {
-      3.33333333333329318027e-01,  -1.99999999998764832476e-01,
-      1.42857142725034663711e-01,  -1.11111104054623557880e-01,
-      9.09088713343650656196e-02,  -7.69187620504482999495e-02,
-      6.66107313738753120669e-02,  -5.83357013379057348645e-02,
-      4.97687799461593236017e-02,  -3.65315727442169155270e-02,
+      3.33333333333329318027e-01, -1.99999999998764832476e-01,
+      1.42857142725034663711e-01, -1.11111104054623557880e-01,
+      9.09088713343650656196e-02, -7.69187620504482999495e-02,
+      6.66107313738753120669e-02, -5.83357013379057348645e-02,
+      4.97687799461593236017e-02, -3.65315727442169155270e-02,
       1.62858201153657823623e-02};
 
   uint32_t ix = HighWord(x);
@@ -481,12 +480,12 @@ inline double atan(double x) {
     const double z = atanhi[3] + 0x1p-120f;
     return sign ? -z : z;
   }
-  if (ix < 0x3fdc0000) {  // |x| < 0.4375
+  if (ix < 0x3fdc0000) {            // |x| < 0.4375
     if (ix < 0x3e400000) return x;  // |x| < 2^-27
     id = -1;
   } else {
     x = std::fabs(x);
-    if (ix < 0x3ff30000) {  // |x| < 1.1875
+    if (ix < 0x3ff30000) {    // |x| < 1.1875
       if (ix < 0x3fe60000) {  // 7/16 <= |x| < 11/16
         id = 0;
         x = (2.0 * x - 1.0) / (2.0 + x);
@@ -508,8 +507,10 @@ inline double atan(double x) {
   const double z = x * x;
   const double w = z * z;
   const double s1 =
-      z * (aT[0] + w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))));
-  const double s2 = w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))));
+      z * (aT[0] +
+           w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))));
+  const double s2 =
+      w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))));
   if (id < 0) return x - x * (s1 + s2);
   const double zz = atanhi[id] - (x * (s1 + s2) - atanlo[id] - x);
   return sign ? -zz : zz;
