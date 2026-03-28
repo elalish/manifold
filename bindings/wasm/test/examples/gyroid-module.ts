@@ -28,13 +28,15 @@ function gyroidOffset(level) {
     min: [-period, -period, -period],
     max: [period, period, period]
   } as Box;
-  return Manifold.levelSet(gyroid, box, period / n, level).scale(size / period);
+  return Manifold.levelSet(gyroid, box, period / n, level)
+      .scale(size / period)
+      .calculateNormals(0);
 };
 
 function rhombicDodecahedron() {
   const box = Manifold.cube([1, 1, 2], true).scale(size * Math.sqrt(2));
   const result = box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
-  return result.intersect(box.rotate([0, 0, 45]));
+  return result.intersect(box.rotate([0, 0, 45])).calculateNormals(0);
 }
 
 const gyroidModule = rhombicDodecahedron()
@@ -49,7 +51,8 @@ if (m > 1) {
         node.manifold = gyroidModule;
         node.translation = [(k + i - j) * size, (k - i) * size, (-j) * size];
         node.material = {
-          baseColorFactor: [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
+          baseColorFactor: [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m],
+          attributes: ['NORMAL']  // Render with smooth normals shading.
         };
       }
     }

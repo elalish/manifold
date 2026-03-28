@@ -346,7 +346,6 @@ const initializeWebWorker = (): void => {
   const interceptConsole = () => {
     console.debug('Intercepting console.log() in manifoldCAD worker.');
     if (self.console) {
-      const oldLog = self.console.log;
       self.console.log = function(...args) {
         let message = '';
         for (const arg of args) {
@@ -359,7 +358,6 @@ const initializeWebWorker = (): void => {
           }
         }
         self.postMessage({type: 'log', message} as MessageFromWorker.Log);
-        oldLog(...args);
       };
     };
   };

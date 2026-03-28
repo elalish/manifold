@@ -20,7 +20,7 @@ jobs:
           git config --global core.longpaths true
       - if: matrix.os == 'macos-15'
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.0
       - uses: actions/upload-artifact@v4
@@ -32,7 +32,7 @@ jobs:
     name: Make SDist
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Build SDist
       run: pipx run build --sdist
     - name: Confirm SDist can be built

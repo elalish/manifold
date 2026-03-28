@@ -122,8 +122,8 @@ if(MANIFOLD_CROSS_SECTION)
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      # Jun 15, 2025
-      GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
+      # Mar 05, 2026
+      GIT_TAG 46f639177fe418f9689e8ddb74f08a870c71f5b4
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR
       CPP
@@ -192,12 +192,12 @@ if(MANIFOLD_PYBIND)
     FetchContent_Declare(
       nanobind
       GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-      GIT_TAG v2.5.0
+      GIT_TAG v2.12.0
       GIT_PROGRESS TRUE
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(nanobind)
-    set(NB_VERSION 2.2.0)
+    set(NB_VERSION 2.12.0)
   endif()
 
   if(NB_VERSION VERSION_LESS 2.1.0)
@@ -218,7 +218,7 @@ if(MANIFOLD_TEST)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG v1.14.0
+      GIT_TAG v1.17.0
       GIT_SHALLOW TRUE
       GIT_PROGRESS TRUE
       FIND_PACKAGE_ARGS NAMES GTest gtest

@@ -851,7 +851,7 @@ export class Manifold {
    * all.
    * @group Properties
    */
-  calculateNormals(normalIdx: number, minSharpAngle: number): Manifold;
+  calculateNormals(normalIdx: number, minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 

@@ -12,8 +12,12 @@ import {pointsOnPath} from 'points-on-path';
 import {Font, getGlyphPath, pathToSVG} from 'text-shaper';
 
 // Orbitron Font from https://github.com/theleagueof/orbitron/
-const fonturl =
+const localFontPath = '/fonts/orbitron-black-webfont.ttf';
+const remoteFontUrl =
     'https://raw.githubusercontent.com/theleagueof/orbitron/master/webfonts/orbitron-black-webfont.ttf';
+const fonturl = typeof location === 'undefined' ?
+    remoteFontUrl :
+    new URL(localFontPath, location.href).toString();
 
 // Return a function that generates a CrossSection for a given letter.
 // Getting the function is asynchronous as it depends on a fetch, but

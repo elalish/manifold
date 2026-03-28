@@ -15,7 +15,7 @@
 #pragma once
 #include <map>
 
-#include "lazy_collider.h"
+#include "collider.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "shared.h"
@@ -52,12 +52,12 @@ struct Manifold::Impl {
   Vec<vec3> faceNormal_;
   Vec<vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
-  std::shared_ptr<LazyCollider> collider_ = std::make_shared<LazyCollider>();
+  Collider collider_;
 
   static std::atomic<uint32_t> meshIDCounter_;
   static uint32_t ReserveIDs(uint32_t);
 
-  Impl() : collider_{std::make_shared<LazyCollider>(LazyCollider::Empty())} {};
+  Impl() {};
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat3x4 = la::identity);
 
@@ -542,7 +542,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + 3 + normalIdx + i];
           }
-          normal = la::normalize(runNormalTransform[run] * normal);
+          normal = SafeNormalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
             out.vertProperties[start + 3 + normalIdx + i] = normal[i];
           }
