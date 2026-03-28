@@ -41,6 +41,18 @@
 #include <functional>   // For std::hash declaration
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
 
+namespace manifold {
+namespace math {
+double sin(double);
+double cos(double);
+double tan(double);
+double asin(double);
+double acos(double);
+double atan(double);
+double atan2(double, double);
+}  // namespace math
+}  // namespace manifold
+
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
 #if defined(_MSC_VER) && (_MSC_VER <= 1900)
@@ -659,40 +671,106 @@ struct std_sqrt {
     return std::sqrt(a);
   }
 };
+template <class A>
+constexpr auto deterministic_sin(A a) -> decltype(std::sin(a)) {
+  return std::sin(a);
+}
+inline double deterministic_sin(double a) { return manifold::math::sin(a); }
+inline float deterministic_sin(float a) {
+  return static_cast<float>(manifold::math::sin(static_cast<double>(a)));
+}
+inline long double deterministic_sin(long double a) {
+  return static_cast<long double>(manifold::math::sin(static_cast<double>(a)));
+}
 struct std_sin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
-    return std::sin(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_sin(a)) {
+    return deterministic_sin(a);
   }
 };
+template <class A>
+constexpr auto deterministic_cos(A a) -> decltype(std::cos(a)) {
+  return std::cos(a);
+}
+inline double deterministic_cos(double a) { return manifold::math::cos(a); }
+inline float deterministic_cos(float a) {
+  return static_cast<float>(manifold::math::cos(static_cast<double>(a)));
+}
+inline long double deterministic_cos(long double a) {
+  return static_cast<long double>(manifold::math::cos(static_cast<double>(a)));
+}
 struct std_cos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
-    return std::cos(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_cos(a)) {
+    return deterministic_cos(a);
   }
 };
+template <class A>
+constexpr auto deterministic_tan(A a) -> decltype(std::tan(a)) {
+  return std::tan(a);
+}
+inline double deterministic_tan(double a) { return manifold::math::tan(a); }
+inline float deterministic_tan(float a) {
+  return static_cast<float>(manifold::math::tan(static_cast<double>(a)));
+}
+inline long double deterministic_tan(long double a) {
+  return static_cast<long double>(manifold::math::tan(static_cast<double>(a)));
+}
 struct std_tan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
-    return std::tan(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_tan(a)) {
+    return deterministic_tan(a);
   }
 };
+template <class A>
+constexpr auto deterministic_asin(A a) -> decltype(std::asin(a)) {
+  return std::asin(a);
+}
+inline double deterministic_asin(double a) { return manifold::math::asin(a); }
+inline float deterministic_asin(float a) {
+  return static_cast<float>(manifold::math::asin(static_cast<double>(a)));
+}
+inline long double deterministic_asin(long double a) {
+  return static_cast<long double>(manifold::math::asin(static_cast<double>(a)));
+}
 struct std_asin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
-    return std::asin(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_asin(a)) {
+    return deterministic_asin(a);
   }
 };
+template <class A>
+constexpr auto deterministic_acos(A a) -> decltype(std::acos(a)) {
+  return std::acos(a);
+}
+inline double deterministic_acos(double a) { return manifold::math::acos(a); }
+inline float deterministic_acos(float a) {
+  return static_cast<float>(manifold::math::acos(static_cast<double>(a)));
+}
+inline long double deterministic_acos(long double a) {
+  return static_cast<long double>(manifold::math::acos(static_cast<double>(a)));
+}
 struct std_acos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
-    return std::acos(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_acos(a)) {
+    return deterministic_acos(a);
   }
 };
+template <class A>
+constexpr auto deterministic_atan(A a) -> decltype(std::atan(a)) {
+  return std::atan(a);
+}
+inline double deterministic_atan(double a) { return manifold::math::atan(a); }
+inline float deterministic_atan(float a) {
+  return static_cast<float>(manifold::math::atan(static_cast<double>(a)));
+}
+inline long double deterministic_atan(long double a) {
+  return static_cast<long double>(manifold::math::atan(static_cast<double>(a)));
+}
 struct std_atan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
-    return std::atan(a);
+  constexpr auto operator()(A a) const -> decltype(deterministic_atan(a)) {
+    return deterministic_atan(a);
   }
 };
 struct std_sinh {
@@ -731,10 +809,26 @@ struct std_pow {
     return std::pow(a, b);
   }
 };
+template <class A, class B>
+constexpr auto deterministic_atan2(A a, B b) -> decltype(std::atan2(a, b)) {
+  return std::atan2(a, b);
+}
+inline double deterministic_atan2(double a, double b) {
+  return manifold::math::atan2(a, b);
+}
+inline float deterministic_atan2(float a, float b) {
+  return static_cast<float>(
+      manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
+}
+inline long double deterministic_atan2(long double a, long double b) {
+  return static_cast<long double>(
+      manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
+}
 struct std_atan2 {
   template <class A, class B>
-  constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
-    return std::atan2(a, b);
+  constexpr auto operator()(A a, B b) const
+      -> decltype(deterministic_atan2(a, b)) {
+    return deterministic_atan2(a, b);
   }
 };
 struct std_copysign {
@@ -1801,7 +1895,7 @@ T distance(const vec<T, M>& a, const vec<T, M>& b) {
 template <class T, int M>
 T uangle(const vec<T, M>& a, const vec<T, M>& b) {
   T d = dot(a, b);
-  return d > 1 ? 0 : std::acos(d < -1 ? -1 : d);
+  return d > 1 ? 0 : acos(d < -1 ? -1 : d);
 }
 /**
  * @brief Return the angle in radians between two non-unit vectors.
@@ -1816,7 +1910,7 @@ T angle(const vec<T, M>& a, const vec<T, M>& b) {
  */
 template <class T>
 vec<T, 2> rot(T a, const vec<T, 2>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = sin(a), c = cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c};
 }
 /**
@@ -1825,7 +1919,7 @@ vec<T, 2> rot(T a, const vec<T, 2>& v) {
  */
 template <class T>
 vec<T, 3> rotx(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = sin(a), c = cos(a);
   return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
 }
 /**
@@ -1834,7 +1928,7 @@ vec<T, 3> rotx(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> roty(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = sin(a), c = cos(a);
   return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
 }
 /**
@@ -1843,7 +1937,7 @@ vec<T, 3> roty(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> rotz(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = sin(a), c = cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c, v.z};
 }
 /**
@@ -1861,9 +1955,9 @@ vec<T, M> nlerp(const vec<T, M>& a, const vec<T, M>& b, T t) {
 template <class T, int M>
 vec<T, M> slerp(const vec<T, M>& a, const vec<T, M>& b, T t) {
   T th = uangle(a, b);
-  return th == 0 ? a
-                 : a * (std::sin(th * (1 - t)) / std::sin(th)) +
-                       b * (std::sin(th * t) / std::sin(th));
+  return th == 0
+             ? a
+             : a * (sin(th * (1 - t)) / sin(th)) + b * (sin(th * t) / sin(th));
 }
 /** @} */
 
@@ -1900,8 +1994,7 @@ template <class T>
 vec<T, 4> qexp(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v);
-  return std::exp(q.w) *
-         vec<T, 4>{v * (vv > 0 ? std::sin(vv) / vv : 0), std::cos(vv)};
+  return std::exp(q.w) * vec<T, 4>{v * (vv > 0 ? sin(vv) / vv : 0), cos(vv)};
 }
 /**
  * @brief
@@ -1912,7 +2005,7 @@ template <class T>
 vec<T, 4> qlog(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v), qq = length(q);
-  return {v * (vv > 0 ? std::acos(q.w / qq) / vv : 0), std::log(qq)};
+  return {v * (vv > 0 ? acos(q.w / qq) / vv : 0), std::log(qq)};
 }
 /**
  * @brief quaternion `q` raised to the exponent `p`
@@ -1920,9 +2013,9 @@ vec<T, 4> qlog(const vec<T, 4>& q) {
 template <class T>
 vec<T, 4> qpow(const vec<T, 4>& q, const T& p) {
   const auto v = q.xyz();
-  const auto vv = length(v), qq = length(q), th = std::acos(q.w / qq);
+  const auto vv = length(v), qq = length(q), th = acos(q.w / qq);
   return std::pow(qq, p) *
-         vec<T, 4>{v * (vv > 0 ? std::sin(p * th) / vv : 0), std::cos(p * th)};
+         vec<T, 4>{v * (vv > 0 ? sin(p * th) / vv : 0), cos(p * th)};
 }
 /**
  * @brief [Hamilton
@@ -1995,7 +2088,7 @@ constexpr vec<T, 3> qrot(const vec<T, 4>& q, const vec<T, 3>& v) {
  */
 template <class T>
 T qangle(const vec<T, 4>& q) {
-  return std::atan2(length(q.xyz()), q.w) * 2;
+  return atan2(length(q.xyz()), q.w) * 2;
 }
 /**
  * @brief Return the normalized axis of the axis-angle representation of the
@@ -2026,7 +2119,7 @@ vec<T, 4> qslerp(const vec<T, 4>& a, const vec<T, 4>& b, T t) {
  */
 template <class T>
 vec<T, 4> constexpr rotation_quat(const vec<T, 3>& axis, T angle) {
-  return {axis * std::sin(angle / 2), std::cos(angle / 2)};
+  return {axis * sin(angle / 2), cos(angle / 2)};
 }
 /**
  * @brief Returns a normalized quaternion representing the shortest rotation
@@ -2297,7 +2390,7 @@ mat<T, 4, 4> frustum_matrix(T x0, T x1, T y0, T y1, T n, T f,
 template <class T>
 mat<T, 4, 4> perspective_matrix(T fovy, T aspect, T n, T f, fwd_axis a = neg_z,
                                 z_range z = neg_one_to_one) {
-  T y = n * std::tan(fovy / 2), x = y * aspect;
+  T y = n * tan(fovy / 2), x = y * aspect;
   return frustum_matrix(-x, x, -y, y, n, f, a, z);
 }
 /** @} */
