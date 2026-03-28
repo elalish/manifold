@@ -93,7 +93,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
   name: 'esbuild-manifold-plugin',
   async setup(build) {
     let manifoldCADExportPath: string|null = null;
-    const manifoldCADExportSpecifier = 'manifold-3d/manifoldCAD'
+    const manifoldCADExportURLMatch = /manifold-3d(@[0-9.]+)?\/manifoldCAD/
     const ManifoldCADExportMatch = /^manifold-3d\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
@@ -232,7 +232,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
         // Is this a manifoldCAD context import from a remote package?
         // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
-        if (path === cdnUrl(manifoldCADExportSpecifier, options.jsCDN)) {
+        if (path.match(manifoldCADExportURLMatch)) {
           const response = {
             path,
             namespace: 'manifold-cad-globals',
