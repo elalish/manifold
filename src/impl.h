@@ -463,7 +463,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
-    out.runFlags.push_back({rel.backSide});
+    out.runFlags.push_back(rel.backSide ? 1 : 0);
     if (updateNormals) {
       runNormalTransform.push_back(rel.GetNormalTransform());
     }

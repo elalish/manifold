@@ -158,7 +158,7 @@ struct MeshGLP {
   /// Optional: For each run, defines a set of flags giving extra information
   /// about the run. See the corresponding getter functions for details on the
   /// specific flags. These are primarily used on output.
-  std::vector<Flags> runFlags;
+  std::vector<uint8_t> runFlags;
   /// Optional: Length NumTri, contains the source face ID this triangle comes
   /// from. Simplification will maintain all edges between triangles with
   /// different faceIDs. Input faceIDs will be maintained to the outputs, but if
@@ -261,8 +261,8 @@ struct MeshGLP {
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
-  bool Backside(I run) const {
-    return run < runFlags.size() && runFlags[run].backside;
+  bool Backside(size_t run) const {
+    return run < runFlags.size() && runFlags[run] == 1;
   }
 };
 
