@@ -21,8 +21,8 @@
 #include <chrono>
 #endif
 
-#include "linalg.h"
 #include "deterministic_trig.h"
+#include "linalg.h"
 
 namespace manifold {
 /** @addtogroup Math
