@@ -256,12 +256,17 @@ namespace manifold {
  * normalIdx shows the beginning of where normals are stored in the properties.
  */
 vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
+  const int meshID = meshRelation_.triRef[halfedge / 3].meshID;
+
+  const mat3 transform =
+      meshRelation_.meshIDtransform.find(meshID)->second.GetNormalTransform();
+
   const int prop = halfedge_[halfedge].propVert;
   vec3 normal;
   for (const int i : {0, 1, 2}) {
     normal[i] = properties_[prop * numProp_ + normalIdx + i];
   }
-  return normal;
+  return transform * normal;
 }
 
 /**
@@ -479,15 +484,24 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                halfedge_[i].propVert = -1;
              });
 
+  std::map<int, mat3> meshIDtoNormalTransform;
+
   const int numEdge = halfedge_.size();
   for (int startEdge = 0; startEdge < numEdge; ++startEdge) {
     if (halfedge_[startEdge].propVert >= 0) continue;
     const int vert = halfedge_[startEdge].startVert;
 
+    const int meshID = meshRelation_.triRef[startEdge / 3].meshID;
+    if (meshIDtoNormalTransform.find(meshID) == meshIDtoNormalTransform.end()) {
+      meshIDtoNormalTransform[meshID] =
+          meshRelation_.meshIDtransform[meshID].GetInverseNormalTransform();
+    }
+    const mat3 transform = meshIDtoNormalTransform[meshID];
+
     if (vertNumSharp[vert] < 2) {  // vertex has single normal
-      const vec3 normal = vertFlatFace[vert] >= 0
-                              ? faceNormal_[vertFlatFace[vert]]
-                              : vertNormal_[vert];
+      const vec3 normal =
+          transform * (vertFlatFace[vert] >= 0 ? faceNormal_[vertFlatFace[vert]]
+                                               : vertNormal_[vert]);
       int lastProp = -1;
       ForVert(startEdge, [&](int current) {
         const int prop = oldHalfedgeProp[current];
@@ -579,7 +593,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           });
 
       for (auto& normal : normals) {
-        normal = SafeNormalize(normal);
+        normal = transform * SafeNormalize(normal);
       }
 
       int lastGroup = 0;

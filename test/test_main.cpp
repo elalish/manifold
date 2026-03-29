@@ -323,19 +323,19 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
-  const int normalIdx = updateNormals ? 0 : -1;
-  MeshGL output = out.GetMeshGL(normalIdx);
+  MeshGL output = out.GetMeshGL();
+  std::vector<mat3x4> runTransforms(output.NumRun());
+  for (size_t run = 0; run < output.NumRun(); ++run) {
+    runTransforms[run] = output.GetRunTransform(run);
+  }
+  if (updateNormals) {
+    output.UpdateNormals(3);
+  }
 
-  for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
-    const float* m = output.runTransform.data() + 12 * run;
-    const mat3x4 transform =
-        output.runTransform.empty()
-            ? la::identity
-            : mat3x4({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
-                     {m[9], m[10], m[11]});
+  for (size_t run = 0; run < output.NumRun(); ++run) {
     size_t i = 0;
     for (; i < originals.size(); ++i) {
-      ASSERT_EQ(originals[i].runOriginalID.size(), 1);
+      ASSERT_EQ(originals[i].NumRun(), 1);
       if (originals[i].runOriginalID[0] == output.runOriginalID[run]) break;
     }
     ASSERT_LT(i, originals.size());
@@ -365,7 +365,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           outTriPos[j][k] = output.vertProperties[vert * output.numProp + k];
         }
         pos[3] = 1;
-        inTriPos[j] = transform * pos;
+        inTriPos[j] = runTransforms[run] * pos;
       }
       vec3 outNormal =
           la::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);

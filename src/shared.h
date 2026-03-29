@@ -36,8 +36,21 @@ inline int NextHalfedge(int current) {
   return current;
 }
 
+/**
+When a transform is applied to the verts of an object, and different transform
+is needed for the normals. Note that applying this transform will stretch their
+length, so they should be renormalized after.
+*/
 inline mat3 NormalTransform(const mat3x4& transform) {
   return la::inverse(la::transpose(mat3(transform)));
+}
+
+/**
+This is the corresponding normal transform for the inverse of the input
+transform.
+*/
+inline mat3 InverseNormalTransform(const mat3x4& transform) {
+  return la::inverse(la::transpose(la::inverse(mat3(transform))));
 }
 
 /**

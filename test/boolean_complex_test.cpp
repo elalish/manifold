@@ -850,7 +850,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
 
   auto aMinusB = aManifold - bManifold;
 
-  RelatedGL(aMinusB, {a, b}, false, false);
+  RelatedGL(aMinusB, {a, b}, true, true);
 }
 
 MeshGL mgl_0() {

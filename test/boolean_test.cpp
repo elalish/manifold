@@ -72,7 +72,7 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
-  MeshGL output = result.GetMeshGL(0);
+  MeshGL output = result.GetMeshGL();
 
   if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
@@ -81,7 +81,7 @@ TEST(Boolean, Normals) {
   output.Merge();
   Manifold roundTrip(output);
 
-  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, false);
+  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, true);
 }
 
 TEST(Boolean, MissingNormals) {

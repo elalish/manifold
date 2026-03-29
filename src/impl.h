@@ -29,6 +29,14 @@ struct Manifold::Impl {
     int originalID = -1;
     mat3x4 transform = la::identity;
     bool backSide = false;
+
+    mat3 GetNormalTransform() const {
+      return NormalTransform(transform) * (backSide ? -1.0 : 1.0);
+    }
+
+    mat3 GetInverseNormalTransform() const {
+      return InverseNormalTransform(transform) * (backSide ? -1.0 : 1.0);
+    }
   };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
@@ -184,6 +192,7 @@ struct Manifold::Impl {
     for (size_t i = 0; i < runOriginalID.size(); ++i) {
       const int meshID = startID + i;
       const int originalID = runOriginalID[i];
+      const bool backside = meshGL.Backside(i);
       for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
         TriRef& ref = triRef[tri];
         ref.meshID = meshID;
@@ -200,7 +209,8 @@ struct Manifold::Impl {
                                                  {{m[0], m[1], m[2]},
                                                   {m[3], m[4], m[5]},
                                                   {m[6], m[7], m[8]},
-                                                  {m[9], m[10], m[11]}}};
+                                                  {m[9], m[10], m[11]}},
+                                                 backside};
       }
     }
 
@@ -453,11 +463,12 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
+    out.runFlags.push_back(rel.backSide ? 1 : 0);
     if (updateNormals) {
-      runNormalTransform.push_back(NormalTransform(rel.transform) *
-                                   (rel.backSide ? -1.0 : 1.0));
+      runNormalTransform.push_back(rel.GetNormalTransform());
     }
-    if (!isOriginal) {
+    // clear transforms if applying them to normals
+    if (!isOriginal && !updateNormals) {
       for (const int col : {0, 1, 2, 3}) {
         for (const int row : {0, 1, 2}) {
           out.runTransform.push_back(rel.transform[col][row]);

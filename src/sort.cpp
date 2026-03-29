@@ -178,6 +178,36 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
 
   return true;
 }
+
+template <typename Precision, typename I>
+void UpdateNormalsMeshGLP(MeshGLP<Precision, I>& mesh, int normalIdx) {
+  ZoneScoped;
+  if (normalIdx < 3 || normalIdx + 3 > mesh.numProp) {
+    return;
+  }
+  std::vector<bool> vertUpdated(mesh.NumVert(), false);
+  for (size_t run = 0; run < mesh.NumRun(); ++run) {
+    const mat3 transform = NormalTransform(mesh.GetRunTransform(run)) *
+                           (mesh.Backside(run) ? -1.0 : 1.0);
+    for (I* itr = &mesh.triVerts[mesh.runIndex[run]];
+         itr < &mesh.triVerts[mesh.runIndex[run + 1]]; ++itr) {
+      const I vert = *itr;
+      if (vertUpdated[vert]) continue;
+      vertUpdated[vert] = true;
+      vec3 normal;
+      const int start = vert * mesh.numProp + normalIdx;
+      for (int i : {0, 1, 2}) {
+        normal[i] = mesh.vertProperties[start + i];
+      }
+      normal = SafeNormalize(transform * normal);
+      for (int i : {0, 1, 2}) {
+        mesh.vertProperties[start + i] = normal[i];
+      }
+    }
+  }
+  mesh.runTransform.clear();
+  mesh.runFlags.clear();
+}
 }  // namespace
 
 namespace manifold {
@@ -528,5 +558,15 @@ bool MeshGL::Merge() {
 template <>
 bool MeshGL64::Merge() {
   return MergeMeshGLP(*this);
+}
+
+template <>
+void MeshGL::UpdateNormals(int normalIdx) {
+  UpdateNormalsMeshGLP(*this, normalIdx);
+}
+
+template <>
+void MeshGL64::UpdateNormals(int normalIdx) {
+  UpdateNormalsMeshGLP(*this, normalIdx);
 }
 }  // namespace manifold
