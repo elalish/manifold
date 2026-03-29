@@ -476,8 +476,8 @@ struct select {
 };
 struct lerp {
   template <class A, class B, class C>
-  constexpr auto operator()(A a, B b, C c) const
-      -> decltype(a * (1 - c) + b * c) {
+  constexpr auto operator()(A a, B b,
+                            C c) const -> decltype(a * (1 - c) + b * c) {
     return a * (1 - c) + b * c;
   }
 };
@@ -671,106 +671,88 @@ struct std_sqrt {
     return std::sqrt(a);
   }
 };
-template <class A>
-constexpr auto deterministic_sin(A a) -> decltype(std::sin(a)) {
-  return std::sin(a);
-}
-inline double deterministic_sin(double a) { return manifold::math::sin(a); }
-inline float deterministic_sin(float a) {
-  return static_cast<float>(manifold::math::sin(static_cast<double>(a)));
-}
-inline long double deterministic_sin(long double a) {
-  return static_cast<long double>(manifold::math::sin(static_cast<double>(a)));
-}
 struct std_sin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_sin(a)) {
-    return deterministic_sin(a);
+  constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
+    return std::sin(a);
+  }
+  double operator()(double a) const { return manifold::math::sin(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::sin(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::sin(static_cast<double>(a)));
   }
 };
-template <class A>
-constexpr auto deterministic_cos(A a) -> decltype(std::cos(a)) {
-  return std::cos(a);
-}
-inline double deterministic_cos(double a) { return manifold::math::cos(a); }
-inline float deterministic_cos(float a) {
-  return static_cast<float>(manifold::math::cos(static_cast<double>(a)));
-}
-inline long double deterministic_cos(long double a) {
-  return static_cast<long double>(manifold::math::cos(static_cast<double>(a)));
-}
 struct std_cos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_cos(a)) {
-    return deterministic_cos(a);
+  constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
+    return std::cos(a);
+  }
+  double operator()(double a) const { return manifold::math::cos(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::cos(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::cos(static_cast<double>(a)));
   }
 };
-template <class A>
-constexpr auto deterministic_tan(A a) -> decltype(std::tan(a)) {
-  return std::tan(a);
-}
-inline double deterministic_tan(double a) { return manifold::math::tan(a); }
-inline float deterministic_tan(float a) {
-  return static_cast<float>(manifold::math::tan(static_cast<double>(a)));
-}
-inline long double deterministic_tan(long double a) {
-  return static_cast<long double>(manifold::math::tan(static_cast<double>(a)));
-}
 struct std_tan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_tan(a)) {
-    return deterministic_tan(a);
+  constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
+    return std::tan(a);
+  }
+  double operator()(double a) const { return manifold::math::tan(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::tan(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::tan(static_cast<double>(a)));
   }
 };
-template <class A>
-constexpr auto deterministic_asin(A a) -> decltype(std::asin(a)) {
-  return std::asin(a);
-}
-inline double deterministic_asin(double a) { return manifold::math::asin(a); }
-inline float deterministic_asin(float a) {
-  return static_cast<float>(manifold::math::asin(static_cast<double>(a)));
-}
-inline long double deterministic_asin(long double a) {
-  return static_cast<long double>(manifold::math::asin(static_cast<double>(a)));
-}
 struct std_asin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_asin(a)) {
-    return deterministic_asin(a);
+  constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
+    return std::asin(a);
+  }
+  double operator()(double a) const { return manifold::math::asin(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::asin(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::asin(static_cast<double>(a)));
   }
 };
-template <class A>
-constexpr auto deterministic_acos(A a) -> decltype(std::acos(a)) {
-  return std::acos(a);
-}
-inline double deterministic_acos(double a) { return manifold::math::acos(a); }
-inline float deterministic_acos(float a) {
-  return static_cast<float>(manifold::math::acos(static_cast<double>(a)));
-}
-inline long double deterministic_acos(long double a) {
-  return static_cast<long double>(manifold::math::acos(static_cast<double>(a)));
-}
 struct std_acos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_acos(a)) {
-    return deterministic_acos(a);
+  constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
+    return std::acos(a);
+  }
+  double operator()(double a) const { return manifold::math::acos(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::acos(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::acos(static_cast<double>(a)));
   }
 };
-template <class A>
-constexpr auto deterministic_atan(A a) -> decltype(std::atan(a)) {
-  return std::atan(a);
-}
-inline double deterministic_atan(double a) { return manifold::math::atan(a); }
-inline float deterministic_atan(float a) {
-  return static_cast<float>(manifold::math::atan(static_cast<double>(a)));
-}
-inline long double deterministic_atan(long double a) {
-  return static_cast<long double>(manifold::math::atan(static_cast<double>(a)));
-}
 struct std_atan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(deterministic_atan(a)) {
-    return deterministic_atan(a);
+  constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
+    return std::atan(a);
+  }
+  double operator()(double a) const { return manifold::math::atan(a); }
+  float operator()(float a) const {
+    return static_cast<float>(manifold::math::atan(static_cast<double>(a)));
+  }
+  long double operator()(long double a) const {
+    return static_cast<long double>(
+        manifold::math::atan(static_cast<double>(a)));
   }
 };
 struct std_sinh {
@@ -809,26 +791,21 @@ struct std_pow {
     return std::pow(a, b);
   }
 };
-template <class A, class B>
-constexpr auto deterministic_atan2(A a, B b) -> decltype(std::atan2(a, b)) {
-  return std::atan2(a, b);
-}
-inline double deterministic_atan2(double a, double b) {
-  return manifold::math::atan2(a, b);
-}
-inline float deterministic_atan2(float a, float b) {
-  return static_cast<float>(
-      manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
-}
-inline long double deterministic_atan2(long double a, long double b) {
-  return static_cast<long double>(
-      manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
-}
 struct std_atan2 {
   template <class A, class B>
-  constexpr auto operator()(A a, B b) const
-      -> decltype(deterministic_atan2(a, b)) {
-    return deterministic_atan2(a, b);
+  constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
+    return std::atan2(a, b);
+  }
+  double operator()(double a, double b) const {
+    return manifold::math::atan2(a, b);
+  }
+  float operator()(float a, float b) const {
+    return static_cast<float>(
+        manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
+  }
+  long double operator()(long double a, long double b) const {
+    return static_cast<long double>(
+        manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
   }
 };
 struct std_copysign {
@@ -1395,33 +1372,33 @@ constexpr typename detail::any_compare<A, B>::type compare(const A& a,
   return detail::any_compare<A, B>()(a, b);
 }
 template <class A, class B>
-constexpr auto operator==(const A& a, const B& b)
-    -> decltype(compare(a, b) == 0) {
+constexpr auto operator==(const A& a,
+                          const B& b) -> decltype(compare(a, b) == 0) {
   return compare(a, b) == 0;
 }
 template <class A, class B>
-constexpr auto operator!=(const A& a, const B& b)
-    -> decltype(compare(a, b) != 0) {
+constexpr auto operator!=(const A& a,
+                          const B& b) -> decltype(compare(a, b) != 0) {
   return compare(a, b) != 0;
 }
 template <class A, class B>
-constexpr auto operator<(const A& a, const B& b)
-    -> decltype(compare(a, b) < 0) {
+constexpr auto operator<(const A& a,
+                         const B& b) -> decltype(compare(a, b) < 0) {
   return compare(a, b) < 0;
 }
 template <class A, class B>
-constexpr auto operator>(const A& a, const B& b)
-    -> decltype(compare(a, b) > 0) {
+constexpr auto operator>(const A& a,
+                         const B& b) -> decltype(compare(a, b) > 0) {
   return compare(a, b) > 0;
 }
 template <class A, class B>
-constexpr auto operator<=(const A& a, const B& b)
-    -> decltype(compare(a, b) <= 0) {
+constexpr auto operator<=(const A& a,
+                          const B& b) -> decltype(compare(a, b) <= 0) {
   return compare(a, b) <= 0;
 }
 template <class A, class B>
-constexpr auto operator>=(const A& a, const B& b)
-    -> decltype(compare(a, b) >= 0) {
+constexpr auto operator>=(const A& a,
+                          const B& b) -> decltype(compare(a, b) >= 0) {
   return compare(a, b) >= 0;
 }
 /** @} */
