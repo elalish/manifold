@@ -43,27 +43,6 @@ double AngleBetween(vec3 a, vec3 b) {
   return dot >= 1 ? 0 : (dot <= -1 ? kPi : math::acos(dot));
 }
 
-quat RotationQuatAxisAngle(const vec3& axis, double angle) {
-  return {axis * math::sin(angle * 0.5), math::cos(angle * 0.5)};
-}
-
-quat RotationQuatBetween(const vec3& orig, const vec3& dest) {
-  const double cosTheta = la::dot(orig, dest);
-  if (cosTheta >= 1 - std::numeric_limits<double>::epsilon()) {
-    return {0, 0, 0, 1};
-  }
-  if (cosTheta < -1 + std::numeric_limits<double>::epsilon()) {
-    vec3 axis = la::cross(vec3(0, 0, 1), orig);
-    if (la::dot(axis, axis) < std::numeric_limits<double>::epsilon()) {
-      axis = la::cross(vec3(1, 0, 0), orig);
-    }
-    return RotationQuatAxisAngle(la::normalize(axis), kPi);
-  }
-  const vec3 axis = la::cross(orig, dest);
-  const double s = std::sqrt((1 + cosTheta) * 2);
-  return {axis * (1 / s), s * 0.5};
-}
-
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
 // input the desired tangent direction (length doesn't matter) and the edge
 // vector to the neighboring vertex. In a symmetric situation where the tangents
@@ -168,8 +147,7 @@ struct InterpTri {
     const bool longWay =
         la::dot(nTangentsX[0], edge) + la::dot(nTangentsX[1], edge) < 0;
     const quat qTmp = Slerp(q0, q1, x, longWay);
-    const quat q =
-        la::qmul(RotationQuatBetween(la::qxdir(qTmp), tangent), qTmp);
+    const quat q = la::qmul(la::rotation_quat(la::qxdir(qTmp), tangent), qTmp);
 
     const vec3 delta = la::lerp(RotateFromTo(vec3(tangentsY[0]), q0, q),
                                 RotateFromTo(vec3(tangentsY[1]), q1, q), x);
@@ -760,7 +738,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           }
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
           vec3 tangent(halfedgeTangent_[current]);
-          const quat q = RotationQuatAxisAngle(la::normalize(normal), angle);
+          const quat q = la::rotation_quat(la::normalize(normal), angle);
           halfedgeTangent_[current] =
               vec4(la::qrot(q, tangent), halfedgeTangent_[current].w);
           ++i;
