@@ -167,6 +167,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("smoothByNormals", &Manifold::SmoothByNormals)
       .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
+      .function("_WarpBatch", &man_js::WarpBatch)
       .function("_SetProperties", &man_js::SetProperties)
       .function("transform", &man_js::Transform)
       .function("_Translate", &Manifold::Translate)
