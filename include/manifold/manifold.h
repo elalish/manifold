@@ -111,9 +111,6 @@ class CsgLeafNode;
  */
 template <typename Precision, typename I = uint32_t>
 struct MeshGLP {
-  struct Flags {
-    bool backside : 1;
-  };
   /// Number of property vertices
   I NumVert() const { return vertProperties.size() / numProp; };
   /// Number of triangles
