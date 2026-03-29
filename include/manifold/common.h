@@ -22,7 +22,7 @@
 #endif
 
 #include "linalg.h"
-#include "manifold/deterministic_trig.h"
+#include "deterministic_trig.h"
 
 namespace manifold {
 /** @addtogroup Math
