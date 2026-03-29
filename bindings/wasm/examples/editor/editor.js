@@ -1,3 +1,11 @@
+// Returns a unique script name not already in use
+function uniqueName(base) {
+  const all = getAllScripts();
+  if (!(base in all)) return base;
+  let i = 2;
+  while ((base + ' ' + i) in all) i++;
+  return base + ' ' + i;
+}
 // Copyright 2022 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -282,6 +290,10 @@ window.beforeunload = saveCurrent;
 let switching = false;
 let isExample = true;
 function switchTo(scriptName) {
+  // Always restore script name and edit icon
+  currentFileElement.style.display = '';
+  const currentEdit = document.getElementById('current-edit');
+  if (currentEdit) currentEdit.style.display = '';
   if (editor) {
     switching = true;
     currentFileElement.textContent = scriptName;
@@ -319,72 +331,10 @@ function createDropdownItem(name) {
   button.onkeyup = function(event) {
     event.preventDefault();
   };
-  return button;
-}
-
-function addIcon(button) {
-  const icon = document.createElement('button');
-  icon.classList.add('icon');
-  button.parentElement.appendChild(icon);
-  return icon;
-}
-
-function uniqueName(name) {
-  let num = 1;
-  let newName = name;
-  while (getScript(newName) != null || exampleFunctions.get(newName) != null) {
-    newName = name + ' ' + num++;
-  }
-  return newName;
-}
-
-function addEdit(button) {
-  const label = button.firstChild;
-  const edit = addIcon(button);
-  edit.classList.add('edit');
-
-  edit.onclick = function(event) {
-    event.stopPropagation();
-    const oldName = label.textContent;
-    const code = getScript(oldName);
-    const form = document.createElement('form');
-    const inputElement = document.createElement('input');
-    inputElement.classList.add('name');
-    inputElement.value = oldName;
-    label.textContent = '';
-    button.appendChild(form);
-    form.appendChild(inputElement);
-    inputElement.focus();
-    inputElement.setSelectionRange(0, oldName.length);
-
-    function rename() {
-      const input = inputElement.value;
-      inputElement.blur();
-      if (!input) return;
-      const newName = uniqueName(input);
-      label.textContent = newName;
-      if (currentFileElement.textContent == oldName) {
-        currentFileElement.textContent = newName;
-      }
-      removeScript(oldName);
-      setScript(newName, code);
-    }
-
-    form.onsubmit = rename;
-    inputElement.onclick = function(event) {
-      event.stopPropagation();
-    };
-
-    inputElement.onblur = function() {
-      button.removeChild(form);
-      label.textContent = oldName;
-    };
-  };
-
+  // Add trash icon for deleting script
   const trash = addIcon(button);
   trash.classList.add('trash');
   let lastClick = 0;
-
   trash.onclick = function(event) {
     event.stopPropagation();
     if (button.classList.contains('blue')) {
@@ -404,6 +354,18 @@ function addEdit(button) {
       container.parentElement.removeChild(container);
     }
   };
+  return button;
+}
+
+function addIcon(button) {
+  const icon = document.createElement('button');
+  icon.classList.add('icon');
+  button.parentElement.appendChild(icon);
+  return icon;
+}
+
+function addEdit(button) {
+  // Removed edit icon for dropdown items
 }
 
 const newButton = document.querySelector('#new');
@@ -566,6 +528,7 @@ async function createEditor() {
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
+    addEdit(button);
   }
 
   let currentName = currentFileElement.textContent;
@@ -583,6 +546,99 @@ async function createEditor() {
       addEdit(button);
     }
   }
+
+  // Add rename logic to the always-visible edit icon next to #current
+  const currentEdit = document.getElementById('current-edit');
+  currentEdit.onclick = function(event) {
+    event.stopPropagation();
+    hideDropdown();
+    const oldName = currentFileElement.textContent;
+    const code = getScript(oldName) ?? exampleFunctions.get(oldName) ?? '';
+    const form = document.createElement('form');
+    const inputElement = document.createElement('input');
+    inputElement.classList.add('name');
+    inputElement.value = oldName;
+    // Attach blur handler before DOM insertion for robustness
+    inputElement.onblur = function() {
+      finishRename(inputElement.value, false);
+      currentFileElement.style.display = '';
+      currentEdit.style.display = '';
+    };
+
+    // Minimal fallback: document click handler in case blur is not triggered
+    function docClickHandler(e) {
+      if (!form.contains(e.target)) {
+        finishRename(inputElement.value, false);
+        document.removeEventListener('mousedown', docClickHandler, true);
+        document.removeEventListener('touchstart', docClickHandler, true);
+      }
+    }
+    setTimeout(() => {
+      document.addEventListener('mousedown', docClickHandler, true);
+      document.addEventListener('touchstart', docClickHandler, true);
+    }, 0);
+    // Hide the script name and edit icon while renaming
+    currentFileElement.style.display = 'none';
+    currentEdit.style.display = 'none';
+    // Insert the form robustly in place of the script name
+    const parent = currentFileElement.parentElement;
+    if (parent && currentEdit.parentElement === parent) {
+      parent.insertBefore(form, currentEdit);
+    } else if (parent) {
+      parent.appendChild(form);
+    } else {
+      // fallback: insert after currentFileElement
+      currentFileElement.insertAdjacentElement('afterend', form);
+    }
+    form.appendChild(inputElement);
+    inputElement.focus();
+    inputElement.setSelectionRange(0, oldName.length);
+
+
+    function finishRename(newName, revert) {
+      if (finishRename._called) return;
+      finishRename._called = true;
+      inputElement.onblur = null;
+      form.onsubmit = null;
+      if (form.parentElement) form.remove();
+      currentFileElement.style.display = '';
+      currentEdit.style.display = '';
+      if (!revert && newName && newName !== oldName) {
+        currentFileElement.textContent = newName;
+        // Update dropdown label for renamed script
+        for (const item of fileDropdown.children) {
+          const btn = item.querySelector('button');
+          if (!btn) continue;
+          const span = btn.querySelector('span');
+          if (span && span.textContent === oldName) {
+            span.textContent = newName;
+            break;
+          }
+        }
+        if (exampleFunctions.get(oldName)) {
+          // Example: just update label
+        } else {
+          removeScript(oldName);
+          setScript(newName, code);
+        }
+      } else {
+        currentFileElement.textContent = oldName;
+      }
+    }
+
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      finishRename(inputElement.value, false);
+    };
+    inputElement.onclick = function(event) {
+      event.stopPropagation();
+    };
+    inputElement.onblur = function() {
+      finishRename(inputElement.value, true);
+      currentFileElement.style.display = '';
+      currentEdit.style.display = '';
+    };
+  };
 
   if (window.location.hash.length > 0) {
     const fragment = decodeURIComponent(window.location.hash.substring(1));
