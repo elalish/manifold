@@ -678,7 +678,7 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
     // (radius) in order to get back the same number of segments in Clipper2:
     // steps_per_360 = PI / acos(1 - arc_tol / abs_delta)
     const double abs_delta = std::fabs(delta);
-    arc_tol = (std::cos(Clipper2Lib::PI / n) - 1) * -abs_delta;
+    arc_tol = (math::cos(Clipper2Lib::PI / n) - 1) * -abs_delta;
   }
   auto ps =
       C2::InflatePaths(GetPaths()->paths_, delta, jt(jointype),

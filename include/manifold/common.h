@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include <chrono>
 #endif
 
+#include "deterministic_trig.h"
 #include "linalg.h"
 
 namespace manifold {
@@ -92,19 +94,20 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  * @param x Angle in degrees.
  */
 inline double sind(double x) {
-  if (!la::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
   int quo;
-  x = remquo(fabs(x), 90.0, &quo);
+  x = std::remquo(std::fabs(x), 90.0, &quo);
+  const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return sin(radians(x));
+      return math::sin(xr);
     case 1:
-      return cos(radians(x));
+      return math::cos(xr);
     case 2:
-      return -sin(radians(x));
+      return -math::sin(xr);
     case 3:
-      return -cos(radians(x));
+      return -math::cos(xr);
   }
   return 0.0;
 }
@@ -532,13 +535,11 @@ struct ExecutionParams {
 #ifdef MANIFOLD_DEBUG
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
