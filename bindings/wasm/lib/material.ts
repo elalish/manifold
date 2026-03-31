@@ -120,14 +120,13 @@ function makeDefaultMaterial(
   }
 
   if (alpha < 1) {
-    material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND)
-        .setDoubleSided(true);
+    material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND);
   }
 
   return material.setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
       .setBaseColorFactor([...baseColorFactor, alpha])
-      .setDoubleSided(!!doubleSided);
+      .setDoubleSided(!!doubleSided || alpha < 1);
 }
 
 /**
