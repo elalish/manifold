@@ -687,27 +687,21 @@ struct std_asin {
   constexpr auto operator()(A a) const {
     return std::asin(a);
   }
-  double operator()(double a) const {
-    return manifold::math::asin(a);
-  }
+  double operator()(double a) const { return manifold::math::asin(a); }
 };
 struct std_acos {
   template <class A>
   constexpr auto operator()(A a) const {
     return std::acos(a);
   }
-  double operator()(double a) const {
-    return manifold::math::acos(a);
-  }
+  double operator()(double a) const { return manifold::math::acos(a); }
 };
 struct std_atan {
   template <class A>
   constexpr auto operator()(A a) const {
     return std::atan(a);
   }
-  double operator()(double a) const {
-    return manifold::math::atan(a);
-  }
+  double operator()(double a) const { return manifold::math::atan(a); }
 };
 struct std_sinh {
   template <class A>
