@@ -21,7 +21,7 @@
 #include <chrono>
 #endif
 
-#include "deterministic_trig.h"
+#include "math.h"
 #include "linalg.h"
 
 namespace manifold {
@@ -382,7 +382,7 @@ struct Rect {
   /**
    * Is the rectangle empty (containing no space)?
    */
-  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; }
 
   /**
    * Does this recangle have finite bounds?
@@ -489,7 +489,6 @@ constexpr double DEFAULT_LENGTH = 1.0;
  * must be specified.
  */
 class Quality {
- private:
  public:
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);

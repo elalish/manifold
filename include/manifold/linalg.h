@@ -41,17 +41,7 @@
 #include <functional>   // For std::hash declaration
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
 
-namespace manifold {
-namespace math {
-double sin(double);
-double cos(double);
-double tan(double);
-double asin(double);
-double acos(double);
-double atan(double);
-double atan2(double, double);
-}  // namespace math
-}  // namespace manifold
+#include "math.h"
 
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
@@ -674,84 +664,42 @@ struct std_sqrt {
 struct std_sin {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
-    return std::sin(a);
-  }
-  double operator()(double a) const { return manifold::math::sin(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::sin(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::sin(a))>(
         manifold::math::sin(static_cast<double>(a)));
   }
 };
 struct std_cos {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
-    return std::cos(a);
-  }
-  double operator()(double a) const { return manifold::math::cos(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::cos(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::cos(a))>(
         manifold::math::cos(static_cast<double>(a)));
   }
 };
 struct std_tan {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
-    return std::tan(a);
-  }
-  double operator()(double a) const { return manifold::math::tan(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::tan(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::tan(a))>(
         manifold::math::tan(static_cast<double>(a)));
   }
 };
 struct std_asin {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
-    return std::asin(a);
-  }
-  double operator()(double a) const { return manifold::math::asin(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::asin(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::asin(a))>(
         manifold::math::asin(static_cast<double>(a)));
   }
 };
 struct std_acos {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
-    return std::acos(a);
-  }
-  double operator()(double a) const { return manifold::math::acos(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::acos(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::acos(a))>(
         manifold::math::acos(static_cast<double>(a)));
   }
 };
 struct std_atan {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
-    return std::atan(a);
-  }
-  double operator()(double a) const { return manifold::math::atan(a); }
-  float operator()(float a) const {
-    return static_cast<float>(manifold::math::atan(static_cast<double>(a)));
-  }
-  long double operator()(long double a) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::atan(a))>(
         manifold::math::atan(static_cast<double>(a)));
   }
 };
@@ -794,17 +742,7 @@ struct std_pow {
 struct std_atan2 {
   template <class A, class B>
   constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
-    return std::atan2(a, b);
-  }
-  double operator()(double a, double b) const {
-    return manifold::math::atan2(a, b);
-  }
-  float operator()(float a, float b) const {
-    return static_cast<float>(
-        manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
-  }
-  long double operator()(long double a, long double b) const {
-    return static_cast<long double>(
+    return static_cast<decltype(std::atan2(a, b))>(
         manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
   }
 };
