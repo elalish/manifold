@@ -666,28 +666,28 @@ struct std_sin {
   constexpr auto operator()(A a) const {
     return std::sin(a);
   }
-  constexpr double operator()(double a) const { return manifold::math::sin(a); }
+  double operator()(double a) const { return manifold::math::sin(a); }
 };
 struct std_cos {
   template <class A>
   constexpr auto operator()(A a) const {
     return std::cos(a);
   }
-  constexpr double operator()(double a) const { return manifold::math::cos(a); }
+  double operator()(double a) const { return manifold::math::cos(a); }
 };
 struct std_tan {
   template <class A>
   constexpr auto operator()(A a) const {
     return std::tan(a);
   }
-  constexpr double operator()(double a) const { return manifold::math::tan(a); }
+  double operator()(double a) const { return manifold::math::tan(a); }
 };
 struct std_asin {
   template <class A>
   constexpr auto operator()(A a) const {
     return std::asin(a);
   }
-  constexpr double operator()(double a) const {
+  double operator()(double a) const {
     return manifold::math::asin(a);
   }
 };
@@ -696,7 +696,7 @@ struct std_acos {
   constexpr auto operator()(A a) const {
     return std::acos(a);
   }
-  constexpr double operator()(double a) const {
+  double operator()(double a) const {
     return manifold::math::acos(a);
   }
 };
@@ -705,7 +705,7 @@ struct std_atan {
   constexpr auto operator()(A a) const {
     return std::atan(a);
   }
-  constexpr double operator()(double a) const {
+  double operator()(double a) const {
     return manifold::math::atan(a);
   }
 };
@@ -750,7 +750,7 @@ struct std_atan2 {
   constexpr auto operator()(A a, B b) const {
     return std::atan2(a, b);
   }
-  constexpr double operator()(double a, double b) const {
+  double operator()(double a, double b) const {
     return manifold::math::atan2(a, b);
   }
 };
