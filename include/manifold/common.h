@@ -21,8 +21,8 @@
 #include <chrono>
 #endif
 
-#include "math.h"
 #include "linalg.h"
+#include "math.h"
 
 namespace manifold {
 /** @addtogroup Math

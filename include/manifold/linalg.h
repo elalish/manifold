@@ -1810,7 +1810,7 @@ T distance(const vec<T, M>& a, const vec<T, M>& b) {
 template <class T, int M>
 T uangle(const vec<T, M>& a, const vec<T, M>& b) {
   T d = dot(a, b);
-  return d > 1 ? 0 : acos(d < -1 ? -1 : d);
+  return d > 1 ? 0 : linalg::acos(d < -1 ? -1 : d);
 }
 /**
  * @brief Return the angle in radians between two non-unit vectors.
@@ -1825,7 +1825,7 @@ T angle(const vec<T, M>& a, const vec<T, M>& b) {
  */
 template <class T>
 vec<T, 2> rot(T a, const vec<T, 2>& v) {
-  const T s = sin(a), c = cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c};
 }
 /**
@@ -1834,7 +1834,7 @@ vec<T, 2> rot(T a, const vec<T, 2>& v) {
  */
 template <class T>
 vec<T, 3> rotx(T a, const vec<T, 3>& v) {
-  const T s = sin(a), c = cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
 }
 /**
@@ -1843,7 +1843,7 @@ vec<T, 3> rotx(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> roty(T a, const vec<T, 3>& v) {
-  const T s = sin(a), c = cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
 }
 /**
@@ -1852,7 +1852,7 @@ vec<T, 3> roty(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> rotz(T a, const vec<T, 3>& v) {
-  const T s = sin(a), c = cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c, v.z};
 }
 /**
@@ -1870,9 +1870,9 @@ vec<T, M> nlerp(const vec<T, M>& a, const vec<T, M>& b, T t) {
 template <class T, int M>
 vec<T, M> slerp(const vec<T, M>& a, const vec<T, M>& b, T t) {
   T th = uangle(a, b);
-  return th == 0
-             ? a
-             : a * (sin(th * (1 - t)) / sin(th)) + b * (sin(th * t) / sin(th));
+  return th == 0 ? a
+                 : a * (linalg::sin(th * (1 - t)) / linalg::sin(th)) +
+                       b * (linalg::sin(th * t) / linalg::sin(th));
 }
 /** @} */
 
@@ -1909,7 +1909,8 @@ template <class T>
 vec<T, 4> qexp(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v);
-  return std::exp(q.w) * vec<T, 4>{v * (vv > 0 ? sin(vv) / vv : 0), cos(vv)};
+  return std::exp(q.w) *
+         vec<T, 4>{v * (vv > 0 ? linalg::sin(vv) / vv : 0), linalg::cos(vv)};
 }
 /**
  * @brief
@@ -1920,7 +1921,7 @@ template <class T>
 vec<T, 4> qlog(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v), qq = length(q);
-  return {v * (vv > 0 ? acos(q.w / qq) / vv : 0), std::log(qq)};
+  return {v * (vv > 0 ? linalg::acos(q.w / qq) / vv : 0), std::log(qq)};
 }
 /**
  * @brief quaternion `q` raised to the exponent `p`
@@ -1928,9 +1929,10 @@ vec<T, 4> qlog(const vec<T, 4>& q) {
 template <class T>
 vec<T, 4> qpow(const vec<T, 4>& q, const T& p) {
   const auto v = q.xyz();
-  const auto vv = length(v), qq = length(q), th = acos(q.w / qq);
+  const auto vv = length(v), qq = length(q), th = linalg::acos(q.w / qq);
   return std::pow(qq, p) *
-         vec<T, 4>{v * (vv > 0 ? sin(p * th) / vv : 0), cos(p * th)};
+         vec<T, 4>{v * (vv > 0 ? linalg::sin(p * th) / vv : 0),
+                   linalg::cos(p * th)};
 }
 /**
  * @brief [Hamilton
@@ -2003,7 +2005,7 @@ constexpr vec<T, 3> qrot(const vec<T, 4>& q, const vec<T, 3>& v) {
  */
 template <class T>
 T qangle(const vec<T, 4>& q) {
-  return atan2(length(q.xyz()), q.w) * 2;
+  return linalg::atan2(length(q.xyz()), q.w) * 2;
 }
 /**
  * @brief Return the normalized axis of the axis-angle representation of the
@@ -2034,7 +2036,7 @@ vec<T, 4> qslerp(const vec<T, 4>& a, const vec<T, 4>& b, T t) {
  */
 template <class T>
 vec<T, 4> constexpr rotation_quat(const vec<T, 3>& axis, T angle) {
-  return {axis * sin(angle / 2), cos(angle / 2)};
+  return {axis * linalg::sin(angle / 2), linalg::cos(angle / 2)};
 }
 /**
  * @brief Returns a normalized quaternion representing the shortest rotation
@@ -2305,7 +2307,7 @@ mat<T, 4, 4> frustum_matrix(T x0, T x1, T y0, T y1, T n, T f,
 template <class T>
 mat<T, 4, 4> perspective_matrix(T fovy, T aspect, T n, T f, fwd_axis a = neg_z,
                                 z_range z = neg_one_to_one) {
-  T y = n * tan(fovy / 2), x = y * aspect;
+  T y = n * linalg::tan(fovy / 2), x = y * aspect;
   return frustum_matrix(-x, x, -y, y, n, f, a, z);
 }
 /** @} */
