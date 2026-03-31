@@ -1,4 +1,4 @@
-// Copyright 2024 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -663,44 +663,50 @@ struct std_sqrt {
 };
 struct std_sin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
-    return static_cast<decltype(std::sin(a))>(
-        manifold::math::sin(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::sin(a);
   }
+  constexpr double operator()(double a) const { return manifold::math::sin(a); }
 };
 struct std_cos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
-    return static_cast<decltype(std::cos(a))>(
-        manifold::math::cos(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::cos(a);
   }
+  constexpr double operator()(double a) const { return manifold::math::cos(a); }
 };
 struct std_tan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
-    return static_cast<decltype(std::tan(a))>(
-        manifold::math::tan(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::tan(a);
   }
+  constexpr double operator()(double a) const { return manifold::math::tan(a); }
 };
 struct std_asin {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
-    return static_cast<decltype(std::asin(a))>(
-        manifold::math::asin(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::asin(a);
+  }
+  constexpr double operator()(double a) const {
+    return manifold::math::asin(a);
   }
 };
 struct std_acos {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
-    return static_cast<decltype(std::acos(a))>(
-        manifold::math::acos(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::acos(a);
+  }
+  constexpr double operator()(double a) const {
+    return manifold::math::acos(a);
   }
 };
 struct std_atan {
   template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
-    return static_cast<decltype(std::atan(a))>(
-        manifold::math::atan(static_cast<double>(a)));
+  constexpr auto operator()(A a) const {
+    return std::atan(a);
+  }
+  constexpr double operator()(double a) const {
+    return manifold::math::atan(a);
   }
 };
 struct std_sinh {
@@ -741,9 +747,11 @@ struct std_pow {
 };
 struct std_atan2 {
   template <class A, class B>
-  constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
-    return static_cast<decltype(std::atan2(a, b))>(
-        manifold::math::atan2(static_cast<double>(a), static_cast<double>(b)));
+  constexpr auto operator()(A a, B b) const {
+    return std::atan2(a, b);
+  }
+  constexpr double operator()(double a, double b) const {
+    return manifold::math::atan2(a, b);
   }
 };
 struct std_copysign {
