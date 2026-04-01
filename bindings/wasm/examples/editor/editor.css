@@ -296,6 +296,17 @@ model-viewer {
   right: 30px;
 }
 
+.current-edit {
+  display: none;
+  position: static;
+  width: 24px;
+  height: 24px;
+  margin-left: 6px;
+  vertical-align: middle;
+  background-size: 16px;
+  border-radius: 12px;
+}
+
 .trash {
   background-image: url(/icons/trash.png);
 }

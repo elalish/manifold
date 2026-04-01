@@ -201,6 +201,7 @@ shareButton.onclick = () => {
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
 const currentFileElement = document.querySelector('#current');
+const currentEditElement = document.querySelector('#current-edit');
 const fileArrow = document.querySelector('#file .uparrow');
 const fileDropdown = document.querySelector('#fileDropdown');
 const saveContainer = document.querySelector('#save');
@@ -281,12 +282,19 @@ window.beforeunload = saveCurrent;
 
 let switching = false;
 let isExample = true;
+function syncCurrentEditVisibility(scriptName) {
+  if (!currentEditElement) return;
+  currentEditElement.style.display =
+      exampleFunctions.get(scriptName) == null ? 'inline-block' : 'none';
+}
+
 function switchTo(scriptName) {
   if (editor) {
     switching = true;
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
+    syncCurrentEditVisibility(scriptName);
     const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
@@ -403,6 +411,71 @@ function addEdit(button) {
       const container = button.parentElement;
       container.parentElement.removeChild(container);
     }
+  };
+}
+
+function startRenameCurrentScript() {
+  const oldName = currentFileElement.textContent;
+  if (exampleFunctions.get(oldName) != null) return;
+
+  hideDropdown();
+  const code = getScript(oldName) ?? '';
+  const form = document.createElement('form');
+  const inputElement = document.createElement('input');
+  inputElement.classList.add('name');
+  inputElement.value = oldName;
+  currentFileElement.style.display = 'none';
+  currentEditElement.style.display = 'none';
+  currentFileElement.insertAdjacentElement('afterend', form);
+  form.appendChild(inputElement);
+  inputElement.focus();
+  inputElement.setSelectionRange(0, oldName.length);
+
+  function finishRename(revert = false) {
+    const input = inputElement.value.trim();
+    const shouldRename = !revert && input && input !== oldName;
+    const newName = shouldRename ? uniqueName(input) : oldName;
+    if (shouldRename) {
+      currentFileElement.textContent = newName;
+      setScript('currentName', newName);
+      removeScript(oldName);
+      setScript(newName, code);
+      for (const item of fileDropdown.children) {
+        const span = item.querySelector('button span');
+        if (span && span.textContent === oldName) {
+          span.textContent = newName;
+          break;
+        }
+      }
+    } else {
+      currentFileElement.textContent = oldName;
+    }
+    if (form.parentElement) {
+      form.parentElement.removeChild(form);
+    }
+    currentFileElement.style.display = '';
+    syncCurrentEditVisibility(currentFileElement.textContent);
+  }
+
+  form.onsubmit = event => {
+    event.preventDefault();
+    finishRename();
+  };
+  inputElement.onblur = () => finishRename();
+  inputElement.onkeydown = event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      finishRename(true);
+    }
+  };
+  inputElement.onclick = event => event.stopPropagation();
+}
+
+if (currentEditElement) {
+  currentEditElement.onclick = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    startRenameCurrentScript();
   };
 }
 
