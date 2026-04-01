@@ -662,45 +662,21 @@ struct std_sqrt {
   }
 };
 struct std_sin {
-  template <class A>
-  auto operator()(A a) const {
-    return std::sin(a);
-  }
   double operator()(double a) const { return manifold::math::sin(a); }
 };
 struct std_cos {
-  template <class A>
-  auto operator()(A a) const {
-    return std::cos(a);
-  }
   double operator()(double a) const { return manifold::math::cos(a); }
 };
 struct std_tan {
-  template <class A>
-  auto operator()(A a) const {
-    return std::tan(a);
-  }
   double operator()(double a) const { return manifold::math::tan(a); }
 };
 struct std_asin {
-  template <class A>
-  auto operator()(A a) const {
-    return std::asin(a);
-  }
   double operator()(double a) const { return manifold::math::asin(a); }
 };
 struct std_acos {
-  template <class A>
-  auto operator()(A a) const {
-    return std::acos(a);
-  }
   double operator()(double a) const { return manifold::math::acos(a); }
 };
 struct std_atan {
-  template <class A>
-  auto operator()(A a) const {
-    return std::atan(a);
-  }
   double operator()(double a) const { return manifold::math::atan(a); }
 };
 struct std_sinh {
@@ -740,10 +716,6 @@ struct std_pow {
   }
 };
 struct std_atan2 {
-  template <class A, class B>
-  auto operator()(A a, B b) const {
-    return std::atan2(a, b);
-  }
   double operator()(double a, double b) const {
     return manifold::math::atan2(a, b);
   }
