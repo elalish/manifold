@@ -224,9 +224,9 @@ model-viewer {
 }
 
 #fileDropdown .item > button.item {
-  /* Keep room on the right for edit/trash icons. */
+  /* Keep room on the right for the trash icon. */
   width: 100%;
-  padding-right: 78px;
+  padding-right: 42px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -456,6 +456,11 @@ model-viewer {
 
   #file-margin {
     width: calc(100% - 32px);
+    max-width: 360px;
+  }
+
+  #fileDropdown {
+    max-width: 360px;
   }
 
   p {

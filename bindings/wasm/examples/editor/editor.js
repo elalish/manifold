@@ -349,47 +349,6 @@ function uniqueName(name) {
 
 function addEdit(button) {
   const label = button.firstChild;
-  const edit = addIcon(button);
-  edit.classList.add('edit');
-
-  edit.onclick = function(event) {
-    event.stopPropagation();
-    const oldName = label.textContent;
-    const code = getScript(oldName);
-    const form = document.createElement('form');
-    const inputElement = document.createElement('input');
-    inputElement.classList.add('name');
-    inputElement.value = oldName;
-    label.textContent = '';
-    button.appendChild(form);
-    form.appendChild(inputElement);
-    inputElement.focus();
-    inputElement.setSelectionRange(0, oldName.length);
-
-    function rename() {
-      const input = inputElement.value;
-      inputElement.blur();
-      if (!input) return;
-      const newName = uniqueName(input);
-      label.textContent = newName;
-      if (currentFileElement.textContent == oldName) {
-        currentFileElement.textContent = newName;
-      }
-      removeScript(oldName);
-      setScript(newName, code);
-    }
-
-    form.onsubmit = rename;
-    inputElement.onclick = function(event) {
-      event.stopPropagation();
-    };
-
-    inputElement.onblur = function() {
-      button.removeChild(form);
-      label.textContent = oldName;
-    };
-  };
-
   const trash = addIcon(button);
   trash.classList.add('trash');
   let lastClick = 0;
