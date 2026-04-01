@@ -22,7 +22,7 @@
 #endif
 
 #include "linalg.h"
-#include "math.h"
+#include "./math.h"
 
 namespace manifold {
 /** @addtogroup Math
