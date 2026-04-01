@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -91,6 +92,19 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  *
  * @param x Angle in degrees.
  */
+inline double CanonicalizeTrig(double x) {
+  if (!la::isfinite(x)) return x;
+  x = la::clamp(x, -1.0, 1.0);
+  // The current cross-platform divergence is a 1-ULP drift around sqrt(1/2)
+  // (45-degree rotations). Snap only this neighborhood to avoid changing
+  // unrelated trigonometric outputs used elsewhere.
+  constexpr double kSqrtHalf = 0x1.6a09e667f3bccp-1;
+  constexpr double kTol = 8 * std::numeric_limits<double>::epsilon();
+  if (std::abs(x - kSqrtHalf) <= kTol) return kSqrtHalf;
+  if (std::abs(x + kSqrtHalf) <= kTol) return -kSqrtHalf;
+  return x;
+}
+
 inline double sind(double x) {
   if (!la::isfinite(x)) return sin(x);
   if (x < 0.0) return -sind(-x);
@@ -98,13 +112,13 @@ inline double sind(double x) {
   x = remquo(fabs(x), 90.0, &quo);
   switch (quo % 4) {
     case 0:
-      return sin(radians(x));
+      return CanonicalizeTrig(sin(radians(x)));
     case 1:
-      return cos(radians(x));
+      return CanonicalizeTrig(cos(radians(x)));
     case 2:
-      return -sin(radians(x));
+      return CanonicalizeTrig(-sin(radians(x)));
     case 3:
-      return -cos(radians(x));
+      return CanonicalizeTrig(-cos(radians(x)));
   }
   return 0.0;
 }

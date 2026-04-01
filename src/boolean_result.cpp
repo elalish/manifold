@@ -14,7 +14,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <map>
+#include <sstream>
 
 #include "boolean3.h"
 #include "parallel.h"
@@ -45,6 +52,90 @@ struct std::hash<std::pair<int, int>> {
 namespace {
 
 constexpr int kParallelThreshold = 128;
+
+bool BooleanDumpEnabled() {
+  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP");
+  if (v == nullptr) return false;
+  return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
+         std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
+         std::strcmp(v, "ON") == 0;
+}
+
+std::filesystem::path BooleanDumpDir() {
+  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR");
+  if (v == nullptr || *v == '\0') return ".";
+  return v;
+}
+
+const char* OpName(const OpType op) {
+  switch (op) {
+    case OpType::Add:
+      return "add";
+    case OpType::Subtract:
+      return "subtract";
+    case OpType::Intersect:
+      return "intersect";
+  }
+  return "unknown";
+}
+
+std::atomic<uint64_t> gBooleanResultDumpCounter{0};
+
+void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
+  std::ofstream out(path);
+  if (!out.good()) return;
+  for (const int value : data) out << value << "\n";
+}
+
+void DumpBooleanResultState(const char* stage, const OpType op,
+                            const Manifold::Impl& inP,
+                            const Manifold::Impl& inQ,
+                            const Manifold::Impl* outR, const Vec<int>& i03,
+                            const Vec<int>& i30, const Vec<int>& i12,
+                            const Vec<int>& i21) {
+  if (!BooleanDumpEnabled()) return;
+
+  const auto id = gBooleanResultDumpCounter.fetch_add(1);
+  std::ostringstream prefix;
+  prefix << "boolean_result_" << std::setw(6) << std::setfill('0') << id << "_"
+         << stage << "_" << OpName(op);
+
+  std::error_code ec;
+  const auto dir = BooleanDumpDir();
+  std::filesystem::create_directories(dir, ec);
+
+  {
+    std::ofstream out(dir / (prefix.str() + "_inP.obj"));
+    if (out.good()) out << inP;
+  }
+  {
+    std::ofstream out(dir / (prefix.str() + "_inQ.obj"));
+    if (out.good()) out << inQ;
+  }
+  if (outR != nullptr) {
+    std::ofstream out(dir / (prefix.str() + "_outR.obj"));
+    if (out.good()) out << *outR;
+  }
+  {
+    std::ofstream out(dir / (prefix.str() + "_meta.txt"));
+    if (out.good()) {
+      out << "stage=" << stage << "\n";
+      out << "op=" << OpName(op) << "\n";
+      out << "i03_size=" << i03.size() << "\n";
+      out << "i30_size=" << i30.size() << "\n";
+      out << "i12_size=" << i12.size() << "\n";
+      out << "i21_size=" << i21.size() << "\n";
+      if (outR != nullptr) {
+        out << "out_num_vert=" << outR->NumVert() << "\n";
+        out << "out_num_tri=" << outR->NumTri() << "\n";
+      }
+    }
+  }
+  DumpIntVector(dir / (prefix.str() + "_i03.txt"), i03);
+  DumpIntVector(dir / (prefix.str() + "_i30.txt"), i30);
+  DumpIntVector(dir / (prefix.str() + "_i12.txt"), i12);
+  DumpIntVector(dir / (prefix.str() + "_i21.txt"), i21);
+}
 
 struct AbsSum {
   int operator()(int a, int b) const { return abs(a) + abs(b); }
@@ -711,6 +802,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
             [c1, c3](int v) { return c1 + c3 * v; });
   transform(w30_.begin(), w30_.end(), i30.begin(),
             [c2, c3](int v) { return c2 + c3 * v; });
+  DumpBooleanResultState("inclusion", op, inP_, inQ_, nullptr, i03, i30, i12,
+                         i21);
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
@@ -739,7 +832,19 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  if (numVertR == 0) return outR;
+  if (numVertR == 0) {
+    DumpBooleanResultState("empty", op, inP_, inQ_, &outR, i03, i30, i12, i21);
+    return outR;
+  }
+
+  const bool doDump = BooleanDumpEnabled();
+  Vec<int> dumpI03, dumpI30, dumpI12, dumpI21;
+  if (doDump) {
+    dumpI03 = i03;
+    dumpI30 = i30;
+    dumpI12 = i12;
+    dumpI21 = i21;
+  }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
@@ -883,6 +988,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
+  DumpBooleanResultState("final", op, inP_, inQ_, &outR, doDump ? dumpI03 : i03,
+                         doDump ? dumpI30 : i30, doDump ? dumpI12 : i12,
+                         doDump ? dumpI21 : i21);
   return outR;
 }
 
