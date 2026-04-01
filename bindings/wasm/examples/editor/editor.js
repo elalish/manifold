@@ -284,6 +284,7 @@ let switching = false;
 let isExample = true;
 function syncCurrentEditVisibility(scriptName) {
   if (!currentEditElement) return;
+  // Show current edit icon only for user scripts.
   currentEditElement.style.display =
       exampleFunctions.get(scriptName) == null ? 'inline-block' : 'none';
 }
@@ -420,23 +421,27 @@ function startRenameCurrentScript() {
 
   hideDropdown();
   const code = getScript(oldName) ?? '';
-  const form = document.createElement('form');
-  const inputElement = document.createElement('input');
-  inputElement.classList.add('name');
-  inputElement.value = oldName;
-  currentFileElement.style.display = 'none';
   currentEditElement.style.display = 'none';
-  currentFileElement.insertAdjacentElement('afterend', form);
-  form.appendChild(inputElement);
-  inputElement.focus();
-  inputElement.setSelectionRange(0, oldName.length);
+  // Rename in the same place (no extra input box).
+  currentFileElement.contentEditable = 'true';
+  currentFileElement.classList.add('renaming');
+  currentFileElement.spellcheck = false;
+  currentFileElement.focus();
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(currentFileElement);
+  selection.removeAllRanges();
+  selection.addRange(range);
 
   function finishRename(revert = false) {
-    const input = inputElement.value.trim();
+    const input = currentFileElement.textContent.trim();
     const shouldRename = !revert && input && input !== oldName;
     const newName = shouldRename ? uniqueName(input) : oldName;
+    currentFileElement.contentEditable = 'false';
+    currentFileElement.classList.remove('renaming');
+    currentFileElement.textContent = newName;
     if (shouldRename) {
-      currentFileElement.textContent = newName;
+      // Keep storage key and dropdown label in sync with new name.
       setScript('currentName', newName);
       removeScript(oldName);
       setScript(newName, code);
@@ -447,28 +452,21 @@ function startRenameCurrentScript() {
           break;
         }
       }
-    } else {
-      currentFileElement.textContent = oldName;
     }
-    if (form.parentElement) {
-      form.parentElement.removeChild(form);
-    }
-    currentFileElement.style.display = '';
     syncCurrentEditVisibility(currentFileElement.textContent);
   }
 
-  form.onsubmit = event => {
-    event.preventDefault();
-    finishRename();
-  };
-  inputElement.onblur = () => finishRename();
-  inputElement.onkeydown = event => {
-    if (event.key === 'Escape') {
+  currentFileElement.onkeydown = event => {
+    // Enter = save, Escape = cancel.
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finishRename();
+    } else if (event.key === 'Escape') {
       event.preventDefault();
       finishRename(true);
     }
   };
-  inputElement.onclick = event => event.stopPropagation();
+  currentFileElement.onblur = () => finishRename();
 }
 
 if (currentEditElement) {
