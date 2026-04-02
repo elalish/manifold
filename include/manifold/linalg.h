@@ -619,40 +619,10 @@ struct std_abs {
     return std::abs(a);
   }
 };
-struct std_floor {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::floor(a)) {
-    return std::floor(a);
-  }
-};
-struct std_ceil {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::ceil(a)) {
-    return std::ceil(a);
-  }
-};
-struct std_exp {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::exp(a)) {
-    return std::exp(a);
-  }
-};
-struct std_log {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::log(a)) {
-    return std::log(a);
-  }
-};
 struct std_log2 {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::log2(a)) {
     return std::log2(a);
-  }
-};
-struct std_log10 {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::log10(a)) {
-    return std::log10(a);
   }
 };
 struct std_sqrt {
@@ -678,36 +648,6 @@ struct std_acos {
 };
 struct std_atan {
   double operator()(double a) const { return manifold::math::atan(a); }
-};
-struct std_sinh {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::sinh(a)) {
-    return std::sinh(a);
-  }
-};
-struct std_cosh {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::cosh(a)) {
-    return std::cosh(a);
-  }
-};
-struct std_tanh {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::tanh(a)) {
-    return std::tanh(a);
-  }
-};
-struct std_round {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::round(a)) {
-    return std::round(a);
-  }
-};
-struct std_fmod {
-  template <class A, class B>
-  constexpr auto operator()(A a, B b) const -> decltype(std::fmod(a, b)) {
-    return std::fmod(a, b);
-  }
 };
 struct std_pow {
   template <class A, class B>
@@ -1528,29 +1468,8 @@ template <class A>
 constexpr apply_t<detail::std_abs, A> abs(const A& a) {
   return apply(detail::std_abs{}, a);
 }
-template <class A>
-constexpr apply_t<detail::std_floor, A> floor(const A& a) {
-  return apply(detail::std_floor{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_ceil, A> ceil(const A& a) {
-  return apply(detail::std_ceil{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_exp, A> exp(const A& a) {
-  return apply(detail::std_exp{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_log, A> log(const A& a) {
-  return apply(detail::std_log{}, a);
-}
-template <class A>
 constexpr apply_t<detail::std_log2, A> log2(const A& a) {
   return apply(detail::std_log2{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_log10, A> log10(const A& a) {
-  return apply(detail::std_log10{}, a);
 }
 template <class A>
 constexpr apply_t<detail::std_sqrt, A> sqrt(const A& a) {
@@ -1580,22 +1499,6 @@ template <class A>
 constexpr apply_t<detail::std_atan, A> atan(const A& a) {
   return apply(detail::std_atan{}, a);
 }
-template <class A>
-constexpr apply_t<detail::std_sinh, A> sinh(const A& a) {
-  return apply(detail::std_sinh{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_cosh, A> cosh(const A& a) {
-  return apply(detail::std_cosh{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_tanh, A> tanh(const A& a) {
-  return apply(detail::std_tanh{}, a);
-}
-template <class A>
-constexpr apply_t<detail::std_round, A> round(const A& a) {
-  return apply(detail::std_round{}, a);
-}
 /** @} */
 
 /** @addtogroup binary_STL
@@ -1604,10 +1507,6 @@ constexpr apply_t<detail::std_round, A> round(const A& a) {
  * a vector or a scalar.
  *  @{
  */
-template <class A, class B>
-constexpr apply_t<detail::std_fmod, A, B> fmod(const A& a, const B& b) {
-  return apply(detail::std_fmod{}, a, b);
-}
 template <class A, class B>
 constexpr apply_t<detail::std_pow, A, B> pow(const A& a, const B& b) {
   return apply(detail::std_pow{}, a, b);
