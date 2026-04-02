@@ -223,6 +223,22 @@ model-viewer {
   position: relative;
 }
 
+#fileDropdown .item > button.item {
+  /* Keep room on the right for the trash icon. */
+  width: 100%;
+  padding-right: 42px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#fileDropdown .item > button.item > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .top-edit {
   display: inline-block;
   vertical-align: middle;
@@ -296,6 +312,21 @@ model-viewer {
   right: 30px;
 }
 
+.current-edit {
+  display: none;
+  position: static;
+  flex: 0 0 auto;
+  min-width: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 6px;
+  vertical-align: middle;
+  background-size: 16px;
+  border-radius: 12px;
+}
+
 .trash {
   background-image: url(/icons/trash.png);
 }
@@ -331,6 +362,27 @@ model-viewer {
 #file-margin {
   position: relative;
   width: 250px;
+}
+
+#file {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#current {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#current.renaming {
+  /* While typing, show full text (no three dots). */
+  overflow: visible;
+  text-overflow: clip;
 }
 
 #save {
@@ -404,6 +456,11 @@ model-viewer {
 
   #file-margin {
     width: calc(100% - 32px);
+    max-width: 360px;
+  }
+
+  #fileDropdown {
+    max-width: 360px;
   }
 
   p {
