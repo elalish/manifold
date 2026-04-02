@@ -287,6 +287,7 @@ install(
 set(
   MANIFOLD_PUBLIC_HDRS
   common.h
+  math.h
   linalg.h
   manifold.h
   optional_assert.h

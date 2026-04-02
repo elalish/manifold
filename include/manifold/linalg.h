@@ -1,4 +1,4 @@
-// Copyright 2024 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@
 #include <cstdlib>      // To resolve std::abs ambiguity on clang
 #include <functional>   // For std::hash declaration
 #include <type_traits>  // For std::enable_if, std::is_same, std::declval
+
+#include "./math.h"
 
 // In Visual Studio 2015, `constexpr` applied to a member function implies
 // `const`, which causes ambiguous overload resolution
@@ -660,40 +662,22 @@ struct std_sqrt {
   }
 };
 struct std_sin {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::sin(a)) {
-    return std::sin(a);
-  }
+  double operator()(double a) const { return manifold::math::sin(a); }
 };
 struct std_cos {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::cos(a)) {
-    return std::cos(a);
-  }
+  double operator()(double a) const { return manifold::math::cos(a); }
 };
 struct std_tan {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::tan(a)) {
-    return std::tan(a);
-  }
+  double operator()(double a) const { return manifold::math::tan(a); }
 };
 struct std_asin {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::asin(a)) {
-    return std::asin(a);
-  }
+  double operator()(double a) const { return manifold::math::asin(a); }
 };
 struct std_acos {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::acos(a)) {
-    return std::acos(a);
-  }
+  double operator()(double a) const { return manifold::math::acos(a); }
 };
 struct std_atan {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::atan(a)) {
-    return std::atan(a);
-  }
+  double operator()(double a) const { return manifold::math::atan(a); }
 };
 struct std_sinh {
   template <class A>
@@ -732,9 +716,8 @@ struct std_pow {
   }
 };
 struct std_atan2 {
-  template <class A, class B>
-  constexpr auto operator()(A a, B b) const -> decltype(std::atan2(a, b)) {
-    return std::atan2(a, b);
+  double operator()(double a, double b) const {
+    return manifold::math::atan2(a, b);
   }
 };
 struct std_copysign {
@@ -1801,7 +1784,7 @@ T distance(const vec<T, M>& a, const vec<T, M>& b) {
 template <class T, int M>
 T uangle(const vec<T, M>& a, const vec<T, M>& b) {
   T d = dot(a, b);
-  return d > 1 ? 0 : std::acos(d < -1 ? -1 : d);
+  return d > 1 ? 0 : linalg::acos(d < -1 ? -1 : d);
 }
 /**
  * @brief Return the angle in radians between two non-unit vectors.
@@ -1816,7 +1799,7 @@ T angle(const vec<T, M>& a, const vec<T, M>& b) {
  */
 template <class T>
 vec<T, 2> rot(T a, const vec<T, 2>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c};
 }
 /**
@@ -1825,7 +1808,7 @@ vec<T, 2> rot(T a, const vec<T, 2>& v) {
  */
 template <class T>
 vec<T, 3> rotx(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
 }
 /**
@@ -1834,7 +1817,7 @@ vec<T, 3> rotx(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> roty(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
 }
 /**
@@ -1843,7 +1826,7 @@ vec<T, 3> roty(T a, const vec<T, 3>& v) {
  */
 template <class T>
 vec<T, 3> rotz(T a, const vec<T, 3>& v) {
-  const T s = std::sin(a), c = std::cos(a);
+  const T s = linalg::sin(a), c = linalg::cos(a);
   return {v.x * c - v.y * s, v.x * s + v.y * c, v.z};
 }
 /**
@@ -1862,8 +1845,8 @@ template <class T, int M>
 vec<T, M> slerp(const vec<T, M>& a, const vec<T, M>& b, T t) {
   T th = uangle(a, b);
   return th == 0 ? a
-                 : a * (std::sin(th * (1 - t)) / std::sin(th)) +
-                       b * (std::sin(th * t) / std::sin(th));
+                 : a * (linalg::sin(th * (1 - t)) / linalg::sin(th)) +
+                       b * (linalg::sin(th * t) / linalg::sin(th));
 }
 /** @} */
 
@@ -1901,7 +1884,7 @@ vec<T, 4> qexp(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v);
   return std::exp(q.w) *
-         vec<T, 4>{v * (vv > 0 ? std::sin(vv) / vv : 0), std::cos(vv)};
+         vec<T, 4>{v * (vv > 0 ? linalg::sin(vv) / vv : 0), linalg::cos(vv)};
 }
 /**
  * @brief
@@ -1912,7 +1895,7 @@ template <class T>
 vec<T, 4> qlog(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v), qq = length(q);
-  return {v * (vv > 0 ? std::acos(q.w / qq) / vv : 0), std::log(qq)};
+  return {v * (vv > 0 ? linalg::acos(q.w / qq) / vv : 0), std::log(qq)};
 }
 /**
  * @brief quaternion `q` raised to the exponent `p`
@@ -1920,9 +1903,10 @@ vec<T, 4> qlog(const vec<T, 4>& q) {
 template <class T>
 vec<T, 4> qpow(const vec<T, 4>& q, const T& p) {
   const auto v = q.xyz();
-  const auto vv = length(v), qq = length(q), th = std::acos(q.w / qq);
+  const auto vv = length(v), qq = length(q), th = linalg::acos(q.w / qq);
   return std::pow(qq, p) *
-         vec<T, 4>{v * (vv > 0 ? std::sin(p * th) / vv : 0), std::cos(p * th)};
+         vec<T, 4>{v * (vv > 0 ? linalg::sin(p * th) / vv : 0),
+                   linalg::cos(p * th)};
 }
 /**
  * @brief [Hamilton
@@ -1995,7 +1979,7 @@ constexpr vec<T, 3> qrot(const vec<T, 4>& q, const vec<T, 3>& v) {
  */
 template <class T>
 T qangle(const vec<T, 4>& q) {
-  return std::atan2(length(q.xyz()), q.w) * 2;
+  return linalg::atan2(length(q.xyz()), q.w) * 2;
 }
 /**
  * @brief Return the normalized axis of the axis-angle representation of the
@@ -2026,7 +2010,7 @@ vec<T, 4> qslerp(const vec<T, 4>& a, const vec<T, 4>& b, T t) {
  */
 template <class T>
 vec<T, 4> constexpr rotation_quat(const vec<T, 3>& axis, T angle) {
-  return {axis * std::sin(angle / 2), std::cos(angle / 2)};
+  return {axis * linalg::sin(angle / 2), linalg::cos(angle / 2)};
 }
 /**
  * @brief Returns a normalized quaternion representing the shortest rotation
@@ -2297,7 +2281,7 @@ mat<T, 4, 4> frustum_matrix(T x0, T x1, T y0, T y1, T n, T f,
 template <class T>
 mat<T, 4, 4> perspective_matrix(T fovy, T aspect, T n, T f, fwd_axis a = neg_z,
                                 z_range z = neg_one_to_one) {
-  T y = n * std::tan(fovy / 2), x = y * aspect;
+  T y = n * linalg::tan(fovy / 2), x = y * aspect;
   return frustum_matrix(-x, x, -y, y, n, f, a, z);
 }
 /** @} */

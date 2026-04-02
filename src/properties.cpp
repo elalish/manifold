@@ -46,16 +46,16 @@ struct CurvatureAngles {
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
-          std::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
-                            edge[i]));
+          math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
+                             edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
       AtomicAdd(degree[startVert], 1.0);
     }
 
     vec3 phi;
-    phi[0] = std::acos(-la::dot(edge[2], edge[0]));
-    phi[1] = std::acos(-la::dot(edge[0], edge[1]));
+    phi[0] = math::acos(-la::dot(edge[2], edge[0]));
+    phi[1] = math::acos(-la::dot(edge[0], edge[1]));
     phi[2] = kPi - phi[0] - phi[1];
     const double area3 = edgeLength[0] * edgeLength[1] *
                          la::length(la::cross(edge[0], edge[1])) / 6;

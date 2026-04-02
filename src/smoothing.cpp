@@ -40,7 +40,7 @@ double Wrap(double radians) {
 // Get the angle between two unit-vectors.
 double AngleBetween(vec3 a, vec3 b) {
   const double dot = la::dot(a, b);
-  return dot >= 1 ? 0 : (dot <= -1 ? kPi : la::acos(dot));
+  return dot >= 1 ? 0 : (dot <= -1 ? kPi : math::acos(dot));
 }
 
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
@@ -118,9 +118,9 @@ struct InterpTri {
     if (std::abs(cosTheta) > 1.0 - std::numeric_limits<double>::epsilon()) {
       return la::lerp(x, z, a);  // for numerical stability
     } else {
-      double angle = std::acos(cosTheta);
-      return (std::sin((1.0 - a) * angle) * x + std::sin(a * angle) * z) /
-             std::sin(angle);
+      double angle = math::acos(cosTheta);
+      return (math::sin((1.0 - a) * angle) * x + math::sin(a * angle) * z) /
+             math::sin(angle);
     }
   }
 
@@ -413,7 +413,7 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     if (!halfedge_[e].IsForward()) continue;
     const size_t pair = halfedge_[e].pairedHalfedge;
     const double dihedral =
-        std::acos(la::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+        math::acos(la::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
     if (dihedral > minRadians) {
       sharpenedEdges.push_back({e, minSmoothness});
       sharpenedEdges.push_back({pair, minSmoothness});
@@ -454,7 +454,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const int tri1 = e / 3;
     const int tri2 = pair / 3;
     const double dihedral =
-        degrees(std::acos(la::dot(faceNormal_[tri1], faceNormal_[tri2])));
+        degrees(math::acos(la::dot(faceNormal_[tri1], faceNormal_[tri2])));
     if (dihedral > minSharpAngle) {
       ++vertNumSharp[halfedge_[e].startVert];
       ++vertNumSharp[halfedge_[e].endVert];
@@ -529,7 +529,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         const int face = next / 3;
 
         const double dihedral = degrees(
-            std::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
+            math::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
         if (dihedral > minSharpAngle ||
             triIsFlatFace[face] != triIsFlatFace[prevFace] ||
             (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
@@ -573,7 +573,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           },
           [this, &triIsFlatFace, &normals, &group, minSharpAngle](
               int, const FaceEdge& here, FaceEdge& next) {
-            const double dihedral = degrees(std::acos(
+            const double dihedral = degrees(math::acos(
                 la::dot(faceNormal_[here.face], faceNormal_[next.face])));
             if (dihedral > minSharpAngle ||
                 triIsFlatFace[here.face] != triIsFlatFace[next.face] ||

@@ -31,8 +31,8 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double size = la::length(bBox.Center() - normal * originOffset) +
                 0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
-  double yDeg = degrees(-std::asin(normal.z));
-  double zDeg = degrees(std::atan2(normal.y, normal.x));
+  double yDeg = degrees(-math::asin(normal.z));
+  double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 }  // namespace
