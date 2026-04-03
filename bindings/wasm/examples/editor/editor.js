@@ -16,6 +16,7 @@
 // vite will package the asset and provide a proper URL.
 import '@google/model-viewer';
 
+import {$needsRender, $scene} from '@google/model-viewer/lib/model-viewer-base.js';
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
@@ -24,6 +25,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import {EdgesGeometry, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -648,7 +650,23 @@ const mv = document.querySelector('model-viewer');
 const animationContainer = document.querySelector('#animation');
 const playButton = document.querySelector('#play');
 const scrubber = document.querySelector('#scrubber');
+const edgeToggle = document.getElementById('edgesToggle');
 let paused = false;
+let showEdges = false;
+const EDGE_KEY = 'edgeLines';
+const EDGE_MODE_KEY = 'edgeMode';
+const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+const EDGE_GEOMETRY_VERTEX_LIMIT = 50000;
+
+function shouldUseWireOverlay(mesh) {
+  const hasModelAnimation = mv.availableAnimations.length > 0;
+  const hasMorphTargets = Array.isArray(mesh.morphTargetInfluences) &&
+      mesh.morphTargetInfluences.length > 0;
+  const isAnimated = mesh.isSkinnedMesh || hasMorphTargets || hasModelAnimation;
+  const positionCount = mesh.geometry?.attributes?.position?.count ?? 0;
+  const isDense = positionCount > EDGE_GEOMETRY_VERTEX_LIMIT;
+  return isAnimated || isDense;
+}
 
 mv.addEventListener('load', () => {
   const hasAnimation = mv.availableAnimations.length > 0;
@@ -656,6 +674,15 @@ mv.addEventListener('load', () => {
   if (hasAnimation) {
     play();
   }
+  if (showEdges) {
+    setEdgesVisible(true);
+  }
+});
+
+edgeToggle.addEventListener('change', () => {
+  showEdges = edgeToggle.checked;
+
+  setEdgesVisible(showEdges);
 });
 
 function play() {
@@ -664,6 +691,74 @@ function play() {
   playButton.classList.add('pause');
   paused = false;
   scrubber.classList.add('hide');
+}
+
+function setEdgesVisible(visible) {
+  const scene = mv[$scene];
+  if (!scene) return;
+
+  const root = scene.model ?? scene;
+  root.traverse((obj) => {
+    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
+
+    if (obj.isMesh) {
+      if (visible && !obj.userData[EDGE_KEY]) {
+        const wireOverlay = shouldUseWireOverlay(obj);
+
+        if (wireOverlay) {
+          const material = new MeshBasicMaterial({
+            color: 0x111111,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.7,
+            toneMapped: false,
+            depthWrite: false,
+          });
+
+          let edgeLines;
+          if (obj.isSkinnedMesh) {
+            edgeLines = new SkinnedMesh(obj.geometry, material);
+            edgeLines.bind(obj.skeleton, obj.bindMatrix);
+            edgeLines.bindMatrix.copy(obj.bindMatrix);
+            edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
+          } else {
+            edgeLines = new Mesh(obj.geometry, material);
+            edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
+            edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
+          }
+
+          edgeLines.renderOrder = 2;
+          edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+          obj.add(edgeLines);
+          obj.userData[EDGE_KEY] = edgeLines;
+          obj.userData[EDGE_MODE_KEY] = 'wire-overlay';
+        } else {
+          const geometry = new EdgesGeometry(obj.geometry);
+          const material = new LineBasicMaterial({
+            color: 0x111111,
+            transparent: true,
+            opacity: 0.9,
+            toneMapped: false,
+            depthWrite: false,
+          });
+          const edgeLines = new LineSegments(geometry, material);
+          edgeLines.renderOrder = 2;
+          edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+          obj.add(edgeLines);
+          obj.userData[EDGE_KEY] = edgeLines;
+          obj.userData[EDGE_MODE_KEY] = 'static-edge';
+        }
+      }
+
+      const edgeLines = obj.userData[EDGE_KEY];
+      if (edgeLines) {
+        edgeLines.visible = visible;
+      }
+    }
+  });
+
+  scene.queueRender?.();
+  mv[$needsRender]?.();
 }
 
 function pause() {
