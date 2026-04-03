@@ -102,6 +102,42 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
          static_cast<uint64_t>(gridPos.x) << (1 + gridPow.z + gridPow.y);
 }
 
+int BitWidth(uint32_t x) {
+  int bits = 0;
+  while (x != 0) {
+    ++bits;
+    x >>= 1;
+  }
+  return bits;
+}
+
+ivec3 ComputeGridPow(ivec3 gridSize) {
+  // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, but
+  // integer-only and deterministic across platforms.
+  return {BitWidth(static_cast<uint32_t>(gridSize.x + 2)),
+          BitWidth(static_cast<uint32_t>(gridSize.y + 2)),
+          BitWidth(static_cast<uint32_t>(gridSize.z + 2))};
+}
+
+uint64_t CubeRootFloor(uint64_t x) {
+  uint64_t lo = 0;
+  uint64_t hi = 1ull << 22;  // cube root upper bound for uint64_t domain.
+  while (lo < hi) {
+    const uint64_t mid = lo + (hi - lo + 1) / 2;
+    if (mid <= x / (mid * mid))
+      lo = mid;
+    else
+      hi = mid - 1;
+  }
+  return lo;
+}
+
+uint64_t PowTwoThirdsApprox(uint64_t x) {
+  // Deterministic approximation for x^0.667 used only for hash-table sizing.
+  const uint64_t c = CubeRootFloor(x);
+  return c * c;
+}
+
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
   ivec4 gridPos;
   gridPos.w = idx & 1;
@@ -467,7 +503,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const ivec3 gridPow(la::log2(gridSize + 2) + 1);
+  const ivec3 gridPow = ComputeGridPow(gridSize);
   const uint64_t maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
@@ -486,7 +522,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       });
 
   size_t tableSize = std::min(
-      2 * maxIndex, static_cast<uint64_t>(10 * la::pow(maxIndex, 0.667)));
+      2 * maxIndex, static_cast<uint64_t>(10 * PowTwoThirdsApprox(maxIndex)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
 

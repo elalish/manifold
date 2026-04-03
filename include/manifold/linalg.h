@@ -619,12 +619,6 @@ struct std_abs {
     return std::abs(a);
   }
 };
-struct std_log2 {
-  template <class A>
-  constexpr auto operator()(A a) const -> decltype(std::log2(a)) {
-    return std::log2(a);
-  }
-};
 struct std_sqrt {
   template <class A>
   constexpr auto operator()(A a) const -> decltype(std::sqrt(a)) {
@@ -648,12 +642,6 @@ struct std_acos {
 };
 struct std_atan {
   double operator()(double a) const { return manifold::math::atan(a); }
-};
-struct std_pow {
-  template <class A, class B>
-  constexpr auto operator()(A a, B b) const -> decltype(std::pow(a, b)) {
-    return std::pow(a, b);
-  }
 };
 struct std_atan2 {
   double operator()(double a, double b) const {
@@ -1469,10 +1457,6 @@ constexpr apply_t<detail::std_abs, A> abs(const A& a) {
   return apply(detail::std_abs{}, a);
 }
 template <class A>
-constexpr apply_t<detail::std_log2, A> log2(const A& a) {
-  return apply(detail::std_log2{}, a);
-}
-template <class A>
 constexpr apply_t<detail::std_sqrt, A> sqrt(const A& a) {
   return apply(detail::std_sqrt{}, a);
 }
@@ -1508,10 +1492,6 @@ constexpr apply_t<detail::std_atan, A> atan(const A& a) {
  * a vector or a scalar.
  *  @{
  */
-template <class A, class B>
-constexpr apply_t<detail::std_pow, A, B> pow(const A& a, const B& b) {
-  return apply(detail::std_pow{}, a, b);
-}
 template <class A, class B>
 constexpr apply_t<detail::std_atan2, A, B> atan2(const A& a, const B& b) {
   return apply(detail::std_atan2{}, a, b);
