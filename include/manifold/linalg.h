@@ -1468,6 +1468,7 @@ template <class A>
 constexpr apply_t<detail::std_abs, A> abs(const A& a) {
   return apply(detail::std_abs{}, a);
 }
+template <class A>
 constexpr apply_t<detail::std_log2, A> log2(const A& a) {
   return apply(detail::std_log2{}, a);
 }
