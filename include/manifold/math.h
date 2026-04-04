@@ -651,13 +651,14 @@ inline double log(double x) {
   double hfsq, f, s, z, R, w, t1, t2, dk;
   int32_t k, hx, i, j;
   uint32_t lx;
+  volatile double vzero = 0.0;
 
   ExtractWords(hx, lx, x);
   k = 0;
   if (hx < 0x00100000) {
     if (((hx & 0x7fffffff) | static_cast<int32_t>(lx)) == 0)
-      return -two54 / zero;
-    if (hx < 0) return (x - x) / zero;
+      return -two54 / vzero;
+    if (hx < 0) return (x - x) / vzero;
     k -= 54;
     x *= two54;
     GetHighWord(hx, x);
@@ -878,12 +879,15 @@ inline double pow(double x, double y) {
   p_l = (y - y1) * t1 + y * t2;
   p_h = y1 * t1;
   z = p_l + p_h;
-  ExtractWords(j, i, z);
+  uint32_t izLow;
+  ExtractWords(j, izLow, z);
   if (j >= 0x40900000) {
-    if (((j - 0x40900000) | i) != 0) return s * huge * huge;
+    if (((j - 0x40900000) | static_cast<int32_t>(izLow)) != 0)
+      return s * huge * huge;
     if (p_l + ovt > z - p_h) return s * huge * huge;
   } else if ((j & 0x7fffffff) >= 0x4090cc00) {
-    if (((j - 0xc090cc00) | i) != 0) return s * tiny * tiny;
+    if (((j - 0xc090cc00) | static_cast<int32_t>(izLow)) != 0)
+      return s * tiny * tiny;
     if (p_l <= z - p_h) return s * tiny * tiny;
   }
 
