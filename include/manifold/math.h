@@ -83,8 +83,9 @@ inline void GetLowWord(uint32_t& low, double x) {
 }
 
 inline void InsertWords(double& x, int32_t high, uint32_t low) {
-  const uint64_t u = (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
-                     static_cast<uint64_t>(low);
+  const uint64_t u =
+      (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
+      static_cast<uint64_t>(low);
   x = FromUint64(u);
 }
 
@@ -98,8 +99,7 @@ inline void SetHighWord(double& x, int32_t high) {
 
 inline void SetLowWord(double& x, uint32_t low) {
   const uint64_t u = AsUint64(x);
-  const uint64_t out =
-      (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
+  const uint64_t out = (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
   x = FromUint64(out);
 }
 
@@ -853,7 +853,8 @@ inline double pow(double x, double y) {
     t_l = ax - (t_h - bp[k]);
     s_l = v * ((u - s_h * t_h) - s_h * t_l);
     s2 = ss * ss;
-    r = s2 * s2 * (L1 + s2 * (L2 + s2 * (L3 + s2 * (L4 + s2 * (L5 + s2 * L6)))));
+    r = s2 * s2 *
+        (L1 + s2 * (L2 + s2 * (L3 + s2 * (L4 + s2 * (L5 + s2 * L6)))));
     r += s_l * (s_h + ss);
     s2 = s_h * s_h;
     t_h = 3.0 + s2 + r;
