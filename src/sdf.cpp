@@ -133,25 +133,6 @@ ivec3 ComputeGridPow(ivec3 gridSize) {
           BitWidth(static_cast<uint32_t>(gridSize.z + 2))};
 }
 
-uint64_t CubeRootFloor(uint64_t x) {
-  uint64_t lo = 0;
-  uint64_t hi = 1ull << 22;  // cube root upper bound for uint64_t domain.
-  while (lo < hi) {
-    const uint64_t mid = lo + (hi - lo + 1) / 2;
-    if (mid <= x / (mid * mid))
-      lo = mid;
-    else
-      hi = mid - 1;
-  }
-  return lo;
-}
-
-uint64_t PowTwoThirdsApprox(uint64_t x) {
-  // Deterministic approximation for x^0.667 used only for hash-table sizing.
-  const uint64_t c = CubeRootFloor(x);
-  return c * c;
-}
-
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
   ivec4 gridPos;
   gridPos.w = idx & 1;
@@ -536,7 +517,8 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       });
 
   size_t tableSize = std::min(
-      2 * maxIndex, static_cast<uint64_t>(10 * PowTwoThirdsApprox(maxIndex)));
+      2 * maxIndex,
+      static_cast<uint64_t>(10 * manifold::math::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
 
