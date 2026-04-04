@@ -658,6 +658,10 @@ const EDGE_MODE_KEY = 'edgeMode';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
 const EDGE_GEOMETRY_VERTEX_LIMIT = 50000;
 
+function syncEdgeToggleButton() {
+  edgeToggle.setAttribute('aria-pressed', showEdges ? 'true' : 'false');
+}
+
 function shouldUseWireOverlay(mesh) {
   const hasModelAnimation = mv.availableAnimations.length > 0;
   const hasMorphTargets = Array.isArray(mesh.morphTargetInfluences) &&
@@ -674,14 +678,15 @@ mv.addEventListener('load', () => {
   if (hasAnimation) {
     play();
   }
+  syncEdgeToggleButton();
   if (showEdges) {
     setEdgesVisible(true);
   }
 });
 
-edgeToggle.addEventListener('change', () => {
-  showEdges = edgeToggle.checked;
-
+edgeToggle.addEventListener('click', () => {
+  showEdges = !showEdges;
+  syncEdgeToggleButton();
   setEdgesVisible(showEdges);
 });
 
