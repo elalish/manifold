@@ -123,9 +123,7 @@ uint32_t Clz32(uint32_t value) {
 }
 #endif
 
-int BitWidth(uint32_t x) {
-  return static_cast<int>(32 - Clz32(x));
-}
+int BitWidth(uint32_t x) { return static_cast<int>(32 - Clz32(x)); }
 
 ivec3 ComputeGridPow(ivec3 gridSize) {
   // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, but
