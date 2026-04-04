@@ -104,11 +104,27 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
 
 int BitWidth(uint32_t x) {
   int bits = 0;
-  while (x != 0) {
-    ++bits;
-    x >>= 1;
+  if (x >= (1u << 16)) {
+    x >>= 16;
+    bits += 16;
   }
-  return bits;
+  if (x >= (1u << 8)) {
+    x >>= 8;
+    bits += 8;
+  }
+  if (x >= (1u << 4)) {
+    x >>= 4;
+    bits += 4;
+  }
+  if (x >= (1u << 2)) {
+    x >>= 2;
+    bits += 2;
+  }
+  if (x >= (1u << 1)) {
+    x >>= 1;
+    bits += 1;
+  }
+  return bits + static_cast<int>(x != 0);
 }
 
 ivec3 ComputeGridPow(ivec3 gridSize) {
