@@ -48,8 +48,7 @@ inline uint32_t ClzSizeT(size_t value) {
   return static_cast<uint32_t>(
       __builtin_clzll(static_cast<unsigned long long>(value)));
 #else
-  return static_cast<uint32_t>(
-      __builtin_clz(static_cast<unsigned int>(value)));
+  return static_cast<uint32_t>(__builtin_clz(static_cast<unsigned int>(value)));
 #endif
 #endif
 }
