@@ -284,6 +284,11 @@ model-viewer {
   border-radius: 18px;
 }
 
+.edges-icon {
+  background-image: url(/icons/edges.png);
+  margin-left: -8px;
+}
+
 .cancel {
   background-image: url(/icons/close.png);
   background-size: 20px;
