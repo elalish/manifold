@@ -289,10 +289,6 @@ model-viewer {
   margin-left: -8px;
 }
 
-.top-icon.edges-icon[aria-pressed="true"] {
-  background-color: rgb(131, 255, 131);
-}
-
 .cancel {
   background-image: url(/icons/close.png);
   background-size: 20px;
