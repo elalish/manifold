@@ -28,6 +28,12 @@
 // Developed at SunPro/SunSoft, a Sun Microsystems, Inc. business.
 // Permission to use, copy, modify, and distribute this software is freely
 // granted, provided that this notice is preserved.
+//
+// Deterministic exp/log/pow helpers adapted from OpenLibm (FreeBSD msun):
+// - https://github.com/JuliaMath/openlibm/blob/master/src/e_exp.c
+// - https://github.com/JuliaMath/openlibm/blob/master/src/e_log.c
+// - https://github.com/JuliaMath/openlibm/blob/master/src/e_pow.c
+// These files also carry the Sun permissive notice above.
 
 #pragma once
 
@@ -60,6 +66,41 @@ inline double WithLowWord(double x, uint32_t low) {
   uint64_t u = AsUint64(x);
   u = (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
   return FromUint64(u);
+}
+
+inline void ExtractWords(int32_t& high, uint32_t& low, double x) {
+  const uint64_t u = AsUint64(x);
+  high = static_cast<int32_t>(u >> 32);
+  low = static_cast<uint32_t>(u);
+}
+
+inline void GetHighWord(int32_t& high, double x) {
+  high = static_cast<int32_t>(AsUint64(x) >> 32);
+}
+
+inline void GetLowWord(uint32_t& low, double x) {
+  low = static_cast<uint32_t>(AsUint64(x));
+}
+
+inline void InsertWords(double& x, int32_t high, uint32_t low) {
+  const uint64_t u =
+      (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
+      static_cast<uint64_t>(low);
+  x = FromUint64(u);
+}
+
+inline void SetHighWord(double& x, int32_t high) {
+  const uint64_t u = AsUint64(x);
+  const uint64_t out =
+      (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
+      (u & 0xffffffffULL);
+  x = FromUint64(out);
+}
+
+inline void SetLowWord(double& x, uint32_t low) {
+  const uint64_t u = AsUint64(x);
+  const uint64_t out = (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
+  x = FromUint64(out);
 }
 
 constexpr inline double SinKernel(double x, double y, int iy) {
@@ -522,6 +563,363 @@ inline double atan2(double y, double x) {
     default:
       return (z - pi_lo) - pi;
   }
+}
+
+inline double exp(double x) {
+  constexpr double one = 1.0;
+  constexpr double half[2] = {0.5, -0.5};
+  constexpr double huge = 1.0e300;
+  constexpr double o_threshold = 7.09782712893383973096e+02;
+  constexpr double u_threshold = -7.45133219101941108420e+02;
+  constexpr double ln2HI[2] = {6.93147180369123816490e-01,
+                               -6.93147180369123816490e-01};
+  constexpr double ln2LO[2] = {1.90821492927058770002e-10,
+                               -1.90821492927058770002e-10};
+  constexpr double invln2 = 1.44269504088896338700e+00;
+  constexpr double P1 = 1.66666666666666019037e-01;
+  constexpr double P2 = -2.77777777770155933842e-03;
+  constexpr double P3 = 6.61375632143793436117e-05;
+  constexpr double P4 = -1.65339022054652515390e-06;
+  constexpr double P5 = 4.13813679705723846039e-08;
+  constexpr double twom1000 = 9.33263618503218878990e-302;
+
+  double y, hi = 0.0, lo = 0.0, c, t, twopk;
+  int32_t k = 0;
+  int32_t hx;
+  GetHighWord(hx, x);
+  int32_t xsb = (hx >> 31) & 1;
+  hx &= 0x7fffffff;
+
+  if (hx >= 0x40862E42) {
+    if (hx >= 0x7ff00000) {
+      uint32_t lx;
+      GetLowWord(lx, x);
+      if (((hx & 0xfffff) | static_cast<int32_t>(lx)) != 0) return x + x;
+      return xsb == 0 ? x : 0.0;
+    }
+    if (x > o_threshold) return huge * huge;
+    if (x < u_threshold) return twom1000 * twom1000;
+  }
+  if (x == 1.0) return 2.718281828459045235360;
+
+  if (hx > 0x3fd62e42) {
+    if (hx < 0x3FF0A2B2) {
+      hi = x - ln2HI[xsb];
+      lo = ln2LO[xsb];
+      k = 1 - xsb - xsb;
+    } else {
+      k = static_cast<int>(invln2 * x + half[xsb]);
+      t = static_cast<double>(k);
+      hi = x - t * ln2HI[0];
+      lo = t * ln2LO[0];
+    }
+    x = hi - lo;
+  } else if (hx < 0x3e300000) {
+    if (huge + x > one) return one + x;
+  } else {
+    k = 0;
+  }
+
+  t = x * x;
+  if (k >= -1021)
+    InsertWords(twopk, 0x3ff00000 + (k << 20), 0);
+  else
+    InsertWords(twopk, 0x3ff00000 + ((k + 1000) << 20), 0);
+  c = x - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
+  if (k == 0) return one - ((x * c) / (c - 2.0) - x);
+  y = one - ((lo - (x * c) / (2.0 - c)) - hi);
+  if (k >= -1021) {
+    if (k == 1024) return y * 2.0 * 0x1p1023;
+    return y * twopk;
+  }
+  return y * twopk * twom1000;
+}
+
+inline double log(double x) {
+  constexpr double ln2_hi = 6.93147180369123816490e-01;
+  constexpr double ln2_lo = 1.90821492927058770002e-10;
+  constexpr double two54 = 1.80143985094819840000e+16;
+  constexpr double Lg1 = 6.666666666666735130e-01;
+  constexpr double Lg2 = 3.999999999940941908e-01;
+  constexpr double Lg3 = 2.857142874366239149e-01;
+  constexpr double Lg4 = 2.222219843214978396e-01;
+  constexpr double Lg5 = 1.818357216161805012e-01;
+  constexpr double Lg6 = 1.531383769920937332e-01;
+  constexpr double Lg7 = 1.479819860511658591e-01;
+  constexpr double zero = 0.0;
+
+  double hfsq, f, s, z, R, w, t1, t2, dk;
+  int32_t k, hx, i, j;
+  uint32_t lx;
+  volatile double vzero = 0.0;
+
+  ExtractWords(hx, lx, x);
+  k = 0;
+  if (hx < 0x00100000) {
+    if (((hx & 0x7fffffff) | static_cast<int32_t>(lx)) == 0)
+      return -two54 / vzero;
+    if (hx < 0) return (x - x) / vzero;
+    k -= 54;
+    x *= two54;
+    GetHighWord(hx, x);
+  }
+  if (hx >= 0x7ff00000) return x + x;
+  k += (hx >> 20) - 1023;
+  hx &= 0x000fffff;
+  i = (hx + 0x95f64) & 0x100000;
+  SetHighWord(x, hx | (i ^ 0x3ff00000));
+  k += (i >> 20);
+  f = x - 1.0;
+  if ((0x000fffff & (2 + hx)) < 3) {
+    if (f == zero) {
+      if (k == 0) return zero;
+      dk = static_cast<double>(k);
+      return dk * ln2_hi + dk * ln2_lo;
+    }
+    R = f * f * (0.5 - 0.33333333333333333 * f);
+    if (k == 0) return f - R;
+    dk = static_cast<double>(k);
+    return dk * ln2_hi - ((R - dk * ln2_lo) - f);
+  }
+  s = f / (2.0 + f);
+  dk = static_cast<double>(k);
+  z = s * s;
+  i = hx - 0x6147a;
+  w = z * z;
+  j = 0x6b851 - hx;
+  t1 = w * (Lg2 + w * (Lg4 + w * Lg6));
+  t2 = z * (Lg1 + w * (Lg3 + w * (Lg5 + w * Lg7)));
+  i |= j;
+  R = t2 + t1;
+  if (i > 0) {
+    hfsq = 0.5 * f * f;
+    if (k == 0) return f - (hfsq - s * (hfsq + R));
+    return dk * ln2_hi - ((hfsq - (s * (hfsq + R) + dk * ln2_lo)) - f);
+  }
+  if (k == 0) return f - s * (f - R);
+  return dk * ln2_hi - ((s * (f - R) - dk * ln2_lo) - f);
+}
+
+inline double pow(double x, double y) {
+  constexpr double bp[] = {1.0, 1.5};
+  constexpr double dp_h[] = {0.0, 5.84962487220764160156e-01};
+  constexpr double dp_l[] = {0.0, 1.35003920212974897128e-08};
+  constexpr double zero = 0.0;
+  constexpr double one = 1.0;
+  constexpr double two = 2.0;
+  constexpr double two53 = 9007199254740992.0;
+  constexpr double huge = 1.0e300;
+  constexpr double tiny = 1.0e-300;
+  constexpr double L1 = 5.99999999999994648725e-01;
+  constexpr double L2 = 4.28571428578550184252e-01;
+  constexpr double L3 = 3.33333329818377432918e-01;
+  constexpr double L4 = 2.72728123808534006489e-01;
+  constexpr double L5 = 2.30660745775561754067e-01;
+  constexpr double L6 = 2.06975017800338417784e-01;
+  constexpr double P1 = 1.66666666666666019037e-01;
+  constexpr double P2 = -2.77777777770155933842e-03;
+  constexpr double P3 = 6.61375632143793436117e-05;
+  constexpr double P4 = -1.65339022054652515390e-06;
+  constexpr double P5 = 4.13813679705723846039e-08;
+  constexpr double lg2 = 6.93147180559945286227e-01;
+  constexpr double lg2_h = 6.93147182464599609375e-01;
+  constexpr double lg2_l = -1.90465429995776804525e-09;
+  constexpr double ovt = 8.0085662595372944372e-17;
+  constexpr double cp = 9.61796693925975554329e-01;
+  constexpr double cp_h = 9.61796700954437255859e-01;
+  constexpr double cp_l = -7.02846165095275826516e-09;
+  constexpr double ivln2 = 1.44269504088896338700e+00;
+  constexpr double ivln2_h = 1.44269502162933349609e+00;
+  constexpr double ivln2_l = 1.92596299112661746887e-08;
+
+  double z, ax, z_h, z_l, p_h, p_l;
+  double y1, t1, t2, r, s, t, u, v, w;
+  int32_t i, j, k, yisint, n;
+  int32_t hx, hy, ix, iy;
+  uint32_t lx, ly;
+
+  ExtractWords(hx, lx, x);
+  ExtractWords(hy, ly, y);
+  ix = hx & 0x7fffffff;
+  iy = hy & 0x7fffffff;
+
+  if ((iy | static_cast<int32_t>(ly)) == 0) return one;
+  if (hx == 0x3ff00000 && lx == 0) return one;
+  if (ix > 0x7ff00000 || (ix == 0x7ff00000 && lx != 0) || iy > 0x7ff00000 ||
+      (iy == 0x7ff00000 && ly != 0))
+    return (x + 0.0) + (y + 0.0);
+
+  yisint = 0;
+  if (hx < 0) {
+    if (iy >= 0x43400000)
+      yisint = 2;
+    else if (iy >= 0x3ff00000) {
+      k = (iy >> 20) - 0x3ff;
+      if (k > 20) {
+        j = static_cast<int32_t>(ly >> (52 - k));
+        if ((static_cast<uint32_t>(j) << (52 - k)) == ly) yisint = 2 - (j & 1);
+      } else if (ly == 0) {
+        j = iy >> (20 - k);
+        if ((j << (20 - k)) == iy) yisint = 2 - (j & 1);
+      }
+    }
+  }
+
+  if (ly == 0) {
+    if (iy == 0x7ff00000) {
+      if (((ix - 0x3ff00000) | static_cast<int32_t>(lx)) == 0) return one;
+      if (ix >= 0x3ff00000)
+        return hy >= 0 ? y : zero;
+      else
+        return hy < 0 ? -y : zero;
+    }
+    if (iy == 0x3ff00000) return hy < 0 ? one / x : x;
+    if (hy == 0x40000000) return x * x;
+    if (hy == 0x40080000) return x * x * x;
+    if (hy == 0x40100000) {
+      u = x * x;
+      return u * u;
+    }
+    if (hy == 0x3fe00000) {
+      if (hx >= 0) return std::sqrt(x);
+    }
+  }
+
+  ax = std::fabs(x);
+  if (lx == 0) {
+    if (ix == 0x7ff00000 || ix == 0 || ix == 0x3ff00000) {
+      z = ax;
+      if (hy < 0) z = one / z;
+      if (hx < 0) {
+        if (((ix - 0x3ff00000) | yisint) == 0) {
+          z = (z - z) / (z - z);
+        } else if (yisint == 1) {
+          z = -z;
+        }
+      }
+      return z;
+    }
+  }
+
+  n = static_cast<int32_t>(static_cast<uint32_t>(hx) >> 31) - 1;
+  if ((n | yisint) == 0) return (x - x) / (x - x);
+
+  s = one;
+  if ((n | (yisint - 1)) == 0) s = -one;
+
+  if (iy > 0x41e00000) {
+    if (iy > 0x43f00000) {
+      if (ix <= 0x3fefffff) return hy < 0 ? s * huge * huge : s * tiny * tiny;
+      if (ix >= 0x3ff00000) return hy > 0 ? s * huge * huge : s * tiny * tiny;
+    }
+    if (ix < 0x3fefffff) return hy < 0 ? s * huge * huge : s * tiny * tiny;
+    if (ix > 0x3ff00000) return hy > 0 ? s * huge * huge : s * tiny * tiny;
+    t = ax - one;
+    w = (t * t) * (0.5 - t * (0.3333333333333333333333 - t * 0.25));
+    u = ivln2_h * t;
+    v = t * ivln2_l - w * ivln2;
+    t1 = u + v;
+    SetLowWord(t1, 0);
+    t2 = v - (t1 - u);
+  } else {
+    double ss, s2, s_h, s_l, t_h, t_l;
+    n = 0;
+    if (ix < 0x00100000) {
+      ax *= two53;
+      n -= 53;
+      GetHighWord(ix, ax);
+    }
+    n += (ix >> 20) - 0x3ff;
+    j = ix & 0x000fffff;
+    ix = j | 0x3ff00000;
+    if (j <= 0x3988E)
+      k = 0;
+    else if (j < 0xBB67A)
+      k = 1;
+    else {
+      k = 0;
+      n += 1;
+      ix -= 0x00100000;
+    }
+    SetHighWord(ax, ix);
+
+    u = ax - bp[k];
+    v = one / (ax + bp[k]);
+    ss = u * v;
+    s_h = ss;
+    SetLowWord(s_h, 0);
+
+    t_h = zero;
+    SetHighWord(t_h, ((ix >> 1) | 0x20000000) + 0x00080000 + (k << 18));
+    t_l = ax - (t_h - bp[k]);
+    s_l = v * ((u - s_h * t_h) - s_h * t_l);
+    s2 = ss * ss;
+    r = s2 * s2 *
+        (L1 + s2 * (L2 + s2 * (L3 + s2 * (L4 + s2 * (L5 + s2 * L6)))));
+    r += s_l * (s_h + ss);
+    s2 = s_h * s_h;
+    t_h = 3.0 + s2 + r;
+    SetLowWord(t_h, 0);
+    t_l = r - ((t_h - 3.0) - s2);
+    u = s_h * t_h;
+    v = s_l * t_h + t_l * ss;
+    p_h = u + v;
+    SetLowWord(p_h, 0);
+    p_l = v - (p_h - u);
+    z_h = cp_h * p_h;
+    z_l = cp_l * p_h + p_l * cp + dp_l[k];
+    t = static_cast<double>(n);
+    t1 = (((z_h + z_l) + dp_h[k]) + t);
+    SetLowWord(t1, 0);
+    t2 = z_l - (((t1 - t) - dp_h[k]) - z_h);
+  }
+
+  y1 = y;
+  SetLowWord(y1, 0);
+  p_l = (y - y1) * t1 + y * t2;
+  p_h = y1 * t1;
+  z = p_l + p_h;
+  uint32_t izLow;
+  ExtractWords(j, izLow, z);
+  if (j >= 0x40900000) {
+    if (((j - 0x40900000) | static_cast<int32_t>(izLow)) != 0)
+      return s * huge * huge;
+    if (p_l + ovt > z - p_h) return s * huge * huge;
+  } else if ((j & 0x7fffffff) >= 0x4090cc00) {
+    if (((j - 0xc090cc00) | static_cast<int32_t>(izLow)) != 0)
+      return s * tiny * tiny;
+    if (p_l <= z - p_h) return s * tiny * tiny;
+  }
+
+  i = j & 0x7fffffff;
+  k = (i >> 20) - 0x3ff;
+  n = 0;
+  if (i > 0x3fe00000) {
+    n = j + (0x00100000 >> (k + 1));
+    k = ((n & 0x7fffffff) >> 20) - 0x3ff;
+    t = zero;
+    SetHighWord(t, n & ~(0x000fffff >> k));
+    n = ((n & 0x000fffff) | 0x00100000) >> (20 - k);
+    if (j < 0) n = -n;
+    p_h -= t;
+  }
+  t = p_l + p_h;
+  SetLowWord(t, 0);
+  u = t * lg2_h;
+  v = (p_l - (t - p_h)) * lg2 + t * lg2_l;
+  z = u + v;
+  w = v - (z - u);
+  t = z * z;
+  t1 = z - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
+  r = (z * t1) / (t1 - two) - (w + z * w);
+  z = one - (r - z);
+  GetHighWord(j, z);
+  j += (n << 20);
+  if ((j >> 20) <= 0)
+    z = std::scalbn(z, n);
+  else
+    SetHighWord(z, j);
+  return s * z;
 }
 }  // namespace math
 }  // namespace manifold

@@ -19,6 +19,10 @@
 #include "utils.h"
 #include "vec.h"
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 namespace {
 using namespace manifold;
 
@@ -100,6 +104,33 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
          static_cast<uint64_t>(gridPos.z) << 1 |
          static_cast<uint64_t>(gridPos.y) << (1 + gridPow.z) |
          static_cast<uint64_t>(gridPos.x) << (1 + gridPow.z + gridPow.y);
+}
+
+#ifdef _MSC_VER
+#ifndef _WINDEF_
+using DWORD = unsigned long;
+#endif
+uint32_t Clz32(uint32_t value) {
+  DWORD leading_zero = 0;
+  if (_BitScanReverse(&leading_zero, value)) {
+    return 31 - leading_zero;
+  }
+  return 32;
+}
+#else
+uint32_t Clz32(uint32_t value) {
+  return value == 0 ? 32 : static_cast<uint32_t>(__builtin_clz(value));
+}
+#endif
+
+int BitWidth(uint32_t x) { return static_cast<int>(32 - Clz32(x)); }
+
+ivec3 ComputeGridPow(ivec3 gridSize) {
+  // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, but
+  // integer-only and deterministic across platforms.
+  return {BitWidth(static_cast<uint32_t>(gridSize.x + 2)),
+          BitWidth(static_cast<uint32_t>(gridSize.y + 2)),
+          BitWidth(static_cast<uint32_t>(gridSize.z + 2))};
 }
 
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
@@ -467,7 +498,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const ivec3 gridPow(la::log2(gridSize + 2) + 1);
+  const ivec3 gridPow = ComputeGridPow(gridSize);
   const uint64_t maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
@@ -486,7 +517,8 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       });
 
   size_t tableSize = std::min(
-      2 * maxIndex, static_cast<uint64_t>(10 * la::pow(maxIndex, 0.667)));
+      2 * maxIndex,
+      static_cast<uint64_t>(10 * manifold::math::pow(maxIndex, 0.667)));
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
 
