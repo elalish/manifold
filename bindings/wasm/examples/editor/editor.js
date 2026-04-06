@@ -703,12 +703,16 @@ function setEdgesVisible(visible) {
     if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
 
     if (obj.isMesh) {
+      // Fix wireframe z-fighting.
+      obj.material.polygonOffset = true;
+      obj.material.polygonOffsetFactor = 4;
+      obj.material.polygonOffsetUnits = 4;
+
       if (visible && !obj.userData[EDGE_KEY]) {
         const material = new MeshBasicMaterial({
           color: 0x111111,
           wireframe: true,
           toneMapped: false,
-          polygonOffset: true,
         });
 
         let edgeLines;
@@ -723,7 +727,6 @@ function setEdgesVisible(visible) {
           edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
         }
 
-        edgeLines.renderOrder = 2;
         edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
         obj.add(edgeLines);
         obj.userData[EDGE_KEY] = edgeLines;
