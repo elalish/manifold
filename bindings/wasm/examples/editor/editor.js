@@ -658,7 +658,6 @@ const needsRenderSym =
 let paused = false;
 let showEdges = false;
 const EDGE_KEY = 'edgeLines';
-const EDGE_MODE_KEY = 'edgeMode';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
 
 function syncEdgeToggleButton() {
@@ -728,7 +727,6 @@ function setEdgesVisible(visible) {
         edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
         obj.add(edgeLines);
         obj.userData[EDGE_KEY] = edgeLines;
-        obj.userData[EDGE_MODE_KEY] = 'wire-overlay';
       }
 
       const edgeLines = obj.userData[EDGE_KEY];
