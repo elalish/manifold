@@ -24,6 +24,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import {Mesh, MeshBasicMaterial, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -648,7 +649,24 @@ const mv = document.querySelector('model-viewer');
 const animationContainer = document.querySelector('#animation');
 const playButton = document.querySelector('#play');
 const scrubber = document.querySelector('#scrubber');
+const edgeToggle = document.getElementById('edgesToggle');
+const sceneSym =
+    Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
+const needsRenderSym =
+    Object.getOwnPropertySymbols(mv).find(x => x.description === 'needsRender');
+
 let paused = false;
+let showEdges = false;
+const EDGE_KEY = 'edgeLines';
+const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+
+function syncEdgeToggleButton() {
+  if (showEdges) {
+    edgeToggle.classList.add('green');
+  } else {
+    edgeToggle.classList.remove('green');
+  }
+}
 
 mv.addEventListener('load', () => {
   const hasAnimation = mv.availableAnimations.length > 0;
@@ -656,6 +674,16 @@ mv.addEventListener('load', () => {
   if (hasAnimation) {
     play();
   }
+  syncEdgeToggleButton();
+  if (showEdges) {
+    setEdgesVisible(true);
+  }
+});
+
+edgeToggle.addEventListener('click', () => {
+  showEdges = !showEdges;
+  syncEdgeToggleButton();
+  setEdgesVisible(showEdges);
 });
 
 function play() {
@@ -664,6 +692,54 @@ function play() {
   playButton.classList.add('pause');
   paused = false;
   scrubber.classList.add('hide');
+}
+
+function setEdgesVisible(visible) {
+  const scene = sceneSym ? mv[sceneSym] : null;
+  if (!scene) return;
+
+  const root = scene.model ?? scene;
+  root.traverse((obj) => {
+    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
+
+    if (obj.isMesh) {
+      if (visible && !obj.userData[EDGE_KEY]) {
+        const material = new MeshBasicMaterial({
+          color: 0x111111,
+          wireframe: true,
+          toneMapped: false,
+          polygonOffset: true,
+        });
+
+        let edgeLines;
+        if (obj.isSkinnedMesh) {
+          edgeLines = new SkinnedMesh(obj.geometry, material);
+          edgeLines.bind(obj.skeleton, obj.bindMatrix);
+          edgeLines.bindMatrix.copy(obj.bindMatrix);
+          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
+        } else {
+          edgeLines = new Mesh(obj.geometry, material);
+          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
+          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
+        }
+
+        edgeLines.renderOrder = 2;
+        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+        obj.add(edgeLines);
+        obj.userData[EDGE_KEY] = edgeLines;
+      }
+
+      const edgeLines = obj.userData[EDGE_KEY];
+      if (edgeLines) {
+        edgeLines.visible = visible;
+      }
+    }
+  });
+
+  scene.queueRender?.();
+  if (needsRenderSym) {
+    mv[needsRenderSym]?.();
+  }
 }
 
 function pause() {
