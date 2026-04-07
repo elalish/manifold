@@ -271,7 +271,8 @@ vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
 
 /**
  * Returns a circular tangent for the requested halfedge, orthogonal to the
- * given normal vector, and avoiding folding.
+ * given normal vector, and avoiding folding when the tangent needs to be more
+ * than 90 degrees from the edge vector.
  */
 vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
   const Halfedge edge = halfedge_[halfedge];
@@ -764,9 +765,11 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
  * Calculates halfedgeTangent_, allowing the manifold to be refined and
  * smoothed. The tangents form weighted cubic Beziers along each edge. This
  * function creates circular arcs where possible (minimizing maximum curvature),
- * constrained to the indicated property normals. Across edges that form
- * discontinuities in the normals, the tangent vectors are zero-length, allowing
- * the shape to form a sharp corner with minimal oscillation.
+ * constrained to the indicated property normals. Where a vert has multiple
+ * normals, the tangents will form a crease. Where the only normal is that of a
+ * flat face, the tangents at its ends will be made colinear. Zero-length
+ * normals are considered missing and will defer to their neighboring normals
+ * instead. If all normals are missing, the vertex pseudonormal will be used.
  */
 void Manifold::Impl::CreateTangents(int normalIdx) {
   ZoneScoped;
@@ -775,6 +778,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   halfedgeTangent_.clear();
   Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
+
+  constexpr int kMissingNormal = -3;
+  constexpr int kNoMissingNormals = -1;
+  constexpr int kAllMissingNormals = -2;
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
@@ -786,6 +793,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         };
 
         ivec2 faceEdges(-1, -1);
+        int startHalfedge = kNoMissingNormals;
+        vec3 lastNormal(0.0);
 
         ForVert<FlatNormal>(
             e,
@@ -795,22 +804,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               return FlatNormal(
                   {la::dot(diff, diff) < kPrecision * kPrecision, normal});
             },
-            [&faceEdges, &tangent, &fixedHalfedge, this](
-                int halfedge, const FlatNormal& here, const FlatNormal& next) {
-              if (IsInsideQuad(halfedge)) {
-                tangent[halfedge] = {0, 0, 0, -1};
-                return;
-              }
-
-              const vec3 diff = next.normal - here.normal;
-              const bool differentNormals =
-                  la::dot(diff, diff) > kPrecision * kPrecision;
-              if (differentNormals) {
-                // tangents at the intersection of two normals are fixed.
-                fixedHalfedge[halfedge] = true;
-                // Override the logic below if more than one normal.
-                faceEdges[0] = -2;
-              }
+            [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
               if (here.isFlatFace != next.isFlatFace) {
                 // Record the two halfedges that border a single flat face.
                 if (faceEdges[0] == -1) {
@@ -821,6 +815,36 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                   faceEdges[0] = -2;
                 }
               }
+
+              if (IsInsideQuad(halfedge)) {
+                tangent[halfedge] = {0, 0, 0, -1};
+                return;
+              }
+
+              if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
+                if (here.normal != vec3(0.)) {
+                  lastNormal = here.normal;
+                  startHalfedge = halfedge;
+                  tangent[halfedge] = {lastNormal, kMissingNormal};
+                } else if (next.normal == vec3(0.)) {
+                  tangent[halfedge] = {lastNormal, kMissingNormal};
+                  if (startHalfedge == kNoMissingNormals) {
+                    startHalfedge = kAllMissingNormals;
+                  }
+                }
+                return;
+              }
+
+              const vec3 diff = next.normal - here.normal;
+              const bool differentNormals =
+                  la::dot(diff, diff) > kPrecision * kPrecision;
+              if (differentNormals) {
+                // tangents at the intersection of two normals are fixed.
+                fixedHalfedge[halfedge] = true;
+                // Override the flat face logic if more than one normal.
+                faceEdges[0] = -2;
+              }
+
               // calculate tangents
               if (differentNormals) {
                 const vec3 edgeVec = vertPos_[halfedge_[halfedge].endVert] -
@@ -832,6 +856,47 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
+
+        std::cout << e << ", " << startHalfedge << std::endl;
+
+        if (startHalfedge == kAllMissingNormals) {
+          const vec3 normal = vertNormal_[halfedge_[e].startVert];
+          ForVert(e, [&](int halfedge) {
+            tangent[halfedge] = TangentFromNormal(normal, halfedge);
+          });
+          return;
+        }
+
+        if (startHalfedge >= 0) {
+          // Orbit the vertex backwards, pulling the next normal from the
+          // tangent where it is stored temporarily.
+          int current = startHalfedge;
+          vec3 prevNormal(0.);
+          do {
+            current = halfedge_[PrevHalfedge(current)].pairedHalfedge;
+
+            vec3 currentNormal = GetNormal(current, normalIdx);
+            if (currentNormal != vec3(0.)) {
+              prevNormal = currentNormal;
+            }
+            DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
+                         "missing prevNormal");
+            std::cout << current << ", " << tangent[current] << ", "
+                      << prevNormal << std::endl;
+            if (tangent[current].w != kMissingNormal) continue;
+            const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
+                                 vertPos_[halfedge_[current].startVert];
+            vec3 nextNormal = tangent[current].xyz();
+            if (nextNormal == vec3(0.)) {
+              nextNormal = lastNormal;
+            }
+            const vec3 dir = la::cross(prevNormal, nextNormal);
+            tangent[current] = CircularTangent(
+                (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
+            std::cout << edgeVec << ", " << prevNormal << ", " << nextNormal
+                      << ", " << tangent[current] << std::endl;
+          } while (current != startHalfedge);
+        }
 
         if (faceEdges[0] >= 0 && faceEdges[1] >= 0) {
           // When only a single flat face is present with a single shared normal

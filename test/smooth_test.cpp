@@ -182,6 +182,15 @@ TEST(Smooth, NormalTransform) {
   EXPECT_FLOAT_EQ(out2.SurfaceArea(), 12);
 }
 
+TEST(Smooth, MissingNormals) {
+  Manifold tetNorm = Manifold::Tetrahedron().CalculateNormals(0);
+  Manifold diff = tetNorm - Manifold::Tetrahedron().Translate(vec3(0.5));
+  Manifold out = diff.SmoothByNormals(0).Refine(10);
+  EXPECT_FLOAT_EQ(out.Volume(), 2);
+  EXPECT_FLOAT_EQ(out.SurfaceArea(), 12);
+  if (options.exportModels) WriteTestOBJ("missingNormals.obj", out);
+}
+
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();

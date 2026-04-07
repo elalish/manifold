@@ -36,6 +36,12 @@ inline int NextHalfedge(int current) {
   return current;
 }
 
+inline int PrevHalfedge(int current) {
+  --current;
+  if (current % 3 == 2) current += 3;
+  return current;
+}
+
 /**
 When a transform is applied to the verts of an object, and different transform
 is needed for the normals. Note that applying this transform will stretch their
