@@ -194,7 +194,29 @@ model-viewer {
   z-index: 1;
   width: 100%;
   max-height: 80vh;
+  overflow-x: hidden;
   overflow-y: auto;
+    /* Scrollbar styles for Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+/* Minimal, borderless scrollbar for dropdown (Windows/Chrome/Edge/Safari) */
+.dropdown::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+  border: none;
+}
+
+.dropdown::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 8px;
+  border: none;
+}
+
+.dropdown::-webkit-scrollbar-track {
+  background: transparent;
+  border: none;
 }
 
 .show {
@@ -223,6 +245,22 @@ model-viewer {
   position: relative;
 }
 
+#fileDropdown .item > button.item {
+  /* Keep room on the right for the trash icon. */
+  width: 100%;
+  padding-right: 42px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#fileDropdown .item > button.item > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .top-edit {
   display: inline-block;
   vertical-align: middle;
@@ -230,6 +268,10 @@ model-viewer {
   top: 18px;
   border: none;
   border-radius: 18px;
+  -webkit-border-radius: 18px;
+  -moz-border-radius: 18px;
+  -ms-border-radius: 18px;
+  -o-border-radius: 18px;
 }
 
 .top-icon {
@@ -278,10 +320,13 @@ model-viewer {
   background-image: url(/icons/docs.png);
   width: 36px;
   height: 36px;
-
   cursor: pointer;
   border: none;
   border-radius: 18px;
+  -webkit-border-radius: 18px;
+  -moz-border-radius: 18px;
+  -ms-border-radius: 18px;
+  -o-border-radius: 18px;
 }
 
 .edges-icon {
@@ -298,7 +343,25 @@ model-viewer {
 
 .edit {
   background-image: url(/icons/pencil.png);
-  right: 30px;
+}
+
+.current-edit {
+  display: none;
+  position: static;
+  flex: 0 0 auto;
+  min-width: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  margin-right: -12px;
+  vertical-align: middle;
+  background-size: 16px;
+  border-radius: 12px;
+  -webkit-border-radius: 12px;
+  -moz-border-radius: 12px;
+  -ms-border-radius: 12px;
+  -o-border-radius: 12px;
 }
 
 .trash {
@@ -338,6 +401,28 @@ model-viewer {
   width: 250px;
 }
 
+#file {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+}
+
+#current {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#current.renaming {
+  /* While typing, show full text (no three dots). */
+  overflow: visible;
+  text-overflow: clip;
+}
+
 #save {
   width: 125px;
 }
@@ -367,6 +452,10 @@ model-viewer {
   margin-right: 16px;
   background: #ffffff55;
   outline: none;
+  -webkit-border-radius:;
+  -moz-border-radius:;
+  -ms-border-radius:;
+  -o-border-radius:;
 }
 
 .slider::-webkit-slider-thumb {
@@ -377,6 +466,10 @@ model-viewer {
   border-radius: 50%;
   background: #ccc;
   cursor: pointer;
+  -webkit-border-radius:;
+  -moz-border-radius:;
+  -ms-border-radius:;
+  -o-border-radius:;
 }
 
 .slider::-moz-range-thumb {
@@ -385,6 +478,21 @@ model-viewer {
   border-radius: 50%;
   background: #ccc;
   cursor: pointer;
+  -webkit-border-radius:;
+  -moz-border-radius:;
+  -ms-border-radius:;
+  -o-border-radius:;
+}
+
+/* on desktop (mouse, trackpad)
+  make dropdown little wider, so after scrollbar
+  it look same size as top bar.
+  on touch it stay 100% width. */
+@media (pointer: fine) {
+  #fileDropdown,
+  #saveDropdown {
+    width: calc(100% + 8px);
+  }
 }
 
 /* draggable pane dividers */
@@ -409,6 +517,7 @@ model-viewer {
 
   #file-margin {
     width: calc(100% - 32px);
+    max-width: 360px;
   }
 
   p {
