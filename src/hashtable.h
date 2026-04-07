@@ -31,7 +31,7 @@ inline uint32_t ClzSizeT(size_t value) {
 #ifdef _MSC_VER
 #if defined(_WIN64)
   unsigned long index = 0;
-  if (_BitScanReverse64(&index, static_cast<unsigned __int64>(value))) {
+  if (_BitScanReverse64(&index, static_cast<uint64_t>(value))) {
     return 63u - index;
   }
   return 64u;
