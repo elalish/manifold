@@ -90,8 +90,8 @@ TEST(Smooth, ToLength) {
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
-  EXPECT_NEAR(smooth.Volume(), 4604, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1356, 1);
+  EXPECT_NEAR(smooth.Volume(), 4577, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1349, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -99,7 +99,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 1.67, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 0.71, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }

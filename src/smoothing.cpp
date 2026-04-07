@@ -801,12 +801,18 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 tangent[halfedge] = {0, 0, 0, -1};
                 return;
               }
-              // mark special edges
+
               const vec3 diff = next.normal - here.normal;
               const bool differentNormals =
                   la::dot(diff, diff) > kPrecision * kPrecision;
-              if (differentNormals || here.isFlatFace != next.isFlatFace) {
+              if (differentNormals) {
+                // tangents at the intersection of two normals are fixed.
                 fixedHalfedge[halfedge] = true;
+                // Override the logic below if more than one normal.
+                faceEdges[0] = -2;
+              }
+              if (here.isFlatFace != next.isFlatFace) {
+                // Record the two halfedges that border a single flat face.
                 if (faceEdges[0] == -1) {
                   faceEdges[0] = halfedge;
                 } else if (faceEdges[1] == -1) {
@@ -828,6 +834,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
             });
 
         if (faceEdges[0] >= 0 && faceEdges[1] >= 0) {
+          // When only a single flat face is present with a single shared normal
+          // for the entire vert, the tangents on either side of it should be
+          // aligned to give a continuous curve.
           const vec3 edge0 = vertPos_[halfedge_[faceEdges[0]].endVert] -
                              vertPos_[halfedge_[faceEdges[0]].startVert];
           const vec3 edge1 = vertPos_[halfedge_[faceEdges[1]].endVert] -
@@ -835,8 +844,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           const vec3 newTangent = la::normalize(edge0) - la::normalize(edge1);
           tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
           tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
-        } else if (faceEdges[0] == -1 && faceEdges[0] == -1) {
-          fixedHalfedge[e] = true;
+          // Fix these tangents to keep them even to the edges.
+          fixedHalfedge[faceEdges[0]] = true;
+          fixedHalfedge[faceEdges[1]] = true;
         }
       });
 
