@@ -1763,7 +1763,7 @@ template <class T>
 vec<T, 4> qexp(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v);
-  return manifold::math::exp(q.w) *
+  return std::exp(q.w) *
          vec<T, 4>{v * (vv > 0 ? linalg::sin(vv) / vv : 0), linalg::cos(vv)};
 }
 /**
@@ -1775,8 +1775,7 @@ template <class T>
 vec<T, 4> qlog(const vec<T, 4>& q) {
   const auto v = q.xyz();
   const auto vv = length(v), qq = length(q);
-  return {v * (vv > 0 ? linalg::acos(q.w / qq) / vv : 0),
-          manifold::math::log(qq)};
+  return {v * (vv > 0 ? linalg::acos(q.w / qq) / vv : 0), std::log(qq)};
 }
 /**
  * @brief quaternion `q` raised to the exponent `p`
