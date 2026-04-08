@@ -518,8 +518,15 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
 
   const uint64_t tableSizeCap =
       static_cast<uint64_t>(std::numeric_limits<size_t>::max());
-  const uint64_t tableSize64 =
-      maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
+  const uint64_t kLargeIndexThreshold = 1'000'000;
+  uint64_t tableSize64;
+  if (maxIndex > kLargeIndexThreshold) {
+    const uint64_t half = maxIndex / 2;
+    tableSize64 = maxIndex > tableSizeCap - half ? tableSizeCap : maxIndex + half;
+  } else {
+    tableSize64 = maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
+  }
+  tableSize64 = std::max<uint64_t>(1, tableSize64);
   size_t tableSize = static_cast<size_t>(tableSize64);
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
