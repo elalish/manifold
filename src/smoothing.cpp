@@ -822,16 +822,16 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               }
 
               if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
-                if (here.normal != vec3(0.)) {
+                if (here.normal != vec3(0.)) {  // next missing
                   lastNormal = here.normal;
-                  startHalfedge = halfedge;
-                  tangent[halfedge] = {lastNormal, kMissingNormal};
-                } else if (next.normal == vec3(0.)) {
-                  tangent[halfedge] = {lastNormal, kMissingNormal};
+                } else if (next.normal == vec3(0.)) {  // both missing
                   if (startHalfedge == kNoMissingNormals) {
                     startHalfedge = kAllMissingNormals;
                   }
+                } else if (startHalfedge == kNoMissingNormals) {
+                  startHalfedge = halfedge;  // here missing
                 }
+                tangent[halfedge] = {lastNormal, kMissingNormal};
                 return;
               }
 
@@ -857,8 +857,6 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               }
             });
 
-        std::cout << e << ", " << startHalfedge << std::endl;
-
         if (startHalfedge == kAllMissingNormals) {
           const vec3 normal = vertNormal_[halfedge_[e].startVert];
           ForVert(e, [&](int halfedge) {
@@ -871,30 +869,28 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           // Orbit the vertex backwards, pulling the next normal from the
           // tangent where it is stored temporarily.
           int current = startHalfedge;
-          vec3 prevNormal(0.);
+          vec3 prevNormal =
+              GetNormal(halfedge_[current].pairedHalfedge, normalIdx);
           do {
-            current = halfedge_[PrevHalfedge(current)].pairedHalfedge;
-
+            DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
+                         "missing prevNormal");
+            if (tangent[current].w == kMissingNormal) {
+              vec3 nextNormal = tangent[current].xyz();
+              if (nextNormal == vec3(0.)) {
+                nextNormal = lastNormal;
+              }
+              const vec3 dir = la::cross(prevNormal, nextNormal);
+              const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
+                                   vertPos_[halfedge_[current].startVert];
+              tangent[current] = CircularTangent(
+                  (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
+            }
             vec3 currentNormal = GetNormal(current, normalIdx);
             if (currentNormal != vec3(0.)) {
               prevNormal = currentNormal;
             }
-            DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
-                         "missing prevNormal");
-            std::cout << current << ", " << tangent[current] << ", "
-                      << prevNormal << std::endl;
-            if (tangent[current].w != kMissingNormal) continue;
-            const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
-                                 vertPos_[halfedge_[current].startVert];
-            vec3 nextNormal = tangent[current].xyz();
-            if (nextNormal == vec3(0.)) {
-              nextNormal = lastNormal;
-            }
-            const vec3 dir = la::cross(prevNormal, nextNormal);
-            tangent[current] = CircularTangent(
-                (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
-            std::cout << edgeVec << ", " << prevNormal << ", " << nextNormal
-                      << ", " << tangent[current] << std::endl;
+            current = halfedge_[PrevHalfedge(current)].pairedHalfedge;
+
           } while (current != startHalfedge);
         }
 

@@ -186,8 +186,8 @@ TEST(Smooth, MissingNormals) {
   Manifold tetNorm = Manifold::Tetrahedron().CalculateNormals(0);
   Manifold diff = tetNorm - Manifold::Tetrahedron().Translate(vec3(0.5));
   Manifold out = diff.SmoothByNormals(0).Refine(10);
-  EXPECT_FLOAT_EQ(out.Volume(), 2);
-  EXPECT_FLOAT_EQ(out.SurfaceArea(), 12);
+  EXPECT_NEAR(out.Volume(), 2.46, 0.01);
+  EXPECT_NEAR(out.SurfaceArea(), 12.45, 0.01);
   if (options.exportModels) WriteTestOBJ("missingNormals.obj", out);
 }
 
