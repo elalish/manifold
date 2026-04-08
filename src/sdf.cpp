@@ -133,6 +133,25 @@ ivec3 ComputeGridPow(ivec3 gridSize) {
           BitWidth(static_cast<uint32_t>(gridSize.z + 2))};
 }
 
+uint64_t CubeRootFloor(uint64_t x) {
+  uint64_t lo = 0;
+  uint64_t hi = 1ull << 22;  // cube root upper bound for uint64_t domain.
+  while (lo < hi) {
+    const uint64_t mid = lo + (hi - lo + 1) / 2;
+    if (mid <= x / (mid * mid))
+      lo = mid;
+    else
+      hi = mid - 1;
+  }
+  return lo;
+}
+
+uint64_t PowTwoThirdsApprox(uint64_t x) {
+  // Deterministic approximation for x^(2/3) used only for hash-table sizing.
+  const uint64_t c = CubeRootFloor(x);
+  return c * c;
+}
+
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
   ivec4 gridPos;
   gridPos.w = idx & 1;
@@ -519,14 +538,19 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const uint64_t tableSizeCap =
       static_cast<uint64_t>(std::numeric_limits<size_t>::max());
   const uint64_t kLargeIndexThreshold = 1'000'000;
-  uint64_t tableSize64;
+  uint64_t denseTableSize64;
   if (maxIndex > kLargeIndexThreshold) {
     const uint64_t half = maxIndex / 2;
-    tableSize64 =
+    denseTableSize64 =
         maxIndex > tableSizeCap - half ? tableSizeCap : maxIndex + half;
   } else {
-    tableSize64 = maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
+    denseTableSize64 =
+        maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
   }
+  // Level sets are sparse in the volume; cap dense sizing for large grids.
+  const uint64_t sparseTableSize64 = std::min(
+      tableSizeCap, static_cast<uint64_t>(10 * PowTwoThirdsApprox(maxIndex)));
+  uint64_t tableSize64 = std::min(denseTableSize64, sparseTableSize64);
   tableSize64 = std::max<uint64_t>(1, tableSize64);
   size_t tableSize = static_cast<size_t>(tableSize64);
   HashTable<GridVert> gridVerts(tableSize);
