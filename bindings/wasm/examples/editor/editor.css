@@ -82,7 +82,7 @@ button:hover {
 }
 
 p {
-  margin: 18px;
+  margin: 8px;
   text-align: left;
 }
 
@@ -185,7 +185,7 @@ model-viewer {
 
 .header .margin {
   font-size: 16px;
-  margin: 18px 8px;
+  margin: 8px;
 }
 
 .dropdown {
@@ -194,13 +194,12 @@ model-viewer {
   z-index: 1;
   width: 100%;
   max-height: 80vh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
     /* Scrollbar styles for Firefox */
   scrollbar-width: thin;
-  scrollbar-color: #ccc transparent;
+  scrollbar-color: #777 transparent;
 }
-
+  
 /* Minimal, borderless scrollbar for dropdown (Windows/Chrome/Edge/Safari) */
 .dropdown::-webkit-scrollbar {
   width: 8px;
@@ -209,7 +208,7 @@ model-viewer {
 }
 
 .dropdown::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: #777;
   border-radius: 8px;
   border: none;
 }
@@ -217,6 +216,10 @@ model-viewer {
 .dropdown::-webkit-scrollbar-track {
   background: transparent;
   border: none;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar {
+    z-index: 0 !important; 
 }
 
 .show {
@@ -285,7 +288,7 @@ model-viewer {
 }
 
 .squish {
-  margin-right: -12px;
+  margin-right: -8px;
 }
 
 .icon {
@@ -329,9 +332,8 @@ model-viewer {
   -o-border-radius: 18px;
 }
 
-.edges-icon {
+.edges {
   background-image: url(/icons/edges.png);
-  margin-left: -8px;
 }
 
 .cancel {
@@ -343,25 +345,6 @@ model-viewer {
 
 .edit {
   background-image: url(/icons/pencil.png);
-}
-
-.current-edit {
-  display: none;
-  position: static;
-  flex: 0 0 auto;
-  min-width: 24px;
-  background-repeat: no-repeat;
-  background-position: center;
-  width: 24px;
-  height: 24px;
-  margin-right: -12px;
-  vertical-align: middle;
-  background-size: 16px;
-  border-radius: 12px;
-  -webkit-border-radius: 12px;
-  -moz-border-radius: 12px;
-  -ms-border-radius: 12px;
-  -o-border-radius: 12px;
 }
 
 .trash {
@@ -452,10 +435,6 @@ model-viewer {
   margin-right: 16px;
   background: #ffffff55;
   outline: none;
-  -webkit-border-radius:;
-  -moz-border-radius:;
-  -ms-border-radius:;
-  -o-border-radius:;
 }
 
 .slider::-webkit-slider-thumb {
@@ -466,10 +445,6 @@ model-viewer {
   border-radius: 50%;
   background: #ccc;
   cursor: pointer;
-  -webkit-border-radius:;
-  -moz-border-radius:;
-  -ms-border-radius:;
-  -o-border-radius:;
 }
 
 .slider::-moz-range-thumb {
@@ -478,21 +453,6 @@ model-viewer {
   border-radius: 50%;
   background: #ccc;
   cursor: pointer;
-  -webkit-border-radius:;
-  -moz-border-radius:;
-  -ms-border-radius:;
-  -o-border-radius:;
-}
-
-/* on desktop (mouse, trackpad)
-  make dropdown little wider, so after scrollbar
-  it look same size as top bar.
-  on touch it stay 100% width. */
-@media (pointer: fine) {
-  #fileDropdown,
-  #saveDropdown {
-    width: calc(100% + 8px);
-  }
 }
 
 /* draggable pane dividers */

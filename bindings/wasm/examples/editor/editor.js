@@ -123,8 +123,8 @@ function setupPaneSplitters() {
   const rightPaneElement = document.getElementById('rightPane');
   const horizontalSplitterElement = document.getElementById('split-x');
   const verticalSplitterElement = document.getElementById('split-y');
-  const leftPaneStorageKey = 'ManifoldCAD:leftPanePercent';
-  const viewerPaneStorageKey = 'ManifoldCAD:viewerPanePercent';
+  const leftPaneStorageKey = 'leftPanePercent';
+  const viewerPaneStorageKey = 'viewerPanePercent';
 
   if (!pageElement || !workbenchElement || !rightPaneElement) return;
 
@@ -492,6 +492,7 @@ async function createEditor() {
     // remove horizontal scrollbar:
     scrollbar: {
       horizontal: 'hidden',
+      verticalScrollbarSize: 8,
     },
     // make monaco editor to wrap the content,and hide horizontal
     // scrollbar----end-------.
