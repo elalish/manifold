@@ -24,7 +24,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import {Mesh, MeshBasicMaterial, SkinnedMesh,} from 'three';
+import {Box3, BufferGeometry, CanvasTexture, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PlaneGeometry, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -659,6 +659,210 @@ let paused = false;
 let showEdges = false;
 const EDGE_KEY = 'edgeLines';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+const ORIENTATION_GRID_FLAG = '__isOrientationGrid';
+const ORIENTATION_GRID_KEY = '__orientationGrid';
+
+function ceilNiceNumber(value) {
+  const positiveValue = Math.max(value, 1e-9);
+  const exponent = Math.floor(Math.log10(positiveValue));
+  const magnitude = 10 ** exponent;
+  const fraction = positiveValue / magnitude;
+  let roundedFraction = 10;
+  if (fraction <= 1) {
+    roundedFraction = 1;
+  } else if (fraction <= 2) {
+    roundedFraction = 2;
+  } else if (fraction <= 5) {
+    roundedFraction = 5;
+  }
+  return roundedFraction * magnitude;
+}
+
+function formatMetricLength(meters) {
+  const trim = number => String(Number(number.toFixed(2)))
+                             .replace(/\.0+$/, '')
+                             .replace(/(\.\d*?)0+$/, '$1');
+  const absMeters = Math.abs(meters);
+  if (absMeters >= 1) {
+    return `${trim(meters)}m`;
+  }
+  if (absMeters >= 0.01) {
+    return `${trim(meters * 100)}cm`;
+  }
+  if (absMeters >= 0.001) {
+    return `${trim(meters * 1000)}mm`;
+  }
+  return `${trim(meters * 1e6)}um`;
+}
+
+function createAxisLabelMesh(text, size) {
+  const canvas = document.createElement('canvas');
+  const canvasSize = 128;
+  canvas.width = canvasSize;
+  canvas.height = canvasSize;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  context.clearRect(0, 0, canvasSize, canvasSize);
+  context.fillStyle = 'rgba(0,0,0,0.8)';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '700 86px "Arial", sans-serif';
+  context.fillText(text, canvasSize / 2, canvasSize / 2);
+
+  const texture = new CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const material = new MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: 2,
+    toneMapped: false,
+    depthWrite: false,
+  });
+  const mesh = new Mesh(new PlaneGeometry(size, size), material);
+  mesh.userData[ORIENTATION_GRID_FLAG] = true;
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+function createGridLinesGeometry(gridHalfExtent, spacing, includeLine) {
+  const vertices = [];
+  const epsilon = spacing * 0.001;
+  for (let coordinate = -gridHalfExtent; coordinate <= gridHalfExtent + epsilon;
+       coordinate += spacing) {
+    if (!includeLine(coordinate)) continue;
+    vertices.push(
+        -gridHalfExtent, 0, coordinate, gridHalfExtent, 0, coordinate);
+    vertices.push(
+        coordinate, 0, -gridHalfExtent, coordinate, 0, gridHalfExtent);
+  }
+  if (vertices.length === 0) return null;
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
+  return geometry;
+}
+
+function updateOrientationGrid() {
+  const scene = sceneSym ? mv[sceneSym] : null;
+  if (!scene) return;
+
+  const root = scene.model ?? scene;
+  const previousGrid = root.userData[ORIENTATION_GRID_KEY];
+  if (previousGrid) {
+    previousGrid.removeFromParent();
+    delete root.userData[ORIENTATION_GRID_KEY];
+  }
+
+  const bounds = new Box3().setFromObject(root);
+  if (bounds.isEmpty()) return;
+
+  const extentX = Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x));
+  const extentZ = Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z));
+  const gridHalfExtent = ceilNiceNumber(Math.max(extentX, extentZ, 0.01) * 2);
+  const maxGridDimension = gridHalfExtent * 2;
+
+  const shortestSide = Math.min(mv.clientWidth || 800, mv.clientHeight || 600);
+  const maxMinorLines = clampToRange(Math.floor(shortestSide / 18), 12, 80);
+  const majorStep = ceilNiceNumber(maxGridDimension / 6);
+  const minorStep = ceilNiceNumber(maxGridDimension / (maxMinorLines * 2));
+
+  const nearAxis = value => Math.abs(value) < minorStep * 0.01;
+  const isMajorLine = value => {
+    const nearest = Math.round(value / majorStep) * majorStep;
+    return Math.abs(value - nearest) <= minorStep * 0.01;
+  };
+
+  const minorGeometry = createGridLinesGeometry(
+      gridHalfExtent, minorStep,
+      coordinate => !nearAxis(coordinate) && !isMajorLine(coordinate));
+  const majorGeometry = createGridLinesGeometry(
+      gridHalfExtent, majorStep, coordinate => !nearAxis(coordinate));
+
+  const grid = new Group();
+  grid.userData[ORIENTATION_GRID_FLAG] = true;
+  grid.renderOrder = 2;
+
+  if (minorGeometry) {
+    const minorLines = new LineSegments(minorGeometry, new LineBasicMaterial({
+                                          color: 0x6f7881,
+                                          transparent: true,
+                                          opacity: 0.28,
+                                          depthWrite: false,
+                                          toneMapped: false,
+                                        }));
+    minorLines.userData[ORIENTATION_GRID_FLAG] = true;
+    grid.add(minorLines);
+  }
+
+  if (majorGeometry) {
+    const majorLines = new LineSegments(majorGeometry, new LineBasicMaterial({
+                                          color: 0x424b55,
+                                          transparent: true,
+                                          opacity: 0.45,
+                                          depthWrite: false,
+                                          toneMapped: false,
+                                        }));
+    majorLines.userData[ORIENTATION_GRID_FLAG] = true;
+    grid.add(majorLines);
+  }
+
+  const axisStripWidth = minorStep * 0.12;
+  const axisMaterial = new MeshBasicMaterial({
+    color: 0x1f262d,
+    transparent: true,
+    opacity: 0.85,
+    side: 2,
+    depthWrite: false,
+    toneMapped: false,
+  });
+
+  const xAxis = new Mesh(
+      new PlaneGeometry(maxGridDimension, axisStripWidth),
+      axisMaterial.clone());
+  xAxis.rotation.x = -Math.PI / 2;
+  xAxis.position.y = 0.001;
+  xAxis.userData[ORIENTATION_GRID_FLAG] = true;
+  grid.add(xAxis);
+
+  const yAxis = new Mesh(
+      new PlaneGeometry(axisStripWidth, maxGridDimension),
+      axisMaterial.clone());
+  yAxis.rotation.x = -Math.PI / 2;
+  yAxis.position.y = 0.001;
+  yAxis.userData[ORIENTATION_GRID_FLAG] = true;
+  grid.add(yAxis);
+
+  const labelSize =
+      clampToRange(maxGridDimension * 0.045, majorStep * 0.9, minorStep * 0.9);
+  const labelOffset = majorStep * 0.25;
+
+  const xLabel = createAxisLabelMesh('X', labelSize);
+  if (xLabel) {
+    xLabel.position.set(gridHalfExtent + labelOffset, 0.002, 0);
+    grid.add(xLabel);
+  }
+
+  const yLabel = createAxisLabelMesh('Y', labelSize);
+  if (yLabel) {
+    yLabel.position.set(0, 0.002, gridHalfExtent + labelOffset);
+    grid.add(yLabel);
+  }
+
+  root.add(grid);
+  root.userData[ORIENTATION_GRID_KEY] = grid;
+
+  scene.queueRender?.();
+  if (needsRenderSym) {
+    mv[needsRenderSym]?.();
+  }
+
+  const filteredLines = consoleElement.textContent.split(/\r?\n/).filter(
+      line => line && !line.startsWith('Max grid dimension: '));
+  filteredLines.push(
+      `Max grid dimension: ${formatMetricLength(maxGridDimension)}`);
+  consoleElement.textContent = `${filteredLines.join('\r\n')}\r\n`;
+  consoleElement.scrollTop = consoleElement.scrollHeight;
+}
 
 function syncEdgeToggleButton() {
   if (showEdges) {
@@ -674,6 +878,7 @@ mv.addEventListener('load', () => {
   if (hasAnimation) {
     play();
   }
+  updateOrientationGrid();
   syncEdgeToggleButton();
   if (showEdges) {
     setEdgesVisible(true);
@@ -700,6 +905,7 @@ function setEdgesVisible(visible) {
 
   const root = scene.model ?? scene;
   root.traverse((obj) => {
+    if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
     if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
 
     if (obj.isMesh) {
