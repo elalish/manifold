@@ -516,9 +516,11 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
                                  origin, spacing, gridSize, level, sdf);
       });
 
-  size_t tableSize = std::min(
-      2 * maxIndex,
-      static_cast<uint64_t>(10 * manifold::math::pow(maxIndex, 0.667)));
+  const uint64_t tableSizeCap =
+      static_cast<uint64_t>(std::numeric_limits<size_t>::max());
+  const uint64_t tableSize64 =
+      maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
+  size_t tableSize = static_cast<size_t>(tableSize64);
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
 

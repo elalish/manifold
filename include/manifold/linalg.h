@@ -1784,7 +1784,7 @@ template <class T>
 vec<T, 4> qpow(const vec<T, 4>& q, const T& p) {
   const auto v = q.xyz();
   const auto vv = length(v), qq = length(q), th = linalg::acos(q.w / qq);
-  return manifold::math::pow(qq, p) *
+  return std::pow(qq, p) *
          vec<T, 4>{v * (vv > 0 ? linalg::sin(p * th) / vv : 0),
                    linalg::cos(p * th)};
 }
