@@ -522,7 +522,8 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   uint64_t tableSize64;
   if (maxIndex > kLargeIndexThreshold) {
     const uint64_t half = maxIndex / 2;
-    tableSize64 = maxIndex > tableSizeCap - half ? tableSizeCap : maxIndex + half;
+    tableSize64 =
+        maxIndex > tableSizeCap - half ? tableSizeCap : maxIndex + half;
   } else {
     tableSize64 = maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
   }
