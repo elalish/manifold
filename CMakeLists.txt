@@ -30,7 +30,7 @@ include(CMakeDependentOption)
 # Define Manifold version
 set(MANIFOLD_VERSION_MAJOR 3)
 set(MANIFOLD_VERSION_MINOR 4)
-set(MANIFOLD_VERSION_PATCH 0)
+set(MANIFOLD_VERSION_PATCH 1)
 set(
   MANIFOLD_VERSION
   "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}"
@@ -159,6 +159,7 @@ else()
     -Wno-unknown-warning-option
     -Wno-unused
     -Wno-shorten-64-to-32
+    -Wno-sign-compare
     -Wno-alloc-size-larger-than
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -286,6 +287,7 @@ install(
 set(
   MANIFOLD_PUBLIC_HDRS
   common.h
+  math.h
   linalg.h
   manifold.h
   optional_assert.h

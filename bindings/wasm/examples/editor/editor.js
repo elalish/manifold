@@ -24,6 +24,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
 // '?worker' is vite convention to load a module as a web worker.
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import {Mesh, MeshBasicMaterial, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -78,6 +79,104 @@ if (navigator.serviceWorker) {
 
 let editor = undefined;
 
+// Pane resizing - draggable pane dividers ---------------------
+
+const LEFT_PANE_MIN_PERCENT = 20;
+const LEFT_PANE_MAX_PERCENT = 80;
+const VIEWER_PANE_MIN_PERCENT = 35;
+const VIEWER_PANE_MAX_PERCENT = 90;
+
+// Keep percentages within practical bounds so panes stay usable.
+function clampToRange(value, minValue, maxValue) {
+  return Math.min(maxValue, Math.max(minValue, value));
+}
+
+// Attach pointer-drag behavior to a splitter element.
+// The callback receives pointer-move events and applies the layout update.
+function attachSplitterDrag(splitterElement, handleDragMove) {
+  if (!splitterElement) return;
+
+  splitterElement.addEventListener('pointerdown', pointerDownEvent => {
+    const isMobileLayout = window.matchMedia('(max-width: 820px)').matches;
+    if (isMobileLayout) return;
+
+    pointerDownEvent.preventDefault();
+    splitterElement.setPointerCapture(pointerDownEvent.pointerId);
+
+    const onPointerMove = moveEvent => handleDragMove(moveEvent);
+    const onPointerEnd = endEvent => {
+      splitterElement.releasePointerCapture(endEvent.pointerId);
+      splitterElement.removeEventListener('pointermove', onPointerMove);
+      splitterElement.removeEventListener('pointerup', onPointerEnd);
+      splitterElement.removeEventListener('pointercancel', onPointerEnd);
+    };
+
+    splitterElement.addEventListener('pointermove', onPointerMove);
+    splitterElement.addEventListener('pointerup', onPointerEnd);
+    splitterElement.addEventListener('pointercancel', onPointerEnd);
+  });
+}
+
+function setupPaneSplitters() {
+  const pageElement = document.querySelector('.page');
+  const workbenchElement = document.getElementById('workbench');
+  const rightPaneElement = document.getElementById('rightPane');
+  const horizontalSplitterElement = document.getElementById('split-x');
+  const verticalSplitterElement = document.getElementById('split-y');
+  const leftPaneStorageKey = 'leftPanePercent';
+  const viewerPaneStorageKey = 'viewerPanePercent';
+
+  if (!pageElement || !workbenchElement || !rightPaneElement) return;
+
+  // Restore saved pane percentages on refresh when they are valid numbers.
+  const savedLeftPane = Number(window.localStorage.getItem(leftPaneStorageKey));
+  if (Number.isFinite(savedLeftPane)) {
+    const clampedLeftPanePercent = clampToRange(
+        savedLeftPane, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+  }
+
+  const savedViewerPane =
+      Number(window.localStorage.getItem(viewerPaneStorageKey));
+  if (Number.isFinite(savedViewerPane)) {
+    const clampedViewerPanePercent = clampToRange(
+        savedViewerPane, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+  }
+
+  attachSplitterDrag(horizontalSplitterElement, moveEvent => {
+    // Convert pointer X position to a percentage of the full workbench width.
+    const workbenchBounds = workbenchElement.getBoundingClientRect();
+    const leftPanePercent =
+        ((moveEvent.clientX - workbenchBounds.left) / workbenchBounds.width) *
+        100;
+    const clampedLeftPanePercent = clampToRange(
+        leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+    pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
+    window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
+
+    // Monaco reacts to container size changes, but an explicit layout keeps
+    // drag updates immediate and smooth.
+    editor?.layout({});
+  });
+
+  attachSplitterDrag(verticalSplitterElement, moveEvent => {
+    // Convert pointer Y position to a percentage of the right pane height.
+    const rightPaneBounds = rightPaneElement.getBoundingClientRect();
+    const viewerPanePercent =
+        ((moveEvent.clientY - rightPaneBounds.top) / rightPaneBounds.height) *
+        100;
+    const clampedViewerPanePercent = clampToRange(
+        viewerPanePercent, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+    pageElement.style.setProperty(
+        '--viewer-pane', `${clampedViewerPanePercent}%`);
+    window.localStorage.setItem(viewerPaneStorageKey, clampedViewerPanePercent);
+  });
+}
+
+setupPaneSplitters();
+
 // Edit UI ------------------------------------------------------------
 
 const undoButton = document.querySelector('#undo');
@@ -103,6 +202,7 @@ shareButton.onclick = () => {
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
 const currentFileElement = document.querySelector('#current');
+const currentEditElement = document.querySelector('#current-edit');
 const fileArrow = document.querySelector('#file .uparrow');
 const fileDropdown = document.querySelector('#fileDropdown');
 const saveContainer = document.querySelector('#save');
@@ -183,12 +283,20 @@ window.beforeunload = saveCurrent;
 
 let switching = false;
 let isExample = true;
+function syncCurrentEditVisibility(scriptName) {
+  if (!currentEditElement) return;
+  // Show current edit icon only for user scripts.
+  currentEditElement.style.display =
+      exampleFunctions.get(scriptName) == null ? 'inline-block' : 'none';
+}
+
 function switchTo(scriptName) {
   if (editor) {
     switching = true;
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
+    syncCurrentEditVisibility(scriptName);
     const code = isExample ? exampleFunctions.get(scriptName) :
                              getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
@@ -242,47 +350,6 @@ function uniqueName(name) {
 
 function addEdit(button) {
   const label = button.firstChild;
-  const edit = addIcon(button);
-  edit.classList.add('edit');
-
-  edit.onclick = function(event) {
-    event.stopPropagation();
-    const oldName = label.textContent;
-    const code = getScript(oldName);
-    const form = document.createElement('form');
-    const inputElement = document.createElement('input');
-    inputElement.classList.add('name');
-    inputElement.value = oldName;
-    label.textContent = '';
-    button.appendChild(form);
-    form.appendChild(inputElement);
-    inputElement.focus();
-    inputElement.setSelectionRange(0, oldName.length);
-
-    function rename() {
-      const input = inputElement.value;
-      inputElement.blur();
-      if (!input) return;
-      const newName = uniqueName(input);
-      label.textContent = newName;
-      if (currentFileElement.textContent == oldName) {
-        currentFileElement.textContent = newName;
-      }
-      removeScript(oldName);
-      setScript(newName, code);
-    }
-
-    form.onsubmit = rename;
-    inputElement.onclick = function(event) {
-      event.stopPropagation();
-    };
-
-    inputElement.onblur = function() {
-      button.removeChild(form);
-      label.textContent = oldName;
-    };
-  };
-
   const trash = addIcon(button);
   trash.classList.add('trash');
   let lastClick = 0;
@@ -305,6 +372,68 @@ function addEdit(button) {
       const container = button.parentElement;
       container.parentElement.removeChild(container);
     }
+  };
+}
+
+function startRenameCurrentScript() {
+  const oldName = currentFileElement.textContent;
+  if (exampleFunctions.get(oldName) != null) return;
+
+  hideDropdown();
+  const code = getScript(oldName) ?? '';
+  currentEditElement.style.display = 'none';
+  // Rename in the same place (no extra input box).
+  currentFileElement.contentEditable = 'true';
+  currentFileElement.classList.add('renaming');
+  currentFileElement.spellcheck = false;
+  currentFileElement.focus();
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(currentFileElement);
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  function finishRename(revert = false) {
+    const input = currentFileElement.textContent.trim();
+    const shouldRename = !revert && input && input !== oldName;
+    const newName = shouldRename ? uniqueName(input) : oldName;
+    currentFileElement.contentEditable = 'false';
+    currentFileElement.classList.remove('renaming');
+    currentFileElement.textContent = newName;
+    if (shouldRename) {
+      // Keep storage key and dropdown label in sync with new name.
+      setScript('currentName', newName);
+      removeScript(oldName);
+      setScript(newName, code);
+      for (const item of fileDropdown.children) {
+        const span = item.querySelector('button span');
+        if (span && span.textContent === oldName) {
+          span.textContent = newName;
+          break;
+        }
+      }
+    }
+    syncCurrentEditVisibility(currentFileElement.textContent);
+  }
+
+  currentFileElement.onkeydown = event => {
+    // Enter = save, Escape = cancel.
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finishRename();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      finishRename(true);
+    }
+  };
+  currentFileElement.onblur = () => finishRename();
+}
+
+if (currentEditElement) {
+  currentEditElement.onclick = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    startRenameCurrentScript();
   };
 }
 
@@ -352,6 +481,23 @@ async function createEditor() {
     language: 'typescript',
     automaticLayout: true,
     minimap: {enabled: false},
+
+
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----start----:
+
+    // make text wrap to the next line when it exceeds the width of the editor:
+    wordWrap: 'on',
+
+    // remove horizontal scrollbar:
+    scrollbar: {
+      horizontal: 'hidden',
+      verticalScrollbarSize: 8,
+    },
+    // make monaco editor to wrap the content,and hide horizontal
+    // scrollbar----end-------.
+
+
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -534,7 +680,24 @@ const mv = document.querySelector('model-viewer');
 const animationContainer = document.querySelector('#animation');
 const playButton = document.querySelector('#play');
 const scrubber = document.querySelector('#scrubber');
+const edgeToggle = document.getElementById('edgesToggle');
+const sceneSym =
+    Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
+const needsRenderSym =
+    Object.getOwnPropertySymbols(mv).find(x => x.description === 'needsRender');
+
 let paused = false;
+let showEdges = false;
+const EDGE_KEY = 'edgeLines';
+const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+
+function syncEdgeToggleButton() {
+  if (showEdges) {
+    edgeToggle.classList.add('green');
+  } else {
+    edgeToggle.classList.remove('green');
+  }
+}
 
 mv.addEventListener('load', () => {
   const hasAnimation = mv.availableAnimations.length > 0;
@@ -542,6 +705,16 @@ mv.addEventListener('load', () => {
   if (hasAnimation) {
     play();
   }
+  syncEdgeToggleButton();
+  if (showEdges) {
+    setEdgesVisible(true);
+  }
+});
+
+edgeToggle.addEventListener('click', () => {
+  showEdges = !showEdges;
+  syncEdgeToggleButton();
+  setEdgesVisible(showEdges);
 });
 
 function play() {
@@ -550,6 +723,57 @@ function play() {
   playButton.classList.add('pause');
   paused = false;
   scrubber.classList.add('hide');
+}
+
+function setEdgesVisible(visible) {
+  const scene = sceneSym ? mv[sceneSym] : null;
+  if (!scene) return;
+
+  const root = scene.model ?? scene;
+  root.traverse((obj) => {
+    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
+
+    if (obj.isMesh) {
+      // Fix wireframe z-fighting.
+      obj.material.polygonOffset = true;
+      obj.material.polygonOffsetFactor = 4;
+      obj.material.polygonOffsetUnits = 4;
+
+      if (visible && !obj.userData[EDGE_KEY]) {
+        const material = new MeshBasicMaterial({
+          color: 0x111111,
+          wireframe: true,
+          toneMapped: false,
+        });
+
+        let edgeLines;
+        if (obj.isSkinnedMesh) {
+          edgeLines = new SkinnedMesh(obj.geometry, material);
+          edgeLines.bind(obj.skeleton, obj.bindMatrix);
+          edgeLines.bindMatrix.copy(obj.bindMatrix);
+          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
+        } else {
+          edgeLines = new Mesh(obj.geometry, material);
+          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
+          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
+        }
+
+        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+        obj.add(edgeLines);
+        obj.userData[EDGE_KEY] = edgeLines;
+      }
+
+      const edgeLines = obj.userData[EDGE_KEY];
+      if (edgeLines) {
+        edgeLines.visible = visible;
+      }
+    }
+  });
+
+  scene.queueRender?.();
+  if (needsRenderSym) {
+    mv[needsRenderSym]?.();
+  }
 }
 
 function pause() {

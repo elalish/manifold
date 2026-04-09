@@ -169,6 +169,19 @@ TEST(Smooth, Normals) {
   if (options.exportModels) WriteTestOBJ("smoothNormals.obj", byNormals);
 }
 
+TEST(Smooth, NormalTransform) {
+  Manifold cube1 = Manifold::Cube().Rotate(30).CalculateNormals(0);
+  Manifold cube2 =
+      Manifold::Cube().CalculateNormals(0).Rotate(30).Translate({3, 0, 0});
+  Manifold combo = cube1 + cube2;
+  Manifold out1 = combo.SmoothByNormals(0).Refine(10);
+  EXPECT_FLOAT_EQ(out1.Volume(), 2);
+  EXPECT_FLOAT_EQ(out1.SurfaceArea(), 12);
+  Manifold out2 = Manifold(combo.GetMeshGL(0)).SmoothByNormals(0).Refine(10);
+  EXPECT_FLOAT_EQ(out2.Volume(), 2);
+  EXPECT_FLOAT_EQ(out2.SurfaceArea(), 12);
+}
+
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();

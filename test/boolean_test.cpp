@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/utils.h"
+#include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -71,7 +72,7 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
-  MeshGL output = result.GetMeshGL(0);
+  MeshGL output = result.GetMeshGL();
 
   if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
@@ -80,7 +81,16 @@ TEST(Boolean, Normals) {
   output.Merge();
   Manifold roundTrip(output);
 
-  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, false);
+  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, true);
+}
+
+TEST(Boolean, MissingNormals) {
+  const Manifold noNormals = Manifold::Cube(vec3(1), true);
+  const Manifold hasNormals =
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+  Manifold result(combo);
+  EXPECT_FALSE(result.IsEmpty());
 }
 
 TEST(Boolean, EmptyOriginal) {
@@ -545,6 +555,20 @@ TEST(Boolean, Split) {
   CheckStrictly(splits.second);
   EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
                   cube.Volume());
+}
+
+TEST(Boolean, SplitByPlaneEmpty) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+
+  std::pair<Manifold, Manifold> split =
+      empty.SplitByPlane({1.0, 0.0, 0.0}, 0.0);
+
+  EXPECT_EQ(split.first.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(split.second.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(split.first.IsEmpty());
+  EXPECT_TRUE(split.second.IsEmpty());
 }
 
 TEST(Boolean, SplitByPlane) {

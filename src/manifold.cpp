@@ -31,8 +31,8 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double size = la::length(bBox.Center() - normal * originOffset) +
                 0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
-  double yDeg = degrees(-std::asin(normal.z));
-  double zDeg = degrees(std::atan2(normal.y, normal.x));
+  double yDeg = degrees(-math::asin(normal.z));
+  double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 }  // namespace
@@ -182,18 +182,19 @@ Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
 
 /**
- * The most complete output of this library, returning a MeshGL that is designed
+ * Returns a MeshGL that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify the first of the
- * three consecutive property channels forming the (x, y, z) normals, which will
- * cause this output MeshGL to automatically update these normals according to
- * the applied transforms and front/back side. normalIdx + 3 must be <=
- * numProp, and all original MeshGLs must use the same channels for their
- * normals.
+ * @param normalIdx If this manifold has properties corresponding to normal
+ * vectors, you can specify the first of the three consecutive property channels
+ * forming the (x, y, z) normals, which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
+ * must use the same channels for their normals. Default is -1, meaning no
+ * normals. If normals are selected, the runTransform matrices will be removed
+ * from the output, to avoid them being double-applied when round-tripped.
  */
 MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
@@ -201,18 +202,20 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
 }
 
 /**
- * The most complete output of this library, returning a MeshGL that is designed
+ * Returns a MeshGL that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify the first of the
- * three consecutive property channels forming the (x, y, z) normals, which will
- * cause this output MeshGL to automatically update these normals according to
- * the applied transforms and front/back side. normalIdx + 3 must be <=
- * numProp, and all original MeshGLs must use the same channels for their
- * normals.
+ * @param normalIdx If this manifold has properties corresponding to normal
+ * vectors, you can specify the first of the three consecutive property channels
+ * forming the (x, y, z) normals, which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
+ * must use the same channels for their normals. Default is -1, meaning no
+ * normals. If normals are selected, the runTransform matrices will be removed
+ * from the output, to avoid them being double-applied when round-tripped.
+
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
@@ -848,6 +851,7 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     vec3 normal, double originOffset) const {
+  if (IsEmpty()) return {Manifold(), Manifold()};
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
 

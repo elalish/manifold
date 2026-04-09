@@ -1,4 +1,4 @@
-// Copyright 2021 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include <chrono>
 #endif
 
+#include "./math.h"
 #include "linalg.h"
 
 namespace manifold {
@@ -92,33 +93,21 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  *
  * @param x Angle in degrees.
  */
-inline double CanonicalizeTrig(double x) {
-  if (!la::isfinite(x)) return x;
-  x = la::clamp(x, -1.0, 1.0);
-  // The current cross-platform divergence is a 1-ULP drift around sqrt(1/2)
-  // (45-degree rotations). Snap only this neighborhood to avoid changing
-  // unrelated trigonometric outputs used elsewhere.
-  constexpr double kSqrtHalf = 0x1.6a09e667f3bccp-1;
-  constexpr double kTol = 8 * std::numeric_limits<double>::epsilon();
-  if (std::abs(x - kSqrtHalf) <= kTol) return kSqrtHalf;
-  if (std::abs(x + kSqrtHalf) <= kTol) return -kSqrtHalf;
-  return x;
-}
-
 inline double sind(double x) {
-  if (!la::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
   int quo;
-  x = remquo(fabs(x), 90.0, &quo);
+  x = std::remquo(std::fabs(x), 90.0, &quo);
+  const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return CanonicalizeTrig(sin(radians(x)));
+      return math::sin(xr);
     case 1:
-      return CanonicalizeTrig(cos(radians(x)));
+      return math::cos(xr);
     case 2:
-      return CanonicalizeTrig(-sin(radians(x)));
+      return -math::sin(xr);
     case 3:
-      return CanonicalizeTrig(-cos(radians(x)));
+      return -math::cos(xr);
   }
   return 0.0;
 }
@@ -393,7 +382,7 @@ struct Rect {
   /**
    * Is the rectangle empty (containing no space)?
    */
-  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; }
 
   /**
    * Does this recangle have finite bounds?
@@ -500,7 +489,6 @@ constexpr double DEFAULT_LENGTH = 1.0;
  * must be specified.
  */
 class Quality {
- private:
  public:
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);
@@ -546,13 +534,11 @@ struct ExecutionParams {
 #ifdef MANIFOLD_DEBUG
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
