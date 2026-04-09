@@ -664,18 +664,8 @@ const ORIENTATION_GRID_KEY = '__orientationGrid';
 
 function ceilNiceNumber(value) {
   const positiveValue = Math.max(value, 1e-9);
-  const exponent = Math.floor(Math.log10(positiveValue));
-  const magnitude = 10 ** exponent;
-  const fraction = positiveValue / magnitude;
-  let roundedFraction = 10;
-  if (fraction <= 1) {
-    roundedFraction = 1;
-  } else if (fraction <= 2) {
-    roundedFraction = 2;
-  } else if (fraction <= 5) {
-    roundedFraction = 5;
-  }
-  return roundedFraction * magnitude;
+  const exponent = Math.ceil(Math.log10(positiveValue));
+  return 10 ** exponent;
 }
 
 function formatMetricLength(meters) {
@@ -707,8 +697,15 @@ function createAxisLabelMesh(text, size) {
   context.fillStyle = 'rgba(0,0,0,0.8)';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.font = '700 86px "Arial", sans-serif';
-  context.fillText(text, canvasSize / 2, canvasSize / 2);
+
+  const lines = String(text).split('\n').filter(Boolean);
+  context.font = '700 52px "Arial", sans-serif';
+
+  const lineHeight = 60;
+  const startY = (canvasSize / 2) - ((lines.length - 1) * lineHeight / 2);
+  lines.forEach((line, index) => {
+    context.fillText(line, canvasSize / 2, startY + (index * lineHeight));
+  });
 
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
@@ -742,6 +739,28 @@ function createGridLinesGeometry(gridHalfExtent, spacing, includeLine) {
   return geometry;
 }
 
+function disposeOrientationGrid(grid) {
+  if (!grid) return;
+
+  grid.traverse(obj => {
+    if (obj.geometry) {
+      obj.geometry.dispose();
+    }
+
+    const material = obj.material;
+    if (!material) return;
+
+    const materials = Array.isArray(material) ? material : [material];
+    for (const currentMaterial of materials) {
+      const map = currentMaterial.map;
+      if (map) {
+        map.dispose();
+      }
+      currentMaterial.dispose();
+    }
+  });
+}
+
 function updateOrientationGrid() {
   const scene = sceneSym ? mv[sceneSym] : null;
   if (!scene) return;
@@ -749,6 +768,7 @@ function updateOrientationGrid() {
   const root = scene.model ?? scene;
   const previousGrid = root.userData[ORIENTATION_GRID_KEY];
   if (previousGrid) {
+    disposeOrientationGrid(previousGrid);
     previousGrid.removeFromParent();
     delete root.userData[ORIENTATION_GRID_KEY];
   }
@@ -758,13 +778,12 @@ function updateOrientationGrid() {
 
   const extentX = Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x));
   const extentZ = Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z));
-  const gridHalfExtent = ceilNiceNumber(Math.max(extentX, extentZ, 0.01) * 2);
+  const modelHalfExtent = Math.max(extentX, extentZ, 0.1);
+  const paddedHalfExtent = modelHalfExtent * 1.2;
+  const majorStep = ceilNiceNumber(Math.max(paddedHalfExtent * 2, 0.1 * 2) / 8);
+  const minorStep = majorStep / 10;
+  const gridHalfExtent = Math.ceil(paddedHalfExtent / majorStep) * majorStep;
   const maxGridDimension = gridHalfExtent * 2;
-
-  const shortestSide = Math.min(mv.clientWidth || 800, mv.clientHeight || 600);
-  const maxMinorLines = clampToRange(Math.floor(shortestSide / 18), 12, 80);
-  const majorStep = ceilNiceNumber(maxGridDimension / 6);
-  const minorStep = ceilNiceNumber(maxGridDimension / (maxMinorLines * 2));
 
   const nearAxis = value => Math.abs(value) < minorStep * 0.01;
   const isMajorLine = value => {
@@ -834,15 +853,16 @@ function updateOrientationGrid() {
 
   const labelSize =
       clampToRange(maxGridDimension * 0.045, majorStep * 0.9, minorStep * 0.9);
-  const labelOffset = majorStep * 0.25;
+  const labelOffset = majorStep * 0.15;
+  const axisDimensionLabel = formatMetricLength(gridHalfExtent);
 
-  const xLabel = createAxisLabelMesh('X', labelSize);
+  const xLabel = createAxisLabelMesh(`X\n${axisDimensionLabel}`, labelSize);
   if (xLabel) {
     xLabel.position.set(gridHalfExtent + labelOffset, 0.002, 0);
     grid.add(xLabel);
   }
 
-  const yLabel = createAxisLabelMesh('Y', labelSize);
+  const yLabel = createAxisLabelMesh(`Y\n${axisDimensionLabel}`, labelSize);
   if (yLabel) {
     yLabel.position.set(0, 0.002, gridHalfExtent + labelOffset);
     grid.add(yLabel);
@@ -855,13 +875,6 @@ function updateOrientationGrid() {
   if (needsRenderSym) {
     mv[needsRenderSym]?.();
   }
-
-  const filteredLines = consoleElement.textContent.split(/\r?\n/).filter(
-      line => line && !line.startsWith('Max grid dimension: '));
-  filteredLines.push(
-      `Max grid dimension: ${formatMetricLength(maxGridDimension)}`);
-  consoleElement.textContent = `${filteredLines.join('\r\n')}\r\n`;
-  consoleElement.scrollTop = consoleElement.scrollHeight;
 }
 
 function syncEdgeToggleButton() {
