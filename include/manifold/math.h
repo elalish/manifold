@@ -28,13 +28,6 @@
 // Developed at SunPro/SunSoft, a Sun Microsystems, Inc. business.
 // Permission to use, copy, modify, and distribute this software is freely
 // granted, provided that this notice is preserved.
-//
-// Deterministic exp/log/pow helpers adapted from OpenLibm (FreeBSD msun):
-// - https://github.com/JuliaMath/openlibm/blob/master/src/e_exp.c
-// - https://github.com/JuliaMath/openlibm/blob/master/src/e_log.c
-// - https://github.com/JuliaMath/openlibm/blob/master/src/e_pow.c
-// These files also carry the Sun permissive notice above.
-
 #pragma once
 
 #include <cfloat>
@@ -66,41 +59,6 @@ inline double WithLowWord(double x, uint32_t low) {
   uint64_t u = AsUint64(x);
   u = (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
   return FromUint64(u);
-}
-
-inline void ExtractWords(int32_t& high, uint32_t& low, double x) {
-  const uint64_t u = AsUint64(x);
-  high = static_cast<int32_t>(u >> 32);
-  low = static_cast<uint32_t>(u);
-}
-
-inline void GetHighWord(int32_t& high, double x) {
-  high = static_cast<int32_t>(AsUint64(x) >> 32);
-}
-
-inline void GetLowWord(uint32_t& low, double x) {
-  low = static_cast<uint32_t>(AsUint64(x));
-}
-
-inline void InsertWords(double& x, int32_t high, uint32_t low) {
-  const uint64_t u =
-      (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
-      static_cast<uint64_t>(low);
-  x = FromUint64(u);
-}
-
-inline void SetHighWord(double& x, int32_t high) {
-  const uint64_t u = AsUint64(x);
-  const uint64_t out =
-      (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
-      (u & 0xffffffffULL);
-  x = FromUint64(out);
-}
-
-inline void SetLowWord(double& x, uint32_t low) {
-  const uint64_t u = AsUint64(x);
-  const uint64_t out = (u & 0xffffffff00000000ULL) | static_cast<uint64_t>(low);
-  x = FromUint64(out);
 }
 
 constexpr inline double SinKernel(double x, double y, int iy) {
