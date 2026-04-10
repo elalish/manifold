@@ -321,6 +321,18 @@ ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(refined));
 }
 
+ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
+                                         double tolerance) {
+  auto result = from_c(m)->SetTolerance(tolerance);
+  return to_c(new (mem) Manifold(result));
+}
+
+ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
+                                    double tolerance) {
+  auto simplified = from_c(m)->Simplify(tolerance);
+  return to_c(new (mem) Manifold(simplified));
+}
+
 ManifoldManifold* manifold_empty(void* mem) {
   return to_c(new (mem) Manifold());
 }
@@ -652,6 +664,26 @@ float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m) {
   return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
+float manifold_meshgl_tolerance(ManifoldMeshGL* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl_run_flags_length(ManifoldMeshGL* m) {
+  return from_c(m)->runFlags.size();
+}
+
+uint8_t* manifold_meshgl_run_flags(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runFlags);
+}
+
+size_t manifold_meshgl_num_run(ManifoldMeshGL* m) {
+  return from_c(m)->NumRun();
+}
+
+void manifold_meshgl_update_normals(ManifoldMeshGL* m, int normal_idx) {
+  from_c(m)->UpdateNormals(normal_idx);
+}
+
 size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m) {
   return from_c(m)->numProp;
 }
@@ -713,6 +745,26 @@ double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m) {
   return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
+double manifold_meshgl64_tolerance(ManifoldMeshGL64* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl64_run_flags_length(ManifoldMeshGL64* m) {
+  return from_c(m)->runFlags.size();
+}
+
+uint8_t* manifold_meshgl64_run_flags(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runFlags);
+}
+
+size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m) {
+  return from_c(m)->NumRun();
+}
+
+void manifold_meshgl64_update_normals(ManifoldMeshGL64* m, int normal_idx) {
+  from_c(m)->UpdateNormals(normal_idx);
+}
+
 ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {
   auto orig = from_c(m)->AsOriginal();
   return to_c(new (mem) Manifold(orig));
@@ -746,6 +798,14 @@ ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m) {
 }
 
 double manifold_epsilon(ManifoldManifold* m) { return from_c(m)->GetEpsilon(); }
+
+double manifold_get_tolerance(ManifoldManifold* m) {
+  return from_c(m)->GetTolerance();
+}
+
+size_t manifold_num_prop_vert(ManifoldManifold* m) {
+  return from_c(m)->NumPropVert();
+}
 
 uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
 
