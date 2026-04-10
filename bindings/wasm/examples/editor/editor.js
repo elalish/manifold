@@ -780,10 +780,13 @@ function updateOrientationGrid() {
   const extentZ = Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z));
   const modelHalfExtent = Math.max(extentX, extentZ, 0.1);
   const paddedHalfExtent = modelHalfExtent * 1.2;
-  const majorStep = ceilNiceNumber(Math.max(paddedHalfExtent * 2, 0.1 * 2) / 8);
+  const majorStep = ceilNiceNumber(Math.max(paddedHalfExtent, 0.1) / 8);
   const minorStep = majorStep / 10;
   const gridHalfExtent = Math.ceil(paddedHalfExtent / majorStep) * majorStep;
   const maxGridDimension = gridHalfExtent * 2;
+  const minorLineCountPerAxis =
+      Math.floor((maxGridDimension / minorStep) + 1e-6) + 1;
+  const showMinorLines = minorLineCountPerAxis <= 120;
 
   const nearAxis = value => Math.abs(value) < minorStep * 0.01;
   const isMajorLine = value => {
@@ -791,15 +794,32 @@ function updateOrientationGrid() {
     return Math.abs(value - nearest) <= minorStep * 0.01;
   };
 
-  const minorGeometry = createGridLinesGeometry(
-      gridHalfExtent, minorStep,
-      coordinate => !nearAxis(coordinate) && !isMajorLine(coordinate));
+  const minorGeometry = showMinorLines ?
+      createGridLinesGeometry(
+          gridHalfExtent, minorStep,
+          coordinate => !nearAxis(coordinate) && !isMajorLine(coordinate)) :
+      null;
   const majorGeometry = createGridLinesGeometry(
       gridHalfExtent, majorStep, coordinate => !nearAxis(coordinate));
 
   const grid = new Group();
   grid.userData[ORIENTATION_GRID_FLAG] = true;
   grid.renderOrder = 2;
+
+  const gridPlane = new Mesh(
+      new PlaneGeometry(maxGridDimension, maxGridDimension),
+      new MeshBasicMaterial({
+        color: 0x5a6169,
+        transparent: true,
+        opacity: 0.12,
+        side: 2,
+        depthWrite: false,
+        toneMapped: false,
+      }));
+  gridPlane.rotation.x = -Math.PI / 2;
+  gridPlane.position.y = -0.0005;
+  gridPlane.userData[ORIENTATION_GRID_FLAG] = true;
+  grid.add(gridPlane);
 
   if (minorGeometry) {
     const minorLines = new LineSegments(minorGeometry, new LineBasicMaterial({
