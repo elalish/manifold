@@ -37,6 +37,11 @@ double Wrap(double radians) {
                          : radians;
 }
 
+// Minimum sharp angle in degrees, below which edges are considered coplanar.
+// Floating point noise in the dihedral angle computation can reach ~1e-6
+// degrees for nearly-parallel face normals; this threshold must exceed that.
+constexpr double kMinSharpAngle = 1e-4;
+
 // Get the angle between two unit-vectors.
 double AngleBetween(vec3 a, vec3 b) {
   const double dot = la::dot(a, b);
@@ -408,12 +413,13 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
 std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     double minSharpAngle, double minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
+  minSharpAngle = std::max(minSharpAngle, kMinSharpAngle);
   const double minRadians = radians(minSharpAngle);
   for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
     const size_t pair = halfedge_[e].pairedHalfedge;
     const double dihedral =
-        math::acos(la::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+        AngleBetween(faceNormal_[e / 3], faceNormal_[pair / 3]);
     if (dihedral > minRadians) {
       sharpenedEdges.push_back({e, minSmoothness});
       sharpenedEdges.push_back({pair, minSmoothness});
@@ -441,6 +447,9 @@ void Manifold::Impl::SharpenTangent(int halfedge, double smoothness) {
 void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   if (IsEmpty()) return;
   if (normalIdx < 0) return;
+  // Ensure minSharpAngle is large enough to avoid treating nearly-coplanar
+  // faces as sharp due to floating point noise in the dihedral computation.
+  minSharpAngle = std::max(minSharpAngle, kMinSharpAngle);
   halfedge_.MakeUnique();
 
   const int oldNumProp = NumProp();
@@ -454,7 +463,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const int tri1 = e / 3;
     const int tri2 = pair / 3;
     const double dihedral =
-        degrees(math::acos(la::dot(faceNormal_[tri1], faceNormal_[tri2])));
+        degrees(AngleBetween(faceNormal_[tri1], faceNormal_[tri2]));
     if (dihedral > minSharpAngle) {
       ++vertNumSharp[halfedge_[e].startVert];
       ++vertNumSharp[halfedge_[e].endVert];
@@ -528,8 +537,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         int next = NextHalfedge(halfedge_[current].pairedHalfedge);
         const int face = next / 3;
 
-        const double dihedral = degrees(
-            math::acos(la::dot(faceNormal_[face], faceNormal_[prevFace])));
+        const double dihedral =
+            degrees(AngleBetween(faceNormal_[face], faceNormal_[prevFace]));
         if (dihedral > minSharpAngle ||
             triIsFlatFace[face] != triIsFlatFace[prevFace] ||
             (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
@@ -573,8 +582,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           },
           [this, &triIsFlatFace, &normals, &group, minSharpAngle](
               int, const FaceEdge& here, FaceEdge& next) {
-            const double dihedral = degrees(math::acos(
-                la::dot(faceNormal_[here.face], faceNormal_[next.face])));
+            const double dihedral = degrees(
+                AngleBetween(faceNormal_[here.face], faceNormal_[next.face]));
             if (dihedral > minSharpAngle ||
                 triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
                 (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
