@@ -466,3 +466,61 @@ TEST(CBIND, triangulation) {
   manifold_delete_triangulation(triangulation);
   free(tri_verts);
 }
+
+TEST(CBIND, meshgl_merge_returns_mem) {
+  // Create a cube and get its meshgl (which already has merge vectors).
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL* original = manifold_get_meshgl(alloc_meshgl_buffer(), cube);
+
+  // This mesh is already manifold, so Merge() internally returns false.
+  // The bug: old code returned the input pointer instead of the output buffer.
+  void* mem = alloc_meshgl_buffer();
+  ManifoldMeshGL* merged = manifold_meshgl_merge(mem, original);
+
+  // The returned pointer must always come from mem, never from original.
+  EXPECT_EQ(reinterpret_cast<void*>(merged), mem);
+  EXPECT_NE(merged, original);
+
+  // The merged mesh should still be valid — construct a Manifold from it.
+  ManifoldManifold* result =
+      manifold_of_meshgl(alloc_manifold_buffer(), merged);
+  EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
+  EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
+
+  manifold_destruct_manifold(result);
+  manifold_destruct_meshgl(merged);
+  manifold_destruct_meshgl(original);
+  manifold_destruct_manifold(cube);
+  free(result);
+  free(mem);
+  free(original);
+  free(cube);
+}
+
+TEST(CBIND, meshgl64_merge_returns_mem) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL64* original =
+      manifold_get_meshgl64(alloc_meshgl64_buffer(), cube);
+
+  void* mem = alloc_meshgl64_buffer();
+  ManifoldMeshGL64* merged = manifold_meshgl64_merge(mem, original);
+
+  EXPECT_EQ(reinterpret_cast<void*>(merged), mem);
+  EXPECT_NE(merged, original);
+
+  ManifoldManifold* result =
+      manifold_of_meshgl64(alloc_manifold_buffer(), merged);
+  EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
+  EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
+
+  manifold_destruct_manifold(result);
+  manifold_destruct_meshgl64(merged);
+  manifold_destruct_meshgl64(original);
+  manifold_destruct_manifold(cube);
+  free(result);
+  free(mem);
+  free(original);
+  free(cube);
+}

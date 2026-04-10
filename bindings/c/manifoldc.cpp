@@ -548,11 +548,8 @@ ManifoldMeshGL* manifold_meshgl_copy(void* mem, ManifoldMeshGL* m) {
 
 ManifoldMeshGL* manifold_meshgl_merge(void* mem, ManifoldMeshGL* m) {
   auto duplicate = new (mem) MeshGL(*from_c(m));
-  if (duplicate->Merge()) {
-    return to_c(duplicate);
-  }
-  duplicate->~MeshGL();
-  return m;
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m) {
@@ -573,11 +570,8 @@ ManifoldMeshGL64* manifold_meshgl64_copy(void* mem, ManifoldMeshGL64* m) {
 
 ManifoldMeshGL64* manifold_meshgl64_merge(void* mem, ManifoldMeshGL64* m) {
   auto duplicate = new (mem) MeshGL64(*from_c(m));
-  if (duplicate->Merge()) {
-    return to_c(duplicate);
-  }
-  duplicate->~MeshGL64();
-  return m;
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
 size_t manifold_meshgl_num_prop(ManifoldMeshGL* m) {
