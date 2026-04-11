@@ -10,7 +10,7 @@
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
     "build": "tsc && node ./esbuild.mjs",
     "build:wasm": "mkdir -p ../../buildWASM && cd ../../buildWASM && emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make",
-    "build:all": "npm run build && npm run build:editor && npm run build:examples",
+    "build:all": "npm run build:wasm && npm run build && npm run build:editor && npm run build:examples",
     "build:editor": "cd examples/editor && npm run build",
     "build:examples": "(cd examples/three && npm run build) && (cd examples/model-viewer && npm run build) && (cd examples/make-manifold && npm run build)",
     "ci:all": "npm ci && npm run ci:editor && npm run ci:examples",

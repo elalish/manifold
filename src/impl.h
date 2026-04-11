@@ -399,6 +399,7 @@ struct Manifold::Impl {
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
+  void FixMissingTangents();
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false);
 
   // quickhull.cpp

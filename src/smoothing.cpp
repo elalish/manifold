@@ -245,6 +245,9 @@ struct InterpTri {
       posH += Homogeneous(vec4(pY, y * (1 - y)));
     }
     pos = HNormalize(posH);
+    if (la::any(!la::isfinite(pos))) {
+      pos = corners[0];
+    }
   }
 };
 }  // namespace
@@ -816,11 +819,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 }
               }
 
-              if (IsInsideQuad(halfedge)) {
-                tangent[halfedge] = {0, 0, 0, -1};
-                return;
-              }
-
+              // std::cout << halfedge << ", here normal: " << here.normal
+              //           << ", next normal: " << next.normal
+              //           << ", last normal: " << lastNormal << std::endl;
               if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
                 if (here.normal != vec3(0.)) {  // next missing
                   lastNormal = here.normal;
@@ -832,6 +833,11 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                   startHalfedge = halfedge;  // here missing
                 }
                 tangent[halfedge] = {lastNormal, kMissingNormal};
+                return;
+              }
+
+              if (IsInsideQuad(halfedge)) {
+                tangent[halfedge] = {0, 0, 0, -1};
                 return;
               }
 
@@ -856,6 +862,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
+        // std::cout << e << ", " << startHalfedge << std::endl;
 
         if (startHalfedge == kAllMissingNormals) {
           const vec3 normal = vertNormal_[halfedge_[e].startVert];
@@ -872,6 +879,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           vec3 prevNormal =
               GetNormal(halfedge_[current].pairedHalfedge, normalIdx);
           do {
+            // std::cout << current << ", " << tangent[current] << ", "
+            //           << prevNormal << std::endl;
             DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
                          "missing prevNormal");
             if (tangent[current].w == kMissingNormal) {
@@ -879,11 +888,18 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               if (nextNormal == vec3(0.)) {
                 nextNormal = lastNormal;
               }
-              const vec3 dir = la::cross(prevNormal, nextNormal);
-              const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
-                                   vertPos_[halfedge_[current].startVert];
-              tangent[current] = CircularTangent(
-                  (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
+
+              if (IsInsideQuad(current)) {
+                tangent[current] = {0, 0, 0, -1};
+              } else {
+                const vec3 dir = la::cross(prevNormal, nextNormal);
+                const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
+                                     vertPos_[halfedge_[current].startVert];
+                tangent[current] = CircularTangent(
+                    (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
+              }
+              // std::cout << prevNormal << ", " << nextNormal << ", "
+              //           << tangent[current] << std::endl;
             }
             vec3 currentNormal = GetNormal(current, normalIdx);
             if (currentNormal != vec3(0.)) {
@@ -1055,13 +1071,37 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   DistributeTangents(fixedHalfedge);
 }
 
+// void Manifold::Impl::FixMissingTangents() {
+//   const int numHalfedge = halfedge_.size();
+//   Vec<std::atomic<bool>> visited(numHalfedge, false);
+//   for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
+//              [&](const int edgeIdx) {
+//                if (halfedgeTangent_[edgeIdx].w < 0 &&
+//                    halfedgeTangent_[halfedge_[edgeIdx].pairedHalfedge].w > 0)
+//                    {
+//                  halfedgeTangent_[edgeIdx].w = 1;
+//                }
+//              });
+// }
+
 void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
                             bool keepInterior) {
   if (IsEmpty()) return;
+
+  // First we need to FixMissingTangents, because Subdivide only accepts missing
+  // tangents on quads, which means they cannot neighbor, but since these come
+  // in from user input, they must first be sanitized. Ideally, if neighboring
+  // missing tangents form a simple polygon, this should be re-triangulated as a
+  // wagon wheel with an extra vertex added to give a nice average curvature.
+
   Manifold::Impl old = *this;
   halfedge_.MakeUnique();
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   if (vertBary.size() == 0) return;
+
+  // if (!Is2Manifold()) {
+  //   std::cout << __LINE__ << std::endl;
+  // }
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
