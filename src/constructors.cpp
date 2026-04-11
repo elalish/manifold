@@ -486,9 +486,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
-  DisjointSets uf(NumVert());
-  // Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
+  if (pImpl_->status_ != Error::NoError) {
+    return {PropagateStatus(pImpl_->status_)};
+  }
+  DisjointSets uf(NumVert());
   for (const Halfedge& halfedge : pImpl_->halfedge_) {
     if (halfedge.IsForward()) uf.unite(halfedge.startVert, halfedge.endVert);
   }
