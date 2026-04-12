@@ -169,6 +169,27 @@ TEST(Smooth, Normals) {
   if (options.exportModels) WriteTestOBJ("smoothNormals.obj", byNormals);
 }
 
+TEST(Smooth, FacetedNormals) {
+  // calculateNormals with minSharpAngle=0 should produce a faceted result
+  // where smoothing and refinement do not change the volume or surface area.
+  // Regression test for https://github.com/elalish/manifold/issues/1577
+  Manifold cylinder = Manifold::Cylinder(10, 10);
+  Manifold faceted =
+      cylinder.CalculateNormals(0, 0).SmoothByNormals(0).RefineToLength(0.1);
+  EXPECT_EQ(faceted.Status(), Manifold::Error::NoError);
+  EXPECT_FLOAT_EQ(cylinder.Volume(), faceted.Volume());
+  EXPECT_FLOAT_EQ(cylinder.SurfaceArea(), faceted.SurfaceArea());
+
+  // The fix must survive rotation and translation, which change the face
+  // normals and shift the dot products into different float neighborhoods.
+  Manifold rotated = cylinder.Rotate(30, 45, 60).Translate({5, 10, 15});
+  Manifold facetedRot =
+      rotated.CalculateNormals(0, 0).SmoothByNormals(0).RefineToLength(0.1);
+  EXPECT_EQ(facetedRot.Status(), Manifold::Error::NoError);
+  EXPECT_FLOAT_EQ(rotated.Volume(), facetedRot.Volume());
+  EXPECT_FLOAT_EQ(rotated.SurfaceArea(), facetedRot.SurfaceArea());
+}
+
 TEST(Smooth, NormalTransform) {
   Manifold cube1 = Manifold::Cube().Rotate(30).CalculateNormals(0);
   Manifold cube2 =
