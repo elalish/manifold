@@ -369,6 +369,7 @@ class Manifold {
     FaceIDWrongLength,
     InvalidConstruction,
     ResultTooLarge,
+    InvalidTangents,
   };
 
   /** @name Information
@@ -494,7 +495,7 @@ class Manifold {
    *   ifile.close();
    *   if (obj_m.Status() != Manifold::Error::NoError) {
    *      std::cerr << "Failed reading " << filename << ":\n";
-   *      std::cerr << Manifold::ToString(ob_m.Status()) << "\n";
+   *      std::cerr << Manifold::ToString(obj_m.Status()) << "\n";
    *   }
    *   ifile.close();
    * }
@@ -574,6 +575,8 @@ inline std::string ToString(const Manifold::Error& error) {
       return "Invalid Construction";
     case Manifold::Error::ResultTooLarge:
       return "Result Too Large";
+    case Manifold::Error::InvalidTangents:
+      return "Invalid Tangents";
     default:
       return "Unknown Error";
   };

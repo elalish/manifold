@@ -249,6 +249,19 @@ TEST(Smooth, Manual) {
   }
 }
 
+TEST(Smooth, InvalidTangents) {
+  Manifold cube = Manifold::Cube().SmoothOut(180);
+  MeshGL withTangents = cube.GetMeshGL();
+  size_t sizeHalfedges = withTangents.halfedgeTangent.size();
+  for (size_t i = (sizeHalfedges / 8) * 4 + 3; i < sizeHalfedges; i += 4) {
+    // mark the second half of the tangents as missing, which is incorrect.
+    withTangents.halfedgeTangent[i] = -1;
+  }
+  Manifold cube2(withTangents);
+  Manifold smooth = cube2.Refine(10);
+  EXPECT_EQ(smooth.Status(), Manifold::Error::InvalidTangents);
+}
+
 TEST(Smooth, Mirrored) {
   const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMeshGL();
   Manifold smooth = Manifold::Smooth(tet);

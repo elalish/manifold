@@ -1080,37 +1080,37 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   DistributeTangents(fixedHalfedge);
 }
 
-// void Manifold::Impl::FixMissingTangents() {
-//   const int numHalfedge = halfedge_.size();
-//   Vec<std::atomic<bool>> visited(numHalfedge, false);
-//   for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
-//              [&](const int edgeIdx) {
-//                if (halfedgeTangent_[edgeIdx].w < 0 &&
-//                    halfedgeTangent_[halfedge_[edgeIdx].pairedHalfedge].w > 0)
-//                    {
-//                  halfedgeTangent_[edgeIdx].w = 1;
-//                }
-//              });
-// }
+bool Manifold::Impl::ValidTangents() const {
+  const int numHalfedge = halfedge_.size();
+  return all_of(autoPolicy(numHalfedge, 1e4), countAt(0), countAt(numHalfedge),
+                [&](const size_t edgeIdx) {
+                  const bool inQuad = IsMarkedInsideQuad(edgeIdx);
+                  const size_t pair = halfedge_[edgeIdx].pairedHalfedge;
+                  if (inQuad != IsMarkedInsideQuad(pair)) return false;
+                  if (!inQuad) return true;
+                  // missing tangents cannot be adjacent
+                  if (IsMarkedInsideQuad(NextHalfedge(edgeIdx)) ||
+                      IsMarkedInsideQuad(PrevHalfedge(edgeIdx)) ||
+                      IsMarkedInsideQuad(NextHalfedge(pair)) ||
+                      IsMarkedInsideQuad(PrevHalfedge(pair)))
+                    return false;
+                  return true;
+                });
+}
 
 void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
                             bool keepInterior) {
   if (IsEmpty()) return;
 
-  // First we need to FixMissingTangents, because Subdivide only accepts missing
-  // tangents on quads, which means they cannot neighbor, but since these come
-  // in from user input, they must first be sanitized. Ideally, if neighboring
-  // missing tangents form a simple polygon, this should be re-triangulated as a
-  // wagon wheel with an extra vertex added to give a nice average curvature.
+  if (!ValidTangents()) {
+    MakeEmpty(Error::InvalidTangents);
+    return;
+  }
 
   Manifold::Impl old = *this;
   halfedge_.MakeUnique();
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   if (vertBary.size() == 0) return;
-
-  // if (!Is2Manifold()) {
-  //   std::cout << __LINE__ << std::endl;
-  // }
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
