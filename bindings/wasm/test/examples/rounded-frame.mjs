@@ -2,9 +2,8 @@
 // facets match up perfectly, for any choice of global resolution
 // parameters.
 
-import {
-  Manifold, GLTFNode, getGLTFNodes
-} from 'manifold-3d/manifoldCAD';
+import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
+
 const {sphere, cylinder, union, cube} = Manifold;
 
 function roundedFrame(edgeLength, radius, circularSegments = 0) {
@@ -19,11 +18,12 @@ function roundedFrame(edgeLength, radius, circularSegments = 0) {
       union(edge1, edge1.rotate([0, 0, 180])),
       edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
 
-  const edge4 = union(edge2, edge2.rotate([0, 0, 90])).translate([
-    0, 0, -edgeLength / 2
-  ]);
+  const edge4 =
+      union(edge2, edge2.rotate([0, 0, 90])).translate([0, 0, -edgeLength / 2]);
 
-  return union(edge4, edge4.rotate([180, 0, 0]));
+  return union(edge4, edge4.rotate([180, 0, 0])).translate([
+    0, 0, edgeLength / 2 + radius
+  ]);
 }
 
 setMinCircularAngle(3);
@@ -38,7 +38,9 @@ outsideNode.manifold = outside;
 
 const insideNode = new GLTFNode();
 insideNode.manifold = inside;
-insideNode.material = {baseColorFactor: [0, 1, 1]};
+insideNode.material = {
+  baseColorFactor: [0, 1, 1]
+};
 
 const nodes = getGLTFNodes();
 export default nodes;

@@ -2,7 +2,7 @@
 // smooth() and refine(), see more details at:
 // https://elalish.blogspot.com/2022/03/smoothing-triangle-meshes.html
 
-import {Manifold, Mesh, GLTFNode} from 'manifold-3d/manifoldCAD';
+import {GLTFNode, Manifold, Mesh} from 'manifold-3d/manifoldCAD';
 
 const height = 10;
 const radius = 30;
@@ -51,12 +51,13 @@ const colorCurvature = (color, pos, oldProp) => {
   }
 };
 const result = Manifold.smooth(scallop, sharpenedEdges)
-                    .refine(n)
-                    .calculateCurvature(-1, 0)
-                    .setProperties(3, colorCurvature);
+                   .refine(n)
+                   .calculateCurvature(-1, 0)
+                   .setProperties(3, colorCurvature);
 
 const node = new GLTFNode();
 node.manifold = result;
+node.translation = [0, 0, -result.boundingBox().min[2]];
 node.material = {
   baseColorFactor: [1, 1, 1],
   metallic: 0,

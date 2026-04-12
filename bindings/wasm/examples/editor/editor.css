@@ -90,7 +90,7 @@ model-viewer {
   position: relative;
   flex: 3;
   width: 100%;
-  background-color: #ddd;
+  background-color: #fff;
 }
 
 #console {
@@ -100,7 +100,7 @@ model-viewer {
   max-height: none;
   /* draggable pane dividers-end */
   overflow-y: scroll;
-  background-color: #eee;
+  background-color: #fff;
   white-space: pre-wrap;
   font-size: 14px;
   font-weight: 100;
@@ -421,7 +421,7 @@ model-viewer {
 
 #play {
   position: relative;
-  background-color: #ccc;
+  background-color: #0004;
   margin: 8px;
 }
 
@@ -433,7 +433,7 @@ model-viewer {
   height: 10px;
   border-radius: 5px;
   margin-right: 16px;
-  background: #ffffff55;
+  background: #0002;
   outline: none;
 }
 
@@ -443,7 +443,7 @@ model-viewer {
   width: 25px;
   height: 25px;
   border-radius: 50%;
-  background: #ccc;
+  background: #0004;
   cursor: pointer;
 }
 

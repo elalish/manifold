@@ -109,6 +109,6 @@ export default async () => {
     roughness: 0.4
   };
 
-  rootNode.rotation = [0, 0, -45];
+  rootNode.translation = [0, 0, height * 2];
   return [rootNode, csNodes, intersectionNode];
 }
