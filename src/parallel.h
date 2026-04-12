@@ -25,6 +25,25 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_scan.h>
 #endif
+#ifdef MANIFOLD_METAL
+#include <type_traits>
+
+#include "metal_backend.h"
+
+namespace manifold {
+namespace metal_detail {
+// Check if dereferencing an iterator yields an lvalue reference to a
+// contiguous element (i.e. we can take its address safely).
+template <typename Iter, typename = void>
+struct is_contiguous_iter : std::false_type {};
+template <typename Iter>
+struct is_contiguous_iter<Iter, std::void_t<decltype(&*std::declval<Iter&>())>>
+    : std::true_type {};
+template <typename Iter>
+inline constexpr bool is_contiguous_iter_v = is_contiguous_iter<Iter>::value;
+}  // namespace metal_detail
+}  // namespace manifold
+#endif
 #include <algorithm>
 #include <numeric>
 
@@ -426,6 +445,18 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
   (void)policy;
+#ifdef MANIFOLD_METAL
+  if constexpr ((std::is_same_v<T, int> || std::is_same_v<T, int32_t>) &&
+                metal_detail::is_contiguous_iter_v<InputIter>) {
+    size_t n = std::distance(first, last);
+    if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
+        metal::IsAvailable()) {
+      int32_t result =
+          metal::ReduceSumInt(reinterpret_cast<const int32_t*>(&*first), n);
+      return init + result;
+    }
+  }
+#endif
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     // should we use deterministic reduce here?
@@ -505,6 +536,19 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
           std::random_access_iterator_tag>,
       "You can only parallelize RandomAccessIterator.");
   (void)policy;
+#ifdef MANIFOLD_METAL
+  if constexpr ((std::is_same_v<T, int> || std::is_same_v<T, int32_t>) &&
+                metal_detail::is_contiguous_iter_v<InputIter> &&
+                metal_detail::is_contiguous_iter_v<OutputIter>) {
+    size_t n = std::distance(first, last);
+    if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
+        metal::IsAvailable()) {
+      if (metal::InclusiveScanInt(reinterpret_cast<const int32_t*>(&*first),
+                                  reinterpret_cast<int32_t*>(&*d_first), n))
+        return;
+    }
+  }
+#endif
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
@@ -571,6 +615,20 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
       "You can only parallelize RandomAccessIterator.");
   (void)policy;
   (void)identity;
+#ifdef MANIFOLD_METAL
+  if constexpr ((std::is_same_v<T, int> || std::is_same_v<T, int32_t>) &&
+                metal_detail::is_contiguous_iter_v<InputIter> &&
+                metal_detail::is_contiguous_iter_v<OutputIter>) {
+    size_t n = std::distance(first, last);
+    if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
+        metal::IsAvailable()) {
+      if (metal::ExclusiveScanInt(reinterpret_cast<const int32_t*>(&*first),
+                                  reinterpret_cast<int32_t*>(&*d_first), n,
+                                  init))
+        return;
+    }
+  }
+#endif
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     details::ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f,
@@ -1037,6 +1095,16 @@ template <typename Iterator,
           typename T = typename std::iterator_traits<Iterator>::value_type>
 void stable_sort(ExecutionPolicy policy, Iterator first, Iterator last) {
   (void)policy;
+#ifdef MANIFOLD_METAL
+  if constexpr (std::is_same_v<T, uint32_t> &&
+                metal_detail::is_contiguous_iter_v<Iterator>) {
+    size_t n = std::distance(first, last);
+    if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
+        metal::IsAvailable()) {
+      if (metal::RadixSortUint32(&*first, n)) return;
+    }
+  }
+#endif
 #if (MANIFOLD_PAR == 1)
   details::SortFunctor<Iterator, T>()(policy, first, last);
 #else
@@ -1157,6 +1225,18 @@ void gather(InputIterator mapFirst, InputIterator mapLast,
 // Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
+  using T = typename std::iterator_traits<Iterator>::value_type;
+#ifdef MANIFOLD_METAL
+  if constexpr ((std::is_same_v<T, int> || std::is_same_v<T, int32_t>) &&
+                metal_detail::is_contiguous_iter_v<Iterator>) {
+    size_t n = std::distance(first, last);
+    if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
+        metal::IsAvailable()) {
+      if (metal::SequenceFill(reinterpret_cast<int32_t*>(&*first), n, 0))
+        return;
+    }
+  }
+#endif
   for_each(policy, countAt(0),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
