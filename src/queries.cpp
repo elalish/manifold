@@ -74,7 +74,22 @@ NearestPointResult Manifold::Impl::NearestPoint(vec3 point) const {
   ZoneScoped;
   if (IsEmpty()) return {};
 
-  NearestPointResult best;
+  // Track best squared distance to avoid sqrt in the hot loop.
+  double bestDistSq = std::numeric_limits<double>::infinity();
+  vec3 bestPos = vec3(NAN);
+  vec3 bestNormal = vec3(NAN);
+  int bestFaceID = -1;
+
+  auto updateBest = [&](int tri, vec3 closest) {
+    const vec3 diff = closest - point;
+    const double distSq = la::dot(diff, diff);
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      bestPos = closest;
+      bestNormal = faceNormal_[tri];
+      bestFaceID = tri;
+    }
+  };
 
   // Use BVH with expanding search radius for acceleration.
   const vec3 bboxSize = bBox_.Size();
@@ -92,39 +107,23 @@ NearestPointResult Manifold::Impl::NearestPoint(vec3 point) const {
       const vec3 v0 = vertPos_[halfedge_[3 * tri].startVert];
       const vec3 v1 = vertPos_[halfedge_[3 * tri + 1].startVert];
       const vec3 v2 = vertPos_[halfedge_[3 * tri + 2].startVert];
-
-      const vec3 closest = ClosestPointOnTriangle(point, v0, v1, v2);
-      const double dist = la::length(closest - point);
-
-      if (dist < best.distance) {
-        best.distance = dist;
-        best.position = closest;
-        best.normal = faceNormal_[tri];
-        best.faceID = tri;
-      }
+      updateBest(tri, ClosestPointOnTriangle(point, v0, v1, v2));
     };
     auto recorder = MakeSimpleRecorder(recorderf);
     auto f = [&queryBox](int) { return queryBox; };
     collider_.Collisions<false>(recorder, f, 1, false);
 
-    if (best.faceID >= 0) {
-      if (best.distance < searchRadius) {
-        const Box refineBox(point - vec3(best.distance),
-                            point + vec3(best.distance));
+    if (bestFaceID >= 0) {
+      // Refine: search with the exact best distance to ensure no closer
+      // triangle was missed outside the initial search box.
+      const double bestDist = std::sqrt(bestDistSq);
+      if (bestDist < searchRadius) {
+        const Box refineBox(point - vec3(bestDist), point + vec3(bestDist));
         auto recorderf2 = [&](int /*queryIdx*/, int tri) {
           const vec3 v0 = vertPos_[halfedge_[3 * tri].startVert];
           const vec3 v1 = vertPos_[halfedge_[3 * tri + 1].startVert];
           const vec3 v2 = vertPos_[halfedge_[3 * tri + 2].startVert];
-
-          const vec3 closest = ClosestPointOnTriangle(point, v0, v1, v2);
-          const double dist = la::length(closest - point);
-
-          if (dist < best.distance) {
-            best.distance = dist;
-            best.position = closest;
-            best.normal = faceNormal_[tri];
-            best.faceID = tri;
-          }
+          updateBest(tri, ClosestPointOnTriangle(point, v0, v1, v2));
         };
         auto recorder2 = MakeSimpleRecorder(recorderf2);
         auto f2 = [&refineBox](int) { return refineBox; };
@@ -139,7 +138,12 @@ NearestPointResult Manifold::Impl::NearestPoint(vec3 point) const {
     }
   }
 
-  return best;
+  NearestPointResult result;
+  result.position = bestPos;
+  result.normal = bestNormal;
+  result.distance = std::sqrt(bestDistSq);
+  result.faceID = bestFaceID;
+  return result;
 }
 
 }  // namespace manifold

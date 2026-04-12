@@ -354,8 +354,8 @@ Module.setup = function() {
     };
   };
 
-  Module.Manifold.prototype.rayCast = function(origin, endpointOrDirection,
-                                                maxDist) {
+  Module.Manifold.prototype.rayCast = function(
+      origin, endpointOrDirection, maxDist) {
     if (maxDist === undefined) {
       // Two-arg form: origin + endpoint (segment cast)
       return this._RayCast(
@@ -368,6 +368,12 @@ Module.setup = function() {
 
   Module.Manifold.prototype.nearestPoint = function(point) {
     return this._NearestPoint(vararg2vec3([point]));
+  };
+
+  Module.Manifold.prototype._WindingNumber =
+      Module.Manifold.prototype.windingNumber;
+  Module.Manifold.prototype.windingNumber = function(point) {
+    return this._WindingNumber(vararg2vec3([point]));
   };
 
   Module.Manifold.prototype.simplify = function(tolerance = 0) {
