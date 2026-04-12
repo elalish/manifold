@@ -25,7 +25,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
 | [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
-| [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) | | |
+| [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| |
 
 ### Bindings & Packages
 
