@@ -528,4 +528,66 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   }
 #endif
 }
+std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
+  ZoneScoped;
+  if (IsEmpty()) return {};
+  const vec3 dir = endpoint - origin;
+  if (la::dot(dir, dir) == 0.0) return {};
+
+  // Build a minimal single-edge Impl representing the ray segment.
+  // Kernel12 treats inA as an edge mesh, so we need two vertices, two
+  // halfedges (forward + backward), and one face normal. Zero vertex normals
+  // and face normal mean the ray contributes nothing to perturbation
+  // tiebreakers — consistency at shared edges/vertices depends entirely on
+  // the mesh's own normals.
+  Impl rayImpl;
+  rayImpl.vertPos_.resize(2);
+  rayImpl.vertPos_[0] = origin;
+  rayImpl.vertPos_[1] = endpoint;
+  rayImpl.vertNormal_.resize(2);
+  rayImpl.vertNormal_[0] = vec3(0.0);
+  rayImpl.vertNormal_[1] = vec3(0.0);
+  rayImpl.halfedge_.resize(2);
+  rayImpl.halfedge_[0] = {0, 1, 1, 0};  // forward: vert 0 → 1
+  rayImpl.halfedge_[1] = {1, 0, 0, 0};  // backward: vert 1 → 0
+  rayImpl.faceNormal_.resize(1);
+  rayImpl.faceNormal_[0] = vec3(0.0);
+
+  // expandP=false with zero vertNormal means the ray-side perturbation is
+  // zero. forward=true means we project along +Z for the lower-dimensional
+  // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
+  Kernel02<false, true> k02{rayImpl, *this};
+  Kernel11<false> k11{rayImpl, *this};
+  Kernel12<false, true> k12{rayImpl, *this, k02, k11};
+
+  // Use the component with largest magnitude for stable t computation.
+  const vec3 absDir = la::abs(dir);
+  const int tAxis = absDir.x > absDir.y && absDir.x > absDir.z ? 0
+                    : absDir.y > absDir.z                      ? 1
+                                                               : 2;
+
+  std::vector<RayHit> hits;
+  // Query the BVH with the ray's AABB.
+  const Box rayBox(la::min(origin, endpoint), la::max(origin, endpoint));
+  auto recorderf = [&](int /*queryIdx*/, int tri) {
+    const auto [s, v] = k12(0, tri);  // halfedge 0 vs triangle tri
+    if (s != 0 && std::isfinite(v.x)) {
+      // v is the 3D intersection point computed by Kernel12.
+      // Compute parametric t ∈ [0,1] along the ray segment.
+      const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
+      if (t >= 0.0 && t <= 1.0) {
+        hits.push_back({static_cast<uint64_t>(tri), t, v, faceNormal_[tri]});
+      }
+    }
+  };
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&rayBox](int) { return rayBox; };
+  collider_.Collisions<false>(recorder, f, 1, false);
+
+  std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
+    return a.distance < b.distance;
+  });
+  return hits;
+}
+
 }  // namespace manifold
