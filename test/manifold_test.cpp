@@ -171,6 +171,126 @@ TEST(Manifold, InvalidInput7) {
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
+TEST(Manifold, ErrorPropagationDecompose) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  auto parts = errored.Decompose();
+  ASSERT_EQ(parts.size(), 1);
+  EXPECT_EQ(parts[0].Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationHull) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Hull().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationHullMulti) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  Manifold good = Manifold::Cube();
+  EXPECT_EQ(Manifold::Hull({good, errored}).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSetProperties) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SetProperties(1, nullptr).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationCalculateCurvature) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.CalculateCurvature(0, 1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationCalculateNormals) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.CalculateNormals(0).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSmoothByNormals) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SmoothByNormals(0).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSmoothOut) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SmoothOut().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationRefine) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Refine(2).Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.RefineToLength(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.RefineToTolerance(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSetTolerance) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SetTolerance(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationAsOriginal) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.AsOriginal().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationWarp) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Warp([](vec3& v) {}).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.WarpBatch([](VecView<vec3>) {}).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSimplify) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Simplify().Status(), Manifold::Error::NonFiniteVertex);
+}
+
 TEST(Manifold, ObjRoundTrip) {
   Manifold m = Manifold::Cube();
   std::stringstream ss;
