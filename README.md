@@ -42,6 +42,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | C# | NuGet | [ManifoldNET](https://www.nuget.org/packages/ManifoldNET) | external |
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
 | OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
+| Rust | crates.io | [manifold-csg](https://github.com/zmerlynn/manifold-csg) | external |
 | Swift | SPM | [Manifold-Swift](https://github.com/tomasf/manifold-swift) | external |
 
 ## Frontend Sandboxes
