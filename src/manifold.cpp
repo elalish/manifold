@@ -1010,4 +1010,27 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);
 }
+
+/**
+ * Cast a ray segment against this manifold, returning the nearest hit.
+ *
+ * @param origin The start point of the ray segment.
+ * @param endpoint The end point of the ray segment.
+ * @return The nearest RayHit, or std::nullopt on miss.
+ */
+std::optional<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
+  return GetCsgLeafNode().GetImpl()->RayCast(origin, endpoint);
+}
+
+/**
+ * Cast a ray segment against this manifold, returning all hits sorted by
+ * distance from origin.
+ *
+ * @param origin The start point of the ray segment.
+ * @param endpoint The end point of the ray segment.
+ * @return A vector of RayHit sorted by distance, empty on miss.
+ */
+std::vector<RayHit> Manifold::RayCastAll(vec3 origin, vec3 endpoint) const {
+  return GetCsgLeafNode().GetImpl()->RayCastAll(origin, endpoint);
+}
 }  // namespace manifold
