@@ -104,19 +104,14 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
          static_cast<uint64_t>(gridPos.x) << (1 + gridPow.z + gridPow.y);
 }
 
-int BitWidth(uint32_t x) {
-  constexpr uint32_t kValueBits = 32u;
-  constexpr uint32_t kSizeTBits = 8u * static_cast<uint32_t>(sizeof(size_t));
-  const uint32_t clz = ClzSizeT(static_cast<size_t>(x));
-  return static_cast<int>(kValueBits - (clz - (kSizeTBits - kValueBits)));
-}
-
 ivec3 ComputeGridPow(ivec3 gridSize) {
-  // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, but
+  // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, using
   // integer-only and deterministic across platforms.
-  return {BitWidth(static_cast<uint32_t>(gridSize.x + 2)),
-          BitWidth(static_cast<uint32_t>(gridSize.y + 2)),
-          BitWidth(static_cast<uint32_t>(gridSize.z + 2))};
+  auto axisPow = [](int n) {
+    const size_t value = static_cast<size_t>(static_cast<uint32_t>(n + 2));
+    return static_cast<int>(CeilLog2(value + 1_uz));
+  };
+  return {axisPow(gridSize.x), axisPow(gridSize.y), axisPow(gridSize.z)};
 }
 
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
