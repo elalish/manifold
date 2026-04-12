@@ -21,9 +21,7 @@ function roundedFrame(edgeLength, radius, circularSegments = 0) {
   const edge4 =
       union(edge2, edge2.rotate([0, 0, 90])).translate([0, 0, -edgeLength / 2]);
 
-  return union(edge4, edge4.rotate([180, 0, 0])).translate([
-    0, 0, edgeLength / 2 + radius
-  ]);
+  return union(edge4, edge4.rotate([180, 0, 0]));
 }
 
 setMinCircularAngle(3);
@@ -33,10 +31,13 @@ const result = roundedFrame(100, 10);
 // a subtraction and an intersection at once
 const [inside, outside] = result.split(cube(100, true));
 
-const outsideNode = new GLTFNode();
+const root = new GLTFNode();
+root.translation = [0, 0, 60];
+
+const outsideNode = new GLTFNode(root);
 outsideNode.manifold = outside;
 
-const insideNode = new GLTFNode();
+const insideNode = new GLTFNode(root);
 insideNode.manifold = inside;
 insideNode.material = {
   baseColorFactor: [0, 1, 1]
