@@ -113,4 +113,4 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
     'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
     'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
-    'InvalidConstruction';
+    'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents';

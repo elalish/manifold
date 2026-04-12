@@ -720,7 +720,9 @@ NB_MODULE(manifold3d, m) {
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
+      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
+      .value("InvalidTangents", Manifold::Error::InvalidTangents);
 
   nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,

@@ -471,8 +471,16 @@ Module.setup = function() {
         break;
       case 'FaceIDWrongLength':
         message = 'Face ID vector has wrong length';
+        break;
       case 'InvalidConstruction':
         message = 'Manifold constructed with invalid parameters';
+        break;
+      case 'ResultTooLarge':
+        message = 'Result exceeds maximum size';
+        break;
+      case 'InvalidTangents':
+        message = 'Invalid halfedge tangents';
+        break;
     }
 
     const base = Error.apply(this, [message, ...args]);
