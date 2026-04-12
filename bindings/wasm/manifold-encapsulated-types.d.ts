@@ -1145,6 +1145,43 @@ export class Manifold {
   minGap(other: Manifold, searchLength: number): number;
 
   /**
+   * Casts a ray and returns the nearest intersection with the mesh surface.
+   *
+   * Two calling conventions:
+   * - `rayCast(origin, endpoint)`: segment cast, distance is t in [0, 1].
+   * - `rayCast(origin, direction, maxDist)`: direction + distance form.
+   *   Use `Infinity` for maxDist for an unbounded ray (clipped to bounding
+   *   box). Distance is absolute distance along the direction.
+   *
+   * Returns faceID = -1 if no hit.
+   *
+   * @group Queries
+   */
+  rayCast(origin: Vec3, endpointOrDirection: Vec3, maxDist?: number):
+      {distance: number; position: Vec3; normal: Vec3; faceID: number;};
+
+  /**
+   * Returns the winding number at a point. For closed manifolds, 0 means
+   * outside and nonzero means inside.
+   *
+   * @param point The query point.
+   *
+   * @group Queries
+   */
+  windingNumber(point: Vec3): number;
+
+  /**
+   * Returns the closest point on the mesh surface to the given query point.
+   *
+   * @param point The query point.
+   * @returns An object with position, normal, distance, and faceID.
+   *
+   * @group Queries
+   */
+  nearestPoint(point: Vec3):
+      {position: Vec3; normal: Vec3; distance: number; faceID: number;};
+
+  /**
    * Returns the reason for an input Mesh producing an empty Manifold. This
    * Status will carry on through operations like NaN propogation, ensuring an
    * errored mesh doesn't get mysteriously lost. Empty meshes may still show

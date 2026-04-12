@@ -287,6 +287,37 @@ std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
   return {a, b};
 }
 
+val RayCast(const Manifold& manifold, vec3 origin, vec3 endpoint) {
+  auto hit = manifold.RayCast(origin, endpoint);
+  val out = val::object();
+  out.set("distance", hit.distance);
+  out.set("position", hit.position);
+  out.set("normal", hit.normal);
+  out.set("faceID", hit.faceID);
+  return out;
+}
+
+val RayCastDir(const Manifold& manifold, vec3 origin, vec3 direction,
+               double maxDist) {
+  auto hit = manifold.RayCast(origin, direction, maxDist);
+  val out = val::object();
+  out.set("distance", hit.distance);
+  out.set("position", hit.position);
+  out.set("normal", hit.normal);
+  out.set("faceID", hit.faceID);
+  return out;
+}
+
+val NearestPoint(const Manifold& manifold, vec3 point) {
+  auto result = manifold.NearestPoint(point);
+  val out = val::object();
+  out.set("position", result.position);
+  out.set("normal", result.normal);
+  out.set("distance", result.distance);
+  out.set("faceID", result.faceID);
+  return out;
+}
+
 void CollectVertices(std::vector<vec3>& verts, const Manifold& manifold) {
   const MeshGL64 mesh = manifold.GetMeshGL64();
   const auto numVert = mesh.NumVert();

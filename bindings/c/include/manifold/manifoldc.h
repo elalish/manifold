@@ -237,6 +237,19 @@ ManifoldManifold* manifold_calculate_curvature(void* mem, ManifoldManifold* m,
                                                int gaussian_idx, int mean_idx);
 double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
                         double searchLength);
+
+// Queries
+
+ManifoldRayHit manifold_ray_cast(ManifoldManifold* m, ManifoldVec3 origin,
+                                 ManifoldVec3 endpoint);
+ManifoldRayHit manifold_ray_cast_direction(ManifoldManifold* m,
+                                           ManifoldVec3 origin,
+                                           ManifoldVec3 direction,
+                                           double max_dist);
+int manifold_winding_number(ManifoldManifold* m, ManifoldVec3 point);
+ManifoldNearestPointResult manifold_nearest_point(ManifoldManifold* m,
+                                                  ManifoldVec3 point);
+
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle);

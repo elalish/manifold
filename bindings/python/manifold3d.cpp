@@ -320,6 +320,51 @@ NB_MODULE(manifold3d, m) {
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
            "Returns a double between 0 and searchLength.")
+      .def(
+          "ray_cast",
+          [](const Manifold& self, vec3 origin, vec3 endpoint) {
+            auto hit = self.RayCast(origin, endpoint);
+            return nb::make_tuple(
+                hit.distance,
+                nb::make_tuple(hit.position.x, hit.position.y, hit.position.z),
+                nb::make_tuple(hit.normal.x, hit.normal.y, hit.normal.z),
+                hit.faceID);
+          },
+          nb::arg("origin"), nb::arg("endpoint"),
+          "Casts a ray segment from origin to endpoint and returns the "
+          "nearest hit as (distance, position, normal, face_id). "
+          "distance is the t parameter in [0,1]; -1 and face_id -1 if no "
+          "hit.")
+      .def(
+          "ray_cast",
+          [](const Manifold& self, vec3 origin, vec3 direction,
+             double maxDist) {
+            auto hit = self.RayCast(origin, direction, maxDist);
+            return nb::make_tuple(
+                hit.distance,
+                nb::make_tuple(hit.position.x, hit.position.y, hit.position.z),
+                nb::make_tuple(hit.normal.x, hit.normal.y, hit.normal.z),
+                hit.faceID);
+          },
+          nb::arg("origin"), nb::arg("direction"), nb::arg("max_dist"),
+          "Casts a ray from origin in direction up to max_dist. Use "
+          "float('inf') for an unbounded ray (clips to bounding box). "
+          "Returns (distance, position, normal, face_id).")
+      .def("winding_number", &Manifold::WindingNumber, nb::arg("point"),
+           "Returns the winding number at a point. 0 = outside, "
+           "nonzero = inside for closed manifolds.")
+      .def(
+          "nearest_point",
+          [](const Manifold& self, vec3 point) {
+            auto r = self.NearestPoint(point);
+            return nb::make_tuple(
+                nb::make_tuple(r.position.x, r.position.y, r.position.z),
+                nb::make_tuple(r.normal.x, r.normal.y, r.normal.z), r.distance,
+                r.faceID);
+          },
+          nb::arg("point"),
+          "Returns the closest point on the mesh surface as "
+          "(position, normal, distance, face_id).")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)

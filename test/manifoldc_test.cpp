@@ -665,3 +665,38 @@ TEST(CBIND, meshgl_update_normals) {
   free(with_normals);
   free(cube);
 }
+
+TEST(CBIND, ray_cast) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 2., 2., 2., 1);
+  ManifoldVec3 origin = {-5, 0, 0};
+  ManifoldVec3 endpoint = {0, 0, 0};
+  ManifoldRayHit hit = manifold_ray_cast(cube, origin, endpoint);
+  EXPECT_GE(hit.face_id, 0);
+  EXPECT_NEAR(hit.position.x, -1.0, 1e-10);
+  manifold_destruct_manifold(cube);
+  free(cube);
+}
+
+TEST(CBIND, winding_number) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 2., 2., 2., 1);
+  ManifoldVec3 inside = {0, 0, 0};
+  ManifoldVec3 outside = {5, 5, 5};
+  EXPECT_NE(manifold_winding_number(cube, inside), 0);
+  EXPECT_EQ(manifold_winding_number(cube, outside), 0);
+  manifold_destruct_manifold(cube);
+  free(cube);
+}
+
+TEST(CBIND, nearest_point) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 2., 2., 2., 1);
+  ManifoldVec3 point = {5, 0, 0};
+  ManifoldNearestPointResult result = manifold_nearest_point(cube, point);
+  EXPECT_GE(result.face_id, 0);
+  EXPECT_NEAR(result.position.x, 1.0, 1e-10);
+  EXPECT_NEAR(result.distance, 4.0, 1e-10);
+  manifold_destruct_manifold(cube);
+  free(cube);
+}

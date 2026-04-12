@@ -126,5 +126,19 @@ typedef enum ManifoldJoinType {
   MANIFOLD_JOIN_TYPE_BEVEL,
 } ManifoldJoinType;
 
+typedef struct ManifoldRayHit {
+  double distance;
+  ManifoldVec3 position;
+  ManifoldVec3 normal;
+  int face_id;
+} ManifoldRayHit;
+
+typedef struct ManifoldNearestPointResult {
+  ManifoldVec3 position;
+  ManifoldVec3 normal;
+  double distance;
+  int face_id;
+} ManifoldNearestPointResult;
+
 // function pointer
 typedef double (*ManifoldSdf)(double, double, double, void*);

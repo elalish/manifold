@@ -837,6 +837,45 @@ double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
   return from_c(m)->MinGap(*from_c(other), searchLength);
 }
 
+ManifoldRayHit manifold_ray_cast(ManifoldManifold* m, ManifoldVec3 origin,
+                                 ManifoldVec3 endpoint) {
+  auto result = from_c(m)->RayCast(from_c(origin), from_c(endpoint));
+  ManifoldRayHit out;
+  out.distance = result.distance;
+  out.position = to_c(result.position);
+  out.normal = to_c(result.normal);
+  out.face_id = result.faceID;
+  return out;
+}
+
+ManifoldRayHit manifold_ray_cast_direction(ManifoldManifold* m,
+                                           ManifoldVec3 origin,
+                                           ManifoldVec3 direction,
+                                           double max_dist) {
+  auto result = from_c(m)->RayCast(from_c(origin), from_c(direction), max_dist);
+  ManifoldRayHit out;
+  out.distance = result.distance;
+  out.position = to_c(result.position);
+  out.normal = to_c(result.normal);
+  out.face_id = result.faceID;
+  return out;
+}
+
+int manifold_winding_number(ManifoldManifold* m, ManifoldVec3 point) {
+  return from_c(m)->WindingNumber(from_c(point));
+}
+
+ManifoldNearestPointResult manifold_nearest_point(ManifoldManifold* m,
+                                                  ManifoldVec3 point) {
+  auto result = from_c(m)->NearestPoint(from_c(point));
+  ManifoldNearestPointResult out;
+  out.position = to_c(result.position);
+  out.normal = to_c(result.normal);
+  out.distance = result.distance;
+  out.face_id = result.faceID;
+  return out;
+}
+
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle) {
