@@ -64,4 +64,4 @@ const func = (v) => {
 };
 
 const result = Manifold.revolve(circle, m).warp(func);
-export default result;
+export default result.translate([0, 0, -result.boundingBox().min[2]]);

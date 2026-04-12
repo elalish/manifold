@@ -1121,6 +1121,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   SortGeometry();
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     SetNormalsAndCoplanar();
+    CalculateBBox();
   } else {
     CalculateVertNormals();
   }

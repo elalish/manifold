@@ -683,8 +683,6 @@ const scrubber = document.querySelector('#scrubber');
 const edgeToggle = document.getElementById('edgesToggle');
 const sceneSym =
     Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
-const needsRenderSym =
-    Object.getOwnPropertySymbols(mv).find(x => x.description === 'needsRender');
 
 let paused = false;
 let showEdges = false;
@@ -807,6 +805,13 @@ function updateOrientationGrid() {
 
   const center = mv.getBoundingBoxCenter();
   const extent = mv.getDimensions();
+  const maxDim = Math.max(extent.x, extent.y, extent.z);
+
+  if (center.y - extent.y / 2 > 0) {
+    mv.setAttribute('shadow-intensity', '0');
+  } else {
+    mv.setAttribute('shadow-intensity', '1');
+  }
 
   const extentX = Math.max(
       Math.abs(center.x + extent.x / 2), Math.abs(center.x - extent.x / 2));
@@ -827,6 +832,8 @@ function updateOrientationGrid() {
   const grid = new Group();
   grid.userData[ORIENTATION_GRID_FLAG] = true;
   grid.renderOrder = 2;
+  // Avoid shadow clash with animation
+  grid.position.y = -0.0005 * maxDim;
 
   const gridPlane = new Mesh(
       new PlaneGeometry(maxGridDimension, maxGridDimension),
@@ -966,7 +973,7 @@ function setEdgesVisible(visible) {
 
     if (obj.isMesh) {
       // Fix wireframe z-fighting.
-      obj.material.polygonOffset = true;
+      obj.material.polygonOffset = visible;
       obj.material.polygonOffsetFactor = 4;
       obj.material.polygonOffsetUnits = 4;
 
@@ -1002,9 +1009,6 @@ function setEdgesVisible(visible) {
   });
 
   scene.queueRender?.();
-  if (needsRenderSym) {
-    mv[needsRenderSym]?.();
-  }
 }
 
 function pause() {

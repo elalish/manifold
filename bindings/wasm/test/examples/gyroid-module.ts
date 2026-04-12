@@ -43,11 +43,14 @@ const gyroidModule = rhombicDodecahedron()
                          .intersect(gyroidOffset(-0.4))
                          .subtract(gyroidOffset(0.4));
 
+const root = new GLTFNode();
+root.translation = [-1.5 * size, -1.5 * size, 3 * size];
+
 if (m > 1) {
   for (let i = 0; i < m; ++i) {
     for (let j = i; j < m; ++j) {
       for (let k = j; k < m; ++k) {
-        const node = new GLTFNode();
+        const node = new GLTFNode(root);
         node.manifold = gyroidModule;
         node.translation = [(k + i - j) * size, (k - i) * size, (-j) * size];
         node.material = {

@@ -135,6 +135,12 @@ Manifold Manifold::Invalid() {
   return Manifold(pImpl_);
 }
 
+Manifold Manifold::PropagateStatus(Error status) {
+  auto pImpl = std::make_shared<Impl>();
+  pImpl->status_ = status;
+  return Manifold(pImpl);
+}
+
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pNode_ = other.pNode_;
@@ -295,7 +301,10 @@ double Manifold::GetTolerance() const {
  * This performs mesh simplification when the tolerance value is increased.
  */
 Manifold Manifold::SetTolerance(double tolerance) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
@@ -317,7 +326,10 @@ Manifold Manifold::SetTolerance(double tolerance) const {
  * have moved by less than tolerance.
  */
 Manifold Manifold::Simplify(double tolerance) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
   const double oldTolerance = impl->tolerance_;
   if (tolerance == 0) tolerance = oldTolerance;
   if (tolerance > oldTolerance) {
@@ -372,11 +384,8 @@ int Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto newImpl = std::make_shared<Impl>();
-    newImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(newImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->SetNormalsAndCoplanar();
@@ -491,11 +500,8 @@ Manifold Manifold::Mirror(vec3 normal) const {
  */
 Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto pImpl = std::make_shared<Impl>();
-    pImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -511,11 +517,8 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
 Manifold Manifold::WarpBatch(
     std::function<void(VecView<vec3>)> warpFunc) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto pImpl = std::make_shared<Impl>();
-    pImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->WarpBatch(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -537,7 +540,10 @@ Manifold Manifold::SetProperties(
     int numProp,
     std::function<void(double* newProp, vec3 position, const double* oldProp)>
         propFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->properties_;
 
@@ -586,7 +592,10 @@ Manifold Manifold::SetProperties(
  * will be automatically expanded to include the channel index specified.
  */
 Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -607,7 +616,10 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * but in this case it would be better not to calculate normals at all.
  */
 Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -624,7 +636,10 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * agree will result in a sharp edge.
  */
 Manifold Manifold::SmoothByNormals(int normalIdx) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
     pImpl->CreateTangents(normalIdx);
   }
@@ -650,7 +665,10 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * 180 - all edges will be smooth.
  */
 Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
       const int numProp = pImpl->numProp_;
@@ -681,7 +699,10 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (n > 1) {
     pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
   }
@@ -700,7 +721,10 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->Refine([length](vec3 edge, vec4, vec4) {
     return static_cast<int>(la::length(edge) / length);
   });
@@ -721,7 +745,10 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
         [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
@@ -937,8 +964,11 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
+  auto srcImpl = GetCsgLeafNode().GetImpl();
+  if (srcImpl->status_ != Error::NoError)
+    return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(GetCsgLeafNode().GetImpl()->vertPos_);
+  impl->Hull(srcImpl->vertPos_);
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
@@ -948,13 +978,17 @@ Manifold Manifold::Hull() const {
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
+  for (const auto& man : manifolds) {
+    auto status = man.Status();
+    if (status != Error::NoError) return PropagateStatus(status);
+  }
   std::vector<vec3> vertPos;
   size_t size = 0;
   for (const auto& man : manifolds) size += man.NumVert();
   if (size == 0) return Manifold();
   vertPos.reserve(size);
   for (const auto& man : manifolds) {
-    const auto& impl = man.pNode_->ToLeafNode()->GetImpl();
+    const auto& impl = man.GetCsgLeafNode().GetImpl();
     vertPos.insert(vertPos.end(), impl->vertPos_.begin(), impl->vertPos_.end());
   }
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
