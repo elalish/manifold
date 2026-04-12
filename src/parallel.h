@@ -26,8 +26,9 @@
 #include <tbb/parallel_scan.h>
 #endif
 #ifdef MANIFOLD_METAL
-#include "metal_backend.h"
 #include <type_traits>
+
+#include "metal_backend.h"
 
 namespace manifold {
 namespace metal_detail {
@@ -36,8 +37,8 @@ namespace metal_detail {
 template <typename Iter, typename = void>
 struct is_contiguous_iter : std::false_type {};
 template <typename Iter>
-struct is_contiguous_iter<
-    Iter, std::void_t<decltype(&*std::declval<Iter&>())>> : std::true_type {};
+struct is_contiguous_iter<Iter, std::void_t<decltype(&*std::declval<Iter&>())>>
+    : std::true_type {};
 template <typename Iter>
 inline constexpr bool is_contiguous_iter_v = is_contiguous_iter<Iter>::value;
 }  // namespace metal_detail
@@ -278,8 +279,7 @@ struct SortedRange {
   __attribute__((no_sanitize("thread")))
 #endif
 #endif
-  void
-  operator()(const tbb::blocked_range<SizeType>& range) {
+  void operator()(const tbb::blocked_range<SizeType>& range) {
     SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
                                  range.end() - range.begin());
     rhs.inTmp =
@@ -450,8 +450,8 @@ T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
     size_t n = std::distance(first, last);
     if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
         metal::IsAvailable()) {
-      int32_t result = metal::ReduceSumInt(
-          reinterpret_cast<const int32_t*>(&*first), n);
+      int32_t result =
+          metal::ReduceSumInt(reinterpret_cast<const int32_t*>(&*first), n);
       return init + result;
     }
   }
@@ -542,9 +542,8 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
     size_t n = std::distance(first, last);
     if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
         metal::IsAvailable()) {
-      if (metal::InclusiveScanInt(
-              reinterpret_cast<const int32_t*>(&*first),
-              reinterpret_cast<int32_t*>(&*d_first), n))
+      if (metal::InclusiveScanInt(reinterpret_cast<const int32_t*>(&*first),
+                                  reinterpret_cast<int32_t*>(&*d_first), n))
         return;
     }
   }
@@ -622,9 +621,9 @@ void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
     size_t n = std::distance(first, last);
     if (policy == ExecutionPolicy::Par && n >= metal::kGPUThreshold &&
         metal::IsAvailable()) {
-      if (metal::ExclusiveScanInt(
-              reinterpret_cast<const int32_t*>(&*first),
-              reinterpret_cast<int32_t*>(&*d_first), n, init))
+      if (metal::ExclusiveScanInt(reinterpret_cast<const int32_t*>(&*first),
+                                  reinterpret_cast<int32_t*>(&*d_first), n,
+                                  init))
         return;
     }
   }

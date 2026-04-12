@@ -15,8 +15,8 @@
 // Metal GPU compute backend implementation for macOS/Apple Silicon.
 // Uses unified memory architecture for zero-copy GPU dispatch.
 
-#import <Metal/Metal.h>
 #import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
 
 #include "metal_backend.h"
 
@@ -80,11 +80,10 @@ id<MTLComputePipelineState> CreatePipeline(const char* functionName) {
   }
 
   NSError* error = nil;
-  id<MTLComputePipelineState> pso =
-      [g_metal.device newComputePipelineStateWithFunction:function error:&error];
+  id<MTLComputePipelineState> pso = [g_metal.device newComputePipelineStateWithFunction:function
+                                                                                  error:&error];
   if (error) {
-    NSLog(@"[Manifold Metal] Failed to create PSO for %s: %@", functionName,
-          error);
+    NSLog(@"[Manifold Metal] Failed to create PSO for %s: %@", functionName, error);
     return nil;
   }
   return pso;
@@ -112,8 +111,7 @@ void DoInitialize() {
     // Load the Metal shader library
     // First try to find the compiled .metallib next to the executable
     NSBundle* bundle = [NSBundle mainBundle];
-    NSString* libPath = [bundle pathForResource:@"metal_kernels"
-                                         ofType:@"metallib"];
+    NSString* libPath = [bundle pathForResource:@"metal_kernels" ofType:@"metallib"];
 
     if (libPath) {
       NSError* error = nil;
@@ -127,19 +125,15 @@ void DoInitialize() {
     // Fallback: compile from source at runtime
     if (!g_metal.library) {
       // Try to find the .metal source file
-      NSString* srcPath = [bundle pathForResource:@"metal_kernels"
-                                           ofType:@"metal"];
+      NSString* srcPath = [bundle pathForResource:@"metal_kernels" ofType:@"metal"];
       if (!srcPath) {
         // Try relative to executable for development builds
-        NSString* execPath =
-            [[NSProcessInfo processInfo].arguments firstObject];
+        NSString* execPath = [[NSProcessInfo processInfo].arguments firstObject];
         NSString* execDir = [execPath stringByDeletingLastPathComponent];
         NSArray* searchPaths = @[
           [execDir stringByAppendingPathComponent:@"metal_kernels.metal"],
-          [execDir stringByAppendingPathComponent:
-                       @"../Resources/metal_kernels.metal"],
-          [execDir stringByAppendingPathComponent:
-                       @"../share/openscad/metal_kernels.metal"],
+          [execDir stringByAppendingPathComponent:@"../Resources/metal_kernels.metal"],
+          [execDir stringByAppendingPathComponent:@"../share/openscad/metal_kernels.metal"],
         ];
         for (NSString* path in searchPaths) {
           if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
@@ -178,16 +172,11 @@ void DoInitialize() {
     g_metal.radixHistogramPSO = CreatePipeline("radix_histogram");
     g_metal.radixPrefixSumPSO = CreatePipeline("radix_prefix_sum");
     g_metal.radixScatterKVPSO = CreatePipeline("radix_scatter_kv");
-    g_metal.exclusiveScanIntBlockPSO =
-        CreatePipeline("exclusive_scan_int_block");
-    g_metal.scanAddBlockOffsetsPSO =
-        CreatePipeline("scan_add_block_offsets");
-    g_metal.inclusiveScanIntBlockPSO =
-        CreatePipeline("inclusive_scan_int_block");
-    g_metal.inclusiveScanDoubleBlockPSO =
-        CreatePipeline("inclusive_scan_double_block");
-    g_metal.scanAddBlockOffsetsDoublePSO =
-        CreatePipeline("scan_add_block_offsets_double");
+    g_metal.exclusiveScanIntBlockPSO = CreatePipeline("exclusive_scan_int_block");
+    g_metal.scanAddBlockOffsetsPSO = CreatePipeline("scan_add_block_offsets");
+    g_metal.inclusiveScanIntBlockPSO = CreatePipeline("inclusive_scan_int_block");
+    g_metal.inclusiveScanDoubleBlockPSO = CreatePipeline("inclusive_scan_double_block");
+    g_metal.scanAddBlockOffsetsDoublePSO = CreatePipeline("scan_add_block_offsets_double");
     g_metal.reduceSumIntPSO = CreatePipeline("reduce_sum_int");
     g_metal.reduceSumFloatPSO = CreatePipeline("reduce_sum_float");
     g_metal.reduceMinMaxFloatPSO = CreatePipeline("reduce_minmax_float");
@@ -195,22 +184,18 @@ void DoInitialize() {
     g_metal.scatterIntPSO = CreatePipeline("scatter_int");
     g_metal.gatherIntPSO = CreatePipeline("gather_int");
     g_metal.computeMortonCodesPSO = CreatePipeline("compute_morton_codes");
-    g_metal.computeFaceBoxMortonPSO =
-        CreatePipeline("compute_face_box_morton");
+    g_metal.computeFaceBoxMortonPSO = CreatePipeline("compute_face_box_morton");
     g_metal.reindexFacesPSO = CreatePipeline("reindex_faces");
-    g_metal.reindexVertsInHalfedgesPSO =
-        CreatePipeline("reindex_verts_in_halfedges");
+    g_metal.reindexVertsInHalfedgesPSO = CreatePipeline("reindex_verts_in_halfedges");
     g_metal.markUsedPropsPSO = CreatePipeline("mark_used_props");
     g_metal.compactPropertiesPSO = CreatePipeline("compact_properties");
     g_metal.updatePropVertsPSO = CreatePipeline("update_prop_verts");
 
-    g_metal.maxThreadsPerGroup =
-        (uint32_t)g_metal.radixHistogramPSO.maxTotalThreadsPerThreadgroup;
+    g_metal.maxThreadsPerGroup = (uint32_t)g_metal.radixHistogramPSO.maxTotalThreadsPerThreadgroup;
     if (g_metal.maxThreadsPerGroup > 1024) g_metal.maxThreadsPerGroup = 1024;
 
     g_metal.initialized = true;
-    NSLog(@"[Manifold Metal] GPU compute initialized: %s (unified memory: %@)",
-          g_metal.deviceName,
+    NSLog(@"[Manifold Metal] GPU compute initialized: %s (unified memory: %@)", g_metal.deviceName,
           g_metal.device.hasUnifiedMemory ? @"YES" : @"NO");
   }
 }
@@ -219,46 +204,38 @@ void DoInitialize() {
 id<MTLBuffer> WrapBuffer(const void* ptr, size_t size) {
   if (g_metal.device.hasUnifiedMemory) {
     // On Apple Silicon: shared memory, no copy needed
-    return [g_metal.device
-        newBufferWithBytesNoCopy:const_cast<void*>(ptr)
-                         length:size
-                        options:MTLResourceStorageModeShared
-                    deallocator:nil];
+    return [g_metal.device newBufferWithBytesNoCopy:const_cast<void*>(ptr)
+                                             length:size
+                                            options:MTLResourceStorageModeShared
+                                        deallocator:nil];
   } else {
     // On discrete GPU: must copy
-    return [g_metal.device newBufferWithBytes:ptr
-                                      length:size
-                                     options:MTLResourceStorageModeShared];
+    return [g_metal.device newBufferWithBytes:ptr length:size options:MTLResourceStorageModeShared];
   }
 }
 
 // Helper: create a mutable buffer wrapping existing memory
 id<MTLBuffer> WrapMutableBuffer(void* ptr, size_t size) {
   if (g_metal.device.hasUnifiedMemory) {
-    return [g_metal.device
-        newBufferWithBytesNoCopy:ptr
-                         length:size
-                        options:MTLResourceStorageModeShared
-                    deallocator:nil];
+    return [g_metal.device newBufferWithBytesNoCopy:ptr
+                                             length:size
+                                            options:MTLResourceStorageModeShared
+                                        deallocator:nil];
   } else {
-    return [g_metal.device newBufferWithBytes:ptr
-                                      length:size
-                                     options:MTLResourceStorageModeShared];
+    return [g_metal.device newBufferWithBytes:ptr length:size options:MTLResourceStorageModeShared];
   }
 }
 
 // Helper: create a new GPU buffer
 id<MTLBuffer> NewBuffer(size_t size) {
-  return [g_metal.device newBufferWithLength:size
-                                    options:MTLResourceStorageModeShared];
+  return [g_metal.device newBufferWithLength:size options:MTLResourceStorageModeShared];
 }
 
 // Helper: dispatch a compute kernel and wait
-void DispatchAndWait(id<MTLComputeCommandEncoder> encoder,
-                     id<MTLComputePipelineState> pso, uint32_t count) {
-  uint32_t threadGroupSize = std::min(
-      g_metal.maxThreadsPerGroup,
-      (uint32_t)pso.maxTotalThreadsPerThreadgroup);
+void DispatchAndWait(id<MTLComputeCommandEncoder> encoder, id<MTLComputePipelineState> pso,
+                     uint32_t count) {
+  uint32_t threadGroupSize =
+      std::min(g_metal.maxThreadsPerGroup, (uint32_t)pso.maxTotalThreadsPerThreadgroup);
   // Ensure power of 2 for reduction kernels
   uint32_t numGroups = (count + threadGroupSize - 1) / threadGroupSize;
 
@@ -361,8 +338,7 @@ bool RadixSortKeyValue(uint32_t* keys, int32_t* values, size_t count) {
 
       // Clear histogram
       id<MTLBlitCommandEncoder> blit = [cmdBuf blitCommandEncoder];
-      [blit fillBuffer:histogram range:NSMakeRange(0, 256 * sizeof(uint32_t))
-                 value:0];
+      [blit fillBuffer:histogram range:NSMakeRange(0, 256 * sizeof(uint32_t)) value:0];
       [blit endEncoding];
 
       // Phase 1: Compute histogram
@@ -375,8 +351,7 @@ bool RadixSortKeyValue(uint32_t* keys, int32_t* values, size_t count) {
         [enc setBytes:&shift length:sizeof(uint32_t) atIndex:3];
 
         uint32_t groupSize = std::min(g_metal.maxThreadsPerGroup, 256u);
-        uint32_t numGroups = std::min(
-            (uint32_t)((count + groupSize - 1) / groupSize), 64u);
+        uint32_t numGroups = std::min((uint32_t)((count + groupSize - 1) / groupSize), 64u);
         [enc dispatchThreadgroups:MTLSizeMake(numGroups, 1, 1)
             threadsPerThreadgroup:MTLSizeMake(groupSize, 1, 1)];
         [enc endEncoding];
@@ -457,14 +432,12 @@ bool RadixSortUint32(uint32_t* data, size_t count) {
 
 bool InclusiveScanInt(const int32_t* input, int32_t* output, size_t count) {
   if (!g_metal.initialized || count < kGPUThreshold) return false;
-  if (!g_metal.inclusiveScanIntBlockPSO || !g_metal.scanAddBlockOffsetsPSO)
-    return false;
+  if (!g_metal.inclusiveScanIntBlockPSO || !g_metal.scanAddBlockOffsetsPSO) return false;
 
   @autoreleasepool {
     uint32_t groupSize =
         std::min(g_metal.maxThreadsPerGroup,
-                 (uint32_t)g_metal.inclusiveScanIntBlockPSO
-                     .maxTotalThreadsPerThreadgroup);
+                 (uint32_t)g_metal.inclusiveScanIntBlockPSO.maxTotalThreadsPerThreadgroup);
     // Ensure power of 2
     groupSize = 1u << (31 - __builtin_clz(groupSize));
     if (groupSize > 1024) groupSize = 1024;
@@ -525,25 +498,21 @@ bool InclusiveScanInt(const int32_t* input, int32_t* output, size_t count) {
   }
 }
 
-bool ExclusiveScanInt(const int32_t* input, int32_t* output, size_t count,
-                      int32_t init) {
+bool ExclusiveScanInt(const int32_t* input, int32_t* output, size_t count, int32_t init) {
   if (!g_metal.initialized || count < kGPUThreshold) return false;
-  if (!g_metal.exclusiveScanIntBlockPSO || !g_metal.scanAddBlockOffsetsPSO)
-    return false;
+  if (!g_metal.exclusiveScanIntBlockPSO || !g_metal.scanAddBlockOffsetsPSO) return false;
 
   @autoreleasepool {
     uint32_t groupSize =
         std::min(g_metal.maxThreadsPerGroup,
-                 (uint32_t)g_metal.exclusiveScanIntBlockPSO
-                     .maxTotalThreadsPerThreadgroup);
+                 (uint32_t)g_metal.exclusiveScanIntBlockPSO.maxTotalThreadsPerThreadgroup);
     groupSize = 1u << (31 - __builtin_clz(groupSize));
     if (groupSize > 1024) groupSize = 1024;
 
     uint32_t numGroups = (uint32_t)((count + groupSize - 1) / groupSize);
 
     id<MTLBuffer> inputBuf = WrapBuffer(input, count * sizeof(int32_t));
-    id<MTLBuffer> outputBuf =
-        WrapMutableBuffer(output, count * sizeof(int32_t));
+    id<MTLBuffer> outputBuf = WrapMutableBuffer(output, count * sizeof(int32_t));
     id<MTLBuffer> blockSums = NewBuffer(numGroups * sizeof(int32_t));
 
     if (!inputBuf || !outputBuf || !blockSums) return false;
@@ -613,15 +582,13 @@ bool InclusiveScanDouble(const double* input, double* output, size_t count) {
 
     uint32_t groupSize =
         std::min(g_metal.maxThreadsPerGroup,
-                 (uint32_t)g_metal.inclusiveScanDoubleBlockPSO
-                     .maxTotalThreadsPerThreadgroup);
+                 (uint32_t)g_metal.inclusiveScanDoubleBlockPSO.maxTotalThreadsPerThreadgroup);
     groupSize = 1u << (31 - __builtin_clz(groupSize));
     if (groupSize > 1024) groupSize = 1024;
 
     uint32_t numGroups = (uint32_t)((count + groupSize - 1) / groupSize);
 
-    id<MTLBuffer> inputBuf =
-        WrapBuffer(floatInput.data(), count * sizeof(float));
+    id<MTLBuffer> inputBuf = WrapBuffer(floatInput.data(), count * sizeof(float));
     id<MTLBuffer> outputBuf = NewBuffer(count * sizeof(float));
     id<MTLBuffer> blockSums = NewBuffer(numGroups * sizeof(float));
 
@@ -686,8 +653,7 @@ double ReduceSumDouble(const double* data, size_t count) {
     if (groupSize > 1024) groupSize = 1024;
     uint32_t numGroups = (uint32_t)((count + groupSize - 1) / groupSize);
 
-    id<MTLBuffer> inputBuf =
-        WrapBuffer(floatData.data(), count * sizeof(float));
+    id<MTLBuffer> inputBuf = WrapBuffer(floatData.data(), count * sizeof(float));
     id<MTLBuffer> outputBuf = NewBuffer(numGroups * sizeof(float));
 
     {
@@ -714,8 +680,7 @@ double ReduceSumDouble(const double* data, size_t count) {
 }
 
 int32_t ReduceSumInt(const int32_t* data, size_t count) {
-  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.reduceSumIntPSO)
-    return 0;
+  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.reduceSumIntPSO) return 0;
 
   @autoreleasepool {
     uint32_t groupSize = g_metal.maxThreadsPerGroup;
@@ -749,10 +714,8 @@ int32_t ReduceSumInt(const int32_t* data, size_t count) {
 }
 
 std::pair<double, double> ReduceMinMaxDouble(const double* data, size_t count) {
-  if (!g_metal.initialized || count < kGPUThreshold ||
-      !g_metal.reduceMinMaxFloatPSO)
-    return {std::numeric_limits<double>::infinity(),
-            -std::numeric_limits<double>::infinity()};
+  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.reduceMinMaxFloatPSO)
+    return {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()};
 
   @autoreleasepool {
     std::vector<float> floatData(count);
@@ -763,8 +726,7 @@ std::pair<double, double> ReduceMinMaxDouble(const double* data, size_t count) {
     if (groupSize > 1024) groupSize = 1024;
     uint32_t numGroups = (uint32_t)((count + groupSize - 1) / groupSize);
 
-    id<MTLBuffer> inputBuf =
-        WrapBuffer(floatData.data(), count * sizeof(float));
+    id<MTLBuffer> inputBuf = WrapBuffer(floatData.data(), count * sizeof(float));
     id<MTLBuffer> minBuf = NewBuffer(numGroups * sizeof(float));
     id<MTLBuffer> maxBuf = NewBuffer(numGroups * sizeof(float));
 
@@ -801,12 +763,10 @@ std::pair<double, double> ReduceMinMaxDouble(const double* data, size_t count) {
 // ---------------------------------------------------------------------------
 
 bool SequenceFill(int32_t* data, size_t count, int32_t start) {
-  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.sequenceFillPSO)
-    return false;
+  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.sequenceFillPSO) return false;
 
   @autoreleasepool {
-    id<MTLBuffer> outputBuf =
-        WrapMutableBuffer(data, count * sizeof(int32_t));
+    id<MTLBuffer> outputBuf = WrapMutableBuffer(data, count * sizeof(int32_t));
     if (!outputBuf) return false;
 
     id<MTLCommandBuffer> cmdBuf = [g_metal.commandQueue commandBuffer];
@@ -828,17 +788,14 @@ bool SequenceFill(int32_t* data, size_t count, int32_t start) {
   }
 }
 
-bool ScatterInt(const int32_t* input, const int32_t* indices, int32_t* output,
-                size_t count) {
-  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.scatterIntPSO)
-    return false;
+bool ScatterInt(const int32_t* input, const int32_t* indices, int32_t* output, size_t count) {
+  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.scatterIntPSO) return false;
 
   @autoreleasepool {
     id<MTLBuffer> inputBuf = WrapBuffer(input, count * sizeof(int32_t));
     id<MTLBuffer> indicesBuf = WrapBuffer(indices, count * sizeof(int32_t));
     // Output size unknown (could be larger), use input size as estimate
-    id<MTLBuffer> outputBuf =
-        WrapMutableBuffer(output, count * sizeof(int32_t));
+    id<MTLBuffer> outputBuf = WrapMutableBuffer(output, count * sizeof(int32_t));
 
     if (!inputBuf || !indicesBuf || !outputBuf) return false;
 
@@ -862,16 +819,13 @@ bool ScatterInt(const int32_t* input, const int32_t* indices, int32_t* output,
   }
 }
 
-bool GatherInt(const int32_t* input, const int32_t* indices, int32_t* output,
-               size_t count) {
-  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.gatherIntPSO)
-    return false;
+bool GatherInt(const int32_t* input, const int32_t* indices, int32_t* output, size_t count) {
+  if (!g_metal.initialized || count < kGPUThreshold || !g_metal.gatherIntPSO) return false;
 
   @autoreleasepool {
     id<MTLBuffer> inputBuf = WrapBuffer(input, count * sizeof(int32_t));
     id<MTLBuffer> indicesBuf = WrapBuffer(indices, count * sizeof(int32_t));
-    id<MTLBuffer> outputBuf =
-        WrapMutableBuffer(output, count * sizeof(int32_t));
+    id<MTLBuffer> outputBuf = WrapMutableBuffer(output, count * sizeof(int32_t));
 
     if (!inputBuf || !indicesBuf || !outputBuf) return false;
 
