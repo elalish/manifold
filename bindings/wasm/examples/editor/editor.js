@@ -700,31 +700,29 @@ function ceilNiceNumber(value) {
 }
 
 function formatMetricLength(meters) {
-  const trim = number => String(Number(number.toFixed(2)))
-                             .replace(/\.0+$/, '')
-                             .replace(/(\.\d*?)0+$/, '$1');
+  const trim = x => x.toFixed(0);
   const absMeters = Math.abs(meters);
-  if (absMeters >= 1) {
-    return `${trim(meters)}m`;
+  if (absMeters >= 10) {
+    return `${trim(meters)} m`;
+  }
+  if (absMeters >= 0.1) {
+    return `${trim(meters * 100)} cm`;
   }
   if (absMeters >= 0.01) {
-    return `${trim(meters * 100)}cm`;
+    return `${trim(meters * 1000)} mm`;
   }
-  if (absMeters >= 0.001) {
-    return `${trim(meters * 1000)}mm`;
-  }
-  return `${trim(meters * 1e6)}um`;
+  return `${trim(meters * 1e6)} µm`;
 }
 
 function createAxisLabelMesh(text, size) {
   const canvas = document.createElement('canvas');
   const canvasSize = 128;
-  canvas.width = canvasSize;
+  canvas.width = 2 * canvasSize;
   canvas.height = canvasSize;
   const context = canvas.getContext('2d');
   if (!context) return null;
 
-  context.clearRect(0, 0, canvasSize, canvasSize);
+  context.clearRect(0, 0, 2 * canvasSize, canvasSize);
   context.fillStyle = 'rgba(0,0,0,0.8)';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
@@ -735,7 +733,7 @@ function createAxisLabelMesh(text, size) {
   const lineHeight = 60;
   const startY = (canvasSize / 2) - ((lines.length - 1) * lineHeight / 2);
   lines.forEach((line, index) => {
-    context.fillText(line, canvasSize / 2, startY + (index * lineHeight));
+    context.fillText(line, canvasSize, startY + (index * lineHeight));
   });
 
   const texture = new CanvasTexture(canvas);
@@ -747,22 +745,25 @@ function createAxisLabelMesh(text, size) {
     toneMapped: false,
     depthWrite: false,
   });
-  const mesh = new Mesh(new PlaneGeometry(size, size), material);
+  const mesh = new Mesh(new PlaneGeometry(2 * size, size), material);
   mesh.userData[ORIENTATION_GRID_FLAG] = true;
   mesh.rotation.x = -Math.PI / 2;
   return mesh;
 }
 
-function createGridLinesGeometry(gridHalfExtent, spacing, includeLine) {
+function createGridLinesGeometry(gridHalfExtent, numLines, spacing) {
   const vertices = [];
   const epsilon = spacing * 0.001;
-  for (let coordinate = -gridHalfExtent; coordinate <= gridHalfExtent + epsilon;
-       coordinate += spacing) {
-    if (!includeLine(coordinate)) continue;
+  for (let i = 1; i <= numLines; i++) {
+    const coordinate = i * spacing;
     vertices.push(
         -gridHalfExtent, 0, coordinate, gridHalfExtent, 0, coordinate);
     vertices.push(
         coordinate, 0, -gridHalfExtent, coordinate, 0, gridHalfExtent);
+    vertices.push(
+        -gridHalfExtent, 0, -coordinate, gridHalfExtent, 0, -coordinate);
+    vertices.push(
+        -coordinate, 0, -gridHalfExtent, -coordinate, 0, gridHalfExtent);
   }
   if (vertices.length === 0) return null;
   const geometry = new BufferGeometry();
@@ -804,34 +805,24 @@ function updateOrientationGrid() {
     delete root.userData[ORIENTATION_GRID_KEY];
   }
 
-  const bounds = new Box3().setFromObject(root);
-  if (bounds.isEmpty()) return;
+  const center = mv.getBoundingBoxCenter();
+  const extent = mv.getDimensions();
 
-  const extentX = Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x));
-  const extentZ = Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z));
-  const modelHalfExtent = Math.max(extentX, extentZ, 0.1);
+  const extentX = Math.max(
+      Math.abs(center.x + extent.x / 2), Math.abs(center.x - extent.x / 2));
+  const extentZ = Math.max(
+      Math.abs(center.z + extent.z / 2), Math.abs(center.z - extent.z / 2));
+  const modelHalfExtent = Math.max(extentX, extentZ);
   const paddedHalfExtent = modelHalfExtent * 1.2;
-  const majorStep = ceilNiceNumber(Math.max(paddedHalfExtent, 0.1) / 8);
-  const minorStep = majorStep / 10;
-  const gridHalfExtent = Math.ceil(paddedHalfExtent / majorStep) * majorStep;
+  const minorStep = ceilNiceNumber(paddedHalfExtent / 50);
+  const numMinor = Math.ceil(paddedHalfExtent / minorStep);
+  const gridHalfExtent = numMinor * minorStep;
   const maxGridDimension = gridHalfExtent * 2;
-  const minorLineCountPerAxis =
-      Math.floor((maxGridDimension / minorStep) + 1e-6) + 1;
-  const showMinorLines = minorLineCountPerAxis <= 120;
 
-  const nearAxis = value => Math.abs(value) < minorStep * 0.01;
-  const isMajorLine = value => {
-    const nearest = Math.round(value / majorStep) * majorStep;
-    return Math.abs(value - nearest) <= minorStep * 0.01;
-  };
-
-  const minorGeometry = showMinorLines ?
-      createGridLinesGeometry(
-          gridHalfExtent, minorStep,
-          coordinate => !nearAxis(coordinate) && !isMajorLine(coordinate)) :
-      null;
-  const majorGeometry = createGridLinesGeometry(
-      gridHalfExtent, majorStep, coordinate => !nearAxis(coordinate));
+  const minorGeometry =
+      createGridLinesGeometry(gridHalfExtent, numMinor, minorStep);
+  const majorGeometry =
+      createGridLinesGeometry(gridHalfExtent, numMinor / 10, 10 * minorStep);
 
   const grid = new Group();
   grid.userData[ORIENTATION_GRID_FLAG] = true;
@@ -840,45 +831,47 @@ function updateOrientationGrid() {
   const gridPlane = new Mesh(
       new PlaneGeometry(maxGridDimension, maxGridDimension),
       new MeshBasicMaterial({
-        color: 0x5a6169,
+        color: 0,
         transparent: true,
-        opacity: 0.12,
+        opacity: 0.1,
         side: 2,
         depthWrite: false,
         toneMapped: false,
       }));
   gridPlane.rotation.x = -Math.PI / 2;
-  gridPlane.position.y = -0.0005;
   gridPlane.userData[ORIENTATION_GRID_FLAG] = true;
+  gridPlane.userData.noHit = true;  // using <model-viewer>'s internals
   grid.add(gridPlane);
 
   if (minorGeometry) {
     const minorLines = new LineSegments(minorGeometry, new LineBasicMaterial({
-                                          color: 0x6f7881,
+                                          color: 0,
                                           transparent: true,
-                                          opacity: 0.28,
+                                          opacity: 0.4,
                                           depthWrite: false,
                                           toneMapped: false,
                                         }));
     minorLines.userData[ORIENTATION_GRID_FLAG] = true;
+    minorLines.userData.noHit = true;  // using <model-viewer>'s internals
     grid.add(minorLines);
   }
 
   if (majorGeometry) {
     const majorLines = new LineSegments(majorGeometry, new LineBasicMaterial({
-                                          color: 0x424b55,
+                                          color: 0,
                                           transparent: true,
-                                          opacity: 0.45,
+                                          opacity: 0.8,
                                           depthWrite: false,
                                           toneMapped: false,
                                         }));
     majorLines.userData[ORIENTATION_GRID_FLAG] = true;
+    majorLines.userData.noHit = true;  // using <model-viewer>'s internals
     grid.add(majorLines);
   }
 
-  const axisStripWidth = minorStep * 0.12;
+  const axisStripWidth = maxGridDimension * 0.005;
   const axisMaterial = new MeshBasicMaterial({
-    color: 0x1f262d,
+    color: 0,
     transparent: true,
     opacity: 0.85,
     side: 2,
@@ -890,32 +883,31 @@ function updateOrientationGrid() {
       new PlaneGeometry(maxGridDimension, axisStripWidth),
       axisMaterial.clone());
   xAxis.rotation.x = -Math.PI / 2;
-  xAxis.position.y = 0.001;
   xAxis.userData[ORIENTATION_GRID_FLAG] = true;
+  xAxis.userData.noHit = true;  // using <model-viewer>'s internals
   grid.add(xAxis);
 
   const yAxis = new Mesh(
       new PlaneGeometry(axisStripWidth, maxGridDimension),
       axisMaterial.clone());
   yAxis.rotation.x = -Math.PI / 2;
-  yAxis.position.y = 0.001;
   yAxis.userData[ORIENTATION_GRID_FLAG] = true;
+  yAxis.userData.noHit = true;  // using <model-viewer>'s internals
   grid.add(yAxis);
 
-  const labelSize =
-      clampToRange(maxGridDimension * 0.045, majorStep * 0.9, minorStep * 0.9);
-  const labelOffset = majorStep * 0.15;
+  const labelSize = maxGridDimension * 0.07;
+  const labelOffset = labelSize;
   const axisDimensionLabel = formatMetricLength(gridHalfExtent);
 
-  const xLabel = createAxisLabelMesh(`X\n${axisDimensionLabel}`, labelSize);
+  const xLabel = createAxisLabelMesh(`+X\n${axisDimensionLabel}`, labelSize);
   if (xLabel) {
-    xLabel.position.set(gridHalfExtent + labelOffset, 0.002, 0);
+    xLabel.position.set(gridHalfExtent + labelOffset, 0, 0);
     grid.add(xLabel);
   }
 
-  const yLabel = createAxisLabelMesh(`Y\n${axisDimensionLabel}`, labelSize);
+  const yLabel = createAxisLabelMesh(`+Y\n${axisDimensionLabel}`, labelSize);
   if (yLabel) {
-    yLabel.position.set(0, 0.002, gridHalfExtent + labelOffset);
+    yLabel.position.set(0, 0, -(gridHalfExtent + labelOffset));
     grid.add(yLabel);
   }
 
