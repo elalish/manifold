@@ -404,7 +404,8 @@ class Manifold {
    * Casts a ray segment from origin to endpoint and returns the nearest
    * intersection with the mesh surface. The returned distance is the parameter
    * t in [0, 1] where the hit occurs along the segment. Returns faceID = -1
-   * if no hit.
+   * if no hit. Uses the same robust edge-crossing math as the boolean engine
+   * (Shadow01 / Kernel02) for watertight results at mesh edges.
    *
    * @param origin The start point of the ray segment.
    * @param endpoint The end point of the ray segment.
@@ -412,10 +413,24 @@ class Manifold {
   RayHit RayCast(vec3 origin, vec3 endpoint) const;
 
   /**
+   * Casts a ray from origin in the given direction up to maxDist and returns
+   * the nearest intersection. When maxDist is infinity, the ray is clipped to
+   * the mesh bounding box for precision. The returned distance is the absolute
+   * distance along the direction vector.
+   *
+   * @param origin The ray origin.
+   * @param direction The ray direction (does not need to be normalized).
+   * @param maxDist Maximum ray distance. Use
+   *   std::numeric_limits<double>::infinity() for an unbounded ray.
+   */
+  RayHit RayCast(vec3 origin, vec3 direction, double maxDist) const;
+
+  /**
    * Returns the winding number of a point with respect to the manifold
    * surface. For a closed manifold, 0 means the point is outside, and nonzero
-   * (typically 1) means it is inside. Uses robust Z-axis ray casting with
-   * BVH acceleration.
+   * (typically 1) means it is inside. Uses the robust Kernel02 Z-axis shadow
+   * test from the boolean engine, with BVH acceleration and
+   * symbolic-perturbation tie-breaking via the mesh's vertex normals.
    *
    * @param point The query point.
    */

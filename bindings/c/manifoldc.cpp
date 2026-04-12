@@ -848,6 +848,19 @@ ManifoldRayHit manifold_ray_cast(ManifoldManifold* m, ManifoldVec3 origin,
   return out;
 }
 
+ManifoldRayHit manifold_ray_cast_direction(ManifoldManifold* m,
+                                           ManifoldVec3 origin,
+                                           ManifoldVec3 direction,
+                                           double max_dist) {
+  auto result = from_c(m)->RayCast(from_c(origin), from_c(direction), max_dist);
+  ManifoldRayHit out;
+  out.distance = result.distance;
+  out.position = to_c(result.position);
+  out.normal = to_c(result.normal);
+  out.face_id = result.faceID;
+  return out;
+}
+
 int manifold_winding_number(ManifoldManifold* m, ManifoldVec3 point) {
   return from_c(m)->WindingNumber(from_c(point));
 }

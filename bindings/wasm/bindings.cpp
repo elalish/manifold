@@ -193,7 +193,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("minGap", &Manifold::MinGap)
       .function("windingNumber", &Manifold::WindingNumber)
       .function("_RayCast", &man_js::RayCast)
-      .function("_RayCastInfinite", &man_js::RayCastInfinite)
+      .function("_RayCastDir", &man_js::RayCastDir)
       .function("_NearestPoint", &man_js::NearestPoint)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)

@@ -1145,30 +1145,19 @@ export class Manifold {
   minGap(other: Manifold, searchLength: number): number;
 
   /**
-   * Casts a ray segment from origin to endpoint and returns the nearest hit.
-   * The returned distance is the t parameter in [0, 1]. Returns faceID = -1 if
-   * no hit.
+   * Casts a ray and returns the nearest intersection with the mesh surface.
    *
-   * @param origin Start point of the ray segment.
-   * @param endpoint End point of the ray segment.
-   * @returns An object with distance, position, normal, and faceID.
+   * Two calling conventions:
+   * - `rayCast(origin, endpoint)`: segment cast, distance is t in [0, 1].
+   * - `rayCast(origin, direction, maxDist)`: direction + distance form.
+   *   Use `Infinity` for maxDist for an unbounded ray (clipped to bounding
+   *   box). Distance is absolute distance along the direction.
    *
-   * @group Queries
-   */
-  rayCast(origin: Vec3, endpoint: Vec3):
-      {distance: number; position: Vec3; normal: Vec3; faceID: number;};
-
-  /**
-   * Casts an infinite ray from origin in the given direction. Internally
-   * clips to the bounding box for precision.
-   *
-   * @param origin Ray origin.
-   * @param direction Ray direction (does not need to be normalized).
-   * @returns An object with distance, position, normal, and faceID.
+   * Returns faceID = -1 if no hit.
    *
    * @group Queries
    */
-  rayCastInfinite(origin: Vec3, direction: Vec3):
+  rayCast(origin: Vec3, endpointOrDirection: Vec3, maxDist?: number):
       {distance: number; position: Vec3; normal: Vec3; faceID: number;};
 
   /**

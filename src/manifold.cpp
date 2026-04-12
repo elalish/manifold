@@ -991,10 +991,66 @@ RayHit Manifold::RayCast(vec3 origin, vec3 endpoint) const {
 }
 
 /**
+ * Casts a ray from origin in the given direction up to maxDist and returns
+ * the nearest intersection. When maxDist is infinity, the ray is clipped to
+ * the mesh bounding box for precision.
+ *
+ * @param origin The ray origin.
+ * @param direction The ray direction (does not need to be normalized).
+ * @param maxDist Maximum ray distance.
+ */
+RayHit Manifold::RayCast(vec3 origin, vec3 direction, double maxDist) const {
+  const double len = la::length(direction);
+  if (len < 1e-30) return {};
+  const vec3 dir = direction / len;
+
+  vec3 endpoint;
+  if (!std::isfinite(maxDist)) {
+    // Clip to the mesh bounding box (padded) for precision.
+    Box bbox = BoundingBox();
+    const vec3 pad = vec3(bbox.Scale() * 1e-6);
+    const Box expanded(bbox.min - pad, bbox.max + pad);
+    double tNear = 0.0;
+    double tFar = std::numeric_limits<double>::infinity();
+    bool miss = false;
+    for (int i = 0; i < 3; ++i) {
+      if (std::fabs(dir[i]) < 1e-30) {
+        if (origin[i] < expanded.min[i] || origin[i] > expanded.max[i]) {
+          miss = true;
+          break;
+        }
+      } else {
+        double invD = 1.0 / dir[i];
+        double t1 = (expanded.min[i] - origin[i]) * invD;
+        double t2 = (expanded.max[i] - origin[i]) * invD;
+        if (t1 > t2) std::swap(t1, t2);
+        tNear = std::max(tNear, t1);
+        tFar = std::min(tFar, t2);
+        if (tNear > tFar) {
+          miss = true;
+          break;
+        }
+      }
+    }
+    if (miss) return {};
+    endpoint = origin + dir * std::max(tFar, 0.0);
+  } else {
+    endpoint = origin + dir * maxDist;
+  }
+
+  RayHit hit = RayCast(origin, endpoint);
+  // Convert t ∈ [0,1] segment parameter to absolute distance along direction.
+  if (hit.faceID >= 0) {
+    hit.distance = la::length(hit.position - origin);
+  }
+  return hit;
+}
+
+/**
  * Returns the winding number of a point with respect to the manifold
  * surface. For a closed manifold, 0 means the point is outside, and nonzero
- * (typically 1) means it is inside. Uses robust Z-axis ray casting with BVH
- * acceleration.
+ * (typically 1) means it is inside. Uses the robust Kernel02 Z-axis shadow
+ * test from the boolean engine, with BVH acceleration.
  *
  * @param point The query point.
  */

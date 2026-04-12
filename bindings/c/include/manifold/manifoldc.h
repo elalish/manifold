@@ -242,6 +242,10 @@ double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
 
 ManifoldRayHit manifold_ray_cast(ManifoldManifold* m, ManifoldVec3 origin,
                                  ManifoldVec3 endpoint);
+ManifoldRayHit manifold_ray_cast_direction(ManifoldManifold* m,
+                                           ManifoldVec3 origin,
+                                           ManifoldVec3 direction,
+                                           double max_dist);
 int manifold_winding_number(ManifoldManifold* m, ManifoldVec3 point);
 ManifoldNearestPointResult manifold_nearest_point(ManifoldManifold* m,
                                                   ManifoldVec3 point);

@@ -354,13 +354,16 @@ Module.setup = function() {
     };
   };
 
-  Module.Manifold.prototype.rayCast = function(origin, endpoint) {
-    return this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
-  };
-
-  Module.Manifold.prototype.rayCastInfinite = function(origin, direction) {
-    return this._RayCastInfinite(
-        vararg2vec3([origin]), vararg2vec3([direction]));
+  Module.Manifold.prototype.rayCast = function(origin, endpointOrDirection,
+                                                maxDist) {
+    if (maxDist === undefined) {
+      // Two-arg form: origin + endpoint (segment cast)
+      return this._RayCast(
+          vararg2vec3([origin]), vararg2vec3([endpointOrDirection]));
+    }
+    // Three-arg form: origin + direction + maxDist
+    return this._RayCastDir(
+        vararg2vec3([origin]), vararg2vec3([endpointOrDirection]), maxDist);
   };
 
   Module.Manifold.prototype.nearestPoint = function(point) {

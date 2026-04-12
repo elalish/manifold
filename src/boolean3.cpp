@@ -528,4 +528,143 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   }
 #endif
 }
+// ---------------------------------------------------------------------------
+// Standalone spatial queries reusing the boolean3 kernel primitives.
+// These live in this translation unit so they can call Shadow01, Kernel02,
+// Interpolate, and Shadows directly (anonymous-namespace symbols).
+// ---------------------------------------------------------------------------
+
+int Manifold::Impl::WindingNumber(vec3 point) const {
+  ZoneScoped;
+  if (IsEmpty()) return 0;
+
+  // Build a minimal single-vertex Impl so Kernel02 can read vertPos_[0]
+  // and vertNormal_[0].  expandP=false makes the query-side perturbation
+  // -vertNormal, which is zero here, so only the mesh's perturbation acts.
+  Impl queryImpl;
+  queryImpl.vertPos_.resize(1);
+  queryImpl.vertPos_[0] = point;
+  queryImpl.vertNormal_.resize(1);
+  queryImpl.vertNormal_[0] = vec3(0.0);
+
+  int winding = 0;
+  Kernel02<false, true> k02{queryImpl, *this};
+  auto recorderf = [&](int /*queryIdx*/, int tri) {
+    const auto [s02, z02] = k02(0, tri);
+    if (std::isfinite(z02)) winding += s02;
+  };
+  auto recorder = MakeSimpleRecorder(recorderf);
+  // DoesOverlap(vec3) checks XY containment – the correct filter for a +Z ray.
+  auto f = [&point](int) { return point; };
+  collider_.Collisions<false>(recorder, f, 1, false);
+
+  return winding;
+}
+
+RayHit Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
+  ZoneScoped;
+  if (IsEmpty()) return {};
+
+  const vec3 dir = endpoint - origin;
+  const double rayLen = la::length(dir);
+  if (rayLen < 1e-30) return {};
+
+  // AABB of the ray segment for BVH candidate filtering.
+  const Box rayBox(la::min(origin, endpoint), la::max(origin, endpoint));
+
+  double bestT = std::numeric_limits<double>::infinity();
+  int bestTri = -1;
+
+  auto recorderf = [&](int /*queryIdx*/, int tri) {
+    const vec3 v0 = vertPos_[halfedge_[3 * tri].startVert];
+    const vec3 v1 = vertPos_[halfedge_[3 * tri + 1].startVert];
+    const vec3 v2 = vertPos_[halfedge_[3 * tri + 2].startVert];
+
+    // --- ray-plane intersection (standard, no edge-consistency issues) ---
+    const vec3& fn = faceNormal_[tri];
+    const double denom = la::dot(dir, fn);
+    if (std::fabs(denom) < 1e-30) return;  // ray parallel to face
+    const double t = la::dot(v0 - origin, fn) / denom;
+    if (t < 0.0 || t > 1.0 || t >= bestT) return;
+
+    const vec3 hitPoint = origin + t * dir;
+
+    // --- 2D containment test reusing Shadow01-style edge crossing ---
+    // Project onto the plane perpendicular to the dominant normal axis,
+    // exactly as GetAxisAlignedProjection does (axis permutation, no
+    // rounding error).  We then reuse Shadows() and Interpolate() from
+    // boolean3 for the edge-crossing logic, together with the mesh's
+    // vertNormal_ for symbolic-perturbation tie-breaking at edges.
+    const vec3 absN = la::abs(fn);
+    int xA, yA;
+    double flip;
+    if (absN.z > absN.x && absN.z > absN.y) {
+      xA = 0;
+      yA = 1;
+      flip = fn.z > 0 ? 1.0 : -1.0;
+    } else if (absN.y > absN.x) {
+      xA = 2;
+      yA = 0;
+      flip = fn.y > 0 ? 1.0 : -1.0;
+    } else {
+      xA = 1;
+      yA = 2;
+      flip = fn.x > 0 ? 1.0 : -1.0;
+    }
+
+    int crossings = 0;
+    for (int i = 0; i < 3; ++i) {
+      const int b1 = 3 * tri + i;
+      const Halfedge& edge = halfedge_[b1];
+      const int b1F = edge.IsForward() ? b1 : edge.pairedHalfedge;
+      const int b1s = halfedge_[b1F].startVert;
+      const int b1e = halfedge_[b1F].endVert;
+
+      // Shadow01 X-axis crossing test in the projected coordinate system.
+      // Query perturbation is 0 (not a mesh vertex); mesh perturbation
+      // comes from vertNormal_ ensuring consistent edge assignment.
+      const double px = hitPoint[xA] * flip;
+      const double sx = vertPos_[b1s][xA] * flip;
+      const double ex = vertPos_[b1e][xA] * flip;
+      const double sxp = vertNormal_[b1s][xA] * flip;
+      const double exp_ = vertNormal_[b1e][xA] * flip;
+
+      int s01 = Shadows(px, ex, -exp_) - Shadows(px, sx, -sxp);
+
+      if (s01 != 0) {
+        // Interpolate projected Y at the crossing X, using the same
+        // Interpolate() helper that Shadow01 calls.
+        const vec3 sv(sx, vertPos_[b1s][yA], 0.0);
+        const vec3 ev(ex, vertPos_[b1e][yA], 0.0);
+        const vec2 yz = Interpolate(sv, ev, px);
+
+        const int b1pair = halfedge_[b1F].pairedHalfedge;
+        const double edgeDir =
+            faceNormal_[b1F / 3][yA] + faceNormal_[b1pair / 3][yA];
+        if (!Shadows(hitPoint[yA], yz[0], -edgeDir)) s01 = 0;
+      }
+
+      crossings += s01 * (edge.IsForward() ? -1 : 1);
+    }
+
+    if (crossings != 0) {
+      bestT = t;
+      bestTri = tri;
+    }
+  };
+
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&rayBox](int) { return rayBox; };
+  collider_.Collisions<false>(recorder, f, 1, false);
+
+  if (bestTri < 0) return {};
+
+  RayHit hit;
+  hit.distance = bestT;
+  hit.position = origin + bestT * dir;
+  hit.normal = faceNormal_[bestTri];
+  hit.faceID = bestTri;
+  return hit;
+}
+
 }  // namespace manifold

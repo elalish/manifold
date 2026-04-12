@@ -336,52 +336,20 @@ NB_MODULE(manifold3d, m) {
           "distance is the t parameter in [0,1]; -1 and face_id -1 if no "
           "hit.")
       .def(
-          "ray_cast_infinite",
-          [](const Manifold& self, vec3 origin, vec3 direction) {
-            double len = la::length(direction);
-            if (len < 1e-30)
-              return nb::make_tuple(-1.0, nb::make_tuple(NAN, NAN, NAN),
-                                    nb::make_tuple(NAN, NAN, NAN), -1);
-            vec3 dir = direction / len;
-            Box bbox = self.BoundingBox();
-            // Expand bbox slightly for numerical safety
-            vec3 pad = vec3(bbox.Scale() * 1e-6);
-            Box expanded(bbox.min - pad, bbox.max + pad);
-            // Compute far intersection with expanded bbox
-            double tNear = 0.0;
-            double tFar = std::numeric_limits<double>::infinity();
-            for (int i = 0; i < 3; ++i) {
-              if (std::fabs(dir[i]) < 1e-30) {
-                if (origin[i] < expanded.min[i] ||
-                    origin[i] > expanded.max[i]) {
-                  return nb::make_tuple(-1.0, nb::make_tuple(NAN, NAN, NAN),
-                                        nb::make_tuple(NAN, NAN, NAN), -1);
-                }
-              } else {
-                double invD = 1.0 / dir[i];
-                double t1 = (expanded.min[i] - origin[i]) * invD;
-                double t2 = (expanded.max[i] - origin[i]) * invD;
-                if (t1 > t2) std::swap(t1, t2);
-                tNear = std::max(tNear, t1);
-                tFar = std::min(tFar, t2);
-                if (tNear > tFar) {
-                  return nb::make_tuple(-1.0, nb::make_tuple(NAN, NAN, NAN),
-                                        nb::make_tuple(NAN, NAN, NAN), -1);
-                }
-              }
-            }
-            vec3 endpoint = origin + dir * std::max(tFar, 0.0);
-            auto hit = self.RayCast(origin, endpoint);
+          "ray_cast",
+          [](const Manifold& self, vec3 origin, vec3 direction,
+             double maxDist) {
+            auto hit = self.RayCast(origin, direction, maxDist);
             return nb::make_tuple(
                 hit.distance,
                 nb::make_tuple(hit.position.x, hit.position.y, hit.position.z),
                 nb::make_tuple(hit.normal.x, hit.normal.y, hit.normal.z),
                 hit.faceID);
           },
-          nb::arg("origin"), nb::arg("direction"),
-          "Casts an infinite ray from origin in the given direction. "
-          "Internally clips to the bounding box for precision. Returns "
-          "(distance, position, normal, face_id).")
+          nb::arg("origin"), nb::arg("direction"), nb::arg("max_dist"),
+          "Casts a ray from origin in direction up to max_dist. Use "
+          "float('inf') for an unbounded ray (clips to bounding box). "
+          "Returns (distance, position, normal, face_id).")
       .def("winding_number", &Manifold::WindingNumber, nb::arg("point"),
            "Returns the winding number at a point. 0 = outside, "
            "nonzero = inside for closed manifolds.")
