@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include "manifold/common.h"
@@ -175,6 +176,8 @@ class CrossSection {
   ///@}
 
  private:
+  mutable std::shared_ptr<std::mutex> pathsMutex_ =
+      std::make_shared<std::mutex>();
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
   CrossSection(std::shared_ptr<const PathImpl> paths);
