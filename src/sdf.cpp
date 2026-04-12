@@ -21,10 +21,6 @@
 #include "utils.h"
 #include "vec.h"
 
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
-
 namespace {
 using namespace manifold;
 
@@ -108,24 +104,12 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
          static_cast<uint64_t>(gridPos.x) << (1 + gridPow.z + gridPow.y);
 }
 
-#ifdef _MSC_VER
-#ifndef _WINDEF_
-using DWORD = unsigned long;
-#endif
-uint32_t Clz32(uint32_t value) {
-  DWORD leading_zero = 0;
-  if (_BitScanReverse(&leading_zero, value)) {
-    return 31 - leading_zero;
-  }
-  return 32;
+int BitWidth(uint32_t x) {
+  constexpr uint32_t kValueBits = 32u;
+  constexpr uint32_t kSizeTBits = 8u * static_cast<uint32_t>(sizeof(size_t));
+  const uint32_t clz = ClzSizeT(static_cast<size_t>(x));
+  return static_cast<int>(kValueBits - (clz - (kSizeTBits - kValueBits)));
 }
-#else
-uint32_t Clz32(uint32_t value) {
-  return value == 0 ? 32 : static_cast<uint32_t>(__builtin_clz(value));
-}
-#endif
-
-int BitWidth(uint32_t x) { return static_cast<int>(32 - Clz32(x)); }
 
 ivec3 ComputeGridPow(ivec3 gridSize) {
   // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, but
