@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
+
 #include "hashtable.h"
 #include "impl.h"
 #include "manifold/manifold.h"
@@ -100,6 +102,16 @@ uint64_t EncodeIndex(ivec4 gridPos, ivec3 gridPow) {
          static_cast<uint64_t>(gridPos.z) << 1 |
          static_cast<uint64_t>(gridPos.y) << (1 + gridPow.z) |
          static_cast<uint64_t>(gridPos.x) << (1 + gridPow.z + gridPow.y);
+}
+
+ivec3 ComputeGridPow(ivec3 gridSize) {
+  // Equivalent to floor(log2(gridSize + 2)) + 1 for positive inputs, using
+  // integer-only and deterministic across platforms.
+  auto axisPow = [](int n) {
+    const size_t value = static_cast<size_t>(static_cast<uint32_t>(n + 2));
+    return static_cast<int>(CeilLog2(value + 1_uz));
+  };
+  return {axisPow(gridSize.x), axisPow(gridSize.y), axisPow(gridSize.z)};
 }
 
 ivec4 DecodeIndex(uint64_t idx, ivec3 gridPow) {
@@ -467,7 +479,7 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   const ivec3 gridSize(dim / edgeLength + 1.0);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
-  const ivec3 gridPow(la::log2(gridSize + 2) + 1);
+  const ivec3 gridPow = ComputeGridPow(gridSize);
   const uint64_t maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks
@@ -485,8 +497,17 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
                                  origin, spacing, gridSize, level, sdf);
       });
 
-  size_t tableSize = std::min(
-      2 * maxIndex, static_cast<uint64_t>(10 * la::pow(maxIndex, 0.667)));
+  const uint64_t tableSizeCap =
+      static_cast<uint64_t>(std::numeric_limits<size_t>::max());
+  const uint64_t denseTableSize64 =
+      maxIndex > tableSizeCap / 2 ? tableSizeCap : 2 * maxIndex;
+  // Level sets are sparse in the volume; cap dense sizing for large grids.
+  const uint64_t sparseTableSize64 = std::min(
+      tableSizeCap,
+      static_cast<uint64_t>(10 * std::sqrt(static_cast<double>(maxIndex))));
+  uint64_t tableSize64 = std::min(denseTableSize64, sparseTableSize64);
+  tableSize64 = std::max<uint64_t>(1, tableSize64);
+  size_t tableSize = static_cast<size_t>(tableSize64);
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
 
