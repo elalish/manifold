@@ -14,6 +14,9 @@
 
 cmake_minimum_required(VERSION 3.18)
 project(manifold LANGUAGES CXX)
+if(MANIFOLD_METAL AND APPLE)
+  enable_language(OBJCXX)
+endif()
 
 # Use C++17
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -47,6 +50,7 @@ option(
   ON
 )
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
+option(MANIFOLD_METAL "Enable Metal GPU compute backend (macOS)" OFF)
 option(
   MANIFOLD_OPTIMIZED
   "Force optimized build, even with debugging enabled"
