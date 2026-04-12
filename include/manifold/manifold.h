@@ -16,6 +16,7 @@
 #include <cstdint>  // uint32_t, uint64_t
 #include <functional>
 #include <memory>  // needed for shared_ptr
+#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -393,6 +394,13 @@ class Manifold {
   double SurfaceArea() const;
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
+  ///@}
+
+  /** @name Spatial Queries
+   */
+  ///@{
+  std::optional<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
+  std::vector<RayHit> RayCastAll(vec3 origin, vec3 endpoint) const;
   ///@}
 
   /** @name Mesh ID
