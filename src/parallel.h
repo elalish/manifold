@@ -279,7 +279,8 @@ struct SortedRange {
   __attribute__((no_sanitize("thread")))
 #endif
 #endif
-  void operator()(const tbb::blocked_range<SizeType>& range) {
+  void
+  operator()(const tbb::blocked_range<SizeType>& range) {
     SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
                                  range.end() - range.begin());
     rhs.inTmp =
