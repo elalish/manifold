@@ -337,9 +337,11 @@ struct Manifold::Impl {
   bool IsConvex() const;
   double MinGap(const Impl& other, double searchLength) const;
 
-  // queries.cpp
+  // boolean3.cpp
   RayHit RayCast(vec3 origin, vec3 endpoint) const;
   int WindingNumber(vec3 point) const;
+
+  // queries.cpp
   NearestPointResult NearestPoint(vec3 point) const;
 
   // sort.cpp

@@ -91,18 +91,21 @@ NearestPointResult Manifold::Impl::NearestPoint(vec3 point) const {
     }
   };
 
-  // Use BVH with expanding search radius for acceleration.
-  const vec3 bboxSize = bBox_.Size();
-  const double bboxDiag = la::length(bboxSize);
-  double searchRadius = bboxDiag / std::max(1.0, std::pow(NumTri(), 1.0 / 3.0));
-
+  // BVH-accelerated search with expanding radius.  The collider's query is a
+  // fixed Box, so we cannot shrink it during traversal.  Instead we use a
+  // two-pass approach: first find any candidate within an estimated radius,
+  // then refine with a tight box equal to the best distance found.
+  const double bboxDiag = la::length(bBox_.Size());
   const vec3 clamped = la::clamp(point, bBox_.min, bBox_.max);
   const double distToBox = la::length(point - clamped);
-  searchRadius = std::max(searchRadius, distToBox + searchRadius);
 
-  for (int attempt = 0; attempt < 32; ++attempt) {
-    const Box queryBox(point - vec3(searchRadius), point + vec3(searchRadius));
+  // Initial radius: must reach the mesh (>= distToBox) plus a margin based
+  // on average inter-triangle spacing so we're likely to hit at least one.
+  double searchRadius =
+      distToBox + bboxDiag / std::max(1.0, std::pow(NumTri(), 1.0 / 3.0));
 
+  auto search = [&](double radius) {
+    const Box queryBox(point - vec3(radius), point + vec3(radius));
     auto recorderf = [&](int /*queryIdx*/, int tri) {
       const vec3 v0 = vertPos_[halfedge_[3 * tri].startVert];
       const vec3 v1 = vertPos_[halfedge_[3 * tri + 1].startVert];
@@ -112,29 +115,28 @@ NearestPointResult Manifold::Impl::NearestPoint(vec3 point) const {
     auto recorder = MakeSimpleRecorder(recorderf);
     auto f = [&queryBox](int) { return queryBox; };
     collider_.Collisions<false>(recorder, f, 1, false);
+  };
 
-    if (bestFaceID >= 0) {
-      // Refine: search with the exact best distance to ensure no closer
-      // triangle was missed outside the initial search box.
-      const double bestDist = std::sqrt(bestDistSq);
-      if (bestDist < searchRadius) {
-        const Box refineBox(point - vec3(bestDist), point + vec3(bestDist));
-        auto recorderf2 = [&](int /*queryIdx*/, int tri) {
-          const vec3 v0 = vertPos_[halfedge_[3 * tri].startVert];
-          const vec3 v1 = vertPos_[halfedge_[3 * tri + 1].startVert];
-          const vec3 v2 = vertPos_[halfedge_[3 * tri + 2].startVert];
-          updateBest(tri, ClosestPointOnTriangle(point, v0, v1, v2));
-        };
-        auto recorder2 = MakeSimpleRecorder(recorderf2);
-        auto f2 = [&refineBox](int) { return refineBox; };
-        collider_.Collisions<false>(recorder2, f2, 1, false);
-      }
-      break;
-    }
-
+  // Expand until we find at least one candidate.
+  const double maxRadius = bboxDiag * 2 + distToBox;
+  for (int attempt = 0; attempt < 16 && bestFaceID < 0; ++attempt) {
+    search(searchRadius);
+    if (bestFaceID >= 0) break;
     searchRadius *= 4;
-    if (searchRadius > bboxDiag * 4) {
-      searchRadius = bboxDiag * 4 + distToBox;
+    if (searchRadius >= maxRadius) {
+      searchRadius = maxRadius;
+      search(searchRadius);
+      break;  // Don't loop further at the cap.
+    }
+  }
+
+  // Refine: search with the exact best distance to catch any closer
+  // triangle whose BVH box fell outside the initial search radius but
+  // whose actual surface is closer.
+  if (bestFaceID >= 0) {
+    const double bestDist = std::sqrt(bestDistSq);
+    if (bestDist < searchRadius) {
+      search(bestDist);
     }
   }
 

@@ -473,8 +473,11 @@ struct Rect {
  * @brief Result of a ray cast query against a Manifold.
  */
 struct RayHit {
-  /// Parameter t along the ray segment: 0 = origin, 1 = endpoint. A value of
-  /// -1 indicates no hit.
+  /// Hit distance semantics depend on the ray-cast overload used: for segment
+  /// casts, this is the segment parameter t in [0, 1] (0 = origin, 1 =
+  /// endpoint); for direction casts taking (origin, direction, maxDist), this
+  /// is the absolute distance from the origin along the ray. A value of -1
+  /// indicates no hit.
   double distance = -1;
   /// The point on the mesh surface where the ray hit.
   vec3 position = vec3(NAN);

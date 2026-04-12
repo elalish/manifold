@@ -1008,6 +1008,7 @@ RayHit Manifold::RayCast(vec3 origin, vec3 direction, double maxDist) const {
   if (!std::isfinite(maxDist)) {
     // Clip to the mesh bounding box (padded) for precision.
     Box bbox = BoundingBox();
+    if (!bbox.IsFinite()) return {};
     const vec3 pad = vec3(bbox.Scale() * 1e-6);
     const Box expanded(bbox.min - pad, bbox.max + pad);
     double tNear = 0.0;

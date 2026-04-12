@@ -237,4 +237,169 @@ TEST(Queries, RayCastDirectionFiniteDist) {
   EXPECT_GE(hit.faceID, 0);
 }
 
+// --- Adversarial floating-point and robustness tests ---
+// These probe edge cases that reveal subtle bugs in containment logic,
+// edge tie-breaking, and numerical precision.
+
+TEST(Queries, WindingNumberGrid) {
+  // Sample a grid of points around a cube and verify all winding numbers
+  // are consistent (0 outside, 1 inside, no stray values).
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  int insideCount = 0;
+  int outsideCount = 0;
+  const double step = 0.37;  // Intentionally non-aligned with mesh edges
+  for (double x = -1.5; x <= 1.5; x += step) {
+    for (double y = -1.5; y <= 1.5; y += step) {
+      for (double z = -1.5; z <= 1.5; z += step) {
+        int w = cube.WindingNumber(vec3(x, y, z));
+        bool geometricallyInside =
+            x > -1 && x < 1 && y > -1 && y < 1 && z > -1 && z < 1;
+        if (geometricallyInside) {
+          EXPECT_NE(w, 0) << "at (" << x << "," << y << "," << z << ")";
+          insideCount++;
+        } else if (std::fabs(x) > 1.01 || std::fabs(y) > 1.01 ||
+                   std::fabs(z) > 1.01) {
+          // Points clearly outside (with margin for surface ambiguity)
+          EXPECT_EQ(w, 0) << "at (" << x << "," << y << "," << z << ")";
+          outsideCount++;
+        }
+      }
+    }
+  }
+  EXPECT_GT(insideCount, 10);
+  EXPECT_GT(outsideCount, 10);
+}
+
+TEST(Queries, RayCastAlongEdge) {
+  // Ray that travels exactly along a mesh edge -- a degenerate case
+  // that should not crash and should return a valid hit or clean miss.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  // Shoot along the +X edge at y=1, z=1 from outside
+  RayHit hit = cube.RayCast(vec3(-5, 1, 1), vec3(5, 1, 1));
+  // May or may not hit (edge is degenerate), but must not crash
+  // and must have consistent output.
+  if (hit.faceID >= 0) {
+    EXPECT_GE(hit.distance, 0.0);
+    EXPECT_LE(hit.distance, 1.0);
+    EXPECT_TRUE(std::isfinite(hit.position.x));
+  }
+}
+
+TEST(Queries, RayCastThroughVertex) {
+  // Ray aimed directly at a mesh vertex -- another degenerate case.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  // Shoot at the corner (-1, -1, -1) from outside
+  vec3 corner(-1, -1, -1);
+  vec3 origin = corner - vec3(3, 3, 3);
+  RayHit hit = cube.RayCast(origin, corner);
+  // Should either hit the corner or a face near it; must not crash.
+  if (hit.faceID >= 0) {
+    EXPECT_GE(hit.distance, 0.0);
+    EXPECT_NEAR(la::length(hit.position - corner), 0.0, 0.1);
+  }
+}
+
+TEST(Queries, WindingNumberBelowEdge) {
+  // Point whose +Z ray hits exactly on a shared edge between two top-face
+  // triangles of a cube. The robust Kernel02 should count exactly one hit.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  // The top face (z=1) of the cube is split into 2 triangles along a
+  // diagonal. A point at (0, 0, -0.5) has its +Z ray hitting the top face
+  // at (0, 0, 1) which lies on that diagonal.
+  int w = cube.WindingNumber(vec3(0, 0, -0.5));
+  EXPECT_EQ(w, 1);  // Must be inside
+}
+
+TEST(Queries, WindingNumberBelowVertex) {
+  // Point whose +Z ray passes through a mesh vertex. The symbolic
+  // perturbation from vertNormal_ should give a consistent result.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  // (1, 1, *) line passes through the cube corner vertex at (1, 1, 1).
+  // A point below the cube on that line should be outside.
+  int w = cube.WindingNumber(vec3(1, 1, -5));
+  EXPECT_EQ(w, 0);
+}
+
+TEST(Queries, RayCastParallelToFace) {
+  // Ray exactly parallel to a face should miss (denom ≈ 0 in ray-plane).
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  RayHit hit = cube.RayCast(vec3(-5, 0, 1), vec3(5, 0, 1));
+  // Parallel to the top face; tangent rays should miss.
+  // Implementation-defined whether this hits, but must not crash.
+  // If it does hit, position should be on the surface.
+  if (hit.faceID >= 0) {
+    EXPECT_NEAR(hit.position.z, 1.0, 1e-6);
+  }
+}
+
+TEST(Queries, NearestPointEquidistant) {
+  // Point equidistant from two faces -- must pick one consistently.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  // Origin is equidistant from all 6 faces. Must still return a valid result.
+  NearestPointResult r1 = cube.NearestPoint(vec3(0, 0, 0));
+  NearestPointResult r2 = cube.NearestPoint(vec3(0, 0, 0));
+  EXPECT_GE(r1.faceID, 0);
+  EXPECT_EQ(r1.faceID, r2.faceID);  // Deterministic
+  EXPECT_NEAR(r1.distance, 1.0, 1e-10);
+}
+
+TEST(Queries, NearestPointFarAway) {
+  // Point very far from the mesh -- tests the expanding search logic.
+  Manifold cube = Manifold::Cube(vec3(2.0), true);
+  NearestPointResult r = cube.NearestPoint(vec3(1000, 0, 0));
+  EXPECT_GE(r.faceID, 0);
+  EXPECT_NEAR(r.distance, 999.0, 1e-6);
+  EXPECT_NEAR(r.position.x, 1.0, 1e-10);
+}
+
+TEST(Queries, RayCastDiagonalThroughSphere) {
+  // Diagonal ray through a sphere -- tests the axis-permutation logic in
+  // the containment test (the ray doesn't align with any axis).
+  Manifold sphere = Manifold::Sphere(1.0, 128);
+  vec3 dir = la::normalize(vec3(1, 1, 1));
+  RayHit hit = sphere.RayCast(vec3(-5, -5, -5), vec3(0, 0, 0));
+  EXPECT_GE(hit.faceID, 0);
+  // Hit should be near the sphere surface at distance ~1 from origin
+  double hitRadius = la::length(hit.position);
+  EXPECT_NEAR(hitRadius, 1.0, 0.05);
+}
+
+TEST(Queries, WindingNumberTranslatedMesh) {
+  // Translated mesh -- verifies that BVH and kernel use world-space coords.
+  Manifold cube = Manifold::Cube(vec3(2.0), true).Translate(vec3(10, 0, 0));
+  EXPECT_EQ(cube.WindingNumber(vec3(10, 0, 0)), 1);
+  EXPECT_EQ(cube.WindingNumber(vec3(0, 0, 0)), 0);
+}
+
+TEST(Queries, RayCastTranslatedMesh) {
+  Manifold cube = Manifold::Cube(vec3(2.0), true).Translate(vec3(10, 0, 0));
+  RayHit hit = cube.RayCast(vec3(0, 0, 0), vec3(20, 0, 0));
+  EXPECT_GE(hit.faceID, 0);
+  EXPECT_NEAR(hit.position.x, 9.0, 1e-10);
+}
+
+TEST(Queries, NearestPointTranslatedMesh) {
+  Manifold cube = Manifold::Cube(vec3(2.0), true).Translate(vec3(10, 0, 0));
+  NearestPointResult r = cube.NearestPoint(vec3(0, 0, 0));
+  EXPECT_GE(r.faceID, 0);
+  EXPECT_NEAR(r.position.x, 9.0, 1e-10);
+  EXPECT_NEAR(r.distance, 9.0, 1e-10);
+}
+
+TEST(Queries, WindingNumberScaledMesh) {
+  // Very small mesh -- tests floating point precision at small scales.
+  Manifold tiny = Manifold::Cube(vec3(1e-6), true);
+  EXPECT_NE(tiny.WindingNumber(vec3(0, 0, 0)), 0);
+  EXPECT_EQ(tiny.WindingNumber(vec3(1e-3, 0, 0)), 0);
+}
+
+TEST(Queries, NearestPointOnThinSlab) {
+  // A very thin slab (high aspect ratio) -- tests numerical stability.
+  Manifold slab = Manifold::Cube(vec3(10, 10, 0.001), true);
+  NearestPointResult r = slab.NearestPoint(vec3(0, 0, 1));
+  EXPECT_GE(r.faceID, 0);
+  EXPECT_NEAR(r.position.z, 0.0005, 0.001);
+  EXPECT_NEAR(r.distance, 1.0 - 0.0005, 0.001);
+}
+
 }  // namespace
