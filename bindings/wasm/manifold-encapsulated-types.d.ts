@@ -1145,6 +1145,54 @@ export class Manifold {
   minGap(other: Manifold, searchLength: number): number;
 
   /**
+   * Casts a ray segment from origin to endpoint and returns the nearest hit.
+   * The returned distance is the t parameter in [0, 1]. Returns faceID = -1 if
+   * no hit.
+   *
+   * @param origin Start point of the ray segment.
+   * @param endpoint End point of the ray segment.
+   * @returns An object with distance, position, normal, and faceID.
+   *
+   * @group Queries
+   */
+  rayCast(origin: Vec3, endpoint: Vec3):
+      {distance: number; position: Vec3; normal: Vec3; faceID: number;};
+
+  /**
+   * Casts an infinite ray from origin in the given direction. Internally
+   * clips to the bounding box for precision.
+   *
+   * @param origin Ray origin.
+   * @param direction Ray direction (does not need to be normalized).
+   * @returns An object with distance, position, normal, and faceID.
+   *
+   * @group Queries
+   */
+  rayCastInfinite(origin: Vec3, direction: Vec3):
+      {distance: number; position: Vec3; normal: Vec3; faceID: number;};
+
+  /**
+   * Returns the winding number at a point. For closed manifolds, 0 means
+   * outside and nonzero means inside.
+   *
+   * @param point The query point.
+   *
+   * @group Queries
+   */
+  windingNumber(point: Vec3): number;
+
+  /**
+   * Returns the closest point on the mesh surface to the given query point.
+   *
+   * @param point The query point.
+   * @returns An object with position, normal, distance, and faceID.
+   *
+   * @group Queries
+   */
+  nearestPoint(point: Vec3):
+      {position: Vec3; normal: Vec3; distance: number; faceID: number;};
+
+  /**
    * Returns the reason for an input Mesh producing an empty Manifold. This
    * Status will carry on through operations like NaN propogation, ensuring an
    * errored mesh doesn't get mysteriously lost. Empty meshes may still show

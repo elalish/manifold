@@ -25,6 +25,7 @@ set(
   minkowski.cpp
   polygon.cpp
   properties.cpp
+  queries.cpp
   quickhull.cpp
   sdf.cpp
   smoothing.cpp

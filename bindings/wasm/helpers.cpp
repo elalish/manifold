@@ -287,6 +287,74 @@ std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
   return {a, b};
 }
 
+val RayCast(const Manifold& manifold, vec3 origin, vec3 endpoint) {
+  auto hit = manifold.RayCast(origin, endpoint);
+  val out = val::object();
+  out.set("distance", hit.distance);
+  out.set("position", hit.position);
+  out.set("normal", hit.normal);
+  out.set("faceID", hit.faceID);
+  return out;
+}
+
+val RayCastInfinite(const Manifold& manifold, vec3 origin, vec3 direction) {
+  double len = la::length(direction);
+  if (len < 1e-30) {
+    val out = val::object();
+    out.set("distance", -1.0);
+    out.set("position", vec3(NAN));
+    out.set("normal", vec3(NAN));
+    out.set("faceID", -1);
+    return out;
+  }
+  vec3 dir = direction / len;
+  Box bbox = manifold.BoundingBox();
+  vec3 pad = vec3(bbox.Scale() * 1e-6);
+  Box expanded(bbox.min - pad, bbox.max + pad);
+  double tNear = 0.0;
+  double tFar = std::numeric_limits<double>::infinity();
+  bool miss = false;
+  for (int i = 0; i < 3; ++i) {
+    if (std::fabs(dir[i]) < 1e-30) {
+      if (origin[i] < expanded.min[i] || origin[i] > expanded.max[i]) {
+        miss = true;
+        break;
+      }
+    } else {
+      double invD = 1.0 / dir[i];
+      double t1 = (expanded.min[i] - origin[i]) * invD;
+      double t2 = (expanded.max[i] - origin[i]) * invD;
+      if (t1 > t2) std::swap(t1, t2);
+      tNear = std::max(tNear, t1);
+      tFar = std::min(tFar, t2);
+      if (tNear > tFar) {
+        miss = true;
+        break;
+      }
+    }
+  }
+  if (miss) {
+    val out = val::object();
+    out.set("distance", -1.0);
+    out.set("position", vec3(NAN));
+    out.set("normal", vec3(NAN));
+    out.set("faceID", -1);
+    return out;
+  }
+  vec3 endpoint = origin + dir * std::max(tFar, 0.0);
+  return RayCast(manifold, origin, endpoint);
+}
+
+val NearestPoint(const Manifold& manifold, vec3 point) {
+  auto result = manifold.NearestPoint(point);
+  val out = val::object();
+  out.set("position", result.position);
+  out.set("normal", result.normal);
+  out.set("distance", result.distance);
+  out.set("faceID", result.faceID);
+  return out;
+}
+
 void CollectVertices(std::vector<vec3>& verts, const Manifold& manifold) {
   const MeshGL64 mesh = manifold.GetMeshGL64();
   const auto numVert = mesh.NumVert();

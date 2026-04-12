@@ -470,6 +470,35 @@ struct Rect {
 };
 
 /**
+ * @brief Result of a ray cast query against a Manifold.
+ */
+struct RayHit {
+  /// Parameter t along the ray segment: 0 = origin, 1 = endpoint. A value of
+  /// -1 indicates no hit.
+  double distance = -1;
+  /// The point on the mesh surface where the ray hit.
+  vec3 position = vec3(NAN);
+  /// The face normal at the hit point.
+  vec3 normal = vec3(NAN);
+  /// The triangle index that was hit, or -1 if no hit.
+  int faceID = -1;
+};
+
+/**
+ * @brief Result of a nearest point query against a Manifold.
+ */
+struct NearestPointResult {
+  /// The closest point on the mesh surface.
+  vec3 position = vec3(NAN);
+  /// The face normal at the closest point.
+  vec3 normal = vec3(NAN);
+  /// The distance from the query point to the closest point.
+  double distance = std::numeric_limits<double>::infinity();
+  /// The triangle index of the closest point, or -1 if the mesh is empty.
+  int faceID = -1;
+};
+
+/**
  * @brief Boolean operation type: Add (Union), Subtract (Difference), and
  * Intersect.
  */

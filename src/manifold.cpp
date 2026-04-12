@@ -976,4 +976,39 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);
 }
+
+/**
+ * Casts a ray segment from origin to endpoint and returns the nearest
+ * intersection with the mesh surface. The returned distance is the parameter
+ * t in [0, 1] where the hit occurs along the segment. Returns faceID = -1 if
+ * no hit.
+ *
+ * @param origin The start point of the ray segment.
+ * @param endpoint The end point of the ray segment.
+ */
+RayHit Manifold::RayCast(vec3 origin, vec3 endpoint) const {
+  return GetCsgLeafNode().GetImpl()->RayCast(origin, endpoint);
+}
+
+/**
+ * Returns the winding number of a point with respect to the manifold
+ * surface. For a closed manifold, 0 means the point is outside, and nonzero
+ * (typically 1) means it is inside. Uses robust Z-axis ray casting with BVH
+ * acceleration.
+ *
+ * @param point The query point.
+ */
+int Manifold::WindingNumber(vec3 point) const {
+  return GetCsgLeafNode().GetImpl()->WindingNumber(point);
+}
+
+/**
+ * Returns the closest point on the mesh surface to the given query point,
+ * along with the face normal and distance.
+ *
+ * @param point The query point.
+ */
+NearestPointResult Manifold::NearestPoint(vec3 point) const {
+  return GetCsgLeafNode().GetImpl()->NearestPoint(point);
+}
 }  // namespace manifold

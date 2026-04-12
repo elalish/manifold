@@ -29,6 +29,7 @@ set(
   sdf_test.cpp
   smooth_test.cpp
   hull_test.cpp
+  queries_test.cpp
   samples_test.cpp
   boolean_complex_test.cpp
   $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section_test.cpp>
