@@ -902,19 +902,18 @@ function updateOrientationGrid() {
   yAxis.userData.noHit = true;  // using <model-viewer>'s internals
   grid.add(yAxis);
 
-  const labelSize = maxGridDimension * 0.07;
-  const labelOffset = labelSize;
+  const labelHeight = maxGridDimension * 0.07;
   const axisDimensionLabel = formatMetricLength(gridHalfExtent);
 
-  const xLabel = createAxisLabelMesh(`+X\n${axisDimensionLabel}`, labelSize);
+  const xLabel = createAxisLabelMesh(`+X\n${axisDimensionLabel}`, labelHeight);
   if (xLabel) {
-    xLabel.position.set(gridHalfExtent + labelOffset, 0, 0);
+    xLabel.position.set(gridHalfExtent + labelHeight, 0, 0);
     grid.add(xLabel);
   }
 
-  const yLabel = createAxisLabelMesh(`+Y\n${axisDimensionLabel}`, labelSize);
+  const yLabel = createAxisLabelMesh(`+Y\n${axisDimensionLabel}`, labelHeight);
   if (yLabel) {
-    yLabel.position.set(0, 0, -(gridHalfExtent + labelOffset));
+    yLabel.position.set(0, 0, -(gridHalfExtent + labelHeight / 2));
     grid.add(yLabel);
   }
 
