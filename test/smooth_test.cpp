@@ -221,6 +221,7 @@ TEST(Smooth, MissingNormalsCone) {
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 
+#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Fillet) {
   float depth = 3;
   Manifold cylinder =
@@ -235,11 +236,12 @@ TEST(Smooth, Fillet) {
 
   Manifold fillet = chamfered.Simplify(0.01).SmoothByNormals(0).Refine(10);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  // This doesn't give good result yet
+  // This doesn't give good results yet
   // EXPECT_NEAR(fillet.Volume(), 1092, 1);
   // EXPECT_NEAR(fillet.SurfaceArea(), 748, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
+#endif
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
