@@ -395,11 +395,6 @@ class Manifold {
   double SurfaceArea() const;
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
-  ///@}
-
-  /** @name Spatial Queries
-   */
-  ///@{
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
   ///@}
 
