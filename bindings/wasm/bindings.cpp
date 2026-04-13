@@ -104,6 +104,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("halfedge", &Smoothness::halfedge)
       .field("smoothness", &Smoothness::smoothness);
 
+  value_object<RayHit>("rayHit")
+      .field("faceID", &RayHit::faceID)
+      .field("distance", &RayHit::distance)
+      .field("position", &RayHit::position)
+      .field("normal", &RayHit::normal);
+
+  register_vector<RayHit>("Vector_rayHit");
   register_vector<ivec3>("Vector_ivec3");
   register_vector<vec3>("Vector_vec3");
   register_vector<vec2>("Vector_vec2");
@@ -193,6 +200,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("volume", &Manifold::Volume)
       .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
+      .function("_RayCast", &man_js::RayCast)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)

@@ -88,7 +88,7 @@ export declare function isManifoldCAD(): boolean
 export type {
   Mat3, Mat4, Vec2, Vec3,
   Polygons, SimplePolygon, FillRule, JoinType,
-  Box, Rect, Smoothness,
+  Box, Rect, Smoothness, RayHit,
   ErrorStatus
 } from '../manifold';
 

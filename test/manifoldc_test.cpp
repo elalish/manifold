@@ -525,6 +525,34 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
   free(cube);
 }
 
+TEST(CBIND, ray_cast) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
+
+  void* mem = malloc(manifold_ray_hit_vec_size());
+  ManifoldRayHitVec* hits =
+      manifold_ray_cast(mem, cube, 0.0, 0.0, -5.0, 0.0, 0.0, 5.0);
+  ASSERT_EQ(manifold_ray_hit_vec_length(hits), 2);
+  ManifoldRayHit h0 = manifold_ray_hit_vec_get(hits, 0);
+  ManifoldRayHit h1 = manifold_ray_hit_vec_get(hits, 1);
+  EXPECT_FLOAT_EQ(h0.position.z, -0.5);
+  EXPECT_FLOAT_EQ(h0.normal.z, -1.0);
+  EXPECT_FLOAT_EQ(h1.position.z, 0.5);
+  EXPECT_FLOAT_EQ(h1.normal.z, 1.0);
+  manifold_destruct_ray_hit_vec(hits);
+  free(mem);
+
+  void* mem2 = malloc(manifold_ray_hit_vec_size());
+  ManifoldRayHitVec* miss =
+      manifold_ray_cast(mem2, cube, 10.0, 10.0, -5.0, 10.0, 10.0, 5.0);
+  EXPECT_EQ(manifold_ray_hit_vec_length(miss), 0);
+  manifold_destruct_ray_hit_vec(miss);
+  free(mem2);
+
+  manifold_destruct_manifold(cube);
+  free(cube);
+}
+
 TEST(CBIND, tolerance) {
   ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
 

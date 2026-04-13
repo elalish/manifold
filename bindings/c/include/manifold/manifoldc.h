@@ -241,6 +241,14 @@ ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle);
 
+// Ray Casting
+ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
+                                     double origin_x, double origin_y,
+                                     double origin_z, double end_x,
+                                     double end_y, double end_z);
+size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
+ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
+
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void* mem);
 ManifoldCrossSection* manifold_cross_section_copy(void* mem,
@@ -462,6 +470,7 @@ size_t manifold_manifold_size();
 size_t manifold_manifold_vec_size();
 size_t manifold_cross_section_size();
 size_t manifold_cross_section_vec_size();
+size_t manifold_ray_hit_vec_size();
 size_t manifold_simple_polygon_size();
 size_t manifold_polygons_size();
 size_t manifold_manifold_pair_size();
@@ -477,6 +486,7 @@ ManifoldManifold* manifold_alloc_manifold();
 ManifoldManifoldVec* manifold_alloc_manifold_vec();
 ManifoldCrossSection* manifold_alloc_cross_section();
 ManifoldCrossSectionVec* manifold_alloc_cross_section_vec();
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec();
 ManifoldSimplePolygon* manifold_alloc_simple_polygon();
 ManifoldPolygons* manifold_alloc_polygons();
 ManifoldMeshGL* manifold_alloc_meshgl();
@@ -491,6 +501,7 @@ void manifold_destruct_manifold(ManifoldManifold* m);
 void manifold_destruct_manifold_vec(ManifoldManifoldVec* ms);
 void manifold_destruct_cross_section(ManifoldCrossSection* m);
 void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_destruct_ray_hit_vec(ManifoldRayHitVec* v);
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p);
 void manifold_destruct_polygons(ManifoldPolygons* p);
 void manifold_destruct_meshgl(ManifoldMeshGL* m);
@@ -505,6 +516,7 @@ void manifold_delete_manifold(ManifoldManifold* m);
 void manifold_delete_manifold_vec(ManifoldManifoldVec* ms);
 void manifold_delete_cross_section(ManifoldCrossSection* cs);
 void manifold_delete_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_delete_ray_hit_vec(ManifoldRayHitVec* v);
 void manifold_delete_simple_polygon(ManifoldSimplePolygon* p);
 void manifold_delete_polygons(ManifoldPolygons* p);
 void manifold_delete_meshgl(ManifoldMeshGL* m);

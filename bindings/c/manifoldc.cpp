@@ -837,6 +837,24 @@ double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
   return from_c(m)->MinGap(*from_c(other), searchLength);
 }
 
+ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
+                                     double origin_x, double origin_y,
+                                     double origin_z, double end_x,
+                                     double end_y, double end_z) {
+  auto hits = from_c(m)->RayCast(vec3(origin_x, origin_y, origin_z),
+                                 vec3(end_x, end_y, end_z));
+  return to_c(new (mem) RayHitVec(std::move(hits)));
+}
+
+size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v) {
+  return from_c(v)->size();
+}
+
+ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
+  const auto& hit = (*from_c(v))[idx];
+  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
+}
+
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle) {
@@ -883,6 +901,7 @@ size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_cross_section_vec_size() {
   return sizeof(std::vector<CrossSection>);
 }
+size_t manifold_ray_hit_vec_size() { return sizeof(RayHitVec); }
 size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
@@ -907,6 +926,7 @@ ManifoldCrossSection* manifold_alloc_cross_section() {
 ManifoldCrossSectionVec* manifold_alloc_cross_section_vec() {
   return to_c(new std::vector<CrossSection>);
 }
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec() { return to_c(new RayHitVec); }
 ManifoldSimplePolygon* manifold_alloc_simple_polygon() {
   return to_c(new SimplePolygon);
 }
@@ -928,6 +948,7 @@ void manifold_delete_cross_section(ManifoldCrossSection* c) {
 void manifold_delete_cross_section_vec(ManifoldCrossSectionVec* csv) {
   delete from_c(csv);
 }
+void manifold_delete_ray_hit_vec(ManifoldRayHitVec* v) { delete from_c(v); }
 void manifold_delete_simple_polygon(ManifoldSimplePolygon* p) {
   delete from_c(p);
 }
@@ -950,6 +971,9 @@ void manifold_destruct_cross_section(ManifoldCrossSection* cs) {
 }
 void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv) {
   from_c(csv)->~CrossSectionVec();
+}
+void manifold_destruct_ray_hit_vec(ManifoldRayHitVec* v) {
+  from_c(v)->~RayHitVec();
 }
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p) {
   from_c(p)->~SimplePolygon();

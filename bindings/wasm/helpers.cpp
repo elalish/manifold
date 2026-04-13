@@ -291,6 +291,10 @@ std::vector<Manifold> SplitByPlane(Manifold& m, vec3 normal,
   return {a, b};
 }
 
+std::vector<RayHit> RayCast(const Manifold& m, vec3 origin, vec3 endpoint) {
+  return m.RayCast(origin, endpoint);
+}
+
 void CollectVertices(std::vector<vec3>& verts, const Manifold& manifold) {
   const MeshGL64 mesh = manifold.GetMeshGL64();
   const auto numVert = mesh.NumVert();
