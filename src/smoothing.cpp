@@ -836,8 +836,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
                 if (here.normal != vec3(0.)) {  // next missing
                   lastNormal = here.normal;
-                } else if (next.normal != vec3(0.) && startHalfedge < 0) {
-                  startHalfedge = halfedge;  // here missing
+                } else if (next.normal != vec3(0.)) {  // here missing
+                  if (startHalfedge < 0) startHalfedge = halfedge;
+                } else {  // both missing
+                  if (startHalfedge < 0) startHalfedge = -2;
                 }
                 tangent[halfedge] = {lastNormal, kMissingNormal};
               }
@@ -869,7 +871,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               }
             });
 
-        if (startHalfedge >= 0 && lastNormal == vec3(0.)) {
+        if (startHalfedge != -1 && lastNormal == vec3(0.)) {
           // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_[e].startVert];
           ForVert(e, [&](int halfedge) {
