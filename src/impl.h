@@ -337,6 +337,9 @@ struct Manifold::Impl {
   bool IsConvex() const;
   double MinGap(const Impl& other, double searchLength) const;
 
+  // boolean3.cpp
+  std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
+
   // sort.cpp
   void SortGeometry();
   void SortVerts();

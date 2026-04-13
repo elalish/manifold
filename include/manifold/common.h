@@ -155,6 +155,22 @@ struct Smoothness {
 };
 
 /**
+ * @brief Result of a ray cast query against a Manifold.
+ */
+struct RayHit {
+  /// The triangle index that was hit.
+  uint64_t faceID = 0;
+  /// The parametric distance along the ray segment in the closed interval
+  /// [0, 1], where 0 is the origin and 1 is the endpoint. Hits exactly at
+  /// the origin or endpoint are included.
+  double distance = 0;
+  /// The 3D position of the hit point.
+  vec3 position = vec3(0.0);
+  /// The geometric face normal at the hit.
+  vec3 normal = vec3(0.0);
+};
+
+/**
  * @brief Axis-aligned 3D box, primarily for bounding.
  */
 struct Box {

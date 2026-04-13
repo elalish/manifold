@@ -1273,3 +1273,103 @@ TEST(Manifold, OpenscadCrash) {
   EXPECT_EQ(m2.IsEmpty(), false);
 }
 #endif
+
+TEST(Manifold, RayCastHitCube) {
+  // Ray through center along Z — also tests watertight shared edge at (0,0)
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(0, 0, -5), vec3(0, 0, 5));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_LT(hits[0].distance, hits[1].distance);
+  EXPECT_FLOAT_EQ(hits[0].position.z, -0.5);
+  EXPECT_FLOAT_EQ(hits[1].position.z, 0.5);
+  // Bottom face normal should point -Z, top +Z
+  EXPECT_FLOAT_EQ(hits[0].normal.z, -1.0);
+  EXPECT_FLOAT_EQ(hits[1].normal.z, 1.0);
+}
+
+TEST(Manifold, RayCastMiss) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  EXPECT_EQ(cube.RayCast(vec3(10, 10, -5), vec3(10, 10, 5)).size(), 0);
+}
+
+TEST(Manifold, RayCastDiagonal) {
+  // Diagonal ray — not axis-aligned
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(-5, -5, -5), vec3(5, 5, 5));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_FLOAT_EQ(hits[0].position.z, -0.5);
+}
+
+TEST(Manifold, RayCastBehindOrigin) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  EXPECT_EQ(cube.RayCast(vec3(0, 0, 5), vec3(0, 0, 10)).size(), 0);
+}
+
+TEST(Manifold, RayCastSphere) {
+  Manifold sphere = Manifold::Sphere(1.0, 128);
+
+  auto hits = sphere.RayCast(vec3(0, 0, -5), vec3(0, 0, 5));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_NEAR(la::length(hits[0].position), 1.0, 1e-4);
+
+  EXPECT_EQ(sphere.RayCast(vec3(2, 2, -5), vec3(2, 2, 5)).size(), 0);
+}
+
+TEST(Manifold, RayCastTwoCubes) {
+  Manifold c1 = Manifold::Cube(vec3(1), true);
+  Manifold c2 = Manifold::Cube(vec3(1), true).Translate(vec3(0, 0, 5));
+  Manifold both = c1 + c2;
+
+  auto hits = both.RayCast(vec3(0, 0, -5), vec3(0, 0, 10));
+  ASSERT_EQ(hits.size(), 4);
+  EXPECT_FLOAT_EQ(hits[0].position.z, -0.5);
+  EXPECT_FLOAT_EQ(hits[1].position.z, 0.5);
+  EXPECT_FLOAT_EQ(hits[2].position.z, 4.5);
+  EXPECT_FLOAT_EQ(hits[3].position.z, 5.5);
+}
+
+TEST(Manifold, RayCastEmpty) {
+  Manifold empty;
+  EXPECT_EQ(empty.RayCast(vec3(0, 0, -5), vec3(0, 0, 5)).size(), 0);
+}
+
+TEST(Manifold, RayCastAlongX) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(-5, 0, 0), vec3(5, 0, 0));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_FLOAT_EQ(hits[0].position.x, -0.5);
+}
+
+TEST(Manifold, RayCastAlongY) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(0, -5, 0), vec3(0, 5, 0));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_FLOAT_EQ(hits[0].position.y, -0.5);
+}
+
+TEST(Manifold, RayCastZeroLength) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  EXPECT_EQ(cube.RayCast(vec3(0, 0, 0), vec3(0, 0, 0)).size(), 0);
+}
+
+TEST(Manifold, RayCastWatertightVertex) {
+  // Ray exactly through a vertex. Symbolic perturbation should assign
+  // the hit to exactly one triangle per face.
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(0.5, 0.5, -5), vec3(0.5, 0.5, 5));
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_FLOAT_EQ(hits[0].position.z, -0.5);
+}
+
+TEST(Manifold, RayCastSilhouetteEdge) {
+  // Ray at the silhouette edge should return 0 or 2 hits, never 1.
+  Manifold cube = Manifold::Cube(vec3(1), true);
+
+  auto hits = cube.RayCast(vec3(0.5, 0, -5), vec3(0.5, 0, 5));
+  EXPECT_TRUE(hits.size() == 0 || hits.size() == 2);
+}
