@@ -157,7 +157,7 @@ model-viewer {
 
 .splitter {
   flex: 0 0 8px;
-  background: #d0d0d0;
+  background: #d8c5e5;
   touch-action: none;
 }
 
@@ -183,6 +183,10 @@ model-viewer {
   transform: translate3d(-50%, -50%, 0);
 }
 
+.header {
+  background-color: #A288B3;
+}
+
 .header .margin {
   font-size: 16px;
   margin: 8px;
@@ -193,7 +197,6 @@ model-viewer {
   position: absolute;
   z-index: 1;
   width: 100%;
-  max-height: 80vh;
   overflow: auto;
     /* Scrollbar styles for Firefox */
   scrollbar-width: thin;

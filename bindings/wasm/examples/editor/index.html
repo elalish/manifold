@@ -37,7 +37,7 @@
 
 <body>
   <div class="page">
-    <div class="container header" style="background-color: #A288B3;">
+    <div class="container header purple">
       <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD
        &nbsp;&nbsp;<span class="top-edit blue">
           <button type="button" id="undo" class="top-icon undo squish" title="Undo"></button>
@@ -74,7 +74,7 @@
     <!-- Draggable pane dividers-start -->
     <div id="workbench" class="container workbench" style="flex: 2;">
       <div id="editor" class="col pane-left"></div>
-      <div id="split-x" class="splitter splitter-x" aria-hidden="true"></div>
+      <div id="split-x" class="splitter purple splitter-x" aria-hidden="true"></div>
       <div id="rightPane" class="col container pane-right" style="flex-direction: column;">
         <model-viewer id="viewer" camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
           min-field-of-view="1deg" shadow-intensity="1" tone-mapping="neutral" interaction-prompt="none" alt="Editor 3D output">
@@ -86,7 +86,7 @@
             <input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="scrubber">
           </div>
         </model-viewer>
-        <div id="split-y" class="splitter splitter-y" aria-hidden="true"></div>
+        <div id="split-y" class="splitter purple splitter-y" aria-hidden="true"></div>
         <!-- Draggable pane dividers-end -->
         <div id="console"></div>
       </div>

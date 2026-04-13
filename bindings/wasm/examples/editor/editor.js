@@ -922,9 +922,6 @@ function updateOrientationGrid() {
   root.userData[ORIENTATION_GRID_KEY] = grid;
 
   scene.queueRender?.();
-  if (needsRenderSym) {
-    mv[needsRenderSym]?.();
-  }
 }
 
 function syncEdgeToggleButton() {
