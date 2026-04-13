@@ -70,233 +70,15 @@ struct Manifold::Impl {
   Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
-  Impl(const MeshGLP<Precision, I>& meshGL) {
-    const uint32_t numVert = meshGL.NumVert();
-    const uint32_t numTri = meshGL.NumTri();
-
-    if (numVert == 0 && numTri == 0) {
-      MakeEmpty(Error::NoError);
-      return;
-    }
-
-    if (numVert < 4 || numTri < 4) {
-      MakeEmpty(Error::NotManifold);
-      return;
-    }
-
-    if (meshGL.numProp < 3) {
-      MakeEmpty(Error::MissingPositionProperties);
-      return;
-    }
-
-    if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
-      MakeEmpty(Error::MergeVectorsDifferentLengths);
-      return;
-    }
-
-    if (!meshGL.runTransform.empty() &&
-        12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
-      MakeEmpty(Error::TransformWrongLength);
-      return;
-    }
-
-    if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
-        meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
-        meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
-      MakeEmpty(Error::RunIndexWrongLength);
-      return;
-    }
-
-    if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
-      MakeEmpty(Error::FaceIDWrongLength);
-      return;
-    }
-
-    if (!manifold::all_of(meshGL.vertProperties.begin(),
-                          meshGL.vertProperties.end(),
-                          [](Precision x) { return std::isfinite(x); })) {
-      MakeEmpty(Error::NonFiniteVertex);
-      return;
-    }
-
-    if (!manifold::all_of(meshGL.runTransform.begin(),
-                          meshGL.runTransform.end(),
-                          [](Precision x) { return std::isfinite(x); })) {
-      MakeEmpty(Error::InvalidConstruction);
-      return;
-    }
-
-    if (!manifold::all_of(meshGL.halfedgeTangent.begin(),
-                          meshGL.halfedgeTangent.end(),
-                          [](Precision x) { return std::isfinite(x); })) {
-      MakeEmpty(Error::InvalidConstruction);
-      return;
-    }
-
-    std::vector<int> prop2vert;
-    if (!meshGL.mergeFromVert.empty()) {
-      prop2vert.resize(numVert);
-      std::iota(prop2vert.begin(), prop2vert.end(), 0);
-      for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-        const uint32_t from = meshGL.mergeFromVert[i];
-        const uint32_t to = meshGL.mergeToVert[i];
-        if (from >= numVert || to >= numVert) {
-          MakeEmpty(Error::MergeIndexOutOfBounds);
-          return;
-        }
-        prop2vert[from] = to;
-      }
-    }
-
-    const auto numProp = meshGL.numProp - 3;
-    numProp_ = numProp;
-    properties_.resize_nofill(meshGL.NumVert() * numProp);
-    tolerance_ = meshGL.tolerance;
-    // This will have unreferenced duplicate positions that will be removed by
-    // Impl::RemoveUnreferencedVerts().
-    vertPos_.resize_nofill(meshGL.NumVert());
-
-    for (size_t i = 0; i < meshGL.NumVert(); ++i) {
-      for (const int j : {0, 1, 2})
-        vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
-      for (size_t j = 0; j < numProp; ++j)
-        properties_[i * numProp + j] =
-            meshGL.vertProperties[meshGL.numProp * i + 3 + j];
-    }
-
-    halfedgeTangent_.resize_nofill(meshGL.halfedgeTangent.size() / 4);
-    for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
-      for (const int j : {0, 1, 2, 3})
-        halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
-    }
-
-    Vec<TriRef> triRef;
-    triRef.resize_nofill(meshGL.NumTri());
-
-    auto runIndex = meshGL.runIndex;
-    const auto runEnd = meshGL.triVerts.size();
-    if (runIndex.empty()) {
-      runIndex = {0, static_cast<I>(runEnd)};
-    } else if (runIndex.size() == meshGL.runOriginalID.size()) {
-      runIndex.push_back(runEnd);
-    } else if (runIndex.size() == 1) {
-      runIndex.push_back(runEnd);
-    }
-
-    const auto startID =
-        Impl::ReserveIDs(std::max(1_uz, meshGL.runOriginalID.size()));
-    auto runOriginalID = meshGL.runOriginalID;
-    if (runOriginalID.empty()) {
-      runOriginalID.push_back(startID);
-    }
-    for (size_t i = 0; i < runOriginalID.size(); ++i) {
-      const int meshID = startID + i;
-      const int originalID = runOriginalID[i];
-      const bool backside = meshGL.Backside(i);
-      for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
-        TriRef& ref = triRef[tri];
-        ref.meshID = meshID;
-        ref.originalID = originalID;
-        ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
-        ref.coplanarID = tri;
-      }
-
-      if (meshGL.runTransform.empty()) {
-        meshRelation_.meshIDtransform[meshID] = {originalID};
-      } else {
-        const Precision* m = meshGL.runTransform.data() + 12 * i;
-        meshRelation_.meshIDtransform[meshID] = {originalID,
-                                                 {{m[0], m[1], m[2]},
-                                                  {m[3], m[4], m[5]},
-                                                  {m[6], m[7], m[8]},
-                                                  {m[9], m[10], m[11]}},
-                                                 backside};
-      }
-    }
-
-    Vec<ivec3> triProp;
-    triProp.reserve(numTri);
-    Vec<ivec3> triVert;
-    const bool needsPropMap = numProp > 0 && !prop2vert.empty();
-    if (needsPropMap) triVert.reserve(numTri);
-    if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
-    for (size_t i = 0; i < numTri; ++i) {
-      ivec3 triP, triV;
-      for (const size_t j : {0, 1, 2}) {
-        uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
-        if (vert >= numVert) {
-          MakeEmpty(Error::VertexOutOfBounds);
-          return;
-        }
-        triP[j] = vert;
-        triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
-      }
-      if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
-        if (needsPropMap) {
-          triProp.push_back(triP);
-          triVert.push_back(triV);
-        } else {
-          triProp.push_back(triV);
-        }
-        if (triRef.size() > 0) {
-          meshRelation_.triRef.push_back(triRef[i]);
-        }
-      }
-    }
-
-    CreateHalfedges(triProp, triVert);
-    if (!IsManifold()) {
-      MakeEmpty(Error::NotManifold);
-      return;
-    }
-
-    CalculateBBox();
-    SetEpsilon(-1, std::is_same<Precision, float>::value);
-
-    // we need to split pinched verts before calculating vertex normals, because
-    // the algorithm doesn't work with pinched verts
-    CleanupTopology();
-
-    DedupePropVerts();
-    SetNormalsAndCoplanar();
-
-    RemoveDegenerates();
-    RemoveUnreferencedVerts();
-    SortGeometry();
-
-    if (!IsFinite()) {
-      MakeEmpty(Error::NonFiniteVertex);
-      return;
-    }
-
-    // A Manifold created from an input mesh is never an original - the input is
-    // the original.
-    meshRelation_.originalID = -1;
-  }
+  Impl(const MeshGLP<Precision, I>& meshGL);
 
   template <typename F>
-  inline void ForVert(int halfedge, F func) {
-    int current = halfedge;
-    do {
-      current = NextHalfedge(halfedge_[current].pairedHalfedge);
-      func(current);
-    } while (current != halfedge);
-  }
+  inline void ForVert(int halfedge, F func);
 
   template <typename T>
   void ForVert(
       int halfedge, std::function<T(int halfedge)> transform,
-      std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
-    T here = transform(halfedge);
-    int current = halfedge;
-    do {
-      const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
-      T next = transform(nextHalfedge);
-      binaryOp(current, here, next);
-      here = next;
-      current = nextHalfedge;
-    } while (current != halfedge);
-  }
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp);
 
   void SetNormalsAndCoplanar();
   void DedupePropVerts();
@@ -414,6 +196,237 @@ struct Manifold::Impl {
 
 extern std::mutex dump_lock;
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
+
+// ------------------------------------------------------------------------------
+// Template implementations follow:
+
+template <typename F>
+inline void Manifold::Impl::ForVert(int halfedge, F func) {
+  int current = halfedge;
+  do {
+    current = NextHalfedge(halfedge_[current].pairedHalfedge);
+    func(current);
+  } while (current != halfedge);
+}
+
+template <typename T>
+void Manifold::Impl::ForVert(
+    int halfedge, std::function<T(int halfedge)> transform,
+    std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
+  T here = transform(halfedge);
+  int current = halfedge;
+  do {
+    const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
+    T next = transform(nextHalfedge);
+    binaryOp(current, here, next);
+    here = next;
+    current = nextHalfedge;
+  } while (current != halfedge);
+}
+
+template <typename Precision, typename I>
+Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
+  const uint32_t numVert = meshGL.NumVert();
+  const uint32_t numTri = meshGL.NumTri();
+
+  if (numVert == 0 && numTri == 0) {
+    MakeEmpty(Error::NoError);
+    return;
+  }
+
+  if (numVert < 4 || numTri < 4) {
+    MakeEmpty(Error::NotManifold);
+    return;
+  }
+
+  if (meshGL.numProp < 3) {
+    MakeEmpty(Error::MissingPositionProperties);
+    return;
+  }
+
+  if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
+    MakeEmpty(Error::MergeVectorsDifferentLengths);
+    return;
+  }
+
+  if (!meshGL.runTransform.empty() &&
+      12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
+    MakeEmpty(Error::TransformWrongLength);
+    return;
+  }
+
+  if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
+      meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
+      meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
+    MakeEmpty(Error::RunIndexWrongLength);
+    return;
+  }
+
+  if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
+    MakeEmpty(Error::FaceIDWrongLength);
+    return;
+  }
+
+  if (!manifold::all_of(meshGL.vertProperties.begin(),
+                        meshGL.vertProperties.end(),
+                        [](Precision x) { return std::isfinite(x); })) {
+    MakeEmpty(Error::NonFiniteVertex);
+    return;
+  }
+
+  if (!manifold::all_of(meshGL.runTransform.begin(), meshGL.runTransform.end(),
+                        [](Precision x) { return std::isfinite(x); })) {
+    MakeEmpty(Error::InvalidConstruction);
+    return;
+  }
+
+  if (!manifold::all_of(meshGL.halfedgeTangent.begin(),
+                        meshGL.halfedgeTangent.end(),
+                        [](Precision x) { return std::isfinite(x); })) {
+    MakeEmpty(Error::InvalidConstruction);
+    return;
+  }
+
+  std::vector<int> prop2vert;
+  if (!meshGL.mergeFromVert.empty()) {
+    prop2vert.resize(numVert);
+    std::iota(prop2vert.begin(), prop2vert.end(), 0);
+    for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+      const uint32_t from = meshGL.mergeFromVert[i];
+      const uint32_t to = meshGL.mergeToVert[i];
+      if (from >= numVert || to >= numVert) {
+        MakeEmpty(Error::MergeIndexOutOfBounds);
+        return;
+      }
+      prop2vert[from] = to;
+    }
+  }
+
+  const auto numProp = meshGL.numProp - 3;
+  numProp_ = numProp;
+  properties_.resize_nofill(meshGL.NumVert() * numProp);
+  tolerance_ = meshGL.tolerance;
+  // This will have unreferenced duplicate positions that will be removed by
+  // Impl::RemoveUnreferencedVerts().
+  vertPos_.resize_nofill(meshGL.NumVert());
+
+  for (size_t i = 0; i < meshGL.NumVert(); ++i) {
+    for (const int j : {0, 1, 2})
+      vertPos_[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
+    for (size_t j = 0; j < numProp; ++j)
+      properties_[i * numProp + j] =
+          meshGL.vertProperties[meshGL.numProp * i + 3 + j];
+  }
+
+  halfedgeTangent_.resize_nofill(meshGL.halfedgeTangent.size() / 4);
+  for (size_t i = 0; i < halfedgeTangent_.size(); ++i) {
+    for (const int j : {0, 1, 2, 3})
+      halfedgeTangent_[i][j] = meshGL.halfedgeTangent[4 * i + j];
+  }
+
+  Vec<TriRef> triRef;
+  triRef.resize_nofill(meshGL.NumTri());
+
+  auto runIndex = meshGL.runIndex;
+  const auto runEnd = meshGL.triVerts.size();
+  if (runIndex.empty()) {
+    runIndex = {0, static_cast<I>(runEnd)};
+  } else if (runIndex.size() == meshGL.runOriginalID.size()) {
+    runIndex.push_back(runEnd);
+  } else if (runIndex.size() == 1) {
+    runIndex.push_back(runEnd);
+  }
+
+  const auto startID =
+      Impl::ReserveIDs(std::max(1_uz, meshGL.runOriginalID.size()));
+  auto runOriginalID = meshGL.runOriginalID;
+  if (runOriginalID.empty()) {
+    runOriginalID.push_back(startID);
+  }
+  for (size_t i = 0; i < runOriginalID.size(); ++i) {
+    const int meshID = startID + i;
+    const int originalID = runOriginalID[i];
+    const bool backside = meshGL.Backside(i);
+    for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
+      TriRef& ref = triRef[tri];
+      ref.meshID = meshID;
+      ref.originalID = originalID;
+      ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
+      ref.coplanarID = tri;
+    }
+
+    if (meshGL.runTransform.empty()) {
+      meshRelation_.meshIDtransform[meshID] = {originalID};
+    } else {
+      const Precision* m = meshGL.runTransform.data() + 12 * i;
+      meshRelation_.meshIDtransform[meshID] = {originalID,
+                                               {{m[0], m[1], m[2]},
+                                                {m[3], m[4], m[5]},
+                                                {m[6], m[7], m[8]},
+                                                {m[9], m[10], m[11]}},
+                                               backside};
+    }
+  }
+
+  Vec<ivec3> triProp;
+  triProp.reserve(numTri);
+  Vec<ivec3> triVert;
+  const bool needsPropMap = numProp > 0 && !prop2vert.empty();
+  if (needsPropMap) triVert.reserve(numTri);
+  if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
+  for (size_t i = 0; i < numTri; ++i) {
+    ivec3 triP, triV;
+    for (const size_t j : {0, 1, 2}) {
+      uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
+      if (vert >= numVert) {
+        MakeEmpty(Error::VertexOutOfBounds);
+        return;
+      }
+      triP[j] = vert;
+      triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
+    }
+    if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
+      if (needsPropMap) {
+        triProp.push_back(triP);
+        triVert.push_back(triV);
+      } else {
+        triProp.push_back(triV);
+      }
+      if (triRef.size() > 0) {
+        meshRelation_.triRef.push_back(triRef[i]);
+      }
+    }
+  }
+
+  CreateHalfedges(triProp, triVert);
+  if (!IsManifold()) {
+    MakeEmpty(Error::NotManifold);
+    return;
+  }
+
+  CalculateBBox();
+  SetEpsilon(-1, std::is_same<Precision, float>::value);
+
+  // we need to split pinched verts before calculating vertex normals, because
+  // the algorithm doesn't work with pinched verts
+  CleanupTopology();
+
+  DedupePropVerts();
+  SetNormalsAndCoplanar();
+
+  RemoveDegenerates();
+  RemoveUnreferencedVerts();
+  SortGeometry();
+
+  if (!IsFinite()) {
+    MakeEmpty(Error::NonFiniteVertex);
+    return;
+  }
+
+  // A Manifold created from an input mesh is never an original - the input is
+  // the original.
+  meshRelation_.originalID = -1;
+}
 
 template <typename Precision, typename I>
 inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,

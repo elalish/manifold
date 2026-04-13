@@ -234,6 +234,7 @@ void Manifold::Impl::SortGeometry() {
     return;
   }
   collider_ = Collider(faceBox, faceMorton);
+  bBox_ = collider_.GetBoundingBox();
   CompactProps();
 
   DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,

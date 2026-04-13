@@ -225,6 +225,18 @@ struct Box {
   }
 
   /**
+   * Does this box equal the given box exactly?
+   */
+  constexpr bool operator==(const Box& box) const {
+    return la::all(la::equal(box.min, min)) && la::all(la::equal(max, box.max));
+  }
+
+  /**
+   * Does this box not equal the given box exactly?
+   */
+  constexpr bool operator!=(const Box& box) const { return !(*this == box); }
+
+  /**
    * Expand this box to include the given point.
    */
   void Union(const vec3 p) {
