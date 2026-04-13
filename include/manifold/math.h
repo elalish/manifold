@@ -28,7 +28,6 @@
 // Developed at SunPro/SunSoft, a Sun Microsystems, Inc. business.
 // Permission to use, copy, modify, and distribute this software is freely
 // granted, provided that this notice is preserved.
-
 #pragma once
 
 #include <cfloat>
@@ -523,5 +522,6 @@ inline double atan2(double y, double x) {
       return (z - pi_lo) - pi;
   }
 }
+
 }  // namespace math
 }  // namespace manifold
