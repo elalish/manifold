@@ -792,8 +792,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
   // special flags for tangent.w
-  constexpr int kInsideQuad = -1;
-  constexpr int kMissingNormal = -3;
+  constexpr double kInsideQuad = -1;
+  constexpr double kMissingNormal = -3;
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
