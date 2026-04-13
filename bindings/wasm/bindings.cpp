@@ -81,7 +81,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
+      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
+      .value("InvalidTangents", Manifold::Error::InvalidTangents);
 
   enum_<CrossSection::FillRule>("fillrule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd)

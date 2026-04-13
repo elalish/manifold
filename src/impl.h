@@ -386,6 +386,7 @@ struct Manifold::Impl {
   bool IsMarkedInsideQuad(int halfedge) const;
   vec3 GetNormal(int halfedge, int normalIdx) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
+  bool ValidTangents() const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
