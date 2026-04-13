@@ -797,8 +797,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
-      autoPolicy(numVert, 1e4), vertHalfedge.begin(), numVert,
-      [this, &tangent, &fixedHalfedge, normalIdx](int e) {
+      autoPolicy(numVert, 1e4), vertHalfedge.begin(), numVert, [&](int e) {
         struct FlatNormal {
           bool isFlatFace;
           vec3 normal;
