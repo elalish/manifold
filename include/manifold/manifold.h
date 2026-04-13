@@ -16,6 +16,7 @@
 #include <cstdint>  // uint32_t, uint64_t
 #include <functional>
 #include <memory>  // needed for shared_ptr
+#include <mutex>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -531,8 +532,11 @@ class Manifold {
   Manifold(std::shared_ptr<Impl> pImpl_);
   static Manifold Invalid();
   static Manifold PropagateStatus(Error status);
+  mutable std::shared_ptr<std::mutex> pNodeMutex_ =
+      std::make_shared<std::mutex>();
   mutable std::shared_ptr<CsgNode> pNode_;
 
+  std::shared_ptr<CsgNode> LoadPNode() const;
   CsgLeafNode& GetCsgLeafNode() const;
 };
 /** @} */

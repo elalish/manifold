@@ -122,7 +122,10 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pNode_(other.pNode_) {}
+Manifold::Manifold(const Manifold& other) {
+  std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
+  pNode_ = other.pNode_;
+}
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
 
@@ -143,12 +146,19 @@ Manifold Manifold::PropagateStatus(Error status) {
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
+    std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
   }
   return *this;
 }
 
+std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
+  std::lock_guard<std::mutex> lock(*pNodeMutex_);
+  return pNode_;
+}
+
 CsgLeafNode& Manifold::GetCsgLeafNode() const {
+  std::lock_guard<std::mutex> lock(*pNodeMutex_);
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
     pNode_ = pNode_->ToLeafNode();
   }
@@ -426,7 +436,7 @@ size_t Manifold::NumDegenerateTris() const {
  * @param v The vector to add to every vertex.
  */
 Manifold Manifold::Translate(vec3 v) const {
-  return Manifold(pNode_->Translate(v));
+  return Manifold(LoadPNode()->Translate(v));
 }
 
 /**
@@ -435,7 +445,9 @@ Manifold Manifold::Translate(vec3 v) const {
  *
  * @param v The vector to multiply every vertex by per component.
  */
-Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
+Manifold Manifold::Scale(vec3 v) const {
+  return Manifold(LoadPNode()->Scale(v));
+}
 
 /**
  * Applies an Euler angle rotation to the manifold, This operation can be
@@ -458,7 +470,7 @@ Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
  */
 Manifold Manifold::Rotate(double xDegrees, double yDegrees,
                           double zDegrees) const {
-  return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
+  return Manifold(LoadPNode()->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
 /**
@@ -469,7 +481,7 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  * @param m The affine transform matrix to apply to all the vertices.
  */
 Manifold Manifold::Transform(const mat3x4& m) const {
-  return Manifold(pNode_->Transform(m));
+  return Manifold(LoadPNode()->Transform(m));
 }
 
 /**
@@ -486,7 +498,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
-  return Manifold(pNode_->Transform(m));
+  return Manifold(LoadPNode()->Transform(m));
 }
 
 /**
@@ -784,7 +796,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  return Manifold(pNode_->Boolean(second.pNode_, op));
+  return Manifold(LoadPNode()->Boolean(second.LoadPNode(), op));
 }
 
 /**
@@ -799,7 +811,7 @@ Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
     return manifolds[0];
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
-  for (const auto& m : manifolds) children.push_back(m.pNode_);
+  for (const auto& m : manifolds) children.push_back(m.LoadPNode());
   return Manifold(std::make_shared<CsgOpNode>(children, op));
 }
 
