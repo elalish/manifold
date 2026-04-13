@@ -170,6 +170,14 @@ if(MANIFOLD_PYBIND)
     message("Python version too old, stub will not be generated")
   endif()
 
+  if(
+    CMAKE_CXX_FLAGS MATCHES "-fsanitize=address"
+    OR CMAKE_EXE_LINKER_FLAGS MATCHES "-fsanitize=address"
+  )
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("AddressSanitizer detected, Python stub generation disabled")
+  endif()
+
   if(NOT MANIFOLD_USE_BUILTIN_NANOBIND)
     execute_process(
       COMMAND "${Python_EXECUTABLE}" -m nanobind --version

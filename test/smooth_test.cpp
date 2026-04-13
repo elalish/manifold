@@ -90,8 +90,8 @@ TEST(Smooth, ToLength) {
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
-  EXPECT_NEAR(smooth.Volume(), 4604, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1356, 1);
+  EXPECT_NEAR(smooth.Volume(), 4577, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1349, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -99,7 +99,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 1.67, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 0.71, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }
@@ -203,6 +203,46 @@ TEST(Smooth, NormalTransform) {
   EXPECT_FLOAT_EQ(out2.SurfaceArea(), 12);
 }
 
+TEST(Smooth, MissingNormals) {
+  Manifold tetNorm = Manifold::Tetrahedron().CalculateNormals(0);
+  Manifold diff = tetNorm - Manifold::Tetrahedron().Translate(vec3(0.5));
+  Manifold out = diff.SmoothByNormals(0).Refine(10);
+  EXPECT_NEAR(out.Volume(), 2.46, 0.01);
+  EXPECT_NEAR(out.SurfaceArea(), 12.45, 0.01);
+  if (options.exportModels) WriteTestOBJ("missingNormals.obj", out);
+}
+
+TEST(Smooth, MissingNormalsCone) {
+  Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0);
+  Manifold diff = cone - Manifold::Cube(vec3(10), true).Translate({0, 0, 10});
+  Manifold out = diff.SmoothByNormals(0).Refine(20);
+  EXPECT_NEAR(out.Volume(), 1092, 1);
+  EXPECT_NEAR(out.SurfaceArea(), 748, 1);
+  if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
+}
+
+#ifdef MANIFOLD_CROSS_SECTION
+TEST(Smooth, Fillet) {
+  float depth = 3;
+  Manifold cylinder =
+      Manifold::Cylinder(40, 10, 10, 6, true).CalculateNormals(0, 80);
+  Polygons section = CrossSection(cylinder.Slice(0)).Simplify().ToPolygons();
+  Manifold chamfer =
+      Manifold::Extrude(section, depth, 0, 0, {1.2, 1.3}).Mirror({0, 0, 1});
+  Manifold base = Manifold::Cube(vec3(40), true)
+                      .Translate({0, 0, -20 - depth + 0.001})
+                      .CalculateNormals(0);
+  Manifold chamfered = (cylinder + chamfer) - base;
+
+  Manifold fillet = chamfered.Simplify(0.01).SmoothByNormals(0).Refine(10);
+  EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
+  // This doesn't give good results yet
+  // EXPECT_NEAR(fillet.Volume(), 1092, 1);
+  // EXPECT_NEAR(fillet.SurfaceArea(), 748, 1);
+  if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
+}
+#endif
+
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
@@ -229,6 +269,19 @@ TEST(Smooth, Manual) {
         });
     WriteTestOBJ("manual.obj", interp);
   }
+}
+
+TEST(Smooth, InvalidTangents) {
+  Manifold cube = Manifold::Cube().SmoothOut(180);
+  MeshGL withTangents = cube.GetMeshGL();
+  size_t sizeHalfedges = withTangents.halfedgeTangent.size();
+  for (size_t i = (sizeHalfedges / 8) * 4 + 3; i < sizeHalfedges; i += 4) {
+    // mark the second half of the tangents as missing, which is incorrect.
+    withTangents.halfedgeTangent[i] = -1;
+  }
+  Manifold cube2(withTangents);
+  Manifold smooth = cube2.Refine(10);
+  EXPECT_EQ(smooth.Status(), Manifold::Error::InvalidTangents);
 }
 
 TEST(Smooth, Mirrored) {

@@ -176,8 +176,8 @@ TEST(SDF, SineSurface) {
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
   EXPECT_EQ(smoothed.Genus(), 38);
-  EXPECT_NEAR(smoothed.Volume(), 107.4, 0.1);
-  EXPECT_NEAR(smoothed.SurfaceArea(), 394.7, 0.1);
+  EXPECT_NEAR(smoothed.Volume(), 107.7, 0.1);
+  EXPECT_NEAR(smoothed.SurfaceArea(), 395.8, 0.1);
 
   if (options.exportModels) WriteTestOBJ("sinesurface.obj", smoothed);
 }

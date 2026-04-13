@@ -271,6 +271,10 @@ std::string Status(Manifold& manifold) {
       return "FaceIDWrongLength";
     case Manifold::Error::InvalidConstruction:
       return "InvalidConstruction";
+    case Manifold::Error::ResultTooLarge:
+      return "ResultTooLarge";
+    case Manifold::Error::InvalidTangents:
+      return "InvalidTangents";
     default:
       return "UnknownError";
   }

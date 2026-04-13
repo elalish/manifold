@@ -110,6 +110,7 @@ typedef enum ManifoldError {
   MANIFOLD_FACE_ID_WRONG_LENGTH,
   MANIFOLD_INVALID_CONSTRUCTION,
   MANIFOLD_RESULT_TOO_LARGE,
+  MANIFOLD_INVALID_TANGENTS,
 } ManifoldError;
 
 typedef enum ManifoldFillRule {
