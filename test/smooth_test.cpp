@@ -215,9 +215,9 @@ TEST(Smooth, MissingNormals) {
 TEST(Smooth, MissingNormalsCone) {
   Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0);
   Manifold diff = cone - Manifold::Cube(vec3(10), true).Translate({0, 0, 10});
-  Manifold out = diff.SmoothByNormals(0).Refine(2);
-  EXPECT_NEAR(out.Volume(), 2.46, 0.01);
-  EXPECT_NEAR(out.SurfaceArea(), 12.45, 0.01);
+  Manifold out = diff.SmoothByNormals(0).Refine(20);
+  EXPECT_NEAR(out.Volume(), 1092, 1);
+  EXPECT_NEAR(out.SurfaceArea(), 748, 1);
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 

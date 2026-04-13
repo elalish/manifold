@@ -626,10 +626,13 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
 
 /**
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine or RefineToLength is called to
- * interpolate the surface. This version uses the supplied vertex normal
- * properties to define the tangent vectors. Faces of two coplanar triangles
- * will be marked as quads, while faces with three or more will be flat.
+ * geometry will remain unchanged until Refine, RefineToLength, or
+ * RefineToTolerance is called to interpolate the surface. This version uses the
+ * supplied vertex normal properties to define the tangent vectors. Faces of two
+ * coplanar triangles will be marked as quads, while faces with three or more
+ * will be flat. Zero-length normals are considered missing and will defer to
+ * their neighboring normals instead. If all normals are missing, the vertex
+ * pseudonormal will be used.
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
@@ -648,10 +651,10 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 
 /**
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine or RefineToLength is called to
- * interpolate the surface. This version uses the geometry of the triangles and
- * pseudo-normals to define the tangent vectors. Faces of two coplanar triangles
- * will be marked as quads.
+ * geometry will remain unchanged until Refine, RefineToLength, or
+ * RefineToTolerance is called to interpolate the surface. This version uses the
+ * geometry of the triangles and pseudo-normals to define the tangent vectors.
+ * Faces of two coplanar triangles will be marked as quads.
  *
  * @param minSharpAngle degrees, default 60. Any edges with angles greater than
  * this value will remain sharp. The rest will be smoothed to G1 continuity,

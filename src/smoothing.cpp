@@ -791,9 +791,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
+  // special flags for tangent.w
+  constexpr int kInsideQuad = -1;
   constexpr int kMissingNormal = -3;
-  constexpr int kNoMissingNormals = -1;
-  constexpr int kAllMissingNormals = -2;
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
@@ -805,7 +805,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         };
 
         ivec2 faceEdges(-1, -1);
-        int startHalfedge = kNoMissingNormals;
+        int startHalfedge = -1;
         vec3 lastNormal(0.0);
 
         ForVert<FlatNormal>(
@@ -817,6 +817,11 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                   {la::dot(diff, diff) < kPrecision * kPrecision, normal});
             },
             [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
+              // Tangents not known at first are used as temporary storage for
+              // normals and w is set to a negative flag value. This starts with
+              // the flag clear.
+              tangent[halfedge].w = 1;
+
               if (here.isFlatFace != next.isFlatFace) {
                 // Record the two halfedges that border a single flat face.
                 if (faceEdges[0] == -1) {
@@ -828,27 +833,19 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 }
               }
 
-              // std::cout << halfedge << ", here normal: " << here.normal
-              //           << ", next normal: " << next.normal
-              //           << ", last normal: " << lastNormal << std::endl;
               if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
                 if (here.normal != vec3(0.)) {  // next missing
                   lastNormal = here.normal;
-                } else if (next.normal == vec3(0.)) {  // both missing
-                  if (startHalfedge == kNoMissingNormals) {
-                    startHalfedge = kAllMissingNormals;
-                  }
-                } else if (startHalfedge == kNoMissingNormals) {
+                } else if (next.normal != vec3(0.) && startHalfedge < 0) {
                   startHalfedge = halfedge;  // here missing
                 }
                 tangent[halfedge] = {lastNormal, kMissingNormal};
-                return;
               }
 
-              if (IsInsideQuad(halfedge)) {
-                tangent[halfedge] = {0, 0, 0, -1};
-                return;
-              }
+              if (IsInsideQuad(halfedge))
+                tangent[halfedge] = {lastNormal, kInsideQuad};
+
+              if (tangent[halfedge].w < 0) return;
 
               const vec3 diff = next.normal - here.normal;
               const bool differentNormals =
@@ -871,12 +868,13 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
-        // std::cout << e << ", " << startHalfedge << std::endl;
 
-        if (startHalfedge == kAllMissingNormals) {
+        if (startHalfedge >= 0 && lastNormal == vec3(0.)) {
+          // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_[e].startVert];
           ForVert(e, [&](int halfedge) {
-            tangent[halfedge] = TangentFromNormal(normal, halfedge);
+            if (tangent[halfedge].w != kInsideQuad)
+              tangent[halfedge] = TangentFromNormal(normal, halfedge);
           });
           return;
         }
@@ -885,11 +883,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           // Orbit the vertex backwards, pulling the next normal from the
           // tangent where it is stored temporarily.
           int current = startHalfedge;
-          vec3 prevNormal =
-              GetNormal(halfedge_[current].pairedHalfedge, normalIdx);
+          vec3 prevNormal = GetNormal(
+              NextHalfedge(halfedge_[current].pairedHalfedge), normalIdx);
           do {
-            // std::cout << current << ", " << tangent[current] << ", "
-            //           << prevNormal << std::endl;
             DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
                          "missing prevNormal");
             if (tangent[current].w == kMissingNormal) {
@@ -898,8 +894,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 nextNormal = lastNormal;
               }
 
-              if (IsInsideQuad(current)) {
-                tangent[current] = {0, 0, 0, -1};
+              if (prevNormal == nextNormal) {
+                tangent[current] = TangentFromNormal(prevNormal, current);
               } else {
                 const vec3 dir = la::cross(prevNormal, nextNormal);
                 const vec3 edgeVec = vertPos_[halfedge_[current].endVert] -
@@ -907,8 +903,6 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 tangent[current] = CircularTangent(
                     (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
               }
-              // std::cout << prevNormal << ", " << nextNormal << ", "
-              //           << tangent[current] << std::endl;
             }
             vec3 currentNormal = GetNormal(current, normalIdx);
             if (currentNormal != vec3(0.)) {
