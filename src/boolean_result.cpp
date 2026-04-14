@@ -14,16 +14,10 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
 #include <map>
-#include <sstream>
 
 #include "boolean3.h"
+#include "boolean_dump.h"
 #include "parallel.h"
 #include "utils.h"
 
@@ -53,39 +47,7 @@ namespace {
 
 constexpr int kParallelThreshold = 128;
 
-bool BooleanDumpEnabled() {
-  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP");
-  if (v == nullptr) return false;
-  return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
-         std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
-         std::strcmp(v, "ON") == 0;
-}
-
-std::filesystem::path BooleanDumpDir() {
-  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR");
-  if (v == nullptr || *v == '\0') return ".";
-  return v;
-}
-
-const char* OpName(const OpType op) {
-  switch (op) {
-    case OpType::Add:
-      return "add";
-    case OpType::Subtract:
-      return "subtract";
-    case OpType::Intersect:
-      return "intersect";
-  }
-  return "unknown";
-}
-
 std::atomic<uint64_t> gBooleanResultDumpCounter{0};
-
-void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
-  std::ofstream out(path);
-  if (!out.good()) return;
-  for (const int value : data) out << value << "\n";
-}
 
 void DumpBooleanResultState(const char* stage, const OpType op,
                             const Manifold::Impl& inP,
@@ -93,34 +55,23 @@ void DumpBooleanResultState(const char* stage, const OpType op,
                             const Manifold::Impl* outR, const Vec<int>& i03,
                             const Vec<int>& i30, const Vec<int>& i12,
                             const Vec<int>& i21) {
-  if (!BooleanDumpEnabled()) return;
+  if (!debug::BooleanDumpEnabled()) return;
 
-  const auto id = gBooleanResultDumpCounter.fetch_add(1);
-  std::ostringstream prefix;
-  prefix << "boolean_result_" << std::setw(6) << std::setfill('0') << id << "_"
-         << stage << "_" << OpName(op);
+  const std::string prefix = debug::DumpPrefix("boolean_result", stage, op,
+                                               gBooleanResultDumpCounter);
+  const auto dir = debug::BooleanDumpDir();
+  debug::EnsureDumpDir(dir);
 
-  std::error_code ec;
-  const auto dir = BooleanDumpDir();
-  std::filesystem::create_directories(dir, ec);
-
-  {
-    std::ofstream out(dir / (prefix.str() + "_inP.obj"));
-    if (out.good()) out << inP;
-  }
-  {
-    std::ofstream out(dir / (prefix.str() + "_inQ.obj"));
-    if (out.good()) out << inQ;
-  }
+  debug::DumpImplObj(dir / (prefix + "_inP.obj"), inP);
+  debug::DumpImplObj(dir / (prefix + "_inQ.obj"), inQ);
   if (outR != nullptr) {
-    std::ofstream out(dir / (prefix.str() + "_outR.obj"));
-    if (out.good()) out << *outR;
+    debug::DumpImplObj(dir / (prefix + "_outR.obj"), *outR);
   }
   {
-    std::ofstream out(dir / (prefix.str() + "_meta.txt"));
+    std::ofstream out(dir / (prefix + "_meta.txt"));
     if (out.good()) {
       out << "stage=" << stage << "\n";
-      out << "op=" << OpName(op) << "\n";
+      out << "op=" << debug::OpName(op) << "\n";
       out << "i03_size=" << i03.size() << "\n";
       out << "i30_size=" << i30.size() << "\n";
       out << "i12_size=" << i12.size() << "\n";
@@ -131,10 +82,10 @@ void DumpBooleanResultState(const char* stage, const OpType op,
       }
     }
   }
-  DumpIntVector(dir / (prefix.str() + "_i03.txt"), i03);
-  DumpIntVector(dir / (prefix.str() + "_i30.txt"), i30);
-  DumpIntVector(dir / (prefix.str() + "_i12.txt"), i12);
-  DumpIntVector(dir / (prefix.str() + "_i21.txt"), i21);
+  debug::DumpIntVector(dir / (prefix + "_i03.txt"), i03);
+  debug::DumpIntVector(dir / (prefix + "_i30.txt"), i30);
+  debug::DumpIntVector(dir / (prefix + "_i12.txt"), i12);
+  debug::DumpIntVector(dir / (prefix + "_i21.txt"), i21);
 }
 
 struct AbsSum {
@@ -837,7 +788,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return outR;
   }
 
-  const bool doDump = BooleanDumpEnabled();
+  const bool doDump = debug::BooleanDumpEnabled();
   Vec<int> dumpI03, dumpI30, dumpI12, dumpI21;
   if (doDump) {
     dumpI03 = i03;

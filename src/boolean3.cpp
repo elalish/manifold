@@ -15,16 +15,10 @@
 #include "boolean3.h"
 
 #include <atomic>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
 #include <limits>
-#include <sstream>
 #include <unordered_set>
 
+#include "boolean_dump.h"
 #include "disjoint_sets.h"
 #include "parallel.h"
 
@@ -36,91 +30,27 @@ using namespace manifold;
 
 namespace {
 
-bool BooleanDumpEnabled() {
-  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP");
-  if (v == nullptr) return false;
-  return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
-         std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
-         std::strcmp(v, "ON") == 0;
-}
-
-std::filesystem::path BooleanDumpDir() {
-  const char* v = std::getenv("MANIFOLD_BOOLEAN_DEBUG_DUMP_DIR");
-  if (v == nullptr || *v == '\0') return ".";
-  return v;
-}
-
-const char* OpName(const OpType op) {
-  switch (op) {
-    case OpType::Add:
-      return "add";
-    case OpType::Subtract:
-      return "subtract";
-    case OpType::Intersect:
-      return "intersect";
-  }
-  return "unknown";
-}
-
 std::atomic<uint64_t> gBoolean3DumpCounter{0};
-
-const char* HexValue(double value) {
-  static thread_local char buf[128];
-  std::snprintf(buf, sizeof(buf), "%.13a", value);
-  return buf;
-}
-
-void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
-  std::ofstream out(path);
-  if (!out.good()) return;
-  for (const int value : data) out << value << "\n";
-}
-
-void DumpPairVector(const std::filesystem::path& path,
-                    const Vec<std::array<int, 2>>& data) {
-  std::ofstream out(path);
-  if (!out.good()) return;
-  for (const auto& value : data) out << value[0] << " " << value[1] << "\n";
-}
-
-void DumpVec3Vector(const std::filesystem::path& path, const Vec<vec3>& data) {
-  std::ofstream out(path);
-  if (!out.good()) return;
-  for (const auto& value : data) {
-    out << HexValue(value.x) << " " << HexValue(value.y) << " "
-        << HexValue(value.z) << "\n";
-  }
-}
 
 void DumpBoolean3State(const char* stage, const OpType op,
                        const Manifold::Impl& inP, const Manifold::Impl& inQ,
                        const Intersections& xv12, const Intersections& xv21,
                        const Vec<int>& w03, const Vec<int>& w30,
                        const bool valid) {
-  if (!BooleanDumpEnabled()) return;
+  if (!debug::BooleanDumpEnabled()) return;
 
-  const auto id = gBoolean3DumpCounter.fetch_add(1);
-  std::ostringstream prefix;
-  prefix << "boolean3_" << std::setw(6) << std::setfill('0') << id << "_"
-         << stage << "_" << OpName(op);
+  const std::string prefix =
+      debug::DumpPrefix("boolean3", stage, op, gBoolean3DumpCounter);
+  const auto dir = debug::BooleanDumpDir();
+  debug::EnsureDumpDir(dir);
 
-  std::error_code ec;
-  const auto dir = BooleanDumpDir();
-  std::filesystem::create_directories(dir, ec);
-
+  debug::DumpImplObj(dir / (prefix + "_inP.obj"), inP);
+  debug::DumpImplObj(dir / (prefix + "_inQ.obj"), inQ);
   {
-    std::ofstream out(dir / (prefix.str() + "_inP.obj"));
-    if (out.good()) out << inP;
-  }
-  {
-    std::ofstream out(dir / (prefix.str() + "_inQ.obj"));
-    if (out.good()) out << inQ;
-  }
-  {
-    std::ofstream out(dir / (prefix.str() + "_meta.txt"));
+    std::ofstream out(dir / (prefix + "_meta.txt"));
     if (out.good()) {
       out << "stage=" << stage << "\n";
-      out << "op=" << OpName(op) << "\n";
+      out << "op=" << debug::OpName(op) << "\n";
       out << "valid=" << (valid ? 1 : 0) << "\n";
       out << "xv12_size=" << xv12.x12.size() << "\n";
       out << "xv21_size=" << xv21.x12.size() << "\n";
@@ -128,14 +58,14 @@ void DumpBoolean3State(const char* stage, const OpType op,
       out << "w30_size=" << w30.size() << "\n";
     }
   }
-  DumpIntVector(dir / (prefix.str() + "_xv12_x12.txt"), xv12.x12);
-  DumpIntVector(dir / (prefix.str() + "_xv21_x12.txt"), xv21.x12);
-  DumpPairVector(dir / (prefix.str() + "_xv12_p1q2.txt"), xv12.p1q2);
-  DumpPairVector(dir / (prefix.str() + "_xv21_p1q2.txt"), xv21.p1q2);
-  DumpVec3Vector(dir / (prefix.str() + "_xv12_v12.txt"), xv12.v12);
-  DumpVec3Vector(dir / (prefix.str() + "_xv21_v12.txt"), xv21.v12);
-  DumpIntVector(dir / (prefix.str() + "_w03.txt"), w03);
-  DumpIntVector(dir / (prefix.str() + "_w30.txt"), w30);
+  debug::DumpIntVector(dir / (prefix + "_xv12_x12.txt"), xv12.x12);
+  debug::DumpIntVector(dir / (prefix + "_xv21_x12.txt"), xv21.x12);
+  debug::DumpPairVector(dir / (prefix + "_xv12_p1q2.txt"), xv12.p1q2);
+  debug::DumpPairVector(dir / (prefix + "_xv21_p1q2.txt"), xv21.p1q2);
+  debug::DumpVec3HexVector(dir / (prefix + "_xv12_v12.txt"), xv12.v12);
+  debug::DumpVec3HexVector(dir / (prefix + "_xv21_v12.txt"), xv21.v12);
+  debug::DumpIntVector(dir / (prefix + "_w03.txt"), w03);
+  debug::DumpIntVector(dir / (prefix + "_w30.txt"), w30);
 }
 
 // These two functions (Interpolate and Intersect) are the only places where
