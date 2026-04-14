@@ -57,8 +57,8 @@ void DumpBooleanResultState(const char* stage, const OpType op,
                             const Vec<int>& i21) {
   if (!debug::BooleanDumpEnabled()) return;
 
-  const std::string prefix = debug::DumpPrefix("boolean_result", stage, op,
-                                               gBooleanResultDumpCounter);
+  const std::string prefix =
+      debug::DumpPrefix("boolean_result", stage, op, gBooleanResultDumpCounter);
   const auto dir = debug::BooleanDumpDir();
   debug::EnsureDumpDir(dir);
 

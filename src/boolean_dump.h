@@ -65,8 +65,8 @@ inline const char* OpName(const OpType op) {
   return "unknown";
 }
 
-inline std::string DumpPrefix(const char* kind, const char* stage, const OpType op,
-                              std::atomic<uint64_t>& counter) {
+inline std::string DumpPrefix(const char* kind, const char* stage,
+                              const OpType op, std::atomic<uint64_t>& counter) {
   const uint64_t id = counter.fetch_add(1, std::memory_order_relaxed);
   std::ostringstream prefix;
   prefix << kind << "_" << std::setw(6) << std::setfill('0') << id << "_"
@@ -85,15 +85,17 @@ inline void DumpVector(const std::filesystem::path& path, const Vec<T>& data,
   }
 }
 
-inline void DumpIntVector(const std::filesystem::path& path, const Vec<int>& data) {
+inline void DumpIntVector(const std::filesystem::path& path,
+                          const Vec<int>& data) {
   DumpVector(path, data, [](std::ofstream& out, int value) { out << value; });
 }
 
 inline void DumpPairVector(const std::filesystem::path& path,
                            const Vec<std::array<int, 2>>& data) {
-  DumpVector(path, data, [](std::ofstream& out, const std::array<int, 2>& value) {
-    out << value[0] << " " << value[1];
-  });
+  DumpVector(path, data,
+             [](std::ofstream& out, const std::array<int, 2>& value) {
+               out << value[0] << " " << value[1];
+             });
 }
 
 inline void DumpVec3HexVector(const std::filesystem::path& path,
