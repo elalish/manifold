@@ -510,6 +510,7 @@ TEST(Boolean, AlmostCoplanar) {
   Manifold result =
       tet + tet.Rotate(0.001, -0.08472872823860228, 0.055910459615905288) + tet;
   ExpectMeshes(result, {{20, 36}});
+  if (options.exportModels) WriteTestOBJ("det_nearly_coplanar.obj", result);
 }
 
 TEST(Boolean, FaceUnion) {
