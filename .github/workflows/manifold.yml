@@ -91,9 +91,9 @@ jobs:
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
         cd build/bin/Release
-        ./manifold_test.exe -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        ./manifold_test.exe -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting
         mkdir -p ../../../meshes-windows
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj ../../../meshes-windows/
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj ../../../meshes-windows/
     - name: Upload determinism meshes (Windows)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
       uses: actions/upload-artifact@v4
@@ -192,9 +192,9 @@ jobs:
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
-        ./build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        ./build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting
         mkdir -p meshes-linux
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj meshes-linux/
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj meshes-linux/
     - name: Upload determinism meshes (Linux)
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       uses: actions/upload-artifact@v4
@@ -508,9 +508,9 @@ jobs:
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
-        build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar
+        build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting
         mkdir -p meshes-mac
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj meshes-mac/
+        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj meshes-mac/
     - name: Upload determinism meshes (macOS)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
@@ -630,7 +630,7 @@ jobs:
         set -euo pipefail
         failed=0
         normalized_dir="$(mktemp -d)"
-        for f in det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj; do
+        for f in det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj; do
           echo "--- $f ---"
           file_missing=0
           for os in linux mac windows; do

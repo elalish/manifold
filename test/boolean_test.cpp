@@ -753,9 +753,11 @@ TEST(Boolean, NonIntersecting) {
   Manifold cube2 = cube1.Scale(vec3(2)).Translate({3, 0, 0});
   double vol2 = cube2.Volume();
 
-  EXPECT_EQ((cube1 + cube2).Volume(), vol1 + vol2);
+  Manifold unionOut = cube1 + cube2;
+  EXPECT_EQ(unionOut.Volume(), vol1 + vol2);
   EXPECT_EQ((cube1 - cube2).Volume(), vol1);
   EXPECT_TRUE((cube1 ^ cube2).IsEmpty());
+  if (options.exportModels) WriteTestOBJ("det_non_overlap.obj", unionOut);
 }
 
 TEST(Boolean, Precision) {
