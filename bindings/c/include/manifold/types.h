@@ -22,6 +22,7 @@ typedef struct ManifoldManifold ManifoldManifold;
 typedef struct ManifoldManifoldVec ManifoldManifoldVec;
 typedef struct ManifoldCrossSection ManifoldCrossSection;
 typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
+typedef struct ManifoldRayHitVec ManifoldRayHitVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
@@ -87,6 +88,13 @@ typedef struct ManifoldMeshGL64Options {
   size_t merge_verts_length;
   double* halfedge_tangents;
 } ManifoldMeshGL64Options;
+
+typedef struct ManifoldRayHit {
+  uint64_t face_id;
+  double distance;
+  ManifoldVec3 position;
+  ManifoldVec3 normal;
+} ManifoldRayHit;
 
 // enums
 

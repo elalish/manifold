@@ -37,6 +37,10 @@ ManifoldCrossSectionVec* to_c(CrossSectionVec* csv) {
   return reinterpret_cast<ManifoldCrossSectionVec*>(csv);
 }
 
+ManifoldRayHitVec* to_c(RayHitVec* v) {
+  return reinterpret_cast<ManifoldRayHitVec*>(v);
+}
+
 ManifoldSimplePolygon* to_c(manifold::SimplePolygon* m) {
   return reinterpret_cast<ManifoldSimplePolygon*>(m);
 }
@@ -148,6 +152,10 @@ manifold::CrossSection* from_c(ManifoldCrossSection* cs) {
 
 CrossSectionVec* from_c(ManifoldCrossSectionVec* csv) {
   return reinterpret_cast<CrossSectionVec*>(csv);
+}
+
+RayHitVec* from_c(ManifoldRayHitVec* v) {
+  return reinterpret_cast<RayHitVec*>(v);
 }
 
 manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m) {

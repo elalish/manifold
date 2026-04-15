@@ -320,6 +320,9 @@ NB_MODULE(manifold3d, m) {
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
            "Returns a double between 0 and searchLength.")
+      .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
+           nb::arg("endpoint"),
+           "Cast a ray segment, returning all hits sorted by distance.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
@@ -705,6 +708,12 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL64::runOriginalID)
       .def_ro("face_id", &MeshGL64::faceID)
       .def("merge", &MeshGL64::Merge, mesh_gl__merge);
+
+  nb::class_<RayHit>(m, "RayHit")
+      .def_ro("face_id", &RayHit::faceID)
+      .def_ro("distance", &RayHit::distance)
+      .def_ro("position", &RayHit::position)
+      .def_ro("normal", &RayHit::normal);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)

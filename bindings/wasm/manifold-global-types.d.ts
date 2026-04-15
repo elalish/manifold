@@ -102,6 +102,13 @@ export type Smoothness = {
   smoothness: number
 };
 
+export type RayHit = {
+  faceID: number,
+  distance: number,
+  position: Vec3,
+  normal: Vec3
+};
+
 export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
 
 export type JoinType = 'Square'|'Round'|'Miter';

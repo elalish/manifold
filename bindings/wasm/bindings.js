@@ -325,6 +325,20 @@ Module.setup = function() {
     return result;
   };
 
+  Module.Manifold.prototype.rayCast = function(origin, endpoint) {
+    const vec = this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
+    const result =
+        fromVec(vec, hit => ({
+                       faceID: hit.faceID,
+                       distance: hit.distance,
+                       position: ['x', 'y', 'z'].map(f => hit.position[f]),
+                       normal: ['x', 'y', 'z'].map(f => hit.normal[f]),
+                     }));
+    vec.delete();
+    return result;
+  };
+
+
   Module.Manifold.prototype.split = function(manifold) {
     const vec = this._Split(manifold);
     const result = fromVec(vec);

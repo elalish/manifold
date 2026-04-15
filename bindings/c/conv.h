@@ -24,6 +24,7 @@
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
 using CrossSectionVec = std::vector<CrossSection>;
+using RayHitVec = std::vector<RayHit>;
 
 ManifoldManifold* to_c(manifold::Manifold* m);
 ManifoldManifoldVec* to_c(ManifoldVec* ms);
@@ -40,6 +41,7 @@ ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
 ManifoldTriangulation* to_c(std::vector<ivec3>* m);
+ManifoldRayHitVec* to_c(RayHitVec* v);
 
 manifold::Manifold* from_c(ManifoldManifold* m);
 ManifoldVec* from_c(ManifoldManifoldVec* ms);
@@ -59,6 +61,7 @@ vec3 from_c(ManifoldVec3 v);
 ivec3 from_c(ManifoldIVec3 v);
 vec4 from_c(ManifoldVec4 v);
 std::vector<ivec3>* from_c(ManifoldTriangulation* m);
+RayHitVec* from_c(ManifoldRayHitVec* v);
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length);
 std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length);

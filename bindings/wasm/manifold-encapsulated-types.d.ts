@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -1143,6 +1143,17 @@ export class Manifold {
    * @group Measurement
    */
   minGap(other: Manifold, searchLength: number): number;
+
+  /**
+   * Cast a ray segment, returning all hits sorted by distance.
+   *
+   * @param origin The start point of the ray segment.
+   * @param endpoint The end point of the ray segment.
+   * @returns Array of RayHit sorted by distance, empty on miss.
+   *
+   * @group Spatial Queries
+   */
+  rayCast(origin: Vec3, endpoint: Vec3): RayHit[];
 
   /**
    * Returns the reason for an input Mesh producing an empty Manifold. This

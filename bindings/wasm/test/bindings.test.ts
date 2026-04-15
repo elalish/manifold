@@ -39,6 +39,20 @@ suite('Manifold Bindings', () => {
     expect(manifold.volume()).toBeGreaterThan(0);
   });
 
+  test('rayCast returns hits through cube', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].position[2]).toEqual(-0.5);
+    expect(hits[1].position[2]).toEqual(0.5);
+  });
+
+  test('rayCast returns empty on miss', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const hits = cube.rayCast([10, 10, -5], [10, 10, 5]);
+    expect(hits).toHaveLength(0);
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat
