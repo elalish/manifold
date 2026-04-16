@@ -21,6 +21,7 @@ html {
 body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
   font-family: 'Rubik', sans-serif;
   font-size: 24px;
   line-height: 24px;
@@ -197,6 +198,7 @@ model-viewer {
   position: absolute;
   z-index: 1;
   width: 100%;
+  max-height: 85dvh;
   overflow: auto;
     /* Scrollbar styles for Firefox */
   scrollbar-width: thin;
