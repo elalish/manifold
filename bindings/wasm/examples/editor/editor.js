@@ -87,6 +87,7 @@ let monacoContributionsPromise = undefined;
 let monacoContributionsReady = false;
 let autoTypings = undefined;
 let autoTypingsPromise = undefined;
+let esbuildWasmPreloadPromise = undefined;
 let updateTypeIndicator = () => {};
 
 async function loadMonacoModules() {
@@ -168,6 +169,25 @@ function ensureMonacoNavigationLoaded() {
             });
   }
   return monacoNavigationPromise;
+}
+
+function ensureEsbuildWasmPreloaded() {
+  if (!esbuildWasmPreloadPromise) {
+    esbuildWasmPreloadPromise =
+        fetch(esbuildWasmUrl, {cache: 'force-cache'})
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(
+                    `Failed to preload esbuild.wasm (${response.status})`);
+              }
+              return response.arrayBuffer();
+            })
+            .catch(error => {
+              esbuildWasmPreloadPromise = undefined;
+              throw error;
+            });
+  }
+  return esbuildWasmPreloadPromise;
 }
 
 // Pane resizing - draggable pane dividers ---------------------
@@ -666,6 +686,9 @@ async function createEditor() {
     if (enhancementsStarted) return;
     enhancementsStarted = true;
     // Start downloads in background; don't block editor interactivity.
+    ensureEsbuildWasmPreloaded().catch(error => {
+      console.warn('Failed to preload esbuild.wasm:', error);
+    });
     ensureMonacoContributionsLoaded().catch(error => {
       console.error('Failed to load Monaco contributions:', error);
     });
