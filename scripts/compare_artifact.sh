@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="${1:-meshes}"
 FILES="${DETERMINISM_COMPARE_FILES:-}"
-NON_BLOCKING="${DETERMINISM_COMPARE_NON_BLOCKING:-0}"
-LABEL="${DETERMINISM_COMPARE_LABEL:-Cross-platform determinism}"
 DIFF_LINES="${DETERMINISM_COMPARE_DIFF_LINES:-200}"
 NORMALIZE_SCRIPT="${DETERMINISM_NORMALIZE_SCRIPT:-./scripts/normalize_objs.sh}"
 
@@ -16,10 +14,6 @@ fi
 for os in linux mac windows; do
   if [ ! -d "$ROOT_DIR/$os" ]; then
     echo "Missing directory: $ROOT_DIR/$os"
-    if [ "$NON_BLOCKING" = "1" ]; then
-      echo "::warning::$LABEL: missing artifacts under $ROOT_DIR."
-      exit 0
-    fi
     exit 1
   fi
 done
@@ -28,7 +22,6 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 failed=0
-mismatches=""
 
 for f in $FILES; do
   echo "--- $f ---"
@@ -41,7 +34,6 @@ for f in $FILES; do
     fi
   done
   if [ "$file_missing" -ne 0 ]; then
-    mismatches="$mismatches $f(missing)"
     continue
   fi
 
@@ -63,29 +55,17 @@ for f in $FILES; do
     echo "linux vs windows diff:"
     diff "$tmpdir/linux-$f" "$tmpdir/windows-$f" | sed -n "1,${DIFF_LINES}p" || true
     failed=1
-    mismatches="$mismatches $f"
   fi
 done
 
 if [ "$failed" -ne 0 ]; then
-  if [ "$NON_BLOCKING" = "1" ]; then
-    echo "::warning::$LABEL found cross-platform mismatches:$mismatches"
-    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-      {
-        echo "### $LABEL"
-        echo ""
-        echo "Mismatches:$mismatches"
-      } >> "$GITHUB_STEP_SUMMARY"
-    fi
-    exit 0
-  fi
-  echo "::error::$LABEL failed."
+  echo "::error::Cross-platform determinism check failed."
   exit 1
 fi
 
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
-    echo "### $LABEL"
+    echo "### Cross-platform determinism check"
     echo ""
     echo "No cross-platform mismatches detected."
   } >> "$GITHUB_STEP_SUMMARY"
