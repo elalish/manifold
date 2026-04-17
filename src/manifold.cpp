@@ -493,6 +493,9 @@ Manifold Manifold::Transform(const mat3x4& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
     return Manifold();
   }
@@ -893,6 +896,11 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     vec3 normal, double originOffset) const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError) {
+    Manifold err = PropagateStatus(leafImpl->status_);
+    return {err, err};
+  }
   if (IsEmpty()) return {Manifold(), Manifold()};
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
@@ -921,7 +929,9 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
+  if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
+  if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
   return aImpl->Minkowski(*bImpl, false);
 }
 
@@ -936,7 +946,9 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
+  if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
+  if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
   return aImpl->Minkowski(*bImpl, true);
 }
 

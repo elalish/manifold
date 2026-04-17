@@ -283,6 +283,44 @@ TEST(Manifold, ErrorPropagationWarp) {
             Manifold::Error::NonFiniteVertex);
 }
 
+TEST(Manifold, ErrorPropagationMinkowski) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  Manifold good = Manifold::Cube();
+  EXPECT_EQ(errored.MinkowskiSum(good).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(good.MinkowskiSum(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.MinkowskiDifference(good).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(good.MinkowskiDifference(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSplitByPlane) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  auto parts = errored.SplitByPlane(vec3(0, 0, 1), 0);
+  EXPECT_EQ(parts.first.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(parts.second.Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationMirror) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Mirror(vec3(1, 0, 0)).Status(),
+            Manifold::Error::NonFiniteVertex);
+  // Degenerate normal (zero vector) on errored input should still propagate.
+  EXPECT_EQ(errored.Mirror(vec3(0, 0, 0)).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
 TEST(Manifold, ErrorPropagationSimplify) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
