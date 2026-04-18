@@ -17,7 +17,6 @@
 #include <map>
 
 #include "boolean3.h"
-#include "boolean_dump.h"
 #include "parallel.h"
 #include "utils.h"
 
@@ -46,47 +45,6 @@ struct std::hash<std::pair<int, int>> {
 namespace {
 
 constexpr int kParallelThreshold = 128;
-
-std::atomic<uint64_t> gBooleanResultDumpCounter{0};
-
-void DumpBooleanResultState(const char* stage, const OpType op,
-                            const Manifold::Impl& inP,
-                            const Manifold::Impl& inQ,
-                            const Manifold::Impl* outR, const Vec<int>& i03,
-                            const Vec<int>& i30, const Vec<int>& i12,
-                            const Vec<int>& i21) {
-  if (!debug::BooleanDumpEnabled()) return;
-
-  const std::string prefix =
-      debug::DumpPrefix("boolean_result", stage, op, gBooleanResultDumpCounter);
-  const auto dir = debug::BooleanDumpDir();
-  debug::EnsureDumpDir(dir);
-
-  debug::DumpImplObj(dir / (prefix + "_inP.obj"), inP);
-  debug::DumpImplObj(dir / (prefix + "_inQ.obj"), inQ);
-  if (outR != nullptr) {
-    debug::DumpImplObj(dir / (prefix + "_outR.obj"), *outR);
-  }
-  {
-    std::ofstream out(dir / (prefix + "_meta.txt"));
-    if (out.good()) {
-      out << "stage=" << stage << "\n";
-      out << "op=" << debug::OpName(op) << "\n";
-      out << "i03_size=" << i03.size() << "\n";
-      out << "i30_size=" << i30.size() << "\n";
-      out << "i12_size=" << i12.size() << "\n";
-      out << "i21_size=" << i21.size() << "\n";
-      if (outR != nullptr) {
-        out << "out_num_vert=" << outR->NumVert() << "\n";
-        out << "out_num_tri=" << outR->NumTri() << "\n";
-      }
-    }
-  }
-  debug::DumpIntVector(dir / (prefix + "_i03.txt"), i03);
-  debug::DumpIntVector(dir / (prefix + "_i30.txt"), i30);
-  debug::DumpIntVector(dir / (prefix + "_i12.txt"), i12);
-  debug::DumpIntVector(dir / (prefix + "_i21.txt"), i21);
-}
 
 struct AbsSum {
   int operator()(int a, int b) const { return abs(a) + abs(b); }
@@ -753,8 +711,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
             [c1, c3](int v) { return c1 + c3 * v; });
   transform(w30_.begin(), w30_.end(), i30.begin(),
             [c2, c3](int v) { return c2 + c3 * v; });
-  DumpBooleanResultState("inclusion", op, inP_, inQ_, nullptr, i03, i30, i12,
-                         i21);
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
@@ -784,17 +740,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Manifold::Impl outR;
 
   if (numVertR == 0) {
-    DumpBooleanResultState("empty", op, inP_, inQ_, &outR, i03, i30, i12, i21);
     return outR;
-  }
-
-  const bool doDump = debug::BooleanDumpEnabled();
-  Vec<int> dumpI03, dumpI30, dumpI12, dumpI21;
-  if (doDump) {
-    dumpI03 = i03;
-    dumpI30 = i30;
-    dumpI12 = i12;
-    dumpI21 = i21;
   }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
@@ -939,9 +885,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
-  DumpBooleanResultState("final", op, inP_, inQ_, &outR, doDump ? dumpI03 : i03,
-                         doDump ? dumpI30 : i30, doDump ? dumpI12 : i12,
-                         doDump ? dumpI21 : i21);
   return outR;
 }
 

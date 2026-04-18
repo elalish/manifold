@@ -14,11 +14,9 @@
 
 #include "boolean3.h"
 
-#include <atomic>
 #include <limits>
 #include <unordered_set>
 
-#include "boolean_dump.h"
 #include "disjoint_sets.h"
 #include "parallel.h"
 
@@ -29,44 +27,6 @@
 using namespace manifold;
 
 namespace {
-
-std::atomic<uint64_t> gBoolean3DumpCounter{0};
-
-void DumpBoolean3State(const char* stage, const OpType op,
-                       const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                       const Intersections& xv12, const Intersections& xv21,
-                       const Vec<int>& w03, const Vec<int>& w30,
-                       const bool valid) {
-  if (!debug::BooleanDumpEnabled()) return;
-
-  const std::string prefix =
-      debug::DumpPrefix("boolean3", stage, op, gBoolean3DumpCounter);
-  const auto dir = debug::BooleanDumpDir();
-  debug::EnsureDumpDir(dir);
-
-  debug::DumpImplObj(dir / (prefix + "_inP.obj"), inP);
-  debug::DumpImplObj(dir / (prefix + "_inQ.obj"), inQ);
-  {
-    std::ofstream out(dir / (prefix + "_meta.txt"));
-    if (out.good()) {
-      out << "stage=" << stage << "\n";
-      out << "op=" << debug::OpName(op) << "\n";
-      out << "valid=" << (valid ? 1 : 0) << "\n";
-      out << "xv12_size=" << xv12.x12.size() << "\n";
-      out << "xv21_size=" << xv21.x12.size() << "\n";
-      out << "w03_size=" << w03.size() << "\n";
-      out << "w30_size=" << w30.size() << "\n";
-    }
-  }
-  debug::DumpIntVector(dir / (prefix + "_xv12_x12.txt"), xv12.x12);
-  debug::DumpIntVector(dir / (prefix + "_xv21_x12.txt"), xv21.x12);
-  debug::DumpPairVector(dir / (prefix + "_xv12_p1q2.txt"), xv12.p1q2);
-  debug::DumpPairVector(dir / (prefix + "_xv21_p1q2.txt"), xv21.p1q2);
-  debug::DumpVec3HexVector(dir / (prefix + "_xv12_v12.txt"), xv12.v12);
-  debug::DumpVec3HexVector(dir / (prefix + "_xv21_v12.txt"), xv21.v12);
-  debug::DumpIntVector(dir / (prefix + "_w03.txt"), w03);
-  debug::DumpIntVector(dir / (prefix + "_w30.txt"), w30);
-}
 
 // These two functions (Interpolate and Intersect) are the only places where
 // floating-point operations take place in the whole Boolean function. These
@@ -535,8 +495,6 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
-    DumpBoolean3State("early_out", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
-                      valid);
     return;
   }
 
@@ -554,8 +512,6 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
-    DumpBoolean3State("too_large", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
-                      valid);
     return;
   }
 
@@ -563,8 +519,6 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Vertices on the same connected component have the same winding number
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
-  DumpBoolean3State("post_winding", op, inP_, inQ_, xv12_, xv21_, w03_, w30_,
-                    valid);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
