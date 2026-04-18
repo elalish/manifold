@@ -387,7 +387,10 @@ NB_MODULE(manifold3d, m) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
-      .def("status", &Manifold::Status, manifold__status)
+      .def(
+          "status",
+          static_cast<Manifold::Error (Manifold::*)() const>(&Manifold::Status),
+          manifold__status)
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -731,7 +734,8 @@ NB_MODULE(manifold3d, m) {
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
       .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
       .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
-      .value("InvalidTangents", Manifold::Error::InvalidTangents);
+      .value("InvalidTangents", Manifold::Error::InvalidTangents)
+      .value("Cancelled", Manifold::Error::Cancelled);
 
   nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
