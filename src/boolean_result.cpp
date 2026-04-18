@@ -739,7 +739,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  if (numVertR == 0) return outR;
+  if (numVertR == 0) {
+    return outR;
+  }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);

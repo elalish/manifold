@@ -140,6 +140,45 @@ TEST(Boolean, Cubes) {
   if (options.exportModels) WriteTestOBJ("cubes.obj", result);
 }
 
+TEST(Boolean, DeterminismSimpleSubtract) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a - b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_subtract.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleUnion) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a + b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 1.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_union.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleIntersect) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a ^ b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_intersect.obj", out);
+}
+
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
@@ -372,14 +411,50 @@ TEST(Boolean, Perturb3) {
   const int N = 16;  // Number of rotations for the gear pattern
   const double alpha = 90.0 / N;
 
+  // First decomposition step: a single union operation from the same setup.
+  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  const Manifold pairUnion = cube + cube.Rotate(0, 0, alpha);
+  if (options.exportModels) WriteTestOBJ("perturb3_pair_union.obj", pairUnion);
+
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
-  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
   for (int i = 0; i < N; i++) {
     outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
+
+  // Binary-tree probes for the first 4 shapes.
+  Manifold pair01 = outerCubes[0] + outerCubes[1];
+  Manifold pair23 = outerCubes[2] + outerCubes[3];
+  Manifold gear4BalancedSeq = pair01 + pair23;
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_pair01.obj", pair01);
+    WriteTestOBJ("perturb3_pair23.obj", pair23);
+    WriteTestOBJ("perturb3_gear4_balanced_seq.obj", gear4BalancedSeq);
+  }
+
+  // small prefixes before the full 16-shape reduction.
+  Manifold gear3Seq = outerCubes[0] + outerCubes[1];
+  gear3Seq = gear3Seq + outerCubes[2];
+  Manifold gear3Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2]}, OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear3_seq.obj", gear3Seq);
+    WriteTestOBJ("perturb3_gear3_batch.obj", gear3Batch);
+  }
+
+  Manifold gear4Seq = gear3Seq + outerCubes[3];
+  Manifold gear4Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2], outerCubes[3]},
+      OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear4_seq.obj", gear4Seq);
+    WriteTestOBJ("perturb3_gear4_batch.obj", gear4Batch);
+  }
+
   Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  if (options.exportModels) WriteTestOBJ("perturb3_gear.obj", gear);
   Manifold outerGear = gear.Scale({2, 2, 1});
+  if (options.exportModels) WriteTestOBJ("perturb3_outerGear.obj", outerGear);
 
   // Subtract inner from outer to create the nasty gear with slivers
   Manifold nastyGear = outerGear - gear;
@@ -396,7 +471,10 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
-  if (options.exportModels) WriteTestOBJ("nastyGear.obj", nastyGear);
+  if (options.exportModels) {
+    WriteTestOBJ("nastyGear.obj", nastyGear);
+    WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
+  }
 }
 
 TEST(Boolean, Coplanar) {
@@ -423,6 +501,8 @@ TEST(Boolean, MultiCoplanar) {
   EXPECT_EQ(out.Genus(), -1);
   EXPECT_NEAR(out.Volume(), 0.18, 1e-5);
   EXPECT_NEAR(out.SurfaceArea(), 2.76, 1e-5);
+
+  if (options.exportModels) WriteTestOBJ("det_multi_coplanar.obj", out);
 }
 
 TEST(Boolean, AlmostCoplanar) {
@@ -430,6 +510,7 @@ TEST(Boolean, AlmostCoplanar) {
   Manifold result =
       tet + tet.Rotate(0.001, -0.08472872823860228, 0.055910459615905288) + tet;
   ExpectMeshes(result, {{20, 36}});
+  if (options.exportModels) WriteTestOBJ("det_nearly_coplanar.obj", result);
 }
 
 TEST(Boolean, FaceUnion) {
@@ -673,9 +754,11 @@ TEST(Boolean, NonIntersecting) {
   Manifold cube2 = cube1.Scale(vec3(2)).Translate({3, 0, 0});
   double vol2 = cube2.Volume();
 
-  EXPECT_EQ((cube1 + cube2).Volume(), vol1 + vol2);
+  Manifold unionOut = cube1 + cube2;
+  EXPECT_EQ(unionOut.Volume(), vol1 + vol2);
   EXPECT_EQ((cube1 - cube2).Volume(), vol1);
   EXPECT_TRUE((cube1 ^ cube2).IsEmpty());
+  if (options.exportModels) WriteTestOBJ("det_non_overlap.obj", unionOut);
 }
 
 TEST(Boolean, Precision) {

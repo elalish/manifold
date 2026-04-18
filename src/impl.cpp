@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <map>
@@ -700,16 +702,48 @@ void Manifold::Impl::IncrementMeshIDs() {
 static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
                                          const MeshGL64& mesh,
                                          std::optional<double> epsilon) {
+  auto useHexFloat = []() {
+    const char* v = std::getenv("MANIFOLD_OBJ_HEX_FLOAT");
+    if (v == nullptr) return false;
+    return std::strcmp(v, "1") == 0 || std::strcmp(v, "true") == 0 ||
+           std::strcmp(v, "TRUE") == 0 || std::strcmp(v, "on") == 0 ||
+           std::strcmp(v, "ON") == 0;
+  };
+  const bool hexFloat = useHexFloat();
+  auto writeValue = [&](double value) {
+    if (hexFloat) {
+      // Use explicit C-format hex to keep text stable across standard library
+      // implementations.
+      char buf[128];
+      std::snprintf(buf, sizeof(buf), "%.13a", value);
+      stream << buf;
+    } else {
+      stream << value;
+    }
+  };
+
   stream << std::setprecision(19);  // for double precision
-  stream << std::fixed;             // for uniformity in output numbers
+  if (!hexFloat) {
+    stream << std::fixed;  // for uniformity in output numbers
+  }
   stream << "# ======= begin mesh ======" << std::endl;
-  stream << "# tolerance = " << mesh.tolerance << std::endl;
-  if (epsilon.has_value())
-    stream << "# epsilon = " << epsilon.value() << std::endl;
+  stream << "# float_format = " << (hexFloat ? "hexfloat" : "fixed")
+         << std::endl;
+  stream << "# tolerance = ";
+  writeValue(mesh.tolerance);
+  stream << std::endl;
+  if (epsilon.has_value()) {
+    stream << "# epsilon = ";
+    writeValue(epsilon.value());
+    stream << std::endl;
+  }
   for (size_t i = 0; i < mesh.NumVert(); i++) {
     stream << "v";
     size_t offset = i * mesh.numProp;
-    for (size_t j : {0, 1, 2}) stream << " " << mesh.vertProperties[offset + j];
+    for (size_t j : {0, 1, 2}) {
+      stream << " ";
+      writeValue(mesh.vertProperties[offset + j]);
+    }
     stream << std::endl;
   }
   std::vector<ivec3> triangles;
