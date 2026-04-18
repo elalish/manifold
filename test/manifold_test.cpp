@@ -1462,6 +1462,12 @@ TEST(Manifold, ExecutionContextCancelBeforeEval) {
 // Cancel from another thread mid-evaluation. Expensive CSG tree so there's
 // time to set the flag before the full eval finishes. Verify Error::Cancelled
 // is returned and doneBooleans < totalBooleans.
+//
+// MANIFOLD_PAR guard: emscripten/WASM builds without pthreads can't
+// construct std::thread and abort at runtime. Skip on non-parallel builds
+// — cancellation mid-evaluation isn't meaningful there anyway since the
+// eval is synchronous.
+#if MANIFOLD_PAR == 1
 TEST(Manifold, ExecutionContextCancelConcurrent) {
   // Build a large enough tree that evaluation takes measurable time.
   std::vector<Manifold> items;
@@ -1488,6 +1494,7 @@ TEST(Manifold, ExecutionContextCancelConcurrent) {
     EXPECT_LT(ctx.impl_->doneBooleans.load(), ctx.impl_->totalBooleans.load());
   }
 }
+#endif  // MANIFOLD_PAR == 1
 
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {
@@ -1609,6 +1616,8 @@ TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
 }
 
 // Progress is observable from another thread while evaluation runs.
+// MANIFOLD_PAR guard: see note on ExecutionContextCancelConcurrent above.
+#if MANIFOLD_PAR == 1
 TEST(Manifold, ExecutionContextConcurrentProgress) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
@@ -1639,6 +1648,7 @@ TEST(Manifold, ExecutionContextConcurrentProgress) {
   // timing-dependent. Not strictly required but usually the case.
   // (Not asserting sawProgress to avoid CI flakes.)
 }
+#endif  // MANIFOLD_PAR == 1
 
 // Calling Status(ctx) on an already-evaluated Manifold should reset counters,
 // not leave stale values from a previous evaluation on a different Manifold.
