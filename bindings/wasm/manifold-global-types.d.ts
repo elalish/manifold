@@ -120,4 +120,4 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
     'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
     'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
-    'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents';
+    'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents'|'Cancelled';

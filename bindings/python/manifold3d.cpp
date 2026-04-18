@@ -731,7 +731,8 @@ NB_MODULE(manifold3d, m) {
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
       .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
       .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
-      .value("InvalidTangents", Manifold::Error::InvalidTangents);
+      .value("InvalidTangents", Manifold::Error::InvalidTangents)
+      .value("Cancelled", Manifold::Error::Cancelled);
 
   nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
