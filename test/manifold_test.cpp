@@ -1562,9 +1562,50 @@ TEST(Manifold, ExecutionContextCancelPermanent) {
   // the cached leaf is the Cancelled one.
   EXPECT_EQ(u.Status(), Manifold::Error::Cancelled);
 
-  // Even reusing the context with cancel cleared.
-  /* cancel remains set; Manifold is already Cancelled */;
+  // Re-querying with the same context (still cancelled) is still Cancelled.
   EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+}
+
+// Once a context is cancelled it stays cancelled for any future evaluation
+// through it — not just the Manifold in flight at the time of Cancel().
+TEST(Manifold, ExecutionContextCancelStickyAcrossManifolds) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+
+  // Fresh Manifold that needs evaluation (CsgOpNode, not a leaf) — the
+  // cancelled ctx should short-circuit it to Cancelled.
+  Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+
+  // Another unrelated Manifold, same ctx — also Cancelled.
+  Manifold v =
+      Manifold::Tetrahedron() + Manifold::Sphere(0.3).Translate(vec3(2, 0, 0));
+  EXPECT_EQ(v.Status(ctx), Manifold::Error::Cancelled);
+}
+
+// A cancelled ctx does NOT contaminate a fresh context: constructing a new
+// ExecutionContext gives an evaluation that can complete normally.
+TEST(Manifold, ExecutionContextFreshContextEscapesCancel) {
+  ExecutionContext cancelledCtx;
+  cancelledCtx.Cancel();
+  Manifold dead = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(dead.Status(cancelledCtx), Manifold::Error::Cancelled);
+
+  ExecutionContext fresh;
+  Manifold live = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(live.Status(fresh), Manifold::Error::NoError);
+  EXPECT_FALSE(fresh.Cancelled());
+}
+
+// A cancelled ctx applied to a Manifold that is already a leaf (no
+// evaluation needed) returns the Manifold's real status — cancel only
+// applies when there is actual evaluation work to short-circuit. This
+// matches the docstring phrasing "every subsequent evaluation".
+TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
+  Manifold cube = Manifold::Cube();  // CsgLeafNode from the start
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(cube.Status(ctx), Manifold::Error::NoError);
 }
 
 // Progress is observable from another thread while evaluation runs.
