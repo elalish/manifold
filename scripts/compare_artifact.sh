@@ -6,9 +6,10 @@ FILES="${DETERMINISM_COMPARE_FILES:-}"
 DIFF_LINES="${DETERMINISM_COMPARE_DIFF_LINES:-200}"
 NORMALIZE_SCRIPT="${DETERMINISM_NORMALIZE_SCRIPT:-./scripts/normalize_objs.sh}"
 
+source "$(dirname "$0")/determinism_cases.sh"
+
 if [ -z "$FILES" ]; then
-  echo "DETERMINISM_COMPARE_FILES is required."
-  exit 2
+  FILES="${DETERMINISM_OBJ_FILES[*]}"
 fi
 
 for os in linux mac windows; do

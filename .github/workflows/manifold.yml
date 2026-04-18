@@ -90,10 +90,7 @@ jobs:
         MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
         cp ./build/lib/Release/* ./build/bin/Release
-        cd build/bin/Release
-        ./manifold_test.exe -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Boolean.AlmostCoplanar
-        mkdir -p ../../../meshes-windows
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj det_nearly_coplanar.obj ../../../meshes-windows/
+        bash ./scripts/export_determinism_meshes.sh build/bin/Release ./manifold_test.exe meshes-windows
     - name: Upload determinism meshes (Windows)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
       uses: actions/upload-artifact@v4
@@ -166,9 +163,7 @@ jobs:
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
-        ./build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Boolean.AlmostCoplanar
-        mkdir -p meshes-linux
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj det_nearly_coplanar.obj meshes-linux/
+        bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-linux
     - name: Upload determinism meshes (Linux)
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
       uses: actions/upload-artifact@v4
@@ -460,9 +455,7 @@ jobs:
       env:
         MANIFOLD_OBJ_HEX_FLOAT: 1
       run: |
-        build/test/manifold_test -e --gtest_filter=Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Boolean.AlmostCoplanar
-        mkdir -p meshes-mac
-        cp det_simple_subtract.obj det_simple_union.obj det_simple_intersect.obj det_multi_coplanar.obj det_non_overlap.obj det_nearly_coplanar.obj meshes-mac/
+        bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-mac
     - name: Upload determinism meshes (macOS)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
       uses: actions/upload-artifact@v4
@@ -540,7 +533,7 @@ jobs:
     needs: [build, build_windows, build_mac]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download Linux meshes
       uses: actions/download-artifact@v4
       with:
@@ -557,13 +550,5 @@ jobs:
         name: meshes-windows
         path: meshes/windows
     - name: Compare meshes across platforms
-      env:
-        DETERMINISM_COMPARE_FILES: >-
-          det_simple_subtract.obj
-          det_simple_union.obj
-          det_simple_intersect.obj
-          det_multi_coplanar.obj
-          det_non_overlap.obj
-          det_nearly_coplanar.obj
       run: |
         bash ./scripts/compare_artifact.sh meshes
