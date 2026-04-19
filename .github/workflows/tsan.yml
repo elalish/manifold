@@ -1,0 +1,102 @@
+name: TSAN
+
+# Run ThreadSanitizer against the test suite using a TBB built with
+# TBB_SANITIZE=thread (so TBB's internal fences are swapped for acquire/release
+# ops TSAN can model — otherwise stock libtbb produces thousands of spurious
+# warnings). On a cold TBB build run takes ~22 min on CI; intent is to move
+# off per-PR onto a nightly/on-demand trigger once validated. For now it
+# runs per-PR to prove out the plumbing.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  tsan:
+    name: TSAN (GCC 14, TBB_SANITIZE=thread)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      TBB_TAG: v2022.3.0
+      TBB_PREFIX: ${{ github.workspace }}/.tbb-tsan
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install apt packages
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: libgtest-dev libassimp-dev pkg-config cmake
+
+      - name: Cache TBB (TSAN build)
+        id: cache-tbb
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBB_PREFIX }}
+          key: tbb-tsan-${{ env.TBB_TAG }}-gcc14-ubuntu-24.04-v1
+
+      - name: Build oneTBB with TBB_SANITIZE=thread
+        if: steps.cache-tbb.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TBB_TAG" https://github.com/uxlfoundation/oneTBB.git tbb-src
+          # -Wno-tsan: GCC 14's -Wtsan fires on TBB's own atomic_thread_fence
+          # usage (which TBB_SANITIZE=thread mode replaces internally anyway).
+          # oneTBB master adds this suppression in its own sanitize.cmake but
+          # it didn't land until after v2022.3.0.
+          cmake -S tbb-src -B tbb-build \
+            -DTBB_TEST=OFF \
+            -DTBB_SANITIZE=thread \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS=-Wno-tsan \
+            -DCMAKE_INSTALL_PREFIX="$TBB_PREFIX"
+          cmake --build tbb-build -j$(nproc)
+          cmake --install tbb-build
+
+      - name: Configure manifold with TSAN
+        run: |
+          cmake \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_SHARED_LIBS=ON \
+            -DMANIFOLD_CBIND=ON \
+            -DMANIFOLD_CROSS_SECTION=ON \
+            -DMANIFOLD_TEST=ON \
+            -DMANIFOLD_PAR=ON \
+            -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
+            -DCMAKE_PREFIX_PATH="$TBB_PREFIX" \
+            -DCMAKE_CXX_FLAGS=-fsanitize=thread \
+            -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
+            -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread \
+            . -B build
+
+      - name: Build manifold
+        run: cmake --build build -j$(nproc)
+
+      - name: Run tests under TSAN
+        env:
+          LD_LIBRARY_PATH: ${{ env.TBB_PREFIX }}/lib
+          TSAN_OPTIONS: halt_on_error=0 report_thread_leaks=0
+        run: |
+          set -o pipefail
+          ./build/test/manifold_test 2>&1 | tee tsan.log
+          # Fail the job if TSAN reported any warnings. The test process itself
+          # returns 0 because halt_on_error=0; the log is our signal.
+          if grep -q "^WARNING: ThreadSanitizer" tsan.log; then
+            echo "::error::TSAN reported data races — see log"
+            grep -c "^WARNING: ThreadSanitizer" tsan.log
+            exit 1
+          fi
+
+      - name: Upload TSAN log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsan-log
+          path: tsan.log
