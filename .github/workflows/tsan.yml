@@ -47,10 +47,15 @@ jobs:
         if: steps.cache-tbb.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch "$TBB_TAG" https://github.com/uxlfoundation/oneTBB.git tbb-src
+          # -Wno-tsan: GCC 14's -Wtsan fires on TBB's own atomic_thread_fence
+          # usage (which TBB_SANITIZE=thread mode replaces internally anyway).
+          # oneTBB master adds this suppression in its own sanitize.cmake but
+          # it didn't land until after v2022.3.0.
           cmake -S tbb-src -B tbb-build \
             -DTBB_TEST=OFF \
             -DTBB_SANITIZE=thread \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS=-Wno-tsan \
             -DCMAKE_INSTALL_PREFIX="$TBB_PREFIX"
           cmake --build tbb-build -j$(nproc)
           cmake --install tbb-build
