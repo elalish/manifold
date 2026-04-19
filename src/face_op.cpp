@@ -56,8 +56,23 @@ std::vector<std::vector<int>> AssembleHalfedges(VecView<Halfedge>::IterC start,
       polys.push_back({});
     }
     polys.back().push_back(startHalfedgeIdx + thisEdge);
+    const int numEdges = static_cast<int>(end - start);
+    if (thisEdge < 0 || thisEdge >= numEdges) {
+      // Out-of-bounds edge index — topology is broken, bail out and drain
+      // the remaining edges to prevent an infinite loop.
+      vert_edge.clear();
+      break;
+    }
     const auto result = vert_edge.find((start + thisEdge)->endVert);
-    DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
+    if (result == vert_edge.end()) {
+      // Non-manifold or broken topology: the endVert of this edge has no
+      // matching startVert among the remaining edges. This should not
+      // happen on valid geometry, but can occur when boolean operations
+      // produce degenerate faces. Drain and move on rather than crashing.
+      DEBUG_ASSERT(false, topologyErr, "non-manifold edge");
+      vert_edge.clear();
+      break;
+    }
     thisEdge = result->second;
     vert_edge.erase(result);
   }
@@ -127,8 +142,11 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
       }
-      DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-                   topologyErr, "These 3 edges do not form a triangle!");
+      if (ends[0] != tri[1] && ends[1] != tri[2] && ends[2] != tri[0]) {
+        DEBUG_ASSERT(false, topologyErr,
+                     "These 3 edges do not form a triangle!");
+        return;  // Skip degenerate triangle rather than producing garbage
+      }
 
       addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
@@ -140,30 +158,38 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                    epsilon_) >= 0;
       };
 
-      std::vector<int> quad = AssembleHalfedges(
+      auto assembled = AssembleHalfedges(
           halfedge_.cbegin() + faceEdge[face],
-          halfedge_.cbegin() + faceEdge[face + 1], faceEdge[face])[0];
-
-      const la::mat<int, 3, 2> tris[2] = {
-          {{quad[0], quad[1], quad[2]}, {quad[0], quad[2], quad[3]}},
-          {{quad[1], quad[2], quad[3]}, {quad[0], quad[1], quad[3]}}};
-
-      int choice = 0;
-
-      if (!(triCCW(tris[0][0]) && triCCW(tris[0][1]))) {
-        choice = 1;
-      } else if (triCCW(tris[1][0]) && triCCW(tris[1][1])) {
-        vec3 diag0 = vertPos_[halfedge_[quad[0]].startVert] -
-                     vertPos_[halfedge_[quad[2]].startVert];
-        vec3 diag1 = vertPos_[halfedge_[quad[1]].startVert] -
-                     vertPos_[halfedge_[quad[3]].startVert];
-        if (la::length2(diag0) > la::length2(diag1)) {
-          choice = 1;
+          halfedge_.cbegin() + faceEdge[face + 1], faceEdge[face]);
+      if (assembled.empty() || assembled[0].size() < 4) {
+        // Degenerate quad — fall through to general triangulation
+        for (const auto& tri : general(face)) {
+          addTri(face, tri, normal, halfedgeRef[firstEdge]);
         }
-      }
+      } else {
+        std::vector<int>& quad = assembled[0];
 
-      for (const auto& tri : tris[choice]) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
+        const la::mat<int, 3, 2> tris[2] = {
+            {{quad[0], quad[1], quad[2]}, {quad[0], quad[2], quad[3]}},
+            {{quad[1], quad[2], quad[3]}, {quad[0], quad[1], quad[3]}}};
+
+        int choice = 0;
+
+        if (!(triCCW(tris[0][0]) && triCCW(tris[0][1]))) {
+          choice = 1;
+        } else if (triCCW(tris[1][0]) && triCCW(tris[1][1])) {
+          vec3 diag0 = vertPos_[halfedge_[quad[0]].startVert] -
+                       vertPos_[halfedge_[quad[2]].startVert];
+          vec3 diag1 = vertPos_[halfedge_[quad[1]].startVert] -
+                       vertPos_[halfedge_[quad[3]].startVert];
+          if (la::length2(diag0) > la::length2(diag1)) {
+            choice = 1;
+          }
+        }
+
+        for (const auto& tri : tris[choice]) {
+          addTri(face, tri, normal, halfedgeRef[firstEdge]);
+        }
       }
     } else {  // General triangulation
       for (const auto& tri : general(face)) {
