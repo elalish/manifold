@@ -3,9 +3,9 @@ name: TSAN
 # Run ThreadSanitizer against the test suite using a TBB built with
 # TBB_SANITIZE=thread (so TBB's internal fences are swapped for acquire/release
 # ops TSAN can model — otherwise stock libtbb produces thousands of spurious
-# warnings). The run takes ~45 min, so once this workflow is validated we
-# intend to move it off per-PR and onto a nightly/on-demand trigger. For now
-# it runs per-PR to prove out the plumbing.
+# warnings). On a cold TBB build run takes ~22 min on CI; intent is to move
+# off per-PR onto a nightly/on-demand trigger once validated. For now it
+# runs per-PR to prove out the plumbing.
 
 on:
   push:
