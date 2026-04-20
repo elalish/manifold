@@ -96,6 +96,10 @@ async function loadMonacoModules() {
         Promise
             .all([
               import('monaco-editor/esm/vs/editor/editor.api'),
+              // Load TS tokenizer early so first paint has syntax colors
+              // without waiting for hover-driven language-service activation.
+              import(
+                  'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
               import(
                   'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
               // '?worker' is vite convention to load a module as a web worker.
@@ -103,7 +107,8 @@ async function loadMonacoModules() {
               import(
                   'monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
             ])
-            .then(([monacoModule, _, editorWorkerModule, tsWorkerModule]) => ({
+            .then(([monacoModule, _, __, editorWorkerModule,
+                    tsWorkerModule]) => ({
                     monaco: monacoModule,
                     editorWorker: editorWorkerModule.default,
                     tsWorker: tsWorkerModule.default,
