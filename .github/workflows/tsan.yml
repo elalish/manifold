@@ -82,17 +82,10 @@ jobs:
       - name: Run tests under TSAN
         env:
           LD_LIBRARY_PATH: ${{ env.TBB_PREFIX }}/lib
-          TSAN_OPTIONS: halt_on_error=0 report_thread_leaks=0
+          TSAN_OPTIONS: halt_on_error=1 report_thread_leaks=0
         run: |
           set -o pipefail
           ./build/test/manifold_test 2>&1 | tee tsan.log
-          # Fail the job if TSAN reported any warnings. The test process itself
-          # returns 0 because halt_on_error=0; the log is our signal.
-          if grep -q "^WARNING: ThreadSanitizer" tsan.log; then
-            echo "::error::TSAN reported data races — see log"
-            grep -c "^WARNING: ThreadSanitizer" tsan.log
-            exit 1
-          fi
 
       - name: Upload TSAN log
         if: always()
