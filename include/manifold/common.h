@@ -196,6 +196,20 @@ struct RayHit {
  * Cancellation granularity is currently per-boolean-operation; a single
  * large boolean may run to completion before the flag is checked again.
  * This may improve in future versions.
+ *
+ * Example: cancel from an observer thread.
+ * @code
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add);
+ * ExecutionContext ctx;
+ * std::thread eval([&] {
+ *   if (big.Status(ctx) == Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
+ * // ...later, from the UI thread:
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
  */
 class ExecutionContext {
  public:

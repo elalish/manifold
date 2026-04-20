@@ -713,7 +713,17 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
   // }
   while (!stack.empty()) {
     if (ctx && ctx->cancel.load(std::memory_order_relaxed)) {
-      cache_ = ErrorLeaf(Manifold::Error::Cancelled);
+      // Poison every op_node currently on the stack, not just `this`.
+      // Sub-ops may have had their impl_ partially mutated during finalize
+      // (children replaced with an intermediate result); leaving cache_
+      // unset would let a later evaluation of a shared sub-op run against
+      // a partially-reduced tree. Shared cache ensures any subsequent
+      // eval of any op on the stack returns Cancelled.
+      auto cancelled = ErrorLeaf(Manifold::Error::Cancelled);
+      for (auto& frame : stack) {
+        if (!frame->op_node->cache_) frame->op_node->cache_ = cancelled;
+      }
+      cache_ = cancelled;
       return cache_;
     }
     std::shared_ptr<CsgStackFrame> frame = stack.back();
@@ -815,11 +825,29 @@ CsgNodeType CsgOpNode::GetNodeType() const {
 
 size_t CsgOpNode::NumLeaves() const {
   // An already-evaluated CsgOpNode counts as a single leaf for the purposes
-  // of estimating remaining boolean work.
+  // of estimating remaining boolean work. Iterative walk: `+=` chains can
+  // produce very deep CsgOpNode trees that would blow the call stack if
+  // this were recursive.
   if (cache_ != nullptr) return 1;
-  auto impl = impl_.GetGuard();
   size_t total = 0;
-  for (const auto& child : *impl) total += child->NumLeaves();
+  std::vector<const CsgOpNode*> stack;
+  stack.push_back(this);
+  while (!stack.empty()) {
+    const CsgOpNode* op = stack.back();
+    stack.pop_back();
+    if (op->cache_ != nullptr) {
+      total += 1;
+      continue;
+    }
+    auto impl = op->impl_.GetGuard();
+    for (const auto& child : *impl) {
+      if (child->GetNodeType() == CsgNodeType::Leaf) {
+        total += 1;
+      } else {
+        stack.push_back(static_cast<const CsgOpNode*>(child.get()));
+      }
+    }
+  }
   return total;
 }
 

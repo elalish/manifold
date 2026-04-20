@@ -1689,6 +1689,19 @@ TEST(Manifold, ExecutionContextCopyShareState) {
   EXPECT_EQ(ctx1.impl_->totalBooleans.load(), 42);
 }
 
+// Move construction and move assignment preserve shared state.
+TEST(Manifold, ExecutionContextMoveSemantics) {
+  ExecutionContext ctx1;
+  ctx1.Cancel();
+  ExecutionContext ctx2 = std::move(ctx1);  // move-construct
+  EXPECT_TRUE(ctx2.Cancelled());
+
+  ExecutionContext ctx3;
+  EXPECT_FALSE(ctx3.Cancelled());
+  ctx3 = std::move(ctx2);  // move-assign
+  EXPECT_TRUE(ctx3.Cancelled());
+}
+
 // A Manifold that's already a leaf (no CSG tree) should report no work.
 TEST(Manifold, ExecutionContextNoWorkNeeded) {
   Manifold cube = Manifold::Cube(vec3(1), true);
@@ -1737,4 +1750,23 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
   }
+}
+
+// Deeply-nested CsgOpNode chain (e.g. repeated `+=` in a loop) must not
+// stack-overflow in the leaf-counting pre-pass. Cancel up front so we only
+// exercise NumLeaves, not the full boolean evaluation.
+//
+// 300k depth SIGSEGVs on the recursive NumLeaves (8MB default stack on
+// macOS/Linux); runs in ~1s / ~1.2GB peak RSS on the iterative version.
+TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
+  constexpr int kDepth = 300000;
+  Manifold m = Manifold::Cube(vec3(1), true);
+  for (int i = 0; i < kDepth; ++i) {
+    m = m + Manifold::Cube(vec3(1), true).Translate(vec3(i * 2.0, 0, 0));
+  }
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(m.Status(ctx), Manifold::Error::Cancelled);
+  // kDepth + 1 leaves in the chain → kDepth booleans to reduce.
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), kDepth);
 }
