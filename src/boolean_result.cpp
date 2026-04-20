@@ -199,19 +199,13 @@ struct EdgePos {
   }
 };
 
-// thread sanitizer doesn't really know how to check when there are too many
-// mutex
-#if defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-__attribute__((no_sanitize("thread")))
-#endif
-#endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
-    concurrent_map<int, std::vector<EdgePos>> &edgesP,
-    concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    concurrent_map<int, std::vector<EdgePos>>& edgesP,
+    concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
+    const Vec<std::array<int, 2>>& p1q2, const Vec<int>& i12,
+    const Vec<int>& v12R, const VecView<Halfedge>& halfedgeP, bool forward,
+    size_t offset) {
   ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
@@ -256,7 +250,9 @@ void AddNewEdgeVerts(
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
-    static tbb::affinity_partitioner ap;
+    // thread_local: affinity_partitioner isn't safe for concurrent use
+    // (internal state mutated by parallel_for without synchronization).
+    thread_local tbb::affinity_partitioner ap;
     auto processFun = std::bind(
         process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
