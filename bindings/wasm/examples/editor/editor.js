@@ -78,16 +78,16 @@ if (navigator.serviceWorker) {
   }
 }
 
-let editor = undefined;
-let monaco = undefined;
-let monacoModulesPromise = undefined;
-let monacoSuggestPromise = undefined;
-let monacoNavigationPromise = undefined;
-let monacoContributionsPromise = undefined;
+let editor = null;
+let monaco = null;
+let monacoModulesPromise = null;
+let monacoSuggestPromise = null;
+let monacoNavigationPromise = null;
+let monacoContributionsPromise = null;
 let monacoContributionsReady = false;
-let autoTypings = undefined;
-let autoTypingsPromise = undefined;
-let esbuildWasmPreloadPromise = undefined;
+let autoTypings = null;
+let autoTypingsPromise = null;
+let esbuildWasmPreloadPromise = null;
 let updateTypeIndicator = () => {};
 
 async function loadMonacoModules() {
@@ -126,7 +126,7 @@ function ensureMonacoContributionsLoaded() {
               return module;
             })
             .catch(error => {
-              monacoContributionsPromise = undefined;
+              monacoContributionsPromise = null;
               monacoContributionsReady = false;
               throw error;
             });
@@ -147,7 +147,7 @@ function ensureMonacoSuggestLoaded() {
                   'monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js'),
             ])
             .catch(error => {
-              monacoSuggestPromise = undefined;
+              monacoSuggestPromise = null;
               throw error;
             });
   }
@@ -169,7 +169,7 @@ function ensureMonacoNavigationLoaded() {
                   'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js'),
             ])
             .catch(error => {
-              monacoNavigationPromise = undefined;
+              monacoNavigationPromise = null;
               throw error;
             });
   }
@@ -188,7 +188,7 @@ function ensureEsbuildWasmPreloaded() {
               return response.arrayBuffer();
             })
             .catch(error => {
-              esbuildWasmPreloadPromise = undefined;
+              esbuildWasmPreloadPromise = null;
               throw error;
             });
   }
@@ -586,8 +586,9 @@ function initializeRun() {
 // Editor ------------------------------------------------------------
 
 async function createEditor() {
-  const {monaco: monacoApi, editorWorker, tsWorker} = await loadMonacoModules();
-  monaco = monacoApi;
+  const monacoModules = await loadMonacoModules();
+  monaco = monacoModules.monaco;
+  const {editorWorker, tsWorker} = monacoModules;
   await ensureMonacoSuggestLoaded();
   await ensureMonacoNavigationLoaded();
   self.MonacoEnvironment = {
@@ -679,7 +680,7 @@ async function createEditor() {
     if (!autoTypingsPromise) {
       autoTypingsPromise =
           initializeAutoTypings(showTypeIndicator).catch(error => {
-            autoTypingsPromise = undefined;
+            autoTypingsPromise = null;
             console.error('Failed to initialize auto typings:', error);
           });
     }
