@@ -693,3 +693,21 @@ TEST(CBIND, meshgl_update_normals) {
   free(with_normals);
   free(cube);
 }
+
+// Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The
+// rest of this file covers the malloc + manifold_destruct_* + free
+// pattern; this one fills in the alloc/delete variant (used by
+// language bindings that let the library manage memory).
+TEST(CBIND, alloc_delete_roundtrip) {
+  for (int i = 0; i < 10; ++i) {
+    ManifoldManifold* m = manifold_alloc_manifold();
+    manifold_cube(m, 1.0, 1.0, 1.0, 0);
+    EXPECT_EQ(manifold_status(m), MANIFOLD_NO_ERROR);
+    manifold_delete_manifold(m);
+  }
+  for (int i = 0; i < 10; ++i) {
+    ManifoldCrossSection* cs = manifold_alloc_cross_section();
+    manifold_cross_section_square(cs, 1.0, 1.0, 0);
+    manifold_delete_cross_section(cs);
+  }
+}

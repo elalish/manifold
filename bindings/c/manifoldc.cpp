@@ -41,6 +41,18 @@ ManifoldManifold* level_set(
   return to_c(new (mem) Manifold(Manifold::LevelSet(
       fun, *from_c(bounds), edge_length, level, tolerance, !seq)));
 }
+
+// Raw uninitialized storage for a T — callers must placement-new into it
+// before any use or before passing to manifold_destruct_* / manifold_delete_*.
+// Pairs with `delete T*`, which uses the plain `::operator delete` for
+// types with default alignment.
+template <typename T>
+T* alloc_raw() {
+  static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                "over-aligned types need the aligned operator new/delete "
+                "pair; extend this helper if a binding type ever needs it");
+  return static_cast<T*>(::operator new(sizeof(T)));
+}
 }  // namespace
 
 #ifdef __cplusplus
@@ -914,31 +926,42 @@ size_t manifold_rect_size() { return sizeof(Rect); }
 size_t manifold_triangulation_size() { return sizeof(std::vector<ivec3>); }
 
 // allocation
+//
+// Returns raw uninitialized storage. Callers must placement-new into it
+// via one of the constructor functions (e.g. manifold_cube) before any
+// use or before passing to manifold_destruct_* / manifold_delete_*.
+// Using `new T` here would silently leak the default-constructed object
+// every time a constructor function placement-new'd over it (see
+// Manifold's pNode_ and CrossSection's paths_ shared_ptrs).
 ManifoldManifold* manifold_alloc_manifold() {
-  return to_c(new manifold::Manifold);
+  return to_c(alloc_raw<manifold::Manifold>());
 }
 ManifoldManifoldVec* manifold_alloc_manifold_vec() {
-  return to_c(new std::vector<manifold::Manifold>);
+  return to_c(alloc_raw<std::vector<manifold::Manifold>>());
 }
 ManifoldCrossSection* manifold_alloc_cross_section() {
-  return to_c(new CrossSection);
+  return to_c(alloc_raw<CrossSection>());
 }
 ManifoldCrossSectionVec* manifold_alloc_cross_section_vec() {
-  return to_c(new std::vector<CrossSection>);
+  return to_c(alloc_raw<std::vector<CrossSection>>());
 }
-ManifoldRayHitVec* manifold_alloc_ray_hit_vec() { return to_c(new RayHitVec); }
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec() {
+  return to_c(alloc_raw<RayHitVec>());
+}
 ManifoldSimplePolygon* manifold_alloc_simple_polygon() {
-  return to_c(new SimplePolygon);
+  return to_c(alloc_raw<SimplePolygon>());
 }
 ManifoldPolygons* manifold_alloc_polygons() {
-  return to_c(new std::vector<SimplePolygon>);
+  return to_c(alloc_raw<std::vector<SimplePolygon>>());
 }
-ManifoldMeshGL* manifold_alloc_meshgl() { return to_c(new MeshGL); }
-ManifoldMeshGL64* manifold_alloc_meshgl64() { return to_c(new MeshGL64); }
-ManifoldBox* manifold_alloc_box() { return to_c(new Box); }
-ManifoldRect* manifold_alloc_rect() { return to_c(new Rect); }
+ManifoldMeshGL* manifold_alloc_meshgl() { return to_c(alloc_raw<MeshGL>()); }
+ManifoldMeshGL64* manifold_alloc_meshgl64() {
+  return to_c(alloc_raw<MeshGL64>());
+}
+ManifoldBox* manifold_alloc_box() { return to_c(alloc_raw<Box>()); }
+ManifoldRect* manifold_alloc_rect() { return to_c(alloc_raw<Rect>()); }
 ManifoldTriangulation* manifold_alloc_triangulation() {
-  return to_c(new std::vector<ivec3>);
+  return to_c(alloc_raw<std::vector<ivec3>>());
 }
 
 // pointer free + destruction
