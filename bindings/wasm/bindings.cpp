@@ -111,6 +111,12 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("position", &RayHit::position)
       .field("normal", &RayHit::normal);
 
+  class_<ExecutionContext>("ExecutionContext")
+      .constructor<>()
+      .function("cancel", &ExecutionContext::Cancel)
+      .function("cancelled", &ExecutionContext::Cancelled)
+      .function("progress", &ExecutionContext::Progress);
+
   register_vector<RayHit>("Vector_rayHit");
   register_vector<ivec3>("Vector_ivec3");
   register_vector<vec3>("Vector_vec3");
@@ -188,6 +194,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
                                   &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
+      .function("statusWithContext", &man_js::StatusWithContext)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)

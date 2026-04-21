@@ -121,3 +121,22 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
     'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
     'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents'|'Cancelled';
+
+/**
+ * Observe and control a long-running Manifold evaluation. Pass to
+ * Manifold.statusWithContext() to observe progress and optionally request
+ * cancellation. Safe to read/write from any thread/worker.
+ *
+ * Cancellation is permanent for a Manifold: once cancelled and detected,
+ * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
+ */
+export interface ExecutionContext {
+  /** Request cancellation. Can be called from any context. Idempotent. */
+  cancel(): void;
+  /** Has cancellation been requested? */
+  cancelled(): boolean;
+  /** Normalized progress in [0, 1]. Monotonic within an evaluation. */
+  progress(): number;
+  /** Release the underlying memory. */
+  delete(): void;
+}

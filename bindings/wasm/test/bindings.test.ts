@@ -53,6 +53,38 @@ suite('Manifold Bindings', () => {
     expect(hits).toHaveLength(0);
   });
 
+  test('ExecutionContext happy path returns NoError', () => {
+    const ctx = new manifoldModule.ExecutionContext();
+    expect(ctx.cancelled()).toBe(false);
+    expect(ctx.progress()).toEqual(0);
+
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const sphere = manifoldModule.Manifold.sphere(1.0, 8);
+    const u = cube.add(sphere);
+    expect(u.statusWithContext(ctx)).toEqual('NoError');
+
+    cube.delete();
+    sphere.delete();
+    u.delete();
+    ctx.delete();
+  });
+
+  test('ExecutionContext cancels pending evaluation', () => {
+    const ctx = new manifoldModule.ExecutionContext();
+    ctx.cancel();
+    expect(ctx.cancelled()).toBe(true);
+
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const sphere = manifoldModule.Manifold.sphere(1.0, 8);
+    const u = cube.add(sphere);
+    expect(u.statusWithContext(ctx)).toEqual('Cancelled');
+
+    cube.delete();
+    sphere.delete();
+    u.delete();
+    ctx.delete();
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat
