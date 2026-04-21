@@ -218,7 +218,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 }
 
 /**
- * Returns the number of triangles that are colinear within epsilon_.
+ * Returns the number of triangles that are colinear within tolerance_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
@@ -230,7 +230,7 @@ int Manifold::Impl::NumDegenerateTris() const {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos_[halfedge_[3 * face + i].startVert];
 
-    const int ccw = CCW(v[0], v[1], v[2], epsilon_ / 2);
+    const int ccw = CCW(v[0], v[1], v[2], tolerance_ / 2);
     return ccw == 0;
   });
 }
