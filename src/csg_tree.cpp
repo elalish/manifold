@@ -21,6 +21,7 @@
 
 #include "boolean3.h"
 #include "csg_tree.h"
+#include "execution_impl.h"
 #include "impl.h"
 #include "mesh_fixes.h"
 #include "parallel.h"
@@ -101,7 +102,8 @@ std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
   return pImpl_;
 }
 
-std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
+std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode(
+    ExecutionContext::Impl*) const {
   return std::make_shared<CsgLeafNode>(*this);
 }
 
@@ -144,8 +146,19 @@ std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
       std::make_shared<Manifold::Impl>(std::move(impl)));
 }
 
+// Build a leaf with the given error status — used to short-circuit boolean
+// evaluation on cancellation.
+std::shared_ptr<CsgLeafNode> ErrorLeaf(Manifold::Error err) {
+  Manifold::Impl impl;
+  impl.status_ = err;
+  return ImplToLeaf(std::move(impl));
+}
+
 std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
-                                           const Manifold::Impl& b, OpType op) {
+                                           const Manifold::Impl& b, OpType op,
+                                           ExecutionContext::Impl* ctx) {
+  if (ctx && ctx->cancel.load(std::memory_order_relaxed))
+    return ErrorLeaf(Manifold::Error::Cancelled);
 #ifdef MANIFOLD_DEBUG
   auto dump = [&]() {
     dump_lock.lock();
@@ -175,6 +188,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
       dump_lock.unlock();
       throw logicErr("self intersection detected");
     }
+    if (ctx) ctx->doneBooleans.fetch_add(1, std::memory_order_relaxed);
     return ImplToLeaf(std::move(impl));
   } catch (logicErr& err) {
     dump();
@@ -184,7 +198,9 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
     throw err;
   }
 #else
-  return ImplToLeaf(Boolean3(a, b, op).Result(op));
+  auto leaf = ImplToLeaf(Boolean3(a, b, op).Result(op));
+  if (ctx) ctx->doneBooleans.fetch_add(1, std::memory_order_relaxed);
+  return leaf;
 #endif
 }
 
@@ -379,7 +395,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
  * operation. Only supports union and intersection.
  */
 std::shared_ptr<CsgLeafNode> BatchBoolean(
-    OpType operation, std::vector<std::shared_ptr<CsgLeafNode>>& results) {
+    OpType operation, std::vector<std::shared_ptr<CsgLeafNode>>& results,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
                "BatchBoolean doesn't support Difference.");
@@ -388,7 +405,7 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   if (results.size() == 1) return results.front();
   if (results.size() == 2)
     return SimpleBoolean(*results[0]->GetImpl(), *results[1]->GetImpl(),
-                         operation);
+                         operation, ctx);
   std::vector<std::pair<std::shared_ptr<CsgLeafNode>, uint64_t>> heapNodes;
   heapNodes.reserve(results.size());
   for (size_t i = 0; i < results.size(); ++i) {
@@ -412,6 +429,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   for (int i = 0; i < 4; i++) parallelSerial.push_back(0);
 #endif
   while (heapNodes.size() > 1) {
+    if (ctx && ctx->cancel.load(std::memory_order_relaxed))
+      return ErrorLeaf(Manifold::Error::Cancelled);
     for (size_t i = 0; i < 4 && heapNodes.size() > 1; i++) {
       std::pop_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
       auto a = std::move(heapNodes.back());
@@ -422,11 +441,12 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
 #if MANIFOLD_PAR == 1
       parallelSerial[i] = nextSerial++;
       group.run([&, i, a = std::move(a.first), b = std::move(b.first)]() {
-        parallelTmp[i] = SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation);
+        parallelTmp[i] =
+            SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation, ctx);
       });
 #else
-      auto result =
-          SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(), operation);
+      auto result = SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(),
+                                  operation, ctx);
       tmp.emplace_back(std::move(result), nextSerial++);
 #endif
     }
@@ -449,7 +469,8 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
  * possible.
  */
 std::shared_ptr<CsgLeafNode> BatchUnion(
-    std::vector<std::shared_ptr<CsgLeafNode>>& children) {
+    std::vector<std::shared_ptr<CsgLeafNode>>& children,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // INVARIANT: children_ is a vector of leaf nodes
   // this kMaxUnionSize is a heuristic to avoid the pairwise disjoint check
@@ -460,6 +481,8 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
   DEBUG_ASSERT(!children.empty(), logicErr,
                "BatchUnion should not have empty children");
   while (children.size() > 1) {
+    if (ctx && ctx->cancel.load(std::memory_order_relaxed))
+      return ErrorLeaf(Manifold::Error::Cancelled);
     const size_t start = (children.size() > kMaxUnionSize)
                              ? (children.size() - kMaxUnionSize)
                              : 0;
@@ -495,11 +518,16 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
           tmp.push_back(children[start + j]);
         }
         impls.push_back(CsgLeafNode::Compose(tmp));
+        // Compose absorbs set.size() leaves into 1 leaf, which is
+        // set.size() - 1 leaf-reductions toward the final result.
+        if (ctx)
+          ctx->doneBooleans.fetch_add(static_cast<int>(set.size() - 1),
+                                      std::memory_order_relaxed);
       }
     }
 
     children.erase(children.begin() + start, children.end());
-    children.push_back(BatchBoolean(OpType::Add, impls));
+    children.push_back(BatchBoolean(OpType::Add, impls, ctx));
     // move it to the front as we process from the back, and the newly added
     // child should be quite complicated
     std::swap(children.front(), children.back());
@@ -580,7 +608,8 @@ struct CsgStackFrame {
         op_node(op_node) {}
 };
 
-std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
+std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
+    ExecutionContext::Impl* ctx) const {
   ZoneScoped;
   if (cache_ != nullptr) return cache_;
 
@@ -683,16 +712,31 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   //     destination->push_back(node->cache_->Transform(transform));
   // }
   while (!stack.empty()) {
+    if (ctx && ctx->cancel.load(std::memory_order_relaxed)) {
+      // Poison every op_node currently on the stack, not just `this`.
+      // Sub-ops may have had their impl_ partially mutated during finalize
+      // (children replaced with an intermediate result); leaving cache_
+      // unset would let a later evaluation of a shared sub-op run against
+      // a partially-reduced tree. Shared cache ensures any subsequent
+      // eval of any op on the stack returns Cancelled.
+      auto cancelled = ErrorLeaf(Manifold::Error::Cancelled);
+      for (auto& frame : stack) {
+        if (!frame->op_node->cache_) frame->op_node->cache_ = cancelled;
+      }
+      cache_ = cancelled;
+      return cache_;
+    }
     std::shared_ptr<CsgStackFrame> frame = stack.back();
     auto impl = frame->op_node->impl_.GetGuard();
     if (frame->finalize) {
       if (!frame->op_node->cache_) {
         switch (frame->op_node->op_) {
           case OpType::Add:
-            *impl = {BatchUnion(frame->positive_children)};
+            *impl = {BatchUnion(frame->positive_children, ctx)};
             break;
           case OpType::Intersect: {
-            *impl = {BatchBoolean(OpType::Intersect, frame->positive_children)};
+            *impl = {
+                BatchBoolean(OpType::Intersect, frame->positive_children, ctx)};
             break;
           };
           case OpType::Subtract:
@@ -700,14 +744,15 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
               // nothing to subtract from, so the result is empty.
               *impl = {std::make_shared<CsgLeafNode>()};
             } else {
-              auto positive = BatchUnion(frame->positive_children);
+              auto positive = BatchUnion(frame->positive_children, ctx);
               if (frame->negative_children.empty()) {
                 // nothing to subtract, result equal to the LHS.
                 *impl = {frame->positive_children[0]};
               } else {
-                auto negative = BatchUnion(frame->negative_children);
+                auto negative = BatchUnion(frame->negative_children, ctx);
                 *impl = {SimpleBoolean(*positive->GetImpl(),
-                                       *negative->GetImpl(), OpType::Subtract)};
+                                       *negative->GetImpl(), OpType::Subtract,
+                                       ctx)};
               }
             }
             break;
@@ -776,6 +821,34 @@ CsgNodeType CsgOpNode::GetNodeType() const {
   }
   // unreachable...
   return CsgNodeType::Leaf;
+}
+
+size_t CsgOpNode::NumLeaves() const {
+  // An already-evaluated CsgOpNode counts as a single leaf for the purposes
+  // of estimating remaining boolean work. Iterative walk: `+=` chains can
+  // produce very deep CsgOpNode trees that would blow the call stack if
+  // this were recursive.
+  if (cache_ != nullptr) return 1;
+  size_t total = 0;
+  std::vector<const CsgOpNode*> stack;
+  stack.push_back(this);
+  while (!stack.empty()) {
+    const CsgOpNode* op = stack.back();
+    stack.pop_back();
+    if (op->cache_ != nullptr) {
+      total += 1;
+      continue;
+    }
+    auto impl = op->impl_.GetGuard();
+    for (const auto& child : *impl) {
+      if (child->GetNodeType() == CsgNodeType::Leaf) {
+        total += 1;
+      } else {
+        stack.push_back(static_cast<const CsgOpNode*>(child.get()));
+      }
+    }
+  }
+  return total;
 }
 
 }  // namespace manifold

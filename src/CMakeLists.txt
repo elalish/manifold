@@ -19,6 +19,7 @@ set(
   constructors.cpp
   csg_tree.cpp
   edge_op.cpp
+  execution_impl.cpp
   face_op.cpp
   impl.cpp
   manifold.cpp
@@ -40,6 +41,7 @@ set(
   boolean3.h
   collider.h
   csg_tree.h
+  execution_impl.h
   hashtable.h
   impl.h
   iters.h

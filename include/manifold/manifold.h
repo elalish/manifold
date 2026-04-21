@@ -371,6 +371,7 @@ class Manifold {
     InvalidConstruction,
     ResultTooLarge,
     InvalidTangents,
+    Cancelled,
   };
 
   /** @name Information
@@ -378,6 +379,7 @@ class Manifold {
    */
   ///@{
   Error Status() const;
+  Error Status(ExecutionContext& ctx) const;
   bool IsEmpty() const;
   size_t NumVert() const;
   size_t NumEdge() const;
@@ -539,7 +541,7 @@ class Manifold {
   mutable std::shared_ptr<CsgNode> pNode_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;
-  CsgLeafNode& GetCsgLeafNode() const;
+  CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;
 };
 /** @} */
 
@@ -582,6 +584,8 @@ inline std::string ToString(const Manifold::Error& error) {
       return "Result Too Large";
     case Manifold::Error::InvalidTangents:
       return "Invalid Tangents";
+    case Manifold::Error::Cancelled:
+      return "Cancelled";
     default:
       return "Unknown Error";
   };

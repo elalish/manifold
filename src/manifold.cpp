@@ -16,6 +16,7 @@
 
 #include "boolean3.h"
 #include "csg_tree.h"
+#include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
@@ -157,10 +158,22 @@ std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
   return pNode_;
 }
 
-CsgLeafNode& Manifold::GetCsgLeafNode() const {
+CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
   std::lock_guard<std::mutex> lock(*pNodeMutex_);
+  if (ctx != nullptr) {
+    // Reset counters to reflect this evaluation. For pre-evaluated leaf
+    // Manifolds, NumLeaves() returns 1 so totalBooleans is 0 — no work.
+    // This also prevents stale counters from a previous use of the same
+    // ctx. The cancel flag is intentionally NOT reset — sticky cancel is
+    // part of the documented API contract (see ExecutionContext in
+    // common.h).
+    const size_t leaves = pNode_->NumLeaves();
+    ctx->totalBooleans.store(leaves > 0 ? static_cast<int>(leaves - 1) : 0,
+                             std::memory_order_relaxed);
+    ctx->doneBooleans.store(0, std::memory_order_relaxed);
+  }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
-    pNode_ = pNode_->ToLeafNode();
+    pNode_ = pNode_->ToLeafNode(ctx);
   }
   return *std::static_pointer_cast<CsgLeafNode>(pNode_);
 }
@@ -250,6 +263,19 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
+}
+/**
+ * Like Status() but observes evaluation progress and allows cancellation
+ * via the provided ExecutionContext. If cancel is requested mid-evaluation,
+ * returns Error::Cancelled and the Manifold's status becomes permanent.
+ *
+ * During evaluation, ExecutionContext::Progress() increases monotonically
+ * from 0 to 1 as boolean combinations complete. ExecutionContext::Cancel()
+ * can be called from any thread to request early exit. Cancellation
+ * granularity is per-boolean-operation.
+ */
+Manifold::Error Manifold::Status(ExecutionContext& ctx) const {
+  return GetCsgLeafNode(ctx.impl_.get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.

@@ -15,6 +15,7 @@
 #pragma once
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #ifdef MANIFOLD_DEBUG
@@ -168,6 +169,69 @@ struct RayHit {
   vec3 position = vec3(0.0);
   /// The geometric face normal at the hit.
   vec3 normal = vec3(0.0);
+};
+
+/**
+ * @brief Observe and control a long-running Manifold evaluation.
+ *
+ * Pass to Manifold::Status(ctx) to observe progress and optionally request
+ * cancellation of the evaluation. Safe to read/write from any thread.
+ *
+ * Copyable and movable: copies share the same underlying state via a
+ * shared_ptr, so one thread can evaluate while another holds a copy and
+ * observes Progress() or calls Cancel(). Use a separate context per
+ * evaluation; passing the same context (or a copy of it) to two
+ * concurrent Status(ctx) calls produces meaningless progress values
+ * because both calls reset and mutate the same counters.
+ *
+ * Cancellation is permanent for a Manifold: once requested and detected,
+ * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
+ * retry, construct a new Manifold. A context, however, is reusable: each
+ * Status(ctx) call resets the progress counters, but it does NOT clear
+ * the cancel flag — once Cancel() has been called on a context, every
+ * subsequent evaluation with that context (or any copy of it) will
+ * short-circuit to Error::Cancelled. Construct a fresh context to make a
+ * new evaluation cancellable independently.
+ *
+ * Cancellation granularity is currently per-boolean-operation; a single
+ * large boolean may run to completion before the flag is checked again.
+ * This may improve in future versions.
+ *
+ * Example: cancel from an observer thread.
+ * @code
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add);
+ * ExecutionContext ctx;
+ * std::thread eval([&] {
+ *   if (big.Status(ctx) == Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
+ * // ...later, from the UI thread:
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
+ */
+class ExecutionContext {
+ public:
+  ExecutionContext();
+  ~ExecutionContext();
+  ExecutionContext(const ExecutionContext&);
+  ExecutionContext(ExecutionContext&&) noexcept;
+  ExecutionContext& operator=(const ExecutionContext&);
+  ExecutionContext& operator=(ExecutionContext&&) noexcept;
+
+  /// Request cancellation. Can be called from any thread. Idempotent.
+  void Cancel();
+  /// Has cancellation been requested?
+  bool Cancelled() const;
+  /// Normalized progress in [0, 1]. Returns 0 before any work has been
+  /// scheduled. Monotonically increases during evaluation.
+  double Progress() const;
+
+  /// @internal Opaque implementation. Defined in src/execution_impl.h;
+  /// accessible only to internal code that includes that header.
+  struct Impl;
+  std::shared_ptr<Impl> impl_;
 };
 
 /**

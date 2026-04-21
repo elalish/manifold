@@ -15,7 +15,11 @@
 #include "manifold/manifold.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <thread>
 
+#include "../src/execution_impl.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -1410,4 +1414,359 @@ TEST(Manifold, RayCastSilhouetteEdge) {
 
   auto hits = cube.RayCast(vec3(0.5, 0, -5), vec3(0.5, 0, 5));
   EXPECT_TRUE(hits.size() == 0 || hits.size() == 2);
+}
+
+// A CSG tree with N leaves reduces to 1 result in N-1 combinations.
+TEST(Manifold, ExecutionContextProgress) {
+  // Build a tree with 5 leaves: a union of 5 cubes.
+  std::vector<Manifold> items;
+  for (int i = 0; i < 5; i++) {
+    items.push_back(Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
+  }
+  Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+
+  ExecutionContext ctx;
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 4);  // 5 leaves - 1
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 4);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Forcing evaluation first, then observing with a fresh context, should
+// report no pending work: the Manifold is already a leaf.
+TEST(Manifold, ExecutionContextAlreadyEvaluated) {
+  Manifold u = Manifold::Cube(vec3(1), true) + Manifold::Cube(vec3(1), true);
+  // Force evaluation.
+  EXPECT_EQ(u.Status(), Manifold::Error::NoError);
+
+  ExecutionContext ctx;
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
+}
+
+// Setting cancel before calling Status(ctx) should return Cancelled
+// without doing any work.
+TEST(Manifold, ExecutionContextCancelBeforeEval) {
+  std::vector<Manifold> items;
+  for (int i = 0; i < 10; i++) {
+    items.push_back(Manifold::Sphere(1.0, 32).Translate(vec3(i * 0.5, 0, 0)));
+  }
+  Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+}
+
+// Cancel from another thread mid-evaluation. Expensive CSG tree so there's
+// time to set the flag before the full eval finishes. Verify Error::Cancelled
+// is returned and doneBooleans < totalBooleans.
+//
+// MANIFOLD_PAR guard: emscripten/WASM builds without pthreads can't
+// construct std::thread and abort at runtime. Skip on non-parallel builds
+// — cancellation mid-evaluation isn't meaningful there anyway since the
+// eval is synchronous.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ExecutionContextCancelConcurrent) {
+  // Build a large enough tree that evaluation takes measurable time.
+  std::vector<Manifold> items;
+  for (int i = 0; i < 50; i++) {
+    items.push_back(Manifold::Sphere(1.0, 64).Translate(vec3(i * 0.3, 0, 0)));
+  }
+  Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+
+  ExecutionContext ctx;
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::thread evalThread([&] { result.store(u.Status(ctx)); });
+
+  // Yield briefly so evaluation starts, then request cancel.
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  ctx.Cancel();
+  evalThread.join();
+
+  // Cancel may have fired between ops or after the whole eval finished
+  // (depending on timing). Either Cancelled (expected) or NoError (raced
+  // past us) is acceptable.
+  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+              result.load() == Manifold::Error::NoError);
+  if (result.load() == Manifold::Error::Cancelled) {
+    EXPECT_LT(ctx.impl_->doneBooleans.load(), ctx.impl_->totalBooleans.load());
+  }
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Status() and Status(ctx) should return identical results when no cancel.
+TEST(Manifold, ExecutionContextMatchesPlainStatus) {
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+               Manifold::Tetrahedron();
+
+  // Build two equivalent manifolds (CsgOpNodes) to avoid caching effects.
+  auto makeTree = [] {
+    return (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+           Manifold::Tetrahedron();
+  };
+  Manifold a = makeTree();
+  Manifold b = makeTree();
+
+  Manifold::Error aStatus = a.Status();
+  ExecutionContext ctx;
+  Manifold::Error bStatus = b.Status(ctx);
+  EXPECT_EQ(aStatus, bStatus);
+}
+
+// N-1 invariant holds for Subtract trees too.
+TEST(Manifold, ExecutionContextProgressSubtract) {
+  // Tree shape: (cube + sphere) - tet - octahedron
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 16)) -
+               Manifold::Tetrahedron() - Manifold::Cube(vec3(0.5), true);
+
+  ExecutionContext ctx;
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 3);  // 4 leaves - 1
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 3);
+}
+
+// Reusing the same context for two sequential evaluations should reset
+// doneBooleans so Progress is always in [0, 1].
+TEST(Manifold, ExecutionContextReuse) {
+  auto makeTree = [](int n) {
+    std::vector<Manifold> items;
+    for (int i = 0; i < n; i++) {
+      items.push_back(
+          Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
+    }
+    return Manifold::BatchBoolean(items, OpType::Add);
+  };
+  Manifold a = makeTree(5);
+  Manifold b = makeTree(3);
+
+  ExecutionContext ctx;
+  EXPECT_EQ(a.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 4);
+
+  // Reuse ctx for b. doneBooleans should reset to 0 at start.
+  EXPECT_EQ(b.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Cancel is permanent: once fired, Status on that Manifold stays Cancelled
+// even when called without a context.
+TEST(Manifold, ExecutionContextCancelPermanent) {
+  std::vector<Manifold> items;
+  for (int i = 0; i < 30; i++) {
+    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.3, 0, 0)));
+  }
+  Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+
+  ExecutionContext ctx;
+  ctx.Cancel();  // cancel before any work
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+
+  // Plain Status() on the same Manifold should still report Cancelled —
+  // the cached leaf is the Cancelled one.
+  EXPECT_EQ(u.Status(), Manifold::Error::Cancelled);
+
+  // Re-querying with the same context (still cancelled) is still Cancelled.
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+}
+
+// Once a context is cancelled it stays cancelled for any future evaluation
+// through it — not just the Manifold in flight at the time of Cancel().
+TEST(Manifold, ExecutionContextCancelStickyAcrossManifolds) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+
+  // Fresh Manifold that needs evaluation (CsgOpNode, not a leaf) — the
+  // cancelled ctx should short-circuit it to Cancelled.
+  Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::Cancelled);
+
+  // Another unrelated Manifold, same ctx — also Cancelled.
+  Manifold v =
+      Manifold::Tetrahedron() + Manifold::Sphere(0.3).Translate(vec3(2, 0, 0));
+  EXPECT_EQ(v.Status(ctx), Manifold::Error::Cancelled);
+}
+
+// A cancelled ctx does NOT contaminate a fresh context: constructing a new
+// ExecutionContext gives an evaluation that can complete normally.
+TEST(Manifold, ExecutionContextFreshContextEscapesCancel) {
+  ExecutionContext cancelledCtx;
+  cancelledCtx.Cancel();
+  Manifold dead = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(dead.Status(cancelledCtx), Manifold::Error::Cancelled);
+
+  ExecutionContext fresh;
+  Manifold live = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(live.Status(fresh), Manifold::Error::NoError);
+  EXPECT_FALSE(fresh.Cancelled());
+}
+
+// A cancelled ctx applied to a Manifold that is already a leaf (no
+// evaluation needed) returns the Manifold's real status — cancel only
+// applies when there is actual evaluation work to short-circuit. This
+// matches the docstring phrasing "every subsequent evaluation".
+TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
+  Manifold cube = Manifold::Cube();  // CsgLeafNode from the start
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(cube.Status(ctx), Manifold::Error::NoError);
+}
+
+// Progress is observable from another thread while evaluation runs.
+// MANIFOLD_PAR guard: see note on ExecutionContextCancelConcurrent above.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ExecutionContextConcurrentProgress) {
+  std::vector<Manifold> items;
+  for (int i = 0; i < 30; i++) {
+    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.5, 0, 0)));
+  }
+  Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+
+  ExecutionContext ctx;
+  std::atomic<bool> sawProgress{false};
+  std::thread observer([&] {
+    for (int i = 0; i < 1000 && !sawProgress.load(); i++) {
+      int done = ctx.impl_->doneBooleans.load();
+      int total = ctx.impl_->totalBooleans.load();
+      if (total > 0 && done > 0 && done <= total) {
+        sawProgress.store(true);
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  });
+
+  EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+  observer.join();
+  // Final state invariants.
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 29);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 29);
+  // We expect to have seen a mid-evaluation snapshot, though this is
+  // timing-dependent. Not strictly required but usually the case.
+  // (Not asserting sawProgress to avoid CI flakes.)
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Calling Status(ctx) on an already-evaluated Manifold should reset counters,
+// not leave stale values from a previous evaluation on a different Manifold.
+TEST(Manifold, ExecutionContextNoStaleState) {
+  Manifold complex = Manifold::BatchBoolean(
+      {Manifold::Cube(vec3(1), true),
+       Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)),
+       Manifold::Cube(vec3(1), true).Translate(vec3(4, 0, 0))},
+      OpType::Add);
+  Manifold leaf = Manifold::Cube(vec3(1), true);
+
+  ExecutionContext ctx;
+  EXPECT_EQ(complex.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+
+  // Now evaluate a leaf Manifold with the same ctx. Counters should
+  // reflect that there's no work to do (0/0), not the stale 2/2.
+  EXPECT_EQ(leaf.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
+}
+
+// ExecutionContext copies share state (pimpl semantics): one thread
+// evaluates, another thread holds a copy and observes the same progress.
+TEST(Manifold, ExecutionContextCopyShareState) {
+  ExecutionContext ctx1;
+  ExecutionContext ctx2 = ctx1;  // copy shares impl
+
+  // Cancel on one copy should be observable through the other.
+  EXPECT_FALSE(ctx2.Cancelled());
+  ctx1.Cancel();
+  EXPECT_TRUE(ctx1.Cancelled());
+  EXPECT_TRUE(ctx2.Cancelled());
+
+  // Counters also shared.
+  EXPECT_EQ(ctx1.impl_->totalBooleans.load(), 0);
+  ctx2.impl_->totalBooleans.store(42);
+  EXPECT_EQ(ctx1.impl_->totalBooleans.load(), 42);
+}
+
+// Move construction and move assignment preserve shared state.
+TEST(Manifold, ExecutionContextMoveSemantics) {
+  ExecutionContext ctx1;
+  ctx1.Cancel();
+  ExecutionContext ctx2 = std::move(ctx1);  // move-construct
+  EXPECT_TRUE(ctx2.Cancelled());
+
+  ExecutionContext ctx3;
+  EXPECT_FALSE(ctx3.Cancelled());
+  ctx3 = std::move(ctx2);  // move-assign
+  EXPECT_TRUE(ctx3.Cancelled());
+}
+
+// A Manifold that's already a leaf (no CSG tree) should report no work.
+TEST(Manifold, ExecutionContextNoWorkNeeded) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  ExecutionContext ctx;
+  EXPECT_EQ(cube.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 0.0);  // 0/0 is defined as 0
+}
+
+// doneBooleans reaches totalBooleans exactly for many tree shapes — the N-1
+// invariant shouldn't depend on op type or tree shape.
+TEST(Manifold, ExecutionContextProgressInvariant) {
+  // Intersect
+  {
+    std::vector<Manifold> items{
+        Manifold::Cube(vec3(2), true),
+        Manifold::Cube(vec3(2), true).Translate(vec3(0.5, 0, 0)),
+        Manifold::Cube(vec3(2), true).Translate(vec3(0, 0.5, 0))};
+    Manifold u = Manifold::BatchBoolean(items, OpType::Intersect);
+    ExecutionContext ctx;
+    EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+    EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);
+    EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+  }
+  // Mixed Add/Subtract
+  {
+    Manifold u = (Manifold::Cube(vec3(1), true) +
+                  Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0))) -
+                 Manifold::Tetrahedron();
+    ExecutionContext ctx;
+    EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+    EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);  // 3 leaves - 1
+    EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+  }
+  // Disjoint union (triggers Compose path)
+  {
+    std::vector<Manifold> items;
+    for (int i = 0; i < 6; i++) {
+      items.push_back(
+          Manifold::Cube(vec3(0.5), true).Translate(vec3(i * 2, 0, 0)));
+    }
+    Manifold u = Manifold::BatchBoolean(items, OpType::Add);
+    ExecutionContext ctx;
+    EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
+    EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
+    EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
+  }
+}
+
+// Deeply-nested CsgOpNode chain (e.g. repeated `+=` in a loop) must not
+// stack-overflow in the leaf-counting pre-pass. Cancel up front so we only
+// exercise NumLeaves, not the full boolean evaluation.
+//
+// 300k depth SIGSEGVs on the recursive NumLeaves (8MB default stack on
+// macOS/Linux); runs in ~1s / ~1.2GB peak RSS on the iterative version.
+TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
+  constexpr int kDepth = 300000;
+  Manifold m = Manifold::Cube(vec3(1), true);
+  for (int i = 0; i < kDepth; ++i) {
+    m = m + Manifold::Cube(vec3(1), true).Translate(vec3(i * 2.0, 0, 0));
+  }
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(m.Status(ctx), Manifold::Error::Cancelled);
+  // kDepth + 1 leaves in the chain → kDepth booleans to reduce.
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), kDepth);
 }

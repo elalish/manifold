@@ -116,6 +116,9 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::InvalidTangents:
       e = MANIFOLD_INVALID_TANGENTS;
       break;
+    case Manifold::Error::Cancelled:
+      e = MANIFOLD_CANCELLED;
+      break;
   };
   return e;
 }
