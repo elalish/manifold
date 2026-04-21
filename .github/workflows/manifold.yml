@@ -402,8 +402,8 @@ jobs:
           -DMANIFOLD_PAR=OFF \
           -DCMAKE_C_COMPILER=clang \
           -DCMAKE_CXX_COMPILER=clang++ \
-          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
-          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" \
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
           -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
           -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
@@ -414,7 +414,7 @@ jobs:
         ASAN_OPTIONS: detect_container_overflow=0
         UBSAN_OPTIONS: print_stacktrace=1
       run: |
-        ./build/test/manifold_test --gtest_filter="Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect"
+        ./build/test/manifold_test --gtest_filter="Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Manifold.MeshDeterminism"
 
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})
