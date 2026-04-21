@@ -137,6 +137,9 @@ export interface ExecutionContext {
   cancelled(): boolean;
   /** Normalized progress in [0, 1]. Monotonic within an evaluation. */
   progress(): number;
-  /** Release the underlying memory. */
+  /**
+   * Frees the WASM memory of this ExecutionContext, since these cannot be
+   * garbage-collected automatically.
+   */
   delete(): void;
 }
