@@ -32,8 +32,7 @@ if (navigator.serviceWorker) {
   const disableServiceWorker = params.has('no-sw');
   const isLocalhost = window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1';
-  const skipServiceWorker =
-      disableServiceWorker || import.meta.env.DEV || isLocalhost;
+  const isDevEnv = import.meta.env.DEV;
 
   if (window.caches) {
     window.caches.keys().then(keys => {
@@ -44,7 +43,8 @@ if (navigator.serviceWorker) {
     });
   }
 
-  if (skipServiceWorker) {
+  // Disable the service worker if asked, in development, or on localhost.
+  if (disableServiceWorker || isDevEnv || isLocalhost) {
     // Explicit escape hatch for debugging cache-related issues.
     navigator.serviceWorker.getRegistrations().then(registrations => {
       registrations.forEach(registration => registration.unregister());
@@ -83,117 +83,102 @@ let monaco = null;
 let monacoModulesPromise = null;
 let monacoSuggestPromise = null;
 let monacoNavigationPromise = null;
-let monacoContributionsPromise = null;
 let monacoContributionsReady = false;
 let autoTypings = null;
 let autoTypingsPromise = null;
 let esbuildWasmPreloadPromise = null;
 let updateTypeIndicator = () => {};
 
-async function loadMonacoModules() {
-  if (!monacoModulesPromise) {
-    monacoModulesPromise =
-        Promise
-            .all([
-              import('monaco-editor/esm/vs/editor/editor.api'),
-              // Load TS tokenizer early so first paint has syntax colors
-              // without waiting for hover-driven language-service activation.
-              import(
-                  'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
-              import(
-                  'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
-              // '?worker' is vite convention to load a module as a web worker.
-              import('monaco-editor/esm/vs/editor/editor.worker?worker'),
-              import(
-                  'monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
-            ])
-            .then(([monacoModule, _, __, editorWorkerModule,
-                    tsWorkerModule]) => ({
-                    monaco: monacoModule,
-                    editorWorker: editorWorkerModule.default,
-                    tsWorker: tsWorkerModule.default,
-                  }));
-  }
-  return monacoModulesPromise;
+function memoizeAsync(loadFn, {resetOnReject = false} = {}) {
+  let promise = null;
+  return () => {
+    if (!promise) {
+      promise = Promise.resolve().then(loadFn);
+      if (resetOnReject) {
+        promise = promise.catch(error => {
+          promise = null;
+          throw error;
+        });
+      }
+    }
+    return promise;
+  };
 }
 
-function ensureMonacoContributionsLoaded() {
-  if (!monacoContributionsPromise) {
-    monacoContributionsPromise =
-        import('monaco-editor/esm/vs/editor/editor.all')
-            .then(module => {
-              monacoContributionsReady = true;
-              return module;
-            })
-            .catch(error => {
-              monacoContributionsPromise = null;
-              monacoContributionsReady = false;
-              throw error;
-            });
-  }
-  return monacoContributionsPromise;
-}
+const loadMonacoModules = memoizeAsync(async () => {
+  monacoModulesPromise =
+      Promise
+          .all([
+            import('monaco-editor/esm/vs/editor/editor.api'),
+            // Load TS tokenizer early so first paint has syntax colors
+            // without waiting for hover-driven language-service activation.
+            import(
+                'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
+            import(
+                'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
+            // '?worker' is vite convention to load a module as a web worker.
+            import('monaco-editor/esm/vs/editor/editor.worker?worker'),
+            import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
+          ])
+          .then(
+              ([monacoModule, _, __, editorWorkerModule, tsWorkerModule]) => ({
+                monaco: monacoModule,
+                editorWorker: editorWorkerModule.default,
+                tsWorker: tsWorkerModule.default,
+              }));
+  return monacoModulesPromise;
+}, {resetOnReject: true});
+
+const ensureMonacoContributionsLoaded = memoizeAsync(
+    () => import('monaco-editor/esm/vs/editor/editor.all').then(module => {
+      monacoContributionsReady = true;
+      return module;
+    }),
+    {resetOnReject: true});
 
 function ensureMonacoSuggestLoaded() {
   // Load only the minimal contributions needed for autocomplete/parameter
   // hints. These need to be loaded before editor creation to attach reliably.
-  if (!monacoSuggestPromise) {
-    monacoSuggestPromise =
-        Promise
-            .all([
-              import(
-                  'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController.js'),
-              import(
-                  'monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js'),
-            ])
-            .catch(error => {
-              monacoSuggestPromise = null;
-              throw error;
-            });
-  }
+  monacoSuggestPromise =
+      monacoSuggestPromise ?? ensureMonacoSuggestLoadedMemoized();
   return monacoSuggestPromise;
 }
+
+const ensureMonacoSuggestLoadedMemoized = memoizeAsync(
+    () => Promise.all([
+      import(
+          'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js'),
+    ]),
+    {resetOnReject: true});
 
 function ensureMonacoNavigationLoaded() {
   // Minimal contributions that enable clickable links + hover + "go to
   // definition" without pulling the full `editor.all` bundle up-front.
-  if (!monacoNavigationPromise) {
-    monacoNavigationPromise =
-        Promise
-            .all([
-              import(
-                  'monaco-editor/esm/vs/editor/contrib/links/browser/links.js'),
-              import(
-                  'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js'),
-              import(
-                  'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js'),
-            ])
-            .catch(error => {
-              monacoNavigationPromise = null;
-              throw error;
-            });
-  }
+  monacoNavigationPromise =
+      monacoNavigationPromise ?? ensureMonacoNavigationLoadedMemoized();
   return monacoNavigationPromise;
 }
 
-function ensureEsbuildWasmPreloaded() {
-  if (!esbuildWasmPreloadPromise) {
-    esbuildWasmPreloadPromise =
-        fetch(esbuildWasmUrl, {cache: 'force-cache'})
-            .then(response => {
-              if (!response.ok) {
-                throw new Error(
-                    `Failed to preload esbuild.wasm (${response.status})`);
-              }
-              return response.arrayBuffer();
-            })
-            .catch(error => {
-              esbuildWasmPreloadPromise = null;
-              throw error;
-            });
-  }
-  return esbuildWasmPreloadPromise;
-}
+const ensureMonacoNavigationLoadedMemoized = memoizeAsync(
+    () => Promise.all([
+      import('monaco-editor/esm/vs/editor/contrib/links/browser/links.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js'),
+    ]),
+    {resetOnReject: true});
+
+const ensureEsbuildWasmPreloaded = memoizeAsync(
+    () => fetch(esbuildWasmUrl, {cache: 'force-cache'}).then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to preload esbuild.wasm (${response.status})`);
+      }
+      return response.arrayBuffer();
+    }),
+    {resetOnReject: true});
 
 // Pane resizing - draggable pane dividers ---------------------
 
