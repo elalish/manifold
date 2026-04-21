@@ -180,7 +180,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
     dump_lock.unlock();
   };
   try {
-    Boolean3 boolean(a, b, op);
+    Boolean3 boolean(a, b, op, ctx);
     auto impl = boolean.Result(op);
     if (ManifoldParams().selfIntersectionChecks && impl.IsSelfIntersecting()) {
       dump_lock.lock();
@@ -198,7 +198,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
     throw err;
   }
 #else
-  auto leaf = ImplToLeaf(Boolean3(a, b, op).Result(op));
+  auto leaf = ImplToLeaf(Boolean3(a, b, op, ctx).Result(op));
   if (ctx) ctx->doneBooleans.fetch_add(1, std::memory_order_relaxed);
   return leaf;
 #endif
