@@ -793,6 +793,12 @@ ManifoldError manifold_status(ManifoldManifold* m) {
   return to_c(error);
 }
 
+ManifoldError manifold_status_with_context(ManifoldManifold* m,
+                                           ManifoldExecutionContext* ctx) {
+  auto error = from_c(m)->Status(*from_c(ctx));
+  return to_c(error);
+}
+
 size_t manifold_num_vert(ManifoldManifold* m) { return from_c(m)->NumVert(); }
 size_t manifold_num_edge(ManifoldManifold* m) { return from_c(m)->NumEdge(); }
 size_t manifold_num_tri(ManifoldManifold* m) { return from_c(m)->NumTri(); }
@@ -867,6 +873,22 @@ ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
   return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
 }
 
+ManifoldExecutionContext* manifold_execution_context(void* mem) {
+  return to_c(new (mem) ExecutionContext());
+}
+
+void manifold_execution_context_cancel(ManifoldExecutionContext* ctx) {
+  from_c(ctx)->Cancel();
+}
+
+int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx) {
+  return from_c(ctx)->Cancelled() ? 1 : 0;
+}
+
+double manifold_execution_context_progress(ManifoldExecutionContext* ctx) {
+  return from_c(ctx)->Progress();
+}
+
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle) {
@@ -924,6 +946,7 @@ size_t manifold_meshgl64_size() { return sizeof(MeshGL64); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
 size_t manifold_triangulation_size() { return sizeof(std::vector<ivec3>); }
+size_t manifold_execution_context_size() { return sizeof(ExecutionContext); }
 
 // allocation
 //
@@ -963,6 +986,9 @@ ManifoldRect* manifold_alloc_rect() { return to_c(alloc_raw<Rect>()); }
 ManifoldTriangulation* manifold_alloc_triangulation() {
   return to_c(alloc_raw<std::vector<ivec3>>());
 }
+ManifoldExecutionContext* manifold_alloc_execution_context() {
+  return to_c(alloc_raw<ExecutionContext>());
+}
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection* c) {
@@ -986,6 +1012,9 @@ void manifold_delete_box(ManifoldBox* b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect* r) { delete from_c(r); }
 void manifold_delete_triangulation(ManifoldTriangulation* m) {
   delete from_c(m);
+}
+void manifold_delete_execution_context(ManifoldExecutionContext* ctx) {
+  delete from_c(ctx);
 }
 
 // destruction
@@ -1012,6 +1041,9 @@ void manifold_destruct_box(ManifoldBox* b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect* r) { from_c(r)->~Rect(); }
 void manifold_destruct_triangulation(ManifoldTriangulation* m) {
   from_c(m)->~vector<ivec3>();
+}
+void manifold_destruct_execution_context(ManifoldExecutionContext* ctx) {
+  from_c(ctx)->~ExecutionContext();
 }
 
 // IO

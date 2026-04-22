@@ -42,6 +42,7 @@ ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
 ManifoldTriangulation* to_c(std::vector<ivec3>* m);
 ManifoldRayHitVec* to_c(RayHitVec* v);
+ManifoldExecutionContext* to_c(ExecutionContext* ctx);
 
 manifold::Manifold* from_c(ManifoldManifold* m);
 ManifoldVec* from_c(ManifoldManifoldVec* ms);
@@ -62,6 +63,7 @@ ivec3 from_c(ManifoldIVec3 v);
 vec4 from_c(ManifoldVec4 v);
 std::vector<ivec3>* from_c(ManifoldTriangulation* m);
 RayHitVec* from_c(ManifoldRayHitVec* v);
+ExecutionContext* from_c(ManifoldExecutionContext* ctx);
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length);
 std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length);

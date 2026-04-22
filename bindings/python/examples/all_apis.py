@@ -107,6 +107,18 @@ def all_manifold():
     m, n = m.split(m.translate((1, 0, 0)))
     m, n = m.split_by_plane((0, 0, 1), 0)
     e = m.status()
+    ctx = ExecutionContext()
+    _ = ctx.cancelled()
+    _ = ctx.progress()
+    ctx.cancel()
+    e = m.status(ctx)
+    # Real cancel assertion: a pre-cancelled ctx on a CsgOpNode returns
+    # Cancelled (not NoError). Leaf nodes are trivially evaluated so use a
+    # fresh union to ensure an actual CSG tree is traversed.
+    cancelled_ctx = ExecutionContext()
+    cancelled_ctx.cancel()
+    tree = Manifold.cube() + Manifold.sphere(1)
+    assert tree.status(cancelled_ctx) == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
     ok = mesh.merge()

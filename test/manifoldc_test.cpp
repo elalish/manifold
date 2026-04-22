@@ -711,3 +711,50 @@ TEST(CBIND, alloc_delete_roundtrip) {
     manifold_delete_cross_section(cs);
   }
 }
+
+TEST(CBIND, execution_context_happy_path) {
+  // malloc + destruct + free pattern (matches most other tests in this file).
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 0.0);
+
+  // Uncancelled ctx on a valid evaluation returns NO_ERROR.
+  ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
+  ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
+  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_NO_ERROR);
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
+
+  manifold_destruct_manifold(u);
+  manifold_destruct_manifold(cube2);
+  manifold_destruct_manifold(cube1);
+  manifold_destruct_execution_context(ctx);
+  free(u);
+  free(cube2);
+  free(cube1);
+  free(ctx);
+}
+
+TEST(CBIND, execution_context_cancel) {
+  // alloc + delete pattern (matches the Rust binding's usage of the C API).
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(manifold_alloc_execution_context());
+  manifold_execution_context_cancel(ctx);
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 1);
+
+  // Status on a Manifold that needs evaluation, with the cancelled ctx,
+  // short-circuits to MANIFOLD_CANCELLED.
+  ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
+  ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
+  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_CANCELLED);
+
+  manifold_destruct_manifold(u);
+  manifold_destruct_manifold(cube2);
+  manifold_destruct_manifold(cube1);
+  free(u);
+  free(cube2);
+  free(cube1);
+  manifold_delete_execution_context(ctx);
+}

@@ -16,7 +16,9 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, ExecutionContext, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+
+export {ExecutionContext} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -1164,6 +1166,15 @@ export class Manifold {
    * @group Information
    */
   status(): ErrorStatus;
+
+  /**
+   * Like status() but observes evaluation progress and allows cancellation
+   * via the provided ExecutionContext. If cancel is requested mid-evaluation,
+   * returns 'Cancelled' and the Manifold's status becomes permanent.
+   *
+   * @group Information
+   */
+  statusWithContext(ctx: ExecutionContext): ErrorStatus;
 
   // Export
 
