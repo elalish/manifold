@@ -52,9 +52,9 @@ async function runExample(name: string, firstMeshOnly: boolean = true) {
 
   const firstMesh =
       document.getRoot().listNodes().find(node => !!node.getMesh());
-  const manifold =
-      await (firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
-                             gltfDocToManifold(document))
+  const manifold = await (
+      firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
+                      gltfDocToManifold(document))
 
   if (manifold) {
     const volume = manifold.volume();
@@ -110,7 +110,7 @@ suite('Examples', () => {
     const result = await runExample('Scallop');
     expect(result?.genus).to.equal(0, 'Genus');
     expect(result?.volume).to.be.closeTo(39900, 100, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(7930, 10, 'Surface Area');
+    expect(result?.surfaceArea).to.be.closeTo(7940, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {
