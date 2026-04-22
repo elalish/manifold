@@ -224,23 +224,22 @@ TEST(Smooth, MissingNormalsCone) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Fillet) {
   float depth = 3;
-  Manifold cylinder = Manifold::Cylinder(10, 10, 10, 6, false)
-                          .SetTolerance(0.001)
-                          .CalculateNormals(0, 80);
-  Polygons section = CrossSection(cylinder.Slice(0)).ToPolygons();
-  Manifold chamfer = Manifold::Extrude(section, depth, 0, 0, {1.2, 1.2})
-                         .SetTolerance(0.001)
+  float radius = 10;
+  Manifold cylinder =
+      Manifold::Cylinder(10, radius, radius, 6, false).CalculateNormals(0, 80);
+  Manifold chamfer = Manifold::Extrude(cylinder.Slice(0), depth, 0, 0,
+                                       vec2(radius + depth) / radius)
+                         .Simplify()
                          .Mirror({0, 0, 1});
-  Manifold base = Manifold::Cube(vec3(40), true)
-                      .Translate({0, 0, -20 - depth})
-                      .CalculateNormals(0);
-  Manifold chamfered = (cylinder + chamfer) - base;
+  Manifold base = Manifold::Cylinder(5, 15, 15, 6)
+                      .Translate({0, 0, -5 - depth})
+                      .CalculateNormals(0, 80);
+  Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
-  Manifold fillet = chamfered.SmoothByNormals(0).Refine(10);
+  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  // This doesn't give good results yet
-  // EXPECT_NEAR(fillet.Volume(), 1092, 1);
-  // EXPECT_NEAR(fillet.SurfaceArea(), 748, 1);
+  EXPECT_NEAR(fillet.Volume(), 7745, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
 #endif
