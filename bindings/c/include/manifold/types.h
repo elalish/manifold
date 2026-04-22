@@ -30,6 +30,7 @@ typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldTriangulation ManifoldTriangulation;
+typedef struct ManifoldExecutionContext ManifoldExecutionContext;
 
 // structs
 

@@ -391,6 +391,10 @@ NB_MODULE(manifold3d, m) {
           "status",
           static_cast<Manifold::Error (Manifold::*)() const>(&Manifold::Status),
           manifold__status)
+      .def("status",
+           static_cast<Manifold::Error (Manifold::*)(ExecutionContext&) const>(
+               &Manifold::Status),
+           nb::arg("ctx"), manifold__status__ctx)
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -717,6 +721,12 @@ NB_MODULE(manifold3d, m) {
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)
       .def_ro("normal", &RayHit::normal);
+
+  nb::class_<ExecutionContext>(m, "ExecutionContext")
+      .def(nb::init<>())
+      .def("cancel", &ExecutionContext::Cancel)
+      .def("cancelled", &ExecutionContext::Cancelled)
+      .def("progress", &ExecutionContext::Progress);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)

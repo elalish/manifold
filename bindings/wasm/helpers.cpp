@@ -245,8 +245,8 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
   return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
-std::string Status(Manifold& manifold) {
-  switch (manifold.Status()) {
+std::string ErrorToString(Manifold::Error error) {
+  switch (error) {
     case Manifold::Error::NoError:
       return "NoError";
     case Manifold::Error::NonFiniteVertex:
@@ -275,9 +275,19 @@ std::string Status(Manifold& manifold) {
       return "ResultTooLarge";
     case Manifold::Error::InvalidTangents:
       return "InvalidTangents";
+    case Manifold::Error::Cancelled:
+      return "Cancelled";
     default:
       return "UnknownError";
   }
+}
+
+std::string Status(Manifold& manifold) {
+  return ErrorToString(manifold.Status());
+}
+
+std::string StatusWithContext(Manifold& manifold, ExecutionContext& ctx) {
+  return ErrorToString(manifold.Status(ctx));
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

@@ -15,15 +15,12 @@
 // '?url' is vite convention to reference a static asset.
 // vite will package the asset and provide a proper URL.
 import '@google/model-viewer';
+import 'monaco-editor/esm/vs/editor/browser/widget/codeEditor/editor.css';
+import 'monaco-editor/esm/vs/editor/standalone/browser/standalone-tokens.css';
 
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
 import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import {AutoTypings, JsDelivrSourceResolver, LocalStorageCache} from 'monaco-editor-auto-typings';
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.main';
-// '?worker' is vite convention to load a module as a web worker.
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import {Box3, BufferGeometry, CanvasTexture, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PlaneGeometry, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
@@ -33,6 +30,9 @@ const exampleFunctions = self.examples;
 if (navigator.serviceWorker) {
   const params = new URLSearchParams(window.location.search);
   const disableServiceWorker = params.has('no-sw');
+  const isLocalhost = window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+  const isDevEnv = import.meta.env.DEV;
 
   if (window.caches) {
     window.caches.keys().then(keys => {
@@ -43,7 +43,8 @@ if (navigator.serviceWorker) {
     });
   }
 
-  if (disableServiceWorker) {
+  // Disable the service worker if asked, in development, or on localhost.
+  if (disableServiceWorker || isDevEnv || isLocalhost) {
     // Explicit escape hatch for debugging cache-related issues.
     navigator.serviceWorker.getRegistrations().then(registrations => {
       registrations.forEach(registration => registration.unregister());
@@ -77,7 +78,107 @@ if (navigator.serviceWorker) {
   }
 }
 
-let editor = undefined;
+let editor = null;
+let monaco = null;
+let monacoModulesPromise = null;
+let monacoSuggestPromise = null;
+let monacoNavigationPromise = null;
+let monacoContributionsReady = false;
+let autoTypings = null;
+let autoTypingsPromise = null;
+let esbuildWasmPreloadPromise = null;
+let updateTypeIndicator = () => {};
+
+function memoizeAsync(loadFn, {resetOnReject = false} = {}) {
+  let promise = null;
+  return () => {
+    if (!promise) {
+      promise = Promise.resolve().then(loadFn);
+      if (resetOnReject) {
+        promise = promise.catch(error => {
+          promise = null;
+          throw error;
+        });
+      }
+    }
+    return promise;
+  };
+}
+
+const loadMonacoModules = memoizeAsync(async () => {
+  monacoModulesPromise =
+      Promise
+          .all([
+            import('monaco-editor/esm/vs/editor/editor.api'),
+            // Load TS tokenizer early so first paint has syntax colors
+            // without waiting for hover-driven language-service activation.
+            import(
+                'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
+            import(
+                'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
+            // '?worker' is vite convention to load a module as a web worker.
+            import('monaco-editor/esm/vs/editor/editor.worker?worker'),
+            import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
+          ])
+          .then(
+              ([monacoModule, _, __, editorWorkerModule, tsWorkerModule]) => ({
+                monaco: monacoModule,
+                editorWorker: editorWorkerModule.default,
+                tsWorker: tsWorkerModule.default,
+              }));
+  return monacoModulesPromise;
+}, {resetOnReject: true});
+
+const ensureMonacoContributionsLoaded = memoizeAsync(
+    () => import('monaco-editor/esm/vs/editor/editor.all').then(module => {
+      monacoContributionsReady = true;
+      return module;
+    }),
+    {resetOnReject: true});
+
+function ensureMonacoSuggestLoaded() {
+  // Load only the minimal contributions needed for autocomplete/parameter
+  // hints. These need to be loaded before editor creation to attach reliably.
+  monacoSuggestPromise =
+      monacoSuggestPromise ?? ensureMonacoSuggestLoadedMemoized();
+  return monacoSuggestPromise;
+}
+
+const ensureMonacoSuggestLoadedMemoized = memoizeAsync(
+    () => Promise.all([
+      import(
+          'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js'),
+    ]),
+    {resetOnReject: true});
+
+function ensureMonacoNavigationLoaded() {
+  // Minimal contributions that enable clickable links + hover + "go to
+  // definition" without pulling the full `editor.all` bundle up-front.
+  monacoNavigationPromise =
+      monacoNavigationPromise ?? ensureMonacoNavigationLoadedMemoized();
+  return monacoNavigationPromise;
+}
+
+const ensureMonacoNavigationLoadedMemoized = memoizeAsync(
+    () => Promise.all([
+      import('monaco-editor/esm/vs/editor/contrib/links/browser/links.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js'),
+      import(
+          'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js'),
+    ]),
+    {resetOnReject: true});
+
+const ensureEsbuildWasmPreloaded = memoizeAsync(
+    () => fetch(esbuildWasmUrl, {cache: 'force-cache'}).then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to preload esbuild.wasm (${response.status})`);
+      }
+      return response.arrayBuffer();
+    }),
+    {resetOnReject: true});
 
 // Pane resizing - draggable pane dividers ---------------------
 
@@ -262,6 +363,9 @@ function getAllScripts() {
 }
 
 function getModelForScript(filename) {
+  if (!monaco) {
+    throw new Error('Monaco is not initialized yet.');
+  }
   const uri = monaco.Uri.parse(`inmemory://model/${filename}.ts`);
   const model = monaco.editor.getModel(uri) ||
       monaco.editor.createModel('', 'typescript', uri);
@@ -467,6 +571,11 @@ function initializeRun() {
 // Editor ------------------------------------------------------------
 
 async function createEditor() {
+  const monacoModules = await loadMonacoModules();
+  monaco = monacoModules.monaco;
+  const {editorWorker, tsWorker} = monacoModules;
+  await ensureMonacoSuggestLoaded();
+  await ensureMonacoNavigationLoaded();
   self.MonacoEnvironment = {
     getWorker: (_, label) => {
       if (label === 'typescript' || label === 'javascript') {
@@ -479,8 +588,12 @@ async function createEditor() {
 
   editor = monaco.editor.create(document.getElementById('editor'), {
     language: 'typescript',
+    theme: 'vs',
     automaticLayout: true,
     minimap: {enabled: false},
+    quickSuggestions: true,
+    suggestOnTriggerCharacters: true,
+    parameterHints: {enabled: true},
 
 
     // make monaco editor to wrap the content,and hide horizontal
@@ -501,8 +614,7 @@ async function createEditor() {
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-    module: monaco.languages.typescript.ScriptTarget.ESNext,
-    moduleResolution: monaco.languages.typescript.ScriptTarget.NodeNext,
+    target: monaco.languages.typescript.ScriptTarget.ESNext,
     allowNonTsExtensions: true,
   });
 
@@ -531,70 +643,53 @@ async function createEditor() {
   // Initialize auto typing on monaco editor.
   const typeIndicator = document.querySelector('#type-indicator');
   let typeIndicatorFrame = 0;
-  let autoTypings = undefined;
 
-  const syncTypeIndicator = () => {
+  updateTypeIndicator = () => {
     if (!typeIndicator || !autoTypings) return;
     typeIndicator.textContent =
         autoTypings.isResolving ? 'Fetching types...' : '';
-    typeIndicatorFrame =
-        autoTypings.isResolving ? requestAnimationFrame(syncTypeIndicator) : 0;
+    typeIndicatorFrame = autoTypings.isResolving ?
+        requestAnimationFrame(updateTypeIndicator) :
+        0;
   };
 
   const showTypeIndicator = () => {
     if (!typeIndicator) return;
     typeIndicator.textContent = 'Fetching types...';
     if (autoTypings && typeIndicatorFrame === 0) {
-      typeIndicatorFrame = requestAnimationFrame(syncTypeIndicator);
+      typeIndicatorFrame = requestAnimationFrame(updateTypeIndicator);
     }
   };
 
-  self.window.typecache = new LocalStorageCache();
-
-  // We inject manifold-3d typings locally above, and text-shaper publishes
-  // broken declaration re-exports to non-existent source files. Avoid CDN
-  // probes for those packages to keep refreshes quiet.
-  // This skip list only affects Monaco auto-typing CDN lookups, not runtime
-  // imports.
-  const jsDelivrResolver = new JsDelivrSourceResolver();
-  const skippedTypingPackages =
-      new Set(['manifold-3d', 'text-shaper', '@types/require']);
-  const shouldSkipTypingPackage = packageName => {
-    return skippedTypingPackages.has(packageName);
-  };
-  const sourceResolver = {
-    resolvePackageJson: async (packageName, version, subPath) => {
-      if (shouldSkipTypingPackage(packageName)) return '';
-      return jsDelivrResolver.resolvePackageJson(packageName, version, subPath);
-    },
-    resolveSourceFile: async (packageName, version, path) => {
-      if (shouldSkipTypingPackage(packageName)) return '';
-      return jsDelivrResolver.resolveSourceFile(packageName, version, path);
+  const ensureAutoTypings = () => {
+    if (!autoTypingsPromise) {
+      autoTypingsPromise =
+          initializeAutoTypings(showTypeIndicator).catch(error => {
+            autoTypingsPromise = null;
+            console.error('Failed to initialize auto typings:', error);
+          });
     }
+    return autoTypingsPromise;
   };
 
-  autoTypings = await AutoTypings.create(editor, {
-    sourceResolver,
-    sourceCache: self.window.typecache,
-    // Conservative limits: resolve shallow imports while avoiding deep fetch
-    // fan-out that adds noise and slows editor/offline workflows.
-    packageRecursionDepth: 1,
-    fileRecursionDepth: 2,
-    onUpdate: update => {
-      if (update.type === 'ResolveNewImports') {
-        showTypeIndicator();
-      }
-    },
-    onError: e => {
-      if (String(e?.message ?? e).includes('Not implemented yet')) {
-        return;
-      }
-      console.error(e);
-    }
-  });
-  if (typeIndicator?.textContent) {
-    syncTypeIndicator();
-  }
+  let enhancementsStarted = false;
+  const startEnhancements = () => {
+    if (enhancementsStarted) return;
+    enhancementsStarted = true;
+    // Start downloads in background; don't block editor interactivity.
+    ensureEsbuildWasmPreloaded().catch(error => {
+      console.warn('Failed to preload esbuild.wasm:', error);
+    });
+    ensureMonacoContributionsLoaded().catch(error => {
+      console.error('Failed to load Monaco contributions:', error);
+    });
+    ensureAutoTypings();
+  };
+  // Start fetching enhancements ASAP (non-blocking), and also on first
+  // interaction so suggestions are ready when the user begins typing.
+  setTimeout(startEnhancements, 0);
+  editor.onDidFocusEditorText(() => startEnhancements());
+  editor.onDidType(() => startEnhancements());
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     fileDropdown.appendChild(button.parentElement);
@@ -650,7 +745,7 @@ async function createEditor() {
     }
 
     // monaco-editor-auto-typings loaded types.  Do nothing.
-    if (autoTypings.isResolving && e.changes.isFlush) {
+    if (autoTypings?.isResolving && e.changes.isFlush) {
       return;
     }
 
@@ -674,6 +769,55 @@ async function createEditor() {
 };
 
 createEditor();
+
+async function initializeAutoTypings(showTypeIndicator) {
+  const {AutoTypings, JsDelivrSourceResolver, LocalStorageCache} =
+      await import('monaco-editor-auto-typings');
+  self.window.typecache = new LocalStorageCache();
+
+  // We inject manifold-3d typings locally above, and text-shaper publishes
+  // broken declaration re-exports to non-existent source files. Avoid CDN
+  // probes for those packages to keep refreshes quiet.
+  // This skip list only affects Monaco auto-typing CDN lookups, not runtime
+  // imports.
+  const jsDelivrResolver = new JsDelivrSourceResolver();
+  const skippedTypingPackages =
+      new Set(['manifold-3d', 'text-shaper', '@types/require']);
+  const shouldSkipTypingPackage = packageName => {
+    return skippedTypingPackages.has(packageName);
+  };
+  const sourceResolver = {
+    resolvePackageJson: async (packageName, version, subPath) => {
+      if (shouldSkipTypingPackage(packageName)) return '';
+      return jsDelivrResolver.resolvePackageJson(packageName, version, subPath);
+    },
+    resolveSourceFile: async (packageName, version, path) => {
+      if (shouldSkipTypingPackage(packageName)) return '';
+      return jsDelivrResolver.resolveSourceFile(packageName, version, path);
+    }
+  };
+
+  autoTypings = await AutoTypings.create(editor, {
+    sourceResolver,
+    sourceCache: self.window.typecache,
+    // Conservative limits: resolve shallow imports while avoiding deep fetch
+    // fan-out that adds noise and slows editor/offline workflows.
+    packageRecursionDepth: 1,
+    fileRecursionDepth: 2,
+    onUpdate: update => {
+      if (update.type === 'ResolveNewImports') {
+        showTypeIndicator();
+      }
+    },
+    onError: e => {
+      if (String(e?.message ?? e).includes('Not implemented yet')) {
+        return;
+      }
+      console.error(e);
+    }
+  });
+  updateTypeIndicator();
+}
 
 // Animation ------------------------------------------------------------
 const mv = document.querySelector('model-viewer');
@@ -1072,7 +1216,7 @@ function createWorker() {
     const message = e.data;
 
     if (message?.type === 'ready') {
-      if (tsWorker != null && !manifoldInitialized) {
+      if (editor != null && !manifoldInitialized) {
         initializeRun();
       }
       manifoldInitialized = true;

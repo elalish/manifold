@@ -41,6 +41,10 @@ ManifoldRayHitVec* to_c(RayHitVec* v) {
   return reinterpret_cast<ManifoldRayHitVec*>(v);
 }
 
+ManifoldExecutionContext* to_c(ExecutionContext* ctx) {
+  return reinterpret_cast<ManifoldExecutionContext*>(ctx);
+}
+
 ManifoldSimplePolygon* to_c(manifold::SimplePolygon* m) {
   return reinterpret_cast<ManifoldSimplePolygon*>(m);
 }
@@ -159,6 +163,10 @@ CrossSectionVec* from_c(ManifoldCrossSectionVec* csv) {
 
 RayHitVec* from_c(ManifoldRayHitVec* v) {
   return reinterpret_cast<RayHitVec*>(v);
+}
+
+ExecutionContext* from_c(ManifoldExecutionContext* ctx) {
+  return reinterpret_cast<ExecutionContext*>(ctx);
 }
 
 manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m) {

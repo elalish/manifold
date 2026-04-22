@@ -214,6 +214,10 @@ ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 
 int manifold_is_empty(ManifoldManifold* m);
 ManifoldError manifold_status(ManifoldManifold* m);
+// Variant of manifold_status that observes progress and allows cancellation
+// via the ExecutionContext. See manifold_execution_context.
+ManifoldError manifold_status_with_context(ManifoldManifold* m,
+                                           ManifoldExecutionContext* ctx);
 size_t manifold_num_vert(ManifoldManifold* m);
 size_t manifold_num_edge(ManifoldManifold* m);
 size_t manifold_num_tri(ManifoldManifold* m);
@@ -248,6 +252,15 @@ ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
                                      double end_y, double end_z);
 size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
+
+// ExecutionContext: observe progress and request cancellation of a
+// long-running Manifold evaluation. Pass to manifold_status_with_context.
+// Safe to read/write from any thread. See the ExecutionContext class in
+// common.h for full semantics (sticky cancel, per-boolean granularity).
+ManifoldExecutionContext* manifold_execution_context(void* mem);
+void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
+int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx);
+double manifold_execution_context_progress(ManifoldExecutionContext* ctx);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void* mem);
@@ -479,6 +492,7 @@ size_t manifold_meshgl64_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_triangulation_size();
+size_t manifold_execution_context_size();
 
 // allocation
 
@@ -494,6 +508,7 @@ ManifoldMeshGL64* manifold_alloc_meshgl64();
 ManifoldBox* manifold_alloc_box();
 ManifoldRect* manifold_alloc_rect();
 ManifoldTriangulation* manifold_alloc_triangulation();
+ManifoldExecutionContext* manifold_alloc_execution_context();
 
 // destruction
 
@@ -509,6 +524,7 @@ void manifold_destruct_meshgl64(ManifoldMeshGL64* m);
 void manifold_destruct_box(ManifoldBox* b);
 void manifold_destruct_rect(ManifoldRect* b);
 void manifold_destruct_triangulation(ManifoldTriangulation* M);
+void manifold_destruct_execution_context(ManifoldExecutionContext* ctx);
 
 // pointer free + destruction
 
@@ -524,6 +540,7 @@ void manifold_delete_meshgl64(ManifoldMeshGL64* m);
 void manifold_delete_box(ManifoldBox* b);
 void manifold_delete_rect(ManifoldRect* b);
 void manifold_delete_triangulation(ManifoldTriangulation* m);
+void manifold_delete_execution_context(ManifoldExecutionContext* ctx);
 
 // MeshIO / Export
 

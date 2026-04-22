@@ -377,6 +377,45 @@ jobs:
           . -B build
         ASAN_OPTIONS=detect_container_overflow=0 cmake --build build
 
+  build_sanitizer:
+    name: Sanitizer (ASan+UBSan)
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: libgtest-dev libtbb-dev clang cmake
+        version: 1
+    - *clone-clipper2
+    - name: Build (clang + asan/ubsan)
+      run: |
+        cmake \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DBUILD_SHARED_LIBS=ON \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PYBIND=OFF \
+          -DMANIFOLD_DEBUG=ON \
+          -DMANIFOLD_ASSERT=ON \
+          -DMANIFOLD_CROSS_SECTION=ON \
+          -DMANIFOLD_PAR=OFF \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          . -B build
+        cmake --build build
+    - name: Test (small sanitizer subset)
+      env:
+        ASAN_OPTIONS: detect_container_overflow=0
+        UBSAN_OPTIONS: print_stacktrace=1
+      run: |
+        ./build/test/manifold_test --gtest_filter="Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Manifold.MeshDeterminism"
+
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})
     timeout-minutes: 30
