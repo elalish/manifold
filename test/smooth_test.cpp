@@ -228,14 +228,13 @@ TEST(Smooth, Fillet) {
                           .SetTolerance(0.001)
                           .CalculateNormals(0, 80);
   Polygons section = CrossSection(cylinder.Slice(0)).ToPolygons();
-  Manifold chamfer = Manifold::Extrude(section, depth, 0, 0, {1.2, 1.3})
+  Manifold chamfer = Manifold::Extrude(section, depth, 0, 0, {1.2, 1.2})
                          .SetTolerance(0.001)
                          .Mirror({0, 0, 1});
-  // Manifold base = Manifold::Cube(vec3(40), true)
-  //                     .Translate({0, 0, -20 - depth + 0.001})
-  //                     .CalculateNormals(0);
-  Manifold chamfered = cylinder + chamfer;  //) - base;
-  // chamfered = chamfered.SetTolerance(0.01);
+  Manifold base = Manifold::Cube(vec3(40), true)
+                      .Translate({0, 0, -20 - depth})
+                      .CalculateNormals(0);
+  Manifold chamfered = (cylinder + chamfer) - base;
   EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
   Manifold fillet = chamfered.SmoothByNormals(0).Refine(10);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);

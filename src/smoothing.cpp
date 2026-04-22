@@ -291,8 +291,10 @@ vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
   const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
   const vec3 edgeNormal =
       faceNormal_[halfedge / 3] + faceNormal_[edge.pairedHalfedge / 3];
-  vec3 dir = la::cross(la::cross(edgeNormal, edgeVec), normal);
-  return CircularTangent(dir, edgeVec);
+  const vec3 biTangent = la::dot(normal, edgeNormal) < 0
+                             ? la::cross(edgeNormal, edgeVec)
+                             : la::cross(normal, edgeVec);
+  return CircularTangent(la::cross(biTangent, normal), edgeVec);
 }
 
 /**
