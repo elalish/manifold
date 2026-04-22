@@ -172,7 +172,12 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   // Short edges get to skip several checks and hence remove more classes of
   // degenerate triangles than flagged edges do, but this could in theory lead
   // to error stacking where a vertex moves too far. For this reason this is
-  // restricted to epsilon, rather than tolerance.
+  // restricted to epsilon, rather than tolerance. However, in the case of a
+  // Boolean operation, we set firstNewVert in order to only operate on
+  // newly-created verts, which means error stacking is not a concern, so we
+  // allow collapsing up to tolerance in that case.
+  const double tol = firstNewVert == 0 ? epsilon_ : tolerance_;
+
   auto shortEdge = [&](int edge) {
     const Halfedge& half = halfedge_[edge];
     if (half.pairedHalfedge < 0 ||
@@ -180,11 +185,11 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
       return false;
     // Flag short edges
     const vec3 delta = vertPos_[half.endVert] - vertPos_[half.startVert];
-    return la::dot(delta, delta) < epsilon_ * epsilon_;
+    return la::dot(delta, delta) < tol * tol;
   };
 
   s.run(nbEdges, shortEdge, [&](size_t i) {
-    const bool didCollapse = CollapseEdge(i, scratchBuffer);
+    const bool didCollapse = CollapseEdge(i, scratchBuffer, tol);
     if (didCollapse) numFlagged++;
     scratchBuffer.resize(0);
   });
@@ -484,8 +489,9 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
+bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
+  if (tol < 0) tol = epsilon_;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return false;
@@ -497,7 +503,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[toRemove.startVert];
   const vec3 delta = pNew - pOld;
-  const bool shortEdge = la::dot(delta, delta) < epsilon_ * epsilon_;
+  const bool shortEdge = la::dot(delta, delta) < tol * tol;
 
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
@@ -527,7 +533,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
           // or the edge is sharp. This ensures large shifts are not introduced
           // parallel to the tangent plane.
           if (CCW(projection * pLast, projection * pOld, projection * pNew,
-                  epsilon_) != 0)
+                  tol) != 0)
             return false;
         }
       }

@@ -224,17 +224,21 @@ TEST(Smooth, MissingNormalsCone) {
 #ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Fillet) {
   float depth = 3;
-  Manifold cylinder =
-      Manifold::Cylinder(40, 10, 10, 6, true).CalculateNormals(0, 80);
-  Polygons section = CrossSection(cylinder.Slice(0)).Simplify().ToPolygons();
-  Manifold chamfer =
-      Manifold::Extrude(section, depth, 0, 0, {1.2, 1.3}).Mirror({0, 0, 1});
-  Manifold base = Manifold::Cube(vec3(40), true)
-                      .Translate({0, 0, -20 - depth + 0.001})
-                      .CalculateNormals(0);
-  Manifold chamfered = (cylinder + chamfer) - base;
-
-  Manifold fillet = chamfered.Simplify(0.01).SmoothByNormals(0).Refine(10);
+  Manifold cylinder = Manifold::Cylinder(10, 10, 10, 6, false)
+                          .SetTolerance(0.001)
+                          .CalculateNormals(0, 80);
+  Polygons section = CrossSection(cylinder.Slice(0)).ToPolygons();
+  Manifold chamfer = Manifold::Extrude(section, depth, 0, 0, {1.2, 1.3})
+                         .SetTolerance(0.001)
+                         .Mirror({0, 0, 1})
+                         .Translate(vec3(0, 0, 0.001));
+  // Manifold base = Manifold::Cube(vec3(40), true)
+  //                     .Translate({0, 0, -20 - depth + 0.001})
+  //                     .CalculateNormals(0);
+  Manifold chamfered = cylinder + chamfer;  //) - base;
+  // chamfered = chamfered.SetTolerance(0.01);
+  EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
+  Manifold fillet = chamfered.SmoothByNormals(0).Refine(10);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
   // This doesn't give good results yet
   // EXPECT_NEAR(fillet.Volume(), 1092, 1);
