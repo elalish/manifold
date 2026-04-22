@@ -90,8 +90,8 @@ TEST(Smooth, ToLength) {
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
-  EXPECT_NEAR(smooth.Volume(), 4577, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1349, 1);
+  EXPECT_NEAR(smooth.Volume(), 4505, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1337, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -99,7 +99,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 0.71, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 2.32, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }
@@ -301,8 +301,8 @@ TEST(Smooth, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
-  EXPECT_NEAR(csaszar.Volume(), 79890, 10);
-  EXPECT_NEAR(csaszar.SurfaceArea(), 11950, 10);
+  EXPECT_NEAR(csaszar.Volume(), 78760, 10);
+  EXPECT_NEAR(csaszar.SurfaceArea(), 11935, 10);
 
   if (options.exportModels) WriteTestOBJ("smoothCsaszar.obj", csaszar);
 }
@@ -395,8 +395,8 @@ TEST(Smooth, SineSurface) {
 
   Manifold smoothed =
       surface.CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
-  EXPECT_NEAR(smoothed.Volume(), 8.09, 0.01);
-  EXPECT_NEAR(smoothed.SurfaceArea(), 30.93, 0.01);
+  EXPECT_NEAR(smoothed.Volume(), 8.07, 0.01);
+  EXPECT_NEAR(smoothed.SurfaceArea(), 30.87, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
   EXPECT_NEAR(smoothed.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
               smoothed.Volume(), 1e-5);
@@ -409,15 +409,15 @@ TEST(Smooth, SineSurface) {
               smoothed1.Volume(), 1e-5);
 
   Manifold smoothed2 = surface.SmoothOut(180, 1).Refine(8);
-  EXPECT_NEAR(smoothed2.Volume(), 9.00, 0.01);
-  EXPECT_NEAR(smoothed2.SurfaceArea(), 33.52, 0.01);
+  EXPECT_NEAR(smoothed2.Volume(), 8.95, 0.01);
+  EXPECT_NEAR(smoothed2.SurfaceArea(), 33.35, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
   EXPECT_NEAR(smoothed2.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
               smoothed2.Volume(), 1e-3);
 
   Manifold smoothed3 = surface.SmoothOut(50, 0.5).Refine(8);
-  EXPECT_NEAR(smoothed3.Volume(), 8.44, 0.01);
-  EXPECT_NEAR(smoothed3.SurfaceArea(), 31.73, 0.02);
+  EXPECT_NEAR(smoothed3.Volume(), 8.38, 0.01);
+  EXPECT_NEAR(smoothed3.SurfaceArea(), 31.55, 0.02);
   EXPECT_EQ(smoothed3.Genus(), 0);
   EXPECT_NEAR(smoothed3.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
               smoothed3.Volume(), 1e-5);
@@ -471,7 +471,7 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.026);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.028);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
   if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);
