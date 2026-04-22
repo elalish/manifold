@@ -651,7 +651,7 @@ namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer assemble;
   assemble.Start();
 #endif
@@ -825,7 +825,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   assemble.Stop();
   Timer triangulate;
   triangulate.Start();
@@ -838,7 +838,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   outR.ReorderHalfedges();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   triangulate.Stop();
   Timer simplify;
   simplify.Start();
@@ -859,7 +859,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   simplify.Stop();
   Timer sort;
   sort.Start();
@@ -869,7 +869,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.SortGeometry();
   outR.IncrementMeshIDs();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   sort.Stop();
   if (ManifoldParams().verbose >= 2) {
     assemble.Print("Assembly");
