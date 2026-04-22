@@ -48,6 +48,10 @@ double AngleBetween(vec3 a, vec3 b) {
   return dot >= 1 ? 0 : (dot <= -1 ? kPi : math::acos(dot));
 }
 
+bool EqualNormals(vec3 a, vec3 b) {
+  return la::dot(SafeNormalize(a), SafeNormalize(b)) > 0.9999;
+}
+
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
 // input the desired tangent direction (length doesn't matter) and the edge
 // vector to the neighboring vertex. In a symmetric situation where the tangents
@@ -558,7 +562,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
       struct FaceEdge {
         int face;
-        vec3 edgeVec;
+        vec3 normalizedEdge;
       };
 
       // calculate pseudo-normals between each sharp edge
@@ -596,12 +600,13 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
               normals.push_back(vec3(0.0));
             }
             group.push_back(normals.size() - 1);
-            if (std::isfinite(next.edgeVec.x)) {
+            if (std::isfinite(next.normalizedEdge.x)) {
               normals.back() +=
-                  SafeNormalize(la::cross(next.edgeVec, here.edgeVec)) *
-                  AngleBetween(here.edgeVec, next.edgeVec);
+                  SafeNormalize(
+                      la::cross(next.normalizedEdge, here.normalizedEdge)) *
+                  AngleBetween(here.normalizedEdge, next.normalizedEdge);
             } else {
-              next.edgeVec = here.edgeVec;
+              next.normalizedEdge = here.normalizedEdge;
             }
           });
 
@@ -811,9 +816,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
             e,
             [normalIdx, this](int halfedge) {
               const vec3 normal = GetNormal(halfedge, normalIdx);
-              const vec3 diff = faceNormal_[halfedge / 3] - normal;
               return FlatNormal(
-                  {la::dot(diff, diff) < kPrecision * kPrecision, normal});
+                  {EqualNormals(normal, faceNormal_[halfedge / 3]), normal});
             },
             [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
               // Tangents not known at first are used as temporary storage for
@@ -848,25 +852,20 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
               if (tangent[halfedge].w < 0) return;
 
-              const vec3 diff = next.normal - here.normal;
-              const bool differentNormals =
-                  la::dot(diff, diff) > kPrecision * kPrecision;
-              if (differentNormals) {
+              // calculate tangents
+              if (EqualNormals(next.normal, here.normal)) {
+                tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
+              } else {
                 // tangents at the intersection of two normals are fixed.
                 fixedHalfedge[halfedge] = true;
                 // Override the flat face logic if more than one normal.
                 faceEdges[0] = -2;
-              }
 
-              // calculate tangents
-              if (differentNormals) {
                 const vec3 edgeVec = vertPos_[halfedge_[halfedge].endVert] -
                                      vertPos_[halfedge_[halfedge].startVert];
                 const vec3 dir = la::cross(here.normal, next.normal);
                 tangent[halfedge] = CircularTangent(
                     (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
-              } else {
-                tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
 
@@ -895,7 +894,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 nextNormal = lastNormal;
               }
 
-              if (prevNormal == nextNormal) {
+              if (EqualNormals(prevNormal, nextNormal)) {
                 tangent[current] = TangentFromNormal(prevNormal, current);
               } else {
                 const vec3 dir = la::cross(prevNormal, nextNormal);

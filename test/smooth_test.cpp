@@ -230,8 +230,7 @@ TEST(Smooth, Fillet) {
   Polygons section = CrossSection(cylinder.Slice(0)).ToPolygons();
   Manifold chamfer = Manifold::Extrude(section, depth, 0, 0, {1.2, 1.3})
                          .SetTolerance(0.001)
-                         .Mirror({0, 0, 1})
-                         .Translate(vec3(0, 0, 0.001));
+                         .Mirror({0, 0, 1});
   // Manifold base = Manifold::Cube(vec3(40), true)
   //                     .Translate({0, 0, -20 - depth + 0.001})
   //                     .CalculateNormals(0);
