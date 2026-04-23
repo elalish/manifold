@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 
 #include "boolean3.h"
 #include "parallel.h"
@@ -685,6 +686,21 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return inP_;
   }
 
+  auto cancelled = [&]() -> std::optional<Manifold::Impl> {
+    if (ctx_ && ctx_->cancel.load(std::memory_order_relaxed)) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::Cancelled;
+      return impl;
+    }
+    return std::nullopt;
+  };
+
+  // Catches both ctor-detected cancel (ctx->cancel is sticky) and cancel
+  // fired between ctor and Result. The assemble phase (through
+  // AppendWholeEdges) is O(N) in intersection count and has no internal
+  // cancel checkpoint until Face2Tri.
+  if (auto c = cancelled()) return *c;
+
   if (!valid) {
     auto impl = Manifold::Impl();
     impl.status_ = Manifold::Error::ResultTooLarge;
@@ -831,6 +847,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   triangulate.Start();
 #endif
 
+  if (auto c = cancelled()) return *c;
+
   // Level 6
   outR.Face2Tri(faceEdge, halfedgeRef);
   halfedgeRef.clear();
@@ -843,6 +861,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Timer simplify;
   simplify.Start();
 #endif
+
+  if (auto c = cancelled()) return *c;
 
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
@@ -864,6 +884,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Timer sort;
   sort.Start();
 #endif
+
+  if (auto c = cancelled()) return *c;
 
   outR.CalculateBBox();
   outR.SortGeometry();

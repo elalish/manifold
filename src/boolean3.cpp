@@ -479,8 +479,8 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   OpType op)
-    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add) {
+                   OpType op, ExecutionContext::Impl* ctx)
+    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add), ctx_(ctx) {
   ZoneScoped;
   // Symbolic perturbation:
   // Union -> expand inP, expand inQ
@@ -498,6 +498,10 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return;
   }
 
+  auto cancelled = [&] {
+    return ctx_ && ctx_->cancel.load(std::memory_order_relaxed);
+  };
+
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer intersections;
   intersections.Start();
@@ -509,11 +513,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
+  if (cancelled()) return;
   xv12_ = Intersect12<true>(inP, inQ, expandP_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12P.Stop();
   intersect12Q.Start();
 #endif
+  if (cancelled()) return;
   xv21_ = Intersect12<false>(inP, inQ, expandP_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12Q.Stop();
@@ -529,11 +535,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Start();
 #endif
+  if (cancelled()) return;
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Stop();
   winding03Q.Start();
 #endif
+  if (cancelled()) return;
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
