@@ -560,7 +560,10 @@ CsgOpNode::~CsgOpNode() {
     while (!toProcess.empty()) {
       auto child = std::move(toProcess.back());
       toProcess.pop_back();
-      if (impl_.UseCount() == 1) {
+      // Only empty the child's impl if we are its last holder. Otherwise
+      // another live tree still references this CsgOpNode and may later
+      // try to evaluate it, which requires its impl intact.
+      if (child.use_count() == 1 && child->impl_.UseCount() == 1) {
         auto childImpl = child->impl_.GetGuard();
         handleChildren(*childImpl);
       }

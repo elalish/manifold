@@ -825,3 +825,28 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
+
+// Regression for #1672: a sub-tree shared between two trees must survive when
+// one of those trees is destroyed without being evaluated. Previously the
+// CsgOpNode destructor emptied descendant impls regardless of whether they
+// were still referenced by other live trees, which then manifested as empty
+// positive_children in Add/Intersect finalize and a crash in BatchUnion.
+TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
+  Manifold a = Manifold::Cube(vec3(1));
+  Manifold b = Manifold::Cube(vec3(1)).Translate(vec3(0.5, 0, 0));
+  Manifold c = Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
+  Manifold shared = a + b;
+  Manifold tree2 = shared - c;
+  {
+    Manifold tree1 = shared + c;
+    // tree1 goes out of scope here, its destructor runs while its impl
+    // still has original children (never evaluated).
+  }
+  // Build the same tree without sharing so we can compare — a partial
+  // corruption that didn't crash would show up as a tri-count mismatch.
+  Manifold reference = (Manifold::Cube(vec3(1)) +
+                        Manifold::Cube(vec3(1)).Translate(vec3(0.5, 0, 0))) -
+                       Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
+  EXPECT_EQ(tree2.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(tree2.NumTri(), reference.NumTri());
+}
