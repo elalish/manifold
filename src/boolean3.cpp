@@ -353,8 +353,8 @@ struct Kernel12Recorder {
 };
 
 template <bool expandP, bool forward>
-Intersections Intersect12_(const Manifold::Impl& inP,
-                           const Manifold::Impl& inQ) {
+Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                           ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // a: 1 (edge), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
@@ -371,7 +371,7 @@ Intersections Intersect12_(const Manifold::Impl& inP,
                      a.vertPos_[a.halfedge_[i].endVert])
                : Box();
   };
-  b.collider_.Collisions<false>(recorder, f, a.halfedge_.size());
+  b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
@@ -393,16 +393,17 @@ Intersections Intersect12_(const Manifold::Impl& inP,
 
 template <bool forward>
 Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                          bool expandP) {
+                          bool expandP, ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Intersect12_<true, forward>(inP, inQ);
+    return Intersect12_<true, forward>(inP, inQ, ctx);
   else
-    return Intersect12_<false, forward>(inP, inQ);
+    return Intersect12_<false, forward>(inP, inQ, ctx);
 }
 
 template <bool expandP, bool forward>
 Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                    const VecView<std::array<int, 2>> p1q2) {
+                    const VecView<std::array<int, 2>> p1q2,
+                    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // a: 0 (vert), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
@@ -412,7 +413,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
-           countAt(a.halfedge_.size()), [&](int edge) {
+           countAt(a.halfedge_.size()), cancellable(ctx, [&](int edge) {
              const Halfedge& he = a.halfedge_[edge];
              if (!he.IsForward()) return;
              // check if the edge is broken
@@ -423,7 +424,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                  });
              if (it == p1q2.end() || (*it)[index] != edge)
                uA.unite(he.startVert, he.endVert);
-           });
+           }));
 
   // find components, the hope is the number of components should be small
   std::unordered_set<int> components;
@@ -431,8 +432,9 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (a.vertPos_.size() > 1e5) {
     tbb::combinable<std::unordered_set<int>> componentsShared;
     for_each(autoPolicy(a.vertPos_.size()), countAt(0),
-             countAt(a.vertPos_.size()),
-             [&](int v) { componentsShared.local().insert(uA.find(v)); });
+             countAt(a.vertPos_.size()), cancellable(ctx, [&](int v) {
+               componentsShared.local().insert(uA.find(v));
+             }));
     componentsShared.combine_each([&](const std::unordered_set<int>& data) {
       components.insert(data.begin(), data.end());
     });
@@ -456,24 +458,25 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&](int i) { return a.vertPos_[verts[i]]; };
-  b.collider_.Collisions<false>(recorder, f, verts.size());
+  b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
-           [&](size_t i) {
+           cancellable(ctx, [&](size_t i) {
              size_t root = uA.find(i);
              if (root == i) return;
              w03[i] = w03[root];
-           });
+           }));
   return w03;
 }
 
 template <bool forward>
 Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   const VecView<std::array<int, 2>> p1q2, bool expandP) {
+                   const VecView<std::array<int, 2>> p1q2, bool expandP,
+                   ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Winding03_<true, forward>(inP, inQ, p1q2);
+    return Winding03_<true, forward>(inP, inQ, p1q2, ctx);
   else
-    return Winding03_<false, forward>(inP, inQ, p1q2);
+    return Winding03_<false, forward>(inP, inQ, p1q2, ctx);
 }
 }  // namespace
 
@@ -514,13 +517,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // that intersect, and record the direction the edge is passing through the
   // triangle.
   if (cancelled()) return;
-  xv12_ = Intersect12<true>(inP, inQ, expandP_);
+  xv12_ = Intersect12<true>(inP, inQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12P.Stop();
   intersect12Q.Start();
 #endif
   if (cancelled()) return;
-  xv21_ = Intersect12<false>(inP, inQ, expandP_);
+  xv21_ = Intersect12<false>(inP, inQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12Q.Stop();
 #endif
@@ -536,13 +539,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   winding03P.Start();
 #endif
   if (cancelled()) return;
-  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
+  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Stop();
   winding03Q.Start();
 #endif
   if (cancelled()) return;
-  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
+  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_, ctx_);
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03Q.Stop();

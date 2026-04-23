@@ -217,25 +217,25 @@ namespace manifold {
  * rest of the internal data structures. This function also removes the verts
  * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
-void Manifold::Impl::SortGeometry() {
+void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   if (halfedge_.size() == 0) {
     collider_ = {};
     return;
   }
 
   halfedge_.MakeUnique();
-  SortVerts();
+  SortVerts(ctx);
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
-  GetFaceBoxMorton(faceBox, faceMorton);
-  SortFaces(faceBox, faceMorton);
+  GetFaceBoxMorton(faceBox, faceMorton, ctx);
+  SortFaces(faceBox, faceMorton, ctx);
   if (halfedge_.size() == 0) {
     collider_ = {};
     return;
   }
   collider_ = Collider(faceBox, faceMorton);
   bBox_ = collider_.GetBoundingBox();
-  CompactProps();
+  CompactProps(ctx);
 
   DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
                "Not an even number of faces after sorting faces!");
@@ -280,14 +280,15 @@ void Manifold::Impl::SortGeometry() {
 /**
  * Sorts the vertices according to their Morton code.
  */
-void Manifold::Impl::SortVerts() {
+void Manifold::Impl::SortVerts(ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const auto numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert, 1e5);
-  for_each_n(policy, countAt(0), numVert, [this, &vertMorton](const int vert) {
-    vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
-  });
+  for_each_n(policy, countAt(0), numVert,
+             cancellable(ctx, [this, &vertMorton](const int vert) {
+               vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
+             }));
 
   Vec<int> vertNew2Old(numVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
@@ -297,7 +298,7 @@ void Manifold::Impl::SortVerts() {
                 return vertMorton[a] < vertMorton[b];
               });
 
-  ReindexVerts(vertNew2Old, numVert);
+  ReindexVerts(vertNew2Old, numVert, ctx);
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
@@ -322,27 +323,28 @@ void Manifold::Impl::SortVerts() {
  * also given.
  */
 void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
-                                  size_t oldNumVert) {
+                                  size_t oldNumVert,
+                                  ExecutionContext::Impl* ctx) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
   const bool hasProp = NumProp() > 0;
   for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(),
-           [&vertOld2New, hasProp](Halfedge& edge) {
+           cancellable(ctx, [&vertOld2New, hasProp](Halfedge& edge) {
              if (edge.startVert < 0) return;
              edge.startVert = vertOld2New[edge.startVert];
              edge.endVert = vertOld2New[edge.endVert];
              if (!hasProp) {
                edge.propVert = edge.startVert;
              }
-           });
+           }));
 }
 
 /**
  * Removes unreferenced property verts and reindexes propVerts.
  */
-void Manifold::Impl::CompactProps() {
+void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   ZoneScoped;
   if (numProp_ == 0) return;
 
@@ -351,10 +353,11 @@ void Manifold::Impl::CompactProps() {
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
-    reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
-        ->store(1, std::memory_order_relaxed);
-  });
+  for_each(policy, halfedge_.cbegin(), halfedge_.cend(),
+           cancellable(ctx, [&keep](Halfedge h) {
+             reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
+                 ->store(1, std::memory_order_relaxed);
+           }));
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
@@ -362,19 +365,19 @@ void Manifold::Impl::CompactProps() {
   const int numVertsNew = propOld2New[numVerts];
   auto& properties = properties_;
   properties.resize_nofill(numProp * numVertsNew);
-  for_each_n(
-      policy, countAt(0), numVerts,
-      [&properties, &oldProp, &propOld2New, &keep, &numProp](const int oldIdx) {
-        if (keep[oldIdx] == 0) return;
-        for (int p = 0; p < numProp; ++p) {
-          properties[propOld2New[oldIdx] * numProp + p] =
-              oldProp[oldIdx * numProp + p];
-        }
-      });
+  for_each_n(policy, countAt(0), numVerts,
+             cancellable(ctx, [&properties, &oldProp, &propOld2New, &keep,
+                               &numProp](const int oldIdx) {
+               if (keep[oldIdx] == 0) return;
+               for (int p = 0; p < numProp; ++p) {
+                 properties[propOld2New[oldIdx] * numProp + p] =
+                     oldProp[oldIdx * numProp + p];
+               }
+             }));
   for_each(policy, halfedge_.begin(), halfedge_.end(),
-           [&propOld2New](Halfedge& edge) {
+           cancellable(ctx, [&propOld2New](Halfedge& edge) {
              edge.propVert = propOld2New[edge.propVert];
-           });
+           }));
 }
 
 /**
@@ -383,13 +386,14 @@ void Manifold::Impl::CompactProps() {
  * the bounding box.
  */
 void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
-                                      Vec<uint32_t>& faceMorton) const {
+                                      Vec<uint32_t>& faceMorton,
+                                      ExecutionContext::Impl* ctx) const {
   ZoneScoped;
   // faceBox should be initialized
   faceBox.resize(NumTri(), Box());
   faceMorton.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [this, &faceBox, &faceMorton](const int face) {
+             cancellable(ctx, [this, &faceBox, &faceMorton](const int face) {
                // Removed tris are marked by all halfedges having pairedHalfedge
                // = -1, and this will sort them to the end (the Morton code only
                // uses the first 30 of 32 bits).
@@ -408,14 +412,15 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                center /= 3;
 
                faceMorton[face] = MortonCode(center, bBox_);
-             });
+             }));
 }
 
 /**
  * Sorts the faces of this manifold according to their input Morton code. The
  * bounding box and Morton code arrays are also sorted accordingly.
  */
-void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
+void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
+                               ExecutionContext::Impl* ctx) {
   ZoneScoped;
   Vec<int> faceNew2Old(NumTri());
   sequence(faceNew2Old.begin(), faceNew2Old.end());
@@ -437,7 +442,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
 
   Permute(faceMorton, faceNew2Old);
   Permute(faceBox, faceNew2Old);
-  GatherFaces(faceNew2Old);
+  GatherFaces(faceNew2Old, ctx);
 }
 
 /**
@@ -445,7 +450,8 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
+                                 ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
@@ -463,11 +469,13 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   if (oldHalfedgeTangent.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(policy, countAt(0), numTri,
-             ReindexFace({halfedge_, halfedgeTangent_, oldHalfedge,
-                          oldHalfedgeTangent, faceNew2Old, faceOld2New}));
+             cancellable(ctx, ReindexFace({halfedge_, halfedgeTangent_,
+                                           oldHalfedge, oldHalfedgeTangent,
+                                           faceNew2Old, faceOld2New})));
 }
 
-void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
+                                 ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const auto numTri = faceNew2Old.size();
 
@@ -498,11 +506,12 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   if (old.halfedgeTangent_.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri,
-             ReindexFace({halfedge_, halfedgeTangent_, old.halfedge_,
-                          old.halfedgeTangent_, faceNew2Old, faceOld2New}));
+             cancellable(ctx, ReindexFace({halfedge_, halfedgeTangent_,
+                                           old.halfedge_, old.halfedgeTangent_,
+                                           faceNew2Old, faceOld2New})));
 }
 
-void Manifold::Impl::ReorderHalfedges() {
+void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // halfedges in the same face are added in non-deterministic order, so we have
   // to reorder them for determinism
@@ -510,7 +519,7 @@ void Manifold::Impl::ReorderHalfedges() {
   // step 1: reorder within the same face, such that the halfedge with the
   // smallest starting vertex is placed first
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
-           countAt(halfedge_.size() / 3), [this](size_t tri) {
+           countAt(halfedge_.size() / 3), cancellable(ctx, [this](size_t tri) {
              std::array<Halfedge, 3> face = {halfedge_[tri * 3],
                                              halfedge_[tri * 3 + 1],
                                              halfedge_[tri * 3 + 2]};
@@ -520,10 +529,10 @@ void Manifold::Impl::ReorderHalfedges() {
                if (face[i].startVert < face[index].startVert) index = i;
              for (int i : {0, 1, 2})
                halfedge_[tri * 3 + i] = face[(index + i) % 3];
-           });
+           }));
   // step 2: fix paired halfedge
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
-           countAt(halfedge_.size() / 3), [this](size_t tri) {
+           countAt(halfedge_.size() / 3), cancellable(ctx, [this](size_t tri) {
              for (int i : {0, 1, 2}) {
                Halfedge& curr = halfedge_[tri * 3 + i];
                if (curr.startVert < 0) return;
@@ -534,7 +543,7 @@ void Manifold::Impl::ReorderHalfedges() {
                    index = j;
                curr.pairedHalfedge = oppositeFace * 3 + index;
              }
-           });
+           }));
 }
 
 /**

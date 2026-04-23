@@ -1527,6 +1527,36 @@ TEST(Manifold, ExecutionContextCancelMidBoolean) {
 }
 #endif  // MANIFOLD_PAR == 1
 
+// Direct test of the Cancellable<F> wrapper: verifies that wrapping a
+// functor and setting cancel mid-loop causes subsequent invocations to
+// no-op. This is the mechanism test; the integration test that cancel
+// works end-to-end on a real boolean is ExecutionContextCancelMidBoolean.
+TEST(Manifold, CancellableWrapperShortCircuits) {
+  ExecutionContext ctx;
+  std::atomic<int> calls{0};
+  auto body = [&calls](int) { calls.fetch_add(1, std::memory_order_relaxed); };
+  auto wrapped = cancellable(ctx.impl_.get(), body);
+
+  // Before cancel, every invocation runs.
+  for (int i = 0; i < 100; i++) wrapped(i);
+  EXPECT_EQ(calls.load(), 100);
+
+  ctx.Cancel();
+
+  // After cancel, subsequent invocations no-op (calls count stays 100).
+  for (int i = 0; i < 100; i++) wrapped(i);
+  EXPECT_EQ(calls.load(), 100);
+}
+
+// Nullptr ctx: wrapper must not crash and must invoke the functor.
+TEST(Manifold, CancellableWrapperNullCtxPassesThrough) {
+  std::atomic<int> calls{0};
+  auto body = [&calls](int) { calls.fetch_add(1, std::memory_order_relaxed); };
+  auto wrapped = cancellable(nullptr, body);
+  for (int i = 0; i < 10; i++) wrapped(i);
+  EXPECT_EQ(calls.load(), 10);
+}
+
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -

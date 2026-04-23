@@ -14,6 +14,8 @@
 
 #pragma once
 #include <atomic>
+#include <type_traits>
+#include <utility>
 
 #include "manifold/common.h"
 
@@ -30,5 +32,38 @@ struct ExecutionContext::Impl {
   std::atomic<int> doneBooleans{0};
   std::atomic<bool> cancel{false};
 };
+
+/** @ingroup Private
+ *
+ * Wrap a functor so each invocation returns early if the
+ * ExecutionContext has been cancelled. `for_each` / `transform` / etc.
+ * will still call the wrapped functor for every remaining iteration,
+ * but each no-ops — TBB's scheduler doesn't let us early-terminate,
+ * so we drain cheaply. `ctx` may be nullptr, in which case the cancel
+ * branch is always cold.
+ *
+ * Only appropriate for functors whose "no-op this iteration" behavior
+ * is safe — `for_each` over a range that writes independent output
+ * slots. Not safe for `transform` / scan-style primitives where
+ * skipping an iteration would silently corrupt the result. Non-void
+ * functors fail to compile (the `return;` on the cancel path is
+ * ill-formed for a non-void return type), enforcing this at build
+ * time.
+ */
+template <typename F>
+struct Cancellable {
+  ExecutionContext::Impl* ctx;
+  F f;
+  template <typename... Args>
+  auto operator()(Args&&... args) -> decltype(f(std::forward<Args>(args)...)) {
+    if (ctx && ctx->cancel.load(std::memory_order_relaxed)) return;
+    f(std::forward<Args>(args)...);
+  }
+};
+
+template <typename F>
+Cancellable<std::decay_t<F>> cancellable(ExecutionContext::Impl* ctx, F&& f) {
+  return {ctx, std::forward<F>(f)};
+}
 
 }  // namespace manifold
