@@ -250,11 +250,6 @@ set_source_files_properties(
   PROPERTIES GENERATED TRUE
 )
 
-# If it's an EMSCRIPTEN build, we're done
-if(EMSCRIPTEN)
-  return()
-endif()
-
 # CMake exports
 configure_file(
   cmake/manifoldConfig.cmake.in
