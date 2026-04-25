@@ -510,8 +510,9 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return;
   }
 
-  // Invariant: every cancellable op is followed by IsCancelled to keep
-  // partial output from feeding unconditional downstream consumers.
+  // Phase-boundary fast-path: skip launching the next phase if cancel fired
+  // between phases. The per-cancellable invariant is enforced inside the
+  // called functions (Intersect12_, Winding03_).
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer intersections;
   intersections.Start();

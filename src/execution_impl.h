@@ -72,8 +72,8 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
  * skipping an iteration would silently corrupt the result. The
  * trailing return type plus bare `return;` on the cancel path make
  * any non-void functor ill-formed when `operator()` is instantiated
- * (i.e. when wrapped into a parallel primitive), enforcing this at
- * build time.
+ * (i.e. when invoked, whether directly or via a parallel primitive),
+ * enforcing this at build time.
  */
 template <typename F>
 struct Cancellable {
