@@ -21,17 +21,46 @@
 
 namespace manifold {
 
+inline bool IsCancelled(ExecutionContext::Impl* ctx);
+
+template <typename F>
+struct Cancellable;
+
 /** @ingroup Private
  *
- * Pimpl for ExecutionContext. Holds the atomic state observed/mutated by
- * the CSG evaluation machinery. Internal code accesses this via
- * ctx.impl_->field directly.
+ * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
+ * to read it -- this is the canonical reader, enforced by the type system.
+ * `totalBooleans` and `doneBooleans` are public for progress reporting and
+ * test introspection.
  */
 struct ExecutionContext::Impl {
+ public:
   std::atomic<int> totalBooleans{0};
   std::atomic<int> doneBooleans{0};
+
+ private:
   std::atomic<bool> cancel{false};
+
+  friend bool IsCancelled(Impl*);
+  template <typename F>
+  friend struct Cancellable;
+  friend class manifold::ExecutionContext;
 };
+
+/** @ingroup Private
+ *
+ * Canonical reader for the cancel flag. The only path to observe cancel
+ * state from internal code -- `Impl::cancel` is private and friended only
+ * to this function, the `Cancellable<F>` wrapper, and `ExecutionContext`
+ * itself. New code that wants to check cancel must call this.
+ *
+ * Returns false if `ctx` is nullptr (no-cancellation calls), otherwise
+ * loads `cancel` with `memory_order_relaxed` (cancel is advisory; we
+ * don't need synchronization with other operations).
+ */
+inline bool IsCancelled(ExecutionContext::Impl* ctx) {
+  return ctx && ctx->cancel.load(std::memory_order_relaxed);
+}
 
 /** @ingroup Private
  *
@@ -45,10 +74,10 @@ struct ExecutionContext::Impl {
  * Only appropriate for functors whose "no-op this iteration" behavior
  * is safe — `for_each` over a range that writes independent output
  * slots. Not safe for `transform` / scan-style primitives where
- * skipping an iteration would silently corrupt the result. Non-void
- * functors fail to compile (the `return;` on the cancel path is
- * ill-formed for a non-void return type), enforcing this at build
- * time.
+ * skipping an iteration would silently corrupt the result. The
+ * trailing return type plus bare `return;` on the cancel path make
+ * any non-void functor ill-formed at instantiation, enforcing this
+ * at build time.
  */
 template <typename F>
 struct Cancellable {
@@ -56,7 +85,7 @@ struct Cancellable {
   F f;
   template <typename... Args>
   auto operator()(Args&&... args) -> decltype(f(std::forward<Args>(args)...)) {
-    if (ctx && ctx->cancel.load(std::memory_order_relaxed)) return;
+    if (IsCancelled(ctx)) return;
     f(std::forward<Args>(args)...);
   }
 };

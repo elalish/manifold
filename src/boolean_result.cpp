@@ -110,6 +110,8 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     const Vec<std::array<int, 2>>& p2q1, bool invertQ,
     ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
 
@@ -141,6 +143,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                                     {sidesPerFaceQ, sidesPerFaceP, i21, p2q1,
                                      inQ.halfedge_})));
   }
+  if (IsCancelled(ctx)) return std::make_tuple(Vec<int>{}, Vec<int>{});
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
@@ -213,6 +216,8 @@ void AddNewEdgeVerts(
     const Vec<int>& v12R, const VecView<Halfedge>& halfedgeP, bool forward,
     size_t offset, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -267,7 +272,7 @@ void AddNewEdgeVerts(
         tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t>& range) {
           for (size_t i = range.begin(); i != range.end(); i++) {
-            if (ctx && ctx->cancel.load(std::memory_order_relaxed)) return;
+            if (IsCancelled(ctx)) return;
             processFun(i);
           }
         },
@@ -278,7 +283,7 @@ void AddNewEdgeVerts(
   auto processFun =
       std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
   for (size_t i = 0; i < p1q2.size(); ++i) {
-    if (ctx && ctx->cancel.load(std::memory_order_relaxed)) return;
+    if (IsCancelled(ctx)) return;
     processFun(i);
   }
 }
@@ -486,6 +491,8 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                       const Vec<int>& vP2R, VecView<const int> faceP2R,
                       bool forward, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   for_each_n(autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
              cancellable(
                  ctx, DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR,
@@ -509,11 +516,14 @@ struct MapTriRef {
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
                      const Manifold::Impl& inQ, bool invertQ,
                      ExecutionContext::Impl* ctx) {
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
              outR.NumTri(),
              cancellable(ctx, MapTriRef({inP.meshRelation_.triRef,
                                          inQ.meshRelation_.triRef, offsetQ})));
+  if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
@@ -559,6 +569,8 @@ struct Barycentric {
 void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
                       const Manifold::Impl& inQ, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = std::max(numPropP, numPropQ);
@@ -573,6 +585,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
                   Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
                                inQ.vertPos_, outR.vertPos_, inP.halfedge_,
                                inQ.halfedge_, outR.halfedge_, outR.epsilon_})));
+  if (IsCancelled(ctx)) return;
 
   using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -702,7 +715,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 
   auto cancelled = [&]() -> std::optional<Manifold::Impl> {
-    if (ctx_ && ctx_->cancel.load(std::memory_order_relaxed)) {
+    if (IsCancelled(ctx_)) {
       auto impl = Manifold::Impl();
       impl.status_ = Manifold::Error::Cancelled;
       return impl;
@@ -710,10 +723,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return std::nullopt;
   };
 
-  // Catches both ctor-detected cancel (ctx->cancel is sticky) and cancel
-  // fired between ctor and Result. The assemble phase (through
-  // AppendWholeEdges) is O(N) in intersection count and has no internal
-  // cancel checkpoint until Face2Tri.
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   if (auto c = cancelled()) return *c;
 
   if (!valid) {
@@ -789,6 +800,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   for_each_n(
       autoPolicy(i21.size(), 1e4), countAt(0), i21.size(),
       cancellable(ctx_, DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12})));
+  if (auto c = cancelled()) return *c;
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -810,6 +822,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                   0, ctx_);
   AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
                   false, xv12_.p1q2.size(), ctx_);
+  if (auto c = cancelled()) return *c;
 
   v12R.clear();
   v21R.clear();
@@ -820,12 +833,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2,
                  invertQ, ctx_);
-
-  // Critical: if cancel fired during SizeOutput, its wrapped for_each loops
-  // drained partway, leaving sidesPerFacePQ undercounted. That sized
-  // outR.halfedge_ too small. The Append* calls below write to halfedge_ via
-  // facePtrR[face]++ indexing -- an undersized buffer means OOB writes. Bail
-  // before touching halfedge_.
   if (auto c = cancelled()) return *c;
 
   i12.clear();
@@ -858,6 +865,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                    facePQ2R.cview(0, inP_.NumTri()), true, ctx_);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false, ctx_);
+  if (auto c = cancelled()) return *c;
 
   wholeHalfedgeP.clear();
   wholeHalfedgeQ.clear();
@@ -874,14 +882,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   triangulate.Start();
 #endif
 
-  if (auto c = cancelled()) return *c;
-
   // Level 6
   outR.Face2Tri(faceEdge, halfedgeRef);
   halfedgeRef.clear();
   faceEdge.clear();
 
   outR.ReorderHalfedges(ctx_);
+  if (auto c = cancelled()) return *c;
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   triangulate.Stop();
@@ -889,15 +896,15 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   simplify.Start();
 #endif
 
-  if (auto c = cancelled()) return *c;
-
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
   CreateProperties(outR, inP_, inQ_, ctx_);
+  if (auto c = cancelled()) return *c;
 
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
+  if (auto c = cancelled()) return *c;
 
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
@@ -912,19 +919,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   sort.Start();
 #endif
 
-  if (auto c = cancelled()) return *c;
-
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
-
-  // SortGeometry's wrapped for_each loops can drain on cancel, leaving
-  // halfedge_ (resize_nofill) with uninitialized slots and vertPos_ permuted
-  // from partial morton codes. The outer CsgOpNode::ToLeafNode cancel check
-  // catches it eventually, but BatchUnion/BatchBoolean can return their
-  // last-iteration result without re-checking cancel, so a corrupt
-  // NoError-status impl can escape to the user. Final check so
-  // Boolean3::Result never returns corrupt data with NoError status.
   if (auto c = cancelled()) return *c;
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)

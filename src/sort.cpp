@@ -223,12 +223,18 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
     return;
   }
 
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
+
   halfedge_.MakeUnique();
   SortVerts(ctx);
+  if (IsCancelled(ctx)) return;
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton, ctx);
+  if (IsCancelled(ctx)) return;
   SortFaces(faceBox, faceMorton, ctx);
+  if (IsCancelled(ctx)) return;
   if (halfedge_.size() == 0) {
     collider_ = {};
     return;
@@ -236,6 +242,7 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   collider_ = Collider(faceBox, faceMorton);
   bBox_ = collider_.GetBoundingBox();
   CompactProps(ctx);
+  if (IsCancelled(ctx)) return;
 
   DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
                "Not an even number of faces after sorting faces!");
@@ -282,6 +289,8 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
  */
 void Manifold::Impl::SortVerts(ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   const auto numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert, 1e5);
@@ -289,6 +298,7 @@ void Manifold::Impl::SortVerts(ExecutionContext::Impl* ctx) {
              cancellable(ctx, [this, &vertMorton](const int vert) {
                vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
              }));
+  if (IsCancelled(ctx)) return;
 
   Vec<int> vertNew2Old(numVert);
   sequence(vertNew2Old.begin(), vertNew2Old.end());
@@ -299,6 +309,7 @@ void Manifold::Impl::SortVerts(ExecutionContext::Impl* ctx) {
               });
 
   ReindexVerts(vertNew2Old, numVert, ctx);
+  if (IsCancelled(ctx)) return;
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
@@ -326,6 +337,8 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
                                   size_t oldNumVert,
                                   ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   Vec<int> vertOld2New(oldNumVert);
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
@@ -339,6 +352,7 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
                edge.propVert = edge.startVert;
              }
            }));
+  if (IsCancelled(ctx)) return;
 }
 
 /**
@@ -347,6 +361,8 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
 void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   ZoneScoped;
   if (numProp_ == 0) return;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
 
   const int numProp = NumProp();
   const auto numVerts = properties_.size() / numProp;
@@ -358,6 +374,7 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
              reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
                  ->store(1, std::memory_order_relaxed);
            }));
+  if (IsCancelled(ctx)) return;
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
 
@@ -374,10 +391,12 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
                      oldProp[oldIdx * numProp + p];
                }
              }));
+  if (IsCancelled(ctx)) return;
   for_each(policy, halfedge_.begin(), halfedge_.end(),
            cancellable(ctx, [&propOld2New](Halfedge& edge) {
              edge.propVert = propOld2New[edge.propVert];
            }));
+  if (IsCancelled(ctx)) return;
 }
 
 /**
@@ -389,6 +408,8 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                                       Vec<uint32_t>& faceMorton,
                                       ExecutionContext::Impl* ctx) const {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   // faceBox should be initialized
   faceBox.resize(NumTri(), Box());
   faceMorton.resize_nofill(NumTri());
@@ -413,6 +434,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
 
                faceMorton[face] = MortonCode(center, bBox_);
              }));
+  if (IsCancelled(ctx)) return;
 }
 
 /**
@@ -422,6 +444,8 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
 void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
                                ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   Vec<int> faceNew2Old(NumTri());
   sequence(faceNew2Old.begin(), faceNew2Old.end());
 
@@ -443,6 +467,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
   Permute(faceMorton, faceNew2Old);
   Permute(faceBox, faceNew2Old);
   GatherFaces(faceNew2Old, ctx);
+  if (IsCancelled(ctx)) return;
 }
 
 /**
@@ -453,6 +478,8 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
 void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
                                  ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   const auto numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
@@ -472,11 +499,14 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
              cancellable(ctx, ReindexFace({halfedge_, halfedgeTangent_,
                                            oldHalfedge, oldHalfedgeTangent,
                                            faceNew2Old, faceOld2New})));
+  if (IsCancelled(ctx)) return;
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
                                  ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   const auto numTri = faceNew2Old.size();
 
   meshRelation_.triRef.resize_nofill(numTri);
@@ -509,10 +539,13 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
              cancellable(ctx, ReindexFace({halfedge_, halfedgeTangent_,
                                            old.halfedge_, old.halfedgeTangent_,
                                            faceNew2Old, faceOld2New})));
+  if (IsCancelled(ctx)) return;
 }
 
 void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   // halfedges in the same face are added in non-deterministic order, so we have
   // to reorder them for determinism
 
@@ -530,6 +563,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
              for (int i : {0, 1, 2})
                halfedge_[tri * 3 + i] = face[(index + i) % 3];
            }));
+  if (IsCancelled(ctx)) return;
   // step 2: fix paired halfedge
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
            countAt(halfedge_.size() / 3), cancellable(ctx, [this](size_t tri) {
@@ -544,6 +578,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
                curr.pairedHalfedge = oppositeFace * 3 + index;
              }
            }));
+  if (IsCancelled(ctx)) return;
 }
 
 /**
