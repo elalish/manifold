@@ -356,6 +356,8 @@ template <bool expandP, bool forward>
 Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                            ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every cancellable op is followed by IsCancelled to keep
+  // partial output from feeding unconditional downstream consumers.
   // a: 1 (edge), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
@@ -372,6 +374,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
+  if (IsCancelled(ctx)) return Intersections{};
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;

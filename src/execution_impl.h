@@ -23,9 +23,6 @@ namespace manifold {
 
 inline bool IsCancelled(ExecutionContext::Impl* ctx);
 
-template <typename F>
-struct Cancellable;
-
 /** @ingroup Private
  *
  * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
@@ -42,8 +39,6 @@ struct ExecutionContext::Impl {
   std::atomic<bool> cancel{false};
 
   friend bool IsCancelled(Impl*);
-  template <typename F>
-  friend struct Cancellable;
   friend class manifold::ExecutionContext;
 };
 
@@ -51,8 +46,8 @@ struct ExecutionContext::Impl {
  *
  * Canonical reader for the cancel flag. The only path to observe cancel
  * state from internal code -- `Impl::cancel` is private and friended only
- * to this function, the `Cancellable<F>` wrapper, and `ExecutionContext`
- * itself. New code that wants to check cancel must call this.
+ * to this function and `ExecutionContext` (for its public `Cancel`/`Cancelled`
+ * members). All other readers, including `Cancellable<F>`, go through here.
  *
  * Returns false if `ctx` is nullptr (no-cancellation calls), otherwise
  * loads `cancel` with `memory_order_relaxed` (cancel is advisory; we
@@ -76,8 +71,9 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
  * slots. Not safe for `transform` / scan-style primitives where
  * skipping an iteration would silently corrupt the result. The
  * trailing return type plus bare `return;` on the cancel path make
- * any non-void functor ill-formed at instantiation, enforcing this
- * at build time.
+ * any non-void functor ill-formed when `operator()` is instantiated
+ * (i.e. when wrapped into a parallel primitive), enforcing this at
+ * build time.
  */
 template <typename F>
 struct Cancellable {
