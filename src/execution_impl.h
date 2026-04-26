@@ -14,21 +14,81 @@
 
 #pragma once
 #include <atomic>
+#include <type_traits>
+#include <utility>
 
 #include "manifold/common.h"
 
 namespace manifold {
 
+inline bool IsCancelled(ExecutionContext::Impl* ctx);
+
 /** @ingroup Private
  *
- * Pimpl for ExecutionContext. Holds the atomic state observed/mutated by
- * the CSG evaluation machinery. Internal code accesses this via
- * ctx.impl_->field directly.
+ * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
+ * to read it -- this is the canonical reader, enforced by the type system.
+ * `totalBooleans` and `doneBooleans` are public for progress reporting and
+ * test introspection.
  */
 struct ExecutionContext::Impl {
+ public:
   std::atomic<int> totalBooleans{0};
   std::atomic<int> doneBooleans{0};
+
+ private:
   std::atomic<bool> cancel{false};
+
+  friend bool IsCancelled(Impl*);
+  friend class manifold::ExecutionContext;
 };
+
+/** @ingroup Private
+ *
+ * Canonical reader for the cancel flag. The only path to observe cancel
+ * state from internal code -- `Impl::cancel` is private and friended only
+ * to this function and `ExecutionContext` (for its public `Cancel`/`Cancelled`
+ * members). All other readers, including `Cancellable<F>`, go through here.
+ *
+ * Returns false if `ctx` is nullptr (no-cancellation calls), otherwise
+ * loads `cancel` with `memory_order_relaxed` (cancel is advisory; we
+ * don't need synchronization with other operations).
+ */
+inline bool IsCancelled(ExecutionContext::Impl* ctx) {
+  return ctx && ctx->cancel.load(std::memory_order_relaxed);
+}
+
+/** @ingroup Private
+ *
+ * Wrap a functor so each invocation returns early if the
+ * ExecutionContext has been cancelled. `for_each` / `transform` / etc.
+ * will still call the wrapped functor for every remaining iteration,
+ * but each no-ops — TBB's scheduler doesn't let us early-terminate,
+ * so we drain cheaply. `ctx` may be nullptr, in which case the cancel
+ * branch is always cold.
+ *
+ * Only appropriate for functors whose "no-op this iteration" behavior
+ * is safe — `for_each` over a range that writes independent output
+ * slots. Not safe for `transform` / scan-style primitives where
+ * skipping an iteration would silently corrupt the result. The
+ * trailing return type plus bare `return;` on the cancel path make
+ * any non-void functor ill-formed when `operator()` is instantiated
+ * (i.e. when invoked, whether directly or via a parallel primitive),
+ * enforcing this at build time.
+ */
+template <typename F>
+struct Cancellable {
+  ExecutionContext::Impl* ctx;
+  F f;
+  template <typename... Args>
+  auto operator()(Args&&... args) -> decltype(f(std::forward<Args>(args)...)) {
+    if (IsCancelled(ctx)) return;
+    f(std::forward<Args>(args)...);
+  }
+};
+
+template <typename F>
+Cancellable<std::decay_t<F>> cancellable(ExecutionContext::Impl* ctx, F&& f) {
+  return {ctx, std::forward<F>(f)};
+}
 
 }  // namespace manifold
