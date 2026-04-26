@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "../src/impl.h"
 #include "../src/tri_dist.h"
 #include "../src/utils.h"
 #include "manifold/manifold.h"
@@ -118,6 +119,38 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 1, precision);
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
+  }
+}
+
+// This test verifies that curvature calculation does not produce NaN values on
+// degenerate faces
+
+TEST(Properties, DegenerateCurvature) {
+  Manifold::Impl impl;
+
+  impl.vertPos_.resize(3);
+  impl.vertPos_[0] = vec3(0.0, 0.0, 0.0);
+  impl.vertPos_[1] = vec3(1.0, 0.0, 0.0);
+  impl.vertPos_[2] = vec3(1.0, 0.0, 0.0);
+
+  impl.halfedge_.resize(6);
+  impl.halfedge_[0] = Halfedge{0, 1, 5, 0};
+  impl.halfedge_[1] = Halfedge{1, 2, 4, 1};
+  impl.halfedge_[2] = Halfedge{2, 0, 3, 2};
+
+  impl.halfedge_[3] = Halfedge{0, 2, 2, 0};
+  impl.halfedge_[4] = Halfedge{2, 1, 1, 1};
+  impl.halfedge_[5] = Halfedge{1, 0, 0, 2};
+
+  impl.faceNormal_.resize(2);
+  impl.faceNormal_[0] = vec3(0.0, 0.0, 1.0);
+  impl.faceNormal_[1] = vec3(0.0, 0.0, 1.0);
+
+  impl.CalculateCurvature(-1, 0);
+
+  const Vec<double>& props = impl.properties_;
+  for (double x : props) {
+    EXPECT_TRUE(std::isfinite(x));
   }
 }
 
