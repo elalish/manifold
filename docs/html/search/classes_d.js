@@ -1,0 +1,28 @@
+var searchData=
+[
+  ['scalar_5ftype_0',['scalar_type',['../structlinalg_1_1detail_1_1scalar__type.html',1,'linalg::detail']]],
+  ['scalar_5ftype_3c_20mat_3c_20t_2c_20m_2c_20n_20_3e_20_3e_1',['scalar_type&lt; mat&lt; T, M, N &gt; &gt;',['../structlinalg_1_1detail_1_1scalar__type_3_01mat_3_01_t_00_01_m_00_01_n_01_4_01_4.html',1,'linalg::detail']]],
+  ['scalar_5ftype_3c_20vec_3c_20t_2c_20m_20_3e_20_3e_2',['scalar_type&lt; vec&lt; T, M &gt; &gt;',['../structlinalg_1_1detail_1_1scalar__type_3_01vec_3_01_t_00_01_m_01_4_01_4.html',1,'linalg::detail']]],
+  ['scalars_3',['scalars',['../structlinalg_1_1detail_1_1scalars.html',1,'linalg::detail']]],
+  ['scalars_3c_20t_2c_20u_2e_2e_2e_20_3e_4',['scalars&lt; T, U... &gt;',['../structlinalg_1_1detail_1_1scalars_3_01_t_00_01_u_8_8_8_01_4.html',1,'linalg::detail']]],
+  ['scalars_3c_3e_5',['scalars&lt;&gt;',['../structlinalg_1_1detail_1_1scalars_3_4.html',1,'linalg::detail']]],
+  ['select_6',['select',['../structlinalg_1_1detail_1_1select.html',1,'linalg::detail']]],
+  ['seq_7',['seq',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['seq_3c_20a_2b0_20_3e_8',['seq&lt; A+0 &gt;',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['seq_3c_20a_2b0_2c_20a_2b1_20_3e_9',['seq&lt; A+0, A+1 &gt;',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['seq_3c_20a_2b0_2c_20a_2b1_2c_20a_2b2_20_3e_10',['seq&lt; A+0, A+1, A+2 &gt;',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['seq_3c_20a_2b0_2c_20a_2b1_2c_20a_2b2_2c_20a_2b3_20_3e_11',['seq&lt; A+0, A+1, A+2, A+3 &gt;',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['seq_3c_3e_12',['seq&lt;&gt;',['../structlinalg_1_1detail_1_1seq.html',1,'linalg::detail']]],
+  ['smoothness_13',['Smoothness',['../group___structs.html#structmanifold_1_1_smoothness',1,'manifold']]],
+  ['std_5fabs_14',['std_abs',['../structlinalg_1_1detail_1_1std__abs.html',1,'linalg::detail']]],
+  ['std_5facos_15',['std_acos',['../structlinalg_1_1detail_1_1std__acos.html',1,'linalg::detail']]],
+  ['std_5fasin_16',['std_asin',['../structlinalg_1_1detail_1_1std__asin.html',1,'linalg::detail']]],
+  ['std_5fatan_17',['std_atan',['../structlinalg_1_1detail_1_1std__atan.html',1,'linalg::detail']]],
+  ['std_5fatan2_18',['std_atan2',['../structlinalg_1_1detail_1_1std__atan2.html',1,'linalg::detail']]],
+  ['std_5fcopysign_19',['std_copysign',['../structlinalg_1_1detail_1_1std__copysign.html',1,'linalg::detail']]],
+  ['std_5fcos_20',['std_cos',['../structlinalg_1_1detail_1_1std__cos.html',1,'linalg::detail']]],
+  ['std_5fisfinite_21',['std_isfinite',['../structlinalg_1_1detail_1_1std__isfinite.html',1,'linalg::detail']]],
+  ['std_5fsin_22',['std_sin',['../structlinalg_1_1detail_1_1std__sin.html',1,'linalg::detail']]],
+  ['std_5fsqrt_23',['std_sqrt',['../structlinalg_1_1detail_1_1std__sqrt.html',1,'linalg::detail']]],
+  ['std_5ftan_24',['std_tan',['../structlinalg_1_1detail_1_1std__tan.html',1,'linalg::detail']]]
+];
