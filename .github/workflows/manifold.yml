@@ -591,3 +591,53 @@ jobs:
     - name: Compare meshes across platforms
       run: |
         bash ./scripts/compare_artifact.sh meshes
+
+  benchmark_guard:
+    name: perfTest base-vs-head guard
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    env:
+      PERF_REPEATS: 3
+      REGRESSION_WARN_PCT: 20
+      REGRESSION_WARN_ABS_MS: 10
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: libgtest-dev libtbb-dev cmake
+        version: 1
+    - *clone-clipper2
+    - name: Prepare base and head worktrees
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE_SHA="${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+        git worktree add wt-base "$BASE_SHA"
+        git worktree add wt-head "$HEAD_SHA"
+    - name: Benchmark base and head
+      shell: bash
+      run: |
+        for variant in base head; do
+          bash ./scripts/run_pr_perf_guard.sh "./wt-${variant}" ./clipper2 "./bench/${variant}" "${PERF_REPEATS}"
+        done
+    - name: Compare benchmark results
+      shell: bash
+      run: |
+        python3 ./scripts/compare_pr_perf_guard.py \
+          --base-dir ./bench/base \
+          --head-dir ./bench/head \
+          --warn-pct "${REGRESSION_WARN_PCT}" \
+          --warn-abs-ms "${REGRESSION_WARN_ABS_MS}" \
+          --markdown-out ./bench/summary.md \
+          --json-out ./bench/result.json
+        cat ./bench/summary.md >> "$GITHUB_STEP_SUMMARY"
+    - name: Upload benchmark artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-benchmark-guard
+        path: bench/
