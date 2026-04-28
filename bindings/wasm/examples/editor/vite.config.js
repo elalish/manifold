@@ -36,8 +36,8 @@ export default defineConfig({
         }
       ],
     }),
-    viteBundleAnalyzer()
-  ],
+    process.env.ANALYZE ? viteBundleAnalyzer() : null
+  ].filter(Boolean),
   resolve: {
     alias: {
       path: resolve(
