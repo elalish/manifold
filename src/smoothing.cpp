@@ -699,9 +699,9 @@ void Manifold::Impl::LinearizeFlatTangents() {
  */
 void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
+  Vec<bool> visited(numHalfedge, false);
   for_each_n(
-      autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
-      [this, &fixedHalfedges](int halfedge) {
+      autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, [&](int halfedge) {
         if (!fixedHalfedges[halfedge]) return;
 
         if (IsMarkedInsideQuad(halfedge)) {
@@ -771,7 +771,10 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
             desiredAngle[i] = scale * desiredAngle[i + 1] - kPi;
           }
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
-          vec3 tangent(halfedgeTangent_[current]);
+          vec3 tangent;
+          for (const int j : {0, 1, 2}) {
+            tangent[j] = halfedgeTangent_[current][j];
+          }
           const quat q = la::rotation_quat(la::normalize(normal), angle);
           const vec3 newTangent = la::qrot(q, tangent);
           for (const int j : {0, 1, 2}) {
