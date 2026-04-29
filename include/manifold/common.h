@@ -18,8 +18,9 @@
 #include <memory>
 #include <vector>
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 #include <chrono>
+#include <iostream>
 #endif
 
 #include "./math.h"
@@ -666,6 +667,9 @@ void Diff(const std::vector<T>& a, const std::vector<T>& b) {
   std::cout << std::endl;
 }
 
+#endif
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 struct Timer {
   std::chrono::high_resolution_clock::time_point start, end;
 

@@ -479,8 +479,8 @@ Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   OpType op)
-    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add) {
+                   OpType op, ExecutionContext::Impl* ctx)
+    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add), ctx_(ctx) {
   ZoneScoped;
   // Symbolic perturbation:
   // Union -> expand inP, expand inQ
@@ -498,17 +498,32 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return;
   }
 
-#ifdef MANIFOLD_DEBUG
+  auto cancelled = [&] {
+    return ctx_ && ctx_->cancel.load(std::memory_order_relaxed);
+  };
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer intersections;
   intersections.Start();
+  Timer intersect12P, intersect12Q, winding03P, winding03Q;
+  intersect12P.Start();
 #endif
 
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
+  if (cancelled()) return;
   xv12_ = Intersect12<true>(inP, inQ, expandP_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  intersect12P.Stop();
+  intersect12Q.Start();
+#endif
+  if (cancelled()) return;
   xv21_ = Intersect12<false>(inP, inQ, expandP_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  intersect12Q.Stop();
+#endif
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
@@ -517,14 +532,28 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   // Compute winding numbers of all vertices using flood fill
   // Vertices on the same connected component have the same winding number
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03P.Start();
+#endif
+  if (cancelled()) return;
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03P.Stop();
+  winding03Q.Start();
+#endif
+  if (cancelled()) return;
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03Q.Stop();
   intersections.Stop();
 
   if (ManifoldParams().verbose >= 2) {
-    intersections.Print("Intersections");
+    intersect12P.Print("  Intersect12 P->Q");
+    intersect12Q.Print("  Intersect12 Q->P");
+    winding03P.Print("  Winding03 P");
+    winding03Q.Print("  Winding03 Q");
+    intersections.Print("Intersections (total)");
   }
 #endif
 }

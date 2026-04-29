@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 
 #include "boolean3.h"
 #include "parallel.h"
@@ -651,7 +652,7 @@ namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer assemble;
   assemble.Start();
 #endif
@@ -684,6 +685,21 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     }
     return inP_;
   }
+
+  auto cancelled = [&]() -> std::optional<Manifold::Impl> {
+    if (ctx_ && ctx_->cancel.load(std::memory_order_relaxed)) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::Cancelled;
+      return impl;
+    }
+    return std::nullopt;
+  };
+
+  // Catches both ctor-detected cancel (ctx->cancel is sticky) and cancel
+  // fired between ctor and Result. The assemble phase (through
+  // AppendWholeEdges) is O(N) in intersection count and has no internal
+  // cancel checkpoint until Face2Tri.
+  if (auto c = cancelled()) return *c;
 
   if (!valid) {
     auto impl = Manifold::Impl();
@@ -825,11 +841,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   assemble.Stop();
   Timer triangulate;
   triangulate.Start();
 #endif
+
+  if (auto c = cancelled()) return *c;
 
   // Level 6
   outR.Face2Tri(faceEdge, halfedgeRef);
@@ -838,11 +856,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   outR.ReorderHalfedges();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   triangulate.Stop();
   Timer simplify;
   simplify.Start();
 #endif
+
+  if (auto c = cancelled()) return *c;
 
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
@@ -859,17 +879,19 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   simplify.Stop();
   Timer sort;
   sort.Start();
 #endif
 
+  if (auto c = cancelled()) return *c;
+
   outR.CalculateBBox();
   outR.SortGeometry();
   outR.IncrementMeshIDs();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   sort.Stop();
   if (ManifoldParams().verbose >= 2) {
     assemble.Print("Assembly");

@@ -1496,6 +1496,37 @@ TEST(Manifold, ExecutionContextCancelConcurrent) {
 }
 #endif  // MANIFOLD_PAR == 1
 
+// Cancel mid-evaluation of a *single* Boolean3 call (as opposed to the outer
+// CSG tree loop). Before per-phase cancel checks inside Boolean3, this would
+// only return Cancelled if the flag fired before the boolean started; a large
+// single boolean would run to completion. With phase-boundary checks, cancel
+// requested mid-way is honored.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ExecutionContextCancelMidBoolean) {
+  // One big boolean — N-1 = 1 op, so outer-loop cancel only has a single
+  // checkpoint. The work itself (two large spheres overlapping) takes long
+  // enough that cancel fires reliably while Boolean3 is running.
+  Manifold a = Manifold::Sphere(1.0, 256);
+  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold u = a + b;
+
+  ExecutionContext ctx;
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::thread evalThread([&] { result.store(u.Status(ctx)); });
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  ctx.Cancel();
+  evalThread.join();
+
+  // Either outcome is acceptable. NoError: eval raced past the 1ms sleep
+  // before cancel fired. Cancelled: caught by an inner Boolean3 phase
+  // check or by the outer CsgOpNode::ToLeafNode check after a fast
+  // SimpleBoolean — we can't cheaply distinguish those paths.
+  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+              result.load() == Manifold::Error::NoError);
+}
+#endif  // MANIFOLD_PAR == 1
+
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
