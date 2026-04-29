@@ -773,8 +773,10 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
           vec3 tangent(halfedgeTangent_[current]);
           const quat q = la::rotation_quat(la::normalize(normal), angle);
-          halfedgeTangent_[current] =
-              vec4(la::qrot(q, tangent), halfedgeTangent_[current].w);
+          const vec3 newTangent = la::qrot(q, tangent);
+          for (const int j : {0, 1, 2}) {
+            halfedgeTangent_[current][j] = newTangent[j];
+          }
           ++i;
         } while (!fixedHalfedges[current]);
       });
