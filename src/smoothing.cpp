@@ -699,14 +699,10 @@ void Manifold::Impl::LinearizeFlatTangents() {
  */
 void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
-  Vec<bool> visited(numHalfedge, false);
   for_each_n(
-      autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, [&](int halfedge) {
-        if (!fixedHalfedges[halfedge]) return;
-
-        if (IsMarkedInsideQuad(halfedge)) {
-          halfedge = NextHalfedge(halfedge_[halfedge].pairedHalfedge);
-        }
+      autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
+      [this, &fixedHalfedges](int halfedge) {
+        if (!fixedHalfedges[halfedge] || IsMarkedInsideQuad(halfedge)) return;
 
         vec3 normal(0.0);
         Vec<double> currentAngle;
@@ -760,6 +756,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         size_t i = 0;
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          if (current != halfedge && fixedHalfedges[current]) break;
           if (IsMarkedInsideQuad(current)) continue;
           desiredAngle[i] *= scale;
           const double lastAngle = i > 0 ? desiredAngle[i - 1] : 0;
@@ -771,10 +768,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
             desiredAngle[i] = scale * desiredAngle[i + 1] - kPi;
           }
           const double angle = currentAngle[i] - desiredAngle[i] - offset;
-          vec3 tangent;
-          for (const int j : {0, 1, 2}) {
-            tangent[j] = halfedgeTangent_[current][j];
-          }
+          vec3 tangent(halfedgeTangent_[current]);
           const quat q = la::rotation_quat(la::normalize(normal), angle);
           const vec3 newTangent = la::qrot(q, tangent);
           for (const int j : {0, 1, 2}) {
