@@ -44,7 +44,11 @@ void print_usage() {
       "  -v: Enable Boolean debug dumps (only works if compiled with "
       "MANIFOLD_DEBUG flag)\n");
   printf(
-      "  -vv: Enable Boolean stats and extra triangulator output (only works "
+      "  -vv: Enable Boolean stats (only works "
+      "if compiled with MANIFOLD_DEBUG "
+      "flag)\n");
+  printf(
+      "  -vvv: Enable extra triangulator output (only works "
       "if compiled with MANIFOLD_DEBUG "
       "flag)\n");
 }
@@ -89,6 +93,9 @@ int main(int argc, char** argv) {
         manifold::ManifoldParams().verbose = 1;
         if (argv[i][2] == 'v') {
           manifold::ManifoldParams().verbose = 2;
+          if (argv[i][3] == 'v') {
+            manifold::ManifoldParams().verbose = 3;
+          }
         }
         break;
       case 'c':
