@@ -185,11 +185,17 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
       return false;
     // Flag short edges
     const vec3 delta = vertPos_[half.endVert] - vertPos_[half.startVert];
-    return la::dot(delta, delta) < tol * tol;
+    const double lenSq = la::dot(delta, delta);
+    // To ensure tolerance_-scale errors don't stack, only collapse these edges
+    // if they connect a new vert to an old vert, since old verts are only
+    // allowed to move by epsilon_.
+    const double maxLen =
+        half.endVert < firstNewVert ? tol * tol : epsilon_ * epsilon_;
+    return lenSq < maxLen;
   };
 
   s.run(nbEdges, shortEdge, [&](size_t i) {
-    const bool didCollapse = CollapseEdge(i, scratchBuffer, tol);
+    const bool didCollapse = CollapseEdge(i, scratchBuffer, tol, firstNewVert);
     if (didCollapse) numFlagged++;
     scratchBuffer.resize(0);
   });
@@ -489,7 +495,8 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 // have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol) {
+bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
+                                  int firstNewVert) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
   if (tol < 0) tol = epsilon_;
 
@@ -503,7 +510,13 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol) {
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[toRemove.startVert];
   const vec3 delta = pNew - pOld;
-  const bool shortEdge = la::dot(delta, delta) < tol * tol;
+  // We don't check that startVert is still new here - it may have been
+  // collapsed to a different neighbor. However, it's still fine to collapse it
+  // further, as it's still only collapsing its own original neighbors together,
+  // which can't stack errors arbitrarily far.
+  const double maxLen =
+      endVert < firstNewVert ? tol * tol : epsilon_ * epsilon_;
+  const bool shortEdge = la::dot(delta, delta) < maxLen;
 
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
