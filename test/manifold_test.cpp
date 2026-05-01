@@ -20,6 +20,7 @@
 #include <thread>
 
 #include "../src/execution_impl.h"
+#include "../src/parallel.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -1780,6 +1781,35 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
+  }
+}
+
+// Sweeps equal-key bucket sizes that span the parallel mergeSort's
+// partition boundaries (n > kSeqThreshold under MANIFOLD_PAR=ON). Tags
+// are sequential and unique; keys are scrambled by a multiplicative hash
+// so the input isn't already sorted by key. std::stable_sort is the
+// oracle.
+TEST(Manifold, ParallelStableSortStability) {
+  constexpr size_t kN = 50000;  // > kSeqThreshold to hit parallel
+  constexpr size_t kBucketSizes[] = {kN, kN / 2, kN / 4, kN / 8, 1000, 100};
+  for (size_t bucket : kBucketSizes) {
+    struct Item {
+      size_t key;
+      int tag;
+    };
+    std::vector<Item> items;
+    items.reserve(kN);
+    for (size_t i = 0; i < kN; ++i) {
+      items.push_back({(i * 2654435761u % kN) / bucket, static_cast<int>(i)});
+    }
+    auto expected = items;
+    auto cmp = [](const Item& a, const Item& b) { return a.key > b.key; };
+    std::stable_sort(expected.begin(), expected.end(), cmp);
+    manifold::stable_sort(items.begin(), items.end(), cmp);
+    for (size_t i = 0; i < items.size(); ++i) {
+      ASSERT_EQ(items[i].tag, expected[i].tag)
+          << "bucket=" << bucket << " i=" << i;
+    }
   }
 }
 

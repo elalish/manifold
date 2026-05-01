@@ -89,13 +89,21 @@ void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
     std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
   } else {
     size_t q1, q2;
+    // For stability: equal-keyed elements from the left half must precede
+    // those from the right in the output. Pivot from the larger half and
+    // use the bound that puts equal-to-pivot from the OPPOSITE half on the
+    // pivot's stable side.
     if (length1 > length2) {
+      // Left pivot: right-side equals belong after pivot. lower_bound on
+      // right places them at q2+ (second sub-merge with pivot).
       q1 = p1 + length1 / 2;
       auto end = std::lower_bound(src + p2, src + r2, src[q1], comp);
       q2 = std::distance(src, end);
     } else {
+      // Right pivot: left-side equals belong before pivot. upper_bound on
+      // left places them strictly before q1 (first sub-merge).
       q2 = p2 + length2 / 2;
-      auto end = std::lower_bound(src + p1, src + r1, src[q2], comp);
+      auto end = std::upper_bound(src + p1, src + r1, src[q2], comp);
       q1 = std::distance(src, end);
     }
     size_t q3 = p3 + (q1 - p1) + (q2 - p2);
