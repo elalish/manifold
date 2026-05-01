@@ -85,13 +85,13 @@ set(
 )
 foreach(OPT IN LISTS OPTIONS)
   if(${${OPT}})
-    target_compile_options(manifold PUBLIC -D${OPT})
+    target_compile_definitions(manifold PUBLIC ${OPT})
   endif()
 endforeach()
 if(MANIFOLD_PAR)
-  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR=1)
+  target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=1)
 else()
-  target_compile_options(manifold PUBLIC -DMANIFOLD_PAR=-1)
+  target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=-1)
 endif()
 
 target_include_directories(
