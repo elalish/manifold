@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <atomic>
+#include <limits>
+#include <thread>
+
 #include "../src/utils.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
@@ -799,6 +803,52 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
+
+// Regression: Compose() in csg_tree.cpp used to read the global atomic
+// Manifold::Impl::meshIDCounter_ twice — once when shifting `triRef.meshID`
+// values and once when shifting `meshIDtransform` keys. If another thread
+// advanced the counter between the two reads, the offsets disagreed and
+// the resulting Impl had `triRef.meshID` values not present in
+// `meshIDtransform`. After IncrementMeshIDs's HashTable lookup, those
+// orphan meshIDs collapsed to 0, and GetMeshGL64 emitted runs with the
+// default Relation's `originalID = -1` (UINT32_MAX as uint32).
+//
+// MANIFOLD_PAR guard: emscripten/WASM builds without pthreads can't
+// construct std::thread and abort at runtime; the bug also can't manifest
+// without concurrent CSG, so skipping there is fine.
+#if MANIFOLD_PAR == 1
+TEST(Boolean, BatchBooleanComposeMeshIDStable) {
+  // Three pairwise-disjoint cubes — forces the Compose path inside
+  // BatchBoolean(Add).
+  auto build = []() {
+    Manifold a = Manifold::Cube(vec3(1, 1, 1));
+    Manifold b = Manifold::Cube(vec3(1, 1, 1)).Translate({3, 0, 0});
+    Manifold c = Manifold::Cube(vec3(1, 1, 1)).Translate({0, 3, 0});
+    return Manifold::BatchBoolean({a, b, c}, OpType::Add);
+  };
+
+  // Several worker threads each running the same pipeline. The internal
+  // ReserveIDs calls during their CSG ops provide the cross-thread counter
+  // contention the bug needs.
+  std::atomic<int> orphans{0};
+  auto worker = [&]() {
+    for (int i = 0; i < 200; ++i) {
+      MeshGL64 m = build().GetMeshGL64();
+      for (uint32_t orig : m.runOriginalID) {
+        if (orig == std::numeric_limits<uint32_t>::max()) ++orphans;
+      }
+    }
+  };
+
+  std::vector<std::thread> ts;
+  for (int t = 0; t < 8; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(orphans.load(), 0)
+      << "Compose produced runs with originalID = -1; indicates a "
+         "non-atomic meshIDCounter_ snapshot.";
+}
+#endif  // MANIFOLD_PAR == 1
 
 TEST(Boolean, BatchBoolean) {
   Manifold cube = Manifold::Cube({100, 100, 1});

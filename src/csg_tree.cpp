@@ -273,11 +273,15 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   if (nodes.size() > 1 && policy == ExecutionPolicy::Par)
     policy = ExecutionPolicy::Seq;
 
+  // Snapshot once and reuse for both shifts; two reads can disagree under
+  // cross-thread CSG and leave triRef.meshID values not in meshIDtransform.
+  const uint32_t meshIDCounterSnapshot = Manifold::Impl::meshIDCounter_;
+
   for_each_n(
       nodes.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
       countAt(0), nodes.size(),
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &propVertIndices,
-       numPropOut, &combined, policy](int i) {
+       numPropOut, &combined, policy, meshIDCounterSnapshot](int i) {
         auto& node = nodes[i];
         copy(node->pImpl_->halfedgeTangent_.begin(),
              node->pImpl_->halfedgeTangent_.end(),
@@ -357,7 +361,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
         // unique meshIDs.
-        const int offset = i * Manifold::Impl::meshIDCounter_;
+        const int offset = i * meshIDCounterSnapshot;
         transform(node->pImpl_->meshRelation_.triRef.begin(),
                   node->pImpl_->meshRelation_.triRef.end(),
                   combined.meshRelation_.triRef.begin() + triIndices[i],
@@ -369,7 +373,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   for (size_t i = 0; i < nodes.size(); i++) {
     auto& node = nodes[i];
-    const int offset = i * Manifold::Impl::meshIDCounter_;
+    const int offset = i * meshIDCounterSnapshot;
 
     for (const auto& pair : node->pImpl_->meshRelation_.meshIDtransform) {
       Manifold::Impl::Relation rel = pair.second;
