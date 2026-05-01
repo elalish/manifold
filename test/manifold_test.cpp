@@ -20,6 +20,7 @@
 #include <thread>
 
 #include "../src/execution_impl.h"
+#include "../src/parallel.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -1780,6 +1781,35 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
+  }
+}
+
+// Sweeps equal-key bucket sizes that span the parallel mergeSort's
+// partition boundaries (n > kSeqThreshold under MANIFOLD_PAR=ON).
+TEST(Manifold, ParallelStableSortStability) {
+  constexpr size_t kN = 50000;  // > kSeqThreshold to hit parallel
+  constexpr size_t kBucketSizes[] = {kN, kN / 2, kN / 4, kN / 8, 1000, 100};
+  for (size_t bucket : kBucketSizes) {
+    struct Item {
+      double key;
+      int tag;
+    };
+    std::vector<Item> items;
+    items.reserve(kN);
+    for (size_t i = 0; i < kN; ++i) {
+      items.push_back({static_cast<double>(i / bucket), static_cast<int>(i)});
+    }
+    manifold::stable_sort(
+        items.begin(), items.end(),
+        [](const Item& a, const Item& b) { return a.key > b.key; });
+    // Ascending input tags + stable sort: tags must ascend within equal keys.
+    size_t violations = 0;
+    for (size_t i = 1; i < items.size(); ++i) {
+      if (items[i].key == items[i - 1].key && items[i].tag < items[i - 1].tag) {
+        ++violations;
+      }
+    }
+    EXPECT_EQ(violations, 0u) << "bucket=" << bucket;
   }
 }
 
