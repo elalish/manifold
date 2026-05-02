@@ -8,6 +8,10 @@ from pathlib import Path
 TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
 
 
+def mean(values: list[float]) -> float:
+    return statistics.fmean(values)
+
+
 def parse_run(run_path: Path) -> dict:
     times = []
     for line in run_path.read_text(encoding="utf-8").splitlines():
@@ -19,7 +23,7 @@ def parse_run(run_path: Path) -> dict:
     return {
         "path": str(run_path),
         "samples_sec": times,
-        "mean_sec": sum(times) / len(times),
+        "mean_sec": mean(times),
         "max_sec": max(times),
     }
 
@@ -34,7 +38,7 @@ def parse_suite(suite_dir: Path) -> dict:
         "runs": runs,
         "run_means_sec": run_means,
         "median_run_mean_sec": statistics.median(run_means),
-        "mean_of_run_means_sec": sum(run_means) / len(run_means),
+        "mean_of_run_means_sec": mean(run_means),
     }
 
 
@@ -104,4 +108,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -637,7 +637,17 @@ jobs:
           --json-out ./bench/result.json
         cat ./bench/summary.md >> "$GITHUB_STEP_SUMMARY"
     - name: Upload benchmark artifacts
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: pr-benchmark-guard
         path: bench/
+    - name: Cleanup benchmark worktrees
+      if: always()
+      shell: bash
+      run: |
+        for wt in wt-base wt-head; do
+          if [ -d "$wt" ]; then
+            git worktree remove "$wt" --force
+          fi
+        done
