@@ -19,11 +19,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <iomanip>
+#endif
 #include <map>
 #include <optional>
 #include <regex>
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <sstream>
+#endif
 
 #include "csg_tree.h"
 #include "disjoint_sets.h"
@@ -61,6 +65,7 @@ int GetLabels(std::vector<int>& components,
   return uf.connectedComponents(components);
 }
 
+#ifndef MANIFOLD_NO_IOSTREAM
 template <typename T>
 double FromChars(T buffer) {
   double tmp;
@@ -69,6 +74,7 @@ double FromChars(T buffer) {
   iss >> tmp;
   return tmp;
 }
+#endif
 }  // namespace
 
 namespace manifold {
@@ -699,6 +705,7 @@ void Manifold::Impl::IncrementMeshIDs() {
              UpdateMeshID({meshIDold2new.D()}));
 }
 
+#ifndef MANIFOLD_NO_IOSTREAM
 static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
                                          const MeshGL64& mesh,
                                          std::optional<double> epsilon) {
@@ -860,4 +867,5 @@ bool Manifold::WriteOBJ(std::ostream& stream) const {
   stream << *this->GetCsgLeafNode().GetImpl();
   return true;
 }
+#endif
 }  // namespace manifold

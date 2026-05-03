@@ -334,6 +334,7 @@ TEST(Manifold, ErrorPropagationSimplify) {
   EXPECT_EQ(errored.Simplify().Status(), Manifold::Error::NonFiniteVertex);
 }
 
+#ifndef MANIFOLD_NO_IOSTREAM
 TEST(Manifold, ObjRoundTrip) {
   Manifold m = Manifold::Cube();
   std::stringstream ss;
@@ -343,6 +344,7 @@ TEST(Manifold, ObjRoundTrip) {
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
 }
+#endif
 
 TEST(Manifold, OppositeFace) {
   MeshGL gl;
