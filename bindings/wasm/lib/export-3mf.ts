@@ -94,7 +94,58 @@ export interface Export3MFOptions extends ExportOptions {
 }
 
 /**
+ * Sort 3MF components topologically.
+ *
+ * Some 3MF parsers (like PrusaSlicer and descendants) expect child nodes to be
+ * defined before their parents.  This function sorts the component list
+ * accordingly.
+ */
+const toposort = (components: Component3MF[]) => {
+  const graph: Record<string, string> = {};
+  for (const parent of components) {
+    for (const {objectID: child} of parent.children) {
+      graph[child] = parent.id;
+    }
+  }
+
+  const children = (id: string) =>
+      Object.entries(graph).filter(([, parent]) => id === parent);
+  const indegree = (id: string) =>
+      Object.entries(graph).filter(([child]) => id === child).length;
+  const removed: Record<string, number> = {};
+  let index = 0;
+
+  const queue = components.map(c => c.id).filter(id => !indegree(id));
+  while (queue.length) {
+    const parent = queue.shift()!;
+    removed[parent] = index++;
+    for (const [child] of children(parent)) {
+      delete graph[child];
+      if (indegree(child) === 0) queue.push(child);
+    }
+  }
+
+  return Object.entries(removed)
+      .sort(([, a], [, b]) => b - a)
+      .map(([id]) => components.find(c => c.id === id))
+      .filter((component) => !!component);
+};
+
+/**
  * Convert a GLTF-Transform document to a 3MF model.
+ *
+ * 3MF files are more sophisticated than STL files; they can encode meshes,
+ * components and build items.
+ *
+ * 3MF components are like a scene graph.  Each component can have multiple
+ * children, and does have its own transformation matrix.
+ * This is flexible enough to allow putting several parts in the same file
+ * (multiple components, each with a mesh) as well as multi-material files (a
+ * tree containing multiple meshes, each for a particular material).
+ *
+ * Finally, build items define what the slicer software actually sees.
+ * ManifoldCAD doesn't have an equivalent comprehension.  We assume that top
+ * level objects -- nodes with no parents -- are build objects.
  *
  * @param doc The GLTF document to convert.
  * @returns A blob containing the converted model.
@@ -167,12 +218,11 @@ export async function toArrayBuffer(
     }
   }
 
-  // Some 3MF parsers (like PrusaSlicer) expect child nodes
-  // to be defined before their parents.
-  const nodes = doc.getRoot().listNodes().reverse()
-  for (const node of nodes) {
+  // Create our components...
+  const components: Component3MF[] = [];
+  for (const node of doc.getRoot().listNodes()) {
     const meshID = node.getMesh() && getMeshID(node.getMesh()!);
-    to3mf.components.push({
+    components.push({
       id: setObjectID(node),
       name: node.getName(),
       children: meshID ? [{objectID: meshID}] : [],
@@ -180,7 +230,7 @@ export async function toArrayBuffer(
     });
   }
 
-  // Now we can work out our node hierarchy.
+  // ...work out our component hierarchy...
   for (const node of doc.getRoot().listNodes()) {
     const objectID = getObjectID(node)
     if (!objectID) {
@@ -200,7 +250,7 @@ export async function toArrayBuffer(
     if (parent) {
       // This is a child node, add it to its parent.
       const parentID = getObjectID(parent);
-      const parent3mf = to3mf.components.find((comp) => comp.id == parentID)!;
+      const parent3mf = components.find((comp) => comp.id == parentID)!;
       parent3mf.children.push(child);
     } else {
       // This is a root node.
@@ -208,6 +258,9 @@ export async function toArrayBuffer(
       to3mf.items.push({objectID})
     }
   }
+
+  // ...and sort it so that parents always follow children.
+  to3mf.components = toposort(components);
 
   const fileForRelThumbnail = new FileForRelThumbnail();
   fileForRelThumbnail.add3dModel('3D/3dmodel.model')
