@@ -19,16 +19,40 @@
 
 namespace manifold {
 
+inline bool IsCancelled(ExecutionContext::Impl* ctx);
+
 /** @ingroup Private
  *
- * Pimpl for ExecutionContext. Holds the atomic state observed/mutated by
- * the CSG evaluation machinery. Internal code accesses this via
- * ctx.impl_->field directly.
+ * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
+ * to read it -- this is the canonical reader, enforced by the type system.
+ * `totalBooleans` and `doneBooleans` are public for progress reporting and
+ * test introspection.
  */
 struct ExecutionContext::Impl {
+ public:
   std::atomic<int> totalBooleans{0};
   std::atomic<int> doneBooleans{0};
+
+ private:
   std::atomic<bool> cancel{false};
+
+  friend bool IsCancelled(Impl*);
+  friend class manifold::ExecutionContext;
 };
+
+/** @ingroup Private
+ *
+ * Canonical reader for the cancel flag. The only path to observe cancel
+ * state from internal code -- `Impl::cancel` is private and friended only
+ * to this function and `ExecutionContext` (for its public `Cancel`/`Cancelled`
+ * members). The ctx-aware overloads in `parallel.h` go through here.
+ *
+ * Returns false if `ctx` is nullptr (no-cancellation calls), otherwise
+ * loads `cancel` with `memory_order_relaxed` (cancel is advisory; we
+ * don't need synchronization with other operations).
+ */
+inline bool IsCancelled(ExecutionContext::Impl* ctx) {
+  return ctx && ctx->cancel.load(std::memory_order_relaxed);
+}
 
 }  // namespace manifold
