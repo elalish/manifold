@@ -273,8 +273,10 @@ using MeshGL = MeshGLP<float>;
  */
 using MeshGL64 = MeshGLP<double, uint64_t>;
 
+#ifndef MANIFOLD_NO_IOSTREAM
 MeshGL64 ReadOBJ(std::istream& stream);
 bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh);
+#endif
 
 /**
  * @brief This library's internal representation of an oriented, 2-manifold,
@@ -517,8 +519,10 @@ class Manifold {
    * ofile.close();
    * @endcode
    */
+#ifndef MANIFOLD_NO_IOSTREAM
   static Manifold ReadOBJ(std::istream& stream);
   bool WriteOBJ(std::ostream& stream) const;
+#endif
 
   /** @name Testing Hooks
    *  These are just for internal testing.

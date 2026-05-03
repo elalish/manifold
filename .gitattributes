@@ -1,0 +1,4 @@
+# Carry-patches must keep LF line endings even when checked out on
+# Windows with default core.autocrlf=true; otherwise `git apply`
+# refuses them on EOL mismatch with the (non-CRLF) target tree.
+*.patch text eol=lf

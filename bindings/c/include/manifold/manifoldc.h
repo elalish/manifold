@@ -542,6 +542,7 @@ void manifold_delete_rect(ManifoldRect* b);
 void manifold_delete_triangulation(ManifoldTriangulation* m);
 void manifold_delete_execution_context(ManifoldExecutionContext* ctx);
 
+#ifndef MANIFOLD_NO_IOSTREAM
 // MeshIO / Export
 
 // Import a manifold from a Wavefront obj file.
@@ -570,6 +571,7 @@ void manifold_write_obj(ManifoldManifold* manifold,
 //    passing additional data into the callback.
 void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
                                  void (*callback)(char*, void*), void* args);
+#endif
 #ifdef __cplusplus
 }
 #endif

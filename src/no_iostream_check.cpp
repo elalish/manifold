@@ -1,0 +1,24 @@
+// Copyright 2026 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Build-time check: compiles manifold's public header with
+// MANIFOLD_NO_IOSTREAM defined. Fails the build if iostream usage
+// creeps into the public header outside the macro guards.
+
+#include "manifold/manifold.h"
+
+namespace {
+manifold::MeshGL64 _force_meshgl64;
+manifold::Manifold _force_manifold;
+}  // namespace

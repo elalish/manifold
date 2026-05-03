@@ -43,3 +43,14 @@ install(
   FILES include/manifold/manifoldc.h include/manifold/types.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold
 )
+
+# Always-on build-time check: compiles manifold/manifoldc.h with
+# MANIFOLD_NO_IOSTREAM defined. Mirrors src/no_iostream_check.cpp's
+# role for the C++ public header.
+add_library(manifoldc_no_iostream_check OBJECT no_iostream_check.cpp)
+target_link_libraries(manifoldc_no_iostream_check PRIVATE manifoldc)
+if(NOT MANIFOLD_NO_IOSTREAM)
+  target_compile_definitions(
+    manifoldc_no_iostream_check PRIVATE MANIFOLD_NO_IOSTREAM
+  )
+endif()

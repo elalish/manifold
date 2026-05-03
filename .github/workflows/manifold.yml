@@ -175,6 +175,40 @@ jobs:
         sudo cmake --install build
         ./scripts/test-cmake.sh
 
+  build_no_iostream:
+    name: NO_IOSTREAM (clang)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: cmake clang libgtest-dev
+    - name: Configure + build with MANIFOLD_NO_IOSTREAM=ON, MANIFOLD_TEST=ON
+      run: |
+        cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DMANIFOLD_NO_IOSTREAM=ON \
+          -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_TEST=ON \
+          -DMANIFOLD_PYBIND=OFF \
+          . -B build
+        cmake --build build
+    - name: Run manifold_test (iostream-using TESTs are gated out)
+      run: ./build/test/manifold_test
+    - name: Verify conflict guard fires (NO_IOSTREAM + DEBUG)
+      run: |
+        if cmake -DMANIFOLD_NO_IOSTREAM=ON -DMANIFOLD_DEBUG=ON \
+                 -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
+                 . -B /tmp/conflict-debug 2>&1; then
+          echo "FAIL: configure should have failed for NO_IOSTREAM + DEBUG"
+          exit 1
+        fi
+
   build_gcc_codecov:
     name: code coverage
     timeout-minutes: 45

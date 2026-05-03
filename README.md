@@ -124,6 +124,14 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
   See profiling section below.
 - `ASSIMP_ENABLE=[<OFF>, ON]`: Enable integration with assimp, which is needed for some of the utilities in `extras`.
 - `MANIFOLD_STRICT=[<OFF>, ON]`: Treat compile warnings as fatal build errors.
+- `MANIFOLD_NO_IOSTREAM=[<OFF>, ON]`: Strip iostream- and filesystem-using
+  bits from the public API and tests; useful for freestanding/embedded
+  builds (e.g., `wasm32-unknown-unknown`). Defines both
+  `MANIFOLD_NO_IOSTREAM` and `MANIFOLD_NO_FILESYSTEM` as PUBLIC compile
+  definitions. The test suite still builds + runs — iostream-using
+  TESTs in `manifold_test`/`polygon_test`/`manifoldc_test` are gated
+  out under the macro. Incompatible with `MANIFOLD_DEBUG` /
+  `MANIFOLD_TIMING` (which use `std::cout` for diagnostic output).
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
