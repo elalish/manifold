@@ -80,6 +80,7 @@ set(
   MANIFOLD_ASSERT
   MANIFOLD_TIMING
   MANIFOLD_CROSS_SECTION
+  MANIFOLD_NO_IOSTREAM
   TRACY_ENABLE
   TRACY_MEMORY_USAGE
 )
@@ -92,6 +93,30 @@ if(MANIFOLD_PAR)
   target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=1)
 else()
   target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=-1)
+endif()
+
+# MANIFOLD_NO_IOSTREAM also defines MANIFOLD_NO_FILESYSTEM (the two
+# track together in practice — `<filesystem>` paths are only useful
+# if you can `<fstream>` them, which needs iostream). Source code
+# uses the macros separately for semantic clarity (NO_IOSTREAM gates
+# the iostream-using public API; NO_FILESYSTEM gates filesystem use
+# in test_main.cpp's fixture helpers + main()).
+if(MANIFOLD_NO_IOSTREAM)
+  target_compile_definitions(manifold PUBLIC MANIFOLD_NO_FILESYSTEM)
+endif()
+
+# Always-on build-time check: compiles manifold/manifold.h with
+# MANIFOLD_NO_IOSTREAM defined. Fails if iostream usage creeps into
+# the public header outside the macro guards. Independent of the
+# MANIFOLD_NO_IOSTREAM option's value (just inherits manifold's other
+# PUBLIC defines via target_link_libraries; sets the macro PRIVATE
+# only when the option isn't already setting it PUBLIC).
+add_library(manifold_no_iostream_check OBJECT no_iostream_check.cpp)
+target_link_libraries(manifold_no_iostream_check PRIVATE manifold)
+if(NOT MANIFOLD_NO_IOSTREAM)
+  target_compile_definitions(
+    manifold_no_iostream_check PRIVATE MANIFOLD_NO_IOSTREAM
+  )
 endif()
 
 target_include_directories(
