@@ -21,6 +21,7 @@
 
 #include "../src/execution_impl.h"
 #include "../src/parallel.h"
+#include "../src/vec.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -1527,6 +1528,32 @@ TEST(Manifold, ExecutionContextCancelMidBoolean) {
               result.load() == Manifold::Error::NoError);
 }
 #endif  // MANIFOLD_PAR == 1
+
+// Direct test of the ctx-aware `for_each` overload: cancel-already-set
+// must skip the entire range; cancel-unset must run every element. This
+// is the mechanism test; the integration test that cancel works
+// end-to-end on a real boolean is ExecutionContextCancelMidBoolean.
+TEST(Manifold, ForEachCtxSkipsWhenCancelled) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  std::atomic<int> calls{0};
+  Vec<int> range(100);
+  sequence(range.begin(), range.end());
+  for_each(ExecutionPolicy::Seq, range.begin(), range.end(), ctx.impl_.get(),
+           [&calls](int) { calls.fetch_add(1, std::memory_order_relaxed); });
+  EXPECT_EQ(calls.load(), 0);
+}
+
+// Nullptr ctx: must not crash and must invoke the functor for every element.
+TEST(Manifold, ForEachCtxNullCtxPassesThrough) {
+  std::atomic<int> calls{0};
+  Vec<int> range(10);
+  sequence(range.begin(), range.end());
+  for_each(ExecutionPolicy::Seq, range.begin(), range.end(),
+           static_cast<ExecutionContext::Impl*>(nullptr),
+           [&calls](int) { calls.fetch_add(1, std::memory_order_relaxed); });
+  EXPECT_EQ(calls.load(), 10);
+}
 
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "execution_impl.h"
 #include "iters.h"
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -387,9 +388,19 @@ struct SortFunctor<
 
 #endif
 
-// Applies the function `f` to each element in the range `[first, last)`
+// Applies the function `f` to each element in the range `[first, last)`,
+// optionally checking `ctx` for cancellation once per parallel chunk (or
+// once at the start of the sequential range). `ctx` may be nullptr — the
+// cancel branch is null-short-circuited and folds out at the call site,
+// so non-cancellable callers pay nothing.
+//
+// A cancel that fires mid-sequential-range is not observed until the next
+// call; `autoPolicy` keeps Seq sizes bounded (≤ kSeqThreshold) so latency
+// is bounded too. Only safe when "skip the rest of the range" produces a
+// result the caller will discard via a post-loop `IsCancelled` check.
 template <typename Iter, typename F>
-void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+void for_each(ExecutionPolicy policy, Iter first, Iter last,
+              ExecutionContext::Impl* ctx, F f) {
   static_assert(std::is_convertible_v<
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
@@ -399,7 +410,8 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
-                        [&f](const tbb::blocked_range<Iter>& range) {
+                        [&f, ctx](const tbb::blocked_range<Iter>& range) {
+                          if (IsCancelled(ctx)) return;
                           for (Iter i = range.begin(); i != range.end(); i++)
                             f(*i);
                         });
@@ -407,17 +419,31 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
     return;
   }
 #endif
+  if (IsCancelled(ctx)) return;
   std::for_each(first, last, f);
 }
 
-// Applies the function `f` to each element in the range `[first, last)`
+// Non-cancellable shim. Threads `nullptr` through the ctx-aware impl.
 template <typename Iter, typename F>
-void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+  for_each(policy, first, last, nullptr, f);
+}
+
+// for_each over [first, first + n).
+template <typename Iter, typename F>
+void for_each_n(ExecutionPolicy policy, Iter first, size_t n,
+                ExecutionContext::Impl* ctx, F f) {
   static_assert(std::is_convertible_v<
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-  for_each(policy, first, first + n, f);
+  for_each(policy, first, first + n, ctx, f);
+}
+
+// Non-cancellable shim.
+template <typename Iter, typename F>
+void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+  for_each_n(policy, first, n, nullptr, f);
 }
 
 // Reduce the range `[first, last)` using a binary operation `f` with an initial
