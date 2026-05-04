@@ -14,7 +14,9 @@
 
 #include "manifold/manifoldc.h"
 
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <sstream>
+#endif
 #include <vector>
 
 #include "conv.h"
@@ -1048,6 +1050,7 @@ void manifold_destruct_execution_context(ManifoldExecutionContext* ctx) {
 
 // IO
 
+#ifndef MANIFOLD_NO_IOSTREAM
 ManifoldManifold* manifold_read_obj(void* mem, char* obj_file) {
   std::istringstream iss(obj_file);
   Manifold m = Manifold::ReadOBJ(iss);
@@ -1075,6 +1078,7 @@ void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
   WriteOBJ(ss, *m);
   callback(ss.str().data(), args);
 }
+#endif
 
 #ifdef __cplusplus
 }

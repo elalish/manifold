@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#ifndef MANIFOLD_NO_FILESYSTEM
 #include <filesystem>
 #include <fstream>
+#endif
 
 #include "manifold/manifold.h"
 #include "test.h"
@@ -485,6 +487,7 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
   }
 }
 
+#ifndef MANIFOLD_NO_FILESYSTEM
 Manifold ReadTestOBJ(const std::string& filename) {
   return Manifold(ReadTestMeshGL64OBJ(filename));
 }
@@ -511,3 +514,15 @@ void WriteTestOBJ(const std::string& filename, Manifold m) {
   WriteOBJ(f, m.GetMeshGL64());
   f.close();
 }
+#else
+// Stub WriteTestOBJ for MANIFOLD_NO_FILESYSTEM builds: lets the
+// `if (options.exportModels) WriteTestOBJ(...)` call sites keep
+// linking. exportModels defaults false, so the runtime path is dead.
+//
+// ReadTestOBJ / ReadTestMeshGL64OBJ are deliberately NOT stubbed —
+// tests that read fixtures depend on real geometry, and a stub
+// returning an empty Manifold would silently make assertions fail
+// by construction. Callers must be compile-time gated; an unguarded
+// caller fails to link, which is the bright signal we want.
+void WriteTestOBJ(const std::string& /*filename*/, Manifold /*m*/) {}
+#endif

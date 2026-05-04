@@ -80,6 +80,7 @@ set(
   MANIFOLD_ASSERT
   MANIFOLD_TIMING
   MANIFOLD_CROSS_SECTION
+  MANIFOLD_NO_IOSTREAM
   TRACY_ENABLE
   TRACY_MEMORY_USAGE
 )
@@ -92,6 +93,16 @@ if(MANIFOLD_PAR)
   target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=1)
 else()
   target_compile_definitions(manifold PUBLIC MANIFOLD_PAR=-1)
+endif()
+
+# MANIFOLD_NO_IOSTREAM also defines MANIFOLD_NO_FILESYSTEM (the two
+# track together in practice — `<filesystem>` paths are only useful
+# if you can `<fstream>` them, which needs iostream). Source code
+# uses the macros separately for semantic clarity (NO_IOSTREAM gates
+# the iostream-using public API; NO_FILESYSTEM gates filesystem use
+# in test_main.cpp's fixture helpers + main()).
+if(MANIFOLD_NO_IOSTREAM)
+  target_compile_definitions(manifold PUBLIC MANIFOLD_NO_FILESYSTEM)
 endif()
 
 target_include_directories(

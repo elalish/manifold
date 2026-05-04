@@ -1,7 +1,9 @@
 #include "manifold/manifoldc.h"
 
 #include <cmath>
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
+#endif
 
 #include "gtest/gtest.h"
 #include "manifold/types.h"
@@ -140,6 +142,7 @@ TEST(CBIND, include_pt_mutates_bounds) {
   free(box);
 }
 
+#ifndef MANIFOLD_NO_IOSTREAM
 TEST(CBIND, obj_round_trip) {
   ManifoldManifold* cube =
       manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
@@ -162,6 +165,7 @@ TEST(CBIND, obj_round_trip) {
   free(result);
   free(buffer);
 }
+#endif
 
 TEST(CBIND, level_set) {
   // can't convert lambda with captures to funptr
@@ -205,6 +209,7 @@ TEST(CBIND, level_set) {
   ManifoldMeshGL* sdf_mesh =
       manifold_get_meshgl(alloc_meshgl_buffer(), sdf_man);
 
+#ifndef MANIFOLD_NO_IOSTREAM
   if (options.exportModels) {
     manifold_write_obj(
         sdf_man,
@@ -215,6 +220,7 @@ TEST(CBIND, level_set) {
         },
         NULL);
   }
+#endif
 
   EXPECT_EQ(manifold_status(sdf_man), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_status(sdf_man_context), MANIFOLD_NO_ERROR);
