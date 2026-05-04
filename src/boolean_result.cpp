@@ -277,7 +277,12 @@ void AddNewEdgeVerts(
   if (IsCancelled(ctx)) return;
   auto processFun =
       std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
-  for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial edgesP/edgesNew.
+  for (size_t i = 0; i < p1q2.size(); ++i) {
+    if (IsCancelled(ctx)) return;
+    processFun(i);
+  }
 }
 
 template <typename F>
@@ -305,7 +310,8 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
                         concurrent_map<int, std::vector<EdgePos>>& edgesP,
                         Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
                         const Vec<int>& i03, const Vec<int>& vP2R,
-                        const Vec<int>::IterC faceP2R, bool forward) {
+                        const Vec<int>::IterC faceP2R, bool forward,
+                        ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
@@ -316,7 +322,10 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
   const Vec<vec3>& vertPosP = inP.vertPos_;
   const SharedVec<Halfedge>& halfedgeP = inP.halfedge_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesP) {
+    if (IsCancelled(ctx)) return;
     const int edgeP = value.first;
     std::vector<EdgePos> edgePosP = value.second;
     std::stable_sort(edgePosP.begin(), edgePosP.end());
@@ -381,13 +390,17 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
 void AppendNewEdges(
     Manifold::Impl& outR, Vec<int>& facePtrR,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
-    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
+    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
   auto& halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesNew) {
+    if (IsCancelled(ctx)) return;
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
@@ -587,6 +600,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
+    if (IsCancelled(ctx)) return;
     // Skip collapsed triangles
     if (outR.halfedge_[3 * tri].startVert < 0) continue;
 
@@ -834,15 +848,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<TriRef> halfedgeRef(2 * outR.NumEdge());
 
   AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP, halfedgeRef, inP_,
-                     i03, vP2R, facePQ2R.begin(), true);
+                     i03, vP2R, facePQ2R.begin(), true, ctx_);
   AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
-                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
+                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false, ctx_);
+  if (auto c = cancelled()) return *c;
 
   edgesP.clear();
   edgesQ.clear();
 
-  AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
-                 inP_.NumTri());
+  AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R, inP_.NumTri(),
+                 ctx_);
+  if (auto c = cancelled()) return *c;
 
   edgesNew.clear();
 
