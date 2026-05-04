@@ -1555,6 +1555,24 @@ TEST(Manifold, ForEachCtxNullCtxPassesThrough) {
   EXPECT_EQ(calls.load(), 10);
 }
 
+// Cancel set mid-iteration must be observed within bounded latency
+// (kSeqCancelChunk = 1024 in parallel.h). Functor cancels after 100
+// calls; total calls must be < N + 1024 (= 100 + at most one full chunk).
+TEST(Manifold, ForEachCtxCancelMidSeqLoop) {
+  ExecutionContext ctx;
+  std::atomic<int> calls{0};
+  constexpr int N = 10000;
+  Vec<int> range(N);
+  sequence(range.begin(), range.end());
+  for_each(ExecutionPolicy::Seq, range.begin(), range.end(), ctx.impl_.get(),
+           [&calls, &ctx](int) {
+             const int n = calls.fetch_add(1, std::memory_order_relaxed) + 1;
+             if (n == 100) ctx.Cancel();
+           });
+  EXPECT_GE(calls.load(), 100);
+  EXPECT_LT(calls.load(), 100 + 1024);
+}
+
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -

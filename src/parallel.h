@@ -389,15 +389,14 @@ struct SortFunctor<
 #endif
 
 // Applies the function `f` to each element in the range `[first, last)`,
-// optionally checking `ctx` for cancellation once per parallel chunk (or
-// once at the start of the sequential range). `ctx` may be nullptr — the
-// cancel branch is null-short-circuited and folds out at the call site,
-// so non-cancellable callers pay nothing.
+// optionally checking `ctx` for cancellation periodically. `ctx` may be
+// nullptr — the cancel branch is null-short-circuited and folds out at
+// the call site, so non-cancellable callers pay nothing.
 //
-// A cancel that fires mid-sequential-range is not observed until the next
-// call; `autoPolicy` keeps Seq sizes bounded (≤ kSeqThreshold) so latency
-// is bounded too. Only safe when "skip the rest of the range" produces a
-// result the caller will discard via a post-loop `IsCancelled` check.
+// Cancel granularity: once per parallel chunk, and once per kSeqCancelChunk
+// elements on the sequential branch. Only safe when "skip the rest of the
+// range" produces a result the caller will discard via a post-loop
+// `IsCancelled` check.
 template <typename Iter, typename F>
 void for_each(ExecutionPolicy policy, Iter first, Iter last,
               ExecutionContext::Impl* ctx, F f) {
@@ -419,8 +418,23 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last,
     return;
   }
 #endif
+  // Sequential branch: check once at start, then every kSeqCancelChunk
+  // elements. Bounded latency for MANIFOLD_PAR=OFF builds and for the
+  // small-input branch under PAR=ON.
+  constexpr size_t kSeqCancelChunk = 1024;
   if (IsCancelled(ctx)) return;
-  std::for_each(first, last, f);
+  if (ctx == nullptr) {
+    std::for_each(first, last, f);
+    return;
+  }
+  size_t since_check = 0;
+  for (Iter i = first; i != last; ++i) {
+    if (++since_check == kSeqCancelChunk) {
+      if (IsCancelled(ctx)) return;
+      since_check = 0;
+    }
+    f(*i);
+  }
 }
 
 // Non-cancellable shim. Threads `nullptr` through the ctx-aware impl.
