@@ -100,35 +100,34 @@ export interface Export3MFOptions extends ExportOptions {
  * defined before their parents.  This function sorts the component list
  * accordingly.
  */
-const toposort = (components: Component3MF[]) => {
-  const graph: Record<string, string> = {};
-  for (const parent of components) {
-    for (const {objectID: child} of parent.children) {
-      graph[child] = parent.id;
+const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+  let graph: Array<[Component3MF, Component3MF]> = [];
+  for (const parent of unsorted) {
+    for (const {objectID} of parent.children) {
+      const child = unsorted.find(c => c.id === objectID);
+      if (child) graph.push([parent, child]);
     }
   }
 
-  const children = (id: string) =>
-      Object.entries(graph).filter(([, parent]) => id === parent);
-  const indegree = (id: string) =>
-      Object.entries(graph).filter(([child]) => id === child).length;
-  const removed: Record<string, number> = {};
-  let index = 0;
+  const orphaned = (child: Component3MF) =>
+      graph.filter(([, c]) => c.id === child.id).length === 0;
+  const children = (parent: Component3MF) =>
+      graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
+  const disown = (parent: Component3MF, child: Component3MF) => graph =
+      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
 
-  const queue = components.map(c => c.id).filter(id => !indegree(id));
+  const queue = unsorted.filter(c => orphaned(c));
+  const sorted = [];
   while (queue.length) {
     const parent = queue.shift()!;
-    removed[parent] = index++;
-    for (const [child] of children(parent)) {
-      delete graph[child];
-      if (indegree(child) === 0) queue.push(child);
+    sorted.unshift(parent);
+    for (const child of children(parent)) {
+      disown(parent, child);
+      if (orphaned(child)) queue.push(child);
     }
   }
 
-  return Object.entries(removed)
-      .sort(([, a], [, b]) => b - a)
-      .map(([id]) => components.find(c => c.id === id))
-      .filter((component) => !!component);
+  return sorted;
 };
 
 /**
