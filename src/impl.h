@@ -123,15 +123,20 @@ struct Manifold::Impl {
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
 
   // sort.cpp
-  void SortGeometry();
-  void SortVerts();
-  void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert);
-  void CompactProps();
-  void GetFaceBoxMorton(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) const;
-  void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton);
-  void GatherFaces(const Vec<int>& faceNew2Old);
-  void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old);
-  void ReorderHalfedges();
+  void SortGeometry(ExecutionContext::Impl* ctx = nullptr);
+  void SortVerts(ExecutionContext::Impl* ctx = nullptr);
+  void ReindexVerts(const Vec<int>& vertNew2Old, size_t numOldVert,
+                    ExecutionContext::Impl* ctx = nullptr);
+  void CompactProps(ExecutionContext::Impl* ctx = nullptr);
+  void GetFaceBoxMorton(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
+                        ExecutionContext::Impl* ctx = nullptr) const;
+  void SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton,
+                 ExecutionContext::Impl* ctx = nullptr);
+  void GatherFaces(const Vec<int>& faceNew2Old,
+                   ExecutionContext::Impl* ctx = nullptr);
+  void GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
+                   ExecutionContext::Impl* ctx = nullptr);
+  void ReorderHalfedges(ExecutionContext::Impl* ctx = nullptr);
 
   // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,

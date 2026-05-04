@@ -29,9 +29,7 @@ void ExecutionContext::Cancel() {
   impl_->cancel.store(true, std::memory_order_relaxed);
 }
 
-bool ExecutionContext::Cancelled() const {
-  return impl_->cancel.load(std::memory_order_relaxed);
-}
+bool ExecutionContext::Cancelled() const { return IsCancelled(impl_.get()); }
 
 double ExecutionContext::Progress() const {
   const int total = impl_->totalBooleans.load(std::memory_order_relaxed);
