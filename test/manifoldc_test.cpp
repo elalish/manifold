@@ -723,7 +723,8 @@ TEST(CBIND, execution_context_happy_path) {
   ManifoldExecutionContext* ctx =
       manifold_execution_context(malloc(manifold_execution_context_size()));
   EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
-  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 0.0);
+  // Fresh ctx with no scheduled work reads as trivially complete (1.0).
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 1.0);
 
   // Uncancelled ctx on a valid evaluation returns NO_ERROR.
   ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);

@@ -1849,7 +1849,8 @@ TEST(Manifold, ExecutionContextNoWorkNeeded) {
   EXPECT_EQ(cube.Status(ctx), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
-  EXPECT_DOUBLE_EQ(ctx.Progress(), 0.0);  // 0/0 is defined as 0
+  // No work scheduled = trivially complete = 1.0.
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
 // doneBooleans reaches totalBooleans exactly for many tree shapes — the N-1

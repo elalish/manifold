@@ -56,7 +56,8 @@ suite('Manifold Bindings', () => {
   test('ExecutionContext happy path returns NoError', () => {
     const ctx = new manifoldModule.ExecutionContext();
     expect(ctx.cancelled()).toBe(false);
-    expect(ctx.progress()).toEqual(0);
+    // Fresh ctx with no scheduled work reads as trivially complete (1.0).
+    expect(ctx.progress()).toEqual(1);
 
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const sphere = manifoldModule.Manifold.sphere(1.0, 8);

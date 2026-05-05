@@ -699,12 +699,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // to `kPhasesPerBoolean` on any non-cancelled return so `Progress()`
   // reaches 1.0 even after early-exit paths (status errors, empty/degenerate
   // inputs) that skip most or all of the phase sites.
-  int phasesPublished = 0;
-  bool fullPath = false;
   struct PhaseBalance {
     ExecutionContext::Impl* ctx;
-    int& published;
-    bool& fullPath;
+    int published = 0;
+    bool fullPath = false;
     ~PhaseBalance() {
       if (!ctx) return;
       if (IsCancelled(ctx)) return;  // partial publication is intentional
@@ -719,7 +717,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                                   std::memory_order_relaxed);
       }
     }
-  } balance{ctx_, phasesPublished, fullPath};
+  };
+  PhaseBalance balance{ctx_};
 
   if (inP_.status_ != Manifold::Error::NoError) {
     auto impl = Manifold::Impl();
@@ -746,7 +745,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   auto phase = [&]() -> std::optional<Manifold::Impl> {
     if (ctx_) ctx_->donePhases.fetch_add(1, std::memory_order_relaxed);
-    ++phasesPublished;
+    ++balance.published;
     if (IsCancelled(ctx_)) {
       auto impl = Manifold::Impl();
       impl.status_ = Manifold::Error::Cancelled;
@@ -966,7 +965,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
-  fullPath = true;
+  balance.fullPath = true;
   return outR;
 }
 

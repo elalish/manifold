@@ -33,7 +33,11 @@ bool ExecutionContext::Cancelled() const { return IsCancelled(impl_.get()); }
 
 double ExecutionContext::Progress() const {
   const int total = impl_->totalPhases.load(std::memory_order_relaxed);
-  if (total == 0) return 0.0;
+  // Zero-work case: no phases scheduled (single-leaf manifold, or
+  // pre-evaluation). Treat as complete -- "no work to do" maps to 100%
+  // more naturally than 0%, and matches the user expectation that a
+  // returned `Status() == NoError` means the operation is done.
+  if (total == 0) return 1.0;
   return double(impl_->donePhases.load(std::memory_order_relaxed)) / total;
 }
 
