@@ -1496,6 +1496,10 @@ TEST(Manifold, ExecutionContextCancelConcurrent) {
               result.load() == Manifold::Error::NoError);
   if (result.load() == Manifold::Error::Cancelled) {
     EXPECT_LT(ctx.impl_->doneBooleans.load(), ctx.impl_->totalBooleans.load());
+    // Sub-Boolean granularity: PhaseBalance skips its top-up on cancel, so
+    // donePhases must reflect partial work (strictly less than the full
+    // budget). This pins the "partial publication is intentional" invariant.
+    EXPECT_LT(ctx.Progress(), 1.0);
   }
 }
 #endif  // MANIFOLD_PAR == 1
@@ -1723,9 +1727,66 @@ TEST(Manifold, ExecutionContextConcurrentProgress) {
   // Final state invariants.
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 29);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 29);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
   // We expect to have seen a mid-evaluation snapshot, though this is
   // timing-dependent. Not strictly required but usually the case.
   // (Not asserting sawProgress to avoid CI flakes.)
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Trivial Booleans (empty input, no intersection) early-return from
+// Boolean3::Result before any phase() site executes. The PhaseBalance scope
+// guard must still credit a full kPhasesPerBoolean phases on those returns
+// so Progress() reaches 1.0 after a sequence of no-op evaluations.
+TEST(Manifold, ExecutionContextProgressReachesOneOnTrivialBooleans) {
+  ExecutionContext ctx;
+  // Boolean of empty + cube: Boolean3::Result takes the IsEmpty fast-path.
+  Manifold result = Manifold() + Manifold::Cube();
+  EXPECT_EQ(result.Status(ctx), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerBoolean);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+#if MANIFOLD_PAR == 1
+// Sub-Boolean granularity: within a single Boolean3 op, Progress() should
+// observably advance through phases (donePhases > 0 while doneBooleans == 0).
+// MANIFOLD_PAR guard: same as above, polling thread requires std::thread.
+TEST(Manifold, ExecutionContextSubBooleanProgress) {
+  // A single nontrivial Boolean with a real intersection: NumLeaves == 2 ->
+  // totalBooleans == 1, so doneBooleans only flips from 0 to 1 at the very
+  // end. Any observed Progress() > 0 mid-eval comes from sub-Boolean phase
+  // advancement. Two overlapping spheres ensure the Boolean takes the full
+  // path (no degenerate-input early return that would short-circuit phases).
+  Manifold a = Manifold::Sphere(1.0, 256);
+  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold result = a + b;
+
+  ExecutionContext ctx;
+  std::atomic<bool> sawSubBoolean{false};
+  std::thread observer([&] {
+    for (int i = 0; i < 10000 && !sawSubBoolean.load(); i++) {
+      const int donePhases = ctx.impl_->donePhases.load();
+      const int doneBooleans = ctx.impl_->doneBooleans.load();
+      if (donePhases > 0 && doneBooleans == 0) {
+        sawSubBoolean.store(true);
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::microseconds(50));
+    }
+  });
+
+  EXPECT_EQ(result.Status(ctx), Manifold::Error::NoError);
+  observer.join();
+  // Final state: exactly kPhasesPerBoolean phases per completed Boolean.
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerBoolean);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+  // sawSubBoolean is timing-dependent; not asserted to avoid CI flakes.
 }
 #endif  // MANIFOLD_PAR == 1
 
@@ -1805,6 +1866,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+    EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
   }
   // Mixed Add/Subtract
   {
@@ -1815,6 +1877,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);  // 3 leaves - 1
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+    EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
   }
   // Disjoint union (triggers Compose path)
   {
@@ -1828,6 +1891,11 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_EQ(u.Status(ctx), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
+    // Progress == 1.0 here is the load-bearing assertion: it cross-checks
+    // that Compose's `donePhases += (set.size() - 1) * kPhasesPerBoolean`
+    // mirror was wired in. Without it, Progress would land below 1.0 and
+    // only the Compose-path multiplier would catch the bug.
+    EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
   }
 }
 
