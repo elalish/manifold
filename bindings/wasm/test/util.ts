@@ -64,3 +64,19 @@ export function expectMeshesMatch(
     }
   }
 }
+
+/**
+ * Generate permutations of an array.
+ */
+export function permute<Type>(arr: Array<Type>): Array<Array<Type>> {
+  if (arr.length === 1) return [arr];
+
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    for (const permutation of permute(
+             [...arr.slice(0, i), ...arr.slice(i + 1)])) {
+      result.push([arr.at(i)!, ...permutation])
+    }
+  }
+  return result;
+}

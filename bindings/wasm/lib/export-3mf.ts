@@ -50,12 +50,20 @@ interface Mesh3MF {
   name?: string;
 }
 
-interface Child3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Child3MF {
   objectID: string;
   transform?: Mat4|Array<string>;
 }
 
-interface Component3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Component3MF {
   id: string;
   children: Array<Child3MF>;
   name?: string;
@@ -94,7 +102,72 @@ export interface Export3MFOptions extends ExportOptions {
 }
 
 /**
+ * Sort 3MF components topologically.
+ *
+ * Some 3MF parsers (like PrusaSlicer and descendants) expect child nodes to be
+ * defined before their parents.  This function sorts the component list
+ * accordingly.
+ *
+ * This is a version of Kahn's algorithm -- a stripped down breadth first
+ * search.  It finds root nodes, adds them to the result, then removes them from
+ * the graph.  It moves on to their children, which are now root nodes
+ * themselves.
+ *
+ * Rinse, lather, repeat, and the final result is a list of nodes ordered by
+ * generation.  Order within a generation is not guaranteed, and is not required
+ * in this particular case.
+ *
+ * @hidden
+ * Exported for unit tests.
+ */
+export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+  // Create a local graph.  We will destroy it by removing edges and do not want
+  // to introduce any side effects.
+  let graph: Array<[Component3MF, Component3MF]> = [];
+  for (const parent of unsorted) {
+    for (const {objectID} of parent.children) {
+      const child = unsorted.find(c => c.id === objectID);
+      if (child) graph.push([parent, child]);
+    }
+  }
+
+  const isRoot = (child: Component3MF): boolean =>
+      graph.filter(([, c]) => c.id === child.id).length === 0;
+  const children = (parent: Component3MF): Component3MF[] =>
+      graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
+  const disown = (parent: Component3MF, child: Component3MF) => graph =
+      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
+
+  const roots = unsorted.filter(isRoot);
+  const sorted = [];
+
+  let root;
+  while (root = roots.shift()) {  // For each root node...
+    sorted.unshift(root);         // ...insert before potential ancestors.
+    for (const child of children(root)) {  // For each child....
+      disown(root, child);  // ...remove the parent-child edge from the graph.
+      if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
+    }
+  }
+
+  return sorted;
+};
+
+/**
  * Convert a GLTF-Transform document to a 3MF model.
+ *
+ * 3MF files are more sophisticated than STL files; they can encode meshes,
+ * components and build items.
+ *
+ * 3MF components are like a scene graph.  Each component can have multiple
+ * children, and does have its own transformation matrix.
+ * This is flexible enough to allow putting several parts in the same file
+ * (multiple components, each with a mesh) as well as multi-material files (a
+ * tree containing multiple meshes, each for a particular material).
+ *
+ * Finally, build items define what the slicer software actually sees.
+ * ManifoldCAD doesn't have an equivalent comprehension.  We assume that top
+ * level objects -- nodes with no parents -- are build objects.
  *
  * @param doc The GLTF document to convert.
  * @returns A blob containing the converted model.
@@ -167,12 +240,11 @@ export async function toArrayBuffer(
     }
   }
 
-  // Some 3MF parsers (like PrusaSlicer) expect child nodes
-  // to be defined before their parents.
-  const nodes = doc.getRoot().listNodes().reverse()
-  for (const node of nodes) {
+  // Create our components...
+  const components: Component3MF[] = [];
+  for (const node of doc.getRoot().listNodes()) {
     const meshID = node.getMesh() && getMeshID(node.getMesh()!);
-    to3mf.components.push({
+    components.push({
       id: setObjectID(node),
       name: node.getName(),
       children: meshID ? [{objectID: meshID}] : [],
@@ -180,7 +252,7 @@ export async function toArrayBuffer(
     });
   }
 
-  // Now we can work out our node hierarchy.
+  // ...work out our component hierarchy...
   for (const node of doc.getRoot().listNodes()) {
     const objectID = getObjectID(node)
     if (!objectID) {
@@ -200,7 +272,7 @@ export async function toArrayBuffer(
     if (parent) {
       // This is a child node, add it to its parent.
       const parentID = getObjectID(parent);
-      const parent3mf = to3mf.components.find((comp) => comp.id == parentID)!;
+      const parent3mf = components.find((comp) => comp.id == parentID)!;
       parent3mf.children.push(child);
     } else {
       // This is a root node.
@@ -208,6 +280,9 @@ export async function toArrayBuffer(
       to3mf.items.push({objectID})
     }
   }
+
+  // ...and sort it so that parents always follow children.
+  to3mf.components = toposort(components);
 
   const fileForRelThumbnail = new FileForRelThumbnail();
   fileForRelThumbnail.add3dModel('3D/3dmodel.model')
