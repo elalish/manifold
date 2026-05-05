@@ -50,12 +50,20 @@ interface Mesh3MF {
   name?: string;
 }
 
-interface Child3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Child3MF {
   objectID: string;
   transform?: Mat4|Array<string>;
 }
 
-interface Component3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Component3MF {
   id: string;
   children: Array<Child3MF>;
   name?: string;
@@ -99,8 +107,22 @@ export interface Export3MFOptions extends ExportOptions {
  * Some 3MF parsers (like PrusaSlicer and descendants) expect child nodes to be
  * defined before their parents.  This function sorts the component list
  * accordingly.
+ *
+ * This is a version of Kahn's algorithm -- a stripped down breadth first
+ * search.  It finds root nodes, adds them to the result, then removes them from
+ * the graph.  It moves on to their children, which are now root nodes
+ * themselves.
+ *
+ * Rinse, lather, repeat, and the final result is a list of nodes ordered by
+ * generation.  Order within a generation is not guaranteed, and is not required
+ * in this particular case.
+ *
+ * @hidden
+ * Exported for unit tests.
  */
-const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+  // Create a local graph.  We will destroy it by removing edges and do not want
+  // to introduce any side effects.
   let graph: Array<[Component3MF, Component3MF]> = [];
   for (const parent of unsorted) {
     for (const {objectID} of parent.children) {
@@ -109,21 +131,22 @@ const toposort = (unsorted: Component3MF[]): Component3MF[] => {
     }
   }
 
-  const orphaned = (child: Component3MF) =>
+  const isRoot = (child: Component3MF): boolean =>
       graph.filter(([, c]) => c.id === child.id).length === 0;
-  const children = (parent: Component3MF) =>
+  const children = (parent: Component3MF): Component3MF[] =>
       graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
   const disown = (parent: Component3MF, child: Component3MF) => graph =
       graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
 
-  const queue = unsorted.filter(c => orphaned(c));
+  const roots = unsorted.filter(isRoot);
   const sorted = [];
-  while (queue.length) {
-    const parent = queue.shift()!;
-    sorted.unshift(parent);
-    for (const child of children(parent)) {
-      disown(parent, child);
-      if (orphaned(child)) queue.push(child);
+
+  let root;
+  while (root = roots.shift()) {  // For each root node...
+    sorted.unshift(root);         // ...insert before potential ancestors.
+    for (const child of children(root)) {  // For each child....
+      disown(root, child);  // ...remove the parent-child edge from the graph.
+      if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
     }
   }
 
