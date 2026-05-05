@@ -32,11 +32,9 @@ void ExecutionContext::Cancel() {
 bool ExecutionContext::Cancelled() const { return IsCancelled(impl_.get()); }
 
 double ExecutionContext::Progress() const {
-  const int total = impl_->totalBooleans.load(std::memory_order_relaxed);
-  return total > 0
-             ? double(impl_->doneBooleans.load(std::memory_order_relaxed)) /
-                   total
-             : 0.0;
+  const int total = impl_->totalPhases.load(std::memory_order_relaxed);
+  if (total == 0) return 0.0;
+  return double(impl_->donePhases.load(std::memory_order_relaxed)) / total;
 }
 
 }  // namespace manifold

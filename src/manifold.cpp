@@ -168,9 +168,15 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
     // part of the documented API contract (see ExecutionContext in
     // common.h).
     const size_t leaves = pNode_->NumLeaves();
-    ctx->totalBooleans.store(leaves > 0 ? static_cast<int>(leaves - 1) : 0,
-                             std::memory_order_relaxed);
+    const int booleans = leaves > 0 ? static_cast<int>(leaves - 1) : 0;
+    // Reset numerators before denominators so a concurrent `Progress()`
+    // observer cannot see (old donePhases / new totalPhases), which could
+    // yield Progress > 1.0 transiently when a ctx is reused across evals.
     ctx->doneBooleans.store(0, std::memory_order_relaxed);
+    ctx->donePhases.store(0, std::memory_order_relaxed);
+    ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
+    ctx->totalPhases.store(booleans * kPhasesPerBoolean,
+                           std::memory_order_relaxed);
   }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
     pNode_ = pNode_->ToLeafNode(ctx);
