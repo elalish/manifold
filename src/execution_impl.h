@@ -23,15 +23,34 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx);
 
 /** @ingroup Private
  *
+ * Number of progress phases per `Boolean3::Result`. Must equal the count of
+ * `phase()` sites in `boolean_result.cpp`'s `Boolean3::Result` (asserted on
+ * the happy-path return). Bump in lockstep when adding/removing a site.
+ */
+constexpr int kPhasesPerBoolean = 11;
+
+/** @ingroup Private
+ *
  * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
  * to read it -- this is the canonical reader, enforced by the type system.
- * `totalBooleans` and `doneBooleans` are public for progress reporting and
- * test introspection.
+ * `totalBooleans`, `doneBooleans`, `totalPhases`, and `donePhases` are
+ * public for progress reporting and test introspection.
+ *
+ * `Progress() = donePhases / totalPhases`. `totalPhases` is the canonical
+ * progress denominator across op types; for Boolean trees it is set at
+ * `GetCsgLeafNode` to `totalBooleans * kPhasesPerBoolean`. Future
+ * non-Boolean ops (Hull, LevelSet, Refine, ...) can add to `totalPhases`
+ * and increment `donePhases` independently using the same mechanism.
+ *
+ * `totalBooleans`/`doneBooleans` are kept as introspection counters for
+ * tests and tools; they are not used in `Progress()`.
  */
 struct ExecutionContext::Impl {
  public:
   std::atomic<int> totalBooleans{0};
   std::atomic<int> doneBooleans{0};
+  std::atomic<int> totalPhases{0};
+  std::atomic<int> donePhases{0};
 
  private:
   std::atomic<bool> cancel{false};

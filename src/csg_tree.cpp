@@ -521,9 +521,12 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
         impls.push_back(CsgLeafNode::Compose(tmp));
         // Compose absorbs set.size() leaves into 1 leaf, which is
         // set.size() - 1 leaf-reductions toward the final result.
-        if (ctx)
-          ctx->doneBooleans.fetch_add(static_cast<int>(set.size() - 1),
-                                      std::memory_order_relaxed);
+        if (ctx) {
+          const int reductions = static_cast<int>(set.size() - 1);
+          ctx->doneBooleans.fetch_add(reductions, std::memory_order_relaxed);
+          ctx->donePhases.fetch_add(reductions * kPhasesPerBoolean,
+                                    std::memory_order_relaxed);
+        }
       }
     }
 

@@ -135,7 +135,11 @@ export interface ExecutionContext {
   cancel(): void;
   /** Has cancellation been requested? */
   cancelled(): boolean;
-  /** Normalized progress in [0, 1]. Monotonic within an evaluation. */
+  /**
+   * Normalized progress in [0, 1]. Monotonic within an evaluation.
+   * Returns 1 when no work has been scheduled (interpreted as trivially
+   * complete -- e.g. a single-leaf manifold has nothing to evaluate).
+   */
   progress(): number;
 
   // Memory

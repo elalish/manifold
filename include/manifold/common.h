@@ -225,8 +225,11 @@ class ExecutionContext {
   void Cancel();
   /// Has cancellation been requested?
   bool Cancelled() const;
-  /// Normalized progress in [0, 1]. Returns 0 before any work has been
-  /// scheduled. Monotonically increases during evaluation.
+  /// Normalized progress in [0, 1]. Monotonically increases during
+  /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
+  /// as trivially complete -- e.g. a single-leaf manifold has nothing to
+  /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
+  /// the same "no pending work" state).
   double Progress() const;
 
   /// @internal Opaque implementation. Defined in src/execution_impl.h;

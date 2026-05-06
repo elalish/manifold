@@ -694,6 +694,32 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
+  // Sub-Boolean progress accounting. `phase()` advances `donePhases` by 1
+  // and checks cancel; `balance` (declared just below) tops up `donePhases`
+  // to `kPhasesPerBoolean` on any non-cancelled return so `Progress()`
+  // reaches 1.0 even after early-exit paths (status errors, empty/degenerate
+  // inputs) that skip most or all of the phase sites.
+  struct PhaseBalance {
+    ExecutionContext::Impl* ctx;
+    int published = 0;
+    bool fullPath = false;
+    ~PhaseBalance() {
+      if (!ctx) return;
+      if (IsCancelled(ctx)) return;  // partial publication is intentional
+      if (fullPath) {
+        DEBUG_ASSERT(published == kPhasesPerBoolean, logicErr,
+                     "Boolean3::Result phase count drift; "
+                     "update kPhasesPerBoolean to match phase() site count");
+        return;
+      }
+      if (published < kPhasesPerBoolean) {
+        ctx->donePhases.fetch_add(kPhasesPerBoolean - published,
+                                  std::memory_order_relaxed);
+      }
+    }
+  };
+  PhaseBalance balance{ctx_};
+
   if (inP_.status_ != Manifold::Error::NoError) {
     auto impl = Manifold::Impl();
     impl.status_ = inP_.status_;
@@ -717,7 +743,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return inP_;
   }
 
-  auto cancelled = [&]() -> std::optional<Manifold::Impl> {
+  auto phase = [&]() -> std::optional<Manifold::Impl> {
+    if (ctx_) ctx_->donePhases.fetch_add(1, std::memory_order_relaxed);
+    ++balance.published;
     if (IsCancelled(ctx_)) {
       auto impl = Manifold::Impl();
       impl.status_ = Manifold::Error::Cancelled;
@@ -728,7 +756,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   if (!valid) {
     auto impl = Manifold::Impl();
@@ -799,7 +827,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
              DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
   for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -821,7 +849,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                   0, ctx_);
   AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
                   false, xv12_.p1q2.size(), ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   v12R.clear();
   v21R.clear();
@@ -832,7 +860,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2,
                  invertQ, ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   i12.clear();
   i21.clear();
@@ -851,14 +879,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                      i03, vP2R, facePQ2R.begin(), true, ctx_);
   AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
                      i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false, ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   edgesP.clear();
   edgesQ.clear();
 
   AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R, inP_.NumTri(),
                  ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   edgesNew.clear();
 
@@ -866,7 +894,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                    facePQ2R.cview(0, inP_.NumTri()), true, ctx_);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false, ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   wholeHalfedgeP.clear();
   wholeHalfedgeQ.clear();
@@ -889,7 +917,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   faceEdge.clear();
 
   outR.ReorderHalfedges(ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   triangulate.Stop();
@@ -902,10 +930,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  "triangulated mesh is not manifold!");
 
   CreateProperties(outR, inP_, inQ_, ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
@@ -923,7 +951,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
-  if (auto c = cancelled()) return *c;
+  if (auto c = phase()) return *c;
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   sort.Stop();
@@ -937,6 +965,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
+  balance.fullPath = true;
   return outR;
 }
 
