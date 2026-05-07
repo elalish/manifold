@@ -75,15 +75,14 @@ export type Mat4 = [
   number,
 ];
 export type SimplePolygon = Vec2[];
-export type Polygons = SimplePolygon | SimplePolygon[];
+export type Polygons = SimplePolygon|SimplePolygon[];
 
 /**
  * A two dimensional rectangle, aligned to the coordinate system.
  * @see {@link CrossSection.bounds}
  */
 export type Rect = {
-  min: Vec2;
-  max: Vec2;
+  min: Vec2; max: Vec2;
 };
 
 /**
@@ -93,32 +92,49 @@ export type Rect = {
  * @see {@link Manifold.levelSet}
  */
 export type Box = {
-  min: Vec3;
-  max: Vec3;
+  min: Vec3; max: Vec3;
 };
 
 export type Smoothness = {
-  halfedge: number;
-  smoothness: number;
+  halfedge: number; smoothness: number;
 };
 
-export type FillRule = 'EvenOdd' | 'NonZero' | 'Positive' | 'Negative';
+export type RayHit = {
+  faceID: number; distance: number; position: Vec3; normal: Vec3;
+};
 
-export type JoinType = 'Square' | 'Round' | 'Miter';
+export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
+
+export type JoinType = 'Square'|'Round'|'Miter';
 
 /**
  * @see {@link Manifold.status}
  */
-export type ErrorStatus =
-  | 'NoError'
-  | 'NonFiniteVertex'
-  | 'NotManifold'
-  | 'VertexOutOfBounds'
-  | 'PropertiesWrongLength'
-  | 'MissingPositionProperties'
-  | 'MergeVectorsDifferentLengths'
-  | 'MergeIndexOutOfBounds'
-  | 'TransformWrongLength'
-  | 'RunIndexWrongLength'
-  | 'FaceIDWrongLength'
-  | 'InvalidConstruction';
+export type ErrorStatus =|'NoError'|'NonFiniteVertex'|'NotManifold'|
+    'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
+    'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
+    'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
+    'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents'|'Cancelled';
+
+/**
+ * Observe and control a long-running Manifold evaluation. Pass to
+ * Manifold.statusWithContext() to observe progress and optionally request
+ * cancellation. Safe to read/write from any thread/worker.
+ *
+ * Cancellation is permanent for a Manifold: once cancelled and detected,
+ * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
+ */
+export interface ExecutionContext {
+  cancel(): void;
+  cancelled(): boolean;
+  progress(): number;
+
+  // Memory
+
+  /**
+   * Frees the WASM memory of this ExecutionContext, since these cannot be
+   * garbage-collected automatically.
+   * @group Basics
+   */
+  delete(): void;
+}

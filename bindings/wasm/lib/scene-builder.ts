@@ -31,7 +31,7 @@ import type {CrossSection, Manifold, Vec2, Vec3} from '../manifold.d.ts';
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph,} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID,} from './debug.ts';
 import type {Properties} from './gltf-io.ts';
-import {writeMesh} from './gltf-io.ts';
+import {attributeDefs, writeMesh} from './gltf-io.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
 import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode,} from './gltf-node.ts';
 import {cleanup as cleanupImport} from './import-model.ts';
@@ -66,6 +66,10 @@ function log(...args: any[]) {
   if (typeof self !== 'undefined' && self.console) {
     self.console.log(...args);
   }
+}
+
+function formatVolume(volume: number) {
+  return `${volume.toLocaleString()} mm^3`;
 }
 
 function applyTransformation(

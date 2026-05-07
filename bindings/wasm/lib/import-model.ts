@@ -38,6 +38,7 @@ import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
+import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
 import {findExtension, findMimeType, isNode} from './util.ts';
@@ -99,6 +100,7 @@ register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
 const mesh2node = new Map<GLTFTransform.Mesh, Array<GLTFTransform.Node>>();
+const mesh2nextNode = new Map<GLTFTransform.Mesh, number>();
 const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
 
@@ -461,7 +463,9 @@ function gltfNodeToMeshes(
         if (!gltfmesh) return null;
 
         node2doc.set(descendant, document);
-        mesh2node.set(gltfmesh, descendant);
+        const nodes = mesh2node.get(gltfmesh) ?? [];
+        nodes.push(descendant);
+        mesh2node.set(gltfmesh, nodes);
 
         return gltfMeshToMesh(gltfmesh);
       })

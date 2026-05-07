@@ -208,6 +208,8 @@ export async function toArrayBuffer(
     return objectID;
   };
 
+  const components: Array<Component3MF> = [];
+
   // Get meshes in place first.
   for (const mesh of doc.getRoot().listMeshes()) {
     const manifoldPrimitive = mesh.getExtension(

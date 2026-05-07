@@ -91,7 +91,7 @@ export { setMaterial } from '../lib/material';
 export { CrossSection, Manifold } from '../manifold';
 /** @group Polygons */
 export { triangulate } from '../manifold';
-// clang-format on         
+// clang-format on                  
 
 /**
  * Is this module running in manifoldCAD.org or the ManifoldCAD CLI?
@@ -107,6 +107,7 @@ export type {
   Mat4,
   Vec2,
   Vec3,
+  RayHit,
   Polygons,
   SimplePolygon,
   FillRule,
@@ -115,6 +116,7 @@ export type {
   Rect,
   Smoothness,
   ErrorStatus,
+  ExecutionContext,
 } from '../manifold';
 
 /* See the Developer Guide for more detail on these: */
