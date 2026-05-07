@@ -24,6 +24,7 @@
 using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
 using CrossSectionVec = std::vector<CrossSection>;
+using RayHitVec = std::vector<RayHit>;
 
 ManifoldManifold* to_c(manifold::Manifold* m);
 ManifoldManifoldVec* to_c(ManifoldVec* ms);
@@ -40,25 +41,29 @@ ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
 ManifoldTriangulation* to_c(std::vector<ivec3>* m);
+ManifoldRayHitVec* to_c(RayHitVec* v);
+ManifoldExecutionContext* to_c(ExecutionContext* ctx);
 
-const manifold::Manifold* from_c(ManifoldManifold* m);
+manifold::Manifold* from_c(ManifoldManifold* m);
 ManifoldVec* from_c(ManifoldManifoldVec* ms);
-const manifold::CrossSection* from_c(ManifoldCrossSection* cs);
+manifold::CrossSection* from_c(ManifoldCrossSection* cs);
 CrossSectionVec* from_c(ManifoldCrossSectionVec* csv);
-const manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m);
-const manifold::Polygons* from_c(ManifoldPolygons* m);
-const manifold::MeshGL* from_c(ManifoldMeshGL* m);
-const manifold::MeshGL64* from_c(ManifoldMeshGL64* m);
+manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m);
+manifold::Polygons* from_c(ManifoldPolygons* m);
+manifold::MeshGL* from_c(ManifoldMeshGL* m);
+manifold::MeshGL64* from_c(ManifoldMeshGL64* m);
 OpType from_c(ManifoldOpType op);
 CrossSection::FillRule from_c(ManifoldFillRule fillrule);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
-const manifold::Box* from_c(ManifoldBox* m);
-const manifold::Rect* from_c(ManifoldRect* r);
+manifold::Box* from_c(ManifoldBox* m);
+manifold::Rect* from_c(ManifoldRect* r);
 vec2 from_c(ManifoldVec2 v);
 vec3 from_c(ManifoldVec3 v);
 ivec3 from_c(ManifoldIVec3 v);
 vec4 from_c(ManifoldVec4 v);
-const std::vector<ivec3>* from_c(ManifoldTriangulation* m);
+std::vector<ivec3>* from_c(ManifoldTriangulation* m);
+RayHitVec* from_c(ManifoldRayHitVec* v);
+ExecutionContext* from_c(ManifoldExecutionContext* ctx);
 
 std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length);
 std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length);

@@ -320,6 +320,9 @@ NB_MODULE(manifold3d, m) {
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
            "Returns a double between 0 and searchLength.")
+      .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
+           nb::arg("endpoint"),
+           "Cast a ray segment, returning all hits sorted by distance.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
@@ -384,7 +387,14 @@ NB_MODULE(manifold3d, m) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
-      .def("status", &Manifold::Status, manifold__status)
+      .def(
+          "status",
+          static_cast<Manifold::Error (Manifold::*)() const>(&Manifold::Status),
+          manifold__status)
+      .def("status",
+           static_cast<Manifold::Error (Manifold::*)(ExecutionContext&) const>(
+               &Manifold::Status),
+           nb::arg("ctx"), manifold__status__ctx)
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -706,6 +716,18 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL64::faceID)
       .def("merge", &MeshGL64::Merge, mesh_gl__merge);
 
+  nb::class_<RayHit>(m, "RayHit")
+      .def_ro("face_id", &RayHit::faceID)
+      .def_ro("distance", &RayHit::distance)
+      .def_ro("position", &RayHit::position)
+      .def_ro("normal", &RayHit::normal);
+
+  nb::class_<ExecutionContext>(m, "ExecutionContext")
+      .def(nb::init<>())
+      .def("cancel", &ExecutionContext::Cancel)
+      .def("cancelled", &ExecutionContext::Cancelled)
+      .def("progress", &ExecutionContext::Progress);
+
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
       .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
@@ -720,7 +742,10 @@ NB_MODULE(manifold3d, m) {
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
+      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
+      .value("InvalidTangents", Manifold::Error::InvalidTangents)
+      .value("Cancelled", Manifold::Error::Cancelled);
 
   nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,

@@ -1,4 +1,4 @@
-// Copyright 2021 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,13 +13,17 @@
 // limitations under the License.
 
 #pragma once
+#include <cmath>
 #include <limits>
+#include <memory>
 #include <vector>
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 #include <chrono>
+#include <iostream>
 #endif
 
+#include "./math.h"
 #include "linalg.h"
 
 namespace manifold {
@@ -92,19 +96,20 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  * @param x Angle in degrees.
  */
 inline double sind(double x) {
-  if (!la::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
   int quo;
-  x = remquo(fabs(x), 90.0, &quo);
+  x = std::remquo(std::fabs(x), 90.0, &quo);
+  const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return sin(radians(x));
+      return math::sin(xr);
     case 1:
-      return cos(radians(x));
+      return math::cos(xr);
     case 2:
-      return -sin(radians(x));
+      return -math::sin(xr);
     case 3:
-      return -cos(radians(x));
+      return -math::cos(xr);
   }
   return 0.0;
 }
@@ -149,6 +154,88 @@ struct Smoothness {
   /// curvature is interpolated between these values. The two paired halfedges
   /// can have different values while maintaining C-1 continuity (except for 0).
   double smoothness;
+};
+
+/**
+ * @brief Result of a ray cast query against a Manifold.
+ */
+struct RayHit {
+  /// The triangle index that was hit.
+  uint64_t faceID = 0;
+  /// The parametric distance along the ray segment in the closed interval
+  /// [0, 1], where 0 is the origin and 1 is the endpoint. Hits exactly at
+  /// the origin or endpoint are included.
+  double distance = 0;
+  /// The 3D position of the hit point.
+  vec3 position = vec3(0.0);
+  /// The geometric face normal at the hit.
+  vec3 normal = vec3(0.0);
+};
+
+/**
+ * @brief Observe and control a long-running Manifold evaluation.
+ *
+ * Pass to Manifold::Status(ctx) to observe progress and optionally request
+ * cancellation of the evaluation. Safe to read/write from any thread.
+ *
+ * Copyable and movable: copies share the same underlying state via a
+ * shared_ptr, so one thread can evaluate while another holds a copy and
+ * observes Progress() or calls Cancel(). Use a separate context per
+ * evaluation; passing the same context (or a copy of it) to two
+ * concurrent Status(ctx) calls produces meaningless progress values
+ * because both calls reset and mutate the same counters.
+ *
+ * Cancellation is permanent for a Manifold: once requested and detected,
+ * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
+ * retry, construct a new Manifold. A context, however, is reusable: each
+ * Status(ctx) call resets the progress counters, but it does NOT clear
+ * the cancel flag — once Cancel() has been called on a context, every
+ * subsequent evaluation with that context (or any copy of it) will
+ * short-circuit to Error::Cancelled. Construct a fresh context to make a
+ * new evaluation cancellable independently.
+ *
+ * Cancellation granularity is currently per-boolean-operation; a single
+ * large boolean may run to completion before the flag is checked again.
+ * This may improve in future versions.
+ *
+ * Example: cancel from an observer thread.
+ * @code
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add);
+ * ExecutionContext ctx;
+ * std::thread eval([&] {
+ *   if (big.Status(ctx) == Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
+ * // ...later, from the UI thread:
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
+ */
+class ExecutionContext {
+ public:
+  ExecutionContext();
+  ~ExecutionContext();
+  ExecutionContext(const ExecutionContext&);
+  ExecutionContext(ExecutionContext&&) noexcept;
+  ExecutionContext& operator=(const ExecutionContext&);
+  ExecutionContext& operator=(ExecutionContext&&) noexcept;
+
+  /// Request cancellation. Can be called from any thread. Idempotent.
+  void Cancel();
+  /// Has cancellation been requested?
+  bool Cancelled() const;
+  /// Normalized progress in [0, 1]. Monotonically increases during
+  /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
+  /// as trivially complete -- e.g. a single-leaf manifold has nothing to
+  /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
+  /// the same "no pending work" state).
+  double Progress() const;
+
+  /// @internal Opaque implementation. Defined in src/execution_impl.h;
+  /// accessible only to internal code that includes that header.
+  struct Impl;
+  std::shared_ptr<Impl> impl_;
 };
 
 /**
@@ -204,6 +291,18 @@ struct Box {
     return la::all(la::gequal(box.min, min)) &&
            la::all(la::gequal(max, box.max));
   }
+
+  /**
+   * Does this box equal the given box exactly?
+   */
+  constexpr bool operator==(const Box& box) const {
+    return la::all(la::equal(box.min, min)) && la::all(la::equal(max, box.max));
+  }
+
+  /**
+   * Does this box not equal the given box exactly?
+   */
+  constexpr bool operator!=(const Box& box) const { return !(*this == box); }
 
   /**
    * Expand this box to include the given point.
@@ -379,7 +478,7 @@ struct Rect {
   /**
    * Is the rectangle empty (containing no space)?
    */
-  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; }
 
   /**
    * Does this recangle have finite bounds?
@@ -486,7 +585,6 @@ constexpr double DEFAULT_LENGTH = 1.0;
  * must be specified.
  */
 class Quality {
- private:
  public:
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);
@@ -572,6 +670,9 @@ void Diff(const std::vector<T>& a, const std::vector<T>& b) {
   std::cout << std::endl;
 }
 
+#endif
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 struct Timer {
   std::chrono::high_resolution_clock::time_point start, end;
 

@@ -119,14 +119,44 @@ if(MANIFOLD_CROSS_SECTION)
       CACHE BOOL
       "Preempt cache default of USINGZ (we only use 2d)"
     )
+    # When manifold is built with MANIFOLD_NO_IOSTREAM, also strip
+    # iostream from the bundled Clipper2 — manifold doesn't call any
+    # of Clipper2's stream operators internally, so passing this
+    # through is safe regardless. The CLIPPER2_NO_IOSTREAM macro is
+    # added by the carry-patch below; once Clipper2#1094 lands and
+    # the SHA pin moves past it, the patch drops and the option is
+    # honored natively.
+    if(MANIFOLD_NO_IOSTREAM)
+      set(
+        CLIPPER2_NO_IOSTREAM
+        ON
+        CACHE BOOL
+        "Strip iostream-using overloads from Clipper2 (set by manifold when MANIFOLD_NO_IOSTREAM=ON)"
+        FORCE
+      )
+    endif()
     FetchContent_Declare(
       Clipper2
       GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      # Jun 15, 2025
-      GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
+      # Mar 05, 2026
+      GIT_TAG 46f639177fe418f9689e8ddb74f08a870c71f5b4
       GIT_PROGRESS TRUE
       SOURCE_SUBDIR
       CPP
+      # Disable Windows autocrlf on the clone so the carry-patch (which
+      # is LF-only) applies cleanly. Default core.autocrlf=true on
+      # Windows would convert all LFs to CRLFs in the working tree, and
+      # `git apply` then fails on the line-ending mismatch.
+      GIT_CONFIG
+      core.autocrlf=false
+      # Carry-patch: tracks AngusJohnson/Clipper2#1094 (CLIPPER2_NO_IOSTREAM
+      # macro guards). Drops once that PR lands and the SHA pin moves past
+      # it. Applied via wrapper script so re-configures (which re-trigger
+      # PATCH_COMMAND) don't fail when the patch is already applied.
+      PATCH_COMMAND ${CMAKE_COMMAND}
+        -DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/0001-clipper2-no-iostream.patch
+        -DSOURCE_DIR=<SOURCE_DIR>
+        -P ${CMAKE_CURRENT_LIST_DIR}/patches/apply-clipper2-patch.cmake
     )
     FetchContent_MakeAvailable(Clipper2)
     set_property(
@@ -170,6 +200,14 @@ if(MANIFOLD_PYBIND)
     message("Python version too old, stub will not be generated")
   endif()
 
+  if(
+    CMAKE_CXX_FLAGS MATCHES "-fsanitize=address"
+    OR CMAKE_EXE_LINKER_FLAGS MATCHES "-fsanitize=address"
+  )
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("AddressSanitizer detected, Python stub generation disabled")
+  endif()
+
   if(NOT MANIFOLD_USE_BUILTIN_NANOBIND)
     execute_process(
       COMMAND "${Python_EXECUTABLE}" -m nanobind --version
@@ -192,12 +230,12 @@ if(MANIFOLD_PYBIND)
     FetchContent_Declare(
       nanobind
       GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-      GIT_TAG v2.5.0
+      GIT_TAG v2.12.0
       GIT_PROGRESS TRUE
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(nanobind)
-    set(NB_VERSION 2.2.0)
+    set(NB_VERSION 2.12.0)
   endif()
 
   if(NB_VERSION VERSION_LESS 2.1.0)
@@ -218,7 +256,7 @@ if(MANIFOLD_TEST)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG v1.14.0
+      GIT_TAG v1.17.0
       GIT_SHALLOW TRUE
       GIT_PROGRESS TRUE
       FIND_PACKAGE_ARGS NAMES GTest gtest

@@ -45,6 +45,8 @@
  *
  * {@include ../documents/using-manifoldcad.md}
  *
+ * {@include ../documents/tips.md}
+ *
  * @packageDocumentation
  * @module manifoldCAD
  */
@@ -89,7 +91,7 @@ export { setMaterial } from '../lib/material';
 export { CrossSection, Manifold } from '../manifold';
 /** @group Polygons */
 export { triangulate } from '../manifold';
-// clang-format on
+// clang-format on         
 
 /**
  * Is this module running in manifoldCAD.org or the ManifoldCAD CLI?

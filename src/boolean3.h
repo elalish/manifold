@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include "execution_impl.h"
 #include "impl.h"
 
 #ifdef MANIFOLD_DEBUG
@@ -56,7 +57,8 @@ struct Intersections {
 
 class Boolean3 {
  public:
-  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ, OpType op);
+  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ, OpType op,
+           ExecutionContext::Impl* ctx = nullptr);
   Manifold::Impl Result(OpType op) const;
 
  private:
@@ -65,5 +67,6 @@ class Boolean3 {
   Intersections xv12_, xv21_;
   Vec<int> w03_, w30_;
   bool valid = true;
+  ExecutionContext::Impl* ctx_ = nullptr;
 };
 }  // namespace manifold

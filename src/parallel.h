@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "execution_impl.h"
 #include "iters.h"
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -89,13 +90,21 @@ void mergeRec(SrcIter src, DestIter dest, size_t p1, size_t r1, size_t p2,
     std::merge(src + p1, src + r1, src + p2, src + r2, dest + p3, comp);
   } else {
     size_t q1, q2;
+    // For stability: equal-keyed elements from the left half must precede
+    // those from the right in the output. Pivot from the larger half and
+    // use the bound that puts equal-to-pivot from the OPPOSITE half on the
+    // pivot's stable side.
     if (length1 > length2) {
+      // Left pivot: right-side equals belong after pivot. lower_bound on
+      // right places them at q2+ (second sub-merge with pivot).
       q1 = p1 + length1 / 2;
       auto end = std::lower_bound(src + p2, src + r2, src[q1], comp);
       q2 = std::distance(src, end);
     } else {
+      // Right pivot: left-side equals belong before pivot. upper_bound on
+      // left places them strictly before q1 (first sub-merge).
       q2 = p2 + length2 / 2;
-      auto end = std::lower_bound(src + p1, src + r1, src[q2], comp);
+      auto end = std::upper_bound(src + p1, src + r1, src[q2], comp);
       q1 = std::distance(src, end);
     }
     size_t q3 = p3 + (q1 - p1) + (q2 - p2);
@@ -260,8 +269,7 @@ struct SortedRange {
   __attribute__((no_sanitize("thread")))
 #endif
 #endif
-  void
-  operator()(const tbb::blocked_range<SizeType>& range) {
+  void operator()(const tbb::blocked_range<SizeType>& range) {
     SortedRange<T, SizeType> rhs(input, tmp, range.begin(),
                                  range.end() - range.begin());
     rhs.inTmp =
@@ -379,9 +387,18 @@ struct SortFunctor<
 
 #endif
 
-// Applies the function `f` to each element in the range `[first, last)`
+// Applies the function `f` to each element in the range `[first, last)`,
+// optionally checking `ctx` for cancellation periodically. `ctx` may be
+// nullptr — the cancel branch is null-short-circuited and folds out at
+// the call site, so non-cancellable callers pay nothing.
+//
+// Cancel granularity: once per parallel chunk, and once per kSeqCancelChunk
+// elements on the sequential branch. Only safe when "skip the rest of the
+// range" produces a result the caller will discard via a post-loop
+// `IsCancelled` check.
 template <typename Iter, typename F>
-void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+void for_each(ExecutionPolicy policy, Iter first, Iter last,
+              ExecutionContext::Impl* ctx, F f) {
   static_assert(std::is_convertible_v<
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
@@ -391,7 +408,8 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
   if (policy == ExecutionPolicy::Par) {
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
-                        [&f](const tbb::blocked_range<Iter>& range) {
+                        [&f, ctx](const tbb::blocked_range<Iter>& range) {
+                          if (IsCancelled(ctx)) return;
                           for (Iter i = range.begin(); i != range.end(); i++)
                             f(*i);
                         });
@@ -399,17 +417,46 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
     return;
   }
 #endif
-  std::for_each(first, last, f);
+  // Sequential branch: check once at start, then every kSeqCancelChunk
+  // elements. Bounded latency for MANIFOLD_PAR=OFF builds and for the
+  // small-input branch under PAR=ON.
+  constexpr size_t kSeqCancelChunk = 1024;
+  if (IsCancelled(ctx)) return;
+  if (ctx == nullptr) {
+    std::for_each(first, last, f);
+    return;
+  }
+  size_t since_check = 0;
+  for (Iter i = first; i != last; ++i) {
+    if (++since_check == kSeqCancelChunk) {
+      if (IsCancelled(ctx)) return;
+      since_check = 0;
+    }
+    f(*i);
+  }
 }
 
-// Applies the function `f` to each element in the range `[first, last)`
+// Non-cancellable shim. Threads `nullptr` through the ctx-aware impl.
 template <typename Iter, typename F>
-void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+  for_each(policy, first, last, nullptr, f);
+}
+
+// for_each over [first, first + n).
+template <typename Iter, typename F>
+void for_each_n(ExecutionPolicy policy, Iter first, size_t n,
+                ExecutionContext::Impl* ctx, F f) {
   static_assert(std::is_convertible_v<
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-  for_each(policy, first, first + n, f);
+  for_each(policy, first, first + n, ctx, f);
+}
+
+// Non-cancellable shim.
+template <typename Iter, typename F>
+void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+  for_each_n(policy, first, n, nullptr, f);
 }
 
 // Reduce the range `[first, last)` using a binary operation `f` with an initial

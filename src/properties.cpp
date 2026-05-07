@@ -46,16 +46,16 @@ struct CurvatureAngles {
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
-          std::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
-                            edge[i]));
+          math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
+                             edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
       AtomicAdd(degree[startVert], 1.0);
     }
 
     vec3 phi;
-    phi[0] = std::acos(-la::dot(edge[2], edge[0]));
-    phi[1] = std::acos(-la::dot(edge[0], edge[1]));
+    phi[0] = math::acos(-la::dot(edge[2], edge[0]));
+    phi[1] = math::acos(-la::dot(edge[0], edge[1]));
     phi[2] = kPi - phi[0] - phi[1];
     const double area3 = edgeLength[0] * edgeLength[1] *
                          la::length(la::cross(edge[0], edge[1])) / 6;
@@ -185,7 +185,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   };
 
   auto recorder = MakeSimpleRecorder(f);
-  collider_->Collisions<true>(recorder, faceBox.cview());
+  collider_.Collisions<true>(recorder, faceBox.cview());
 
   return intersecting.load();
 }
@@ -218,7 +218,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 }
 
 /**
- * Returns the number of triangles that are colinear within epsilon_.
+ * Returns the number of triangles that are colinear within tolerance_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
@@ -230,7 +230,7 @@ int Manifold::Impl::NumDegenerateTris() const {
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos_[halfedge_[3 * face + i].startVert];
 
-    const int ccw = CCW(v[0], v[1], v[2], epsilon_ / 2);
+    const int ccw = CCW(v[0], v[1], v[2], tolerance_ / 2);
     return ccw == 0;
   });
 }
@@ -455,7 +455,7 @@ double Manifold::Impl::MinGap(const Manifold::Impl& other,
             });
 
   MinDistanceRecorder recorder{*this, other};
-  collider_->Collisions<false>(recorder, faceBoxOther.cview(), false);
+  collider_.Collisions<false>(recorder, faceBoxOther.cview(), false);
   double minDistanceSquared =
       std::min(recorder.get(), searchLength * searchLength);
   return sqrt(minDistanceSquared);

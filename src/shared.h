@@ -31,13 +31,30 @@ inline double MaxEpsilon(double minEpsilon, const Box& bBox) {
 }
 
 inline int NextHalfedge(int current) {
-  ++current;
-  if (current % 3 == 0) current -= 3;
+  current += current % 3 == 2 ? -2 : 1;
   return current;
 }
 
+inline int PrevHalfedge(int current) {
+  current += current % 3 == 0 ? 2 : -1;
+  return current;
+}
+
+/**
+When a transform is applied to the verts of an object, and different transform
+is needed for the normals. Note that applying this transform will stretch their
+length, so they should be renormalized after.
+*/
 inline mat3 NormalTransform(const mat3x4& transform) {
   return la::inverse(la::transpose(mat3(transform)));
+}
+
+/**
+This is the corresponding normal transform for the inverse of the input
+transform.
+*/
+inline mat3 InverseNormalTransform(const mat3x4& transform) {
+  return la::inverse(la::transpose(la::inverse(mat3(transform))));
 }
 
 /**
@@ -140,10 +157,13 @@ struct TriRef {
   /// The OriginalID of the mesh this triangle came from. This ID is ideal for
   /// reapplying properties like UV coordinates to the output mesh.
   int originalID;
-  /// Probably the triangle index of the original triangle this was part of:
-  /// Mesh.triVerts[tri], but it's an input, so just pass it along unchanged.
+  /// If set as an input of MeshGL, it is passed along unchanged. This is how
+  /// the user can tell us not to collapse certain edges: those that divide
+  /// difference faceIDs. If not set, this is always -1.
   int faceID;
-  /// Triangles with the same coplanar ID are coplanar.
+  /// Triangles with the same coplanar ID are coplanar. Starts as a canonical
+  /// triangle index, but after boolean operations it may refer to a triangle
+  /// that is no longer present in this mesh.
   int coplanarID;
 
   bool SameFace(const TriRef& other) const {

@@ -60,7 +60,7 @@ int manifold_rect_contains_rect(ManifoldRect* a, ManifoldRect* b) {
 }
 
 void manifold_rect_include_pt(ManifoldRect* r, double x, double y) {
-  auto rect = *from_c(r);
+  auto& rect = *from_c(r);
   auto p = vec2(x, y);
   rect.Union(p);
 }

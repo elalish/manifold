@@ -16,6 +16,7 @@
 
 #include "boolean3.h"
 #include "csg_tree.h"
+#include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
@@ -31,8 +32,8 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double size = la::length(bBox.Center() - normal * originOffset) +
                 0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
-  double yDeg = degrees(-std::asin(normal.z));
-  double zDeg = degrees(std::atan2(normal.y, normal.x));
+  double yDeg = degrees(-math::asin(normal.z));
+  double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
 }  // namespace
@@ -122,7 +123,10 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pNode_(other.pNode_) {}
+Manifold::Manifold(const Manifold& other) {
+  std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
+  pNode_ = other.pNode_;
+}
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
 
@@ -135,16 +139,47 @@ Manifold Manifold::Invalid() {
   return Manifold(pImpl_);
 }
 
+Manifold Manifold::PropagateStatus(Error status) {
+  auto pImpl = std::make_shared<Impl>();
+  pImpl->status_ = status;
+  return Manifold(pImpl);
+}
+
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
+    std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
   }
   return *this;
 }
 
-CsgLeafNode& Manifold::GetCsgLeafNode() const {
+std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
+  std::lock_guard<std::mutex> lock(*pNodeMutex_);
+  return pNode_;
+}
+
+CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
+  std::lock_guard<std::mutex> lock(*pNodeMutex_);
+  if (ctx != nullptr) {
+    // Reset counters to reflect this evaluation. For pre-evaluated leaf
+    // Manifolds, NumLeaves() returns 1 so totalBooleans is 0 — no work.
+    // This also prevents stale counters from a previous use of the same
+    // ctx. The cancel flag is intentionally NOT reset — sticky cancel is
+    // part of the documented API contract (see ExecutionContext in
+    // common.h).
+    const size_t leaves = pNode_->NumLeaves();
+    const int booleans = leaves > 0 ? static_cast<int>(leaves - 1) : 0;
+    // Reset numerators before denominators so a concurrent `Progress()`
+    // observer cannot see (old donePhases / new totalPhases), which could
+    // yield Progress > 1.0 transiently when a ctx is reused across evals.
+    ctx->doneBooleans.store(0, std::memory_order_relaxed);
+    ctx->donePhases.store(0, std::memory_order_relaxed);
+    ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
+    ctx->totalPhases.store(booleans * kPhasesPerBoolean,
+                           std::memory_order_relaxed);
+  }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
-    pNode_ = pNode_->ToLeafNode();
+    pNode_ = pNode_->ToLeafNode(ctx);
   }
   return *std::static_pointer_cast<CsgLeafNode>(pNode_);
 }
@@ -182,18 +217,19 @@ Manifold::Manifold(const MeshGL64& meshGL64)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
 
 /**
- * The most complete output of this library, returning a MeshGL that is designed
+ * Returns a MeshGL that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify the first of the
- * three consecutive property channels forming the (x, y, z) normals, which will
- * cause this output MeshGL to automatically update these normals according to
- * the applied transforms and front/back side. normalIdx + 3 must be <=
- * numProp, and all original MeshGLs must use the same channels for their
- * normals.
+ * @param normalIdx If this manifold has properties corresponding to normal
+ * vectors, you can specify the first of the three consecutive property channels
+ * forming the (x, y, z) normals, which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
+ * must use the same channels for their normals. Default is -1, meaning no
+ * normals. If normals are selected, the runTransform matrices will be removed
+ * from the output, to avoid them being double-applied when round-tripped.
  */
 MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
@@ -201,18 +237,20 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
 }
 
 /**
- * The most complete output of this library, returning a MeshGL that is designed
+ * Returns a MeshGL that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If the original MeshGL inputs that formed this manifold had
- * properties corresponding to normal vectors, you can specify the first of the
- * three consecutive property channels forming the (x, y, z) normals, which will
- * cause this output MeshGL to automatically update these normals according to
- * the applied transforms and front/back side. normalIdx + 3 must be <=
- * numProp, and all original MeshGLs must use the same channels for their
- * normals.
+ * @param normalIdx If this manifold has properties corresponding to normal
+ * vectors, you can specify the first of the three consecutive property channels
+ * forming the (x, y, z) normals, which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
+ * must use the same channels for their normals. Default is -1, meaning no
+ * normals. If normals are selected, the runTransform matrices will be removed
+ * from the output, to avoid them being double-applied when round-tripped.
+
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
@@ -231,6 +269,19 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  */
 Manifold::Error Manifold::Status() const {
   return GetCsgLeafNode().GetImpl()->status_;
+}
+/**
+ * Like Status() but observes evaluation progress and allows cancellation
+ * via the provided ExecutionContext. If cancel is requested mid-evaluation,
+ * returns Error::Cancelled and the Manifold's status becomes permanent.
+ *
+ * During evaluation, ExecutionContext::Progress() increases monotonically
+ * from 0 to 1 as boolean combinations complete. ExecutionContext::Cancel()
+ * can be called from any thread to request early exit. Cancellation
+ * granularity is per-boolean-operation.
+ */
+Manifold::Error Manifold::Status(ExecutionContext& ctx) const {
+  return GetCsgLeafNode(ctx.impl_.get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -292,7 +343,10 @@ double Manifold::GetTolerance() const {
  * This performs mesh simplification when the tolerance value is increased.
  */
 Manifold Manifold::SetTolerance(double tolerance) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
@@ -314,7 +368,10 @@ Manifold Manifold::SetTolerance(double tolerance) const {
  * have moved by less than tolerance.
  */
 Manifold Manifold::Simplify(double tolerance) const {
-  auto impl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
   const double oldTolerance = impl->tolerance_;
   if (tolerance == 0) tolerance = oldTolerance;
   if (tolerance > oldTolerance) {
@@ -369,11 +426,8 @@ int Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal() const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto newImpl = std::make_shared<Impl>();
-    newImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(newImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->SetNormalsAndCoplanar();
@@ -414,7 +468,7 @@ size_t Manifold::NumDegenerateTris() const {
  * @param v The vector to add to every vertex.
  */
 Manifold Manifold::Translate(vec3 v) const {
-  return Manifold(pNode_->Translate(v));
+  return Manifold(LoadPNode()->Translate(v));
 }
 
 /**
@@ -423,7 +477,9 @@ Manifold Manifold::Translate(vec3 v) const {
  *
  * @param v The vector to multiply every vertex by per component.
  */
-Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
+Manifold Manifold::Scale(vec3 v) const {
+  return Manifold(LoadPNode()->Scale(v));
+}
 
 /**
  * Applies an Euler angle rotation to the manifold, This operation can be
@@ -446,7 +502,7 @@ Manifold Manifold::Scale(vec3 v) const { return Manifold(pNode_->Scale(v)); }
  */
 Manifold Manifold::Rotate(double xDegrees, double yDegrees,
                           double zDegrees) const {
-  return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
+  return Manifold(LoadPNode()->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
 /**
@@ -457,7 +513,7 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  * @param m The affine transform matrix to apply to all the vertices.
  */
 Manifold Manifold::Transform(const mat3x4& m) const {
-  return Manifold(pNode_->Transform(m));
+  return Manifold(LoadPNode()->Transform(m));
 }
 
 /**
@@ -469,12 +525,15 @@ Manifold Manifold::Transform(const mat3x4& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
     return Manifold();
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
-  return Manifold(pNode_->Transform(m));
+  return Manifold(LoadPNode()->Transform(m));
 }
 
 /**
@@ -488,11 +547,8 @@ Manifold Manifold::Mirror(vec3 normal) const {
  */
 Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto pImpl = std::make_shared<Impl>();
-    pImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -508,11 +564,8 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
 Manifold Manifold::WarpBatch(
     std::function<void(VecView<vec3>)> warpFunc) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
-  if (oldImpl->status_ != Error::NoError) {
-    auto pImpl = std::make_shared<Impl>();
-    pImpl->status_ = oldImpl->status_;
-    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-  }
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->WarpBatch(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -534,7 +587,10 @@ Manifold Manifold::SetProperties(
     int numProp,
     std::function<void(double* newProp, vec3 position, const double* oldProp)>
         propFunc) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->properties_;
 
@@ -583,7 +639,10 @@ Manifold Manifold::SetProperties(
  * will be automatically expanded to include the channel index specified.
  */
 Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -604,24 +663,33 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * but in this case it would be better not to calculate normals at all.
  */
 Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
 /**
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine or RefineToLength is called to
- * interpolate the surface. This version uses the supplied vertex normal
- * properties to define the tangent vectors. Faces of two coplanar triangles
- * will be marked as quads, while faces with three or more will be flat.
+ * geometry will remain unchanged until Refine, RefineToLength, or
+ * RefineToTolerance is called to interpolate the surface. This version uses the
+ * supplied vertex normal properties to define the tangent vectors. Faces of two
+ * coplanar triangles will be marked as quads, while faces with three or more
+ * will be flat. Zero-length normals are considered missing and will defer to
+ * their neighboring normals instead. If all normals are missing, the vertex
+ * pseudonormal will be used.
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
  * agree will result in a sharp edge.
  */
 Manifold Manifold::SmoothByNormals(int normalIdx) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
     pImpl->CreateTangents(normalIdx);
   }
@@ -630,10 +698,10 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 
 /**
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine or RefineToLength is called to
- * interpolate the surface. This version uses the geometry of the triangles and
- * pseudo-normals to define the tangent vectors. Faces of two coplanar triangles
- * will be marked as quads.
+ * geometry will remain unchanged until Refine, RefineToLength, or
+ * RefineToTolerance is called to interpolate the surface. This version uses the
+ * geometry of the triangles and pseudo-normals to define the tangent vectors.
+ * Faces of two coplanar triangles will be marked as quads.
  *
  * @param minSharpAngle degrees, default 60. Any edges with angles greater than
  * this value will remain sharp. The rest will be smoothed to G1 continuity,
@@ -647,7 +715,10 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * 180 - all edges will be smooth.
  */
 Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
     if (minSmoothness == 0) {
       const int numProp = pImpl->numProp_;
@@ -678,7 +749,10 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (n > 1) {
     pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
   }
@@ -697,7 +771,10 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->Refine([length](vec3 edge, vec4, vec4) {
     return static_cast<int>(la::length(edge) / length);
   });
@@ -718,7 +795,10 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
         [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
@@ -754,7 +834,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  return Manifold(pNode_->Boolean(second.pNode_, op));
+  return Manifold(LoadPNode()->Boolean(second.LoadPNode(), op));
 }
 
 /**
@@ -769,7 +849,7 @@ Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
     return manifolds[0];
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
-  for (const auto& m : manifolds) children.push_back(m.pNode_);
+  for (const auto& m : manifolds) children.push_back(m.LoadPNode());
   return Manifold(std::make_shared<CsgOpNode>(children, op));
 }
 
@@ -848,6 +928,12 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     vec3 normal, double originOffset) const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError) {
+    Manifold err = PropagateStatus(leafImpl->status_);
+    return {err, err};
+  }
+  if (IsEmpty()) return {Manifold(), Manifold()};
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
 
@@ -875,7 +961,9 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
+  if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
+  if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
   return aImpl->Minkowski(*bImpl, false);
 }
 
@@ -890,7 +978,9 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
   auto aImpl = GetCsgLeafNode().GetImpl();
+  if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
+  if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
   return aImpl->Minkowski(*bImpl, true);
 }
 
@@ -933,8 +1023,11 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
+  auto srcImpl = GetCsgLeafNode().GetImpl();
+  if (srcImpl->status_ != Error::NoError)
+    return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(GetCsgLeafNode().GetImpl()->vertPos_);
+  impl->Hull(srcImpl->vertPos_);
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
@@ -944,13 +1037,17 @@ Manifold Manifold::Hull() const {
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
+  for (const auto& man : manifolds) {
+    auto status = man.Status();
+    if (status != Error::NoError) return PropagateStatus(status);
+  }
   std::vector<vec3> vertPos;
   size_t size = 0;
   for (const auto& man : manifolds) size += man.NumVert();
   if (size == 0) return Manifold();
   vertPos.reserve(size);
   for (const auto& man : manifolds) {
-    const auto& impl = man.pNode_->ToLeafNode()->GetImpl();
+    const auto& impl = man.GetCsgLeafNode().GetImpl();
     vertPos.insert(vertPos.end(), impl->vertPos_.begin(), impl->vertPos_.end());
   }
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
@@ -971,5 +1068,17 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
 
   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
                                             searchLength);
+}
+
+/**
+ * Cast a ray segment against this manifold, returning all hits sorted by
+ * distance from origin.
+ *
+ * @param origin The start point of the ray segment.
+ * @param endpoint The end point of the ray segment.
+ * @return A vector of RayHit sorted by distance, empty on miss.
+ */
+std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
+  return GetCsgLeafNode().GetImpl()->RayCast(origin, endpoint);
 }
 }  // namespace manifold

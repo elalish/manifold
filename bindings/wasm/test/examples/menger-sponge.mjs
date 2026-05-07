@@ -43,6 +43,7 @@ const posColors = (newProp, pos) => {
 const result = mengerSponge(3)
                    .trimByPlane([1, 1, 1], 0)
                    .setProperties(3, posColors)
+                   .translate([0, 0, 0.5])
                    .scale(100);
 
 const node = new GLTFNode();

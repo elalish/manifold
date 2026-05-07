@@ -59,7 +59,7 @@ const csg = async () => {
     ]);
   });
 
-  return arranged;
+  return arranged.translate([0, 0, 50 * metres]);
 };
 
 // If the default export is a function, manifoldCAD will execute it,

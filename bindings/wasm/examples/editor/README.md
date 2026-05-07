@@ -12,3 +12,15 @@ npm run build
 ```
 See `package.json` for other useful scripts.
 
+## Bundle Analyzer
+
+To generate a bundle analysis report, run:
+
+On Windows PowerShell:
+	$env:ANALYZE=1; npm run build
+
+On Linux/macOS:
+	ANALYZE=1 npm run build
+
+This will include the analyzer in the build and output a report.
+

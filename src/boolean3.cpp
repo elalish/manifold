@@ -353,9 +353,11 @@ struct Kernel12Recorder {
 };
 
 template <bool expandP, bool forward>
-Intersections Intersect12_(const Manifold::Impl& inP,
-                           const Manifold::Impl& inQ) {
+Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                           ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   // a: 1 (edge), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
@@ -371,7 +373,8 @@ Intersections Intersect12_(const Manifold::Impl& inP,
                      a.vertPos_[a.halfedge_[i].endVert])
                : Box();
   };
-  b.collider_->Collisions<false>(recorder, f, a.halfedge_.size());
+  b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
+  if (IsCancelled(ctx)) return Intersections{};
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
@@ -393,16 +396,17 @@ Intersections Intersect12_(const Manifold::Impl& inP,
 
 template <bool forward>
 Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                          bool expandP) {
+                          bool expandP, ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Intersect12_<true, forward>(inP, inQ);
+    return Intersect12_<true, forward>(inP, inQ, ctx);
   else
-    return Intersect12_<false, forward>(inP, inQ);
+    return Intersect12_<false, forward>(inP, inQ, ctx);
 }
 
 template <bool expandP, bool forward>
 Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                    const VecView<std::array<int, 2>> p1q2) {
+                    const VecView<std::array<int, 2>> p1q2,
+                    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // a: 0 (vert), b: 2 (face)
   const Manifold::Impl& a = forward ? inP : inQ;
@@ -410,9 +414,11 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Vec<int> brokenHalfedges;
   int index = forward ? 0 : 1;
 
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
-           countAt(a.halfedge_.size()), [&](int edge) {
+           countAt(a.halfedge_.size()), ctx, [&](int edge) {
              const Halfedge& he = a.halfedge_[edge];
              if (!he.IsForward()) return;
              // check if the edge is broken
@@ -424,6 +430,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
              if (it == p1q2.end() || (*it)[index] != edge)
                uA.unite(he.startVert, he.endVert);
            });
+  if (IsCancelled(ctx)) return Vec<int>{};
 
   // find components, the hope is the number of components should be small
   std::unordered_set<int> components;
@@ -431,7 +438,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (a.vertPos_.size() > 1e5) {
     tbb::combinable<std::unordered_set<int>> componentsShared;
     for_each(autoPolicy(a.vertPos_.size()), countAt(0),
-             countAt(a.vertPos_.size()),
+             countAt(a.vertPos_.size()), ctx,
              [&](int v) { componentsShared.local().insert(uA.find(v)); });
     componentsShared.combine_each([&](const std::unordered_set<int>& data) {
       components.insert(data.begin(), data.end());
@@ -442,6 +449,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     for (size_t v = 0; v < a.vertPos_.size(); v++)
       components.insert(uA.find(v));
   }
+  if (IsCancelled(ctx)) return Vec<int>{};
   Vec<int> verts;
   verts.reserve(components.size());
   for (int c : components) verts.push_back(c);
@@ -456,31 +464,34 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&](int i) { return a.vertPos_[verts[i]]; };
-  b.collider_->Collisions<false>(recorder, f, verts.size());
+  b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
+  if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
-  for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()),
+  for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()), ctx,
            [&](size_t i) {
              size_t root = uA.find(i);
              if (root == i) return;
              w03[i] = w03[root];
            });
+  if (IsCancelled(ctx)) return Vec<int>{};
   return w03;
 }
 
 template <bool forward>
 Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   const VecView<std::array<int, 2>> p1q2, bool expandP) {
+                   const VecView<std::array<int, 2>> p1q2, bool expandP,
+                   ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Winding03_<true, forward>(inP, inQ, p1q2);
+    return Winding03_<true, forward>(inP, inQ, p1q2, ctx);
   else
-    return Winding03_<false, forward>(inP, inQ, p1q2);
+    return Winding03_<false, forward>(inP, inQ, p1q2, ctx);
 }
 }  // namespace
 
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   OpType op)
-    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add) {
+                   OpType op, ExecutionContext::Impl* ctx)
+    : inP_(inP), inQ_(inQ), expandP_(op == OpType::Add), ctx_(ctx) {
   ZoneScoped;
   // Symbolic perturbation:
   // Union -> expand inP, expand inQ
@@ -498,17 +509,31 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return;
   }
 
-#ifdef MANIFOLD_DEBUG
+  // Phase-boundary fast-path: skip launching the next phase if cancel fired
+  // between phases. The per-phase invariant is enforced inside the called
+  // functions (Intersect12_, Winding03_).
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer intersections;
   intersections.Start();
+  Timer intersect12P, intersect12Q, winding03P, winding03Q;
+  intersect12P.Start();
 #endif
 
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  xv12_ = Intersect12<true>(inP, inQ, expandP_);
-  xv21_ = Intersect12<false>(inP, inQ, expandP_);
+  if (IsCancelled(ctx_)) return;
+  xv12_ = Intersect12<true>(inP, inQ, expandP_, ctx_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  intersect12P.Stop();
+  intersect12Q.Start();
+#endif
+  if (IsCancelled(ctx_)) return;
+  xv21_ = Intersect12<false>(inP, inQ, expandP_, ctx_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  intersect12Q.Stop();
+#endif
 
   if (xv12_.x12.size() > INT_MAX_SZ || xv21_.x12.size() > INT_MAX_SZ) {
     valid = false;
@@ -517,15 +542,93 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   // Compute winding numbers of all vertices using flood fill
   // Vertices on the same connected component have the same winding number
-  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_);
-  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03P.Start();
+#endif
+  if (IsCancelled(ctx_)) return;
+  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_, ctx_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03P.Stop();
+  winding03Q.Start();
+#endif
+  if (IsCancelled(ctx_)) return;
+  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_, ctx_);
+  // No trailing check: Winding03_ already returns empty on cancel and
+  // Boolean3::Result re-checks on entry.
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  winding03Q.Stop();
   intersections.Stop();
 
   if (ManifoldParams().verbose >= 2) {
-    intersections.Print("Intersections");
+    intersect12P.Print("  Intersect12 P->Q");
+    intersect12Q.Print("  Intersect12 Q->P");
+    winding03P.Print("  Winding03 P");
+    winding03Q.Print("  Winding03 Q");
+    intersections.Print("Intersections (total)");
   }
 #endif
 }
+std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
+  ZoneScoped;
+  if (IsEmpty()) return {};
+  const vec3 dir = endpoint - origin;
+  if (la::dot(dir, dir) == 0.0) return {};
+
+  // Build a minimal single-edge Impl representing the ray segment.
+  // Kernel12 treats inA as an edge mesh, so we need two vertices, two
+  // halfedges (forward + backward), and one face normal. Zero vertex normals
+  // and face normal mean the ray contributes nothing to perturbation
+  // tiebreakers — consistency at shared edges/vertices depends entirely on
+  // the mesh's own normals.
+  Impl rayImpl;
+  rayImpl.vertPos_.resize(2);
+  rayImpl.vertPos_[0] = origin;
+  rayImpl.vertPos_[1] = endpoint;
+  rayImpl.vertNormal_.resize(2);
+  rayImpl.vertNormal_[0] = vec3(0.0);
+  rayImpl.vertNormal_[1] = vec3(0.0);
+  rayImpl.halfedge_.resize(2);
+  rayImpl.halfedge_[0] = {0, 1, 1, 0};  // forward: vert 0 → 1
+  rayImpl.halfedge_[1] = {1, 0, 0, 0};  // backward: vert 1 → 0
+  rayImpl.faceNormal_.resize(1);
+  rayImpl.faceNormal_[0] = vec3(0.0);
+
+  // expandP=false with zero vertNormal means the ray-side perturbation is
+  // zero. forward=true means we project along +Z for the lower-dimensional
+  // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
+  Kernel02<false, true> k02{rayImpl, *this};
+  Kernel11<false> k11{rayImpl, *this};
+  Kernel12<false, true> k12{rayImpl, *this, k02, k11};
+
+  // Use the component with largest magnitude for stable t computation.
+  const vec3 absDir = la::abs(dir);
+  const int tAxis = absDir.x > absDir.y && absDir.x > absDir.z ? 0
+                    : absDir.y > absDir.z                      ? 1
+                                                               : 2;
+
+  std::vector<RayHit> hits;
+  // Query the BVH with the ray's AABB.
+  const Box rayBox(la::min(origin, endpoint), la::max(origin, endpoint));
+  auto recorderf = [&](int /*queryIdx*/, int tri) {
+    const auto [s, v] = k12(0, tri);  // halfedge 0 vs triangle tri
+    if (s != 0 && std::isfinite(v.x)) {
+      // v is the 3D intersection point computed by Kernel12.
+      // Compute parametric t ∈ [0,1] along the ray segment.
+      const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
+      if (t >= 0.0 && t <= 1.0) {
+        hits.push_back({static_cast<uint64_t>(tri), t, v, faceNormal_[tri]});
+      }
+    }
+  };
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&rayBox](int) { return rayBox; };
+  collider_.Collisions<false>(recorder, f, 1, false);
+
+  std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
+    return a.distance < b.distance;
+  });
+  return hits;
+}
+
 }  // namespace manifold

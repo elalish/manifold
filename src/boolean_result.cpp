@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 
 #include "boolean3.h"
 #include "parallel.h"
@@ -106,8 +107,11 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl& outR, const Manifold::Impl& inP, const Manifold::Impl& inQ,
     const Vec<int>& i03, const Vec<int>& i30, const Vec<int>& i12,
     const Vec<int>& i21, const Vec<std::array<int, 2>>& p1q2,
-    const Vec<std::array<int, 2>>& p2q1, bool invertQ) {
+    const Vec<std::array<int, 2>>& p2q1, bool invertQ,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
 
@@ -115,26 +119,27 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
   auto policy = autoPolicy(inP.halfedge_.size());
-  for_each(policy, countAt(0_uz), countAt(inP.halfedge_.size() / 3),
+  for_each(policy, countAt(0_uz), countAt(inP.halfedge_.size() / 3), ctx,
            CountVerts({inP.halfedge_, sidesPerFaceP, i03}));
-  for_each(policy, countAt(0_uz), countAt(inQ.halfedge_.size() / 3),
+  for_each(policy, countAt(0_uz), countAt(inQ.halfedge_.size() / 3), ctx,
            CountVerts({inQ.halfedge_, sidesPerFaceQ, i30}));
 
   if (i12.size() >= 1e5) {
-    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(), ctx,
                CountNewVerts<false, true>(
                    {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(), ctx,
                CountNewVerts<true, true>(
                    {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
   } else {
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(),
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(), ctx,
                CountNewVerts<false, false>(
                    {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(),
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(), ctx,
                CountNewVerts<true, false>(
                    {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
   }
+  if (IsCancelled(ctx)) return std::make_tuple(Vec<int>{}, Vec<int>{});
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
@@ -199,20 +204,16 @@ struct EdgePos {
   }
 };
 
-// thread sanitizer doesn't really know how to check when there are too many
-// mutex
-#if defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-__attribute__((no_sanitize("thread")))
-#endif
-#endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
-    concurrent_map<int, std::vector<EdgePos>> &edgesP,
-    concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    concurrent_map<int, std::vector<EdgePos>>& edgesP,
+    concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
+    const Vec<std::array<int, 2>>& p1q2, const Vec<int>& i12,
+    const Vec<int>& v12R, const VecView<Halfedge>& halfedgeP, bool forward,
+    size_t offset, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -256,7 +257,9 @@ void AddNewEdgeVerts(
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
-    static tbb::affinity_partitioner ap;
+    // thread_local: affinity_partitioner isn't safe for concurrent use
+    // (internal state mutated by parallel_for without synchronization).
+    thread_local tbb::affinity_partitioner ap;
     auto processFun = std::bind(
         process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
@@ -264,15 +267,22 @@ void AddNewEdgeVerts(
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t>& range) {
+          if (IsCancelled(ctx)) return;
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },
         ap);
     return;
   }
 #endif
+  if (IsCancelled(ctx)) return;
   auto processFun =
       std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
-  for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial edgesP/edgesNew.
+  for (size_t i = 0; i < p1q2.size(); ++i) {
+    if (IsCancelled(ctx)) return;
+    processFun(i);
+  }
 }
 
 template <typename F>
@@ -300,7 +310,8 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
                         concurrent_map<int, std::vector<EdgePos>>& edgesP,
                         Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
                         const Vec<int>& i03, const Vec<int>& vP2R,
-                        const Vec<int>::IterC faceP2R, bool forward) {
+                        const Vec<int>::IterC faceP2R, bool forward,
+                        ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
@@ -311,7 +322,10 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
   const Vec<vec3>& vertPosP = inP.vertPos_;
   const SharedVec<Halfedge>& halfedgeP = inP.halfedge_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesP) {
+    if (IsCancelled(ctx)) return;
     const int edgeP = value.first;
     std::vector<EdgePos> edgePosP = value.second;
     std::stable_sort(edgePosP.begin(), edgePosP.end());
@@ -376,13 +390,17 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
 void AppendNewEdges(
     Manifold::Impl& outR, Vec<int>& facePtrR,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
-    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
+    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
   auto& halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesNew) {
+    if (IsCancelled(ctx)) return;
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
@@ -476,10 +494,12 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                       Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
                       const Vec<char> wholeHalfedgeP, const Vec<int>& i03,
                       const Vec<int>& vP2R, VecView<const int> faceP2R,
-                      bool forward) {
+                      bool forward, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   for_each_n(
-      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(), ctx,
       DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
                           inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
@@ -498,12 +518,16 @@ struct MapTriRef {
 };
 
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
-                     const Manifold::Impl& inQ, bool invertQ) {
+                     const Manifold::Impl& inQ, bool invertQ,
+                     ExecutionContext::Impl* ctx) {
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(
       autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-      outR.NumTri(),
+      outR.NumTri(), ctx,
       MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
+  if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
@@ -547,8 +571,10 @@ struct Barycentric {
 };
 
 void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
-                      const Manifold::Impl& inQ) {
+                      const Manifold::Impl& inQ, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = std::max(numPropP, numPropQ);
@@ -557,10 +583,11 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
 
   const int numTri = outR.NumTri();
   Vec<vec3> bary(outR.halfedge_.size());
-  for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
+  for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri, ctx,
              Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
                           inQ.vertPos_, outR.vertPos_, inP.halfedge_,
                           inQ.halfedge_, outR.halfedge_, outR.epsilon_}));
+  if (IsCancelled(ctx)) return;
 
   using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -573,6 +600,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
+    if (IsCancelled(ctx)) return;
     // Skip collapsed triangles
     if (outR.halfedge_[3 * tri].startVert < 0) continue;
 
@@ -655,7 +683,7 @@ namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   Timer assemble;
   assemble.Start();
 #endif
@@ -665,6 +693,32 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
+
+  // Sub-Boolean progress accounting. `phase()` advances `donePhases` by 1
+  // and checks cancel; `balance` (declared just below) tops up `donePhases`
+  // to `kPhasesPerBoolean` on any non-cancelled return so `Progress()`
+  // reaches 1.0 even after early-exit paths (status errors, empty/degenerate
+  // inputs) that skip most or all of the phase sites.
+  struct PhaseBalance {
+    ExecutionContext::Impl* ctx;
+    int published = 0;
+    bool fullPath = false;
+    ~PhaseBalance() {
+      if (!ctx) return;
+      if (IsCancelled(ctx)) return;  // partial publication is intentional
+      if (fullPath) {
+        DEBUG_ASSERT(published == kPhasesPerBoolean, logicErr,
+                     "Boolean3::Result phase count drift; "
+                     "update kPhasesPerBoolean to match phase() site count");
+        return;
+      }
+      if (published < kPhasesPerBoolean) {
+        ctx->donePhases.fetch_add(kPhasesPerBoolean - published,
+                                  std::memory_order_relaxed);
+      }
+    }
+  };
+  PhaseBalance balance{ctx_};
 
   if (inP_.status_ != Manifold::Error::NoError) {
     auto impl = Manifold::Impl();
@@ -688,6 +742,21 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     }
     return inP_;
   }
+
+  auto phase = [&]() -> std::optional<Manifold::Impl> {
+    if (ctx_) ctx_->donePhases.fetch_add(1, std::memory_order_relaxed);
+    ++balance.published;
+    if (IsCancelled(ctx_)) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::Cancelled;
+      return impl;
+    }
+    return std::nullopt;
+  };
+
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
+  if (auto c = phase()) return *c;
 
   if (!valid) {
     auto impl = Manifold::Impl();
@@ -739,7 +808,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  if (numVertR == 0) return outR;
+  if (numVertR == 0) {
+    return outR;
+  }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
   outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
@@ -747,15 +818,16 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(),
+  for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(), ctx_,
              DuplicateVerts({outR.vertPos_, i03, vP2R, inP_.vertPos_}));
-  for_each_n(autoPolicy(inQ_.NumVert(), 1e4), countAt(0), inQ_.NumVert(),
+  for_each_n(autoPolicy(inQ_.NumVert(), 1e4), countAt(0), inQ_.NumVert(), ctx_,
              DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
-  for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(),
+  for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
-  for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(),
+  for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
+  if (auto c = phase()) return *c;
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -774,9 +846,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   concurrent_map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
   AddNewEdgeVerts(edgesP, edgesNew, xv12_.p1q2, i12, v12R, inP_.halfedge_, true,
-                  0);
+                  0, ctx_);
   AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
-                  false, xv12_.p1q2.size());
+                  false, xv12_.p1q2.size(), ctx_);
+  if (auto c = phase()) return *c;
 
   v12R.clear();
   v21R.clear();
@@ -784,8 +857,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) = SizeOutput(
-      outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2, invertQ);
+  std::tie(faceEdge, facePQ2R) =
+      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2,
+                 invertQ, ctx_);
+  if (auto c = phase()) return *c;
 
   i12.clear();
   i21.clear();
@@ -801,22 +876,25 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<TriRef> halfedgeRef(2 * outR.NumEdge());
 
   AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP, halfedgeRef, inP_,
-                     i03, vP2R, facePQ2R.begin(), true);
+                     i03, vP2R, facePQ2R.begin(), true, ctx_);
   AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
-                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
+                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false, ctx_);
+  if (auto c = phase()) return *c;
 
   edgesP.clear();
   edgesQ.clear();
 
-  AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
-                 inP_.NumTri());
+  AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R, inP_.NumTri(),
+                 ctx_);
+  if (auto c = phase()) return *c;
 
   edgesNew.clear();
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cview(0, inP_.NumTri()), true);
+                   facePQ2R.cview(0, inP_.NumTri()), true, ctx_);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false);
+                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false, ctx_);
+  if (auto c = phase()) return *c;
 
   wholeHalfedgeP.clear();
   wholeHalfedgeQ.clear();
@@ -827,7 +905,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   assemble.Stop();
   Timer triangulate;
   triangulate.Start();
@@ -838,9 +916,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   halfedgeRef.clear();
   faceEdge.clear();
 
-  outR.ReorderHalfedges();
+  outR.ReorderHalfedges(ctx_);
+  if (auto c = phase()) return *c;
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   triangulate.Stop();
   Timer simplify;
   simplify.Start();
@@ -850,9 +929,11 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
-  CreateProperties(outR, inP_, inQ_);
+  CreateProperties(outR, inP_, inQ_, ctx_);
+  if (auto c = phase()) return *c;
 
-  UpdateReference(outR, inP_, inQ_, invertQ);
+  UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
+  if (auto c = phase()) return *c;
 
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
@@ -861,17 +942,18 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   simplify.Stop();
   Timer sort;
   sort.Start();
 #endif
 
   outR.CalculateBBox();
-  outR.SortGeometry();
+  outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
+  if (auto c = phase()) return *c;
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   sort.Stop();
   if (ManifoldParams().verbose >= 2) {
     assemble.Print("Assembly");
@@ -883,6 +965,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 #endif
 
+  balance.fullPath = true;
   return outR;
 }
 

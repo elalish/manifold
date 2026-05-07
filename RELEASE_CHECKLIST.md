@@ -6,6 +6,7 @@
 1. Make a new branch called the version, e.g. v2.3.0.
 1. Use VSCode to search and replace the old version with the new - so far in test-cmake.sh, flake.nix, pyproject.toml, and package.json.
 1. Also update CMakeLists.txt version by searching for "set(MANIFOLD_VERSION_".
+1. in `bindings/wasm`, run `npm run install:all` to update the package-lock files.
 1. Commit, push, open a PR, verify tests pass, manually trigger build_wheels CI, merge.
 1. On Github, draft a new release, make a new tag with the version number, add release notes, and publish.
 1. Check the Actions and verify that both PyPI and npm publishing actions ran successfully.

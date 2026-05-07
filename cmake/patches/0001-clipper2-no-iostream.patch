@@ -1,0 +1,153 @@
+Carry-patch: add a CLIPPER2_NO_IOSTREAM build option (off by default)
+that strips iostream-using overloads from Clipper2's public headers,
+and propagate the macro through Clipper2's PUBLIC compile definitions
+so consumers see it. Lets manifold pass MANIFOLD_NO_IOSTREAM=ON
+through to the bundled Clipper2 (e.g., for wasm32-unknown-unknown
+consumers via the wasm-cxx-shim integration).
+
+Tracks AngusJohnson/Clipper2#1094 — once that lands and manifold's
+Clipper2 SHA pin moves past it, this patch drops.
+
+Generated against Clipper2 SHA 46f639177fe418f9689e8ddb74f08a870c71f5b4
+(the SHA manifoldDeps.cmake currently pins). The headers at this SHA
+are byte-identical to upstream main, so the patch tracks #1094's diff
+exactly.
+
+Apply with: git apply -p1 0001-clipper2-no-iostream.patch
+
+
+diff --git a/CPP/CMakeLists.txt b/CPP/CMakeLists.txt
+index 7642e86..b327296 100644
+--- a/CPP/CMakeLists.txt
++++ b/CPP/CMakeLists.txt
+@@ -17,6 +17,7 @@ option(CLIPPER2_HI_PRECISION "Caution: enabling this will compromise performance
+ option(CLIPPER2_UTILS "Build utilities" ON)
+ option(CLIPPER2_EXAMPLES "Build examples" ON)
+ option(CLIPPER2_TESTS "Build tests" ON)
++option(CLIPPER2_NO_IOSTREAM "Disable iostream-using header overloads" OFF)
+ option(USE_EXTERNAL_GTEST "Use system-wide installed GoogleTest" OFF)
+ option(USE_EXTERNAL_GBENCHMARK "Use the googlebenchmark" OFF)
+ option(BUILD_SHARED_LIBS "Build shared libs" OFF)
+@@ -69,6 +70,7 @@ if (NOT (CLIPPER2_USINGZ STREQUAL "ONLY"))
+     Clipper2 PUBLIC
+       CLIPPER2_MAX_DECIMAL_PRECISION=${CLIPPER2_MAX_DECIMAL_PRECISION}
+       $<$<BOOL:${CLIPPER2_HI_PRECISION}>:CLIPPER2_HI_PRECISION>
++      $<$<BOOL:${CLIPPER2_NO_IOSTREAM}>:CLIPPER2_NO_IOSTREAM>
+   )
+ 
+   target_include_directories(
+@@ -95,6 +97,7 @@ if (NOT (CLIPPER2_USINGZ STREQUAL "OFF"))
+       USINGZ
+       CLIPPER2_MAX_DECIMAL_PRECISION=${CLIPPER2_MAX_DECIMAL_PRECISION}
+       $<$<BOOL:${CLIPPER2_HI_PRECISION}>:CLIPPER2_HI_PRECISION>
++      $<$<BOOL:${CLIPPER2_NO_IOSTREAM}>:CLIPPER2_NO_IOSTREAM>
+   )
+   target_include_directories(
+     Clipper2Z PUBLIC 
+diff --git a/CPP/Clipper2Lib/include/clipper2/clipper.core.h b/CPP/Clipper2Lib/include/clipper2/clipper.core.h
+index 99a5205..d3af0a0 100644
+--- a/CPP/Clipper2Lib/include/clipper2/clipper.core.h
++++ b/CPP/Clipper2Lib/include/clipper2/clipper.core.h
+@@ -14,7 +14,9 @@
+ #include <cstdint>
+ #include <vector>
+ #include <string>
++#ifndef CLIPPER2_NO_IOSTREAM
+ #include <iostream>
++#endif
+ #include <algorithm>
+ #include <numeric>
+ #include <cmath>
+@@ -166,11 +168,13 @@ namespace Clipper2Lib
+ 
+     void SetZ(const z_type z_value) { z = z_value; }
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+     friend std::ostream& operator<<(std::ostream& os, const Point& point)
+     {
+       os << point.x << "," << point.y << "," << point.z;
+       return os;
+     }
++#endif
+ 
+ #else
+ 
+@@ -203,11 +207,13 @@ namespace Clipper2Lib
+       return Point(x * scale, y * scale);
+     }
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+     friend std::ostream& operator<<(std::ostream& os, const Point& point)
+     {
+       os << point.x << "," << point.y;
+       return os;
+     }
++#endif
+ #endif
+ 
+     friend bool operator==(const Point& a, const Point& b)
+@@ -396,10 +402,12 @@ namespace Clipper2Lib
+       return result;
+     }
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+     friend std::ostream& operator<<(std::ostream& os, const Rect<T>& rect) {
+       os << "(" << rect.left << "," << rect.top << "," << rect.right << "," << rect.bottom << ") ";
+       return os;
+     }
++#endif
+   };
+ 
+   template <typename T1, typename T2>
+@@ -498,6 +506,7 @@ namespace Clipper2Lib
+     return Rect<T>(xmin, ymin, xmax, ymax);
+   }
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+   template <typename T>
+   std::ostream& operator << (std::ostream& outstream, const Path<T>& path)
+   {
+@@ -518,6 +527,7 @@ namespace Clipper2Lib
+       outstream << p;
+     return outstream;
+   }
++#endif
+ 
+ 
+   template <typename T1, typename T2>
+diff --git a/CPP/Clipper2Lib/include/clipper2/clipper.h b/CPP/Clipper2Lib/include/clipper2/clipper.h
+index fe1e299..deb1f7b 100644
+--- a/CPP/Clipper2Lib/include/clipper2/clipper.h
++++ b/CPP/Clipper2Lib/include/clipper2/clipper.h
+@@ -309,6 +309,7 @@ namespace Clipper2Lib {
+       return true;
+     }
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+     static void OutlinePolyPath(std::ostream& os,
+       size_t idx, bool isHole, size_t count, const std::string& preamble)
+     {
+@@ -338,6 +339,7 @@ namespace Clipper2Lib {
+         if (pp.Child(i)->Count())
+           details::OutlinePolyPathD(os, *pp.Child(i), i, preamble + "  ");
+     }
++#endif
+ 
+     template<typename T, typename U>
+     inline constexpr void MakePathGeneric(const T an_array,
+@@ -377,6 +379,7 @@ namespace Clipper2Lib {
+ 
+   } // end details namespace
+ 
++#ifndef CLIPPER2_NO_IOSTREAM
+   inline std::ostream& operator<< (std::ostream& os, const PolyTree64& pp)
+   {
+     std::string plural = (pp.Count() == 1) ? " polygon." : " polygons.";
+@@ -399,6 +402,7 @@ namespace Clipper2Lib {
+     if (!pp.Level()) os << std::endl;
+     return os;
+   }
++#endif
+ 
+   inline Paths64 PolyTreeToPaths64(const PolyTree64& polytree)
+   {

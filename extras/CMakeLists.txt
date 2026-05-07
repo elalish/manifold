@@ -21,6 +21,16 @@ target_link_libraries(perfTest manifold)
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 exportbin(perfTest)
 
+if(MANIFOLD_DEBUG OR MANIFOLD_TIMING)
+  add_executable(perfPhases perf_phases.cpp)
+  target_link_libraries(perfPhases manifold samples)
+  target_include_directories(
+    perfPhases PRIVATE ${PROJECT_SOURCE_DIR}/samples/include
+  )
+  target_compile_options(perfPhases PRIVATE ${MANIFOLD_FLAGS})
+  exportbin(perfPhases)
+endif()
+
 if(MANIFOLD_PAR AND NOT MSVC)
   add_executable(stlTest stl_test.cpp)
   target_link_libraries(stlTest PRIVATE manifold TBB::tbb)

@@ -24,18 +24,14 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
-import {
-  fileForContentTypes,
-  FileForRelThumbnail,
-  to3dmodel,
-} from '@jscadui/3mf-export';
-import type { Zippable } from 'fflate';
-import { strToU8, zipSync } from 'fflate';
+import {fileForContentTypes, FileForRelThumbnail, to3dmodel,} from '@jscadui/3mf-export';
+import type {Zippable} from 'fflate';
+import {strToU8, zipSync} from 'fflate';
 
-import type { Mat4 } from '../manifold-global-types.d.ts';
+import type {Mat4} from '../manifold-global-types.d.ts';
 
-import type { ExportOptions } from './export-model.ts';
-import { ManifoldPrimitive } from './manifold-gltf.ts';
+import type {ExportOptions} from './export-model.ts';
+import {ManifoldPrimitive} from './manifold-gltf.ts';
 
 const supportedFormat = {
   extension: '3mf',
@@ -54,20 +50,28 @@ interface Mesh3MF {
   name?: string;
 }
 
-interface Child3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Child3MF {
   objectID: string;
-  transform?: Mat4 | Array<string>;
+  transform?: Mat4|Array<string>;
 }
 
-interface Component3MF {
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Component3MF {
   id: string;
   children: Array<Child3MF>;
   name?: string;
-  transform?: Mat4 | Array<string>;
+  transform?: Mat4|Array<string>;
 }
 
 export interface Header {
-  unit?: 'micron' | 'millimeter' | 'centimeter' | 'inch' | 'foot' | 'meter';
+  unit?: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter';
   title?: string;
   author?: string;
   description?: string;
@@ -98,44 +102,107 @@ export interface Export3MFOptions extends ExportOptions {
 }
 
 /**
+ * Sort 3MF components topologically.
+ *
+ * Some 3MF parsers (like PrusaSlicer and descendants) expect child nodes to be
+ * defined before their parents.  This function sorts the component list
+ * accordingly.
+ *
+ * This is a version of Kahn's algorithm -- a stripped down breadth first
+ * search.  It finds root nodes, adds them to the result, then removes them from
+ * the graph.  It moves on to their children, which are now root nodes
+ * themselves.
+ *
+ * Rinse, lather, repeat, and the final result is a list of nodes ordered by
+ * generation.  Order within a generation is not guaranteed, and is not required
+ * in this particular case.
+ *
+ * @hidden
+ * Exported for unit tests.
+ */
+export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+  // Create a local graph.  We will destroy it by removing edges and do not want
+  // to introduce any side effects.
+  let graph: Array<[Component3MF, Component3MF]> = [];
+  for (const parent of unsorted) {
+    for (const {objectID} of parent.children) {
+      const child = unsorted.find(c => c.id === objectID);
+      if (child) graph.push([parent, child]);
+    }
+  }
+
+  const isRoot = (child: Component3MF): boolean =>
+      graph.filter(([, c]) => c.id === child.id).length === 0;
+  const children = (parent: Component3MF): Component3MF[] =>
+      graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
+  const disown = (parent: Component3MF, child: Component3MF) => graph =
+      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
+
+  const roots = unsorted.filter(isRoot);
+  const sorted = [];
+
+  let root;
+  while (root = roots.shift()) {  // For each root node...
+    sorted.unshift(root);         // ...insert before potential ancestors.
+    for (const child of children(root)) {  // For each child....
+      disown(root, child);  // ...remove the parent-child edge from the graph.
+      if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
+    }
+  }
+
+  return sorted;
+};
+
+/**
  * Convert a GLTF-Transform document to a 3MF model.
+ *
+ * 3MF files are more sophisticated than STL files; they can encode meshes,
+ * components and build items.
+ *
+ * 3MF components are like a scene graph.  Each component can have multiple
+ * children, and does have its own transformation matrix.
+ * This is flexible enough to allow putting several parts in the same file
+ * (multiple components, each with a mesh) as well as multi-material files (a
+ * tree containing multiple meshes, each for a particular material).
+ *
+ * Finally, build items define what the slicer software actually sees.
+ * ManifoldCAD doesn't have an equivalent comprehension.  We assume that top
+ * level objects -- nodes with no parents -- are build objects.
  *
  * @param doc The GLTF document to convert.
  * @returns A blob containing the converted model.
  * @group Export
  */
 export async function toArrayBuffer(
-  doc: GLTFTransform.Document,
-  options?: Export3MFOptions,
-): Promise<ArrayBuffer> {
+    doc: GLTFTransform.Document,
+    options?: Export3MFOptions,
+    ): Promise<ArrayBuffer> {
   const to3mf = {
     meshes: [],
     components: [],
     items: [],
     precision: 7,
-    header: { ...defaultHeader, ...(options?.header ?? {}) },
+    header: {...defaultHeader, ...(options?.header ?? {})},
   } as To3MF;
 
   // GLTF references by array index.
   // 3MF references by ID.
   let nextGlobalID = 1;
-  const object2globalID = new Map<
-    GLTFTransform.Node | GLTFTransform.Mesh,
-    string
-  >();
-  const getObjectID = (obj: GLTFTransform.Node | GLTFTransform.Mesh) =>
-    `${object2globalID.get(obj)}`;
+  const object2globalID =
+      new Map<GLTFTransform.Node|GLTFTransform.Mesh, string>();
+  const getObjectID = (obj: GLTFTransform.Node|GLTFTransform.Mesh) =>
+      `${object2globalID.get(obj)}`;
   const getMeshID = (mesh: GLTFTransform.Mesh) => {
     // If a mesh has been cloned with a different material, find
     // the original mesh.  This isn't a general GLTF feature; this is set
     // by the ManifoldCAD GLTF exporter.
-    const { clonedFrom } = mesh.getExtras();
+    const {clonedFrom} = mesh.getExtras();
     if (clonedFrom) {
       return object2globalID.get(clonedFrom as GLTFTransform.Mesh);
     }
     return object2globalID.get(mesh);
   };
-  const setObjectID = (obj: GLTFTransform.Node | GLTFTransform.Mesh) => {
+  const setObjectID = (obj: GLTFTransform.Node|GLTFTransform.Mesh) => {
     const objectID = `${nextGlobalID++}`;
     object2globalID.set(obj, objectID);
     return objectID;
@@ -144,14 +211,13 @@ export async function toArrayBuffer(
   // Get meshes in place first.
   for (const mesh of doc.getRoot().listMeshes()) {
     const manifoldPrimitive = mesh.getExtension(
-      'EXT_mesh_manifold',
-    ) as ManifoldPrimitive;
+                                  'EXT_mesh_manifold',
+                                  ) as ManifoldPrimitive;
     if (manifoldPrimitive) {
       // This mesh has a list of triangle vertices already.
       const indices = manifoldPrimitive.getIndices();
-      const positionAccessor = mesh
-        .listPrimitives()[0]
-        .getAttribute('POSITION')!;
+      const positionAccessor =
+          mesh.listPrimitives()[0].getAttribute('POSITION')!;
 
       const objectID = setObjectID(mesh);
       to3mf.meshes.push({
@@ -161,7 +227,7 @@ export async function toArrayBuffer(
       });
     }
 
-    const { clonedFrom } = mesh.getExtras();
+    const {clonedFrom} = mesh.getExtras();
     if (!manifoldPrimitive && clonedFrom) {
       // GLTF Mesh, instance of another mesh.
       // getMeshID will find this when adding it to components.
@@ -180,15 +246,15 @@ export async function toArrayBuffer(
   const nodes = doc.getRoot().listNodes().reverse();
   for (const node of nodes) {
     const meshID = node.getMesh() && getMeshID(node.getMesh()!);
-    to3mf.components.push({
+    components.push({
       id: setObjectID(node),
       name: node.getName(),
-      children: meshID ? [{ objectID: meshID }] : [],
+      children: meshID ? [{objectID: meshID}] : [],
       transform: node.getMatrix().map((n) => n.toFixed(to3mf.precision)),
     });
   }
 
-  // Now we can work out our node hierarchy.
+  // ...work out our component hierarchy...
   for (const node of doc.getRoot().listNodes()) {
     const objectID = getObjectID(node);
     if (!objectID) {
@@ -208,14 +274,17 @@ export async function toArrayBuffer(
     if (parent) {
       // This is a child node, add it to its parent.
       const parentID = getObjectID(parent);
-      const parent3mf = to3mf.components.find((comp) => comp.id == parentID)!;
+      const parent3mf = components.find((comp) => comp.id == parentID)!;
       parent3mf.children.push(child);
     } else {
       // This is a root node.
       // Add it to the build list.
-      to3mf.items.push({ objectID });
+      to3mf.items.push({objectID});
     }
   }
+
+  // ...and sort it so that parents always follow children.
+  to3mf.components = toposort(components);
 
   const fileForRelThumbnail = new FileForRelThumbnail();
   fileForRelThumbnail.add3dModel('3D/3dmodel.model');

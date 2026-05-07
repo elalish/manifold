@@ -30,7 +30,7 @@
 namespace {
 using namespace manifold;
 
-constexpr int TRIANGULATOR_VERBOSE_LEVEL = 2;
+constexpr int TRIANGULATOR_VERBOSE_LEVEL = 3;
 
 constexpr double kBest = -std::numeric_limits<double>::infinity();
 

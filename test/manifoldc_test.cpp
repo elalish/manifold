@@ -1,7 +1,9 @@
 #include "manifold/manifoldc.h"
 
 #include <cmath>
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
+#endif
 
 #include "gtest/gtest.h"
 #include "manifold/types.h"
@@ -10,6 +12,8 @@
 void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
 
 void* alloc_box_buffer() { return malloc(manifold_box_size()); }
+
+void* alloc_rect_buffer() { return malloc(manifold_rect_size()); }
 
 void* alloc_meshgl_buffer() { return malloc(manifold_meshgl_size()); }
 
@@ -113,6 +117,32 @@ TEST(CBIND, warp_translation) {
   free(context);
 }
 
+TEST(CBIND, include_pt_mutates_bounds) {
+  ManifoldRect* rect = manifold_rect(alloc_rect_buffer(), 0.0, 0.0, 1.0, 1.0);
+  manifold_rect_include_pt(rect, 2.0, 3.0);
+
+  EXPECT_TRUE(manifold_rect_contains_pt(rect, 2.0, 3.0));
+  ManifoldVec2 rect_max = manifold_rect_max(rect);
+  EXPECT_FLOAT_EQ(rect_max.x, 2.0);
+  EXPECT_FLOAT_EQ(rect_max.y, 3.0);
+
+  ManifoldBox* box =
+      manifold_box(alloc_box_buffer(), 0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+  manifold_box_include_pt(box, 2.0, 3.0, 4.0);
+
+  EXPECT_TRUE(manifold_box_contains_pt(box, 2.0, 3.0, 4.0));
+  ManifoldVec3 box_max = manifold_box_max(box);
+  EXPECT_FLOAT_EQ(box_max.x, 2.0);
+  EXPECT_FLOAT_EQ(box_max.y, 3.0);
+  EXPECT_FLOAT_EQ(box_max.z, 4.0);
+
+  manifold_destruct_rect(rect);
+  manifold_destruct_box(box);
+  free(rect);
+  free(box);
+}
+
+#ifndef MANIFOLD_NO_IOSTREAM
 TEST(CBIND, obj_round_trip) {
   ManifoldManifold* cube =
       manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
@@ -135,6 +165,7 @@ TEST(CBIND, obj_round_trip) {
   free(result);
   free(buffer);
 }
+#endif
 
 TEST(CBIND, level_set) {
   // can't convert lambda with captures to funptr
@@ -178,6 +209,7 @@ TEST(CBIND, level_set) {
   ManifoldMeshGL* sdf_mesh =
       manifold_get_meshgl(alloc_meshgl_buffer(), sdf_man);
 
+#ifndef MANIFOLD_NO_IOSTREAM
   if (options.exportModels) {
     manifold_write_obj(
         sdf_man,
@@ -188,6 +220,7 @@ TEST(CBIND, level_set) {
         },
         NULL);
   }
+#endif
 
   EXPECT_EQ(manifold_status(sdf_man), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_status(sdf_man_context), MANIFOLD_NO_ERROR);
@@ -438,4 +471,297 @@ TEST(CBIND, triangulation) {
   EXPECT_EQ(tri_verts[2], 2);
   manifold_delete_triangulation(triangulation);
   free(tri_verts);
+}
+
+TEST(CBIND, meshgl_merge_returns_mem) {
+  // Create a cube and get its meshgl (which already has merge vectors).
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL* original = manifold_get_meshgl(alloc_meshgl_buffer(), cube);
+
+  // This mesh is already manifold, so Merge() internally returns false.
+  // The bug: old code returned the input pointer instead of the output buffer.
+  void* mem = alloc_meshgl_buffer();
+  ManifoldMeshGL* merged = manifold_meshgl_merge(mem, original);
+
+  // The returned pointer must always come from mem, never from original.
+  EXPECT_EQ(reinterpret_cast<void*>(merged), mem);
+  EXPECT_NE(merged, original);
+
+  // The merged mesh should still be valid — construct a Manifold from it.
+  ManifoldManifold* result =
+      manifold_of_meshgl(alloc_manifold_buffer(), merged);
+  EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
+  EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
+
+  manifold_destruct_manifold(result);
+  manifold_destruct_meshgl(merged);
+  manifold_destruct_meshgl(original);
+  manifold_destruct_manifold(cube);
+  free(result);
+  free(mem);
+  free(original);
+  free(cube);
+}
+
+TEST(CBIND, meshgl64_merge_returns_mem) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL64* original =
+      manifold_get_meshgl64(alloc_meshgl64_buffer(), cube);
+
+  void* mem = alloc_meshgl64_buffer();
+  ManifoldMeshGL64* merged = manifold_meshgl64_merge(mem, original);
+
+  EXPECT_EQ(reinterpret_cast<void*>(merged), mem);
+  EXPECT_NE(merged, original);
+
+  ManifoldManifold* result =
+      manifold_of_meshgl64(alloc_manifold_buffer(), merged);
+  EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
+  EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
+
+  manifold_destruct_manifold(result);
+  manifold_destruct_meshgl64(merged);
+  manifold_destruct_meshgl64(original);
+  manifold_destruct_manifold(cube);
+  free(result);
+  free(mem);
+  free(original);
+  free(cube);
+}
+
+TEST(CBIND, ray_cast) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 1);
+
+  void* mem = malloc(manifold_ray_hit_vec_size());
+  ManifoldRayHitVec* hits =
+      manifold_ray_cast(mem, cube, 0.0, 0.0, -5.0, 0.0, 0.0, 5.0);
+  ASSERT_EQ(manifold_ray_hit_vec_length(hits), 2);
+  ManifoldRayHit h0 = manifold_ray_hit_vec_get(hits, 0);
+  ManifoldRayHit h1 = manifold_ray_hit_vec_get(hits, 1);
+  EXPECT_FLOAT_EQ(h0.position.z, -0.5);
+  EXPECT_FLOAT_EQ(h0.normal.z, -1.0);
+  EXPECT_FLOAT_EQ(h1.position.z, 0.5);
+  EXPECT_FLOAT_EQ(h1.normal.z, 1.0);
+  manifold_destruct_ray_hit_vec(hits);
+  free(mem);
+
+  void* mem2 = malloc(manifold_ray_hit_vec_size());
+  ManifoldRayHitVec* miss =
+      manifold_ray_cast(mem2, cube, 10.0, 10.0, -5.0, 10.0, 10.0, 5.0);
+  EXPECT_EQ(manifold_ray_hit_vec_length(miss), 0);
+  manifold_destruct_ray_hit_vec(miss);
+  free(mem2);
+
+  manifold_destruct_manifold(cube);
+  free(cube);
+}
+
+TEST(CBIND, tolerance) {
+  ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
+
+  // GetTolerance should return a non-negative value.
+  double tol = manifold_get_tolerance(sphere);
+  EXPECT_GE(tol, 0.0);
+
+  // SetTolerance should be reflected by GetTolerance.
+  ManifoldManifold* with_tol =
+      manifold_set_tolerance(alloc_manifold_buffer(), sphere, 0.5);
+  EXPECT_EQ(manifold_get_tolerance(with_tol), 0.5);
+
+  // Simplify should produce a valid manifold with fewer or equal triangles.
+  ManifoldManifold* simplified =
+      manifold_simplify(alloc_manifold_buffer(), sphere, 0.1);
+  EXPECT_EQ(manifold_status(simplified), MANIFOLD_NO_ERROR);
+  EXPECT_LE(manifold_num_tri(simplified), manifold_num_tri(sphere));
+
+  manifold_destruct_manifold(sphere);
+  manifold_destruct_manifold(with_tol);
+  manifold_destruct_manifold(simplified);
+  free(sphere);
+  free(with_tol);
+  free(simplified);
+}
+
+TEST(CBIND, num_prop_vert) {
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+
+  // A cube has 8 geometric vertices but more property vertices (due to
+  // duplicated normals at sharp edges).
+  EXPECT_EQ(manifold_num_vert(cube), 8);
+  EXPECT_GE(manifold_num_prop_vert(cube), manifold_num_vert(cube));
+
+  manifold_destruct_manifold(cube);
+  free(cube);
+}
+
+TEST(CBIND, meshgl_run_accessors) {
+  // Create two shapes with original IDs so the boolean result has 2 runs.
+  ManifoldManifold* cube_tmp =
+      manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* cube =
+      manifold_as_original(alloc_manifold_buffer(), cube_tmp);
+  ManifoldManifold* sphere_tmp =
+      manifold_sphere(alloc_manifold_buffer(), 0.6, 32);
+  ManifoldManifold* sphere_trans =
+      manifold_translate(alloc_manifold_buffer(), sphere_tmp, 0.5, 0.5, 0.5);
+  ManifoldManifold* sphere =
+      manifold_as_original(alloc_manifold_buffer(), sphere_trans);
+  ManifoldManifold* result =
+      manifold_union(alloc_manifold_buffer(), cube, sphere);
+  EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
+
+  // MeshGL
+  ManifoldMeshGL* mesh = manifold_get_meshgl(alloc_meshgl_buffer(), result);
+  EXPECT_GE(manifold_meshgl_tolerance(mesh), 0.0f);
+  EXPECT_EQ(manifold_meshgl_num_run(mesh), 2);
+  EXPECT_EQ(manifold_meshgl_run_flags_length(mesh),
+            manifold_meshgl_num_run(mesh));
+
+  size_t flags_len = manifold_meshgl_run_flags_length(mesh);
+  uint8_t* flags = (uint8_t*)manifold_meshgl_run_flags(malloc(flags_len), mesh);
+  // Just verify we got data without crashing.
+  EXPECT_NE(flags, (uint8_t*)NULL);
+  free(flags);
+
+  // MeshGL64
+  ManifoldMeshGL64* mesh64 =
+      manifold_get_meshgl64(alloc_meshgl64_buffer(), result);
+  EXPECT_GE(manifold_meshgl64_tolerance(mesh64), 0.0);
+  EXPECT_EQ(manifold_meshgl64_num_run(mesh64), 2);
+  EXPECT_EQ(manifold_meshgl64_run_flags_length(mesh64),
+            manifold_meshgl64_num_run(mesh64));
+
+  size_t flags64_len = manifold_meshgl64_run_flags_length(mesh64);
+  uint8_t* flags64 =
+      (uint8_t*)manifold_meshgl64_run_flags(malloc(flags64_len), mesh64);
+  EXPECT_NE(flags64, (uint8_t*)NULL);
+  free(flags64);
+
+  manifold_destruct_meshgl(mesh);
+  manifold_destruct_meshgl64(mesh64);
+  manifold_destruct_manifold(result);
+  manifold_destruct_manifold(sphere);
+  manifold_destruct_manifold(sphere_trans);
+  manifold_destruct_manifold(sphere_tmp);
+  manifold_destruct_manifold(cube);
+  manifold_destruct_manifold(cube_tmp);
+  free(mesh);
+  free(mesh64);
+  free(result);
+  free(sphere);
+  free(sphere_trans);
+  free(sphere_tmp);
+  free(cube);
+  free(cube_tmp);
+}
+
+TEST(CBIND, meshgl_update_normals) {
+  // Get a mesh with normals, then verify UpdateNormals doesn't corrupt it.
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+  ManifoldManifold* with_normals =
+      manifold_calculate_normals(alloc_manifold_buffer(), cube, 3, 60.0);
+  EXPECT_EQ(manifold_status(with_normals), MANIFOLD_NO_ERROR);
+
+  // MeshGL with normals at channel 3
+  ManifoldMeshGL* mesh =
+      manifold_get_meshgl_w_normals(alloc_meshgl_buffer(), with_normals, 3);
+  size_t tri_before = manifold_meshgl_num_tri(mesh);
+  manifold_meshgl_update_normals(mesh, 3);
+  EXPECT_EQ(manifold_meshgl_num_tri(mesh), tri_before);
+
+  // Verify the mesh is still valid by constructing a Manifold from it.
+  ManifoldManifold* rebuilt = manifold_of_meshgl(alloc_manifold_buffer(), mesh);
+  EXPECT_EQ(manifold_status(rebuilt), MANIFOLD_NO_ERROR);
+
+  // MeshGL64 same test
+  ManifoldMeshGL64* mesh64 =
+      manifold_get_meshgl64_w_normals(alloc_meshgl64_buffer(), with_normals, 3);
+  manifold_meshgl64_update_normals(mesh64, 3);
+  ManifoldManifold* rebuilt64 =
+      manifold_of_meshgl64(alloc_manifold_buffer(), mesh64);
+  EXPECT_EQ(manifold_status(rebuilt64), MANIFOLD_NO_ERROR);
+
+  manifold_destruct_manifold(rebuilt64);
+  manifold_destruct_meshgl64(mesh64);
+  manifold_destruct_manifold(rebuilt);
+  manifold_destruct_meshgl(mesh);
+  manifold_destruct_manifold(with_normals);
+  manifold_destruct_manifold(cube);
+  free(rebuilt64);
+  free(mesh64);
+  free(rebuilt);
+  free(mesh);
+  free(with_normals);
+  free(cube);
+}
+
+// Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The
+// rest of this file covers the malloc + manifold_destruct_* + free
+// pattern; this one fills in the alloc/delete variant (used by
+// language bindings that let the library manage memory).
+TEST(CBIND, alloc_delete_roundtrip) {
+  for (int i = 0; i < 10; ++i) {
+    ManifoldManifold* m = manifold_alloc_manifold();
+    manifold_cube(m, 1.0, 1.0, 1.0, 0);
+    EXPECT_EQ(manifold_status(m), MANIFOLD_NO_ERROR);
+    manifold_delete_manifold(m);
+  }
+  for (int i = 0; i < 10; ++i) {
+    ManifoldCrossSection* cs = manifold_alloc_cross_section();
+    manifold_cross_section_square(cs, 1.0, 1.0, 0);
+    manifold_delete_cross_section(cs);
+  }
+}
+
+TEST(CBIND, execution_context_happy_path) {
+  // malloc + destruct + free pattern (matches most other tests in this file).
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
+  // Fresh ctx with no scheduled work reads as trivially complete (1.0).
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 1.0);
+
+  // Uncancelled ctx on a valid evaluation returns NO_ERROR.
+  ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
+  ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
+  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_NO_ERROR);
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
+
+  manifold_destruct_manifold(u);
+  manifold_destruct_manifold(cube2);
+  manifold_destruct_manifold(cube1);
+  manifold_destruct_execution_context(ctx);
+  free(u);
+  free(cube2);
+  free(cube1);
+  free(ctx);
+}
+
+TEST(CBIND, execution_context_cancel) {
+  // alloc + delete pattern (matches the Rust binding's usage of the C API).
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(manifold_alloc_execution_context());
+  manifold_execution_context_cancel(ctx);
+  EXPECT_EQ(manifold_execution_context_cancelled(ctx), 1);
+
+  // Status on a Manifold that needs evaluation, with the cancelled ctx,
+  // short-circuits to MANIFOLD_CANCELLED.
+  ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
+  ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
+  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_CANCELLED);
+
+  manifold_destruct_manifold(u);
+  manifold_destruct_manifold(cube2);
+  manifold_destruct_manifold(cube1);
+  free(u);
+  free(cube2);
+  free(cube1);
+  manifold_delete_execution_context(ctx);
 }

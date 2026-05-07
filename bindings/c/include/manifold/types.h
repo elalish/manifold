@@ -22,6 +22,7 @@ typedef struct ManifoldManifold ManifoldManifold;
 typedef struct ManifoldManifoldVec ManifoldManifoldVec;
 typedef struct ManifoldCrossSection ManifoldCrossSection;
 typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
+typedef struct ManifoldRayHitVec ManifoldRayHitVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
@@ -29,6 +30,7 @@ typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldTriangulation ManifoldTriangulation;
+typedef struct ManifoldExecutionContext ManifoldExecutionContext;
 
 // structs
 
@@ -88,6 +90,13 @@ typedef struct ManifoldMeshGL64Options {
   double* halfedge_tangents;
 } ManifoldMeshGL64Options;
 
+typedef struct ManifoldRayHit {
+  uint64_t face_id;
+  double distance;
+  ManifoldVec3 position;
+  ManifoldVec3 normal;
+} ManifoldRayHit;
+
 // enums
 
 typedef enum ManifoldOpType {
@@ -110,6 +119,8 @@ typedef enum ManifoldError {
   MANIFOLD_FACE_ID_WRONG_LENGTH,
   MANIFOLD_INVALID_CONSTRUCTION,
   MANIFOLD_RESULT_TOO_LARGE,
+  MANIFOLD_INVALID_TANGENTS,
+  MANIFOLD_CANCELLED,
 } ManifoldError;
 
 typedef enum ManifoldFillRule {

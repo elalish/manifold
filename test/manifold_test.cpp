@@ -16,6 +16,7 @@
 
 #include <algorithm>
 
+#include "../src/vec.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -171,6 +172,165 @@ TEST(Manifold, InvalidInput7) {
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
+TEST(Manifold, ErrorPropagationDecompose) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  auto parts = errored.Decompose();
+  ASSERT_EQ(parts.size(), 1);
+  EXPECT_EQ(parts[0].Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationHull) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Hull().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationHullMulti) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  Manifold good = Manifold::Cube();
+  EXPECT_EQ(Manifold::Hull({good, errored}).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSetProperties) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SetProperties(1, nullptr).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationCalculateCurvature) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.CalculateCurvature(0, 1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationCalculateNormals) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.CalculateNormals(0).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSmoothByNormals) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SmoothByNormals(0).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSmoothOut) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SmoothOut().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationRefine) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Refine(2).Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.RefineToLength(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.RefineToTolerance(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSetTolerance) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.SetTolerance(0.1).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationAsOriginal) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.AsOriginal().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationWarp) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Warp([](vec3& v) {}).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.WarpBatch([](VecView<vec3>) {}).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationMinkowski) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  Manifold good = Manifold::Cube();
+  EXPECT_EQ(errored.MinkowskiSum(good).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(good.MinkowskiSum(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.MinkowskiDifference(good).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(good.MinkowskiDifference(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSplitByPlane) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  auto parts = errored.SplitByPlane(vec3(0, 0, 1), 0);
+  EXPECT_EQ(parts.first.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(parts.second.Status(), Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationMirror) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Mirror(vec3(1, 0, 0)).Status(),
+            Manifold::Error::NonFiniteVertex);
+  // Degenerate normal (zero vector) on errored input should still propagate.
+  EXPECT_EQ(errored.Mirror(vec3(0, 0, 0)).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Manifold, ErrorPropagationSimplify) {
+  MeshGL in = TetGL();
+  in.vertProperties[2 * 3 + 1] = NAN;
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.Simplify().Status(), Manifold::Error::NonFiniteVertex);
+}
+
+#ifndef MANIFOLD_NO_IOSTREAM
 TEST(Manifold, ObjRoundTrip) {
   Manifold m = Manifold::Cube();
   std::stringstream ss;
@@ -180,6 +340,7 @@ TEST(Manifold, ObjRoundTrip) {
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
 }
+#endif
 
 TEST(Manifold, OppositeFace) {
   MeshGL gl;
@@ -192,7 +353,6 @@ TEST(Manifold, OppositeFace) {
       1, 0, 1,  //
       0, 1, 1,  //
       1, 1, 1,  //
-      //
       2, 0, 0,  //
       2, 1, 0,  //
       2, 0, 1,  //
@@ -662,7 +822,7 @@ TEST(Manifold, MeshRelationRefinePrecision) {
   Manifold csaszar = Manifold::Smooth(inGL);
 
   csaszar = csaszar.RefineToTolerance(0.05);
-  ExpectMeshes(csaszar, {{2684, 5368, 3}});
+  ExpectMeshes(csaszar, {{2343, 4686, 3}});
   std::vector<uint32_t> runOriginalID = csaszar.GetMeshGL().runOriginalID;
   EXPECT_EQ(runOriginalID.size(), 1);
   EXPECT_EQ(runOriginalID[0], id);
@@ -1154,3 +1314,22 @@ TEST(Manifold, OpenscadCrash) {
   EXPECT_EQ(m2.IsEmpty(), false);
 }
 #endif
+
+// Deeply-nested CsgOpNode chain (e.g. repeated `+=` in a loop) must not
+// stack-overflow in the leaf-counting pre-pass. Cancel up front so we only
+// exercise NumLeaves, not the full boolean evaluation.
+//
+// 300k depth SIGSEGVs on the recursive NumLeaves (8MB default stack on
+// macOS/Linux); runs in ~1s / ~1.2GB peak RSS on the iterative version.
+TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
+  constexpr int kDepth = 300000;
+  Manifold m = Manifold::Cube(vec3(1), true);
+  for (int i = 0; i < kDepth; ++i) {
+    m = m + Manifold::Cube(vec3(1), true).Translate(vec3(i * 2.0, 0, 0));
+  }
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(m.Status(ctx), Manifold::Error::Cancelled);
+  // kDepth + 1 leaves in the chain → kDepth booleans to reduce.
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), kDepth);
+}

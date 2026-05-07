@@ -173,6 +173,10 @@ ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length);
 ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
                                                double tolerance);
+ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
+                                         double tolerance);
+ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
+                                    double tolerance);
 
 // Manifold Shapes / Constructors
 
@@ -210,12 +214,18 @@ ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 
 int manifold_is_empty(ManifoldManifold* m);
 ManifoldError manifold_status(ManifoldManifold* m);
+// Variant of manifold_status that observes progress and allows cancellation
+// via the ExecutionContext. See manifold_execution_context.
+ManifoldError manifold_status_with_context(ManifoldManifold* m,
+                                           ManifoldExecutionContext* ctx);
 size_t manifold_num_vert(ManifoldManifold* m);
 size_t manifold_num_edge(ManifoldManifold* m);
 size_t manifold_num_tri(ManifoldManifold* m);
 size_t manifold_num_prop(ManifoldManifold* m);
 ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m);
 double manifold_epsilon(ManifoldManifold* m);
+double manifold_get_tolerance(ManifoldManifold* m);
+size_t manifold_num_prop_vert(ManifoldManifold* m);
 int manifold_genus(ManifoldManifold* m);
 double manifold_surface_area(ManifoldManifold* m);
 double manifold_volume(ManifoldManifold* m);
@@ -234,6 +244,23 @@ double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle);
+
+// Ray Casting
+ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
+                                     double origin_x, double origin_y,
+                                     double origin_z, double end_x,
+                                     double end_y, double end_z);
+size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
+ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
+
+// ExecutionContext: observe progress and request cancellation of a
+// long-running Manifold evaluation. Pass to manifold_status_with_context.
+// Safe to read/write from any thread. See the ExecutionContext class in
+// common.h for full semantics (sticky cancel, per-boolean granularity).
+ManifoldExecutionContext* manifold_execution_context(void* mem);
+void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
+int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx);
+double manifold_execution_context_progress(ManifoldExecutionContext* ctx);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void* mem);
@@ -313,8 +340,6 @@ ManifoldCrossSection* manifold_cross_section_transform(void* mem,
                                                        double x1, double y1,
                                                        double x2, double y2,
                                                        double x3, double y3);
-ManifoldCrossSection* manifold_cross_section_warp(
-    void* mem, ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double));
 ManifoldCrossSection* manifold_cross_section_warp_context(
     void* mem, ManifoldCrossSection* cs,
     ManifoldVec2 (*fun)(double, double, void*), void* ctx);
@@ -413,6 +438,11 @@ uint32_t* manifold_meshgl_run_original_id(void* mem, ManifoldMeshGL* m);
 float* manifold_meshgl_run_transform(void* mem, ManifoldMeshGL* m);
 uint32_t* manifold_meshgl_face_id(void* mem, ManifoldMeshGL* m);
 float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m);
+float manifold_meshgl_tolerance(ManifoldMeshGL* m);
+size_t manifold_meshgl_run_flags_length(ManifoldMeshGL* m);
+uint8_t* manifold_meshgl_run_flags(void* mem, ManifoldMeshGL* m);
+size_t manifold_meshgl_num_run(ManifoldMeshGL* m);
+void manifold_meshgl_update_normals(ManifoldMeshGL* m, int normal_idx);
 
 size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m);
 size_t manifold_meshgl64_num_vert(ManifoldMeshGL64* m);
@@ -434,6 +464,11 @@ uint32_t* manifold_meshgl64_run_original_id(void* mem, ManifoldMeshGL64* m);
 double* manifold_meshgl64_run_transform(void* mem, ManifoldMeshGL64* m);
 uint64_t* manifold_meshgl64_face_id(void* mem, ManifoldMeshGL64* m);
 double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m);
+double manifold_meshgl64_tolerance(ManifoldMeshGL64* m);
+size_t manifold_meshgl64_run_flags_length(ManifoldMeshGL64* m);
+uint8_t* manifold_meshgl64_run_flags(void* mem, ManifoldMeshGL64* m);
+size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m);
+void manifold_meshgl64_update_normals(ManifoldMeshGL64* m, int normal_idx);
 
 // Triangulation
 
@@ -448,6 +483,7 @@ size_t manifold_manifold_size();
 size_t manifold_manifold_vec_size();
 size_t manifold_cross_section_size();
 size_t manifold_cross_section_vec_size();
+size_t manifold_ray_hit_vec_size();
 size_t manifold_simple_polygon_size();
 size_t manifold_polygons_size();
 size_t manifold_manifold_pair_size();
@@ -456,6 +492,7 @@ size_t manifold_meshgl64_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_triangulation_size();
+size_t manifold_execution_context_size();
 
 // allocation
 
@@ -463,6 +500,7 @@ ManifoldManifold* manifold_alloc_manifold();
 ManifoldManifoldVec* manifold_alloc_manifold_vec();
 ManifoldCrossSection* manifold_alloc_cross_section();
 ManifoldCrossSectionVec* manifold_alloc_cross_section_vec();
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec();
 ManifoldSimplePolygon* manifold_alloc_simple_polygon();
 ManifoldPolygons* manifold_alloc_polygons();
 ManifoldMeshGL* manifold_alloc_meshgl();
@@ -470,6 +508,7 @@ ManifoldMeshGL64* manifold_alloc_meshgl64();
 ManifoldBox* manifold_alloc_box();
 ManifoldRect* manifold_alloc_rect();
 ManifoldTriangulation* manifold_alloc_triangulation();
+ManifoldExecutionContext* manifold_alloc_execution_context();
 
 // destruction
 
@@ -477,6 +516,7 @@ void manifold_destruct_manifold(ManifoldManifold* m);
 void manifold_destruct_manifold_vec(ManifoldManifoldVec* ms);
 void manifold_destruct_cross_section(ManifoldCrossSection* m);
 void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_destruct_ray_hit_vec(ManifoldRayHitVec* v);
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p);
 void manifold_destruct_polygons(ManifoldPolygons* p);
 void manifold_destruct_meshgl(ManifoldMeshGL* m);
@@ -484,6 +524,7 @@ void manifold_destruct_meshgl64(ManifoldMeshGL64* m);
 void manifold_destruct_box(ManifoldBox* b);
 void manifold_destruct_rect(ManifoldRect* b);
 void manifold_destruct_triangulation(ManifoldTriangulation* M);
+void manifold_destruct_execution_context(ManifoldExecutionContext* ctx);
 
 // pointer free + destruction
 
@@ -491,6 +532,7 @@ void manifold_delete_manifold(ManifoldManifold* m);
 void manifold_delete_manifold_vec(ManifoldManifoldVec* ms);
 void manifold_delete_cross_section(ManifoldCrossSection* cs);
 void manifold_delete_cross_section_vec(ManifoldCrossSectionVec* csv);
+void manifold_delete_ray_hit_vec(ManifoldRayHitVec* v);
 void manifold_delete_simple_polygon(ManifoldSimplePolygon* p);
 void manifold_delete_polygons(ManifoldPolygons* p);
 void manifold_delete_meshgl(ManifoldMeshGL* m);
@@ -498,7 +540,9 @@ void manifold_delete_meshgl64(ManifoldMeshGL64* m);
 void manifold_delete_box(ManifoldBox* b);
 void manifold_delete_rect(ManifoldRect* b);
 void manifold_delete_triangulation(ManifoldTriangulation* m);
+void manifold_delete_execution_context(ManifoldExecutionContext* ctx);
 
+#ifndef MANIFOLD_NO_IOSTREAM
 // MeshIO / Export
 
 // Import a manifold from a Wavefront obj file.
@@ -527,6 +571,7 @@ void manifold_write_obj(ManifoldManifold* manifold,
 //    passing additional data into the callback.
 void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
                                  void (*callback)(char*, void*), void* args);
+#endif
 #ifdef __cplusplus
 }
 #endif

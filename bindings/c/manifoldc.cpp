@@ -14,7 +14,9 @@
 
 #include "manifold/manifoldc.h"
 
+#ifndef MANIFOLD_NO_IOSTREAM
 #include <sstream>
+#endif
 #include <vector>
 
 #include "conv.h"
@@ -40,6 +42,18 @@ ManifoldManifold* level_set(
   };
   return to_c(new (mem) Manifold(Manifold::LevelSet(
       fun, *from_c(bounds), edge_length, level, tolerance, !seq)));
+}
+
+// Raw uninitialized storage for a T — callers must placement-new into it
+// before any use or before passing to manifold_destruct_* / manifold_delete_*.
+// Pairs with `delete T*`, which uses the plain `::operator delete` for
+// types with default alignment.
+template <typename T>
+T* alloc_raw() {
+  static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                "over-aligned types need the aligned operator new/delete "
+                "pair; extend this helper if a binding type ever needs it");
+  return static_cast<T*>(::operator new(sizeof(T)));
 }
 }  // namespace
 
@@ -321,6 +335,18 @@ ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(refined));
 }
 
+ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
+                                         double tolerance) {
+  auto result = from_c(m)->SetTolerance(tolerance);
+  return to_c(new (mem) Manifold(result));
+}
+
+ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
+                                    double tolerance) {
+  auto simplified = from_c(m)->Simplify(tolerance);
+  return to_c(new (mem) Manifold(simplified));
+}
+
 ManifoldManifold* manifold_empty(void* mem) {
   return to_c(new (mem) Manifold());
 }
@@ -548,11 +574,8 @@ ManifoldMeshGL* manifold_meshgl_copy(void* mem, ManifoldMeshGL* m) {
 
 ManifoldMeshGL* manifold_meshgl_merge(void* mem, ManifoldMeshGL* m) {
   auto duplicate = new (mem) MeshGL(*from_c(m));
-  if (duplicate->Merge()) {
-    return to_c(duplicate);
-  }
-  duplicate->~MeshGL();
-  return m;
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m) {
@@ -573,11 +596,8 @@ ManifoldMeshGL64* manifold_meshgl64_copy(void* mem, ManifoldMeshGL64* m) {
 
 ManifoldMeshGL64* manifold_meshgl64_merge(void* mem, ManifoldMeshGL64* m) {
   auto duplicate = new (mem) MeshGL64(*from_c(m));
-  if (duplicate->Merge()) {
-    return to_c(duplicate);
-  }
-  duplicate->~MeshGL64();
-  return m;
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
 size_t manifold_meshgl_num_prop(ManifoldMeshGL* m) {
@@ -658,6 +678,26 @@ float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m) {
   return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
+float manifold_meshgl_tolerance(ManifoldMeshGL* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl_run_flags_length(ManifoldMeshGL* m) {
+  return from_c(m)->runFlags.size();
+}
+
+uint8_t* manifold_meshgl_run_flags(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runFlags);
+}
+
+size_t manifold_meshgl_num_run(ManifoldMeshGL* m) {
+  return from_c(m)->NumRun();
+}
+
+void manifold_meshgl_update_normals(ManifoldMeshGL* m, int normal_idx) {
+  from_c(m)->UpdateNormals(normal_idx);
+}
+
 size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m) {
   return from_c(m)->numProp;
 }
@@ -719,6 +759,26 @@ double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m) {
   return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
+double manifold_meshgl64_tolerance(ManifoldMeshGL64* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl64_run_flags_length(ManifoldMeshGL64* m) {
+  return from_c(m)->runFlags.size();
+}
+
+uint8_t* manifold_meshgl64_run_flags(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runFlags);
+}
+
+size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m) {
+  return from_c(m)->NumRun();
+}
+
+void manifold_meshgl64_update_normals(ManifoldMeshGL64* m, int normal_idx) {
+  from_c(m)->UpdateNormals(normal_idx);
+}
+
 ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {
   auto orig = from_c(m)->AsOriginal();
   return to_c(new (mem) Manifold(orig));
@@ -732,6 +792,12 @@ int manifold_is_empty(ManifoldManifold* m) { return from_c(m)->IsEmpty(); }
 
 ManifoldError manifold_status(ManifoldManifold* m) {
   auto error = from_c(m)->Status();
+  return to_c(error);
+}
+
+ManifoldError manifold_status_with_context(ManifoldManifold* m,
+                                           ManifoldExecutionContext* ctx) {
+  auto error = from_c(m)->Status(*from_c(ctx));
   return to_c(error);
 }
 
@@ -752,6 +818,14 @@ ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m) {
 }
 
 double manifold_epsilon(ManifoldManifold* m) { return from_c(m)->GetEpsilon(); }
+
+double manifold_get_tolerance(ManifoldManifold* m) {
+  return from_c(m)->GetTolerance();
+}
+
+size_t manifold_num_prop_vert(ManifoldManifold* m) {
+  return from_c(m)->NumPropVert();
+}
 
 uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
 
@@ -781,6 +855,40 @@ ManifoldManifold* manifold_calculate_curvature(void* mem, ManifoldManifold* m,
 double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
                         double searchLength) {
   return from_c(m)->MinGap(*from_c(other), searchLength);
+}
+
+ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
+                                     double origin_x, double origin_y,
+                                     double origin_z, double end_x,
+                                     double end_y, double end_z) {
+  auto hits = from_c(m)->RayCast(vec3(origin_x, origin_y, origin_z),
+                                 vec3(end_x, end_y, end_z));
+  return to_c(new (mem) RayHitVec(std::move(hits)));
+}
+
+size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v) {
+  return from_c(v)->size();
+}
+
+ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
+  const auto& hit = (*from_c(v))[idx];
+  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
+}
+
+ManifoldExecutionContext* manifold_execution_context(void* mem) {
+  return to_c(new (mem) ExecutionContext());
+}
+
+void manifold_execution_context_cancel(ManifoldExecutionContext* ctx) {
+  from_c(ctx)->Cancel();
+}
+
+int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx) {
+  return from_c(ctx)->Cancelled() ? 1 : 0;
+}
+
+double manifold_execution_context_progress(ManifoldExecutionContext* ctx) {
+  return from_c(ctx)->Progress();
 }
 
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
@@ -829,6 +937,7 @@ size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_cross_section_vec_size() {
   return sizeof(std::vector<CrossSection>);
 }
+size_t manifold_ray_hit_vec_size() { return sizeof(RayHitVec); }
 size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
@@ -839,32 +948,48 @@ size_t manifold_meshgl64_size() { return sizeof(MeshGL64); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
 size_t manifold_triangulation_size() { return sizeof(std::vector<ivec3>); }
+size_t manifold_execution_context_size() { return sizeof(ExecutionContext); }
 
 // allocation
+//
+// Returns raw uninitialized storage. Callers must placement-new into it
+// via one of the constructor functions (e.g. manifold_cube) before any
+// use or before passing to manifold_destruct_* / manifold_delete_*.
+// Using `new T` here would silently leak the default-constructed object
+// every time a constructor function placement-new'd over it (see
+// Manifold's pNode_ and CrossSection's paths_ shared_ptrs).
 ManifoldManifold* manifold_alloc_manifold() {
-  return to_c(new manifold::Manifold);
+  return to_c(alloc_raw<manifold::Manifold>());
 }
 ManifoldManifoldVec* manifold_alloc_manifold_vec() {
-  return to_c(new std::vector<manifold::Manifold>);
+  return to_c(alloc_raw<std::vector<manifold::Manifold>>());
 }
 ManifoldCrossSection* manifold_alloc_cross_section() {
-  return to_c(new CrossSection);
+  return to_c(alloc_raw<CrossSection>());
 }
 ManifoldCrossSectionVec* manifold_alloc_cross_section_vec() {
-  return to_c(new std::vector<CrossSection>);
+  return to_c(alloc_raw<std::vector<CrossSection>>());
+}
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec() {
+  return to_c(alloc_raw<RayHitVec>());
 }
 ManifoldSimplePolygon* manifold_alloc_simple_polygon() {
-  return to_c(new SimplePolygon);
+  return to_c(alloc_raw<SimplePolygon>());
 }
 ManifoldPolygons* manifold_alloc_polygons() {
-  return to_c(new std::vector<SimplePolygon>);
+  return to_c(alloc_raw<std::vector<SimplePolygon>>());
 }
-ManifoldMeshGL* manifold_alloc_meshgl() { return to_c(new MeshGL); }
-ManifoldMeshGL64* manifold_alloc_meshgl64() { return to_c(new MeshGL64); }
-ManifoldBox* manifold_alloc_box() { return to_c(new Box); }
-ManifoldRect* manifold_alloc_rect() { return to_c(new Rect); }
+ManifoldMeshGL* manifold_alloc_meshgl() { return to_c(alloc_raw<MeshGL>()); }
+ManifoldMeshGL64* manifold_alloc_meshgl64() {
+  return to_c(alloc_raw<MeshGL64>());
+}
+ManifoldBox* manifold_alloc_box() { return to_c(alloc_raw<Box>()); }
+ManifoldRect* manifold_alloc_rect() { return to_c(alloc_raw<Rect>()); }
 ManifoldTriangulation* manifold_alloc_triangulation() {
-  return to_c(new std::vector<ivec3>);
+  return to_c(alloc_raw<std::vector<ivec3>>());
+}
+ManifoldExecutionContext* manifold_alloc_execution_context() {
+  return to_c(alloc_raw<ExecutionContext>());
 }
 
 // pointer free + destruction
@@ -874,6 +999,7 @@ void manifold_delete_cross_section(ManifoldCrossSection* c) {
 void manifold_delete_cross_section_vec(ManifoldCrossSectionVec* csv) {
   delete from_c(csv);
 }
+void manifold_delete_ray_hit_vec(ManifoldRayHitVec* v) { delete from_c(v); }
 void manifold_delete_simple_polygon(ManifoldSimplePolygon* p) {
   delete from_c(p);
 }
@@ -889,6 +1015,9 @@ void manifold_delete_rect(ManifoldRect* r) { delete from_c(r); }
 void manifold_delete_triangulation(ManifoldTriangulation* m) {
   delete from_c(m);
 }
+void manifold_delete_execution_context(ManifoldExecutionContext* ctx) {
+  delete from_c(ctx);
+}
 
 // destruction
 void manifold_destruct_cross_section(ManifoldCrossSection* cs) {
@@ -896,6 +1025,9 @@ void manifold_destruct_cross_section(ManifoldCrossSection* cs) {
 }
 void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv) {
   from_c(csv)->~CrossSectionVec();
+}
+void manifold_destruct_ray_hit_vec(ManifoldRayHitVec* v) {
+  from_c(v)->~RayHitVec();
 }
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p) {
   from_c(p)->~SimplePolygon();
@@ -912,9 +1044,13 @@ void manifold_destruct_rect(ManifoldRect* r) { from_c(r)->~Rect(); }
 void manifold_destruct_triangulation(ManifoldTriangulation* m) {
   from_c(m)->~vector<ivec3>();
 }
+void manifold_destruct_execution_context(ManifoldExecutionContext* ctx) {
+  from_c(ctx)->~ExecutionContext();
+}
 
 // IO
 
+#ifndef MANIFOLD_NO_IOSTREAM
 ManifoldManifold* manifold_read_obj(void* mem, char* obj_file) {
   std::istringstream iss(obj_file);
   Manifold m = Manifold::ReadOBJ(iss);
@@ -942,6 +1078,7 @@ void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
   WriteOBJ(ss, *m);
   callback(ss.str().data(), args);
 }
+#endif
 
 #ifdef __cplusplus
 }

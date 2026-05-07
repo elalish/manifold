@@ -12,25 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { strict as assert } from 'assert';
-import { glob } from 'glob';
+import {strict as assert} from 'assert';
+import {glob} from 'glob';
 import * as fs from 'node:fs/promises';
-import { resolve } from 'path';
-import { afterEach, expect, suite, test } from 'vitest';
+import {resolve} from 'path';
+import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
-import { Mesh } from '../manifold';
+import {Mesh} from '../manifold';
 
-import { gltfDocToManifold, importModel } from './import-model.ts';
-import { cleanup, evaluate, exportBlobURL } from './worker.ts';
+import {gltfDocToManifold, importModel} from './import-model.ts';
+import {cleanup, evaluate, exportBlobURL} from './worker.ts';
 
 async function resolveExample(name: string) {
   const [filepath] = await glob(
-    name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}',
-    {
-      cwd: resolve(import.meta.dirname, '../test/examples/'),
-      withFileTypes: true,
-    },
+      name.toLowerCase().replaceAll(' ', '-') + '.{ts,mjs,js}',
+      {
+        cwd: resolve(import.meta.dirname, '../test/examples/'),
+        withFileTypes: true,
+      },
   );
   if (!filepath) {
     throw new Error(`Could not find example '${name}'.`);
@@ -41,31 +41,29 @@ async function resolveExample(name: string) {
 async function runExample(name: string, firstMeshOnly: boolean = true) {
   const filename = await resolveExample(name);
   const code = await fs.readFile(filename, 'utf-8');
-  const doc = await evaluate(code, { jsCDN: 'jsDelivr', filename });
+  const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
   const glbURL = await exportBlobURL(doc, 'glb');
   cleanup();
   assert.ok(glbURL);
 
   // These tests are agains the first glTF node containing meshes in a given
   // model.
-  const node = await importModel(glbURL, { mimetype: 'model/gltf-binary' });
+  const node = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
   const document = node.document!;
   URL.revokeObjectURL(glbURL);
 
-  const firstMesh = document
-    .getRoot()
-    .listNodes()
-    .find((node) => !!node.getMesh());
-  const manifold = await (firstMeshOnly
-    ? gltfDocToManifold(document, firstMesh)
-    : gltfDocToManifold(document));
+  const firstMesh =
+      document.getRoot().listNodes().find((node) => !!node.getMesh());
+  const manifold = await (
+      firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
+                      gltfDocToManifold(document));
 
   if (manifold) {
     const volume = manifold.volume();
     const surfaceArea = manifold.surfaceArea();
     const genus = manifold.genus();
     cleanup();
-    return { volume, surfaceArea, genus };
+    return {volume, surfaceArea, genus};
   }
   assert.ok(false);
 }
@@ -116,7 +114,7 @@ suite('Examples', () => {
     const result = await runExample('Scallop');
     expect(result?.genus).to.equal(0, 'Genus');
     expect(result?.volume).to.be.closeTo(39900, 100, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(7930, 10, 'Surface Area');
+    expect(result?.surfaceArea).to.be.closeTo(7940, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {
@@ -168,6 +166,15 @@ suite('Examples', () => {
     expect(result?.genus).to.be.lessThan(-25, 'Genus');
     expect(result?.volume).to.be.greaterThan(5000, 'Volume');
     expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
+  });
+
+  test('Import Model', async () => {
+    const filename = await resolveExample('Import Model');
+    const code = await fs.readFile(filename, 'utf-8');
+    const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
+    const glbURL = await exportBlobURL(doc, 'glb');
+    cleanup();
+    expect(glbURL).toBeTruthy();
   });
 
   test('Import Manifold', async () => {

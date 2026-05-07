@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "vite-bundle-analyzer": "^1.3.7"
+  }
+}

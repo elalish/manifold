@@ -850,7 +850,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
 
   auto aMinusB = aManifold - bManifold;
 
-  RelatedGL(aMinusB, {a, b}, false, false);
+  RelatedGL(aMinusB, {a, b}, true, true);
 }
 
 MeshGL mgl_0() {
@@ -1468,6 +1468,7 @@ TEST(BooleanComplex, Ring) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
+#ifndef MANIFOLD_NO_FILESYSTEM
 TEST(BooleanComplex, SelfIntersect) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
@@ -1518,6 +1519,7 @@ TEST(BooleanComplex, HullMask) {
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMeshGL();
 }
+#endif
 
 TEST(BooleanComplex, LazyCollider) {
   Manifold ele1 = Manifold::Cylinder(50, 50);

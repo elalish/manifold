@@ -22,7 +22,7 @@ Our primary goal is reliability: guaranteed manifold output without caveats or e
 
 [ [ManifoldCAD](https://manifoldcad.org) | [ManifoldCAD User Guide](https://manifoldcad.org/docs/jsuser/) ]
 
-If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS and save a GLB or 3MF file. It contains several examples showing how to use our API to make interesting shapes. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, this library is dramatically faster and the code is more flexible.
+If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS and save a GLB or 3MF file. It contains several examples showing how to use our API to make interesting shapes. You may notice that some of these examples bear a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, this library is dramatically faster and the code is more flexible.
 
 manifoldCAD = manifold + [TypeScript](https://www.typescriptlang.org/) + [glTF](https://www.khronos.org/gltf/)
 

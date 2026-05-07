@@ -24,7 +24,8 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 | [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
-| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | |
+| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
+| [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| [PyVista](https://github.com/pyvista/pyvista-manifold) |
 
 ### Bindings & Packages
 
@@ -36,11 +37,12 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
-| Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
+| Java | Maven | [manifold3d](https://github.com/CommonWealthRobotics/manifold3d-java/blob/development/bindings/java/README.md) | external |
 | Clojure | N/A | [clj-manifold3d](https://github.com/SovereignShop/clj-manifold3d) | external |
 | C# | NuGet | [ManifoldNET](https://www.nuget.org/packages/ManifoldNET) | external |
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
 | OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
+| Rust | crates.io | [manifold-csg](https://github.com/zmerlynn/manifold-csg) | external |
 | Swift | SPM | [Manifold-Swift](https://github.com/tomasf/manifold-swift) | external |
 
 ## Frontend Sandboxes
@@ -70,7 +72,7 @@ Also included are a novel and powerful suite of refining functions for smooth me
 
 To aid in speed, this library makes extensive use of parallelization through TBB, if enabled. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
 
-Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
+Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bear a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
 
 ### Dependencies
 
@@ -122,6 +124,14 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
   See profiling section below.
 - `ASSIMP_ENABLE=[<OFF>, ON]`: Enable integration with assimp, which is needed for some of the utilities in `extras`.
 - `MANIFOLD_STRICT=[<OFF>, ON]`: Treat compile warnings as fatal build errors.
+- `MANIFOLD_NO_IOSTREAM=[<OFF>, ON]`: Strip iostream- and filesystem-using
+  bits from the public API and tests; useful for freestanding/embedded
+  builds (e.g., `wasm32-unknown-unknown`). Defines both
+  `MANIFOLD_NO_IOSTREAM` and `MANIFOLD_NO_FILESYSTEM` as PUBLIC compile
+  definitions. The test suite still builds + runs — iostream-using
+  TESTs in `manifold_test`/`polygon_test`/`manifoldc_test` are gated
+  out under the macro. Incompatible with `MANIFOLD_DEBUG` /
+  `MANIFOLD_TIMING` (which use `std::cout` for diagnostic output).
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
