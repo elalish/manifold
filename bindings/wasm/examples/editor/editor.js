@@ -819,19 +819,131 @@ async function initializeAutoTypings(showTypeIndicator) {
   updateTypeIndicator();
 }
 
-// Animation ------------------------------------------------------------
+// Viewer additions -----------------------------------------------------
 const mv = document.querySelector('model-viewer');
-const animationContainer = document.querySelector('#animation');
-const playButton = document.querySelector('#play');
-const scrubber = document.querySelector('#scrubber');
-const edgeToggle = document.getElementById('edgesToggle');
 const sceneSym =
     Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
 
-let paused = false;
+const animationContainer = document.querySelector('#animation');
+const edgeToggle = document.getElementById('edgesToggle');
 let showEdges = false;
+
+mv.addEventListener('load', () => {
+  const hasAnimation = mv.availableAnimations.length > 0;
+  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
+  if (hasAnimation) {
+    play();
+  }
+  updateOrientationGrid();
+  syncEdgeToggleButton();
+  if (showEdges) {
+    setEdgesVisible(true);
+  }
+});
+
+// Animation ------------------------------------------------------------
+const playButton = document.querySelector('#play');
+const scrubber = document.querySelector('#scrubber');
+let paused = false;
+
+function play() {
+  mv.play();
+  playButton.classList.remove('play');
+  playButton.classList.add('pause');
+  paused = false;
+  scrubber.classList.add('hide');
+}
+
+function pause() {
+  mv.pause();
+  playButton.classList.remove('pause');
+  playButton.classList.add('play');
+  paused = true;
+  scrubber.max = mv.duration;
+  scrubber.value = mv.currentTime;
+  scrubber.classList.remove('hide');
+}
+
+playButton.onclick = function() {
+  if (paused) {
+    play();
+  } else {
+    pause();
+  }
+};
+
+scrubber.oninput = function() {
+  mv.currentTime = scrubber.value;
+};
+
+// Wireframe ------------------------------------------------------------
 const EDGE_KEY = 'edgeLines';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+
+edgeToggle.addEventListener('click', () => {
+  showEdges = !showEdges;
+  syncEdgeToggleButton();
+  setEdgesVisible(showEdges);
+});
+
+function syncEdgeToggleButton() {
+  if (showEdges) {
+    edgeToggle.classList.add('green');
+  } else {
+    edgeToggle.classList.remove('green');
+  }
+}
+
+function setEdgesVisible(visible) {
+  const scene = sceneSym ? mv[sceneSym] : null;
+  if (!scene) return;
+
+  const root = scene.model ?? scene;
+  root.traverse((obj) => {
+    if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
+    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
+
+    if (obj.isMesh) {
+      // Fix wireframe z-fighting.
+      obj.material.polygonOffset = visible;
+      obj.material.polygonOffsetFactor = 4;
+      obj.material.polygonOffsetUnits = 4;
+
+      if (visible && !obj.userData[EDGE_KEY]) {
+        const material = new MeshBasicMaterial({
+          color: 0x111111,
+          wireframe: true,
+          toneMapped: false,
+        });
+
+        let edgeLines;
+        if (obj.isSkinnedMesh) {
+          edgeLines = new SkinnedMesh(obj.geometry, material);
+          edgeLines.bind(obj.skeleton, obj.bindMatrix);
+          edgeLines.bindMatrix.copy(obj.bindMatrix);
+          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
+        } else {
+          edgeLines = new Mesh(obj.geometry, material);
+          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
+          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
+        }
+
+        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+        obj.add(edgeLines);
+        obj.userData[EDGE_KEY] = edgeLines;
+      }
+
+      const edgeLines = obj.userData[EDGE_KEY];
+      if (edgeLines) {
+        edgeLines.visible = visible;
+      }
+    }
+  });
+
+  scene.queueRender?.();
+}
+
+// Orientation Grid --------------------------------------------------
 const ORIENTATION_GRID_FLAG = '__isOrientationGrid';
 const ORIENTATION_GRID_KEY = '__orientationGrid';
 
@@ -1066,112 +1178,6 @@ function updateOrientationGrid() {
 
   scene.queueRender?.();
 }
-
-function syncEdgeToggleButton() {
-  if (showEdges) {
-    edgeToggle.classList.add('green');
-  } else {
-    edgeToggle.classList.remove('green');
-  }
-}
-
-mv.addEventListener('load', () => {
-  const hasAnimation = mv.availableAnimations.length > 0;
-  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
-  if (hasAnimation) {
-    play();
-  }
-  updateOrientationGrid();
-  syncEdgeToggleButton();
-  if (showEdges) {
-    setEdgesVisible(true);
-  }
-});
-
-edgeToggle.addEventListener('click', () => {
-  showEdges = !showEdges;
-  syncEdgeToggleButton();
-  setEdgesVisible(showEdges);
-});
-
-function play() {
-  mv.play();
-  playButton.classList.remove('play');
-  playButton.classList.add('pause');
-  paused = false;
-  scrubber.classList.add('hide');
-}
-
-function setEdgesVisible(visible) {
-  const scene = sceneSym ? mv[sceneSym] : null;
-  if (!scene) return;
-
-  const root = scene.model ?? scene;
-  root.traverse((obj) => {
-    if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
-    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
-
-    if (obj.isMesh) {
-      // Fix wireframe z-fighting.
-      obj.material.polygonOffset = visible;
-      obj.material.polygonOffsetFactor = 4;
-      obj.material.polygonOffsetUnits = 4;
-
-      if (visible && !obj.userData[EDGE_KEY]) {
-        const material = new MeshBasicMaterial({
-          color: 0x111111,
-          wireframe: true,
-          toneMapped: false,
-        });
-
-        let edgeLines;
-        if (obj.isSkinnedMesh) {
-          edgeLines = new SkinnedMesh(obj.geometry, material);
-          edgeLines.bind(obj.skeleton, obj.bindMatrix);
-          edgeLines.bindMatrix.copy(obj.bindMatrix);
-          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
-        } else {
-          edgeLines = new Mesh(obj.geometry, material);
-          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
-          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
-        }
-
-        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
-        obj.add(edgeLines);
-        obj.userData[EDGE_KEY] = edgeLines;
-      }
-
-      const edgeLines = obj.userData[EDGE_KEY];
-      if (edgeLines) {
-        edgeLines.visible = visible;
-      }
-    }
-  });
-
-  scene.queueRender?.();
-}
-
-function pause() {
-  mv.pause();
-  playButton.classList.remove('pause');
-  playButton.classList.add('play');
-  paused = true;
-  scrubber.max = mv.duration;
-  scrubber.value = mv.currentTime;
-  scrubber.classList.remove('hide');
-}
-
-playButton.onclick = function() {
-  if (paused) {
-    play();
-  } else {
-    pause();
-  }
-};
-
-scrubber.oninput = function() {
-  mv.currentTime = scrubber.value;
-};
 
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
