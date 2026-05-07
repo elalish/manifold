@@ -37,12 +37,24 @@ struct CurvatureAngles {
   void operator()(size_t tri) {
     vec3 edge[3];
     vec3 edgeLength(0.0);
+
+    // Checking for Degenerate Edges
     for (int i : {0, 1, 2}) {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
       edge[i] = vertPos[endVert] - vertPos[startVert];
       edgeLength[i] = la::length(edge[i]);
+
+      if (!std::isfinite(edgeLength[i]) || edgeLength[i] == 0.0) {
+        return;
+      }
+    }
+
+    for (int i : {0, 1, 2}) {
       edge[i] /= edgeLength[i];
+
+      const int startVert = halfedge[3 * tri + i].startVert;
+      const int endVert = halfedge[3 * tri + i].endVert;
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
@@ -309,9 +321,13 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   for_each_n(policy, countAt(0), NumVert(),
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {
-               const double factor = degree[vert] / (6 * vertArea[vert]);
-               vertMeanCurvature[vert] *= factor;
-               vertGaussianCurvature[vert] *= factor;
+               // Degenerate vertices can have zero area, which can cause the
+               // curvature to become NaN
+               if (vertArea[vert] > 0.0) {
+                 const double factor = degree[vert] / (6.0 * vertArea[vert]);
+                 vertMeanCurvature[vert] *= factor;
+                 vertGaussianCurvature[vert] *= factor;
+               }
              });
 
   const int oldNumProp = NumProp();
