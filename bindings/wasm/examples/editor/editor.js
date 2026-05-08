@@ -394,6 +394,8 @@ function syncCurrentEditVisibility(scriptName) {
       exampleFunctions.get(scriptName) == null ? 'inline-block' : 'none';
 }
 
+let resetCamera = true;
+
 function switchTo(scriptName) {
   if (editor) {
     switching = true;
@@ -406,6 +408,7 @@ function switchTo(scriptName) {
     window.location.hash = '#' + scriptName;
     const model = getModelForScript(scriptName);
     editor.setModel(model);
+    resetCamera = true;
 
     // Either editor.setValue() or model.setValue() will trigger
     // onDidChangeModelContent.  This will cause some UI updates, but will also
@@ -821,12 +824,33 @@ async function initializeAutoTypings(showTypeIndicator) {
 
 // Viewer additions -----------------------------------------------------
 const mv = document.querySelector('model-viewer');
-const sceneSym =
-    Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
+const scene =
+    mv[Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene')];
 
 const animationContainer = document.querySelector('#animation');
-const edgeToggle = document.getElementById('edgesToggle');
 let showEdges = false;
+
+const camera = {
+  orbit: null,
+  target: null,
+  fov: 0,
+};
+
+mv.addEventListener('before-render', async () => {
+  if (resetCamera) {
+    mv.fieldOfView = 'auto';
+    await mv.updateComplete;
+    mv.cameraOrbit = 'auto auto auto';
+    mv.maxCameraOrbit = 'auto 180deg auto';
+    mv.cameraTarget = 'auto auto auto';
+    resetCamera = false;
+  } else {
+    mv.fieldOfView = camera.fov.toString() + 'deg';
+    scene.setTarget(camera.target.x, camera.target.y, camera.target.z);
+    mv.cameraOrbit = camera.orbit.toString();
+  }
+  mv.jumpCameraToGoal();
+});
 
 mv.addEventListener('load', () => {
   const hasAnimation = mv.availableAnimations.length > 0;
@@ -877,6 +901,7 @@ scrubber.oninput = function() {
 };
 
 // Wireframe ------------------------------------------------------------
+const edgeToggle = document.getElementById('edgesToggle');
 const EDGE_KEY = 'edgeLines';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
 
@@ -895,9 +920,6 @@ function syncEdgeToggleButton() {
 }
 
 function setEdgesVisible(visible) {
-  const scene = sceneSym ? mv[sceneSym] : null;
-  if (!scene) return;
-
   const root = scene.model ?? scene;
   root.traverse((obj) => {
     if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
@@ -1048,9 +1070,6 @@ function disposeOrientationGrid(grid) {
 }
 
 function updateOrientationGrid() {
-  const scene = sceneSym ? mv[sceneSym] : null;
-  if (!scene) return;
-
   const root = scene.model ?? scene;
   const previousGrid = root.userData[ORIENTATION_GRID_KEY];
   if (previousGrid) {
@@ -1273,6 +1292,10 @@ function createWorker() {
       if (message.extension === 'glb') {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
         output.glbURL = message.blobURL;
+        // Record view to maintain on reload
+        camera.orbit = mv.getCameraOrbit();
+        camera.target = mv.getCameraTarget();
+        camera.fov = mv.getFieldOfView();
 
         mv.src = output.glbURL;
       } else if (message?.extension === '3mf') {
