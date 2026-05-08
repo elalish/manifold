@@ -140,7 +140,8 @@ struct Manifold::Impl {
 
   // face_op.cpp
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
-                bool allowConvex = false);
+                bool allowConvex = false,
+                ExecutionContext::Impl* ctx = nullptr);
   Polygons Slice(double height) const;
   Polygons Project() const;
 

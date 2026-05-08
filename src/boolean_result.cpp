@@ -912,7 +912,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   // Level 6
-  outR.Face2Tri(faceEdge, halfedgeRef);
+  outR.Face2Tri(faceEdge, halfedgeRef, /*allowConvex=*/false, ctx_);
   halfedgeRef.clear();
   faceEdge.clear();
 

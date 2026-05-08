@@ -98,9 +98,10 @@ using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
  * faceNormal_ values are retained, repeated as necessary.
  */
 void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
-                              const Vec<TriRef>& halfedgeRef,
-                              bool allowConvex) {
+                              const Vec<TriRef>& halfedgeRef, bool allowConvex,
+                              ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  if (IsCancelled(ctx)) return;
   Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
   Vec<ivec3> triProp;
@@ -190,18 +191,20 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
   for_each(autoPolicy(faceEdge.size(), 1e5), countAt(0_uz),
-           countAt(faceEdge.size() - 1), [&](size_t face) {
+           countAt(faceEdge.size() - 1), ctx, [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
                           "face has less than three edges.");
              if (triCount[face] > 2)
                group.run([&, face] {
+                 if (IsCancelled(ctx)) return;
                  std::vector<ivec3> newTris = generalTriangulation(face);
                  triCount[face] = newTris.size();
                  results[face] = std::move(newTris);
                });
            });
   group.wait();
+  if (IsCancelled(ctx)) return;
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(triCount.begin(), triCount.end(), triCount.begin(), 0_uz);
   triVerts.resize(triCount.back());
@@ -223,7 +226,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       std::placeholders::_1);
   // set triangles in parallel
   for_each(autoPolicy(faceEdge.size(), 1e4), countAt(0_uz),
-           countAt(faceEdge.size() - 1), processFace2);
+           countAt(faceEdge.size() - 1), ctx, processFace2);
 #else
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());
@@ -244,10 +247,12 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       },
       std::placeholders::_1);
   for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
+    if (IsCancelled(ctx)) return;
     processFace2(face);
   }
 #endif
 
+  if (IsCancelled(ctx)) return;
   faceNormal_ = std::move(triNormal);
   CreateHalfedges(triProp, triVerts);
 }
