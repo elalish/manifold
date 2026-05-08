@@ -158,7 +158,8 @@ std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
   return pNode_;
 }
 
-CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
+CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx,
+                                      int extraPhases) const {
   std::lock_guard<std::mutex> lock(*pNodeMutex_);
   if (ctx != nullptr) {
     // Reset counters to reflect this evaluation. For pre-evaluated leaf
@@ -167,6 +168,11 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
     // ctx. The cancel flag is intentionally NOT reset — sticky cancel is
     // part of the documented API contract (see ExecutionContext in
     // common.h).
+    //
+    // `extraPhases` lets callers (e.g. ctx-aware Refine/Hull/Minkowski)
+    // include their own phase budget in `totalPhases` up front, so that
+    // Progress monotonically rises through the boolean tree eval and the
+    // post-eval work without dipping below 1.0 between them.
     const size_t leaves = pNode_->NumLeaves();
     const int booleans = leaves > 0 ? static_cast<int>(leaves - 1) : 0;
     // Reset numerators before denominators so a concurrent `Progress()`
@@ -175,7 +181,7 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
     ctx->doneBooleans.store(0, std::memory_order_relaxed);
     ctx->donePhases.store(0, std::memory_order_relaxed);
     ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
-    ctx->totalPhases.store(booleans * kPhasesPerBoolean,
+    ctx->totalPhases.store(booleans * kPhasesPerBoolean + extraPhases,
                            std::memory_order_relaxed);
   }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
@@ -737,6 +743,59 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
+// Edge-division callbacks for the three Refine variants. Built once and
+// shared between the non-ctx and ctx-aware overloads of each variant. An
+// empty std::function is the "no refinement" sentinel and tells
+// RefineCommon to skip pImpl->Refine entirely. `static` (file-local
+// linkage) keeps these next to their callers without requiring a second
+// anonymous namespace block in this file.
+static std::function<int(vec3, vec4, vec4)> EdgeDivByN(int n) {
+  if (n <= 1) return {};
+  return [n](vec3, vec4, vec4) { return n - 1; };
+}
+static std::function<int(vec3, vec4, vec4)> EdgeDivByLength(double length) {
+  return [length](vec3 edge, vec4, vec4) {
+    return static_cast<int>(la::length(edge) / length);
+  };
+}
+static std::function<int(vec3, vec4, vec4)> EdgeDivByTolerance(
+    double tolerance) {
+  return [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
+    const vec3 edgeNorm = la::normalize(edge);
+    // Weight heuristic
+    const vec3 tStart = vec3(tangentStart);
+    const vec3 tEnd = vec3(tangentEnd);
+    // Perpendicular to edge
+    const vec3 start = tStart - edgeNorm * la::dot(edgeNorm, tStart);
+    const vec3 end = tEnd - edgeNorm * la::dot(edgeNorm, tEnd);
+    // Circular arc result plus heuristic term for non-circular curves
+    const double d =
+        0.5 * (la::length(start) + la::length(end)) + la::length(start - end);
+    return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
+  };
+}
+
+// Shared implementation for all six public Refine variants. `ctx == nullptr`
+// gives the no-progress / no-cancel path used by the existing overloads; a
+// non-null ctx reserves one progress phase up front (via GetCsgLeafNode's
+// extraPhases) so Progress() rises monotonically across the boolean tree
+// eval and the refinement.
+Manifold Manifold::RefineCommon(
+    std::function<int(vec3, vec4, vec4)> edgeDivisions, bool keepInterior,
+    bool requireTangents, ExecutionContext::Impl* ctx) const {
+  auto leafImpl = GetCsgLeafNode(ctx, ctx ? 1 : 0).GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  if (IsCancelled(ctx)) return PropagateStatus(Error::Cancelled);
+  auto pImpl = std::make_shared<Impl>(*leafImpl);
+  if (edgeDivisions && (!requireTangents || !pImpl->halfedgeTangent_.empty())) {
+    pImpl->Refine(std::move(edgeDivisions), keepInterior, ctx);
+  }
+  if (IsCancelled(ctx)) return PropagateStatus(Error::Cancelled);
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
 /**
  * Increase the density of the mesh by splitting every edge into n pieces. For
  * instance, with n = 2, each triangle will be split into 4 triangles. Quads
@@ -749,14 +808,19 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto pImpl = std::make_shared<Impl>(*leafImpl);
-  if (n > 1) {
-    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
-  }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  return RefineCommon(EdgeDivByN(n), /*keepInterior=*/false,
+                      /*requireTangents=*/false, /*ctx=*/nullptr);
+}
+
+/**
+ * Like Refine() but observes evaluation progress and allows cancellation
+ * via the provided ExecutionContext. The pending CSG tree is evaluated
+ * first, then the refinement runs as a single additional progress phase.
+ * Refinement honors cancel between major steps.
+ */
+Manifold Manifold::Refine(int n, ExecutionContext& ctx) const {
+  return RefineCommon(EdgeDivByN(n), /*keepInterior=*/false,
+                      /*requireTangents=*/false, ctx.impl_.get());
 }
 
 /**
@@ -770,15 +834,19 @@ Manifold Manifold::Refine(int n) const {
  * @param length The length that edges will be broken down to.
  */
 Manifold Manifold::RefineToLength(double length) const {
-  length = std::abs(length);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto pImpl = std::make_shared<Impl>(*leafImpl);
-  pImpl->Refine([length](vec3 edge, vec4, vec4) {
-    return static_cast<int>(la::length(edge) / length);
-  });
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  return RefineCommon(EdgeDivByLength(std::abs(length)),
+                      /*keepInterior=*/false, /*requireTangents=*/false,
+                      /*ctx=*/nullptr);
+}
+
+/**
+ * Like RefineToLength() but observes evaluation progress and allows
+ * cancellation via the provided ExecutionContext.
+ */
+Manifold Manifold::RefineToLength(double length, ExecutionContext& ctx) const {
+  return RefineCommon(EdgeDivByLength(std::abs(length)),
+                      /*keepInterior=*/false, /*requireTangents=*/false,
+                      ctx.impl_.get());
 }
 
 /**
@@ -794,29 +862,20 @@ Manifold Manifold::RefineToLength(double length) const {
  * the surface, within rounding error.
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
-  tolerance = std::abs(tolerance);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto pImpl = std::make_shared<Impl>(*leafImpl);
-  if (!pImpl->halfedgeTangent_.empty()) {
-    pImpl->Refine(
-        [tolerance](vec3 edge, vec4 tangentStart, vec4 tangentEnd) {
-          const vec3 edgeNorm = la::normalize(edge);
-          // Weight heuristic
-          const vec3 tStart = vec3(tangentStart);
-          const vec3 tEnd = vec3(tangentEnd);
-          // Perpendicular to edge
-          const vec3 start = tStart - edgeNorm * la::dot(edgeNorm, tStart);
-          const vec3 end = tEnd - edgeNorm * la::dot(edgeNorm, tEnd);
-          // Circular arc result plus heuristic term for non-circular curves
-          const double d = 0.5 * (la::length(start) + la::length(end)) +
-                           la::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
-        },
-        true);
-  }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  return RefineCommon(EdgeDivByTolerance(std::abs(tolerance)),
+                      /*keepInterior=*/true, /*requireTangents=*/true,
+                      /*ctx=*/nullptr);
+}
+
+/**
+ * Like RefineToTolerance() but observes evaluation progress and allows
+ * cancellation via the provided ExecutionContext.
+ */
+Manifold Manifold::RefineToTolerance(double tolerance,
+                                     ExecutionContext& ctx) const {
+  return RefineCommon(EdgeDivByTolerance(std::abs(tolerance)),
+                      /*keepInterior=*/true, /*requireTangents=*/true,
+                      ctx.impl_.get());
 }
 
 /**

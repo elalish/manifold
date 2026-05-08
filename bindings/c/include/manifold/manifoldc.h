@@ -169,10 +169,21 @@ ManifoldManifold* manifold_smooth_out(void* mem, ManifoldManifold* m,
                                       double minSharpAngle,
                                       double minSmoothness);
 ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine);
+// Variants of manifold_refine* that observe progress and allow cancellation
+// via the ExecutionContext. See manifold_execution_context.
+ManifoldManifold* manifold_refine_with_context(void* mem, ManifoldManifold* m,
+                                               int refine,
+                                               ManifoldExecutionContext* ctx);
 ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length);
+ManifoldManifold* manifold_refine_to_length_with_context(
+    void* mem, ManifoldManifold* m, double length,
+    ManifoldExecutionContext* ctx);
 ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
                                                double tolerance);
+ManifoldManifold* manifold_refine_to_tolerance_with_context(
+    void* mem, ManifoldManifold* m, double tolerance,
+    ManifoldExecutionContext* ctx);
 ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
                                          double tolerance);
 ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,

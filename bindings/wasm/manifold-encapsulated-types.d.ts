@@ -778,6 +778,15 @@ export class Manifold {
   refine(n: number): Manifold;
 
   /**
+   * Like refine() but observes evaluation progress and allows cancellation
+   * via the provided ExecutionContext. The pending CSG tree is evaluated
+   * first, then the refinement runs as a single additional progress phase.
+   *
+   * @group Smoothing
+   */
+  refineWithContext(n: number, ctx: ExecutionContext): Manifold;
+
+  /**
    * Increase the density of the mesh by splitting each edge into pieces of
    * roughly the input length. Interior verts are added to keep the rest of the
    * triangulation edges also of roughly the same length. If halfedgeTangents
@@ -789,6 +798,14 @@ export class Manifold {
    * @group Smoothing
    */
   refineToLength(length: number): Manifold;
+
+  /**
+   * Like refineToLength() but observes evaluation progress and allows
+   * cancellation via the provided ExecutionContext.
+   *
+   * @group Smoothing
+   */
+  refineToLengthWithContext(length: number, ctx: ExecutionContext): Manifold;
 
   /**
    * Increase the density of the mesh by splitting each edge into pieces such
@@ -804,6 +821,15 @@ export class Manifold {
    * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;
+
+  /**
+   * Like refineToTolerance() but observes evaluation progress and allows
+   * cancellation via the provided ExecutionContext.
+   *
+   * @group Smoothing
+   */
+  refineToToleranceWithContext(tolerance: number, ctx: ExecutionContext):
+      Manifold;
 
   /**
    * Create a new copy of this manifold with updated vertex properties by

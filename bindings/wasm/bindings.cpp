@@ -177,9 +177,21 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Project", &Manifold::Project)
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
-      .function("refine", &Manifold::Refine)
-      .function("refineToLength", &Manifold::RefineToLength)
-      .function("refineToTolerance", &Manifold::RefineToTolerance)
+      .function("refine",
+                select_overload<Manifold(int) const>(&Manifold::Refine))
+      .function("refineWithContext",
+                select_overload<Manifold(int, ExecutionContext&) const>(
+                    &Manifold::Refine))
+      .function("refineToLength", select_overload<Manifold(double) const>(
+                                      &Manifold::RefineToLength))
+      .function("refineToLengthWithContext",
+                select_overload<Manifold(double, ExecutionContext&) const>(
+                    &Manifold::RefineToLength))
+      .function("refineToTolerance", select_overload<Manifold(double) const>(
+                                         &Manifold::RefineToTolerance))
+      .function("refineToToleranceWithContext",
+                select_overload<Manifold(double, ExecutionContext&) const>(
+                    &Manifold::RefineToTolerance))
       .function("smoothByNormals", &Manifold::SmoothByNormals)
       .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)

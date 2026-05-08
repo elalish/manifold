@@ -743,6 +743,24 @@ TEST(CBIND, execution_context_happy_path) {
   free(ctx);
 }
 
+TEST(CBIND, refine_with_context) {
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  ManifoldManifold* cube = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  ManifoldManifold* refined =
+      manifold_refine_with_context(alloc_manifold_buffer(), cube, 2, ctx);
+  EXPECT_EQ(manifold_status(refined), MANIFOLD_NO_ERROR);
+  EXPECT_GT(manifold_num_tri(refined), manifold_num_tri(cube));
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 1.0);
+
+  manifold_destruct_manifold(refined);
+  manifold_destruct_manifold(cube);
+  manifold_destruct_execution_context(ctx);
+  free(refined);
+  free(cube);
+  free(ctx);
+}
+
 TEST(CBIND, execution_context_cancel) {
   // alloc + delete pattern (matches the Rust binding's usage of the C API).
   ManifoldExecutionContext* ctx =

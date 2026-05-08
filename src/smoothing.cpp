@@ -1094,8 +1094,9 @@ bool Manifold::Impl::ValidTangents() const {
 }
 
 void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
-                            bool keepInterior) {
+                            bool keepInterior, ExecutionContext::Impl* ctx) {
   if (IsEmpty()) return;
+  if (IsCancelled(ctx)) return;
 
   if (!ValidTangents()) {
     MakeEmpty(Error::InvalidTangents);
@@ -1106,11 +1107,13 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   halfedge_.MakeUnique();
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   if (vertBary.size() == 0) return;
+  if (IsCancelled(ctx)) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
+    for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(), ctx,
                InterpTri({vertPos_, vertBary, &old}));
   }
+  if (IsCancelled(ctx)) return;
 
   halfedgeTangent_.clear();
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
@@ -1119,7 +1122,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   } else {
     CalculateVertNormals();
   }
-  SortGeometry();
+  SortGeometry(ctx);
   meshRelation_.originalID = -1;
 }
 

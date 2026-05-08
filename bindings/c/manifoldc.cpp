@@ -323,15 +323,36 @@ ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine) {
   return to_c(new (mem) Manifold(refined));
 }
 
+ManifoldManifold* manifold_refine_with_context(void* mem, ManifoldManifold* m,
+                                               int refine,
+                                               ManifoldExecutionContext* ctx) {
+  auto refined = from_c(m)->Refine(refine, *from_c(ctx));
+  return to_c(new (mem) Manifold(refined));
+}
+
 ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length) {
   auto refined = from_c(m)->RefineToLength(length);
   return to_c(new (mem) Manifold(refined));
 }
 
+ManifoldManifold* manifold_refine_to_length_with_context(
+    void* mem, ManifoldManifold* m, double length,
+    ManifoldExecutionContext* ctx) {
+  auto refined = from_c(m)->RefineToLength(length, *from_c(ctx));
+  return to_c(new (mem) Manifold(refined));
+}
+
 ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
                                                double tolerance) {
   auto refined = from_c(m)->RefineToTolerance(tolerance);
+  return to_c(new (mem) Manifold(refined));
+}
+
+ManifoldManifold* manifold_refine_to_tolerance_with_context(
+    void* mem, ManifoldManifold* m, double tolerance,
+    ManifoldExecutionContext* ctx) {
+  auto refined = from_c(m)->RefineToTolerance(tolerance, *from_c(ctx));
   return to_c(new (mem) Manifold(refined));
 }
 

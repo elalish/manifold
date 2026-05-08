@@ -331,11 +331,31 @@ NB_MODULE(manifold3d, m) {
       .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
            nb::arg("min_smoothness") = 0,
            manifold__smooth_out__min_sharp_angle__min_smoothness)
-      .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
-      .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
-           manifold__refine_to_length__length)
-      .def("refine_to_tolerance", &Manifold::RefineToTolerance,
+      .def("refine",
+           static_cast<Manifold (Manifold::*)(int) const>(&Manifold::Refine),
+           nb::arg("n"), manifold__refine__n)
+      .def("refine",
+           static_cast<Manifold (Manifold::*)(int, ExecutionContext&) const>(
+               &Manifold::Refine),
+           nb::arg("n"), nb::arg("ctx"), manifold__refine__n__ctx)
+      .def("refine_to_length",
+           static_cast<Manifold (Manifold::*)(double) const>(
+               &Manifold::RefineToLength),
+           nb::arg("length"), manifold__refine_to_length__length)
+      .def("refine_to_length",
+           static_cast<Manifold (Manifold::*)(double, ExecutionContext&) const>(
+               &Manifold::RefineToLength),
+           nb::arg("length"), nb::arg("ctx"),
+           manifold__refine_to_length__length__ctx)
+      .def("refine_to_tolerance",
+           static_cast<Manifold (Manifold::*)(double) const>(
+               &Manifold::RefineToTolerance),
            nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance)
+      .def("refine_to_tolerance",
+           static_cast<Manifold (Manifold::*)(double, ExecutionContext&) const>(
+               &Manifold::RefineToTolerance),
+           nb::arg("tolerance"), nb::arg("ctx"),
+           manifold__refine_to_tolerance__tolerance__ctx)
       .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
            manifold__get_mesh_gl__normal_idx)
       .def("to_mesh64", &Manifold::GetMeshGL64, nb::arg("normal_idx") = -1,

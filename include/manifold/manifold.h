@@ -466,8 +466,11 @@ class Manifold {
    */
   ///@{
   Manifold Refine(int) const;
+  Manifold Refine(int, ExecutionContext&) const;
   Manifold RefineToLength(double) const;
+  Manifold RefineToLength(double, ExecutionContext&) const;
   Manifold RefineToTolerance(double) const;
+  Manifold RefineToTolerance(double, ExecutionContext&) const;
   Manifold SmoothByNormals(int normalIdx) const;
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   static Manifold Smooth(const MeshGL&,
@@ -545,7 +548,11 @@ class Manifold {
   mutable std::shared_ptr<CsgNode> pNode_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;
-  CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;
+  CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr,
+                              int extraPhases = 0) const;
+  Manifold RefineCommon(std::function<int(vec3, vec4, vec4)> edgeDivisions,
+                        bool keepInterior, bool requireTangents,
+                        ExecutionContext::Impl* ctx) const;
 };
 /** @} */
 

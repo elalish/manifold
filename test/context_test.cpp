@@ -463,6 +463,48 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
   }
 }
+
+// Refine(ctx) on an already-evaluated leaf: no boolean work, so the only
+// phase advance comes from Refine itself. donePhases = totalPhases = 1
+// at completion. Cube has 12 tris; Refine(2) splits each into 4 = 48.
+TEST(Manifold, ExecutionContextRefineProgress) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  ASSERT_EQ(cube.NumTri(), 12u);
+  ExecutionContext ctx;
+  Manifold refined = cube.Refine(2, ctx);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(refined.NumTri(), 48u);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), 1);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), 1);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Pre-cancelled ctx: Refine(ctx) returns Cancelled without doing the work.
+TEST(Manifold, ExecutionContextRefineCancelled) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(cube.Refine(2, ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(cube.RefineToLength(0.1, ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(cube.RefineToTolerance(0.01, ctx).Status(),
+            Manifold::Error::Cancelled);
+}
+
+// Refine on an unevaluated CSG tree: totalPhases reserves the full eventual
+// budget (boolean phases + 1 for Refine) up front via GetCsgLeafNode's
+// extraPhases parameter. This guarantees Progress() monotonically rises and
+// never dips mid-call, even between the boolean tree finishing and Refine
+// starting. Pre-cancel exposes the post-reset totalPhases value before any
+// donePhases work happens.
+TEST(Manifold, ExecutionContextRefineReservesPhasesUpFront) {
+  Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);  // 1 boolean
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold refined = u.Refine(2, ctx);
+  EXPECT_EQ(refined.Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean + 1);
+}
+
 // Direct test of the ctx-aware `for_each` overload: cancel-already-set
 // must skip the entire range; cancel-unset must run every element. This
 // is the mechanism test; the integration test that cancel works
