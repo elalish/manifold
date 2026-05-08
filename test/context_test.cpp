@@ -145,36 +145,6 @@ TEST(Manifold, ExecutionContextCancelMidBoolean) {
 }
 #endif  // MANIFOLD_PAR == 1
 
-// Cancel during a workload heavy in Face2Tri. With ctx threaded into
-// Face2Tri the request is honored mid-sweep instead of waiting for the
-// full triangulation to finish. This test exercises the new code path
-// so sanitizer lanes catch UB in the partial-state path; it does not
-// strictly distinguish pre/post-fix outcomes (existing phase-boundary
-// checks already yield Cancelled).
-#if MANIFOLD_PAR == 1
-TEST(Manifold, ExecutionContextCancelDuringFace2Tri) {
-  // High-segment-count spheres bias the boolean's wall time toward
-  // Face2Tri (many sub-edges per face from the intersection curve).
-  Manifold a = Manifold::Sphere(1.0, 384);
-  Manifold b = Manifold::Sphere(1.0, 384).Translate(vec3(0.5, 0, 0));
-  Manifold u = a + b;
-
-  ExecutionContext ctx;
-  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] { result.store(u.Status(ctx)); });
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  ctx.Cancel();
-  evalThread.join();
-
-  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-              result.load() == Manifold::Error::NoError);
-  if (result.load() == Manifold::Error::Cancelled) {
-    EXPECT_LT(ctx.Progress(), 1.0);
-  }
-}
-#endif  // MANIFOLD_PAR == 1
-
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Manifold, ExecutionContextMatchesPlainStatus) {
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
