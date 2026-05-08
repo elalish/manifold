@@ -394,6 +394,8 @@ function syncCurrentEditVisibility(scriptName) {
       exampleFunctions.get(scriptName) == null ? 'inline-block' : 'none';
 }
 
+let resetCamera = true;
+
 function switchTo(scriptName) {
   if (editor) {
     switching = true;
@@ -406,6 +408,7 @@ function switchTo(scriptName) {
     window.location.hash = '#' + scriptName;
     const model = getModelForScript(scriptName);
     editor.setModel(model);
+    resetCamera = true;
 
     // Either editor.setValue() or model.setValue() will trigger
     // onDidChangeModelContent.  This will cause some UI updates, but will also
@@ -819,19 +822,150 @@ async function initializeAutoTypings(showTypeIndicator) {
   updateTypeIndicator();
 }
 
-// Animation ------------------------------------------------------------
+// Viewer additions -----------------------------------------------------
 const mv = document.querySelector('model-viewer');
+const scene =
+    mv[Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene')];
+
 const animationContainer = document.querySelector('#animation');
+let showEdges = false;
+
+const camera = {
+  orbit: null,
+  target: null,
+  fov: 0,
+};
+
+mv.addEventListener('before-render', async () => {
+  if (resetCamera) {
+    mv.fieldOfView = 'auto';
+    await mv.updateComplete;
+    mv.cameraOrbit = 'auto auto auto';
+    mv.maxCameraOrbit = 'auto 180deg auto';
+    mv.cameraTarget = 'auto auto auto';
+    resetCamera = false;
+  } else {
+    mv.fieldOfView = camera.fov.toString() + 'deg';
+    scene.setTarget(camera.target.x, camera.target.y, camera.target.z);
+    mv.cameraOrbit = camera.orbit.toString();
+  }
+  mv.jumpCameraToGoal();
+});
+
+mv.addEventListener('load', () => {
+  const hasAnimation = mv.availableAnimations.length > 0;
+  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
+  if (hasAnimation) {
+    play();
+  }
+  updateOrientationGrid();
+  syncEdgeToggleButton();
+  if (showEdges) {
+    setEdgesVisible(true);
+  }
+});
+
+// Animation ------------------------------------------------------------
 const playButton = document.querySelector('#play');
 const scrubber = document.querySelector('#scrubber');
-const edgeToggle = document.getElementById('edgesToggle');
-const sceneSym =
-    Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene');
-
 let paused = false;
-let showEdges = false;
+
+function play() {
+  mv.play();
+  playButton.classList.remove('play');
+  playButton.classList.add('pause');
+  paused = false;
+  scrubber.classList.add('hide');
+}
+
+function pause() {
+  mv.pause();
+  playButton.classList.remove('pause');
+  playButton.classList.add('play');
+  paused = true;
+  scrubber.max = mv.duration;
+  scrubber.value = mv.currentTime;
+  scrubber.classList.remove('hide');
+}
+
+playButton.onclick = function() {
+  if (paused) {
+    play();
+  } else {
+    pause();
+  }
+};
+
+scrubber.oninput = function() {
+  mv.currentTime = scrubber.value;
+};
+
+// Wireframe ------------------------------------------------------------
+const edgeToggle = document.getElementById('edgesToggle');
 const EDGE_KEY = 'edgeLines';
 const EDGE_OVERLAY_FLAG = '__isEdgeOverlay';
+
+edgeToggle.addEventListener('click', () => {
+  showEdges = !showEdges;
+  syncEdgeToggleButton();
+  setEdgesVisible(showEdges);
+});
+
+function syncEdgeToggleButton() {
+  if (showEdges) {
+    edgeToggle.classList.add('green');
+  } else {
+    edgeToggle.classList.remove('green');
+  }
+}
+
+function setEdgesVisible(visible) {
+  const root = scene.model ?? scene;
+  root.traverse((obj) => {
+    if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
+    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
+
+    if (obj.isMesh) {
+      // Fix wireframe z-fighting.
+      obj.material.polygonOffset = visible;
+      obj.material.polygonOffsetFactor = 4;
+      obj.material.polygonOffsetUnits = 4;
+
+      if (visible && !obj.userData[EDGE_KEY]) {
+        const material = new MeshBasicMaterial({
+          color: 0x111111,
+          wireframe: true,
+          toneMapped: false,
+        });
+
+        let edgeLines;
+        if (obj.isSkinnedMesh) {
+          edgeLines = new SkinnedMesh(obj.geometry, material);
+          edgeLines.bind(obj.skeleton, obj.bindMatrix);
+          edgeLines.bindMatrix.copy(obj.bindMatrix);
+          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
+        } else {
+          edgeLines = new Mesh(obj.geometry, material);
+          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
+          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
+        }
+
+        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
+        obj.add(edgeLines);
+        obj.userData[EDGE_KEY] = edgeLines;
+      }
+
+      const edgeLines = obj.userData[EDGE_KEY];
+      if (edgeLines) {
+        edgeLines.visible = visible;
+      }
+    }
+  });
+
+  scene.queueRender?.();
+}
+
+// Orientation Grid --------------------------------------------------
 const ORIENTATION_GRID_FLAG = '__isOrientationGrid';
 const ORIENTATION_GRID_KEY = '__orientationGrid';
 
@@ -936,9 +1070,6 @@ function disposeOrientationGrid(grid) {
 }
 
 function updateOrientationGrid() {
-  const scene = sceneSym ? mv[sceneSym] : null;
-  if (!scene) return;
-
   const root = scene.model ?? scene;
   const previousGrid = root.userData[ORIENTATION_GRID_KEY];
   if (previousGrid) {
@@ -1067,112 +1198,6 @@ function updateOrientationGrid() {
   scene.queueRender?.();
 }
 
-function syncEdgeToggleButton() {
-  if (showEdges) {
-    edgeToggle.classList.add('green');
-  } else {
-    edgeToggle.classList.remove('green');
-  }
-}
-
-mv.addEventListener('load', () => {
-  const hasAnimation = mv.availableAnimations.length > 0;
-  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
-  if (hasAnimation) {
-    play();
-  }
-  updateOrientationGrid();
-  syncEdgeToggleButton();
-  if (showEdges) {
-    setEdgesVisible(true);
-  }
-});
-
-edgeToggle.addEventListener('click', () => {
-  showEdges = !showEdges;
-  syncEdgeToggleButton();
-  setEdgesVisible(showEdges);
-});
-
-function play() {
-  mv.play();
-  playButton.classList.remove('play');
-  playButton.classList.add('pause');
-  paused = false;
-  scrubber.classList.add('hide');
-}
-
-function setEdgesVisible(visible) {
-  const scene = sceneSym ? mv[sceneSym] : null;
-  if (!scene) return;
-
-  const root = scene.model ?? scene;
-  root.traverse((obj) => {
-    if (obj.userData?.[ORIENTATION_GRID_FLAG]) return;
-    if (obj.userData?.[EDGE_OVERLAY_FLAG]) return;
-
-    if (obj.isMesh) {
-      // Fix wireframe z-fighting.
-      obj.material.polygonOffset = visible;
-      obj.material.polygonOffsetFactor = 4;
-      obj.material.polygonOffsetUnits = 4;
-
-      if (visible && !obj.userData[EDGE_KEY]) {
-        const material = new MeshBasicMaterial({
-          color: 0x111111,
-          wireframe: true,
-          toneMapped: false,
-        });
-
-        let edgeLines;
-        if (obj.isSkinnedMesh) {
-          edgeLines = new SkinnedMesh(obj.geometry, material);
-          edgeLines.bind(obj.skeleton, obj.bindMatrix);
-          edgeLines.bindMatrix.copy(obj.bindMatrix);
-          edgeLines.bindMatrixInverse.copy(obj.bindMatrixInverse);
-        } else {
-          edgeLines = new Mesh(obj.geometry, material);
-          edgeLines.morphTargetInfluences = obj.morphTargetInfluences;
-          edgeLines.morphTargetDictionary = obj.morphTargetDictionary;
-        }
-
-        edgeLines.userData[EDGE_OVERLAY_FLAG] = true;
-        obj.add(edgeLines);
-        obj.userData[EDGE_KEY] = edgeLines;
-      }
-
-      const edgeLines = obj.userData[EDGE_KEY];
-      if (edgeLines) {
-        edgeLines.visible = visible;
-      }
-    }
-  });
-
-  scene.queueRender?.();
-}
-
-function pause() {
-  mv.pause();
-  playButton.classList.remove('pause');
-  playButton.classList.add('play');
-  paused = true;
-  scrubber.max = mv.duration;
-  scrubber.value = mv.currentTime;
-  scrubber.classList.remove('hide');
-}
-
-playButton.onclick = function() {
-  if (paused) {
-    play();
-  } else {
-    pause();
-  }
-};
-
-scrubber.oninput = function() {
-  mv.currentTime = scrubber.value;
-};
-
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
@@ -1267,6 +1292,10 @@ function createWorker() {
       if (message.extension === 'glb') {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
         output.glbURL = message.blobURL;
+        // Record view to maintain on reload
+        camera.orbit = mv.getCameraOrbit();
+        camera.target = mv.getCameraTarget();
+        camera.fov = mv.getFieldOfView();
 
         mv.src = output.glbURL;
       } else if (message?.extension === '3mf') {
