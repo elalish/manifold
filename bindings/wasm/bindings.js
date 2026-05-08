@@ -258,6 +258,31 @@ Module.setup = function() {
     return out;
   };
 
+  Module.Manifold.prototype.warpBatch = function(func) {
+    const wasmFuncPtr = addFunction(function(vertsPtr, count) {
+      const verts = new Float64Array(count * 3);
+      for (let i = 0; i < count * 3; ++i) {
+        verts[i] = getValue(vertsPtr + 8 * i, 'double');
+      }
+      func(verts, count);
+      for (let i = 0; i < count * 3; ++i) {
+        setValue(vertsPtr + 8 * i, verts[i], 'double');
+      }
+    }, 'vii');
+    const out = this._WarpBatch(wasmFuncPtr);
+    removeFunction(wasmFuncPtr);
+
+    const status = out.status();
+    if (status !== 'NoError') {
+      throw new Module.ManifoldError(status);
+    }
+    return out;
+  };
+
+  Module.Manifold.prototype.rayCast = function(origin, endpoint) {
+    return this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
+  };
+
   Module.Manifold.prototype.calculateNormals = function(
       normalIdx,
       minSharpAngle = 60,

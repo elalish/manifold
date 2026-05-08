@@ -126,7 +126,7 @@ export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
   let graph: Array<[Component3MF, Component3MF]> = [];
   for (const parent of unsorted) {
     for (const {objectID} of parent.children) {
-      const child = unsorted.find(c => c.id === objectID);
+      const child = unsorted.find((c) => c.id === objectID);
       if (child) graph.push([parent, child]);
     }
   }
@@ -135,16 +135,20 @@ export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
       graph.filter(([, c]) => c.id === child.id).length === 0;
   const children = (parent: Component3MF): Component3MF[] =>
       graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
-  const disown = (parent: Component3MF, child: Component3MF) => graph =
-      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
+  const disown = (parent: Component3MF, child: Component3MF) =>
+      (graph = graph.filter(
+           ([p, c]) => !(p.id === parent.id && c.id === child.id),
+           ));
 
   const roots = unsorted.filter(isRoot);
   const sorted = [];
 
   let root;
-  while (root = roots.shift()) {  // For each root node...
-    sorted.unshift(root);         // ...insert before potential ancestors.
-    for (const child of children(root)) {  // For each child....
+  while ((root = roots.shift())) {
+    // For each root node...
+    sorted.unshift(root);  // ...insert before potential ancestors.
+    for (const child of children(root)) {
+      // For each child....
       disown(root, child);  // ...remove the parent-child edge from the graph.
       if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
     }

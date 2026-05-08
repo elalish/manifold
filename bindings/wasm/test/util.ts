@@ -55,9 +55,14 @@ export function meshToVec3Array(mesh: Mesh): Array<Vec3> {
 }
 
 export function expectMeshesMatch(
-    sourceMesh: Mesh, roundTripMesh: Mesh, margin: number = 1.0e-5) {
+    sourceMesh: Mesh,
+    roundTripMesh: Mesh,
+    margin: number = 1.0e-5,
+) {
   expect(Array.from(roundTripMesh.triVerts))
-      .toEqual(Array.from(sourceMesh.triVerts));
+      .toEqual(
+          Array.from(sourceMesh.triVerts),
+      );
 
   const sourcePositions = meshToVec3Array(sourceMesh);
   const roundTripPositions = meshToVec3Array(roundTripMesh);
@@ -65,7 +70,9 @@ export function expectMeshesMatch(
 
   for (let i = 0; i < sourcePositions.length; ++i) {
     for (let j = 0; j < 3; ++j) {
-      expect(Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]))
+      expect(
+          Math.abs(roundTripPositions[i][j] - sourcePositions[i][j]),
+          )
           .toBeLessThan(margin);
     }
   }
@@ -79,8 +86,10 @@ export function permute<Type>(arr: Array<Type>): Array<Array<Type>> {
 
   const result = [];
   for (let i = 0; i < arr.length; i++) {
-    for (const permutation of permute(
-             [...arr.slice(0, i), ...arr.slice(i + 1)])) {
+    for (const permutation of permute([
+           ...arr.slice(0, i),
+           ...arr.slice(i + 1),
+         ])) {
       result.push([arr.at(i)!, ...permutation]);
     }
   }

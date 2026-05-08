@@ -19,7 +19,7 @@ import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 import {expectMeshesMatch, permute} from '../test/util.ts';
 
 import type {Component3MF} from './export-3mf.ts';
-import {exportFormats as exportFormats3MF, toArrayBuffer as toArrayBuffer3MF, toposort} from './export-3mf.ts';
+import {exportFormats as exportFormats3MF, toArrayBuffer as toArrayBuffer3MF, toposort,} from './export-3mf.ts';
 import * as exportModel from './export-model.ts';
 import {importManifold as importManifold3MF} from './import-model.ts';
 import * as wasm from './wasm.ts';
@@ -72,8 +72,9 @@ suite('toArrayBuffer header options', () => {
 
   test('custom title and unit appear in model XML', async () => {
     const doc = new GLTFTransform.Document();
-    const result = await toArrayBuffer3MF(
-        doc, {header: {title: 'MyTestModel', unit: 'inch'}});
+    const result = await toArrayBuffer3MF(doc, {
+      header: {title: 'MyTestModel', unit: 'inch'},
+    });
     const files = unzipSync(new Uint8Array(result));
     const modelXml = new TextDecoder().decode(files['3D/3dmodel.model']);
     expect(modelXml).toContain('MyTestModel');
@@ -138,8 +139,9 @@ suite('toArrayBuffer with manifold models', () => {
 
         // Verify dispatch through export-model works for both identifiers.
         const byExt = await exportModel.toArrayBuffer(doc, {extension: '3mf'});
-        const byMime =
-            await exportModel.toArrayBuffer(doc, {mimetype: 'model/3mf'});
+        const byMime = await exportModel.toArrayBuffer(doc, {
+          mimetype: 'model/3mf',
+        });
         expect(new Uint8Array(byExt)[0]).toBe(0x50);
         expect(new Uint8Array(byMime)[0]).toBe(0x50);
       });
@@ -175,48 +177,65 @@ suite('Sorts components topologically', () => {
   // child1 has multiple parents. parent2 has multiple children.
   const child1: Component3MF = {id: 'child1', children: []};
   const child2: Component3MF = {id: 'child2', children: []};
-  const parent1:
-      Component3MF = {id: 'parent1', children: [{objectID: 'child1'}]};
+  const parent1: Component3MF = {
+    id: 'parent1',
+    children: [{objectID: 'child1'}],
+  };
   const parent2: Component3MF = {
     id: 'parent2',
-    children: [{objectID: 'child1'}, {objectID: 'child2'}]
+    children: [{objectID: 'child1'}, {objectID: 'child2'}],
   };
-  const grandparent:
-      Component3MF = {id: 'grandparent', children: [{objectID: 'parent1'}]};
+  const grandparent: Component3MF = {
+    id: 'grandparent',
+    children: [{objectID: 'parent1'}],
+  };
   const family1 = [child1, child2, parent1, parent2, grandparent];
 
   // Family 2.
   const child3: Component3MF = {id: 'child3', children: []};
-  const parent3:
-      Component3MF = {id: 'parent3', children: [{objectID: 'child3'}]};
+  const parent3: Component3MF = {
+    id: 'parent3',
+    children: [{objectID: 'child3'}],
+  };
 
   // External reference, or no children.
-  const mesh: Component3MF = {id: 'mesh', children: [{objectID: 'meshref'}]};
+  const mesh: Component3MF = {
+    id: 'mesh',
+    children: [{objectID: 'meshref'}],
+  };
   const childless: Component3MF = {id: 'childless', children: []};
 
   test.for(permute(family1))(
-      'Children precede parents (permutation %#)', (permutation) => {
+      'Children precede parents (permutation %#)',
+      (permutation) => {
         const sorted = toposort(permutation);
         expect(sorted).to.have.deep.members(permutation);
         expect(sorted.indexOf(child1)).to.be.lessThan(sorted.indexOf(parent1));
         expect(sorted.indexOf(child1)).to.be.lessThan(sorted.indexOf(parent2));
         expect(sorted.indexOf(child2)).to.be.lessThan(sorted.indexOf(parent2));
         expect(sorted.indexOf(parent1))
-            .to.be.lessThan(sorted.indexOf(grandparent));
-      });
+            .to.be.lessThan(
+                sorted.indexOf(grandparent),
+            );
+      },
+  );
 
   test.for(permute([child1, child3, parent1, parent3]))(
-      'Two trees sort correctly (permutation %#)', (permutation) => {
+      'Two trees sort correctly (permutation %#)',
+      (permutation) => {
         const sorted = toposort(permutation);
         expect(sorted).to.have.deep.members(permutation);
         expect(sorted.indexOf(child1)).to.be.lessThan(sorted.indexOf(parent1));
         expect(sorted.indexOf(child3)).to.be.lessThan(sorted.indexOf(parent3));
-      });
+      },
+  );
 
   test.for(permute([child1, parent1, mesh, childless]))(
-      'Childless nodes do not affect sort (permutation %#)', (permutation) => {
+      'Childless nodes do not affect sort (permutation %#)',
+      (permutation) => {
         const sorted = toposort(permutation);
         expect(sorted).to.have.deep.members(permutation);
         expect(sorted.indexOf(child1)).to.be.lessThan(sorted.indexOf(parent1));
-      });
-})
+      },
+  );
+});

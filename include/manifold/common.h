@@ -630,11 +630,13 @@ struct ExecutionParams {
 #ifdef MANIFOLD_DEBUG
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", " << "max: " << box.max;
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", " << "max: " << box.max;
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {

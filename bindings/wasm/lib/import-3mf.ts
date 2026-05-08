@@ -36,8 +36,9 @@ export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
  * the shared import pipeline can apply `importTransform()` consistently across
  * all formats.
  */
-export async function fromArrayBuffer(buffer: ArrayBuffer):
-    Promise<GLTFTransform.Document> {
+export async function fromArrayBuffer(
+    buffer: ArrayBuffer,
+    ): Promise<GLTFTransform.Document> {
   const files = unzipSync(new Uint8Array(buffer));
   const modelData = files['3D/3dmodel.model'];
   if (!modelData) {
@@ -64,8 +65,8 @@ interface Triangle3MF {
 }
 
 interface Mesh3MF {
-  vertices?: {vertex?: Vertex3MF|Array<Vertex3MF>;};
-  triangles?: {triangle?: Triangle3MF|Array<Triangle3MF>;};
+  vertices?: {vertex?: Vertex3MF|Array<Vertex3MF>};
+  triangles?: {triangle?: Triangle3MF|Array<Triangle3MF>};
 }
 
 interface ComponentRef3MF {
@@ -77,13 +78,13 @@ interface ObjectNode3MF {
   id?: number|string;
   name?: string;
   mesh?: Mesh3MF;
-  components?: {component?: ComponentRef3MF|Array<ComponentRef3MF>;};
+  components?: {component?: ComponentRef3MF|Array<ComponentRef3MF>};
 }
 
 interface Model3MF {
   unit?: string;
-  resources?: {object?: ObjectNode3MF|Array<ObjectNode3MF>;};
-  build?: {item?: ComponentRef3MF|Array<ComponentRef3MF>;};
+  resources?: {object?: ObjectNode3MF|Array<ObjectNode3MF>};
+  build?: {item?: ComponentRef3MF|Array<ComponentRef3MF>};
 }
 
 interface Object3MF {
@@ -150,9 +151,11 @@ function parseTransform(value?: string): number[] {
 }
 
 function parseMesh(
-    mesh: Mesh3MF|undefined, doc: GLTFTransform.Document,
+    mesh: Mesh3MF|undefined,
+    doc: GLTFTransform.Document,
     buf: GLTFTransform.Buffer,
-    defaultMaterial: GLTFTransform.Material): GLTFTransform.Mesh|null {
+    defaultMaterial: GLTFTransform.Material,
+    ): GLTFTransform.Mesh|null {
   if (!mesh) return null;
 
   // --- vertices ---
@@ -214,8 +217,11 @@ function parseBuildRefs(model: Model3MF): Array<ObjectRef3MF> {
 }
 
 function instantiateObjectNode(
-    doc: GLTFTransform.Document, objects: Map<string, Object3MF>,
-    ref: ObjectRef3MF, visiting: Set<string>): GLTFTransform.Node|null {
+    doc: GLTFTransform.Document,
+    objects: Map<string, Object3MF>,
+    ref: ObjectRef3MF,
+    visiting: Set<string>,
+    ): GLTFTransform.Node|null {
   const object = objects.get(ref.objectID);
   if (!object) return null;
   if (visiting.has(object.id)) return null;
@@ -238,7 +244,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
     attributeNamePrefix: '',
     trimValues: true,
     parseTagValue: false,
-    parseAttributeValue: false
+    parseAttributeValue: false,
   });
   const parsed = parser.parse(xml) as {model?: Model3MF};
   const model = parsed.model;
@@ -271,7 +277,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
       id,
       name: object.name,
       mesh: parseMesh(object.mesh, doc, buf, defaultMaterial),
-      children: parseComponentRefs(object)
+      children: parseComponentRefs(object),
     });
   }
 

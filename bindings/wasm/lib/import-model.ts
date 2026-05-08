@@ -138,8 +138,9 @@ function getImporter(identifier: ImportFormat|string) {
   return importers.find((im) => im.importFormats.includes(format))!;
 }
 
-function getSourceFilename(source: string|Blob|URL|ArrayBuffer): string|
-    undefined {
+function getSourceFilename(
+    source: string|Blob|URL|ArrayBuffer,
+    ): string|undefined {
   let path: string|undefined;
   if (source instanceof URL) {
     if (source.protocol === 'blob:' || source.protocol === 'data:') return;
@@ -386,16 +387,17 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
 function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
   for (const scene of doc.getRoot().listScenes()) {
     const nodes =
-        scene.listChildren().filter(c => c instanceof GLTFTransform.Node);
+        scene.listChildren().filter((c) => c instanceof GLTFTransform.Node);
     const rotate = euler2quat([90, 0, 0]);
     const scale = 1000;
 
     if (nodes.length === 1) {
       // If there's just one node, transform it in place.
       const [node] = nodes;
-      node.setScale(node.getScale().map(n => n * scale) as GLTFTransform.vec3);
+      node.setScale(
+          node.getScale().map((n) => n * scale) as GLTFTransform.vec3,
+      );
       node.setRotation(multiplyQuat(node.getRotation(), rotate));
-
     } else {
       // If there's more than one node, create a parent node and transform that.
       const parent = doc.createNode();
