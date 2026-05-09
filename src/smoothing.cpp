@@ -14,6 +14,7 @@
 
 #include <unordered_map>
 
+#include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
 
@@ -1094,7 +1095,7 @@ bool Manifold::Impl::ValidTangents() const {
 }
 
 void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
-                            bool keepInterior) {
+                            bool keepInterior, ExecutionContext::Impl* ctx) {
   if (IsEmpty()) return;
 
   if (!ValidTangents()) {
@@ -1105,6 +1106,13 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   Manifold::Impl old = *this;
   halfedge_.MakeUnique();
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
+  // Cancel observed AFTER Subdivide (which is currently cancel-blind) but
+  // BEFORE the no-op early-return: the user requested cancel, so honour it
+  // even when Subdivide produced nothing to interpolate.
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
   if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
@@ -1119,7 +1127,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   } else {
     CalculateVertNormals();
   }
-  SortGeometry();
+  SortGeometry(ctx);
   meshRelation_.originalID = -1;
 }
 

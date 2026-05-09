@@ -817,12 +817,13 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (n > 1) {
-    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
+    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; }, false, ctx.get());
   }
   Manifold result(std::make_shared<CsgLeafNode>(pImpl));
   result.InheritContextFrom(*this);
@@ -841,13 +842,16 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
-  pImpl->Refine([length](vec3 edge, vec4, vec4) {
-    return static_cast<int>(la::length(edge) / length);
-  });
+  pImpl->Refine(
+      [length](vec3 edge, vec4, vec4) {
+        return static_cast<int>(la::length(edge) / length);
+      },
+      false, ctx.get());
   Manifold result(std::make_shared<CsgLeafNode>(pImpl));
   result.InheritContextFrom(*this);
   return result;
@@ -867,7 +871,8 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
@@ -886,7 +891,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
                            la::length(start - end);
           return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
         },
-        true);
+        true, ctx.get());
   }
   Manifold result(std::make_shared<CsgLeafNode>(pImpl));
   result.InheritContextFrom(*this);

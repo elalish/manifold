@@ -640,6 +640,27 @@ TEST(Manifold, ManifoldContextStatusObservesAttached) {
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
+// Refine variants propagate the attachment to their results, just like the
+// transform / boolean / hull ops.
+TEST(Manifold, ManifoldContextPropagatesThroughRefine) {
+  ExecutionContext ctx;
+  Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  EXPECT_TRUE(cube.Refine(2).GetContext().has_value());
+  EXPECT_TRUE(cube.RefineToLength(0.5).GetContext().has_value());
+  EXPECT_TRUE(cube.RefineToTolerance(0.1).GetContext().has_value());
+}
+
+// A pre-cancelled attached ctx aborts Refine -- the cancel check sits
+// between Subdivide and the post-pass (SetNormalsAndCoplanar / SortGeometry),
+// so the result is empty with status Cancelled.
+TEST(Manifold, ManifoldContextCancelMidRefine) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  Manifold refined = cube.Refine(4);
+  EXPECT_EQ(refined.Status(), Manifold::Error::Cancelled);
+}
+
 // Cancellation set on the user's ctx aborts evaluation of an attached
 // Manifold's no-arg Status() midway, just like the explicit-ctx form.
 TEST(Manifold, ManifoldContextCancelMidEval) {

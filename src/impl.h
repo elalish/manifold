@@ -192,7 +192,8 @@ struct Manifold::Impl {
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
-  void Refine(std::function<int(vec3, vec4, vec4)>, bool = false);
+  void Refine(std::function<int(vec3, vec4, vec4)>, bool = false,
+              ExecutionContext::Impl* ctx = nullptr);
 
   // quickhull.cpp
   void Hull(VecView<const vec3> vertPos);
