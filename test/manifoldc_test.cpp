@@ -726,17 +726,21 @@ TEST(CBIND, execution_context_happy_path) {
   // Fresh ctx with no scheduled work reads as trivially complete (1.0).
   EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 1.0);
 
-  // Uncancelled ctx on a valid evaluation returns NO_ERROR.
+  // Uncancelled ctx attached to a manifold means Status routes through ctx.
   ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
   ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
-  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_NO_ERROR);
+  ManifoldManifold* uctx =
+      manifold_with_context(alloc_manifold_buffer(), u, ctx);
+  EXPECT_EQ(manifold_status(uctx), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
 
+  manifold_destruct_manifold(uctx);
   manifold_destruct_manifold(u);
   manifold_destruct_manifold(cube2);
   manifold_destruct_manifold(cube1);
   manifold_destruct_execution_context(ctx);
+  free(uctx);
   free(u);
   free(cube2);
   free(cube1);
@@ -750,18 +754,54 @@ TEST(CBIND, execution_context_cancel) {
   manifold_execution_context_cancel(ctx);
   EXPECT_EQ(manifold_execution_context_cancelled(ctx), 1);
 
-  // Status on a Manifold that needs evaluation, with the cancelled ctx,
-  // short-circuits to MANIFOLD_CANCELLED.
+  // Status on a Manifold that needs evaluation, with the cancelled ctx
+  // attached, short-circuits to MANIFOLD_CANCELLED.
   ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
   ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
-  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_CANCELLED);
+  ManifoldManifold* uctx =
+      manifold_with_context(alloc_manifold_buffer(), u, ctx);
+  EXPECT_EQ(manifold_status(uctx), MANIFOLD_CANCELLED);
 
+  manifold_destruct_manifold(uctx);
   manifold_destruct_manifold(u);
   manifold_destruct_manifold(cube2);
   manifold_destruct_manifold(cube1);
+  free(uctx);
   free(u);
   free(cube2);
   free(cube1);
   manifold_delete_execution_context(ctx);
+}
+
+TEST(CBIND, execution_context_attach_detach_roundtrip) {
+  ManifoldExecutionContext* ctx =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  ManifoldManifold* cube = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
+  EXPECT_EQ(manifold_has_context(cube), 0);
+
+  ManifoldManifold* cubeCtx =
+      manifold_with_context(alloc_manifold_buffer(), cube, ctx);
+  EXPECT_EQ(manifold_has_context(cubeCtx), 1);
+
+  // get_context returns a fresh handle that shares state.
+  ManifoldExecutionContext* got =
+      manifold_get_context(malloc(manifold_execution_context_size()), cubeCtx);
+  manifold_execution_context_cancel(ctx);
+  EXPECT_EQ(manifold_execution_context_cancelled(got), 1);
+
+  ManifoldManifold* cubeDetached =
+      manifold_without_context(alloc_manifold_buffer(), cubeCtx);
+  EXPECT_EQ(manifold_has_context(cubeDetached), 0);
+
+  manifold_destruct_execution_context(got);
+  manifold_destruct_manifold(cubeDetached);
+  manifold_destruct_manifold(cubeCtx);
+  manifold_destruct_manifold(cube);
+  manifold_destruct_execution_context(ctx);
+  free(got);
+  free(cubeDetached);
+  free(cubeCtx);
+  free(cube);
+  free(ctx);
 }

@@ -286,8 +286,11 @@ std::string Status(Manifold& manifold) {
   return ErrorToString(manifold.Status());
 }
 
-std::string StatusWithContext(Manifold& manifold, ExecutionContext& ctx) {
-  return ErrorToString(manifold.Status(ctx));
+bool HasContext(const Manifold& manifold) { return manifold.HasContext(); }
+
+ExecutionContext GetContext(const Manifold& manifold) {
+  // Precondition: caller checked hasContext().
+  return *manifold.GetContext();
 }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {

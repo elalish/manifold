@@ -214,10 +214,26 @@ ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 
 int manifold_is_empty(ManifoldManifold* m);
 ManifoldError manifold_status(ManifoldManifold* m);
-// Variant of manifold_status that observes progress and allows cancellation
-// via the ExecutionContext. See manifold_execution_context.
-ManifoldError manifold_status_with_context(ManifoldManifold* m,
-                                           ManifoldExecutionContext* ctx);
+// Returns a copy of the manifold with the given ExecutionContext attached.
+// Subsequent operations on the result (and its derived manifolds) observe
+// progress and cancellation through this context. The attachment travels
+// with the data: copying propagates it; ops like Boolean / Translate / Hull
+// inherit it from the primary operand. To remove the attachment, use
+// manifold_without_context. To inspect, use manifold_get_context.
+ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
+                                        ManifoldExecutionContext* ctx);
+// Returns a copy of the manifold with no attached ExecutionContext.
+ManifoldManifold* manifold_without_context(void* mem, ManifoldManifold* m);
+// Returns 1 iff an ExecutionContext is currently attached to m, else 0.
+int manifold_has_context(ManifoldManifold* m);
+// Returns the attached ExecutionContext as a fresh handle that shares state
+// with the attached one (cancelling the returned ctx cancels the attached
+// evaluation). PRECONDITION: manifold_has_context(m) returns 1; otherwise
+// behavior is undefined. The returned pointer is derived from `mem` and is
+// released the same way other manifold_execution_context* allocations are
+// (manifold_destruct_execution_context + free if you malloc'd `mem`, or
+// manifold_delete_execution_context if you used manifold_alloc_*).
+ManifoldExecutionContext* manifold_get_context(void* mem, ManifoldManifold* m);
 size_t manifold_num_vert(ManifoldManifold* m);
 size_t manifold_num_edge(ManifoldManifold* m);
 size_t manifold_num_tri(ManifoldManifold* m);
@@ -254,9 +270,11 @@ size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
 
 // ExecutionContext: observe progress and request cancellation of a
-// long-running Manifold evaluation. Pass to manifold_status_with_context.
-// Safe to read/write from any thread. See the ExecutionContext class in
-// common.h for full semantics (sticky cancel, per-boolean granularity).
+// long-running Manifold evaluation. Attach to a manifold via
+// manifold_with_context; subsequent operations on that manifold observe
+// the context. Safe to read/write from any thread. See the ExecutionContext
+// class in common.h for full semantics (sticky cancel, per-boolean
+// granularity).
 ManifoldExecutionContext* manifold_execution_context(void* mem);
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
 int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx);

@@ -188,9 +188,9 @@ struct RayHit {
  * Cancellation is permanent for a Manifold: once requested and detected,
  * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
  * retry, construct a new Manifold. A context, however, is reusable: each
- * Status(ctx) call resets the progress counters, but it does NOT clear
- * the cancel flag — once Cancel() has been called on a context, every
- * subsequent evaluation with that context (or any copy of it) will
+ * evaluation through it resets the progress counters, but it does NOT
+ * clear the cancel flag -- once Cancel() has been called on a context,
+ * every subsequent evaluation with that context (or any copy of it) will
  * short-circuit to Error::Cancelled. Construct a fresh context to make a
  * new evaluation cancellable independently.
  *
@@ -200,10 +200,10 @@ struct RayHit {
  *
  * Example: cancel from an observer thread.
  * @code
- * Manifold big = Manifold::BatchBoolean(items, OpType::Add);
  * ExecutionContext ctx;
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add).WithContext(ctx);
  * std::thread eval([&] {
- *   if (big.Status(ctx) == Manifold::Error::Cancelled) {
+ *   if (big.Status() == Manifold::Error::Cancelled) {
  *     // evaluation was cancelled
  *   }
  * });
@@ -236,6 +236,10 @@ class ExecutionContext {
   /// accessible only to internal code that includes that header.
   struct Impl;
   std::shared_ptr<Impl> impl_;
+
+  /// @internal Construct from an existing Impl, skipping the default Impl
+  /// allocation. For library use (e.g. Manifold::GetContext) only.
+  explicit ExecutionContext(std::shared_ptr<Impl> impl) noexcept;
 };
 
 /**

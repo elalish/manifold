@@ -1168,13 +1168,38 @@ export class Manifold {
   status(): ErrorStatus;
 
   /**
-   * Like status() but observes evaluation progress and allows cancellation
-   * via the provided ExecutionContext. If cancel is requested mid-evaluation,
-   * returns 'Cancelled' and the Manifold's status becomes permanent.
+   * Returns a copy of this Manifold with the given ExecutionContext attached.
+   * Subsequent operations on the result (and its derived Manifolds) observe
+   * progress and cancellation through this context. The attachment travels
+   * with the data: copying propagates it; ops like Boolean / translate / hull
+   * inherit it from the primary operand. Use withoutContext() to detach.
    *
    * @group Information
    */
-  statusWithContext(ctx: ExecutionContext): ErrorStatus;
+  withContext(ctx: ExecutionContext): Manifold;
+
+  /**
+   * Returns a copy of this Manifold with no attached ExecutionContext.
+   *
+   * @group Information
+   */
+  withoutContext(): Manifold;
+
+  /**
+   * Whether an ExecutionContext is currently attached to this Manifold.
+   *
+   * @group Information
+   */
+  hasContext(): boolean;
+
+  /**
+   * Returns the attached ExecutionContext as a fresh handle that shares
+   * state with the attached one (cancelling the returned ctx cancels the
+   * attached evaluation). PRECONDITION: hasContext() returns true.
+   *
+   * @group Information
+   */
+  getContext(): ExecutionContext;
 
   // Export
 

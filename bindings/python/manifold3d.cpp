@@ -387,14 +387,13 @@ NB_MODULE(manifold3d, m) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
-      .def(
-          "status",
-          static_cast<Manifold::Error (Manifold::*)() const>(&Manifold::Status),
-          manifold__status)
-      .def("status",
-           static_cast<Manifold::Error (Manifold::*)(ExecutionContext&) const>(
-               &Manifold::Status),
-           nb::arg("ctx"), manifold__status__ctx)
+      .def("status", &Manifold::Status, manifold__status)
+      .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
+           manifold__with_context__ctx)
+      .def("without_context", &Manifold::WithoutContext,
+           manifold__without_context)
+      .def("get_context", &Manifold::GetContext, manifold__get_context)
+      .def("has_context", &Manifold::HasContext, manifold__has_context)
       .def(
           "bounding_box",
           [](const Manifold& self) {

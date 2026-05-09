@@ -17,6 +17,7 @@
 #include <functional>
 #include <memory>  // needed for shared_ptr
 #include <mutex>
+#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -381,7 +382,32 @@ class Manifold {
    */
   ///@{
   Error Status() const;
-  Error Status(ExecutionContext& ctx) const;
+
+  /// Returns a copy of this Manifold with the given ExecutionContext attached.
+  /// Subsequent operations on the result (and its derived Manifolds) observe
+  /// progress and cancellation through this context. The attachment travels
+  /// with the data: copying the Manifold copies the attachment, and operations
+  /// like Boolean / Translate / Hull propagate the attachment to their
+  /// results.
+  ///
+  /// To remove the attachment from a derived Manifold (e.g. before handing it
+  /// to code that shouldn't observe), use WithoutContext().
+  ///
+  /// When two ctx-attached Manifolds are combined (e.g. `a.Boolean(b, op)`
+  /// where both have ctx), the result inherits the `*this` Manifold's
+  /// context; the other operand's context is ignored.
+  Manifold WithContext(const ExecutionContext& ctx) const;
+  /// Returns a copy of this Manifold with no attached ExecutionContext.
+  Manifold WithoutContext() const;
+  /// Returns the attached ExecutionContext if any, else nullopt. The
+  /// returned context shares state with the attached one (cancelling it
+  /// cancels the attached evaluation; reading Progress() reflects the
+  /// attached counters).
+  std::optional<ExecutionContext> GetContext() const;
+  /// Whether an ExecutionContext is currently attached. Cheap (no
+  /// allocation) compared to `GetContext().has_value()`.
+  bool HasContext() const;
+
   bool IsEmpty() const;
   size_t NumVert() const;
   size_t NumEdge() const;
@@ -543,9 +569,28 @@ class Manifold {
   mutable std::shared_ptr<std::mutex> pNodeMutex_ =
       std::make_shared<std::mutex>();
   mutable std::shared_ptr<CsgNode> pNode_;
+  // Optional attached ExecutionContext. shared_ptr so the Impl outlives
+  // the user's ExecutionContext if a ctx-attached Manifold survives it.
+  // Propagates through copy ctor / op= and through every Manifold-returning
+  // operation (via InheritContextFrom applied at result construction).
+  //
+  // Accessed only via std::atomic_load / std::atomic_store: no const
+  // method mutates ctx_, but op= and the copy ctor write it on a Manifold
+  // that may be concurrently observed by const methods on other threads.
+  // The atomic-shared-ptr free functions give a torn-read-free snapshot
+  // without taking a lock; the snapshot's strong reference also keeps the
+  // Impl alive across long-running evaluations even if op= reseats ctx_
+  // mid-eval. (pNode_ uses a mutex instead because lazy CSG eval mutates
+  // it through const methods, which atomic_load can't model.)
+  std::shared_ptr<ExecutionContext::Impl> ctx_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;
   CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;
+  // Helper: given the "primary" operand's Manifold (typically `*this` for
+  // member ops, or the first operand for static factories that combine
+  // multiple Manifolds), copy its ctx_ onto this. Used at result
+  // construction in Manifold-returning ops.
+  void InheritContextFrom(const Manifold& primary);
 };
 /** @} */
 

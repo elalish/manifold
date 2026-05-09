@@ -126,6 +126,7 @@ Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 Manifold::Manifold(const Manifold& other) {
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
+  std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
 }
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
@@ -149,8 +150,51 @@ Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
+    std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
   }
   return *this;
+}
+
+/**
+ * Returns a copy of this Manifold with the given ExecutionContext attached.
+ * Subsequent operations on the result (and its derived Manifolds) observe
+ * progress and cancellation through this context. The attachment travels
+ * with the data: copying propagates it; ops like Boolean / Translate / Hull
+ * inherit it from the primary operand. Use WithoutContext to detach.
+ */
+Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
+  Manifold result = *this;
+  std::atomic_store(&result.ctx_, ctx.impl_);
+  return result;
+}
+
+/**
+ * Returns a copy of this Manifold with no attached ExecutionContext.
+ */
+Manifold Manifold::WithoutContext() const {
+  Manifold result = *this;
+  std::atomic_store(&result.ctx_, std::shared_ptr<ExecutionContext::Impl>{});
+  return result;
+}
+
+/**
+ * Returns the attached ExecutionContext if any, else nullopt. The returned
+ * context shares state with the attached one; cancelling it cancels the
+ * attached evaluation.
+ */
+std::optional<ExecutionContext> Manifold::GetContext() const {
+  auto snapshot = std::atomic_load(&ctx_);
+  if (!snapshot) return std::nullopt;
+  return ExecutionContext{std::move(snapshot)};
+}
+
+/**
+ * Whether an ExecutionContext is currently attached to this Manifold.
+ */
+bool Manifold::HasContext() const { return std::atomic_load(&ctx_) != nullptr; }
+
+void Manifold::InheritContextFrom(const Manifold& primary) {
+  std::atomic_store(&ctx_, std::atomic_load(&primary.ctx_));
 }
 
 std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
@@ -268,20 +312,12 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  * NoError, for instance the intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
-  return GetCsgLeafNode().GetImpl()->status_;
-}
-/**
- * Like Status() but observes evaluation progress and allows cancellation
- * via the provided ExecutionContext. If cancel is requested mid-evaluation,
- * returns Error::Cancelled and the Manifold's status becomes permanent.
- *
- * During evaluation, ExecutionContext::Progress() increases monotonically
- * from 0 to 1 as boolean combinations complete. ExecutionContext::Cancel()
- * can be called from any thread to request early exit. Cancellation
- * granularity is per-boolean-operation.
- */
-Manifold::Error Manifold::Status(ExecutionContext& ctx) const {
-  return GetCsgLeafNode(ctx.impl_.get()).GetImpl()->status_;
+  // Routes through any attached ExecutionContext (see WithContext). The
+  // atomic_load temporary pins the Impl's lifetime for the duration of the
+  // full expression -- through the lazy eval inside GetCsgLeafNode -- so a
+  // concurrent op= reseating ctx_ on this Manifold can't free the Impl
+  // out from under us.
+  return GetCsgLeafNode(std::atomic_load(&ctx_).get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -357,7 +393,9 @@ Manifold Manifold::SetTolerance(double tolerance) const {
     // equal to epsilon.
     impl->tolerance_ = std::max(impl->epsilon_, tolerance);
   }
-  return Manifold(impl);
+  Manifold result(impl);
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -381,7 +419,9 @@ Manifold Manifold::Simplify(double tolerance) const {
   impl->SimplifyTopology();
   impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
-  return Manifold(impl);
+  Manifold result(impl);
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -431,7 +471,9 @@ Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal();
   newImpl->SetNormalsAndCoplanar();
-  return Manifold(std::make_shared<CsgLeafNode>(newImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(newImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -468,7 +510,9 @@ size_t Manifold::NumDegenerateTris() const {
  * @param v The vector to add to every vertex.
  */
 Manifold Manifold::Translate(vec3 v) const {
-  return Manifold(LoadPNode()->Translate(v));
+  Manifold result(LoadPNode()->Translate(v));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -478,7 +522,9 @@ Manifold Manifold::Translate(vec3 v) const {
  * @param v The vector to multiply every vertex by per component.
  */
 Manifold Manifold::Scale(vec3 v) const {
-  return Manifold(LoadPNode()->Scale(v));
+  Manifold result(LoadPNode()->Scale(v));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -502,7 +548,9 @@ Manifold Manifold::Scale(vec3 v) const {
  */
 Manifold Manifold::Rotate(double xDegrees, double yDegrees,
                           double zDegrees) const {
-  return Manifold(LoadPNode()->Rotate(xDegrees, yDegrees, zDegrees));
+  Manifold result(LoadPNode()->Rotate(xDegrees, yDegrees, zDegrees));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -513,7 +561,9 @@ Manifold Manifold::Rotate(double xDegrees, double yDegrees,
  * @param m The affine transform matrix to apply to all the vertices.
  */
 Manifold Manifold::Transform(const mat3x4& m) const {
-  return Manifold(LoadPNode()->Transform(m));
+  Manifold result(LoadPNode()->Transform(m));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -529,11 +579,15 @@ Manifold Manifold::Mirror(vec3 normal) const {
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
-    return Manifold();
+    Manifold empty;
+    empty.InheritContextFrom(*this);
+    return empty;
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
-  return Manifold(LoadPNode()->Transform(m));
+  Manifold result(LoadPNode()->Transform(m));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -551,7 +605,9 @@ Manifold Manifold::Warp(std::function<void(vec3&)> warpFunc) const {
     return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->Warp(warpFunc);
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -568,7 +624,9 @@ Manifold Manifold::WarpBatch(
     return PropagateStatus(oldImpl->status_);
   auto pImpl = std::make_shared<Impl>(*oldImpl);
   pImpl->WarpBatch(warpFunc);
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -619,7 +677,9 @@ Manifold Manifold::SetProperties(
   }
 
   pImpl->numProp_ = numProp;
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -644,7 +704,9 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -668,7 +730,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -693,7 +757,9 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
   if (!IsEmpty()) {
     pImpl->CreateTangents(normalIdx);
   }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -734,7 +800,9 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
       pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
     }
   }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -756,7 +824,9 @@ Manifold Manifold::Refine(int n) const {
   if (n > 1) {
     pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
   }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -778,7 +848,9 @@ Manifold Manifold::RefineToLength(double length) const {
   pImpl->Refine([length](vec3 edge, vec4, vec4) {
     return static_cast<int>(la::length(edge) / length);
   });
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -816,7 +888,9 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
         },
         true);
   }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  Manifold result(std::make_shared<CsgLeafNode>(pImpl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -834,12 +908,16 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  return Manifold(LoadPNode()->Boolean(second.LoadPNode(), op));
+  Manifold result(LoadPNode()->Boolean(second.LoadPNode(), op));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
  * Perform the given boolean operation on a list of Manifolds. In case of
- * Subtract, all Manifolds in the tail are differenced from the head.
+ * Subtract, all Manifolds in the tail are differenced from the head. If
+ * the input list is empty, returns a default-constructed Manifold with no
+ * attached ExecutionContext (no source operand to inherit from).
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
@@ -850,7 +928,9 @@ Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
   for (const auto& m : manifolds) children.push_back(m.LoadPNode());
-  return Manifold(std::make_shared<CsgOpNode>(children, op));
+  Manifold result(std::make_shared<CsgOpNode>(children, op));
+  result.InheritContextFrom(manifolds[0]);
+  return result;
 }
 
 /**
@@ -914,7 +994,11 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
       std::make_unique<Impl>(boolean.Result(OpType::Intersect)));
   auto result2 = std::make_shared<CsgLeafNode>(
       std::make_unique<Impl>(boolean.Result(OpType::Subtract)));
-  return std::make_pair(Manifold(result1), Manifold(result2));
+  Manifold m1(result1);
+  Manifold m2(result2);
+  m1.InheritContextFrom(*this);
+  m2.InheritContextFrom(*this);
+  return std::make_pair(m1, m2);
 }
 
 /**
@@ -964,7 +1048,9 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return aImpl->Minkowski(*bImpl, false);
+  Manifold result = aImpl->Minkowski(*bImpl, false);
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -981,7 +1067,9 @@ Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return aImpl->Minkowski(*bImpl, true);
+  Manifold result = aImpl->Minkowski(*bImpl, true);
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
@@ -1028,11 +1116,16 @@ Manifold Manifold::Hull() const {
     return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
   impl->Hull(srcImpl->vertPos_);
-  return Manifold(std::make_shared<CsgLeafNode>(impl));
+  Manifold result(std::make_shared<CsgLeafNode>(impl));
+  result.InheritContextFrom(*this);
+  return result;
 }
 
 /**
- * Compute the convex hull enveloping a set of manifolds.
+ * Compute the convex hull enveloping a set of manifolds. If the input list
+ * is empty (or all input manifolds are empty), returns a default-constructed
+ * Manifold with no attached ExecutionContext (no source operand to inherit
+ * from).
  *
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
@@ -1052,7 +1145,9 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   }
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
   impl->Hull(VecView<const vec3>(vertPos));
-  return Manifold(std::make_shared<CsgLeafNode>(impl));
+  Manifold result(std::make_shared<CsgLeafNode>(impl));
+  result.InheritContextFrom(manifolds[0]);
+  return result;
 }
 
 /**

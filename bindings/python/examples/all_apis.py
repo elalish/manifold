@@ -111,14 +111,17 @@ def all_manifold():
     _ = ctx.cancelled()
     _ = ctx.progress()
     ctx.cancel()
-    e = m.status(ctx)
+    m = m.with_context(ctx)
+    _ = m.has_context()
+    _ = m.get_context()
+    m = m.without_context()
     # Real cancel assertion: a pre-cancelled ctx on a CsgOpNode returns
     # Cancelled (not NoError). Leaf nodes are trivially evaluated so use a
     # fresh union to ensure an actual CSG tree is traversed.
     cancelled_ctx = ExecutionContext()
     cancelled_ctx.cancel()
-    tree = Manifold.cube() + Manifold.sphere(1)
-    assert tree.status(cancelled_ctx) == Error.Cancelled
+    tree = (Manifold.cube() + Manifold.sphere(1)).with_context(cancelled_ctx)
+    assert tree.status() == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
     ok = mesh.merge()

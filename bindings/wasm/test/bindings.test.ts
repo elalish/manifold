@@ -62,11 +62,32 @@ suite('Manifold Bindings', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const sphere = manifoldModule.Manifold.sphere(1.0, 8);
     const u = cube.add(sphere);
-    expect(u.statusWithContext(ctx)).toEqual('NoError');
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('NoError');
 
     cube.delete();
     sphere.delete();
     u.delete();
+    uCtx.delete();
+    ctx.delete();
+  });
+
+  test('hasContext / getContext round-trip', () => {
+    const ctx = new manifoldModule.ExecutionContext();
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    expect(cube.hasContext()).toBe(false);
+
+    const cubeCtx = cube.withContext(ctx);
+    expect(cubeCtx.hasContext()).toBe(true);
+    const got = cubeCtx.getContext();
+    // Returned ctx shares state: cancel via the original, observe via the
+    // retrieved one.
+    ctx.cancel();
+    expect(got.cancelled()).toBe(true);
+
+    cube.delete();
+    cubeCtx.delete();
+    got.delete();
     ctx.delete();
   });
 
@@ -78,11 +99,13 @@ suite('Manifold Bindings', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const sphere = manifoldModule.Manifold.sphere(1.0, 8);
     const u = cube.add(sphere);
-    expect(u.statusWithContext(ctx)).toEqual('Cancelled');
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('Cancelled');
 
     cube.delete();
     sphere.delete();
     u.delete();
+    uCtx.delete();
     ctx.delete();
   });
 
