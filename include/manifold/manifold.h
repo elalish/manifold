@@ -586,11 +586,22 @@ class Manifold {
 
   std::shared_ptr<CsgNode> LoadPNode() const;
   CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;
-  // Helper: given the "primary" operand's Manifold (typically `*this` for
-  // member ops, or the first operand for static factories that combine
-  // multiple Manifolds), copy its ctx_ onto this. Used at result
-  // construction in Manifold-returning ops.
+  // Copy the attached ExecutionContext from `primary` onto this Manifold.
+  // The "primary" operand is `*this` for member ops, or the first operand
+  // for static factories that combine multiple Manifolds.
   void InheritContextFrom(const Manifold& primary);
+  // Convenience: constructs a Manifold from `arg` and inherits our ctx
+  // onto it. Used by Manifold-returning member ops to collapse the
+  // construct-then-inherit-then-return pattern. Templated to forward
+  // through derived shared_ptr types (e.g. shared_ptr<CsgLeafNode>),
+  // which would otherwise need two user-defined conversions.
+  // Static factories use the lvalue form: `manifolds[0].Derived(...)`.
+  template <typename T>
+  Manifold Derived(T&& arg) const {
+    Manifold result(std::forward<T>(arg));
+    result.InheritContextFrom(*this);
+    return result;
+  }
 };
 /** @} */
 
