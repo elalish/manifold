@@ -72,25 +72,6 @@ suite('Manifold Bindings', () => {
     ctx.delete();
   });
 
-  test('hasContext / getContext round-trip', () => {
-    const ctx = new manifoldModule.ExecutionContext();
-    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
-    expect(cube.hasContext()).toBe(false);
-
-    const cubeCtx = cube.withContext(ctx);
-    expect(cubeCtx.hasContext()).toBe(true);
-    const got = cubeCtx.getContext();
-    // Returned ctx shares state: cancel via the original, observe via the
-    // retrieved one.
-    ctx.cancel();
-    expect(got.cancelled()).toBe(true);
-
-    cube.delete();
-    cubeCtx.delete();
-    got.delete();
-    ctx.delete();
-  });
-
   test('ExecutionContext cancels pending evaluation', () => {
     const ctx = new manifoldModule.ExecutionContext();
     ctx.cancel();

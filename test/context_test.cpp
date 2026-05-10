@@ -40,7 +40,7 @@ TEST(Manifold, ExecutionContextProgress) {
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
   ExecutionContext ctx;
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 4);  // 5 leaves - 1
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 4);
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
@@ -54,7 +54,7 @@ TEST(Manifold, ExecutionContextAlreadyEvaluated) {
   EXPECT_EQ(u.Status(), Manifold::Error::NoError);
 
   ExecutionContext ctx;
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
 }
@@ -70,7 +70,7 @@ TEST(Manifold, ExecutionContextCancelBeforeEval) {
 
   ExecutionContext ctx;
   ctx.Cancel();
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::Cancelled);
 }
 
 // Cancel from another thread mid-evaluation. Expensive CSG tree so there's
@@ -92,7 +92,7 @@ TEST(Manifold, ExecutionContextCancelConcurrent) {
 
   ExecutionContext ctx;
   std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] { result.store(u.WithContext(ctx).Status()); });
+  std::thread evalThread([&] { result.store(u.With(ctx).Status()); });
 
   // Yield briefly so evaluation starts, then request cancel.
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -130,7 +130,7 @@ TEST(Manifold, ExecutionContextCancelMidBoolean) {
 
   ExecutionContext ctx;
   std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] { result.store(u.WithContext(ctx).Status()); });
+  std::thread evalThread([&] { result.store(u.With(ctx).Status()); });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
   ctx.Cancel();
@@ -160,7 +160,7 @@ TEST(Manifold, ExecutionContextMatchesPlainStatus) {
 
   Manifold::Error aStatus = a.Status();
   ExecutionContext ctx;
-  Manifold::Error bStatus = b.WithContext(ctx).Status();
+  Manifold::Error bStatus = b.With(ctx).Status();
   EXPECT_EQ(aStatus, bStatus);
 }
 
@@ -171,7 +171,7 @@ TEST(Manifold, ExecutionContextProgressSubtract) {
                Manifold::Tetrahedron() - Manifold::Cube(vec3(0.5), true);
 
   ExecutionContext ctx;
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 3);  // 4 leaves - 1
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 3);
 }
@@ -191,11 +191,11 @@ TEST(Manifold, ExecutionContextReuse) {
   Manifold b = makeTree(3);
 
   ExecutionContext ctx;
-  EXPECT_EQ(a.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(a.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 4);
 
   // Reuse ctx for b. doneBooleans should reset to 0 at start.
-  EXPECT_EQ(b.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(b.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
@@ -212,14 +212,14 @@ TEST(Manifold, ExecutionContextCancelPermanent) {
 
   ExecutionContext ctx;
   ctx.Cancel();  // cancel before any work
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::Cancelled);
 
   // Plain Status() on the same Manifold should still report Cancelled —
   // the cached leaf is the Cancelled one.
   EXPECT_EQ(u.Status(), Manifold::Error::Cancelled);
 
   // Re-querying with the same context (still cancelled) is still Cancelled.
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::Cancelled);
 }
 
 // Once a context is cancelled it stays cancelled for any future evaluation
@@ -231,12 +231,12 @@ TEST(Manifold, ExecutionContextCancelStickyAcrossManifolds) {
   // Fresh Manifold that needs evaluation (CsgOpNode, not a leaf) — the
   // cancelled ctx should short-circuit it to Cancelled.
   Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::Cancelled);
 
   // Another unrelated Manifold, same ctx — also Cancelled.
   Manifold v =
       Manifold::Tetrahedron() + Manifold::Sphere(0.3).Translate(vec3(2, 0, 0));
-  EXPECT_EQ(v.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(v.With(ctx).Status(), Manifold::Error::Cancelled);
 }
 
 // A cancelled ctx does NOT contaminate a fresh context: constructing a new
@@ -245,12 +245,11 @@ TEST(Manifold, ExecutionContextFreshContextEscapesCancel) {
   ExecutionContext cancelledCtx;
   cancelledCtx.Cancel();
   Manifold dead = Manifold::Cube() + Manifold::Sphere(0.5);
-  EXPECT_EQ(dead.WithContext(cancelledCtx).Status(),
-            Manifold::Error::Cancelled);
+  EXPECT_EQ(dead.With(cancelledCtx).Status(), Manifold::Error::Cancelled);
 
   ExecutionContext fresh;
   Manifold live = Manifold::Cube() + Manifold::Sphere(0.5);
-  EXPECT_EQ(live.WithContext(fresh).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(live.With(fresh).Status(), Manifold::Error::NoError);
   EXPECT_FALSE(fresh.Cancelled());
 }
 
@@ -262,7 +261,7 @@ TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
   Manifold cube = Manifold::Cube();  // CsgLeafNode from the start
   ExecutionContext ctx;
   ctx.Cancel();
-  EXPECT_EQ(cube.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(cube.With(ctx).Status(), Manifold::Error::NoError);
 }
 
 // Progress is observable from another thread while evaluation runs.
@@ -289,7 +288,7 @@ TEST(Manifold, ExecutionContextConcurrentProgress) {
     }
   });
 
-  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
   observer.join();
   // Final state invariants.
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 29);
@@ -308,7 +307,7 @@ TEST(Manifold, ExecutionContextProgressReachesOneOnTrivialBooleans) {
   ExecutionContext ctx;
   // Boolean of empty + cube: Boolean3::Result takes the IsEmpty fast-path.
   Manifold result = Manifold() + Manifold::Cube();
-  EXPECT_EQ(result.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
   EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean);
@@ -343,7 +342,7 @@ TEST(Manifold, ExecutionContextSubBooleanProgress) {
     }
   });
 
-  EXPECT_EQ(result.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.With(ctx).Status(), Manifold::Error::NoError);
   observer.join();
   // Final state: exactly kPhasesPerBoolean phases per completed Boolean.
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
@@ -366,12 +365,12 @@ TEST(Manifold, ExecutionContextNoStaleState) {
   Manifold leaf = Manifold::Cube(vec3(1), true);
 
   ExecutionContext ctx;
-  EXPECT_EQ(complex.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(complex.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
 
   // Now evaluate a leaf Manifold with the same ctx. Counters should
   // reflect that there's no work to do (0/0), not the stale 2/2.
-  EXPECT_EQ(leaf.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(leaf.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
 }
@@ -411,7 +410,7 @@ TEST(Manifold, ExecutionContextMoveSemantics) {
 TEST(Manifold, ExecutionContextNoWorkNeeded) {
   Manifold cube = Manifold::Cube(vec3(1), true);
   ExecutionContext ctx;
-  EXPECT_EQ(cube.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(cube.With(ctx).Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
   // No work scheduled = trivially complete = 1.0.
@@ -429,7 +428,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
         Manifold::Cube(vec3(2), true).Translate(vec3(0, 0.5, 0))};
     Manifold u = Manifold::BatchBoolean(items, OpType::Intersect);
     ExecutionContext ctx;
-    EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+    EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
     EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
@@ -440,7 +439,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
                   Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0))) -
                  Manifold::Tetrahedron();
     ExecutionContext ctx;
-    EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+    EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 2);  // 3 leaves - 1
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
     EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
@@ -454,7 +453,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
     }
     Manifold u = Manifold::BatchBoolean(items, OpType::Add);
     ExecutionContext ctx;
-    EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+    EXPECT_EQ(u.With(ctx).Status(), Manifold::Error::NoError);
     EXPECT_EQ(ctx.impl_->totalBooleans.load(), 5);
     EXPECT_EQ(ctx.impl_->doneBooleans.load(), 5);
     // Progress == 1.0 here is the load-bearing assertion: it cross-checks
@@ -537,94 +536,84 @@ TEST(Manifold, ParallelStableSortStability) {
   }
 }
 
-// ---- Data-attached ExecutionContext (WithContext / GetContext) ------------
+// ---- Data-attached ExecutionContext (With) -------------------------------
+//
+// Behavioral tests for the attach-ctx model: With() attaches a ctx that is
+// consumed only by the next eager op on the result (Status, Refine family).
+// Deferred ops (Boolean, transforms, batch ops) ignore any attached ctx and
+// produce a result with no attached ctx. Raw copy / assignment preserves the
+// attachment (it's the same logical Manifold).
+//
+// "No attached ctx" is asserted behaviorally: pre-set a sentinel value on
+// the ctx counters, then trigger Status() on the result. If the result has
+// no attached ctx, GetCsgLeafNode(nullptr) skips the counter-reset path,
+// leaving the sentinel intact. If a ctx is attached, the reset overwrites it.
 
-// A Manifold without an attachment reports nullopt; WithContext attaches a
-// shared-state copy of the user's ctx; WithoutContext detaches.
-TEST(Manifold, ManifoldContextAttachAndDetach) {
-  Manifold cube = Manifold::Cube(vec3(1), true);
-  EXPECT_FALSE(cube.GetContext().has_value());
-
+// Raw copy preserves the attachment: ctx-attached on the source means
+// Status on the copy observes the same ctx.
+TEST(Manifold, ManifoldContextRawCopyPreservesAttachment) {
   ExecutionContext ctx;
-  Manifold attached = cube.WithContext(ctx);
-  ASSERT_TRUE(attached.GetContext().has_value());
-  // The retrieved ctx shares state with the attached one (cancel propagates).
-  ctx.Cancel();
-  EXPECT_TRUE(attached.GetContext()->Cancelled());
+  Manifold u = Manifold::Cube(vec3(1), true) +
+               Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
+  Manifold attached = u.With(ctx);
+  Manifold copy = attached;  // copy ctor
 
-  Manifold detached = attached.WithoutContext();
-  EXPECT_FALSE(detached.GetContext().has_value());
+  EXPECT_EQ(copy.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);  // 2 leaves - 1
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
 }
 
-// WithoutContext truly clears the attachment from the chain: subsequent ops
-// must not pick the ctx back up from a memoized hidden source.
-TEST(Manifold, ManifoldContextWithoutContextChainStaysClear) {
+// Assignment also preserves the attachment.
+TEST(Manifold, ManifoldContextAssignmentPreservesAttachment) {
   ExecutionContext ctx;
-  Manifold m = Manifold::Cube(vec3(1), true)
-                   .WithContext(ctx)
-                   .Translate(vec3(1, 0, 0))
-                   .WithoutContext()
-                   .Scale(vec3(2));
-  EXPECT_FALSE(m.GetContext().has_value());
-}
-
-// Copying a Manifold copies the attachment.
-TEST(Manifold, ManifoldContextPropagatesThroughCopy) {
-  ExecutionContext ctx;
-  Manifold attached = Manifold::Cube(vec3(1), true).WithContext(ctx);
-  Manifold copy = attached;
-  ASSERT_TRUE(copy.GetContext().has_value());
-  ctx.Cancel();
-  EXPECT_TRUE(copy.GetContext()->Cancelled());
-}
-
-// Assigning a ctx-attached Manifold over a fresh one carries the attachment.
-TEST(Manifold, ManifoldContextPropagatesThroughAssignment) {
-  ExecutionContext ctx;
-  Manifold attached = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  Manifold u = Manifold::Cube(vec3(1), true) +
+               Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
+  Manifold attached = u.With(ctx);
   Manifold target;
-  EXPECT_FALSE(target.HasContext());
-  target = attached;
-  EXPECT_TRUE(target.HasContext());
+  target = attached;  // copy assignment
+
+  EXPECT_EQ(target.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
 }
 
-// Static factories that combine multiple Manifolds (BatchBoolean, the
-// vector-of-Manifold Hull) inherit the attachment from manifolds[0]; the
-// other operands' contexts (if any) are ignored.
-TEST(Manifold, ManifoldContextPropagatesThroughStaticFactories) {
+// Deferred ops on a ctx-attached Manifold drop the attachment from their
+// result. Verified behaviorally: a pre-cancelled ctx attached to the input
+// does not cancel the result's Status (the deferred op's result has no
+// ctx, so Status routes around it).
+TEST(Manifold, ManifoldContextDeferredOpsDropAttachment) {
   ExecutionContext ctx;
-  std::vector<Manifold> withCtx = {
-      Manifold::Cube(vec3(1), true).WithContext(ctx),
-      Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0))};
-  EXPECT_TRUE(Manifold::BatchBoolean(withCtx, OpType::Add).HasContext());
-  EXPECT_TRUE(Manifold::Hull(withCtx).HasContext());
-
-  // First operand without ctx: result has no ctx, even if a later operand
-  // has one.
-  std::vector<Manifold> firstNoCtx = {
-      Manifold::Cube(vec3(1), true),
-      Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)).WithContext(ctx)};
-  EXPECT_FALSE(Manifold::BatchBoolean(firstNoCtx, OpType::Add).HasContext());
-  EXPECT_FALSE(Manifold::Hull(firstNoCtx).HasContext());
-}
-
-// Operations that derive a new Manifold inherit the attachment from the
-// primary operand.
-TEST(Manifold, ManifoldContextPropagatesThroughOps) {
-  ExecutionContext ctx;
-  Manifold a = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  ctx.Cancel();
+  Manifold a = Manifold::Cube(vec3(1), true).With(ctx);
   Manifold b = Manifold::Cube(vec3(1), true).Translate(vec3(0.5, 0, 0));
 
-  EXPECT_TRUE(a.Translate(vec3(1, 0, 0)).GetContext().has_value());
-  EXPECT_TRUE(a.Scale(vec3(2)).GetContext().has_value());
-  EXPECT_TRUE(a.Rotate(0, 0, 90).GetContext().has_value());
-  EXPECT_TRUE(a.Boolean(b, OpType::Add).GetContext().has_value());
-  // Boolean inherits from `*this`, not the second operand.
-  EXPECT_FALSE(b.Boolean(a, OpType::Add).GetContext().has_value());
+  // None of these results carry ctx, so Status evaluates normally despite
+  // the cancelled ctx attached to the input.
+  EXPECT_EQ(a.Translate(vec3(1, 0, 0)).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(a.Scale(vec3(2)).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(a.Rotate(0, 0, 90).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(a.Boolean(b, OpType::Add).Status(), Manifold::Error::NoError);
+  EXPECT_EQ((a + b).Status(), Manifold::Error::NoError);
 }
 
-// no-arg Status() observes through the attached ctx: counters update on the
-// attached ctx exactly as if it had been passed explicitly.
+// Static factories (BatchBoolean, vector-of-Manifold Hull) are deferred and
+// drop any ctx attached to their inputs.
+TEST(Manifold, ManifoldContextStaticFactoriesDropAttachment) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  std::vector<Manifold> items = {
+      Manifold::Cube(vec3(1), true).With(ctx),
+      Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)).With(ctx)};
+
+  // Both factories drop the input ctx; results evaluate to NoError despite
+  // the cancelled ctx on every input.
+  EXPECT_EQ(Manifold::BatchBoolean(items, OpType::Add).Status(),
+            Manifold::Error::NoError);
+  EXPECT_EQ(Manifold::Hull(items).Status(), Manifold::Error::NoError);
+}
+
+// no-arg Status() on a ctx-attached Manifold observes the attached ctx:
+// counters update exactly as if Status had been passed an explicit ctx.
 TEST(Manifold, ManifoldContextStatusObservesAttached) {
   std::vector<Manifold> items;
   for (int i = 0; i < 4; i++) {
@@ -633,36 +622,59 @@ TEST(Manifold, ManifoldContextStatusObservesAttached) {
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
   ExecutionContext ctx;
-  Manifold attached = u.WithContext(ctx);
+  Manifold attached = u.With(ctx);
   EXPECT_EQ(attached.Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), 3);  // 4 leaves - 1
   EXPECT_EQ(ctx.impl_->doneBooleans.load(), 3);
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
-// Refine variants propagate the attachment to their results, just like the
-// transform / boolean / hull ops.
-TEST(Manifold, ManifoldContextPropagatesThroughRefine) {
+// Idiom for observing a deferred CSG tree: build the tree, attach ctx to
+// the root, call Status. Cancel via the same ctx aborts mid-evaluation.
+TEST(Manifold, ManifoldContextDeferredTreeRootObserves) {
+  std::vector<Manifold> items;
+  for (int i = 0; i < 8; i++) {
+    items.push_back(Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
+  }
+  Manifold tree = Manifold::BatchBoolean(items, OpType::Add);
+
   ExecutionContext ctx;
-  Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
-  EXPECT_TRUE(cube.Refine(2).GetContext().has_value());
-  EXPECT_TRUE(cube.RefineToLength(0.5).GetContext().has_value());
-  EXPECT_TRUE(cube.RefineToTolerance(0.1).GetContext().has_value());
+  ctx.Cancel();
+  EXPECT_EQ(tree.With(ctx).Status(), Manifold::Error::Cancelled);
 }
 
-// A pre-cancelled attached ctx aborts Refine -- the cancel check sits
-// between Subdivide and the post-pass (SetNormalsAndCoplanar / SortGeometry),
-// so the result is empty with status Cancelled.
+// Eager ops (Refine family) read this->ctx_ during the in-call work. A
+// pre-cancelled attached ctx aborts Refine via the cancel check between
+// Subdivide and the post-pass; the result is a Cancelled-status leaf.
 TEST(Manifold, ManifoldContextCancelMidRefine) {
   ExecutionContext ctx;
   ctx.Cancel();
-  Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  Manifold cube = Manifold::Cube(vec3(1), true).With(ctx);
   Manifold refined = cube.Refine(4);
   EXPECT_EQ(refined.Status(), Manifold::Error::Cancelled);
 }
 
-// Cancellation set on the user's ctx aborts evaluation of an attached
-// Manifold's no-arg Status() midway, just like the explicit-ctx form.
+// Eager Refine reads ctx from `*this`; the produced result has no ctx
+// attached. Verified behaviorally: a fresh ctx pre-loaded with a sentinel
+// counter value is left untouched by Status() on the Refine result, because
+// no ctx is attached to dispatch through.
+TEST(Manifold, ManifoldContextRefineDropsAttachmentFromResult) {
+  ExecutionContext ctx;
+  Manifold cube = Manifold::Cube(vec3(1), true).With(ctx);
+  Manifold refined = cube.Refine(2);
+  ASSERT_EQ(refined.Status(), Manifold::Error::NoError);
+
+  // Sentinel counter on a fresh ctx: result.Status() must not touch it,
+  // proving the Refine result has no attached ctx.
+  ExecutionContext other;
+  constexpr int kSentinel = 99;
+  other.impl_->totalBooleans.store(kSentinel);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(other.impl_->totalBooleans.load(), kSentinel);
+}
+
+// Cancellation requested on the attached ctx after Status() begins (or
+// before, in the deferred-tree-root idiom) aborts evaluation.
 TEST(Manifold, ManifoldContextCancelMidEval) {
   std::vector<Manifold> items;
   for (int i = 0; i < 8; i++) {
@@ -672,6 +684,6 @@ TEST(Manifold, ManifoldContextCancelMidEval) {
 
   ExecutionContext ctx;
   ctx.Cancel();
-  Manifold attached = u.WithContext(ctx);
+  Manifold attached = u.With(ctx);
   EXPECT_EQ(attached.Status(), Manifold::Error::Cancelled);
 }

@@ -388,12 +388,7 @@ NB_MODULE(manifold3d, m) {
           },
           manifold__project)
       .def("status", &Manifold::Status, manifold__status)
-      .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
-           manifold__with_context__ctx)
-      .def("without_context", &Manifold::WithoutContext,
-           manifold__without_context)
-      .def("get_context", &Manifold::GetContext, manifold__get_context)
-      .def("has_context", &Manifold::HasContext, manifold__has_context)
+      .def("with_context", &Manifold::With, nb::arg("ctx"), manifold__with__ctx)
       .def(
           "bounding_box",
           [](const Manifold& self) {

@@ -773,35 +773,3 @@ TEST(CBIND, execution_context_cancel) {
   free(cube1);
   manifold_delete_execution_context(ctx);
 }
-
-TEST(CBIND, execution_context_attach_detach_roundtrip) {
-  ManifoldExecutionContext* ctx =
-      manifold_execution_context(malloc(manifold_execution_context_size()));
-  ManifoldManifold* cube = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
-  EXPECT_EQ(manifold_has_context(cube), 0);
-
-  ManifoldManifold* cubeCtx =
-      manifold_with_context(alloc_manifold_buffer(), cube, ctx);
-  EXPECT_EQ(manifold_has_context(cubeCtx), 1);
-
-  // get_context returns a fresh handle that shares state.
-  ManifoldExecutionContext* got =
-      manifold_get_context(malloc(manifold_execution_context_size()), cubeCtx);
-  manifold_execution_context_cancel(ctx);
-  EXPECT_EQ(manifold_execution_context_cancelled(got), 1);
-
-  ManifoldManifold* cubeDetached =
-      manifold_without_context(alloc_manifold_buffer(), cubeCtx);
-  EXPECT_EQ(manifold_has_context(cubeDetached), 0);
-
-  manifold_destruct_execution_context(got);
-  manifold_destruct_manifold(cubeDetached);
-  manifold_destruct_manifold(cubeCtx);
-  manifold_destruct_manifold(cube);
-  manifold_destruct_execution_context(ctx);
-  free(got);
-  free(cubeDetached);
-  free(cubeCtx);
-  free(cube);
-  free(ctx);
-}

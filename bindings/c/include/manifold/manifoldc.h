@@ -215,25 +215,13 @@ ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 int manifold_is_empty(ManifoldManifold* m);
 ManifoldError manifold_status(ManifoldManifold* m);
 // Returns a copy of the manifold with the given ExecutionContext attached.
-// Subsequent operations on the result (and its derived manifolds) observe
-// progress and cancellation through this context. The attachment travels
-// with the data: copying propagates it; ops like Boolean / Translate / Hull
-// inherit it from the primary operand. To remove the attachment, use
-// manifold_without_context. To inspect, use manifold_get_context.
+// The attachment is consumed by the next eager op invoked on the result —
+// manifold_status, or one of the manifold_refine* family. Deferred ops
+// (Boolean operators, transforms, batch ops) ignore any attached ctx and
+// produce a result with no attached ctx. See ExecutionContext in common.h
+// for the full model.
 ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
                                         ManifoldExecutionContext* ctx);
-// Returns a copy of the manifold with no attached ExecutionContext.
-ManifoldManifold* manifold_without_context(void* mem, ManifoldManifold* m);
-// Returns 1 iff an ExecutionContext is currently attached to m, else 0.
-int manifold_has_context(ManifoldManifold* m);
-// Returns the attached ExecutionContext as a fresh handle that shares state
-// with the attached one (cancelling the returned ctx cancels the attached
-// evaluation). PRECONDITION: manifold_has_context(m) returns 1; otherwise
-// behavior is undefined. The returned pointer is derived from `mem` and is
-// released the same way other manifold_execution_context* allocations are
-// (manifold_destruct_execution_context + free if you malloc'd `mem`, or
-// manifold_delete_execution_context if you used manifold_alloc_*).
-ManifoldExecutionContext* manifold_get_context(void* mem, ManifoldManifold* m);
 size_t manifold_num_vert(ManifoldManifold* m);
 size_t manifold_num_edge(ManifoldManifold* m);
 size_t manifold_num_tri(ManifoldManifold* m);

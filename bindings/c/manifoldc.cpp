@@ -797,22 +797,8 @@ ManifoldError manifold_status(ManifoldManifold* m) {
 
 ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
                                         ManifoldExecutionContext* ctx) {
-  auto attached = from_c(m)->WithContext(*from_c(ctx));
+  auto attached = from_c(m)->With(*from_c(ctx));
   return to_c(new (mem) Manifold(attached));
-}
-
-ManifoldManifold* manifold_without_context(void* mem, ManifoldManifold* m) {
-  auto detached = from_c(m)->WithoutContext();
-  return to_c(new (mem) Manifold(detached));
-}
-
-int manifold_has_context(ManifoldManifold* m) {
-  return from_c(m)->HasContext() ? 1 : 0;
-}
-
-ManifoldExecutionContext* manifold_get_context(void* mem, ManifoldManifold* m) {
-  // Precondition: caller checked manifold_has_context(m) == 1.
-  return to_c(new (mem) ExecutionContext(*from_c(m)->GetContext()));
 }
 
 size_t manifold_num_vert(ManifoldManifold* m) { return from_c(m)->NumVert(); }

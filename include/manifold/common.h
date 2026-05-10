@@ -175,15 +175,17 @@ struct RayHit {
 /**
  * @brief Observe and control a long-running Manifold evaluation.
  *
- * Pass to Manifold::Status(ctx) to observe progress and optionally request
- * cancellation of the evaluation. Safe to read/write from any thread.
+ * Attach to a Manifold via Manifold::With(ctx); the next *eager* op invoked
+ * on the result (Status, Refine / RefineToLength / RefineToTolerance)
+ * snapshots the ctx and reports progress and observes cancellation through
+ * it. Safe to read/write from any thread.
  *
  * Copyable and movable: copies share the same underlying state via a
  * shared_ptr, so one thread can evaluate while another holds a copy and
  * observes Progress() or calls Cancel(). Use a separate context per
- * evaluation; passing the same context (or a copy of it) to two
- * concurrent Status(ctx) calls produces meaningless progress values
- * because both calls reset and mutate the same counters.
+ * evaluation; passing the same context (or a copy of it) to two concurrent
+ * eager ops produces meaningless progress values because both calls reset
+ * and mutate the same counters.
  *
  * Cancellation is permanent for a Manifold: once requested and detected,
  * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
@@ -201,7 +203,7 @@ struct RayHit {
  * Example: cancel from an observer thread.
  * @code
  * ExecutionContext ctx;
- * Manifold big = Manifold::BatchBoolean(items, OpType::Add).WithContext(ctx);
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add).With(ctx);
  * std::thread eval([&] {
  *   if (big.Status() == Manifold::Error::Cancelled) {
  *     // evaluation was cancelled
@@ -238,7 +240,7 @@ class ExecutionContext {
   std::shared_ptr<Impl> impl_;
 
   /// @internal Construct from an existing Impl, skipping the default Impl
-  /// allocation. For library use (e.g. Manifold::GetContext) only.
+  /// allocation. For library use only.
   explicit ExecutionContext(std::shared_ptr<Impl> impl) noexcept;
 };
 

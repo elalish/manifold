@@ -17,7 +17,6 @@
 #include <functional>
 #include <memory>  // needed for shared_ptr
 #include <mutex>
-#include <optional>
 
 #include "manifold/common.h"
 #include "manifold/vec_view.h"
@@ -384,29 +383,26 @@ class Manifold {
   Error Status() const;
 
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
-  /// Subsequent operations on the result (and its derived Manifolds) observe
-  /// progress and cancellation through this context. The attachment travels
-  /// with the data: copying the Manifold copies the attachment, and operations
-  /// like Boolean / Translate / Hull propagate the attachment to their
-  /// results.
+  /// The attachment is consumed by the next *eager* op invoked on the result
+  /// — `Status()` for a deferred CSG tree, or `Refine()` / `RefineToLength()`
+  /// / `RefineToTolerance()` for those eager ops. The chosen op snapshots the
+  /// ctx and reports progress / observes cancellation through it.
   ///
-  /// To remove the attachment from a derived Manifold (e.g. before handing it
-  /// to code that shouldn't observe), use WithoutContext().
+  /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
+  /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the
+  /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
+  /// with no attached ctx. Inputs are not mutated. The idiom for observing a
+  /// deferred tree is therefore:
   ///
-  /// When two ctx-attached Manifolds are combined (e.g. `a.Boolean(b, op)`
-  /// where both have ctx), the result inherits the `*this` Manifold's
-  /// context; the other operand's context is ignored.
-  Manifold WithContext(const ExecutionContext& ctx) const;
-  /// Returns a copy of this Manifold with no attached ExecutionContext.
-  Manifold WithoutContext() const;
-  /// Returns the attached ExecutionContext if any, else nullopt. The
-  /// returned context shares state with the attached one (cancelling it
-  /// cancels the attached evaluation; reading Progress() reflects the
-  /// attached counters).
-  std::optional<ExecutionContext> GetContext() const;
-  /// Whether an ExecutionContext is currently attached. Cheap (no
-  /// allocation) compared to `GetContext().has_value()`.
-  bool HasContext() const;
+  ///   (a + b - c).With(ctx).Status();
+  ///
+  /// while the idiom for observing an eager op is:
+  ///
+  ///   m.With(ctx).Refine(n);
+  ///
+  /// Raw copy / assignment preserves the attachment (it's the same logical
+  /// Manifold). Only ops that derive a *new* Manifold drop the attachment.
+  Manifold With(const ExecutionContext& ctx) const;
 
   bool IsEmpty() const;
   size_t NumVert() const;
@@ -571,37 +567,23 @@ class Manifold {
   mutable std::shared_ptr<CsgNode> pNode_;
   // Optional attached ExecutionContext. shared_ptr so the Impl outlives
   // the user's ExecutionContext if a ctx-attached Manifold survives it.
-  // Propagates through copy ctor / op= and through every Manifold-returning
-  // operation (via InheritContextFrom applied at result construction).
+  // Propagates through copy ctor / op= (raw copy preserves the attachment).
+  // Manifold-returning ops do *not* propagate it: derived Manifolds get a
+  // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
+  // their in-call work; the snapshot uses std::atomic_load, which pins the
+  // Impl across long-running evaluations even if a concurrent op= reseats
+  // ctx_ mid-eval.
   //
-  // Accessed only via std::atomic_load / std::atomic_store: no const
-  // method mutates ctx_, but op= and the copy ctor write it on a Manifold
-  // that may be concurrently observed by const methods on other threads.
-  // The atomic-shared-ptr free functions give a torn-read-free snapshot
-  // without taking a lock; the snapshot's strong reference also keeps the
-  // Impl alive across long-running evaluations even if op= reseats ctx_
-  // mid-eval. (pNode_ uses a mutex instead because lazy CSG eval mutates
-  // it through const methods, which atomic_load can't model.)
+  // Accessed only via std::atomic_load / std::atomic_store: no const method
+  // mutates ctx_, but op= and the copy ctor write it on a Manifold that
+  // may be concurrently observed by const methods on other threads. The
+  // atomic-shared-ptr free functions give a torn-read-free snapshot
+  // without taking a lock. (pNode_ uses a mutex instead because lazy CSG
+  // eval mutates it through const methods, which atomic_load can't model.)
   std::shared_ptr<ExecutionContext::Impl> ctx_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;
   CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;
-  // Copy the attached ExecutionContext from `primary` onto this Manifold.
-  // The "primary" operand is `*this` for member ops, or the first operand
-  // for static factories that combine multiple Manifolds.
-  void InheritContextFrom(const Manifold& primary);
-  // Convenience: constructs a Manifold from `arg` and inherits our ctx
-  // onto it. Used by Manifold-returning member ops to collapse the
-  // construct-then-inherit-then-return pattern. Templated to forward
-  // through derived shared_ptr types (e.g. shared_ptr<CsgLeafNode>),
-  // which would otherwise need two user-defined conversions.
-  // Static factories use the lvalue form: `manifolds[0].Derived(...)`.
-  template <typename T>
-  Manifold Derived(T&& arg) const {
-    Manifold result(std::forward<T>(arg));
-    result.InheritContextFrom(*this);
-    return result;
-  }
 };
 /** @} */
 
