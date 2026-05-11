@@ -395,15 +395,15 @@ class Manifold {
   /// with no attached ctx. Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
   ///
-  ///   (a + b - c).With(ctx).Status();
+  ///   (a + b - c).WithContext(ctx).Status();
   ///
   /// while the idiom for observing an eager op is:
   ///
-  ///   m.With(ctx).Refine(n);
+  ///   m.WithContext(ctx).Refine(n);
   ///
   /// Raw copy / assignment preserves the attachment (it's the same logical
   /// Manifold). Only ops that derive a *new* Manifold drop the attachment.
-  Manifold With(const ExecutionContext& ctx) const;
+  Manifold WithContext(const ExecutionContext& ctx) const;
 
   bool IsEmpty() const;
   size_t NumVert() const;

@@ -797,7 +797,7 @@ ManifoldError manifold_status(ManifoldManifold* m) {
 
 ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
                                         ManifoldExecutionContext* ctx) {
-  auto attached = from_c(m)->With(*from_c(ctx));
+  auto attached = from_c(m)->WithContext(*from_c(ctx));
   return to_c(new (mem) Manifold(attached));
 }
 

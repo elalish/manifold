@@ -162,7 +162,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
  * copy preserves the attachment. See ExecutionContext in common.h for the
  * full model.
  */
-Manifold Manifold::With(const ExecutionContext& ctx) const {
+Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
   std::atomic_store(&result.ctx_, ctx.impl_);
   return result;
@@ -283,8 +283,8 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  * NoError, for instance the intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
-  // Routes through any attached ExecutionContext (see With). The atomic_load
-  // temporary pins the Impl's lifetime for the duration of the full
+  // Routes through any attached ExecutionContext (see WithContext). The
+  // atomic_load temporary pins the Impl's lifetime for the duration of the full
   // expression -- through the lazy eval inside GetCsgLeafNode -- so a
   // concurrent op= reseating ctx_ on this Manifold can't free the Impl out
   // from under us.

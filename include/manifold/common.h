@@ -175,8 +175,8 @@ struct RayHit {
 /**
  * @brief Observe and control a long-running Manifold evaluation.
  *
- * Attach to a Manifold via Manifold::With(ctx); the next *eager* op invoked
- * on the result (Status, Refine / RefineToLength / RefineToTolerance)
+ * Attach to a Manifold via Manifold::WithContext(ctx); the next *eager* op
+ * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance)
  * snapshots the ctx and reports progress and observes cancellation through
  * it. Safe to read/write from any thread.
  *
@@ -203,7 +203,7 @@ struct RayHit {
  * Example: cancel from an observer thread.
  * @code
  * ExecutionContext ctx;
- * Manifold big = Manifold::BatchBoolean(items, OpType::Add).With(ctx);
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add).WithContext(ctx);
  * std::thread eval([&] {
  *   if (big.Status() == Manifold::Error::Cancelled) {
  *     // evaluation was cancelled
