@@ -383,10 +383,11 @@ class Manifold {
   Error Status() const;
 
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
-  /// The attachment is consumed by the next *eager* op invoked on the result
-  /// — `Status()` for a deferred CSG tree, or `Refine()` / `RefineToLength()`
-  /// / `RefineToTolerance()` for those eager ops. The chosen op snapshots the
-  /// ctx and reports progress / observes cancellation through it.
+  /// The attachment is consumed only by `Status()` (for deferred CSG trees)
+  /// and the `Refine()` / `RefineToLength()` / `RefineToTolerance()` family
+  /// (eager ops); those snapshot the ctx and report progress / observe
+  /// cancellation through it. Other queries that force evaluation (`Volume`,
+  /// `GetMeshGL`, `BoundingBox`, etc.) do not currently observe attached ctx.
   ///
   /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
   /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the

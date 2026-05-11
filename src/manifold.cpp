@@ -536,7 +536,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
-    return Manifold(Manifold());
+    return Manifold();
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());

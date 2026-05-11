@@ -238,10 +238,6 @@ class ExecutionContext {
   /// accessible only to internal code that includes that header.
   struct Impl;
   std::shared_ptr<Impl> impl_;
-
-  /// @internal Construct from an existing Impl, skipping the default Impl
-  /// allocation. For library use only.
-  explicit ExecutionContext(std::shared_ptr<Impl> impl) noexcept;
 };
 
 /**

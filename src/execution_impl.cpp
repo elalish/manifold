@@ -17,8 +17,6 @@
 namespace manifold {
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}
-ExecutionContext::ExecutionContext(std::shared_ptr<Impl> impl) noexcept
-    : impl_(std::move(impl)) {}
 ExecutionContext::~ExecutionContext() = default;
 ExecutionContext::ExecutionContext(const ExecutionContext&) = default;
 ExecutionContext::ExecutionContext(ExecutionContext&&) noexcept = default;
