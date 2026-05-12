@@ -247,7 +247,7 @@ export class EXTManifold extends Extension {
       for (const prim of mesh.listPrimitives()) {
         const indices = prim.getIndices();
         if (!indices) continue;
-        count += indices.getCount()
+        count += indices.getCount();
       }
 
       // If not, fill them in.
