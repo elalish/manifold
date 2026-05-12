@@ -39,7 +39,7 @@ struct TransformTangents {
   const mat3 transform;
   const bool invert;
   VecView<const vec4> oldTangents;
-  VecView<const Halfedge> halfedge;
+  const Halfedges& halfedge;
 
   void operator()(const int edgeOut) {
     const int edgeIn =
@@ -50,15 +50,18 @@ struct TransformTangents {
 };
 
 struct FlipTris {
-  VecView<Halfedge> halfedge;
+  Halfedges& halfedge;
 
   void operator()(const int tri) {
-    std::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
-
+    std::array<Halfedge, 3> face = {halfedge[3 * tri + 2],
+                                    halfedge[3 * tri + 1],
+                                    halfedge[3 * tri]};
     for (const int i : {0, 1, 2}) {
-      std::swap(halfedge[3 * tri + i].startVert, halfedge[3 * tri + i].endVert);
-      halfedge[3 * tri + i].pairedHalfedge =
-          FlipHalfedge(halfedge[3 * tri + i].pairedHalfedge);
+      std::swap(face[i].startVert, face[i].endVert);
+      face[i].pairedHalfedge = FlipHalfedge(face[i].pairedHalfedge);
+    }
+    for (const int i : {0, 1, 2}) {
+      halfedge[3 * tri + i] = face[i];
     }
   }
 };

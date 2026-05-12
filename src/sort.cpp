@@ -34,9 +34,9 @@ uint32_t MortonCode(vec3 position, Box bBox) {
 }
 
 struct ReindexFace {
-  VecView<Halfedge> halfedge;
+  Halfedges& halfedge;
   VecView<vec4> halfedgeTangent;
-  VecView<const Halfedge> oldHalfedge;
+  const Halfedges& oldHalfedge;
   VecView<const vec4> oldHalfedgeTangent;
   VecView<const int> faceNew2Old;
   VecView<const int> faceOld2New;
@@ -343,15 +343,16 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
   const bool hasProp = NumProp() > 0;
-  for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(), ctx,
-           [&vertOld2New, hasProp](Halfedge& edge) {
-             if (edge.startVert < 0) return;
-             edge.startVert = vertOld2New[edge.startVert];
-             edge.endVert = vertOld2New[edge.endVert];
-             if (!hasProp) {
-               edge.propVert = edge.startVert;
-             }
-           });
+  for_each_n(autoPolicy(oldNumVert, 1e5), countAt(0), halfedge_.size(), ctx,
+             [this, &vertOld2New, hasProp](int idx) {
+               const int startVert = halfedge_.Start(idx);
+               if (startVert < 0) return;
+               const int newStart = vertOld2New[startVert];
+               halfedge_.SetStart(idx, newStart);
+               if (!hasProp) {
+                 halfedge_.SetProp(idx, newStart);
+               }
+             });
   if (IsCancelled(ctx)) return;
 }
 
@@ -369,9 +370,9 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), ctx,
-           [&keep](Halfedge h) {
-             reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
+  for_each_n(policy, countAt(0), halfedge_.size(), ctx,
+           [this, &keep](int idx) {
+             reinterpret_cast<std::atomic<int>*>(&keep[halfedge_[idx].propVert])
                  ->store(1, std::memory_order_relaxed);
            });
   if (IsCancelled(ctx)) return;
@@ -392,9 +393,9 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
         }
       });
   if (IsCancelled(ctx)) return;
-  for_each(policy, halfedge_.begin(), halfedge_.end(), ctx,
-           [&propOld2New](Halfedge& edge) {
-             edge.propVert = propOld2New[edge.propVert];
+  for_each_n(policy, countAt(0), halfedge_.size(), ctx,
+           [this, &propOld2New](int idx) {
+             halfedge_[idx].propVert = propOld2New[halfedge_[idx].propVert];
            });
   if (IsCancelled(ctx)) return;
 }
@@ -485,7 +486,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
     Permute(meshRelation_.triRef, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  Vec<Halfedge> oldHalfedge(std::move(halfedge_));
+  Halfedges oldHalfedge(std::move(halfedge_));
+  halfedge_ = Halfedges();
   Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
@@ -496,8 +498,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
   if (oldHalfedgeTangent.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(policy, countAt(0), numTri, ctx,
-             ReindexFace({halfedge_, halfedgeTangent_, oldHalfedge,
-                          oldHalfedgeTangent, faceNew2Old, faceOld2New}));
+             ReindexFace{halfedge_, halfedgeTangent_, oldHalfedge,
+                         oldHalfedgeTangent, faceNew2Old, faceOld2New});
   if (IsCancelled(ctx)) return;
 }
 
@@ -535,8 +537,8 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
   if (old.halfedgeTangent_.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri, ctx,
-             ReindexFace({halfedge_, halfedgeTangent_, old.halfedge_,
-                          old.halfedgeTangent_, faceNew2Old, faceOld2New}));
+             ReindexFace{halfedge_, halfedgeTangent_, old.halfedge_,
+                         old.halfedgeTangent_, faceNew2Old, faceOld2New});
   if (IsCancelled(ctx)) return;
 }
 
@@ -566,14 +568,15 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              for (int i : {0, 1, 2}) {
-               Halfedge& curr = halfedge_[tri * 3 + i];
+               const int currIdx = tri * 3 + i;
+               Halfedge curr = halfedge_[currIdx];
                if (curr.startVert < 0) return;
                int oppositeFace = curr.pairedHalfedge / 3;
                int index = -1;
                for (int j : {0, 1, 2})
                  if (curr.startVert == halfedge_[oppositeFace * 3 + j].endVert)
                    index = j;
-               curr.pairedHalfedge = oppositeFace * 3 + index;
+               halfedge_[currIdx].pairedHalfedge = oppositeFace * 3 + index;
              }
            });
   if (IsCancelled(ctx)) return;

@@ -54,7 +54,7 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
-  SharedVec<Halfedge> halfedge_;
+  Halfedges halfedge_;
   Vec<double> properties_;
   Vec<vec3> vertNormal_;
   Vec<vec3> faceNormal_;
@@ -139,8 +139,8 @@ struct Manifold::Impl {
   void ReorderHalfedges(ExecutionContext::Impl* ctx = nullptr);
 
   // face_op.cpp
-  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
-                bool allowConvex = false,
+  void Face2Tri(const Vec<int>& faceEdge, const VecView<const Halfedge>&,
+                const Vec<TriRef>& halfedgeRef, bool allowConvex = false,
                 ExecutionContext::Impl* ctx = nullptr);
   Polygons Slice(double height) const;
   Polygons Project() const;

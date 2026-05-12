@@ -491,7 +491,8 @@ std::vector<Manifold> Manifold::Decompose() const {
     return {PropagateStatus(pImpl_->status_)};
   }
   DisjointSets uf(NumVert());
-  for (const Halfedge& halfedge : pImpl_->halfedge_) {
+  for (size_t edge = 0; edge < pImpl_->halfedge_.size(); ++edge) {
+    const Halfedge halfedge = pImpl_->halfedge_[edge];
     if (halfedge.IsForward()) uf.unite(halfedge.startVert, halfedge.endVert);
   }
   std::vector<int> componentIndices;

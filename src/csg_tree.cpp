@@ -289,17 +289,18 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         const int nextEdge = edgeIndices[i];
         const int nextProp = propVertIndices[i];
         const bool hasProp = node->pImpl_->NumProp() > 0;
-        transform(node->pImpl_->halfedge_.begin(),
-                  node->pImpl_->halfedge_.end(),
-                  combined.halfedge_.begin() + edgeIndices[i],
-                  [nextVert, nextEdge, nextProp, hasProp](Halfedge edge) {
-                    edge.startVert += nextVert;
-                    edge.endVert += nextVert;
-                    edge.pairedHalfedge += nextEdge;
-                    if (!hasProp) edge.propVert = 0;
-                    edge.propVert += nextProp;
-                    return edge;
-                  });
+        for_each_n(policy, countAt(0), node->pImpl_->halfedge_.size(),
+                   [&](int edge) {
+                     const Halfedge halfedge = node->pImpl_->halfedge_[edge];
+                     const int newEdge = edgeIndices[i] + edge;
+                     combined.halfedge_.SetStart(newEdge,
+                                                 halfedge.startVert + nextVert);
+                     combined.halfedge_.SetPair(
+                         newEdge, halfedge.pairedHalfedge + nextEdge);
+                     const int propVert =
+                         hasProp ? halfedge.propVert + nextProp : nextProp;
+                     combined.halfedge_.SetProp(newEdge, propVert);
+                   });
 
         if (node->pImpl_->NumProp() > 0) {
           const int numProp = node->pImpl_->NumProp();
@@ -355,7 +356,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
                                        node->pImpl_->halfedge_});
           if (invert)
             for_each_n(policy, countAt(triIndices[i]), node->pImpl_->NumTri(),
-                       FlipTris({combined.halfedge_}));
+                       FlipTris{combined.halfedge_});
         }
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets

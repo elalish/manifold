@@ -98,6 +98,7 @@ using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
  * faceNormal_ values are retained, repeated as necessary.
  */
 void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
+                              const VecView<const Halfedge>& faceHalfedge,
                               const Vec<TriRef>& halfedgeRef, bool allowConvex,
                               ExecutionContext::Impl* ctx) {
   ZoneScoped;
@@ -118,11 +119,12 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
     if (numEdge == 3) {  // Single triangle
       ivec3 triEdge(firstEdge, firstEdge + 1, firstEdge + 2);
-      ivec3 tri(halfedge_[firstEdge].startVert,
-                halfedge_[firstEdge + 1].startVert,
-                halfedge_[firstEdge + 2].startVert);
-      ivec3 ends(halfedge_[firstEdge].endVert, halfedge_[firstEdge + 1].endVert,
-                 halfedge_[firstEdge + 2].endVert);
+      ivec3 tri(faceHalfedge[firstEdge].startVert,
+                faceHalfedge[firstEdge + 1].startVert,
+                faceHalfedge[firstEdge + 2].startVert);
+      ivec3 ends(faceHalfedge[firstEdge].endVert,
+                 faceHalfedge[firstEdge + 1].endVert,
+                 faceHalfedge[firstEdge + 2].endVert);
       if (ends[0] == tri[2]) {
         std::swap(triEdge[1], triEdge[2]);
         std::swap(tri[1], tri[2]);
@@ -134,16 +136,16 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
       const mat2x3 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, this](const ivec3 tri) {
-        return CCW(projection * this->vertPos_[halfedge_[tri[0]].startVert],
-                   projection * this->vertPos_[halfedge_[tri[1]].startVert],
-                   projection * this->vertPos_[halfedge_[tri[2]].startVert],
+      auto triCCW = [&projection, &faceHalfedge, this](const ivec3 tri) {
+        return CCW(projection * this->vertPos_[faceHalfedge[tri[0]].startVert],
+                   projection * this->vertPos_[faceHalfedge[tri[1]].startVert],
+                   projection * this->vertPos_[faceHalfedge[tri[2]].startVert],
                    epsilon_) >= 0;
       };
 
       std::vector<int> quad = AssembleHalfedges(
-          halfedge_.cbegin() + faceEdge[face],
-          halfedge_.cbegin() + faceEdge[face + 1], faceEdge[face])[0];
+          faceHalfedge.cbegin() + faceEdge[face],
+          faceHalfedge.cbegin() + faceEdge[face + 1], faceEdge[face])[0];
 
       const la::mat<int, 3, 2> tris[2] = {
           {{quad[0], quad[1], quad[2]}, {quad[0], quad[2], quad[3]}},
@@ -154,10 +156,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       if (!(triCCW(tris[0][0]) && triCCW(tris[0][1]))) {
         choice = 1;
       } else if (triCCW(tris[1][0]) && triCCW(tris[1][1])) {
-        vec3 diag0 = vertPos_[halfedge_[quad[0]].startVert] -
-                     vertPos_[halfedge_[quad[2]].startVert];
-        vec3 diag1 = vertPos_[halfedge_[quad[1]].startVert] -
-                     vertPos_[halfedge_[quad[3]].startVert];
+        vec3 diag0 = vertPos_[faceHalfedge[quad[0]].startVert] -
+                     vertPos_[faceHalfedge[quad[2]].startVert];
+        vec3 diag1 = vertPos_[faceHalfedge[quad[1]].startVert] -
+                     vertPos_[faceHalfedge[quad[3]].startVert];
         if (la::length2(diag0) > la::length2(diag1)) {
           choice = 1;
         }
@@ -176,10 +178,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const vec3 normal = faceNormal_[face];
     const mat2x3 projection = GetAxisAlignedProjection(normal);
     const PolygonsIdx polys = ProjectPolygons(
-        AssembleHalfedges(halfedge_.cbegin() + faceEdge[face],
-                          halfedge_.cbegin() + faceEdge[face + 1],
+        AssembleHalfedges(faceHalfedge.cbegin() + faceEdge[face],
+                          faceHalfedge.cbegin() + faceEdge[face + 1],
                           faceEdge[face]),
-        halfedge_, vertPos_, projection);
+        faceHalfedge, vertPos_, projection);
     return TriangulateIdx(polys, epsilon_, allowConvex);
   };
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
@@ -216,8 +218,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       processFace, [&](size_t face) { return std::move(results[face]); },
       [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
         for (const int i : {0, 1, 2}) {
-          triVerts[triCount[face]][i] = halfedge_[tri[i]].startVert;
-          triProp[triCount[face]][i] = halfedge_[tri[i]].propVert;
+          triVerts[triCount[face]][i] = faceHalfedge[tri[i]].startVert;
+          triProp[triCount[face]][i] = faceHalfedge[tri[i]].propVert;
         }
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
@@ -237,8 +239,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         ivec3 verts;
         ivec3 props;
         for (const int i : {0, 1, 2}) {
-          verts[i] = halfedge_[tri[i]].startVert;
-          props[i] = halfedge_[tri[i]].propVert;
+          verts[i] = faceHalfedge[tri[i]].startVert;
+          props[i] = faceHalfedge[tri[i]].propVert;
         }
         triVerts.push_back(verts);
         triProp.push_back(props);
@@ -322,16 +324,15 @@ Polygons Manifold::Impl::Slice(double height) const {
 Polygons Manifold::Impl::Project() const {
   const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
   Vec<Halfedge> cusps(NumEdge());
-  cusps.resize(
-      copy_if(
-          halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
-          [&](Halfedge edge) {
-            return faceNormal_[halfedge_[edge.pairedHalfedge].pairedHalfedge /
-                               3]
-                           .z >= 0 &&
-                   faceNormal_[edge.pairedHalfedge / 3].z < 0;
-          }) -
-      cusps.begin());
+  size_t numCusps = 0;
+  for (size_t i = 0; i < halfedge_.size(); ++i) {
+    const Halfedge edge = halfedge_[i];
+    if (faceNormal_[halfedge_[edge.pairedHalfedge].pairedHalfedge / 3].z >= 0 &&
+        faceNormal_[edge.pairedHalfedge / 3].z < 0) {
+      cusps[numCusps++] = edge;
+    }
+  }
+  cusps.resize(numCusps);
 
   PolygonsIdx polysIndexed =
       ProjectPolygons(AssembleHalfedges(cusps.cbegin(), cusps.cend(), 0), cusps,

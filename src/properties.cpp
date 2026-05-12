@@ -30,7 +30,7 @@ struct CurvatureAngles {
   VecView<double> gaussianCurvature;
   VecView<double> area;
   VecView<double> degree;
-  VecView<const Halfedge> halfedge;
+  const Halfedges& halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
 
@@ -38,12 +38,13 @@ struct CurvatureAngles {
     vec3 edge[3];
     vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
-      const int startVert = halfedge[3 * tri + i].startVert;
-      const int endVert = halfedge[3 * tri + i].endVert;
+      const int edgeIdx = 3 * tri + i;
+      const int startVert = halfedge.Start(edgeIdx);
+      const int endVert = halfedge.End(edgeIdx);
       edge[i] = vertPos[endVert] - vertPos[startVert];
       edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
-      const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
+      const int neighborTri = halfedge.Pair(edgeIdx) / 3;
       const double dihedral =
           0.25 * edgeLength[i] *
           math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
@@ -69,7 +70,7 @@ struct CurvatureAngles {
 };
 
 struct CheckHalfedges {
-  VecView<const Halfedge> halfedges;
+  const Halfedges& halfedges;
 
   bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
@@ -103,7 +104,7 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   if (halfedge_.size() % 3 != 0) return false;
   return all_of(countAt(0_uz), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_}));
+                CheckHalfedges{halfedge_});
 }
 
 /**
@@ -114,7 +115,7 @@ bool Manifold::Impl::Is2Manifold() const {
   if (halfedge_.size() == 0) return true;
   if (!IsManifold()) return false;
 
-  Vec<Halfedge> halfedge(halfedge_);
+  Vec<Halfedge> halfedge = halfedge_.ToData();
   stable_sort(halfedge.begin(), halfedge.end());
 
   return all_of(
@@ -304,8 +305,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
   for_each(policy, countAt(0_uz), countAt(NumTri()),
-           CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
-                            degree, halfedge_, vertPos_, faceNormal_}));
+           CurvatureAngles{vertMeanCurvature, vertGaussianCurvature, vertArea,
+                           degree, halfedge_, vertPos_, faceNormal_});
   for_each_n(policy, countAt(0), NumVert(),
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {

@@ -152,9 +152,10 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   const int numVert = NumVert();
   Vec<int> keep(numVert, 0);
   auto policy = autoPolicy(numVert, 1e5);
-  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), [&keep](Halfedge h) {
-    if (h.startVert >= 0) {
-      reinterpret_cast<std::atomic<int>*>(&keep[h.startVert])
+  for_each_n(policy, countAt(0), halfedge_.size(), [&keep, this](int edge) {
+    const int startVert = halfedge_[edge].startVert;
+    if (startVert >= 0) {
+      reinterpret_cast<std::atomic<int>*>(&keep[startVert])
           ->store(1, std::memory_order_relaxed);
     }
   });
@@ -288,8 +289,10 @@ void Manifold::Impl::DedupePropVerts() {
 
   std::vector<int> label2vert(numLabels);
   for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
-  for (Halfedge& edge : halfedge_)
-    edge.propVert = label2vert[vertLabels[edge.propVert]];
+  for (size_t edge = 0; edge < halfedge_.size(); ++edge) {
+    halfedge_[edge].propVert =
+        label2vert[vertLabels[halfedge_[edge].propVert]];
+  }
 }
 
 constexpr int kRemovedHalfedge = -2;
@@ -339,9 +342,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   ZoneScoped;
   const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
-  // drop the old value first to avoid copy
-  halfedge_.clear(true);
-  halfedge_.resize_nofill(numHalfedge);
+  Vec<Halfedge> halfedge(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
 
   int vertCount = static_cast<int>(vertPos_.size());
@@ -358,11 +359,11 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       };
       if (triVert.empty()) {
         for_each_n(policy, countAt(0), numTri,
-                   PrepHalfedges<true, decltype(setEdge)>{halfedge_, triProp,
+                   PrepHalfedges<true, decltype(setEdge)>{halfedge, triProp,
                                                           triVert, setEdge});
       } else {
         for_each_n(policy, countAt(0), numTri,
-                   PrepHalfedges<false, decltype(setEdge)>{halfedge_, triProp,
+                   PrepHalfedges<false, decltype(setEdge)>{halfedge, triProp,
                                                            triVert, setEdge});
       }
       sequence(ids.begin(), ids.end());
@@ -384,19 +385,19 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       if (triVert.empty()) {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<true, decltype(setOffset)>{
-                       halfedge_, triProp, triVert, setOffset});
+                       halfedge, triProp, triVert, setOffset});
       } else {
         for_each_n(policy, countAt(0), numTri,
                    PrepHalfedges<false, decltype(setOffset)>{
-                       halfedge_, triProp, triVert, setOffset});
+                       halfedge, triProp, triVert, setOffset});
       }
       exclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
       for_each_n(policy, countAt(0), numTri,
-                 [this, &offsets, &entries, vertCount](const int tri) {
+                 [&halfedge, &offsets, &entries, vertCount](const int tri) {
                    for (const int i : {0, 1, 2}) {
                      const int e = 3 * tri + i;
-                     const int v0 = halfedge_[e].startVert;
-                     const int v1 = halfedge_[e].endVert;
+                     const int v0 = halfedge[e].startVert;
+                     const int v1 = halfedge[e].endVert;
                      const int offset = v0 > v1 ? 0 : vertCount;
                      const int start = std::min(v0, v1);
                      const int index = AtomicAdd(offsets[start + offset], 1);
@@ -420,16 +421,17 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
 
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
-    Halfedge& h0 = halfedge_[pair0];
+    Halfedge h0 = halfedge[pair0];
     int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge& h1 = halfedge_[pair1];
+      Halfedge h1 = halfedge[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
       if (h1.pairedHalfedge != kRemovedHalfedge &&
-          halfedge_[NextHalfedge(pair0)].endVert ==
-              halfedge_[NextHalfedge(pair1)].endVert) {
-        h0.pairedHalfedge = h1.pairedHalfedge = kRemovedHalfedge;
+          halfedge[NextHalfedge(pair0)].endVert ==
+              halfedge[NextHalfedge(pair1)].endVert) {
+        halfedge[pair0].pairedHalfedge = kRemovedHalfedge;
+        halfedge[pair1].pairedHalfedge = kRemovedHalfedge;
         if (i + numEdge != k) {
           // Reorder so that remaining edges pair up, while preserving relative
           // order between the edges (triangle id order)
@@ -438,8 +440,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
           int dir = i + numEdge < k ? 1 : -1;
           int a = k;
           int b = k + dir;
-          auto isRemoved = [this, &ids](int x) {
-            return halfedge_[ids[x]].pairedHalfedge == kRemovedHalfedge;
+          auto isRemoved = [&halfedge, &ids](int x) {
+            return halfedge[ids[x]].pairedHalfedge == kRemovedHalfedge;
           };
           auto inRange = [&a, dir, i, numEdge]() {
             return (dir > 0 ? a >= i + numEdge : a <= i + numEdge);
@@ -462,7 +464,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       if (k >= segmentEnd + numEdge) break;
     }
     if (i + 1 == segmentEnd) return consecutiveStart;
-    Halfedge& h1 = halfedge_[ids[i + 1]];
+    Halfedge h1 = halfedge[ids[i + 1]];
     if (h1.startVert == h0.startVert && h1.endVert == h0.endVert)
       return consecutiveStart;
     return i + 1;
@@ -474,8 +476,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       std::max(numEdge / tbb::this_task_arena::max_concurrency() / 2, 1024),
       numEdge);
   const auto duplicated = [&](int a, int b) {
-    const Halfedge& h0 = halfedge_[ids[a]];
-    const Halfedge& h1 = halfedge_[ids[b]];
+    const Halfedge h0 = halfedge[ids[a]];
+    const Halfedge h1 = halfedge[ids[b]];
     return h0.startVert == h1.startVert && h0.endVert == h1.endVert;
   };
   int end = 0;
@@ -498,16 +500,17 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   for (int i = 0; i < numEdge; ++i)
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
-  for_each_n(policy, countAt(0), numEdge, [this, &ids, numEdge](int i) {
+  for_each_n(policy, countAt(0), numEdge, [&halfedge, &ids, numEdge](int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
-    if (halfedge_[pair0].pairedHalfedge != kRemovedHalfedge) {
-      halfedge_[pair0].pairedHalfedge = pair1;
-      halfedge_[pair1].pairedHalfedge = pair0;
+    if (halfedge[pair0].pairedHalfedge != kRemovedHalfedge) {
+      halfedge[pair0].pairedHalfedge = pair1;
+      halfedge[pair1].pairedHalfedge = pair0;
     } else {
-      halfedge_[pair0] = halfedge_[pair1] = {-1, -1, -1};
+      halfedge[pair0] = halfedge[pair1] = {-1, -1, -1};
     }
   });
+  halfedge_.FromData(halfedge);
 }
 
 void Manifold::Impl::MakeEmpty(Error status) {

@@ -368,9 +368,9 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
   auto f = [&a](int i) {
-    return a.halfedge_[i].IsForward()
-               ? Box(a.vertPos_[a.halfedge_[i].startVert],
-                     a.vertPos_[a.halfedge_[i].endVert])
+    return a.halfedge_.IsForward(i)
+               ? Box(a.vertPos_[a.halfedge_.Start(i)],
+                     a.vertPos_[a.halfedge_.End(i)])
                : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
@@ -576,11 +576,12 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   if (la::dot(dir, dir) == 0.0) return {};
 
   // Build a minimal single-edge Impl representing the ray segment.
-  // Kernel12 treats inA as an edge mesh, so we need two vertices, two
-  // halfedges (forward + backward), and one face normal. Zero vertex normals
-  // and face normal mean the ray contributes nothing to perturbation
-  // tiebreakers — consistency at shared edges/vertices depends entirely on
-  // the mesh's own normals.
+  // Kernel12 treats inA as an edge mesh. Halfedges derives endVert from the
+  // next edge in a triangle, so this helper uses a padded degenerate face:
+  // edge 0 is the forward ray, edge 1 is its reverse, and edge 2 only closes
+  // the local storage loop. Zero vertex normals and face normal mean the ray
+  // contributes nothing to perturbation tiebreakers; consistency at shared
+  // edges/vertices depends entirely on the mesh's own normals.
   Impl rayImpl;
   rayImpl.vertPos_.resize(2);
   rayImpl.vertPos_[0] = origin;
@@ -588,9 +589,10 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   rayImpl.vertNormal_.resize(2);
   rayImpl.vertNormal_[0] = vec3(0.0);
   rayImpl.vertNormal_[1] = vec3(0.0);
-  rayImpl.halfedge_.resize(2);
+  rayImpl.halfedge_.resize(3);
   rayImpl.halfedge_[0] = {0, 1, 1, 0};  // forward: vert 0 → 1
   rayImpl.halfedge_[1] = {1, 0, 0, 0};  // backward: vert 1 → 0
+  rayImpl.halfedge_[2] = {0, 0, -1, 0};
   rayImpl.faceNormal_.resize(1);
   rayImpl.faceNormal_[0] = vec3(0.0);
 
