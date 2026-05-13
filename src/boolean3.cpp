@@ -88,7 +88,7 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
   for (const int i : {0, 1, 2}) {
     const int halfedge = 3 * tri + i;
     const int start = halfedges.Start(halfedge);
-    const int end = halfedges.Start(NextHalfedge(halfedge));
+    const int end = halfedges.Start(3 * tri + Next3(i));
     if (start < end) {
       edge[i] = {halfedge, start, end, true};
     } else {
