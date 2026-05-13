@@ -23,13 +23,14 @@
  * @category Core
  */
 
-import {Document, Material, Node} from '@gltf-transform/core';
-import {copyToDocument, unpartition} from '@gltf-transform/functions';
+import {Document, Extension, Material, Node, PropertyType} from '@gltf-transform/core';
+import {copyToDocument, dedup, unpartition} from '@gltf-transform/functions';
 
 import type {CrossSection, Manifold, Vec2, Vec3} from '../manifold.d.ts';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
+import {cleanup as cleanupExport, getPropertyResolver} from './export-model.ts';
 import type {Properties} from './gltf-io.ts';
 import {attributeDefs, writeMesh} from './gltf-io.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
@@ -60,6 +61,7 @@ export function cleanup() {
   cleanupDebug();
   cleanupMaterial();
   cleanupImport();
+  cleanupExport();
 }
 
 // Swallow informational logs in testing framework
@@ -290,22 +292,48 @@ function createNodeFromCache(
 
 /**
  * Copy part of a glTF document (on nodeDef) into doc.
+ *
+ * At the time of writing, `copyToDocument()` is flagged as experimental in
+ * glTF-Transform. It has a few limitations.   These are not show-stoppers, but
+ * do require some cleanup.
+ *
+ *    * It creates multiple buffers.  Under the hood, it just copies the
+ *      original buffer into the new document.  It is unclear whether it copies
+ *      the entire buffer, or only the sections of the buffer that are relevant.
+ *      ManifoldCAD users will likely import all geometry within a file anyhow,
+ *      so buffer duplication is an issue for future investigation.
+ *      This can be remediated through `unpartition()`.
+ *    * It will try to use a PropertyResolver to deduplicate. However certain
+ *      properties like textures) are not deduplicated yet.
+ *      This can be fixed with `dedup()`.
  */
 function copyNodeToDocument(
     doc: Document, nodeDef: VisualizationGLTFNode): Node {
   const sourceDoc = nodeDef.document!;
   let targetNode: Node|null = null;
+
+  // Get a property resolver, to deduplicate what we can.
+  const resolve = getPropertyResolver(doc, sourceDoc);
+
+  // Ensure that any extensions applied to the
+  // source document are carried through.
+  for (const sourceExtension of sourceDoc.getRoot().listExtensionsUsed()) {
+    type ExtConstructor = (new (doc: Document) => Extension);
+    const ctor = sourceExtension.constructor as ExtConstructor;
+    const targetExtension = doc.createExtension(ctor);
+    if (sourceExtension.isRequired()) targetExtension.setRequired(true);
+  }
+
   if (nodeDef.node) {
     const sourceNode = nodeDef.node!;
-    const map = copyToDocument(doc, sourceDoc, [sourceNode]);
-    targetNode = map.get(sourceNode) as Node;
+    copyToDocument(doc, sourceDoc, [sourceNode], resolve);
+    targetNode = resolve(sourceNode) as Node;
   } else {
     targetNode = doc.createNode();
-    const sourceNodes = sourceDoc.getRoot().listNodes();
-    const map = copyToDocument(doc, sourceDoc, sourceNodes);
-    for (const sourceNode of sourceNodes) {
+    for (const sourceNode of sourceDoc.getRoot().listNodes()) {
+      copyToDocument(doc, sourceDoc, [sourceNode], resolve);
       if (sourceNode.getParentNode()) continue;
-      targetNode.addChild(map.get(sourceNode) as Node);
+      targetNode.addChild(resolve(sourceNode) as Node);
     }
   }
   if (nodeDef.name) targetNode.setName(nodeDef.name);
@@ -422,6 +450,20 @@ export async function GLTFNodesToGLTFDoc(nodes: Array<BaseGLTFNode>) {
   }
 
   cleanupAnimationInDoc();
+
+  // `copyToDocument()` creates multiple buffers.  Under the hood, it just
+  // copies the original buffer into the new document.
+  // `unpartition()` merges those buffers together.
   await doc.transform(unpartition());
+
+  // `copyToDocument()` will try to use a PropertyResolver to deduplicate.
+  // However, it's an experimental feature in general, and certain properties
+  // (like textures) are not deduplicated yet.
+  await doc.transform(dedup({
+    keepUniqueNames: true,
+    propertyTypes:
+        [PropertyType.TEXTURE, PropertyType.MATERIAL, PropertyType.MESH]
+  }));
+
   return doc;
 }

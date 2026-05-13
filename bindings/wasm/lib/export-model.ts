@@ -30,6 +30,7 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
+import {createDefaultPropertyResolver} from '@gltf-transform/functions';
 
 import {UnsupportedFormatError} from './error.ts';
 import * as export3MF from './export-3mf.ts';
@@ -81,6 +82,15 @@ export interface ExportOptions {
 const exporters: Array<Exporter> = [];
 register(gltfIO);
 register(export3MF);
+
+const documentToPropertyResolver:
+    Map<GLTFTransform.Document,
+        Map<GLTFTransform.Document, GLTFTransform.PropertyResolver<any>>> =
+        new Map();
+
+export const cleanup = () => {
+  documentToPropertyResolver.clear();
+};
 
 function getFormat(identifier: string): ExportFormat {
   const formats = exporters.flatMap(ex => ex.exportFormats);
@@ -177,4 +187,25 @@ export async function writeFile(
       getExporter(options.mimetype ?? options.extension ?? filename);
   const buffer = await exporter.toArrayBuffer(doc, options);
   return await fs.writeFile(filename, new Uint8Array(buffer));
+}
+
+/**
+ * Get or create a PropertyResolver.
+ *
+ * These are used to proactively de-duplicate when copying properties into a
+ * glTF-Transform document.
+ *
+ * @hidden
+ */
+export function getPropertyResolver(
+    dst: GLTFTransform.Document,
+    src: GLTFTransform.Document): GLTFTransform.PropertyResolver<any> {
+  if (!documentToPropertyResolver.has(dst)) {
+    documentToPropertyResolver.set(dst, new Map());
+  }
+  const srcMap = documentToPropertyResolver.get(dst)!;
+  if (!srcMap.has(src)) {
+    srcMap.set(src, createDefaultPropertyResolver(dst, src))
+  }
+  return srcMap.get(src)!
 }

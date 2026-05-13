@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "lib": [
       "es2022",
       "dom"
@@ -29,6 +29,8 @@
     "./types/manifoldCAD.d.ts",
     "./types/manifoldCADGlobals.d.ts"
   ],
-  "exclude": []
+  "exclude": [
+    "./lib/*.test.ts"
+  ]
 }
 

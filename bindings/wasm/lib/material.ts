@@ -26,6 +26,7 @@ import {copyToDocument} from '@gltf-transform/functions';
 
 import type {Manifold} from '../manifold.d.ts';
 
+import {getPropertyResolver} from './export-model.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
 import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode} from './gltf-node.ts';
 import {getDocumentByID} from './import-model.ts';
@@ -100,8 +101,9 @@ function copyImportedMaterial(
   // We need to copy it into place.
   const sourceDoc = getDocumentByID(matIn.sourceRunID!)!;
   const sourceMaterial = matIn.sourceMaterial!;
-  const map = copyToDocument(doc, sourceDoc, [sourceMaterial]);
-  return map.get(sourceMaterial) as GLTFTransform.Material;
+  const resolve = getPropertyResolver(doc, sourceDoc);
+  copyToDocument(doc, sourceDoc, [sourceMaterial], resolve);
+  return resolve(sourceMaterial) as GLTFTransform.Material;
 }
 
 function makeDefaultMaterial(
