@@ -180,9 +180,10 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
 
   auto shortEdge = [&](int edge) {
     const int pair = halfedge_.Pair(edge);
+    if (pair < 0) return false;
     const int start = halfedge_.Start(edge);
     const int end = halfedge_.End(edge);
-    if (pair < 0 || (start < firstNewVert && end < firstNewVert))
+    if (start < firstNewVert && end < firstNewVert)
       return false;
     // Flag short edges
     const vec3 delta = vertPos_[end] - vertPos_[start];
@@ -275,14 +276,15 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   auto swappableEdge = [&](int edge) {
     const int pair = halfedge_.Pair(edge);
     if (pair < 0) return false;
-    if (halfedge_.Start(edge) < firstNewVert &&
-        halfedge_.End(edge) < firstNewVert &&
-        halfedge_.End(NextHalfedge(edge)) < firstNewVert &&
-        halfedge_.End(NextHalfedge(pair)) < firstNewVert)
+    const ivec3 triEdge = TriOf(edge);
+    const ivec3 pairTriEdge = TriOf(pair);
+    if (halfedge_.Start(triEdge[0]) < firstNewVert &&
+        halfedge_.Start(triEdge[1]) < firstNewVert &&
+        halfedge_.Start(triEdge[2]) < firstNewVert &&
+        halfedge_.Start(pairTriEdge[2]) < firstNewVert)
       return false;
 
     int tri = edge / 3;
-    ivec3 triEdge = TriOf(edge);
     mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
     vec2 v[3];
     for (int i : {0, 1, 2})
@@ -293,10 +295,9 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
     // Switch to neighbor's projection.
     edge = pair;
     tri = edge / 3;
-    triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(faceNormal_[tri]);
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos_[halfedge_.Start(triEdge[i])];
+      v[i] = projection * vertPos_[halfedge_.Start(pairTriEdge[i])];
     return CCW(v[0], v[1], v[2], tolerance_) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   };
@@ -326,9 +327,9 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
 // edges distinct. Also duplicates startVert if it becomes pinched.
 void Manifold::Impl::DedupeEdge(const int edge) {
   // Orbit endVert
-  const int startVert = halfedge_.Start(edge);
-  const int endVert = halfedge_.End(edge);
   const int nextEdge = NextHalfedge(edge);
+  const int startVert = halfedge_.Start(edge);
+  const int endVert = halfedge_.Start(nextEdge);
   const int endProp = halfedge_.Prop(nextEdge);
   int current = halfedge_.Pair(nextEdge);
   while (current != edge) {
@@ -469,7 +470,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   const ivec3 tri0edge = TriOf(edge);
   const ivec3 tri1edge = TriOf(halfedge_.Pair(edge));
   if (halfedge_.Pair(tri0edge[1]) == -1) return;
-  if (halfedge_.End(tri0edge[1]) == halfedge_.End(tri1edge[1])) {
+  if (halfedge_.Start(tri0edge[2]) == halfedge_.Start(tri1edge[2])) {
     if (halfedge_.Pair(tri0edge[1]) == tri1edge[2]) {
       if (halfedge_.Pair(tri0edge[2]) == tri1edge[1]) {
         for (int i : {0, 1, 2})
@@ -504,10 +505,10 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
   const int pair = halfedge_.Pair(edge);
   if (pair < 0) return false;
 
-  const int startVert = halfedge_.Start(edge);
-  const int endVert = halfedge_.End(edge);
   const ivec3 tri0edge = TriOf(edge);
   const ivec3 tri1edge = TriOf(pair);
+  const int startVert = halfedge_.Start(tri0edge[0]);
+  const int endVert = halfedge_.Start(tri0edge[1]);
 
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[startVert];
@@ -526,7 +527,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
   if (!shortEdge) {
     current = start;
     TriRef refCheck = triRef[pair / 3];
-    vec3 pLast = vertPos_[halfedge_.End(tri1edge[1])];
+    vec3 pLast = vertPos_[halfedge_.Start(tri1edge[2])];
     while (current != tri1edge[0]) {
       current = NextHalfedge(current);
       vec3 pNext = vertPos_[halfedge_.End(current)];

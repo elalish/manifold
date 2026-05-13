@@ -87,10 +87,13 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
                           FaceEdge edge[3]) {
   for (const int i : {0, 1, 2}) {
     const int halfedge = 3 * tri + i;
-    const bool isForward = halfedges.IsForward(halfedge);
-    const int forwardEdge = isForward ? halfedge : halfedges.Pair(halfedge);
-    edge[i] = {forwardEdge, halfedges.Start(forwardEdge),
-               halfedges.End(forwardEdge), isForward};
+    const int start = halfedges.Start(halfedge);
+    const int end = halfedges.Start(NextHalfedge(halfedge));
+    if (start < end) {
+      edge[i] = {halfedge, start, end, true};
+    } else {
+      edge[i] = {halfedges.Pair(halfedge), end, start, false};
+    }
   }
 }
 
@@ -401,10 +404,9 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
   auto f = [&a](int i) {
-    return a.halfedge_.IsForward(i)
-               ? Box(a.vertPos_[a.halfedge_.Start(i)],
-                     a.vertPos_[a.halfedge_.End(i)])
-               : Box();
+    const int start = a.halfedge_.Start(i);
+    const int end = a.halfedge_.Start(NextHalfedge(i));
+    return start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
   if (IsCancelled(ctx)) return Intersections{};
@@ -452,7 +454,9 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
            countAt(a.halfedge_.size()), ctx, [&](int edge) {
-             if (!a.halfedge_.IsForward(edge)) return;
+             const int start = a.halfedge_.Start(edge);
+             const int end = a.halfedge_.Start(NextHalfedge(edge));
+             if (start >= end) return;
              // check if the edge is broken
              auto it = std::lower_bound(
                  p1q2.begin(), p1q2.end(), edge,
@@ -460,7 +464,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                    return collisionPair[index] < e;
                  });
              if (it == p1q2.end() || (*it)[index] != edge)
-               uA.unite(a.halfedge_.Start(edge), a.halfedge_.End(edge));
+               uA.unite(start, end);
            });
   if (IsCancelled(ctx)) return Vec<int>{};
 

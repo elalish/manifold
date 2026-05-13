@@ -448,10 +448,10 @@ struct DuplicateHalfedges {
 
   void operator()(const int idx) {
     if (!wholeHalfedgeP[idx]) return;
-    if (!halfedgesP.IsForward(idx)) return;
 
     int startVert = halfedgesP.Start(idx);
-    int endVert = halfedgesP.End(idx);
+    int endVert = halfedgesP.Start(NextHalfedge(idx));
+    if (startVert >= endVert) return;
     const int inclusion = i03[startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
