@@ -293,7 +293,11 @@ void Manifold::Impl::DedupePropVerts() {
   }
 }
 
-constexpr int kRemovedHalfedge = -2;
+struct CreateHalfedge {
+  int startVert;
+  int endVert;
+  int propVert;
+};
 
 struct HalfedgePairData {
   int largeVert;
@@ -308,7 +312,7 @@ struct HalfedgePairData {
 
 template <bool useProp, typename F>
 struct PrepHalfedges {
-  VecView<Halfedge> halfedges;
+  VecView<CreateHalfedge> halfedges;
   const VecView<ivec3> triProp;
   const VecView<ivec3> triVert;
   F& f;
@@ -322,7 +326,7 @@ struct PrepHalfedges {
       const int v0 = useProp ? props[i] : triVert[tri][i];
       const int v1 = useProp ? props[j] : triVert[tri][j];
       DEBUG_ASSERT(v0 != v1, logicErr, "topological degeneracy");
-      halfedges[e] = {v0, v1, -1, props[i]};
+      halfedges[e] = {v0, v1, props[i]};
       f(e, v0, v1);
     }
   }
@@ -340,7 +344,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   ZoneScoped;
   const size_t numTri = triProp.size();
   const int numHalfedge = 3 * numTri;
-  Vec<Halfedge> halfedge(numHalfedge);
+  Vec<CreateHalfedge> halfedge(numHalfedge);
   auto policy = autoPolicy(numTri, 1e5);
 
   int vertCount = static_cast<int>(vertPos_.size());
@@ -416,20 +420,20 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   // Mark opposed triangles for removal - this may strand unreferenced verts
   // which are removed later by RemoveUnreferencedVerts() and Finish().
   const int numEdge = numHalfedge / 2;
+  Vec<unsigned char> removed(numHalfedge, false);
 
   const auto body = [&](int i, int consecutiveStart, int segmentEnd) {
     const int pair0 = ids[i];
-    Halfedge h0 = halfedge[pair0];
+    const CreateHalfedge h0 = halfedge[pair0];
     int k = consecutiveStart + numEdge;
     while (1) {
       const int pair1 = ids[k];
-      Halfedge h1 = halfedge[pair1];
+      const CreateHalfedge h1 = halfedge[pair1];
       if (h0.startVert != h1.endVert || h0.endVert != h1.startVert) break;
-      if (h1.pairedHalfedge != kRemovedHalfedge &&
-          halfedge[NextHalfedge(pair0)].endVert ==
-              halfedge[NextHalfedge(pair1)].endVert) {
-        halfedge[pair0].pairedHalfedge = kRemovedHalfedge;
-        halfedge[pair1].pairedHalfedge = kRemovedHalfedge;
+      if (!removed[pair1] && halfedge[NextHalfedge(pair0)].endVert ==
+                                 halfedge[NextHalfedge(pair1)].endVert) {
+        removed[pair0] = true;
+        removed[pair1] = true;
         if (i + numEdge != k) {
           // Reorder so that remaining edges pair up, while preserving relative
           // order between the edges (triangle id order)
@@ -438,9 +442,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
           int dir = i + numEdge < k ? 1 : -1;
           int a = k;
           int b = k + dir;
-          auto isRemoved = [&halfedge, &ids](int x) {
-            return halfedge[ids[x]].pairedHalfedge == kRemovedHalfedge;
-          };
+          auto isRemoved = [&removed, &ids](int x) { return removed[ids[x]]; };
           auto inRange = [&a, dir, i, numEdge]() {
             return (dir > 0 ? a >= i + numEdge : a <= i + numEdge);
           };
@@ -462,7 +464,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       if (k >= segmentEnd + numEdge) break;
     }
     if (i + 1 == segmentEnd) return consecutiveStart;
-    Halfedge h1 = halfedge[ids[i + 1]];
+    const CreateHalfedge h1 = halfedge[ids[i + 1]];
     if (h1.startVert == h0.startVert && h1.endVert == h0.endVert)
       return consecutiveStart;
     return i + 1;
@@ -474,8 +476,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
       std::max(numEdge / tbb::this_task_arena::max_concurrency() / 2, 1024),
       numEdge);
   const auto duplicated = [&](int a, int b) {
-    const Halfedge h0 = halfedge[ids[a]];
-    const Halfedge h1 = halfedge[ids[b]];
+    const CreateHalfedge h0 = halfedge[ids[a]];
+    const CreateHalfedge h1 = halfedge[ids[b]];
     return h0.startVert == h1.startVert && h0.endVert == h1.endVert;
   };
   int end = 0;
@@ -498,17 +500,39 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
   for (int i = 0; i < numEdge; ++i)
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
-  for_each_n(policy, countAt(0), numEdge, [&halfedge, &ids, numEdge](int i) {
-    const int pair0 = ids[i];
-    const int pair1 = ids[i + numEdge];
-    if (halfedge[pair0].pairedHalfedge != kRemovedHalfedge) {
-      halfedge[pair0].pairedHalfedge = pair1;
-      halfedge[pair1].pairedHalfedge = pair0;
-    } else {
-      halfedge[pair0] = halfedge[pair1] = {-1, -1, -1};
+
+  halfedge_.clear(true);
+  halfedge_.resize_nofill(numHalfedge);
+  for_each_n(policy, countAt(0), numEdge,
+             [this, &halfedge, &ids, &removed, numEdge](int i) {
+               const int pair0 = ids[i];
+               const int pair1 = ids[i + numEdge];
+               if (!removed[pair0]) {
+                 halfedge_.SetStart(pair0, halfedge[pair0].startVert);
+                 halfedge_.SetProp(pair0, halfedge[pair0].propVert);
+                 halfedge_.SetPair(pair0, pair1);
+                 halfedge_.SetStart(pair1, halfedge[pair1].startVert);
+                 halfedge_.SetProp(pair1, halfedge[pair1].propVert);
+                 halfedge_.SetPair(pair1, pair0);
+               } else {
+                 halfedge_.SetStart(pair0, -1);
+                 halfedge_.SetProp(pair0, 0);
+                 halfedge_.SetPair(pair0, -1);
+                 halfedge_.SetStart(pair1, -1);
+                 halfedge_.SetProp(pair1, 0);
+                 halfedge_.SetPair(pair1, -1);
+               }
+             });
+#ifdef MANIFOLD_DEBUG
+  for (int edge = 0; edge < numHalfedge; ++edge) {
+    const int next = NextHalfedge(edge);
+    if (!removed[edge] && !removed[next]) {
+      DEBUG_ASSERT(halfedge[edge].endVert == halfedge[next].startVert,
+                   topologyErr,
+                   "CreateHalfedges requires triangle-ordered edges!");
     }
-  });
-  halfedge_.FromData(halfedge);
+  }
+#endif
 }
 
 void Manifold::Impl::MakeEmpty(Error status) {
