@@ -460,10 +460,11 @@ struct DuplicateHalfedges {
     startVert = vP2R[startVert];
     endVert = vP2R[endVert];
     const int propVert = halfedgesP.Prop(idx);
-    const int pairPropVert = halfedgesP.Prop(halfedgesP.Pair(idx));
+    const int pair = halfedgesP.Pair(idx);
+    const int pairPropVert = halfedgesP.Prop(pair);
     const int faceLeftP = idx / 3;
     const int newFace = faceP2R[faceLeftP];
-    const int faceRightP = halfedgesP.Pair(idx) / 3;
+    const int faceRightP = pair / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
