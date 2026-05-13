@@ -492,8 +492,9 @@ std::vector<Manifold> Manifold::Decompose() const {
   }
   DisjointSets uf(NumVert());
   for (size_t edge = 0; edge < pImpl_->halfedge_.size(); ++edge) {
-    const Halfedge halfedge = pImpl_->halfedge_[edge];
-    if (halfedge.IsForward()) uf.unite(halfedge.startVert, halfedge.endVert);
+    if (pImpl_->halfedge_.IsForward(edge)) {
+      uf.unite(pImpl_->halfedge_.Start(edge), pImpl_->halfedge_.End(edge));
+    }
   }
   std::vector<int> componentIndices;
   const int numComponents = uf.connectedComponents(componentIndices);
@@ -531,7 +532,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     const int nFace =
         copy_if(countAt(0_uz), countAt(NumTri()), faceNew2Old.begin(),
                 [i, &vertLabel, &halfedge](int face) {
-                  return vertLabel[halfedge[3 * face].startVert] == i;
+                  return vertLabel[halfedge.Start(3 * face)] == i;
                 }) -
         faceNew2Old.begin();
 

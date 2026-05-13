@@ -179,18 +179,19 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   const double tol = firstNewVert == 0 ? epsilon_ : tolerance_;
 
   auto shortEdge = [&](int edge) {
-    const Halfedge& half = halfedge_[edge];
-    if (half.pairedHalfedge < 0 ||
-        (half.startVert < firstNewVert && half.endVert < firstNewVert))
+    const int pair = halfedge_.Pair(edge);
+    const int start = halfedge_.Start(edge);
+    const int end = halfedge_.End(edge);
+    if (pair < 0 || (start < firstNewVert && end < firstNewVert))
       return false;
     // Flag short edges
-    const vec3 delta = vertPos_[half.endVert] - vertPos_[half.startVert];
+    const vec3 delta = vertPos_[end] - vertPos_[start];
     const double lenSq = la::dot(delta, delta);
     // To ensure tolerance_-scale errors don't stack, only collapse these edges
     // if they connect a new vert to an old vert, since old verts are only
     // allowed to move by epsilon_.
     const double maxLen =
-        half.endVert < firstNewVert ? tol * tol : epsilon_ * epsilon_;
+        end < firstNewVert ? tol * tol : epsilon_ * epsilon_;
     return lenSq < maxLen;
   };
 
@@ -223,17 +224,17 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     // local check, but by the global MarkCoplanar function, which keeps this
     // from being vulnerable to error stacking.
     auto colinearEdge = [&](int edge) {
-      const Halfedge& half = halfedge_[edge];
-      if (half.pairedHalfedge < 0 || half.startVert < firstNewVert)
+      const int pair = halfedge_.Pair(edge);
+      if (pair < 0 || halfedge_.Start(edge) < firstNewVert)
         return false;
       // Flag redundant edges - those where the startVert is surrounded by only
       // two original triangles.
       const TriRef ref0 = meshRelation_.triRef[edge / 3];
-      int current = NextHalfedge(half.pairedHalfedge);
+      int current = NextHalfedge(pair);
       TriRef ref1 = meshRelation_.triRef[current / 3];
       bool ref1Updated = !ref0.SameFace(ref1);
       while (current != edge) {
-        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+        current = NextHalfedge(halfedge_.Pair(current));
         int tri = current / 3;
         const TriRef ref = meshRelation_.triRef[tri];
         if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) {
@@ -272,11 +273,12 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
   scratchBuffer.reserve(10);
 
   auto swappableEdge = [&](int edge) {
-    const Halfedge& half = halfedge_[edge];
-    if (half.pairedHalfedge < 0) return false;
-    if (half.startVert < firstNewVert && half.endVert < firstNewVert &&
-        halfedge_[NextHalfedge(edge)].endVert < firstNewVert &&
-        halfedge_[NextHalfedge(half.pairedHalfedge)].endVert < firstNewVert)
+    const int pair = halfedge_.Pair(edge);
+    if (pair < 0) return false;
+    if (halfedge_.Start(edge) < firstNewVert &&
+        halfedge_.End(edge) < firstNewVert &&
+        halfedge_.End(NextHalfedge(edge)) < firstNewVert &&
+        halfedge_.End(NextHalfedge(pair)) < firstNewVert)
       return false;
 
     int tri = edge / 3;
@@ -284,17 +286,17 @@ void Manifold::Impl::SwapDegenerates(int firstNewVert) {
     mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
     vec2 v[3];
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos_[halfedge_[triEdge[i]].startVert];
+      v[i] = projection * vertPos_[halfedge_.Start(triEdge[i])];
     if (CCW(v[0], v[1], v[2], tolerance_) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
-    edge = half.pairedHalfedge;
+    edge = pair;
     tri = edge / 3;
     triEdge = TriOf(edge);
     projection = GetAxisAlignedProjection(faceNormal_[tri]);
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos_[halfedge_[triEdge[i]].startVert];
+      v[i] = projection * vertPos_[halfedge_.Start(triEdge[i])];
     return CCW(v[0], v[1], v[2], tolerance_) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   };

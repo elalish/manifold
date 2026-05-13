@@ -153,7 +153,7 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   Vec<int> keep(numVert, 0);
   auto policy = autoPolicy(numVert, 1e5);
   for_each_n(policy, countAt(0), halfedge_.size(), [&keep, this](int edge) {
-    const int startVert = halfedge_[edge].startVert;
+    const int startVert = halfedge_.Start(edge);
     if (startVert >= 0) {
       reinterpret_cast<std::atomic<int>*>(&keep[startVert])
           ->store(1, std::memory_order_relaxed);
@@ -192,13 +192,13 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
   for_each_n(
       autoPolicy(numTri), countAt(0), numTri, [&triPriority, this](int tri) {
         meshRelation_.triRef[tri].coplanarID = -1;
-        if (halfedge_[3 * tri].startVert < 0) {
+        if (halfedge_.Start(3 * tri) < 0) {
           triPriority[tri] = {0, tri};
           return;
         }
-        const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
-        const vec3 n = cross(vertPos_[halfedge_[3 * tri].endVert] - v,
-                             vertPos_[halfedge_[3 * tri + 1].endVert] - v);
+        const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
+        const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
+                             vertPos_[halfedge_.End(3 * tri + 1)] - v);
         faceNormal_[tri] = normalize(n);
         if (std::isnan(faceNormal_[tri].x)) faceNormal_[tri] = vec3(0, 0, 1);
         triPriority[tri] = {length2(n), tri};
@@ -212,8 +212,8 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
     if (meshRelation_.triRef[tp.tri].coplanarID >= 0) continue;
 
     meshRelation_.triRef[tp.tri].coplanarID = tp.tri;
-    if (halfedge_[3 * tp.tri].startVert < 0) continue;
-    const vec3 base = vertPos_[halfedge_[3 * tp.tri].startVert];
+    if (halfedge_.Start(3 * tp.tri) < 0) continue;
+    const vec3 base = vertPos_[halfedge_.Start(3 * tp.tri)];
     const vec3 normal = faceNormal_[tp.tri];
     interiorHalfedges.resize(3);
     interiorHalfedges[0] = 3 * tp.tri;
@@ -221,18 +221,18 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
     interiorHalfedges[2] = 3 * tp.tri + 2;
     while (!interiorHalfedges.empty()) {
       const int h =
-          NextHalfedge(halfedge_[interiorHalfedges.back()].pairedHalfedge);
+          NextHalfedge(halfedge_.Pair(interiorHalfedges.back()));
       interiorHalfedges.pop_back();
       if (meshRelation_.triRef[h / 3].coplanarID >= 0) continue;
 
-      const vec3 v = vertPos_[halfedge_[h].endVert];
+      const vec3 v = vertPos_[halfedge_.End(h)];
       if (std::abs(dot(v - base, normal)) < tolerance_) {
         const size_t tri = h / 3;
         meshRelation_.triRef[tri].coplanarID = tp.tri;
         faceNormal_[tri] = normal;
 
         if (interiorHalfedges.empty() ||
-            h != halfedge_[interiorHalfedges.back()].pairedHalfedge) {
+            h != halfedge_.Pair(interiorHalfedges.back())) {
           interiorHalfedges.push_back(h);
         } else {
           interiorHalfedges.pop_back();
@@ -258,18 +258,17 @@ void Manifold::Impl::DedupePropVerts() {
   Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   for_each_n(autoPolicy(halfedge_.size(), 1e4), countAt(0), halfedge_.size(),
              [&vert2vert, numProp, this](const int edgeIdx) {
-               const Halfedge edge = halfedge_[edgeIdx];
-               if (edge.pairedHalfedge < 0) return;
+               const int pair = halfedge_.Pair(edgeIdx);
+               if (pair < 0) return;
                const int edgeFace = edgeIdx / 3;
-               const int pairFace = edge.pairedHalfedge / 3;
+               const int pairFace = pair / 3;
 
                if (meshRelation_.triRef[edgeFace].meshID !=
                    meshRelation_.triRef[pairFace].meshID)
                  return;
 
-               const int prop0 = halfedge_[edgeIdx].propVert;
-               const int prop1 =
-                   halfedge_[NextHalfedge(edge.pairedHalfedge)].propVert;
+               const int prop0 = halfedge_.Prop(edgeIdx);
+               const int prop1 = halfedge_.Prop(NextHalfedge(pair));
                bool propEqual = true;
                for (size_t p = 0; p < numProp; ++p) {
                  if (properties_[numProp * prop0 + p] !=
@@ -290,8 +289,7 @@ void Manifold::Impl::DedupePropVerts() {
   std::vector<int> label2vert(numLabels);
   for (size_t v = 0; v < numPropVert; ++v) label2vert[vertLabels[v]] = v;
   for (size_t edge = 0; edge < halfedge_.size(); ++edge) {
-    halfedge_[edge].propVert =
-        label2vert[vertLabels[halfedge_[edge].propVert]];
+    halfedge_.SetProp(edge, label2vert[vertLabels[halfedge_.Prop(edge)]]);
   }
 }
 
@@ -657,7 +655,7 @@ void Manifold::Impl::CalculateVertNormals() {
   };
 
   for_each_n(policy, countAt(0), halfedge_.size(),
-             [&](const int i) { atomicMin(i, halfedge_[i].startVert); });
+             [&](const int i) { atomicMin(i, halfedge_.Start(i)); });
 
   for_each_n(policy, countAt(0), NumVert(), [&](const size_t vert) {
     int firstEdge = vertHalfedgeMap[vert].load();
@@ -668,8 +666,8 @@ void Manifold::Impl::CalculateVertNormals() {
     }
     vec3 normal = vec3(0.0);
     ForVert(firstEdge, [&](int edge) {
-      ivec3 triVerts = {halfedge_[edge].startVert, halfedge_[edge].endVert,
-                        halfedge_[NextHalfedge(edge)].endVert};
+      ivec3 triVerts = {halfedge_.Start(edge), halfedge_.End(edge),
+                        halfedge_.End(NextHalfedge(edge))};
       vec3 currEdge =
           la::normalize(vertPos_[triVerts[1]] - vertPos_[triVerts[0]]);
       vec3 prevEdge =

@@ -72,7 +72,7 @@ struct CountVerts {
 
   void operator()(size_t i) {
     for (size_t j : {0, 1, 2})
-      count[i] += std::abs(inclusion[halfedges[3 * i + j].startVert]);
+      count[i] += std::abs(inclusion[halfedges.Start(3 * i + j)]);
   }
 };
 
@@ -91,14 +91,12 @@ struct CountNewVerts {
 
     if (atomic) {
       AtomicAdd(countQ[faceQ], inclusion);
-      const Halfedge half = halfedges[edgeP];
       AtomicAdd(countP[edgeP / 3], inclusion);
-      AtomicAdd(countP[half.pairedHalfedge / 3], inclusion);
+      AtomicAdd(countP[halfedges.Pair(edgeP) / 3], inclusion);
     } else {
       countQ[faceQ] += inclusion;
-      const Halfedge half = halfedges[edgeP];
       countP[edgeP / 3] += inclusion;
-      countP[half.pairedHalfedge / 3] += inclusion;
+      countP[halfedges.Pair(edgeP) / 3] += inclusion;
     }
   }
 };
@@ -225,8 +223,7 @@ void AddNewEdgeVerts(
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    Halfedge halfedge = halfedgeP[edgeP];
-    std::pair<int, int> keyRight = {halfedge.pairedHalfedge / 3, faceQ};
+    std::pair<int, int> keyRight = {halfedgeP.Pair(edgeP) / 3, faceQ};
     if (!forward) std::swap(keyRight.first, keyRight.second);
 
     std::pair<int, int> keyLeft = {edgeP / 3, faceQ};
@@ -329,12 +326,12 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<Halfedge>& halfedgeR,
     std::vector<EdgePos> edgePosP = value.second;
     std::stable_sort(edgePosP.begin(), edgePosP.end());
 
-    const Halfedge& halfedge = halfedgeP[edgeP];
+    const int pairP = halfedgeP.Pair(edgeP);
     wholeHalfedgeP[edgeP] = false;
-    wholeHalfedgeP[halfedge.pairedHalfedge] = false;
+    wholeHalfedgeP[pairP] = false;
 
-    const int vStart = halfedge.startVert;
-    const int vEnd = halfedge.endVert;
+    const int vStart = halfedgeP.Start(edgeP);
+    const int vEnd = halfedgeP.End(edgeP);
     const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos& edge : edgePosP) {
@@ -361,7 +358,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<Halfedge>& halfedgeR,
     // add halfedges to result
     const int faceLeftP = edgeP / 3;
     const int faceLeft = faceP2R[faceLeftP];
-    const int faceRightP = halfedge.pairedHalfedge / 3;
+    const int faceRightP = pairP / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -451,19 +448,22 @@ struct DuplicateHalfedges {
 
   void operator()(const int idx) {
     if (!wholeHalfedgeP[idx]) return;
-    Halfedge halfedge = halfedgesP[idx];
-    if (!halfedge.IsForward()) return;
+    if (!halfedgesP.IsForward(idx)) return;
 
-    const int inclusion = i03[halfedge.startVert];
+    int startVert = halfedgesP.Start(idx);
+    int endVert = halfedgesP.End(idx);
+    const int inclusion = i03[startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
-      std::swap(halfedge.startVert, halfedge.endVert);
+      std::swap(startVert, endVert);
     }
-    halfedge.startVert = vP2R[halfedge.startVert];
-    halfedge.endVert = vP2R[halfedge.endVert];
+    startVert = vP2R[startVert];
+    endVert = vP2R[endVert];
+    const int propVert = halfedgesP.Prop(idx);
+    const int pairPropVert = halfedgesP.Prop(halfedgesP.Pair(idx));
     const int faceLeftP = idx / 3;
     const int newFace = faceP2R[faceLeftP];
-    const int faceRightP = halfedge.pairedHalfedge / 3;
+    const int faceRightP = halfedgesP.Pair(idx) / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -474,16 +474,15 @@ struct DuplicateHalfedges {
     for (int i = 0; i < std::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[newFace], 1);
       int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
-      halfedge.pairedHalfedge = backwardEdge;
 
-      halfedgesR[forwardEdge] = halfedge;
-      halfedgesR[backwardEdge] = {halfedge.endVert, halfedge.startVert,
-                                  forwardEdge};
+      halfedgesR[forwardEdge] = {startVert, endVert, backwardEdge, propVert};
+      halfedgesR[backwardEdge] = {endVert, startVert, forwardEdge,
+                                  pairPropVert};
       halfedgeRef[forwardEdge] = forwardRef;
       halfedgeRef[backwardEdge] = backwardRef;
 
-      ++halfedge.startVert;
-      ++halfedge.endVert;
+      ++startVert;
+      ++endVert;
     }
   }
 };
@@ -551,7 +550,7 @@ struct Barycentric {
 
   void operator()(const int tri) {
     const TriRef refPQ = ref[tri];
-    if (halfedgeR[3 * tri].startVert < 0) return;
+    if (halfedgeR.Start(3 * tri) < 0) return;
 
     const int triPQ = refPQ.faceID;
     const bool PQ = refPQ.meshID == 0;
@@ -560,10 +559,10 @@ struct Barycentric {
 
     mat3 triPos;
     for (const int j : {0, 1, 2})
-      triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
+      triPos[j] = vertPos[halfedge.Start(3 * triPQ + j)];
 
     for (const int i : {0, 1, 2}) {
-      const int vert = halfedgeR[3 * tri + i].startVert;
+      const int vert = halfedgeR.Start(3 * tri + i);
       uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, epsilon);
     }
   }
@@ -601,7 +600,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   for (int tri = 0; tri < numTri; ++tri) {
     if (IsCancelled(ctx)) return;
     // Skip collapsed triangles
-    if (outR.halfedge_[3 * tri].startVert < 0) continue;
+    if (outR.halfedge_.Start(3 * tri) < 0) continue;
 
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
@@ -610,7 +609,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
 
     for (const int i : {0, 1, 2}) {
-      const int vert = outR.halfedge_[3 * tri + i].startVert;
+      const int vert = outR.halfedge_.Start(3 * tri + i);
       const vec3& uvw = bary[3 * tri + i];
 
       ivec4 key(PQ, idMissProp, -1, -1);
@@ -619,7 +618,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            key[2] = halfedge[3 * ref.faceID + j].propVert;
+            key[2] = halfedge.Prop(3 * ref.faceID + j);
             edge = -1;
             break;
           }
@@ -627,8 +626,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         }
         if (edge >= 0) {
           // On an edge, both propVerts must match
-          const int p0 = halfedge[3 * ref.faceID + Next3(edge)].propVert;
-          const int p1 = halfedge[3 * ref.faceID + Prev3(edge)].propVert;
+          const int p0 = halfedge.Prop(3 * ref.faceID + Next3(edge));
+          const int p1 = halfedge.Prop(3 * ref.faceID + Prev3(edge));
           key[1] = vert;
           key[2] = std::min(p0, p1);
           key[3] = std::max(p0, p1);
@@ -641,7 +640,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         // only key.x/key.z matters
         auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
-          outR.halfedge_[3 * tri + i].propVert = entry;
+          outR.halfedge_.SetProp(3 * tri + i, entry);
           continue;
         }
         entry = idx;
@@ -651,7 +650,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.halfedge_[3 * tri + i].propVert = b.second;
+            outR.halfedge_.SetProp(3 * tri + i, b.second);
             break;
           }
         }
@@ -659,14 +658,13 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
-      outR.halfedge_[3 * tri + i].propVert = idx++;
+      outR.halfedge_.SetProp(3 * tri + i, idx++);
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] =
-                properties[oldNumProp * halfedge[3 * ref.faceID + j].propVert +
-                           p];
+                properties[oldNumProp * halfedge.Prop(3 * ref.faceID + j) + p];
           outR.properties_.push_back(la::dot(uvw, oldProps));
         } else {
           outR.properties_.push_back(0);

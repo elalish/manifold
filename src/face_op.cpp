@@ -270,7 +270,7 @@ Polygons Manifold::Impl::Slice(double height) const {
     double min = std::numeric_limits<double>::infinity();
     double max = -std::numeric_limits<double>::infinity();
     for (const int j : {0, 1, 2}) {
-      const double z = vertPos_[halfedge_[3 * tri + j].startVert].z;
+      const double z = vertPos_[halfedge_.Start(3 * tri + j)].z;
       min = std::min(min, z);
       max = std::max(max, z);
     }
@@ -290,8 +290,8 @@ Polygons Manifold::Impl::Slice(double height) const {
 
     int k = 0;
     for (const int j : {0, 1, 2}) {
-      if (vertPos_[halfedge_[3 * startTri + j].startVert].z > height &&
-          vertPos_[halfedge_[3 * startTri + Next3(j)].startVert].z <= height) {
+      if (vertPos_[halfedge_.Start(3 * startTri + j)].z > height &&
+          vertPos_[halfedge_.Start(3 * startTri + Next3(j))].z <= height) {
         k = Next3(j);
         break;
       }
@@ -300,17 +300,18 @@ Polygons Manifold::Impl::Slice(double height) const {
     int tri = startTri;
     do {
       tris.erase(tris.find(tri));
-      if (vertPos_[halfedge_[3 * tri + k].endVert].z <= height) {
+      const int edge = 3 * tri + k;
+      if (vertPos_[halfedge_.End(edge)].z <= height) {
         k = Next3(k);
       }
 
-      Halfedge up = halfedge_[3 * tri + k];
-      const vec3 below = vertPos_[up.startVert];
-      const vec3 above = vertPos_[up.endVert];
+      const int up = 3 * tri + k;
+      const vec3 below = vertPos_[halfedge_.Start(up)];
+      const vec3 above = vertPos_[halfedge_.End(up)];
       const double a = (height - below.z) / (above.z - below.z);
       poly.push_back(vec2(la::lerp(below, above, a)));
 
-      const int pair = up.pairedHalfedge;
+      const int pair = halfedge_.Pair(up);
       tri = pair / 3;
       k = Next3(pair % 3);
     } while (tri != startTri);
@@ -326,10 +327,10 @@ Polygons Manifold::Impl::Project() const {
   Vec<Halfedge> cusps(NumEdge());
   size_t numCusps = 0;
   for (size_t i = 0; i < halfedge_.size(); ++i) {
-    const Halfedge edge = halfedge_[i];
-    if (faceNormal_[halfedge_[edge.pairedHalfedge].pairedHalfedge / 3].z >= 0 &&
-        faceNormal_[edge.pairedHalfedge / 3].z < 0) {
-      cusps[numCusps++] = edge;
+    const int pair = halfedge_.Pair(i);
+    if (faceNormal_[halfedge_.Pair(pair) / 3].z >= 0 &&
+        faceNormal_[pair / 3].z < 0) {
+      cusps[numCusps++] = halfedge_.Get(i);
     }
   }
   cusps.resize(numCusps);

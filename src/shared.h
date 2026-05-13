@@ -413,9 +413,8 @@ Vec<TmpEdge> inline CreateTmpEdges(const Halfedges& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
              [&edges, &halfedge](const int idx) {
-               const Halfedge half = halfedge[idx];
-               edges[idx] = TmpEdge(half.startVert, half.endVert,
-                                    half.IsForward() ? idx : -1);
+               edges[idx] = TmpEdge(halfedge.Start(idx), halfedge.End(idx),
+                                    halfedge.IsForward(idx) ? idx : -1);
              });
 
   size_t numEdge =

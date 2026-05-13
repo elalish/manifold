@@ -62,7 +62,7 @@ struct CurvatureAngles {
                          la::length(la::cross(edge[0], edge[1])) / 6;
 
     for (int i : {0, 1, 2}) {
-      const int vert = halfedge[3 * tri + i].startVert;
+      const int vert = halfedge.Start(3 * tri + i);
       AtomicAdd(gaussianCurvature[vert], -phi[i]);
       AtomicAdd(area[vert], area3);
     }
@@ -73,22 +73,22 @@ struct CheckHalfedges {
   const Halfedges& halfedges;
 
   bool operator()(size_t edge) const {
-    const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
-        halfedge.pairedHalfedge == -1)
+    const int start = halfedges.Start(edge);
+    const int end = halfedges.End(edge);
+    const int pair = halfedges.Pair(edge);
+    if (start == -1 && end == -1 && pair == -1)
       return true;
-    if (halfedges[NextHalfedge(edge)].startVert == -1 ||
-        halfedges[NextHalfedge(NextHalfedge(edge))].startVert == -1) {
+    if (halfedges.Start(NextHalfedge(edge)) == -1 ||
+        halfedges.Start(NextHalfedge(NextHalfedge(edge))) == -1) {
       return false;
     }
-    if (halfedge.pairedHalfedge == -1) return false;
+    if (pair == -1) return false;
 
-    const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
-    good &= paired.pairedHalfedge == static_cast<int>(edge);
-    good &= halfedge.startVert != halfedge.endVert;
-    good &= halfedge.startVert == paired.endVert;
-    good &= halfedge.endVert == paired.startVert;
+    good &= halfedges.Pair(pair) == static_cast<int>(edge);
+    good &= start != end;
+    good &= start == halfedges.End(pair);
+    good &= end == halfedges.Start(pair);
     return good;
   }
 };
@@ -148,8 +148,8 @@ bool Manifold::Impl::IsSelfIntersecting() const {
   auto f = [&](int tri0, int tri1) {
     std::array<vec3, 3> triVerts0, triVerts1;
     for (int i : {0, 1, 2}) {
-      triVerts0[i] = vertPos_[halfedge_[3 * tri0 + i].startVert];
-      triVerts1[i] = vertPos_[halfedge_[3 * tri1 + i].startVert];
+      triVerts0[i] = vertPos_[halfedge_.Start(3 * tri0 + i)];
+      triVerts1[i] = vertPos_[halfedge_.Start(3 * tri1 + i)];
     }
     // if triangles tri0 and tri1 share a vertex, return true to skip the
     // check. we relax the sharing criteria a bit to allow for at most
@@ -197,14 +197,14 @@ bool Manifold::Impl::IsSelfIntersecting() const {
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
-    if (halfedge_[3 * face].pairedHalfedge < 0) return true;
+    if (halfedge_.Pair(3 * face) < 0) return true;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
     vec2 v[3];
     double max = -std::numeric_limits<double>::infinity();
     double min = std::numeric_limits<double>::infinity();
     for (int i : {0, 1, 2}) {
-      const vec3 p = vertPos_[halfedge_[3 * face + i].startVert];
+      const vec3 p = vertPos_[halfedge_.Start(3 * face + i)];
       v[i] = projection * p;
       const double d = la::dot(p, faceNormal_[face]);
       if (!std::isfinite(d)) return true;
@@ -224,12 +224,12 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
-    if (halfedge_[3 * face].pairedHalfedge < 0) return true;
+    if (halfedge_.Pair(3 * face) < 0) return true;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
     vec2 v[3];
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos_[halfedge_[3 * face + i].startVert];
+      v[i] = projection * vertPos_[halfedge_.Start(3 * face + i)];
 
     const int ccw = CCW(v[0], v[1], v[2], tolerance_ / 2);
     return ccw == 0;
@@ -248,15 +248,15 @@ bool Manifold::Impl::IsConvex() const {
   // Iterate across all edges; return false if any edges are concave
   const size_t nbEdges = halfedge_.size();
   return all_of(countAt(0_uz), countAt(nbEdges), [this](size_t idx) {
-    Halfedge edge = halfedge_[idx];
-    if (!edge.IsForward()) return true;
+    if (!halfedge_.IsForward(idx)) return true;
 
     const vec3 normal0 = faceNormal_[idx / 3];
-    const vec3 normal1 = faceNormal_[edge.pairedHalfedge / 3];
+    const vec3 normal1 = faceNormal_[halfedge_.Pair(idx) / 3];
 
     if (linalg::all(linalg::equal(normal0, normal1))) return true;
 
-    const vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
+    const vec3 edgeVec =
+        vertPos_[halfedge_.End(idx)] - vertPos_[halfedge_.Start(idx)];
     const bool convex =
         linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
     return convex;
@@ -268,17 +268,17 @@ double Manifold::Impl::GetProperty(Property prop) const {
   if (IsEmpty()) return 0;
 
   auto Volume = [this](size_t tri) {
-    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
-    vec3 crossP = la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
-                            vertPos_[halfedge_[3 * tri + 2].startVert] - v);
+    const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
+    vec3 crossP = la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v,
+                            vertPos_[halfedge_.Start(3 * tri + 2)] - v);
     return la::dot(crossP, v) / 6.0;
   };
 
   auto Area = [this](size_t tri) {
-    const vec3 v = vertPos_[halfedge_[3 * tri].startVert];
+    const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
     return la::length(
-               la::cross(vertPos_[halfedge_[3 * tri + 1].startVert] - v,
-                         vertPos_[halfedge_[3 * tri + 2].startVert] - v)) /
+               la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v,
+                         vertPos_[halfedge_.Start(3 * tri + 2)] - v)) /
            2.0;
   };
 
@@ -324,9 +324,9 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<uint8_t> counters(NumPropVert(), 0);
   for_each_n(policy, countAt(0_uz), NumTri(), [&](const size_t tri) {
     for (const int i : {0, 1, 2}) {
-      const Halfedge& edge = halfedge_[3 * tri + i];
-      const int vert = edge.startVert;
-      const int propVert = edge.propVert;
+      const int edge = 3 * tri + i;
+      const int vert = halfedge_.Start(edge);
+      const int propVert = halfedge_.Prop(edge);
 
       auto old = std::atomic_exchange(
           reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
@@ -430,8 +430,8 @@ struct MinDistanceRecorder {
     std::array<vec3, 3> q;
 
     for (const int j : {0, 1, 2}) {
-      p[j] = self.vertPos_[self.halfedge_[3 * tri + j].startVert];
-      q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+      p[j] = self.vertPos_[self.halfedge_.Start(3 * tri + j)];
+      q[j] = other.vertPos_[other.halfedge_.Start(3 * triOther + j)];
     }
     minDistance = std::min(minDistance, DistanceTriangleTriangleSquared(p, q));
   }

@@ -602,9 +602,9 @@ Manifold Manifold::SetProperties(
         propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), NumTri(), [&](int tri) {
           for (int i : {0, 1, 2}) {
-            const Halfedge& edge = pImpl->halfedge_[3 * tri + i];
-            const int vert = edge.startVert;
-            const int propVert = edge.propVert;
+            const int edge = 3 * tri + i;
+            const int vert = pImpl->halfedge_.Start(edge);
+            const int propVert = pImpl->halfedge_.Prop(edge);
             if (propFunc == nullptr) {
               for (int p = 0; p < numProp; ++p) {
                 pImpl->properties_[numProp * propVert + p] = 0;

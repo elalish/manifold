@@ -81,9 +81,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
           [&newHulls, &aImpl, &verts, offset](const int iter) {
             std::vector<vec3> simpleHull;
             for (int i : {0, 1, 2}) {
-              const auto vertex =
-                  aImpl->vertPos_[aImpl->halfedge_[((offset + iter) * 3) + i]
-                                      .startVert];
+              const int edge = ((offset + iter) * 3) + i;
+              const auto vertex = aImpl->vertPos_[aImpl->halfedge_.Start(edge)];
               auto t = [vertex](vec3 v) { return v + vertex; };
               simpleHull.insert(simpleHull.end(),
                                 TransformIterator(verts.begin(), t),
@@ -109,9 +108,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
     // Process each A face sequentially
     for (size_t aFace = 0; aFace < numTriA; ++aFace) {
-      vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
-      vec3 a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
-      vec3 a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
+      vec3 a1 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 0)];
+      vec3 a2 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 1)];
+      vec3 a3 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 2)];
       vec3 nA = aImpl->faceNormal_[aFace];
 
       // Create hulls for all B faces paired with this A face (parallel)
@@ -130,11 +129,11 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
             if (coplanar) return;
 
             vec3 b1 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
+                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 0)];
             vec3 b2 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
+                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 1)];
             vec3 b3 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
+                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 2)];
             faceHulls[bFace] =
                 Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
                                 a2 + b3, a3 + b1, a3 + b2, a3 + b3});

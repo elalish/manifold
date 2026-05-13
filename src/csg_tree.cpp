@@ -291,14 +291,16 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         const bool hasProp = node->pImpl_->NumProp() > 0;
         for_each_n(policy, countAt(0), node->pImpl_->halfedge_.size(),
                    [&](int edge) {
-                     const Halfedge halfedge = node->pImpl_->halfedge_[edge];
                      const int newEdge = edgeIndices[i] + edge;
-                     combined.halfedge_.SetStart(newEdge,
-                                                 halfedge.startVert + nextVert);
+                     combined.halfedge_.SetStart(
+                         newEdge, node->pImpl_->halfedge_.Start(edge) +
+                                      nextVert);
                      combined.halfedge_.SetPair(
-                         newEdge, halfedge.pairedHalfedge + nextEdge);
+                         newEdge,
+                         node->pImpl_->halfedge_.Pair(edge) + nextEdge);
                      const int propVert =
-                         hasProp ? halfedge.propVert + nextProp : nextProp;
+                         hasProp ? node->pImpl_->halfedge_.Prop(edge) + nextProp
+                                 : nextProp;
                      combined.halfedge_.SetProp(newEdge, propVert);
                    });
 
