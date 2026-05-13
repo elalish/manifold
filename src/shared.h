@@ -237,46 +237,10 @@ class Halfedges {
     return (*this)[static_cast<int>(idx)];
   }
 
-  void Copy(int dst, const Halfedges& src, int srcIdx) {
-    Set(dst, src.Get(srcIdx));
-  }
-
-  void CopyFaceFrom(int newFace, const Halfedges& oldHalfedges, int oldFace,
-                    const VecView<const int>& faceOld2New) {
-    for (const int i : {0, 1, 2}) {
-      const int oldEdge = 3 * oldFace + i;
-      HalfedgeData edge = oldHalfedges.Get(oldEdge);
-      const int pairedFace = edge.pairedHalfedge / 3;
-      const int offset = edge.pairedHalfedge - 3 * pairedFace;
-      edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
-      Set(3 * newFace + i, edge);
-    }
-  }
-
-  void RotateTri(int tri, int offset) {
-    std::array<HalfedgeData, 3> face = {Get(3 * tri), Get(3 * tri + 1),
-                                        Get(3 * tri + 2)};
-    for (int i : {0, 1, 2}) Set(3 * tri + i, face[(offset + i) % 3]);
-  }
-
-  void Swap(int a, int b) {
-    DEBUG_ASSERT(a / 3 != b / 3, logicErr,
-                 "Swapping halfedges within a face is not representable!");
-    HalfedgeData tmp = Get(a);
-    Set(a, Get(b));
-    Set(b, tmp);
-  }
-
   void push_back(HalfedgeData edge) {
     start_.push_back(edge.startVert);
     paired_.push_back(edge.pairedHalfedge);
     propVert_.push_back(edge.propVert);
-  }
-
-  void reserve(size_t n) {
-    start_.reserve(n);
-    paired_.reserve(n);
-    propVert_.reserve(n);
   }
 
   void resize(size_t newSize, HalfedgeData edge = {}) {
@@ -331,12 +295,6 @@ class Halfedges {
       }
     }
 #endif
-  }
-
-  void swap(Halfedges& other) {
-    start_.swap(other.start_);
-    paired_.swap(other.paired_);
-    propVert_.swap(other.propVert_);
   }
 
   SharedVec<int> start_;
