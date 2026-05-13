@@ -124,25 +124,52 @@ void WriteLocalTriangles(Halfedges& output, VecView<int> contour2Tri,
 void WriteGeneralTriangulation(Halfedges& output, VecView<int> contour2Tri,
                                const VecView<const Halfedge>& faceHalfedge,
                                size_t firstTri,
-                               const HalfedgeTriangulation& triangulation) {
+                               const HalfedgeTriangulation& triangulation,
+                               ExecutionContext::Impl* ctx) {
   const int firstOut = 3 * firstTri;
-  for (size_t local = 0; local < 3 * triangulation.NumTri(); ++local) {
-    const int out = firstOut + local;
-    const HalfedgeData edge =
-        triangulation.halfedges[triangulation.contourEnd + local];
-    output.SetStart(out, faceHalfedge[edge.startVert].startVert);
-    output.SetProp(out, faceHalfedge[edge.startVert].propVert);
-    if (edge.pairedHalfedge >= static_cast<int>(triangulation.contourEnd)) {
-      output.SetPair(out, firstOut + edge.pairedHalfedge -
-                              static_cast<int>(triangulation.contourEnd));
-    } else if (edge.pairedHalfedge >= 0) {
-      const int boundary = triangulation.halfedges[edge.pairedHalfedge].endVert;
-      contour2Tri[boundary] = out;
-      output.SetPair(out, -1);
-    } else {
-      output.SetPair(out, -1);
-    }
-  }
+  const size_t numTriHalfedge = 3 * triangulation.NumTri();
+  for_each_n(autoPolicy(numTriHalfedge, 1e5), countAt(0_uz), numTriHalfedge,
+             ctx, [&](size_t local) {
+               const int out = firstOut + local;
+               const HalfedgeData& edge =
+                   triangulation.halfedges[triangulation.contourEnd + local];
+               output.SetStart(out, faceHalfedge[edge.startVert].startVert);
+               output.SetProp(out, faceHalfedge[edge.startVert].propVert);
+               if (edge.pairedHalfedge >=
+                   static_cast<int>(triangulation.contourEnd)) {
+                 output.SetPair(out, firstOut + edge.pairedHalfedge -
+                                         static_cast<int>(
+                                             triangulation.contourEnd));
+               } else {
+                 output.SetPair(out, -1);
+               }
+             });
+
+  for_each_n(autoPolicy(triangulation.contourEnd, 1e5), countAt(0_uz),
+             triangulation.contourEnd, ctx, [&](size_t contour) {
+               const HalfedgeData& edge = triangulation.halfedges[contour];
+               if (edge.pairedHalfedge < 0) return;
+               DEBUG_ASSERT(edge.pairedHalfedge >=
+                                static_cast<int>(triangulation.contourEnd),
+                            topologyErr, "contour paired to another contour");
+               const int boundary = edge.endVert;
+               DEBUG_ASSERT(boundary >= 0 &&
+                                boundary < static_cast<int>(contour2Tri.size()),
+                            topologyErr, "contour edge index out of bounds");
+               contour2Tri[boundary] =
+                   firstOut + edge.pairedHalfedge -
+                   static_cast<int>(triangulation.contourEnd);
+             });
+}
+
+void WriteTriRefs(VecView<vec3> triNormal, VecView<TriRef> triRef,
+                  size_t firstTri, size_t numTri, vec3 normal, TriRef ref,
+                  ExecutionContext::Impl* ctx) {
+  for_each_n(autoPolicy(numTri, 1e5), countAt(0_uz), numTri, ctx,
+             [&](size_t tri) {
+               triNormal[firstTri + tri] = normal;
+               triRef[firstTri + tri] = ref;
+             });
 }
 }  // namespace
 
@@ -246,13 +273,11 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                    "general face missing triangulation result");
       numTri = general->NumTri();
       WriteGeneralTriangulation(halfedge_, contour2Tri, faceHalfedge, firstTri,
-                                *general);
+                                *general, ctx);
     }
 
-    for (size_t tri = 0; tri < numTri; ++tri) {
-      triNormal[firstTri + tri] = normal;
-      triRef[firstTri + tri] = halfedgeRef[firstEdge];
-    }
+    WriteTriRefs(triNormal, triRef, firstTri, numTri, normal,
+                 halfedgeRef[firstEdge], ctx);
   };
 
   Vec<size_t> triOffset(faceEdge.size());
