@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <unordered_set>
 
 #include "impl.h"
 #include "manifold/common.h"
 #include "manifold/polygon.h"
 #include "parallel.h"
+#include "polygon_internal.h"
 #include "shared.h"
 
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/concurrent_map.h>)
@@ -80,12 +82,71 @@ PolygonsIdx ProjectPolygons(const std::vector<std::vector<int>>& polys,
   }  // for poly
   return polygons;
 }
+
+void WriteLocalTriangles(Halfedges& output, VecView<int> contour2Tri,
+                         const VecView<const Halfedge>& faceHalfedge,
+                         size_t firstTri, const ivec3* triangles, int numTri) {
+  DEBUG_ASSERT(numTri <= 2, logicErr,
+               "local face path only handles tris/quads");
+  std::array<ivec3, 6> localEdges;
+  const int firstOut = 3 * firstTri;
+  int numEdge = 0;
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (const int i : {0, 1, 2}) {
+      const int out = firstOut + numEdge;
+      const int start = triangles[tri][i];
+      const int end = triangles[tri][Next3(i)];
+      localEdges[numEdge] = {start, end, out};
+      output.SetStart(out, faceHalfedge[start].startVert);
+      output.SetProp(out, faceHalfedge[start].propVert);
+      output.SetPair(out, -1);
+      ++numEdge;
+    }
+  }
+
+  for (int i = 0; i < numEdge; ++i) {
+    const ivec3 edge = localEdges[i];
+    int pair = -1;
+    for (int j = 0; j < numEdge; ++j) {
+      if (localEdges[j][0] == edge[1] && localEdges[j][1] == edge[0]) {
+        pair = localEdges[j][2];
+        break;
+      }
+    }
+    if (pair >= 0) {
+      output.SetPair(edge[2], pair);
+    } else {
+      contour2Tri[edge[0]] = edge[2];
+    }
+  }
+}
+
+void WriteGeneralTriangulation(Halfedges& output, VecView<int> contour2Tri,
+                               const VecView<const Halfedge>& faceHalfedge,
+                               size_t firstTri,
+                               const HalfedgeTriangulation& triangulation) {
+  const int firstOut = 3 * firstTri;
+  for (size_t local = 0; local < 3 * triangulation.NumTri(); ++local) {
+    const int out = firstOut + local;
+    const HalfedgeData edge =
+        triangulation.halfedges[triangulation.contourEnd + local];
+    output.SetStart(out, faceHalfedge[edge.startVert].startVert);
+    output.SetProp(out, faceHalfedge[edge.startVert].propVert);
+    if (edge.pairedHalfedge >= static_cast<int>(triangulation.contourEnd)) {
+      output.SetPair(out, firstOut + edge.pairedHalfedge -
+                              static_cast<int>(triangulation.contourEnd));
+    } else if (edge.pairedHalfedge >= 0) {
+      const int boundary = triangulation.halfedges[edge.pairedHalfedge].endVert;
+      contour2Tri[boundary] = out;
+      output.SetPair(out, -1);
+    } else {
+      output.SetPair(out, -1);
+    }
+  }
+}
 }  // namespace
 
 namespace manifold {
-
-using GeneralTriangulation = std::function<std::vector<ivec3>(int)>;
-using AddTriangle = std::function<void(int, ivec3, vec3, TriRef)>;
 
 /**
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
@@ -103,19 +164,31 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                               ExecutionContext::Impl* ctx) {
   ZoneScoped;
   if (IsCancelled(ctx)) return;
-  Vec<ivec3> triVerts;
   Vec<vec3> triNormal;
-  Vec<ivec3> triProp;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
-  auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
-                         int face) {
+  Vec<int> contour2Tri(faceHalfedge.size(), -1);
+
+  auto generalTriangulation = [&](int face) {
+    const vec3 normal = faceNormal_[face];
+    const mat2x3 projection = GetAxisAlignedProjection(normal);
+    const PolygonsIdx polys = ProjectPolygons(
+        AssembleHalfedges(faceHalfedge.cbegin() + faceEdge[face],
+                          faceHalfedge.cbegin() + faceEdge[face + 1],
+                          faceEdge[face]),
+        faceHalfedge, vertPos_, projection);
+    return TriangulateIdxHalfedges(polys, epsilon_, allowConvex);
+  };
+
+  auto outputFace = [&](int face, size_t firstTri,
+                        const HalfedgeTriangulation* general) {
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
     if (numEdge == 0) return;
     DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const vec3 normal = faceNormal_[face];
+    size_t numTri = numEdge - 2;
 
     if (numEdge == 3) {  // Single triangle
       ivec3 triEdge(firstEdge, firstEdge + 1, firstEdge + 2);
@@ -133,7 +206,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
                    topologyErr, "These 3 edges do not form a triangle!");
 
-      addTri(face, triEdge, normal, halfedgeRef[firstEdge]);
+      WriteLocalTriangles(halfedge_, contour2Tri, faceHalfedge, firstTri,
+                          &triEdge, 1);
     } else if (numEdge == 4) {  // Pair of triangles
       const mat2x3 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, &faceHalfedge, this](const ivec3 tri) {
@@ -165,98 +239,108 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         }
       }
 
-      for (const auto& tri : tris[choice]) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      }
+      WriteLocalTriangles(halfedge_, contour2Tri, faceHalfedge, firstTri,
+                          &tris[choice][0], 2);
     } else {  // General triangulation
-      for (const auto& tri : general(face)) {
-        addTri(face, tri, normal, halfedgeRef[firstEdge]);
-      }
+      DEBUG_ASSERT(general != nullptr, logicErr,
+                   "general face missing triangulation result");
+      numTri = general->NumTri();
+      WriteGeneralTriangulation(halfedge_, contour2Tri, faceHalfedge, firstTri,
+                                *general);
+    }
+
+    for (size_t tri = 0; tri < numTri; ++tri) {
+      triNormal[firstTri + tri] = normal;
+      triRef[firstTri + tri] = halfedgeRef[firstEdge];
     }
   };
-  auto generalTriangulation = [&](int face) {
-    const vec3 normal = faceNormal_[face];
-    const mat2x3 projection = GetAxisAlignedProjection(normal);
-    const PolygonsIdx polys = ProjectPolygons(
-        AssembleHalfedges(faceHalfedge.cbegin() + faceEdge[face],
-                          faceHalfedge.cbegin() + faceEdge[face + 1],
-                          faceEdge[face]),
-        faceHalfedge, vertPos_, projection);
-    return TriangulateIdx(polys, epsilon_, allowConvex);
-  };
+
+  Vec<size_t> triOffset(faceEdge.size());
+  triOffset.back() = 0;
 #if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
-  // map from face to triangle
-  tbb::concurrent_unordered_map<int, std::vector<ivec3>> results;
-  Vec<size_t> triCount(faceEdge.size());
-  triCount.back() = 0;
+  tbb::concurrent_unordered_map<int, HalfedgeTriangulation> results;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
   for_each(autoPolicy(faceEdge.size(), 1e5), countAt(0_uz),
            countAt(faceEdge.size() - 1), ctx, [&](size_t face) {
-             triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
-             DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
+             const int numEdge = faceEdge[face + 1] - faceEdge[face];
+             if (numEdge == 0) {
+               triOffset[face] = 0;
+               return;
+             }
+             DEBUG_ASSERT(numEdge >= 3, topologyErr,
                           "face has less than three edges.");
-             if (triCount[face] > 2)
+             triOffset[face] = numEdge - 2;
+             if (numEdge > 4)
                group.run([&, face] {
                  if (IsCancelled(ctx)) return;
-                 std::vector<ivec3> newTris = generalTriangulation(face);
-                 triCount[face] = newTris.size();
-                 results[face] = std::move(newTris);
+                 HalfedgeTriangulation triangulation =
+                     generalTriangulation(face);
+                 triOffset[face] = triangulation.NumTri();
+                 results[face] = std::move(triangulation);
                });
            });
   group.wait();
   if (IsCancelled(ctx)) return;
-  // prefix sum computation (assign unique index to each face) and preallocation
-  exclusive_scan(triCount.begin(), triCount.end(), triCount.begin(), 0_uz);
-  triVerts.resize(triCount.back());
-  triProp.resize(triCount.back());
-  triNormal.resize(triCount.back());
-  triRef.resize(triCount.back());
+#else
+  std::unordered_map<int, HalfedgeTriangulation> results;
+  for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
+    if (IsCancelled(ctx)) return;
+    const int numEdge = faceEdge[face + 1] - faceEdge[face];
+    if (numEdge == 0) {
+      triOffset[face] = 0;
+      continue;
+    }
+    DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
+    triOffset[face] = numEdge - 2;
+    if (numEdge > 4) {
+      HalfedgeTriangulation triangulation = generalTriangulation(face);
+      triOffset[face] = triangulation.NumTri();
+      results.emplace(face, std::move(triangulation));
+    }
+  }
+#endif
 
-  auto processFace2 = std::bind(
-      processFace, [&](size_t face) { return std::move(results[face]); },
-      [&](size_t face, ivec3 tri, vec3 normal, TriRef r) {
-        for (const int i : {0, 1, 2}) {
-          triVerts[triCount[face]][i] = faceHalfedge[tri[i]].startVert;
-          triProp[triCount[face]][i] = faceHalfedge[tri[i]].propVert;
-        }
-        triNormal[triCount[face]] = normal;
-        triRef[triCount[face]] = r;
-        triCount[face]++;
-      },
-      std::placeholders::_1);
+  exclusive_scan(triOffset.begin(), triOffset.end(), triOffset.begin(), 0_uz);
+  halfedge_.resize_nofill(3 * triOffset.back());
+  triNormal.resize(triOffset.back());
+  triRef.resize(triOffset.back());
+
+#if (MANIFOLD_PAR == 1) && __has_include(<tbb/tbb.h>)
+  auto processFace2 = [&](size_t face) {
+    const HalfedgeTriangulation* resultPtr = nullptr;
+    auto result = results.find(face);
+    if (result != results.end()) resultPtr = &result->second;
+    outputFace(face, triOffset[face], resultPtr);
+  };
   // set triangles in parallel
   for_each(autoPolicy(faceEdge.size(), 1e4), countAt(0_uz),
            countAt(faceEdge.size() - 1), ctx, processFace2);
 #else
-  triVerts.reserve(faceEdge.size());
-  triNormal.reserve(faceEdge.size());
-  triRef.reserve(faceEdge.size());
-  auto processFace2 = std::bind(
-      processFace, generalTriangulation,
-      [&](size_t, ivec3 tri, vec3 normal, TriRef r) {
-        ivec3 verts;
-        ivec3 props;
-        for (const int i : {0, 1, 2}) {
-          verts[i] = faceHalfedge[tri[i]].startVert;
-          props[i] = faceHalfedge[tri[i]].propVert;
-        }
-        triVerts.push_back(verts);
-        triProp.push_back(props);
-        triNormal.push_back(normal);
-        triRef.push_back(r);
-      },
-      std::placeholders::_1);
   for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
     if (IsCancelled(ctx)) return;
-    processFace2(face);
+    const HalfedgeTriangulation* resultPtr = nullptr;
+    auto result = results.find(face);
+    if (result != results.end()) resultPtr = &result->second;
+    outputFace(face, triOffset[face], resultPtr);
   }
 #endif
 
   if (IsCancelled(ctx)) return;
+  for_each(autoPolicy(faceHalfedge.size(), 1e5), countAt(0_uz),
+           countAt(faceHalfedge.size()), ctx, [&](size_t edge) {
+             const int triEdge = contour2Tri[edge];
+             if (triEdge < 0) return;
+             const int pair = faceHalfedge[edge].pairedHalfedge;
+             if (pair < 0) return;
+             const int pairTri = contour2Tri[pair];
+             DEBUG_ASSERT(pairTri >= 0, topologyErr,
+                          "boundary edge did not triangulate with its pair");
+             halfedge_.SetPair(triEdge, pairTri);
+           });
+  if (IsCancelled(ctx)) return;
   faceNormal_ = std::move(triNormal);
-  CreateHalfedges(triProp, triVerts);
 }
 
 Polygons Manifold::Impl::Slice(double height) const {

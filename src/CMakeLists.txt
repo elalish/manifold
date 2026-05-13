@@ -47,6 +47,7 @@ set(
   iters.h
   mesh_fixes.h
   parallel.h
+  polygon_internal.h
   quickhull.h
   shared.h
   svd.h
