@@ -499,24 +499,23 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   });
 
   Vec<int> edgeAdded(numEdge);
-  for_each_n(policy, countAt(0), numEdge,
-             [&edgeAdded, &edges, edgeDivisions, this](const int i) {
-               const TmpEdge edge = edges[i];
-               const int hIdx = edge.halfedgeIdx;
-               if (IsMarkedInsideQuad(hIdx)) {
-                 edgeAdded[i] = 0;
-                 return;
-               }
-               const vec3 vec = vertPos_[edge.first] - vertPos_[edge.second];
-               const vec4 tangent0 = halfedgeTangent_.empty()
-                                         ? vec4(0.0)
-                                         : halfedgeTangent_[hIdx];
-               const vec4 tangent1 =
-                   halfedgeTangent_.empty()
-                       ? vec4(0.0)
-                       : halfedgeTangent_[halfedge_.Pair(hIdx)];
-               edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
-             });
+  for_each_n(
+      policy, countAt(0), numEdge,
+      [&edgeAdded, &edges, edgeDivisions, this](const int i) {
+        const TmpEdge edge = edges[i];
+        const int hIdx = edge.halfedgeIdx;
+        if (IsMarkedInsideQuad(hIdx)) {
+          edgeAdded[i] = 0;
+          return;
+        }
+        const vec3 vec = vertPos_[edge.first] - vertPos_[edge.second];
+        const vec4 tangent0 =
+            halfedgeTangent_.empty() ? vec4(0.0) : halfedgeTangent_[hIdx];
+        const vec4 tangent1 = halfedgeTangent_.empty()
+                                  ? vec4(0.0)
+                                  : halfedgeTangent_[halfedge_.Pair(hIdx)];
+        edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
+      });
 
   if (keepInterior) {
     // Triangles where the greatest number of divisions exceeds the sum of the
@@ -718,8 +717,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
               vec3 triProp;
               for (const int i : {0, 1, 2}) {
                 triProp[i] =
-                    properties_[halfedge_.Prop(3 * bary.tri + i) * numProp +
-                                p];
+                    properties_[halfedge_.Prop(3 * bary.tri + i) * numProp + p];
               }
               prop[vert * numProp + p] = la::dot(triProp, vec3(bary.uvw));
             } else {
@@ -743,8 +741,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  const int numProp = NumProp();
 
                  const double frac = 1.0 / (n + 1);
-                 const int halfedgeIdx =
-                     halfedge_.Pair(edges[i].halfedgeIdx);
+                 const int halfedgeIdx = halfedge_.Pair(edges[i].halfedgeIdx);
                  const int prop0 = halfedge_.Prop(halfedgeIdx);
                  const int prop1 = halfedge_.Prop(NextHalfedge(halfedgeIdx));
                  for (int i = 0; i < n; ++i) {
@@ -757,45 +754,44 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                });
 
     Vec<ivec3> triProp(triVerts.size());
-    for_each_n(
-        policy, countAt(0), numTri,
-        [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
-         &interiorOffset, &faceHalfedges, propOffset,
-         addedVerts](const int tri) {
-          const ivec4 halfedges = faceHalfedges[tri];
-          if (halfedges[0] < 0) return;
+    for_each_n(policy, countAt(0), numTri,
+               [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
+                &interiorOffset, &faceHalfedges, propOffset,
+                addedVerts](const int tri) {
+                 const ivec4 halfedges = faceHalfedges[tri];
+                 if (halfedges[0] < 0) return;
 
-          ivec4 tri3;
-          ivec4 edgeOffsets;
-          bvec4 edgeFwd(true);
-          for (const int i : {0, 1, 2, 3}) {
-            if (halfedges[i] < 0) {
-              tri3[i] = -1;
-              continue;
-            }
-            tri3[i] = halfedge_.Prop(halfedges[i]);
-            edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
-            if (!halfedge_.IsForward(halfedges[i])) {
-              const int pair = halfedge_.Pair(halfedges[i]);
-              if (halfedge_.Prop(pair) !=
-                      halfedge_.Prop(NextHalfedge(halfedges[i])) ||
-                  halfedge_.Prop(NextHalfedge(pair)) !=
-                      halfedge_.Prop(halfedges[i])) {
-                // if the edge doesn't match, point to the backward edge
-                // propverts.
-                edgeOffsets[i] += addedVerts;
-              } else {
-                edgeFwd[i] = false;
-              }
-            }
-          }
+                 ivec4 tri3;
+                 ivec4 edgeOffsets;
+                 bvec4 edgeFwd(true);
+                 for (const int i : {0, 1, 2, 3}) {
+                   if (halfedges[i] < 0) {
+                     tri3[i] = -1;
+                     continue;
+                   }
+                   tri3[i] = halfedge_.Prop(halfedges[i]);
+                   edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
+                   if (!halfedge_.IsForward(halfedges[i])) {
+                     const int pair = halfedge_.Pair(halfedges[i]);
+                     if (halfedge_.Prop(pair) !=
+                             halfedge_.Prop(NextHalfedge(halfedges[i])) ||
+                         halfedge_.Prop(NextHalfedge(pair)) !=
+                             halfedge_.Prop(halfedges[i])) {
+                       // if the edge doesn't match, point to the backward edge
+                       // propverts.
+                       edgeOffsets[i] += addedVerts;
+                     } else {
+                       edgeFwd[i] = false;
+                     }
+                   }
+                 }
 
-          Vec<ivec3> newTris =
-              subTris[tri].Reindex(tri3, edgeOffsets + propOffset, edgeFwd,
-                                   interiorOffset[tri] + propOffset);
-          copy(newTris.begin(), newTris.end(),
-               triProp.begin() + triOffset[tri]);
-        });
+                 Vec<ivec3> newTris = subTris[tri].Reindex(
+                     tri3, edgeOffsets + propOffset, edgeFwd,
+                     interiorOffset[tri] + propOffset);
+                 copy(newTris.begin(), newTris.end(),
+                      triProp.begin() + triOffset[tri]);
+               });
 
     properties_ = prop;
     CreateHalfedges(triProp, triVerts);

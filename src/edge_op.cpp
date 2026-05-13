@@ -183,16 +183,14 @@ void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
     if (pair < 0) return false;
     const int start = halfedge_.Start(edge);
     const int end = halfedge_.End(edge);
-    if (start < firstNewVert && end < firstNewVert)
-      return false;
+    if (start < firstNewVert && end < firstNewVert) return false;
     // Flag short edges
     const vec3 delta = vertPos_[end] - vertPos_[start];
     const double lenSq = la::dot(delta, delta);
     // To ensure tolerance_-scale errors don't stack, only collapse these edges
     // if they connect a new vert to an old vert, since old verts are only
     // allowed to move by epsilon_.
-    const double maxLen =
-        end < firstNewVert ? tol * tol : epsilon_ * epsilon_;
+    const double maxLen = end < firstNewVert ? tol * tol : epsilon_ * epsilon_;
     return lenSq < maxLen;
   };
 
@@ -226,8 +224,7 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     // from being vulnerable to error stacking.
     auto colinearEdge = [&](int edge) {
       const int pair = halfedge_.Pair(edge);
-      if (pair < 0 || halfedge_.Start(edge) < firstNewVert)
-        return false;
+      if (pair < 0 || halfedge_.Start(edge) < firstNewVert) return false;
       // Flag redundant edges - those where the startVert is surrounded by only
       // two original triangles.
       const TriRef ref0 = meshRelation_.triRef[edge / 3];
@@ -349,8 +346,7 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       int outsideVert = halfedge_.Start(current);
       halfedge_.push_back({endVert, newVert, -1, endProp});
       halfedge_.push_back({newVert, outsideVert, -1, endProp});
-      halfedge_.push_back(
-          {outsideVert, endVert, -1, halfedge_.Prop(current)});
+      halfedge_.push_back({outsideVert, endVert, -1, halfedge_.Prop(current)});
       PairUp(newHalfedge + 2, halfedge_.Pair(current));
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
@@ -362,8 +358,7 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       outsideVert = halfedge_.Start(opposite);
       halfedge_.push_back({newVert, endVert, -1, endProp});  // fix prop
       halfedge_.push_back({endVert, outsideVert, -1, endProp});
-      halfedge_.push_back(
-          {outsideVert, newVert, -1, halfedge_.Prop(opposite)});
+      halfedge_.push_back({outsideVert, newVert, -1, halfedge_.Prop(opposite)});
       PairUp(newHalfedge + 2, halfedge_.Pair(opposite));
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);

@@ -76,20 +76,20 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
     for (size_t offset = 0; offset < numTri; offset += BATCH_SIZE) {
       size_t numIter = std::min(numTri - offset, BATCH_SIZE);
       std::vector<Manifold> newHulls(numIter);
-      for_each_n(
-          autoPolicy(numIter, 100), countAt(0), numIter,
-          [&newHulls, &aImpl, &verts, offset](const int iter) {
-            std::vector<vec3> simpleHull;
-            for (int i : {0, 1, 2}) {
-              const int edge = ((offset + iter) * 3) + i;
-              const auto vertex = aImpl->vertPos_[aImpl->halfedge_.Start(edge)];
-              auto t = [vertex](vec3 v) { return v + vertex; };
-              simpleHull.insert(simpleHull.end(),
-                                TransformIterator(verts.begin(), t),
-                                TransformIterator(verts.end(), t));
-            }
-            newHulls[iter] = Manifold::Hull(simpleHull);
-          });
+      for_each_n(autoPolicy(numIter, 100), countAt(0), numIter,
+                 [&newHulls, &aImpl, &verts, offset](const int iter) {
+                   std::vector<vec3> simpleHull;
+                   for (int i : {0, 1, 2}) {
+                     const int edge = ((offset + iter) * 3) + i;
+                     const auto vertex =
+                         aImpl->vertPos_[aImpl->halfedge_.Start(edge)];
+                     auto t = [vertex](vec3 v) { return v + vertex; };
+                     simpleHull.insert(simpleHull.end(),
+                                       TransformIterator(verts.begin(), t),
+                                       TransformIterator(verts.end(), t));
+                   }
+                   newHulls[iter] = Manifold::Hull(simpleHull);
+                 });
       composedHulls.push_back(Manifold::BatchBoolean(newHulls, OpType::Add));
     }
     // Non-Convex - Non-Convex Minkowski: Very Slow
@@ -128,12 +128,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
                                   (std::abs(dotOpp - 1.0) < kCoplanarTol);
             if (coplanar) return;
 
-            vec3 b1 =
-                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 0)];
-            vec3 b2 =
-                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 1)];
-            vec3 b3 =
-                bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 2)];
+            vec3 b1 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 0)];
+            vec3 b2 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 1)];
+            vec3 b3 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 2)];
             faceHulls[bFace] =
                 Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
                                 a2 + b3, a3 + b1, a3 + b2, a3 + b3});

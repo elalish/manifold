@@ -289,20 +289,18 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
         const int nextEdge = edgeIndices[i];
         const int nextProp = propVertIndices[i];
         const bool hasProp = node->pImpl_->NumProp() > 0;
-        for_each_n(policy, countAt(0), node->pImpl_->halfedge_.size(),
-                   [&](int edge) {
-                     const int newEdge = edgeIndices[i] + edge;
-                     combined.halfedge_.SetStart(
-                         newEdge, node->pImpl_->halfedge_.Start(edge) +
-                                      nextVert);
-                     combined.halfedge_.SetPair(
-                         newEdge,
-                         node->pImpl_->halfedge_.Pair(edge) + nextEdge);
-                     const int propVert =
-                         hasProp ? node->pImpl_->halfedge_.Prop(edge) + nextProp
-                                 : nextProp;
-                     combined.halfedge_.SetProp(newEdge, propVert);
-                   });
+        for_each_n(
+            policy, countAt(0), node->pImpl_->halfedge_.size(), [&](int edge) {
+              const int newEdge = edgeIndices[i] + edge;
+              combined.halfedge_.SetStart(
+                  newEdge, node->pImpl_->halfedge_.Start(edge) + nextVert);
+              combined.halfedge_.SetPair(
+                  newEdge, node->pImpl_->halfedge_.Pair(edge) + nextEdge);
+              const int propVert =
+                  hasProp ? node->pImpl_->halfedge_.Prop(edge) + nextProp
+                          : nextProp;
+              combined.halfedge_.SetProp(newEdge, propVert);
+            });
 
         if (node->pImpl_->NumProp() > 0) {
           const int numProp = node->pImpl_->NumProp();

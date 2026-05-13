@@ -76,8 +76,7 @@ struct CheckHalfedges {
     const int start = halfedges.Start(edge);
     const int end = halfedges.End(edge);
     const int pair = halfedges.Pair(edge);
-    if (start == -1 && end == -1 && pair == -1)
-      return true;
+    if (start == -1 && end == -1 && pair == -1) return true;
     if (halfedges.Start(NextHalfedge(edge)) == -1 ||
         halfedges.Start(NextHalfedge(NextHalfedge(edge))) == -1) {
       return false;
@@ -276,9 +275,8 @@ double Manifold::Impl::GetProperty(Property prop) const {
 
   auto Area = [this](size_t tri) {
     const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
-    return la::length(
-               la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v,
-                         vertPos_[halfedge_.Start(3 * tri + 2)] - v)) /
+    return la::length(la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v,
+                                vertPos_[halfedge_.Start(3 * tri + 2)] - v)) /
            2.0;
   };
 

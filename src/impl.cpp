@@ -189,20 +189,21 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
     int tri;
   };
   Vec<TriPriority> triPriority(numTri);
-  for_each_n(
-      autoPolicy(numTri), countAt(0), numTri, [&triPriority, this](int tri) {
-        meshRelation_.triRef[tri].coplanarID = -1;
-        if (halfedge_.Start(3 * tri) < 0) {
-          triPriority[tri] = {0, tri};
-          return;
-        }
-        const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
-        const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
-                             vertPos_[halfedge_.End(3 * tri + 1)] - v);
-        faceNormal_[tri] = normalize(n);
-        if (std::isnan(faceNormal_[tri].x)) faceNormal_[tri] = vec3(0, 0, 1);
-        triPriority[tri] = {length2(n), tri};
-      });
+  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+             [&triPriority, this](int tri) {
+               meshRelation_.triRef[tri].coplanarID = -1;
+               if (halfedge_.Start(3 * tri) < 0) {
+                 triPriority[tri] = {0, tri};
+                 return;
+               }
+               const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
+               const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
+                                    vertPos_[halfedge_.End(3 * tri + 1)] - v);
+               faceNormal_[tri] = normalize(n);
+               if (std::isnan(faceNormal_[tri].x))
+                 faceNormal_[tri] = vec3(0, 0, 1);
+               triPriority[tri] = {length2(n), tri};
+             });
 
   stable_sort(triPriority.begin(), triPriority.end(),
               [](auto a, auto b) { return a.area2 > b.area2; });
@@ -220,8 +221,7 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
     interiorHalfedges[1] = 3 * tp.tri + 1;
     interiorHalfedges[2] = 3 * tp.tri + 2;
     while (!interiorHalfedges.empty()) {
-      const int h =
-          NextHalfedge(halfedge_.Pair(interiorHalfedges.back()));
+      const int h = NextHalfedge(halfedge_.Pair(interiorHalfedges.back()));
       interiorHalfedges.pop_back();
       if (meshRelation_.triRef[h / 3].coplanarID >= 0) continue;
 

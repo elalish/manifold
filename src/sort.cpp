@@ -255,10 +255,10 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
     int face = 0;
     Halfedge extrema = {0, 0, 0};
     for (size_t i = 0; i < halfedge_.size(); i++) {
-      const int start = halfedge_.IsForward(i) ? halfedge_.Start(i)
-                                               : halfedge_.End(i);
-      const int end = halfedge_.IsForward(i) ? halfedge_.End(i)
-                                             : halfedge_.Start(i);
+      const int start =
+          halfedge_.IsForward(i) ? halfedge_.Start(i) : halfedge_.End(i);
+      const int end =
+          halfedge_.IsForward(i) ? halfedge_.End(i) : halfedge_.Start(i);
       extrema.startVert = std::min(extrema.startVert, start);
       extrema.endVert = std::min(extrema.endVert, end);
       extrema.pairedHalfedge =
@@ -372,11 +372,10 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each_n(policy, countAt(0), halfedge_.size(), ctx,
-             [this, &keep](int idx) {
-               reinterpret_cast<std::atomic<int>*>(&keep[halfedge_.Prop(idx)])
-                   ->store(1, std::memory_order_relaxed);
-             });
+  for_each_n(policy, countAt(0), halfedge_.size(), ctx, [this, &keep](int idx) {
+    reinterpret_cast<std::atomic<int>*>(&keep[halfedge_.Prop(idx)])
+        ->store(1, std::memory_order_relaxed);
+  });
   if (IsCancelled(ctx)) return;
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);

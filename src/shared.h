@@ -269,9 +269,8 @@ class Halfedges {
 
   Vec<HalfedgeData> ToData() const {
     Vec<HalfedgeData> data(size());
-    for_each_n(autoPolicy(size()), countAt(0), size(), [this, &data](int idx) {
-      data[idx] = Get(idx);
-    });
+    for_each_n(autoPolicy(size()), countAt(0), size(),
+               [this, &data](int idx) { data[idx] = Get(idx); });
     return data;
   }
 

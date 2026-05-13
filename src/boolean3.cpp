@@ -98,9 +98,8 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
 }
 
 template <bool expandP, bool forward>
-inline std::pair<int, vec2> Shadow01(const int a0, const int b1,
-                                     const int b1s, const int b1e,
-                                     const Manifold::Impl& inA,
+inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
+                                     const int b1e, const Manifold::Impl& inA,
                                      const Manifold::Impl& inB) {
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
@@ -215,8 +214,7 @@ struct Kernel02 {
     return (*this)(a0, b2, edgeB);
   }
 
-  std::pair<int, double> operator()(int a0, int b2,
-                                    const FaceEdge edgeB[3]) {
+  std::pair<int, double> operator()(int a0, int b2, const FaceEdge edgeB[3]) {
     int s02 = 0;
     double z02 = 0.0;
 
@@ -300,11 +298,11 @@ struct Kernel12 {
     }
 
     for (const int i : {0, 1, 2}) {
-      const auto [s, xyzz] =
-          forward ? k11(a1, edgeAStart, edgeAEnd, edgeB[i].edge,
-                        edgeB[i].start, edgeB[i].end)
-                  : k11(edgeB[i].edge, edgeB[i].start, edgeB[i].end, a1,
-                        edgeAStart, edgeAEnd);
+      const auto [s, xyzz] = forward
+                                 ? k11(a1, edgeAStart, edgeAEnd, edgeB[i].edge,
+                                       edgeB[i].start, edgeB[i].end)
+                                 : k11(edgeB[i].edge, edgeB[i].start,
+                                       edgeB[i].end, a1, edgeAStart, edgeAEnd);
       if (std::isfinite(xyzz[0])) {
         x12 -= s * (edgeB[i].isForward ? 1 : -1);
         if (k < 2 && (k == 0 || (s != 0) != shadows)) {
@@ -463,8 +461,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                  [index](const std::array<int, 2>& collisionPair, int e) {
                    return collisionPair[index] < e;
                  });
-             if (it == p1q2.end() || (*it)[index] != edge)
-               uA.unite(start, end);
+             if (it == p1q2.end() || (*it)[index] != edge) uA.unite(start, end);
            });
   if (IsCancelled(ctx)) return Vec<int>{};
 

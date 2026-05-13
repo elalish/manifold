@@ -124,18 +124,18 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
 
   if (i12.size() >= 1e5) {
     for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(), ctx,
-               CountNewVerts<false, true>{
-                   sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_});
+               CountNewVerts<false, true>{sidesPerFaceP, sidesPerFaceQ, i12,
+                                          p1q2, inP.halfedge_});
     for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(), ctx,
-               CountNewVerts<true, true>{
-                   sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_});
+               CountNewVerts<true, true>{sidesPerFaceQ, sidesPerFaceP, i21,
+                                         p2q1, inQ.halfedge_});
   } else {
     for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(), ctx,
-               CountNewVerts<false, false>{
-                   sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_});
+               CountNewVerts<false, false>{sidesPerFaceP, sidesPerFaceQ, i12,
+                                           p1q2, inP.halfedge_});
     for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(), ctx,
-               CountNewVerts<true, false>{
-                   sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_});
+               CountNewVerts<true, false>{sidesPerFaceQ, sidesPerFaceP, i21,
+                                          p2q1, inQ.halfedge_});
   }
   if (IsCancelled(ctx)) return std::make_tuple(Vec<int>{}, Vec<int>{});
 
@@ -302,8 +302,7 @@ void PairUp(std::vector<EdgePos>& edgePos, F f) {
 }
 
 void AppendPartialEdges(Manifold::Impl& outR, Vec<Halfedge>& halfedgeR,
-                        Vec<char>& wholeHalfedgeP,
-                        Vec<int>& facePtrR,
+                        Vec<char>& wholeHalfedgeP, Vec<int>& facePtrR,
                         concurrent_map<int, std::vector<EdgePos>>& edgesP,
                         Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
                         const Vec<int>& i03, const Vec<int>& vP2R,
@@ -490,10 +489,10 @@ struct DuplicateHalfedges {
 
 void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                       Vec<Halfedge>& halfedgesR, Vec<TriRef>& halfedgeRef,
-                      const Manifold::Impl& inP,
-                      const Vec<char> wholeHalfedgeP, const Vec<int>& i03,
-                      const Vec<int>& vP2R, VecView<const int> faceP2R,
-                      bool forward, ExecutionContext::Impl* ctx) {
+                      const Manifold::Impl& inP, const Vec<char> wholeHalfedgeP,
+                      const Vec<int>& i03, const Vec<int>& vP2R,
+                      VecView<const int> faceP2R, bool forward,
+                      ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
@@ -885,8 +884,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   edgesP.clear();
   edgesQ.clear();
 
-  AppendNewEdges(outR, faceHalfedges, facePtrR, edgesNew, halfedgeRef,
-                 facePQ2R, inP_.NumTri(), ctx_);
+  AppendNewEdges(outR, faceHalfedges, facePtrR, edgesNew, halfedgeRef, facePQ2R,
+                 inP_.NumTri(), ctx_);
   if (auto c = phase()) return *c;
 
   edgesNew.clear();

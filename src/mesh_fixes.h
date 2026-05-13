@@ -42,8 +42,7 @@ struct TransformTangents {
   const Halfedges& halfedge;
 
   void operator()(const int edgeOut) {
-    const int edgeIn =
-        invert ? halfedge.Pair(FlipHalfedge(edgeOut)) : edgeOut;
+    const int edgeIn = invert ? halfedge.Pair(FlipHalfedge(edgeOut)) : edgeOut;
     tangent[edgeOut + edgeOffset] =
         vec4(transform * vec3(oldTangents[edgeIn]), oldTangents[edgeIn].w);
   }
@@ -54,8 +53,7 @@ struct FlipTris {
 
   void operator()(const int tri) {
     std::array<Halfedge, 3> face = {halfedge[3 * tri + 2],
-                                    halfedge[3 * tri + 1],
-                                    halfedge[3 * tri]};
+                                    halfedge[3 * tri + 1], halfedge[3 * tri]};
     for (const int i : {0, 1, 2}) {
       std::swap(face[i].startVert, face[i].endVert);
       face[i].pairedHalfedge = FlipHalfedge(face[i].pairedHalfedge);
