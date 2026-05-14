@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <array>
-
 #include "parallel.h"
 #include "utils.h"
 #include "vec.h"
@@ -186,29 +184,6 @@ struct Halfedge {
 
 class Halfedges {
  public:
-  struct Ref {
-    int& startVert;
-    int& endVert;
-    int& pairedHalfedge;
-    int& propVert;
-
-    Ref operator=(Halfedge edge) {
-      startVert = edge.startVert;
-      endVert = edge.endVert;
-      pairedHalfedge = edge.pairedHalfedge;
-      propVert = edge.propVert;
-      return *this;
-    }
-
-    Ref operator=(const Ref& edge) { return *this = Halfedge(edge); }
-
-    operator Halfedge() const {
-      return {startVert, endVert, pairedHalfedge, propVert};
-    }
-
-    bool IsForward() const { return startVert < endVert; }
-  };
-
   Halfedges() = default;
   explicit Halfedges(size_t size) { resize_nofill(size); }
   explicit Halfedges(const VecView<const Halfedge>& edges) { FromData(edges); }
@@ -238,10 +213,10 @@ class Halfedges {
     SetProp(idx, propVert);
   }
 
-  void push_back(Halfedge edge) {
-    start_.push_back(edge.startVert);
-    paired_.push_back(edge.pairedHalfedge);
-    propVert_.push_back(edge.propVert);
+  void push_back(int startVert, int pairedHalfedge, int propVert) {
+    start_.push_back(startVert);
+    paired_.push_back(pairedHalfedge);
+    propVert_.push_back(propVert);
   }
 
   void resize(size_t newSize) {

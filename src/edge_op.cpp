@@ -344,9 +344,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       int newHalfedge = halfedge_.size();
       int oldFace = current / 3;
       int outsideVert = halfedge_.Start(current);
-      halfedge_.push_back({endVert, newVert, -1, endProp});
-      halfedge_.push_back({newVert, outsideVert, -1, endProp});
-      halfedge_.push_back({outsideVert, endVert, -1, halfedge_.Prop(current)});
+      halfedge_.push_back(endVert, -1, endProp);
+      halfedge_.push_back(newVert, -1, endProp);
+      halfedge_.push_back(outsideVert, -1, halfedge_.Prop(current));
       PairUp(newHalfedge + 2, halfedge_.Pair(current));
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triRef.size() > 0)
@@ -356,9 +356,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       newHalfedge += 3;
       oldFace = opposite / 3;
       outsideVert = halfedge_.Start(opposite);
-      halfedge_.push_back({newVert, endVert, -1, endProp});  // fix prop
-      halfedge_.push_back({endVert, outsideVert, -1, endProp});
-      halfedge_.push_back({outsideVert, newVert, -1, halfedge_.Prop(opposite)});
+      halfedge_.push_back(newVert, -1, endProp);  // fix prop
+      halfedge_.push_back(endVert, -1, endProp);
+      halfedge_.push_back(outsideVert, -1, halfedge_.Prop(opposite));
       PairUp(newHalfedge + 2, halfedge_.Pair(opposite));
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
