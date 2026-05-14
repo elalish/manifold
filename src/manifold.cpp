@@ -979,7 +979,7 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return Manifold(aImpl->Minkowski(*bImpl, false));
+  return aImpl->Minkowski(*bImpl, false);
 }
 
 /**
@@ -996,7 +996,7 @@ Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode().GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return Manifold(aImpl->Minkowski(*bImpl, true));
+  return aImpl->Minkowski(*bImpl, true);
 }
 
 /**
