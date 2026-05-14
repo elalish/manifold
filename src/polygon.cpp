@@ -48,7 +48,7 @@ struct PolyEdge {
 std::vector<PolyEdge> Halfedges2Edges(const HalfedgeTriangulation& result) {
   std::vector<PolyEdge> halfedges;
   halfedges.reserve(result.halfedges.size());
-  for (const HalfedgeData& edge : result.halfedges) {
+  for (const Halfedge& edge : result.halfedges) {
     halfedges.push_back({edge.startVert, edge.endVert});
   }
   return halfedges;

@@ -24,7 +24,7 @@
 namespace manifold {
 
 struct HalfedgeTriangulation {
-  std::vector<HalfedgeData> halfedges;
+  std::vector<Halfedge> halfedges;
   size_t contourEnd = 0;
   double epsilon = -1;
 
@@ -97,7 +97,7 @@ struct HalfedgeTriangulation {
 
   void AddHalfedge(int start, int end) {
     const int halfedge = halfedges.size();
-    HalfedgeData data = {start, end, -1, -1};
+    Halfedge data = {start, end, -1, -1};
     auto reverse = edge2halfedge.find(EdgeKey(end, start));
     if (reverse != edge2halfedge.end() && !reverse->second.empty()) {
       data.pairedHalfedge = reverse->second.back();

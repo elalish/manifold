@@ -132,7 +132,7 @@ void WriteGeneralTriangulation(Halfedges& output, VecView<int> contour2Tri,
       autoPolicy(numTriHalfedge, 1e5), countAt(0_uz), numTriHalfedge, ctx,
       [&](size_t local) {
         const int out = firstOut + local;
-        const HalfedgeData& edge =
+        const Halfedge& edge =
             triangulation.halfedges[triangulation.contourEnd + local];
         output.SetStart(out, faceHalfedge[edge.startVert].startVert);
         output.SetProp(out, faceHalfedge[edge.startVert].propVert);
@@ -146,7 +146,7 @@ void WriteGeneralTriangulation(Halfedges& output, VecView<int> contour2Tri,
 
   for_each_n(autoPolicy(triangulation.contourEnd, 1e5), countAt(0_uz),
              triangulation.contourEnd, ctx, [&](size_t contour) {
-               const HalfedgeData& edge = triangulation.halfedges[contour];
+               const Halfedge& edge = triangulation.halfedges[contour];
                if (edge.pairedHalfedge < 0) return;
                DEBUG_ASSERT(edge.pairedHalfedge >=
                                 static_cast<int>(triangulation.contourEnd),

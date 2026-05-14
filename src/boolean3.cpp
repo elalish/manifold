@@ -398,7 +398,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
   auto f = [&a](int i) {
     const int start = a.halfedge_.Start(i);
-    const int end = a.halfedge_.Start(NextHalfedge(i));
+    const int end = a.halfedge_.End(i);
     return start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
@@ -448,7 +448,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
            countAt(a.halfedge_.size()), ctx, [&](int edge) {
              const int start = a.halfedge_.Start(edge);
-             const int end = a.halfedge_.Start(NextHalfedge(edge));
+             const int end = a.halfedge_.End(edge);
              if (start >= end) return;
              // check if the edge is broken
              auto it = std::lower_bound(
@@ -618,9 +618,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   rayImpl.vertNormal_[0] = vec3(0.0);
   rayImpl.vertNormal_[1] = vec3(0.0);
   rayImpl.halfedge_.resize(3);
-  rayImpl.halfedge_[0] = {0, 1, 1, 0};  // forward: vert 0 → 1
-  rayImpl.halfedge_[1] = {1, 0, 0, 0};  // backward: vert 1 → 0
-  rayImpl.halfedge_[2] = {0, 0, -1, 0};
+  rayImpl.halfedge_.Set(0, 0, 1, 0);  // forward: vert 0 → 1
+  rayImpl.halfedge_.Set(1, 1, 0, 0);  // backward: vert 1 → 0
+  rayImpl.halfedge_.Set(2, -1, -1, 0);
   rayImpl.faceNormal_.resize(1);
   rayImpl.faceNormal_[0] = vec3(0.0);
 

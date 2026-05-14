@@ -45,12 +45,12 @@ struct ReindexFace {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
       const int oldEdge = 3 * oldFace + i;
-      Halfedge edge = oldHalfedge[oldEdge];
+      Halfedge edge = oldHalfedge.Get(oldEdge);
       const int pairedFace = edge.pairedHalfedge / 3;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
       const int newEdge = 3 * newFace + i;
-      halfedge[newEdge] = edge;
+      halfedge.Set(newEdge, edge.startVert, edge.pairedHalfedge, edge.propVert);
       if (!oldHalfedgeTangent.empty()) {
         halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
@@ -554,15 +554,18 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
   // smallest starting vertex is placed first
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
-             std::array<Halfedge, 3> face = {halfedge_[tri * 3],
-                                             halfedge_[tri * 3 + 1],
-                                             halfedge_[tri * 3 + 2]};
+             std::array<Halfedge, 3> face = {halfedge_.Get(tri * 3),
+                                             halfedge_.Get(tri * 3 + 1),
+                                             halfedge_.Get(tri * 3 + 2)};
              if (face[0].startVert < 0) return;
              int index = 0;
              for (int i : {1, 2})
                if (face[i].startVert < face[index].startVert) index = i;
-             for (int i : {0, 1, 2})
-               halfedge_[tri * 3 + i] = face[(index + i) % 3];
+             for (int i : {0, 1, 2}) {
+               const auto& f = face[(index + i) % 3];
+               halfedge_.Set(tri * 3 + i, f.startVert, f.pairedHalfedge,
+                             f.propVert);
+             }
            });
   if (IsCancelled(ctx)) return;
   // step 2: fix paired halfedge

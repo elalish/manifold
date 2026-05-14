@@ -135,18 +135,16 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
  * Temporary or value-style halfedge record. Persistent Manifold storage uses
  * Halfedges below, which derives endVert from the next halfedge in each face.
  */
-struct HalfedgeData {
+struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
   int propVert;
   bool IsForward() const { return startVert < endVert; }
-  bool operator<(const HalfedgeData& other) const {
+  bool operator<(const Halfedge& other) const {
     return startVert == other.startVert ? endVert < other.endVert
                                         : startVert < other.startVert;
   }
 };
-
-using Halfedge = HalfedgeData;
 
 class Halfedges {
  public:
@@ -156,7 +154,7 @@ class Halfedges {
     int& pairedHalfedge;
     int& propVert;
 
-    Ref operator=(HalfedgeData edge) {
+    Ref operator=(Halfedge edge) {
       startVert = edge.startVert;
       endVert = edge.endVert;
       pairedHalfedge = edge.pairedHalfedge;
@@ -164,9 +162,9 @@ class Halfedges {
       return *this;
     }
 
-    Ref operator=(const Ref& edge) { return *this = HalfedgeData(edge); }
+    Ref operator=(const Ref& edge) { return *this = Halfedge(edge); }
 
-    operator HalfedgeData() const {
+    operator Halfedge() const {
       return {startVert, endVert, pairedHalfedge, propVert};
     }
 
@@ -175,10 +173,7 @@ class Halfedges {
 
   Halfedges() = default;
   explicit Halfedges(size_t size) { resize_nofill(size); }
-  Halfedges(size_t size, HalfedgeData edge) { resize(size, edge); }
-  explicit Halfedges(const VecView<const HalfedgeData>& edges) {
-    FromData(edges);
-  }
+  explicit Halfedges(const VecView<const Halfedge>& edges) { FromData(edges); }
 
   size_t size() const { return start_.size(); }
   bool empty() const { return start_.empty(); }
@@ -195,37 +190,26 @@ class Halfedges {
 
   bool IsForward(int idx) const { return Start(idx) < End(idx); }
 
-  HalfedgeData Get(int idx) const {
+  Halfedge Get(int idx) const {
     return {Start(idx), End(idx), Pair(idx), Prop(idx)};
   }
 
-  void Set(int idx, HalfedgeData edge) {
-    SetStart(idx, edge.startVert);
-    SetEnd(idx, edge.endVert);
-    SetPair(idx, edge.pairedHalfedge);
-    SetProp(idx, edge.propVert);
+  void Set(int idx, int startVert, int pairedHalfedge, int propVert) {
+    SetStart(idx, startVert);
+    SetPair(idx, pairedHalfedge);
+    SetProp(idx, propVert);
   }
 
-  Ref operator[](int idx) {
-    return {start_[idx], start_[NextHalfedge(idx)], paired_[idx],
-            propVert_[idx]};
-  }
-  HalfedgeData operator[](int idx) const { return Get(idx); }
-  Ref operator[](size_t idx) { return (*this)[static_cast<int>(idx)]; }
-  HalfedgeData operator[](size_t idx) const {
-    return (*this)[static_cast<int>(idx)];
-  }
-
-  void push_back(HalfedgeData edge) {
+  void push_back(Halfedge edge) {
     start_.push_back(edge.startVert);
     paired_.push_back(edge.pairedHalfedge);
     propVert_.push_back(edge.propVert);
   }
 
-  void resize(size_t newSize, HalfedgeData edge = {}) {
-    start_.resize(newSize, edge.startVert);
-    paired_.resize(newSize, edge.pairedHalfedge);
-    propVert_.resize(newSize, edge.propVert);
+  void resize(size_t newSize) {
+    start_.resize(newSize, -1);
+    paired_.resize(newSize, -1);
+    propVert_.resize(newSize, -1);
   }
 
   void resize_nofill(size_t newSize) {
@@ -246,14 +230,14 @@ class Halfedges {
     propVert_.MakeUnique();
   }
 
-  Vec<HalfedgeData> ToData() const {
-    Vec<HalfedgeData> data(size());
+  Vec<Halfedge> ToData() const {
+    Vec<Halfedge> data(size());
     for_each_n(autoPolicy(size()), countAt(0), size(),
                [this, &data](int idx) { data[idx] = Get(idx); });
     return data;
   }
 
-  void FromData(const VecView<const HalfedgeData>& data) {
+  void FromData(const VecView<const Halfedge>& data) {
     clear(true);
     resize_nofill(data.size());
     for_each_n(autoPolicy(data.size()), countAt(0), data.size(),
@@ -326,24 +310,6 @@ struct TmpEdge {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
-
-Vec<TmpEdge> inline CreateTmpEdges(const VecView<const Halfedge>& halfedge) {
-  Vec<TmpEdge> edges(halfedge.size());
-  for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
-             [&edges, &halfedge](const int idx) {
-               const Halfedge& half = halfedge[idx];
-               edges[idx] = TmpEdge(half.startVert, half.endVert,
-                                    half.IsForward() ? idx : -1);
-             });
-
-  size_t numEdge =
-      remove_if(edges.begin(), edges.end(),
-                [](const TmpEdge& edge) { return edge.halfedgeIdx < 0; }) -
-      edges.begin();
-  DEBUG_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
-  edges.resize(numEdge);
-  return edges;
-}
 
 Vec<TmpEdge> inline CreateTmpEdges(const Halfedges& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());

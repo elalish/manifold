@@ -871,6 +871,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // The halfedgeRef contains the data that will become triRef once the faces
   // are triangulated.
   Vec<TriRef> halfedgeRef(faceEdge.back());
+  // Note that we are working with Vec<Halfedge> instead of Halfedges here,
+  // since the faces can be arbitrary polygons before feeding into the
+  // triangulator.
   Vec<Halfedge> faceHalfedges(faceEdge.back());
 
   AppendPartialEdges(outR, faceHalfedges, wholeHalfedgeP, facePtrR, edgesP,
