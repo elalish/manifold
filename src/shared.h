@@ -58,6 +58,44 @@ inline mat3 InverseNormalTransform(const mat3x4& transform) {
 }
 
 /**
+ * Symbolic perturbation primitives shared by Boolean3 and Boolean2.
+ * Carefully designed to minimize FP rounding error and eliminate it at edge
+ * cases.
+ */
+
+inline double withSign(bool pos, double v) { return pos ? v : -v; }
+
+/**
+ * Interpolate the (y, z) of segment aL-aR at the given x. The choice of
+ * (x - aL) vs (x - aR) is the smaller in magnitude, which keeps FP error
+ * low near either endpoint. Domain check via DEBUG_ASSERT.
+ */
+inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
+  const double dxL = x - aL.x;
+  const double dxR = x - aR.x;
+  DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
+               "Boolean manifold error: not in domain");
+  const bool useL = fabs(dxL) < fabs(dxR);
+  const vec3 dLR = aR - aL;
+  const double lambda = (useL ? dxL : dxR) / dLR.x;
+  if (!std::isfinite(lambda) || !std::isfinite(dLR.y) || !std::isfinite(dLR.z))
+    return vec2(aL.y, aL.z);
+  vec2 yz;
+  yz[0] = lambda * dLR.y + (useL ? aL.y : aR.y);
+  yz[1] = lambda * dLR.z + (useL ? aL.z : aR.z);
+  return yz;
+}
+
+/**
+ * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
+ * acts as the tiebreaker. Used to give consistent strict-ordering answers
+ * regardless of which side of an FP equality we land on.
+ */
+inline bool Shadows(double p, double q, double dir) {
+  return p == q ? dir < 0 : p < q;
+}
+
+/**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
  */
