@@ -179,27 +179,6 @@ class Halfedges {
   explicit Halfedges(const VecView<const HalfedgeData>& edges) {
     FromData(edges);
   }
-  explicit Halfedges(const Vec<HalfedgeData>& edges) { FromData(edges); }
-  explicit Halfedges(const SharedVec<HalfedgeData>& edges) { FromData(edges); }
-  explicit Halfedges(Vec<HalfedgeData>&& edges) { FromData(edges); }
-  explicit Halfedges(SharedVec<HalfedgeData>&& edges) { FromData(edges); }
-
-  Halfedges& operator=(const Vec<HalfedgeData>& edges) {
-    FromData(edges);
-    return *this;
-  }
-  Halfedges& operator=(const SharedVec<HalfedgeData>& edges) {
-    FromData(edges);
-    return *this;
-  }
-  Halfedges& operator=(Vec<HalfedgeData>&& edges) {
-    FromData(edges);
-    return *this;
-  }
-  Halfedges& operator=(SharedVec<HalfedgeData>&& edges) {
-    FromData(edges);
-    return *this;
-  }
 
   size_t size() const { return start_.size(); }
   bool empty() const { return start_.empty(); }

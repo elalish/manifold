@@ -128,22 +128,21 @@ void WriteGeneralTriangulation(Halfedges& output, VecView<int> contour2Tri,
                                ExecutionContext::Impl* ctx) {
   const int firstOut = 3 * firstTri;
   const size_t numTriHalfedge = 3 * triangulation.NumTri();
-  for_each_n(autoPolicy(numTriHalfedge, 1e5), countAt(0_uz), numTriHalfedge,
-             ctx, [&](size_t local) {
-               const int out = firstOut + local;
-               const HalfedgeData& edge =
-                   triangulation.halfedges[triangulation.contourEnd + local];
-               output.SetStart(out, faceHalfedge[edge.startVert].startVert);
-               output.SetProp(out, faceHalfedge[edge.startVert].propVert);
-               if (edge.pairedHalfedge >=
-                   static_cast<int>(triangulation.contourEnd)) {
-                 output.SetPair(out, firstOut + edge.pairedHalfedge -
-                                         static_cast<int>(
-                                             triangulation.contourEnd));
-               } else {
-                 output.SetPair(out, -1);
-               }
-             });
+  for_each_n(
+      autoPolicy(numTriHalfedge, 1e5), countAt(0_uz), numTriHalfedge, ctx,
+      [&](size_t local) {
+        const int out = firstOut + local;
+        const HalfedgeData& edge =
+            triangulation.halfedges[triangulation.contourEnd + local];
+        output.SetStart(out, faceHalfedge[edge.startVert].startVert);
+        output.SetProp(out, faceHalfedge[edge.startVert].propVert);
+        if (edge.pairedHalfedge >= static_cast<int>(triangulation.contourEnd)) {
+          output.SetPair(out, firstOut + edge.pairedHalfedge -
+                                  static_cast<int>(triangulation.contourEnd));
+        } else {
+          output.SetPair(out, -1);
+        }
+      });
 
   for_each_n(autoPolicy(triangulation.contourEnd, 1e5), countAt(0_uz),
              triangulation.contourEnd, ctx, [&](size_t contour) {

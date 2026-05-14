@@ -59,7 +59,9 @@ struct FlipTris {
       face[i].pairedHalfedge = FlipHalfedge(face[i].pairedHalfedge);
     }
     for (const int i : {0, 1, 2}) {
-      halfedge[3 * tri + i] = face[i];
+      halfedge.SetStart(3 * tri + i, face[i].startVert);
+      halfedge.SetPair(3 * tri + i, face[i].pairedHalfedge);
+      halfedge.SetProp(3 * tri + i, face[i].propVert);
     }
   }
 };

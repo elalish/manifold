@@ -134,11 +134,6 @@ struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
 
-  std::pair<int, vec4> operator()(int p1, int q1) {
-    return (*this)(p1, inP.halfedge_.Start(p1), inP.halfedge_.End(p1), q1,
-                   inQ.halfedge_.Start(q1), inQ.halfedge_.End(q1));
-  }
-
   std::pair<int, vec4> operator()(int p1, int p1s, int p1e, int q1, int q1s,
                                   int q1e) {
     vec4 xyzz11 = vec4(NAN);

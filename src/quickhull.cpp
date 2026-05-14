@@ -831,7 +831,9 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos) {
   // empty hull
   if (vertPos.empty()) return;
   QuickHull qh(vertPos);
-  std::tie(halfedge_, vertPos_) = qh.buildMesh();
+  Vec<HalfedgeData> halfedgeData;
+  std::tie(halfedgeData, vertPos_) = qh.buildMesh();
+  halfedge_ = Halfedges(std::move(halfedgeData));
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
