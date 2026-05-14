@@ -1168,13 +1168,16 @@ export class Manifold {
   status(): ErrorStatus;
 
   /**
-   * Like status() but observes evaluation progress and allows cancellation
-   * via the provided ExecutionContext. If cancel is requested mid-evaluation,
-   * returns 'Cancelled' and the Manifold's status becomes permanent.
+   * Returns a copy of this Manifold with the given ExecutionContext attached.
+   * The attachment is consumed by the next eager op invoked on the result —
+   * status() for a deferred CSG tree, or refine() / refineToLength() /
+   * refineToTolerance() for those eager ops. Deferred ops (Boolean
+   * operators, transforms, batch ops) ignore any attached ctx and produce
+   * a result with no attached ctx. See ExecutionContext for the full model.
    *
    * @group Information
    */
-  statusWithContext(ctx: ExecutionContext): ErrorStatus;
+  withContext(ctx: ExecutionContext): Manifold;
 
   // Export
 

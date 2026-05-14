@@ -1329,7 +1329,7 @@ TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
   }
   ExecutionContext ctx;
   ctx.Cancel();
-  EXPECT_EQ(m.Status(ctx), Manifold::Error::Cancelled);
+  EXPECT_EQ(m.WithContext(ctx).Status(), Manifold::Error::Cancelled);
   // kDepth + 1 leaves in the chain → kDepth booleans to reduce.
   EXPECT_EQ(ctx.impl_->totalBooleans.load(), kDepth);
 }

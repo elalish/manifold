@@ -194,7 +194,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
                                   &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
-      .function("statusWithContext", &man_js::StatusWithContext)
+      .function("withContext", &Manifold::WithContext)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)

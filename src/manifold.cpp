@@ -126,6 +126,7 @@ Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 Manifold::Manifold(const Manifold& other) {
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
+  std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
 }
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
@@ -149,8 +150,22 @@ Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
+    std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
   }
   return *this;
+}
+
+/**
+ * Returns a copy of this Manifold with the given ExecutionContext attached.
+ * The attachment is consumed by the next eager op on the result (Status,
+ * Refine family). Deferred ops produce a result with no attached ctx; raw
+ * copy preserves the attachment. See ExecutionContext in common.h for the
+ * full model.
+ */
+Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
+  Manifold result = *this;
+  std::atomic_store(&result.ctx_, ctx.impl_);
+  return result;
 }
 
 std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
@@ -268,20 +283,12 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
  * NoError, for instance the intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
-  return GetCsgLeafNode().GetImpl()->status_;
-}
-/**
- * Like Status() but observes evaluation progress and allows cancellation
- * via the provided ExecutionContext. If cancel is requested mid-evaluation,
- * returns Error::Cancelled and the Manifold's status becomes permanent.
- *
- * During evaluation, ExecutionContext::Progress() increases monotonically
- * from 0 to 1 as boolean combinations complete. ExecutionContext::Cancel()
- * can be called from any thread to request early exit. Cancellation
- * granularity is per-boolean-operation.
- */
-Manifold::Error Manifold::Status(ExecutionContext& ctx) const {
-  return GetCsgLeafNode(ctx.impl_.get()).GetImpl()->status_;
+  // Routes through any attached ExecutionContext (see WithContext). The
+  // atomic_load temporary pins the Impl's lifetime for the duration of the full
+  // expression -- through the lazy eval inside GetCsgLeafNode -- so a
+  // concurrent op= reseating ctx_ on this Manifold can't free the Impl out
+  // from under us.
+  return GetCsgLeafNode(std::atomic_load(&ctx_).get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -749,12 +756,13 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (n > 1) {
-    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; });
+    pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; }, false, ctx.get());
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -771,13 +779,16 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
-  pImpl->Refine([length](vec3 edge, vec4, vec4) {
-    return static_cast<int>(la::length(edge) / length);
-  });
+  pImpl->Refine(
+      [length](vec3 edge, vec4, vec4) {
+        return static_cast<int>(la::length(edge) / length);
+      },
+      false, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -795,7 +806,8 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto leafImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
@@ -814,7 +826,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
                            la::length(start - end);
           return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
         },
-        true);
+        true, ctx.get());
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -839,7 +851,10 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
 
 /**
  * Perform the given boolean operation on a list of Manifolds. In case of
- * Subtract, all Manifolds in the tail are differenced from the head.
+ * Subtract, all Manifolds in the tail are differenced from the head. The
+ * empty-input case returns a default-constructed Manifold; the
+ * single-input case returns the input unchanged (a no-op identity, including
+ * any attached ExecutionContext on that single input).
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
@@ -1032,7 +1047,10 @@ Manifold Manifold::Hull() const {
 }
 
 /**
- * Compute the convex hull enveloping a set of manifolds.
+ * Compute the convex hull enveloping a set of manifolds. If the input list
+ * is empty (or all input manifolds are empty), returns a default-constructed
+ * Manifold with no attached ExecutionContext (no source operand to inherit
+ * from).
  *
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */

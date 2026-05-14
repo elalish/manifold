@@ -795,10 +795,10 @@ ManifoldError manifold_status(ManifoldManifold* m) {
   return to_c(error);
 }
 
-ManifoldError manifold_status_with_context(ManifoldManifold* m,
-                                           ManifoldExecutionContext* ctx) {
-  auto error = from_c(m)->Status(*from_c(ctx));
-  return to_c(error);
+ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
+                                        ManifoldExecutionContext* ctx) {
+  auto attached = from_c(m)->WithContext(*from_c(ctx));
+  return to_c(new (mem) Manifold(attached));
 }
 
 size_t manifold_num_vert(ManifoldManifold* m) { return from_c(m)->NumVert(); }

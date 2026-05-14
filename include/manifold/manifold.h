@@ -381,7 +381,30 @@ class Manifold {
    */
   ///@{
   Error Status() const;
-  Error Status(ExecutionContext& ctx) const;
+
+  /// Returns a copy of this Manifold with the given ExecutionContext attached.
+  /// The attachment is consumed only by `Status()` (for deferred CSG trees)
+  /// and the `Refine()` / `RefineToLength()` / `RefineToTolerance()` family
+  /// (eager ops); those snapshot the ctx and report progress / observe
+  /// cancellation through it. Other queries that force evaluation (`Volume`,
+  /// `GetMeshGL`, `BoundingBox`, etc.) do not currently observe attached ctx.
+  ///
+  /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
+  /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the
+  /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
+  /// with no attached ctx. Inputs are not mutated. The idiom for observing a
+  /// deferred tree is therefore:
+  ///
+  ///   (a + b - c).WithContext(ctx).Status();
+  ///
+  /// while the idiom for observing an eager op is:
+  ///
+  ///   m.WithContext(ctx).Refine(n);
+  ///
+  /// Raw copy / assignment preserves the attachment (it's the same logical
+  /// Manifold). Only ops that derive a *new* Manifold drop the attachment.
+  Manifold WithContext(const ExecutionContext& ctx) const;
+
   bool IsEmpty() const;
   size_t NumVert() const;
   size_t NumEdge() const;
@@ -543,6 +566,22 @@ class Manifold {
   mutable std::shared_ptr<std::mutex> pNodeMutex_ =
       std::make_shared<std::mutex>();
   mutable std::shared_ptr<CsgNode> pNode_;
+  // Optional attached ExecutionContext. shared_ptr so the Impl outlives
+  // the user's ExecutionContext if a ctx-attached Manifold survives it.
+  // Propagates through copy ctor / op= (raw copy preserves the attachment).
+  // Manifold-returning ops do *not* propagate it: derived Manifolds get a
+  // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
+  // their in-call work; the snapshot uses std::atomic_load, which pins the
+  // Impl across long-running evaluations even if a concurrent op= reseats
+  // ctx_ mid-eval.
+  //
+  // Accessed only via std::atomic_load / std::atomic_store: no const method
+  // mutates ctx_, but op= and the copy ctor write it on a Manifold that
+  // may be concurrently observed by const methods on other threads. The
+  // atomic-shared-ptr free functions give a torn-read-free snapshot
+  // without taking a lock. (pNode_ uses a mutex instead because lazy CSG
+  // eval mutates it through const methods, which atomic_load can't model.)
+  std::shared_ptr<ExecutionContext::Impl> ctx_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;
   CsgLeafNode& GetCsgLeafNode(ExecutionContext::Impl* ctx = nullptr) const;

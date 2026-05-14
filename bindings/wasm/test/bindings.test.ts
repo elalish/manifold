@@ -62,11 +62,13 @@ suite('Manifold Bindings', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const sphere = manifoldModule.Manifold.sphere(1.0, 8);
     const u = cube.add(sphere);
-    expect(u.statusWithContext(ctx)).toEqual('NoError');
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('NoError');
 
     cube.delete();
     sphere.delete();
     u.delete();
+    uCtx.delete();
     ctx.delete();
   });
 
@@ -78,11 +80,13 @@ suite('Manifold Bindings', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const sphere = manifoldModule.Manifold.sphere(1.0, 8);
     const u = cube.add(sphere);
-    expect(u.statusWithContext(ctx)).toEqual('Cancelled');
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('Cancelled');
 
     cube.delete();
     sphere.delete();
     u.delete();
+    uCtx.delete();
     ctx.delete();
   });
 

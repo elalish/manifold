@@ -726,17 +726,21 @@ TEST(CBIND, execution_context_happy_path) {
   // Fresh ctx with no scheduled work reads as trivially complete (1.0).
   EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ctx), 1.0);
 
-  // Uncancelled ctx on a valid evaluation returns NO_ERROR.
+  // Uncancelled ctx attached to a manifold means Status routes through ctx.
   ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
   ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
-  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_NO_ERROR);
+  ManifoldManifold* uctx =
+      manifold_with_context(alloc_manifold_buffer(), u, ctx);
+  EXPECT_EQ(manifold_status(uctx), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_execution_context_cancelled(ctx), 0);
 
+  manifold_destruct_manifold(uctx);
   manifold_destruct_manifold(u);
   manifold_destruct_manifold(cube2);
   manifold_destruct_manifold(cube1);
   manifold_destruct_execution_context(ctx);
+  free(uctx);
   free(u);
   free(cube2);
   free(cube1);
@@ -750,16 +754,20 @@ TEST(CBIND, execution_context_cancel) {
   manifold_execution_context_cancel(ctx);
   EXPECT_EQ(manifold_execution_context_cancelled(ctx), 1);
 
-  // Status on a Manifold that needs evaluation, with the cancelled ctx,
-  // short-circuits to MANIFOLD_CANCELLED.
+  // Status on a Manifold that needs evaluation, with the cancelled ctx
+  // attached, short-circuits to MANIFOLD_CANCELLED.
   ManifoldManifold* cube1 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube2 = manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 1);
   ManifoldManifold* u = manifold_union(alloc_manifold_buffer(), cube1, cube2);
-  EXPECT_EQ(manifold_status_with_context(u, ctx), MANIFOLD_CANCELLED);
+  ManifoldManifold* uctx =
+      manifold_with_context(alloc_manifold_buffer(), u, ctx);
+  EXPECT_EQ(manifold_status(uctx), MANIFOLD_CANCELLED);
 
+  manifold_destruct_manifold(uctx);
   manifold_destruct_manifold(u);
   manifold_destruct_manifold(cube2);
   manifold_destruct_manifold(cube1);
+  free(uctx);
   free(u);
   free(cube2);
   free(cube1);

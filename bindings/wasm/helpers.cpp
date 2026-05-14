@@ -286,10 +286,6 @@ std::string Status(Manifold& manifold) {
   return ErrorToString(manifold.Status());
 }
 
-std::string StatusWithContext(Manifold& manifold, ExecutionContext& ctx) {
-  return ErrorToString(manifold.Status(ctx));
-}
-
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   auto [r1, r2] = a.Split(b);
   return {r1, r2};

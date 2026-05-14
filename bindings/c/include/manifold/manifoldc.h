@@ -214,10 +214,14 @@ ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m);
 
 int manifold_is_empty(ManifoldManifold* m);
 ManifoldError manifold_status(ManifoldManifold* m);
-// Variant of manifold_status that observes progress and allows cancellation
-// via the ExecutionContext. See manifold_execution_context.
-ManifoldError manifold_status_with_context(ManifoldManifold* m,
-                                           ManifoldExecutionContext* ctx);
+// Returns a copy of the manifold with the given ExecutionContext attached.
+// The attachment is consumed by the next eager op invoked on the result —
+// manifold_status, or one of the manifold_refine* family. Deferred ops
+// (Boolean operators, transforms, batch ops) ignore any attached ctx and
+// produce a result with no attached ctx. See ExecutionContext in common.h
+// for the full model.
+ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
+                                        ManifoldExecutionContext* ctx);
 size_t manifold_num_vert(ManifoldManifold* m);
 size_t manifold_num_edge(ManifoldManifold* m);
 size_t manifold_num_tri(ManifoldManifold* m);
@@ -254,9 +258,11 @@ size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
 
 // ExecutionContext: observe progress and request cancellation of a
-// long-running Manifold evaluation. Pass to manifold_status_with_context.
-// Safe to read/write from any thread. See the ExecutionContext class in
-// common.h for full semantics (sticky cancel, per-boolean granularity).
+// long-running Manifold evaluation. Attach to a manifold via
+// manifold_with_context; subsequent operations on that manifold observe
+// the context. Safe to read/write from any thread. See the ExecutionContext
+// class in common.h for full semantics (sticky cancel, per-boolean
+// granularity).
 ManifoldExecutionContext* manifold_execution_context(void* mem);
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
 int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx);

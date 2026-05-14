@@ -123,9 +123,12 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents'|'Cancelled';
 
 /**
- * Observe and control a long-running Manifold evaluation. Pass to
- * Manifold.statusWithContext() to observe progress and optionally request
- * cancellation. Safe to read/write from any thread/worker.
+ * Observe and control a long-running Manifold evaluation. Attach to a
+ * Manifold via Manifold.withContext(); the next eager op invoked on the
+ * result (status(), or one of the refine* family) snapshots the ctx and
+ * reports progress / observes cancellation through it. Deferred ops
+ * (Boolean, transforms, batch ops) ignore any attached ctx. Safe to
+ * read/write from any thread/worker.
  *
  * Cancellation is permanent for a Manifold: once cancelled and detected,
  * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
