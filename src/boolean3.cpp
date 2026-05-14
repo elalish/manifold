@@ -28,28 +28,8 @@ using namespace manifold;
 
 namespace {
 
-// These two functions (Interpolate and Intersect) are the only places where
-// floating-point operations take place in the whole Boolean function. These
-// are carefully designed to minimize rounding error and to eliminate it at edge
-// cases to ensure consistency.
-
-inline double withSign(bool pos, double v) { return pos ? v : -v; }
-
-inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
-  const double dxL = x - aL.x;
-  const double dxR = x - aR.x;
-  DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
-               "Boolean manifold error: not in domain");
-  const bool useL = fabs(dxL) < fabs(dxR);
-  const vec3 dLR = aR - aL;
-  const double lambda = (useL ? dxL : dxR) / dLR.x;
-  if (!std::isfinite(lambda) || !std::isfinite(dLR.y) || !std::isfinite(dLR.z))
-    return vec2(aL.y, aL.z);
-  vec2 yz;
-  yz[0] = lambda * dLR.y + (useL ? aL.y : aR.y);
-  yz[1] = lambda * dLR.z + (useL ? aL.z : aR.z);
-  return yz;
-}
+// `Intersect` stays local to the Boolean3 kernel cascade; the lower-level
+// symbolic perturbation primitives it uses live in shared.h.
 
 vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL, const vec3& bR) {
   const double dyL = bL.y - aL.y;
@@ -70,10 +50,6 @@ vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL, const vec3& bR) {
   xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
   xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
   return xyzz;
-}
-
-inline bool Shadows(double p, double q, double dir) {
-  return p == q ? dir < 0 : p < q;
 }
 
 struct FaceEdge {

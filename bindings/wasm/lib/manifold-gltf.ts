@@ -242,11 +242,22 @@ export class EXTManifold extends Extension {
         };
       }
 
-      for (let i = 0; i < numPrimitive; ++i) {
-        const accessor = json.accessors![meshDef.primitives[i].indices!];
-        accessor.bufferView = indices.bufferView;
-        accessor.byteOffset = indices.byteOffset! + 4 * runIndex[i];
-        accessor.count = runIndex[i + 1] - runIndex[i];
+      // Check if our primitive indices have been populated.
+      let count = 0;
+      for (const prim of mesh.listPrimitives()) {
+        const indices = prim.getIndices();
+        if (!indices) continue;
+        count += indices.getCount();
+      }
+
+      // If not, fill them in.
+      if (count !== manifoldPrimitive.getIndices().getCount()) {
+        for (let i = 0; i < numPrimitive; ++i) {
+          const accessor = json.accessors![meshDef.primitives[i].indices!];
+          accessor.bufferView = indices.bufferView;
+          accessor.byteOffset = indices.byteOffset! + 4 * runIndex[i];
+          accessor.count = runIndex[i + 1] - runIndex[i];
+        }
       }
 
       meshDef.extensions = meshDef.extensions || {};

@@ -562,7 +562,7 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
       // 'POSITION' is always present; we don't need to specify it.
       attributes: attributes.filter(x => x !== 'POSITION'),
       alpha: material.getAlpha(),
-      baseColorFactor: material.getBaseColorFactor() as any as Vec3,
+      baseColorFactor: material.getBaseColorFactor().slice(0, 3) as Vec3,
       metallic: material.getMetallicFactor(),
       roughness: material.getRoughnessFactor(),
       name: material.getName(),
