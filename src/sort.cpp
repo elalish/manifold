@@ -34,9 +34,9 @@ uint32_t MortonCode(vec3 position, Box bBox) {
 }
 
 struct ReindexFace {
-  VecView<Halfedge> halfedge;
+  Halfedges& halfedge;
   VecView<vec4> halfedgeTangent;
-  VecView<const Halfedge> oldHalfedge;
+  const Halfedges& oldHalfedge;
   VecView<const vec4> oldHalfedgeTangent;
   VecView<const int> faceNew2Old;
   VecView<const int> faceOld2New;
@@ -45,12 +45,12 @@ struct ReindexFace {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
       const int oldEdge = 3 * oldFace + i;
-      Halfedge edge = oldHalfedge[oldEdge];
+      Halfedge edge = oldHalfedge.Get(oldEdge);
       const int pairedFace = edge.pairedHalfedge / 3;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
       const int newEdge = 3 * newFace + i;
-      halfedge[newEdge] = edge;
+      halfedge.Set(newEdge, edge.startVert, edge.pairedHalfedge, edge.propVert);
       if (!oldHalfedgeTangent.empty()) {
         halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
@@ -255,12 +255,14 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
     int face = 0;
     Halfedge extrema = {0, 0, 0};
     for (size_t i = 0; i < halfedge_.size(); i++) {
-      Halfedge e = halfedge_[i];
-      if (!e.IsForward()) std::swap(e.startVert, e.endVert);
-      extrema.startVert = std::min(extrema.startVert, e.startVert);
-      extrema.endVert = std::min(extrema.endVert, e.endVert);
+      const int start =
+          halfedge_.IsForward(i) ? halfedge_.Start(i) : halfedge_.End(i);
+      const int end =
+          halfedge_.IsForward(i) ? halfedge_.End(i) : halfedge_.Start(i);
+      extrema.startVert = std::min(extrema.startVert, start);
+      extrema.endVert = std::min(extrema.endVert, end);
       extrema.pairedHalfedge =
-          MaxOrMinus(extrema.pairedHalfedge, e.pairedHalfedge);
+          MaxOrMinus(extrema.pairedHalfedge, halfedge_.Pair(i));
       face = MaxOrMinus(face, i / 3);
     }
     DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
@@ -343,15 +345,16 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
   scatter(countAt(0), countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
           vertOld2New.begin());
   const bool hasProp = NumProp() > 0;
-  for_each(autoPolicy(oldNumVert, 1e5), halfedge_.begin(), halfedge_.end(), ctx,
-           [&vertOld2New, hasProp](Halfedge& edge) {
-             if (edge.startVert < 0) return;
-             edge.startVert = vertOld2New[edge.startVert];
-             edge.endVert = vertOld2New[edge.endVert];
-             if (!hasProp) {
-               edge.propVert = edge.startVert;
-             }
-           });
+  for_each_n(autoPolicy(oldNumVert, 1e5), countAt(0), halfedge_.size(), ctx,
+             [this, &vertOld2New, hasProp](int idx) {
+               const int startVert = halfedge_.Start(idx);
+               if (startVert < 0) return;
+               const int newStart = vertOld2New[startVert];
+               halfedge_.SetStart(idx, newStart);
+               if (!hasProp) {
+                 halfedge_.SetProp(idx, newStart);
+               }
+             });
   if (IsCancelled(ctx)) return;
 }
 
@@ -369,11 +372,10 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts, 1e5);
 
-  for_each(policy, halfedge_.cbegin(), halfedge_.cend(), ctx,
-           [&keep](Halfedge h) {
-             reinterpret_cast<std::atomic<int>*>(&keep[h.propVert])
-                 ->store(1, std::memory_order_relaxed);
-           });
+  for_each_n(policy, countAt(0), halfedge_.size(), ctx, [this, &keep](int idx) {
+    reinterpret_cast<std::atomic<int>*>(&keep[halfedge_.Prop(idx)])
+        ->store(1, std::memory_order_relaxed);
+  });
   if (IsCancelled(ctx)) return;
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(keep.begin(), keep.end(), propOld2New.begin() + 1);
@@ -392,10 +394,10 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
         }
       });
   if (IsCancelled(ctx)) return;
-  for_each(policy, halfedge_.begin(), halfedge_.end(), ctx,
-           [&propOld2New](Halfedge& edge) {
-             edge.propVert = propOld2New[edge.propVert];
-           });
+  for_each_n(policy, countAt(0), halfedge_.size(), ctx,
+             [this, &propOld2New](int idx) {
+               halfedge_.SetProp(idx, propOld2New[halfedge_.Prop(idx)]);
+             });
   if (IsCancelled(ctx)) return;
 }
 
@@ -418,7 +420,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                // Removed tris are marked by all halfedges having pairedHalfedge
                // = -1, and this will sort them to the end (the Morton code only
                // uses the first 30 of 32 bits).
-               if (halfedge_[3 * face].pairedHalfedge < 0) {
+               if (halfedge_.Pair(3 * face) < 0) {
                  faceMorton[face] = kNoCode;
                  return;
                }
@@ -426,7 +428,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                vec3 center(0.0);
 
                for (const int i : {0, 1, 2}) {
-                 const vec3 pos = vertPos_[halfedge_[3 * face + i].startVert];
+                 const vec3 pos = vertPos_[halfedge_.Start(3 * face + i)];
                  center += pos;
                  faceBox[face].Union(pos);
                }
@@ -485,7 +487,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
     Permute(meshRelation_.triRef, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  Vec<Halfedge> oldHalfedge(std::move(halfedge_));
+  Halfedges oldHalfedge(std::move(halfedge_));
+  halfedge_ = Halfedges();
   Vec<vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri, 1e5);
@@ -496,8 +499,8 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old,
   if (oldHalfedgeTangent.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(policy, countAt(0), numTri, ctx,
-             ReindexFace({halfedge_, halfedgeTangent_, oldHalfedge,
-                          oldHalfedgeTangent, faceNew2Old, faceOld2New}));
+             ReindexFace{halfedge_, halfedgeTangent_, oldHalfedge,
+                         oldHalfedgeTangent, faceNew2Old, faceOld2New});
   if (IsCancelled(ctx)) return;
 }
 
@@ -535,8 +538,8 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old,
   if (old.halfedgeTangent_.size() != 0)
     halfedgeTangent_.resize_nofill(3 * numTri);
   for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri, ctx,
-             ReindexFace({halfedge_, halfedgeTangent_, old.halfedge_,
-                          old.halfedgeTangent_, faceNew2Old, faceOld2New}));
+             ReindexFace{halfedge_, halfedgeTangent_, old.halfedge_,
+                         old.halfedgeTangent_, faceNew2Old, faceOld2New});
   if (IsCancelled(ctx)) return;
 }
 
@@ -551,29 +554,33 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
   // smallest starting vertex is placed first
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
-             std::array<Halfedge, 3> face = {halfedge_[tri * 3],
-                                             halfedge_[tri * 3 + 1],
-                                             halfedge_[tri * 3 + 2]};
+             std::array<Halfedge, 3> face = {halfedge_.Get(tri * 3),
+                                             halfedge_.Get(tri * 3 + 1),
+                                             halfedge_.Get(tri * 3 + 2)};
              if (face[0].startVert < 0) return;
              int index = 0;
              for (int i : {1, 2})
                if (face[i].startVert < face[index].startVert) index = i;
-             for (int i : {0, 1, 2})
-               halfedge_[tri * 3 + i] = face[(index + i) % 3];
+             for (int i : {0, 1, 2}) {
+               const auto& f = face[(index + i) % 3];
+               halfedge_.Set(tri * 3 + i, f.startVert, f.pairedHalfedge,
+                             f.propVert);
+             }
            });
   if (IsCancelled(ctx)) return;
   // step 2: fix paired halfedge
   for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              for (int i : {0, 1, 2}) {
-               Halfedge& curr = halfedge_[tri * 3 + i];
-               if (curr.startVert < 0) return;
-               int oppositeFace = curr.pairedHalfedge / 3;
+               const int currIdx = tri * 3 + i;
+               const int startVert = halfedge_.Start(currIdx);
+               if (startVert < 0) return;
+               int oppositeFace = halfedge_.Pair(currIdx) / 3;
                int index = -1;
                for (int j : {0, 1, 2})
-                 if (curr.startVert == halfedge_[oppositeFace * 3 + j].endVert)
+                 if (startVert == halfedge_.End(oppositeFace * 3 + j))
                    index = j;
-               curr.pairedHalfedge = oppositeFace * 3 + index;
+               halfedge_.SetPair(currIdx, oppositeFace * 3 + index);
              }
            });
   if (IsCancelled(ctx)) return;

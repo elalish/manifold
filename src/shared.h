@@ -168,8 +168,8 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
 }
 
 /**
- * The fundamental component of the halfedge data structure used for storing and
- * operating on the Manifold.
+ * Temporary or value-style halfedge record. Persistent Manifold storage uses
+ * Halfedges below, which derives endVert from the next halfedge in each face.
  */
 struct Halfedge {
   int startVert, endVert;
@@ -180,6 +180,101 @@ struct Halfedge {
     return startVert == other.startVert ? endVert < other.endVert
                                         : startVert < other.startVert;
   }
+};
+
+class Halfedges {
+ public:
+  Halfedges() = default;
+  explicit Halfedges(size_t size) { resize_nofill(size); }
+  explicit Halfedges(const VecView<const Halfedge>& edges) { FromData(edges); }
+
+  size_t size() const { return start_.size(); }
+  bool empty() const { return start_.empty(); }
+
+  int Start(int idx) const { return start_[idx]; }
+  int End(int idx) const { return start_[NextHalfedge(idx)]; }
+  int Pair(int idx) const { return paired_[idx]; }
+  int Prop(int idx) const { return propVert_[idx]; }
+
+  void SetStart(int idx, int vert) { start_[idx] = vert; }
+  void SetEnd(int idx, int vert) { start_[NextHalfedge(idx)] = vert; }
+  void SetPair(int idx, int pair) { paired_[idx] = pair; }
+  void SetProp(int idx, int prop) { propVert_[idx] = prop; }
+
+  bool IsForward(int idx) const { return Start(idx) < End(idx); }
+
+  Halfedge Get(int idx) const {
+    return {Start(idx), End(idx), Pair(idx), Prop(idx)};
+  }
+
+  void Set(int idx, int startVert, int pairedHalfedge, int propVert) {
+    SetStart(idx, startVert);
+    SetPair(idx, pairedHalfedge);
+    SetProp(idx, propVert);
+  }
+
+  void push_back(int startVert, int pairedHalfedge, int propVert) {
+    start_.push_back(startVert);
+    paired_.push_back(pairedHalfedge);
+    propVert_.push_back(propVert);
+  }
+
+  void resize(size_t newSize) {
+    start_.resize(newSize, -1);
+    paired_.resize(newSize, -1);
+    propVert_.resize(newSize, -1);
+  }
+
+  void resize_nofill(size_t newSize) {
+    start_.resize_nofill(newSize);
+    paired_.resize_nofill(newSize);
+    propVert_.resize_nofill(newSize);
+  }
+
+  void clear(bool shrink = true) {
+    start_.clear(shrink);
+    paired_.clear(shrink);
+    propVert_.clear(shrink);
+  }
+
+  void MakeUnique() {
+    start_.MakeUnique();
+    paired_.MakeUnique();
+    propVert_.MakeUnique();
+  }
+
+  Vec<Halfedge> ToData() const {
+    Vec<Halfedge> data(size());
+    for_each_n(autoPolicy(size()), countAt(0), size(),
+               [this, &data](int idx) { data[idx] = Get(idx); });
+    return data;
+  }
+
+  void FromData(const VecView<const Halfedge>& data) {
+    clear(true);
+    resize_nofill(data.size());
+    for_each_n(autoPolicy(data.size()), countAt(0), data.size(),
+               [this, &data](int idx) {
+                 start_[idx] = data[idx].startVert;
+                 paired_[idx] = data[idx].pairedHalfedge;
+                 propVert_[idx] = data[idx].propVert;
+               });
+#ifdef MANIFOLD_DEBUG
+    DEBUG_ASSERT(data.size() % 3 == 0, topologyErr,
+                 "Halfedges::FromData requires triangle faces!");
+    for (size_t idx = 0; idx < data.size(); ++idx) {
+      const int next = NextHalfedge(static_cast<int>(idx));
+      if (data[idx].endVert >= 0 && data[next].startVert >= 0) {
+        DEBUG_ASSERT(data[idx].endVert == data[next].startVert, topologyErr,
+                     "Halfedges::FromData requires triangle-ordered edges!");
+      }
+    }
+#endif
+  }
+
+  SharedVec<int> start_;
+  SharedVec<int> paired_;
+  SharedVec<int> propVert_;
 };
 
 struct Barycentric {
@@ -229,13 +324,12 @@ struct TmpEdge {
   }
 };
 
-Vec<TmpEdge> inline CreateTmpEdges(const VecView<const Halfedge>& halfedge) {
+Vec<TmpEdge> inline CreateTmpEdges(const Halfedges& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
              [&edges, &halfedge](const int idx) {
-               const Halfedge& half = halfedge[idx];
-               edges[idx] = TmpEdge(half.startVert, half.endVert,
-                                    half.IsForward() ? idx : -1);
+               edges[idx] = TmpEdge(halfedge.Start(idx), halfedge.End(idx),
+                                    halfedge.IsForward(idx) ? idx : -1);
              });
 
   size_t numEdge =
