@@ -739,7 +739,13 @@ TEST(Manifold, ManifoldContextCancelConcurrentHull) {
 // std::thread.
 #if MANIFOLD_PAR == 1
 TEST(Manifold, ManifoldContextCancelConcurrentMinkowski) {
-  // Two non-convex inputs to force the slow path.
+  // Two non-convex inputs to force the slow path. The tet-difference here
+  // produces near-degenerate geometry that fails the MANIFOLD_DEBUG
+  // triangulation CCW check on macOS without processOverlaps -- matches
+  // the workaround in Boolean.NonConvexNonConvexMinkowski{Sum,Difference}.
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
   Manifold other = nonConvex.Scale(vec3(0.5));
