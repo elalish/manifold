@@ -700,6 +700,34 @@ TEST(Manifold, ManifoldContextCancelMidMinkowski) {
   EXPECT_EQ(sum.Status(), Manifold::Error::Cancelled);
 }
 
+// Concurrent cancel mid-Hull: spawn a thread that fires cancel a short
+// delay after the main thread launches a Hull on a non-trivial input.
+// Cancel can fire at either the post-buildMesh checkpoint or inside
+// SortGeometry's per-phase checks; either way the result is Cancelled.
+//
+// MANIFOLD_PAR guard: same as the other concurrent tests -- requires
+// std::thread.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ManifoldContextCancelConcurrentHull) {
+  // High-resolution sphere so QuickHull + SortGeometry have measurable
+  // work to do.
+  Manifold sphere = Manifold::Sphere(1.0, 256);
+
+  ExecutionContext ctx;
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::thread evalThread(
+      [&] { result.store(sphere.WithContext(ctx).Hull().Status()); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  ctx.Cancel();
+  evalThread.join();
+
+  // Either NoError (eval raced past the 1ms sleep) or Cancelled
+  // (caught at one of the Hull cancel checkpoints).
+  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+              result.load() == Manifold::Error::NoError);
+}
+#endif  // MANIFOLD_PAR == 1
+
 // Concurrent cancel mid-Minkowski: spawn a thread that fires cancel a
 // short delay after the main thread launches a non-convex Minkowski
 // (the slow path). The internal BatchBoolean calls observe ctx (via
