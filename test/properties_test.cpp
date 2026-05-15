@@ -14,7 +14,6 @@
 
 #include "../src/utils.h"
 #include "manifold/manifold.h"
-#include "samples.h"
 #include "test.h"
 
 using namespace manifold;
