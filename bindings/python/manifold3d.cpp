@@ -518,6 +518,8 @@ NB_MODULE(manifold3d, m) {
              std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
              const std::optional<
+                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
+             const std::optional<
                  nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
@@ -549,6 +551,10 @@ NB_MODULE(manifold3d, m) {
                   toVector(runTransform->data(), runTransform->size());
             }
 
+            if (runFlags.has_value()) {
+              out.runFlags = toVector(runFlags->data(), runFlags->size());
+            }
+
             if (faceID.has_value())
               out.faceID = toVector(faceID->data(), faceID->size());
 
@@ -563,7 +569,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_index") = nb::none(),
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
-          nb::arg("face_id") = nb::none(),
+          nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
       .def_prop_ro(
           "vert_properties",
@@ -602,6 +608,7 @@ NB_MODULE(manifold3d, m) {
       .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
+      .def_ro("run_flags", &MeshGL::runFlags)
       .def_ro("face_id", &MeshGL::faceID)
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
@@ -623,6 +630,8 @@ NB_MODULE(manifold3d, m) {
                                              nb::c_contig>>& runOriginalID,
              std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
+             const std::optional<
+                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
              const std::optional<
                  nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
@@ -655,6 +664,10 @@ NB_MODULE(manifold3d, m) {
                   toVector(runTransform->data(), runTransform->size());
             }
 
+            if (runFlags.has_value()) {
+              out.runFlags = toVector(runFlags->data(), runFlags->size());
+            }
+
             if (faceID.has_value())
               out.faceID = toVector(faceID->data(), faceID->size());
 
@@ -669,7 +682,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_index") = nb::none(),
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
-          nb::arg("face_id") = nb::none(),
+          nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
       .def_prop_ro(
           "vert_properties",
@@ -708,6 +721,7 @@ NB_MODULE(manifold3d, m) {
       .def_ro("merge_to_vert", &MeshGL64::mergeToVert)
       .def_ro("run_index", &MeshGL64::runIndex)
       .def_ro("run_original_id", &MeshGL64::runOriginalID)
+      .def_ro("run_flags", &MeshGL64::runFlags)
       .def_ro("face_id", &MeshGL64::faceID)
       .def("merge", &MeshGL64::Merge, mesh_gl__merge);
 

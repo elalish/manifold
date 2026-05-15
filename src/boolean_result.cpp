@@ -153,13 +153,13 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   outR.faceNormal_.resize_nofill(numFaceR);
 
   Vec<size_t> tmpBuffer(outR.faceNormal_.size());
-  auto faceIds = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
+  auto faceIdsP = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
     if (sidesPerFacePQ[i] > 0) return i;
     return std::numeric_limits<size_t>::max();
   });
 
   auto next =
-      copy_if(faceIds, faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+      copy_if(faceIdsP, faceIdsP + inP.faceNormal_.size(), tmpBuffer.begin(),
               [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
 
   gather(tmpBuffer.begin(), next, inP.faceNormal_.begin(),
