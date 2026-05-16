@@ -82,3 +82,18 @@ export class UnsupportedFormatError extends Error {
 }
 
 export class ImportError extends Error {}
+
+/**
+ * Thrown when an HTTP fetch performed by ManifoldCAD's bundler or model/texture
+ * loaders returns a non-2xx response. Carries the status and response body so
+ * callers can distinguish transient (5xx, 429) from permanent (4xx) failures.
+ */
+export class FetchError extends Error {
+  constructor(
+      public readonly status: number, public readonly statusText: string,
+      public readonly url: string, public readonly body?: string) {
+    super(
+        `HTTP ${status} ${statusText} fetching ${url}` +
+        (body ? `: ${body}` : ''));
+  }
+}

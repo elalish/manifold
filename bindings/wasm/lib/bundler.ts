@@ -26,6 +26,7 @@ import * as esbuild from 'esbuild-wasm';
 import MagicString from 'magic-string';
 
 import {BundlerError} from './error.ts';
+import {fetchWithRetry} from './fetch-with-retry.ts';
 import {isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
@@ -246,11 +247,16 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
       // Fetch urls.
       build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
-        const response = await fetch(args.path);
+        const response = await fetchWithRetry(args.path);
         if (response.ok) {
           return {contents: await response.text()};
         } else {
-          return {errors: [{text: await response.text()}]};
+          const body = await response.text();
+          return {
+            errors: [
+              {text: `HTTP ${response.status} ${response.statusText}: ${body}`}
+            ]
+          };
         }
       });
     }
