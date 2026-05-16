@@ -384,6 +384,7 @@ Module.setup = function() {
       faceID,
       halfedgeTangent,
       runTransform,
+      runFlags,
       tolerance = 0
     } = {}) {
       this.numProp = numProp;
@@ -396,6 +397,7 @@ Module.setup = function() {
       this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
       this.runTransform = runTransform;
+      this.runFlags = runFlags;
       this.tolerance = tolerance;
     }
 

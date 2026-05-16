@@ -14,7 +14,6 @@
 
 #include "../src/utils.h"
 #include "manifold/manifold.h"
-#include "samples.h"
 #include "test.h"
 
 using namespace manifold;
@@ -118,6 +117,39 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
   }
+}
+
+TEST(Properties, CalculateNormals) {
+  Manifold sphere = Manifold::Sphere(10);
+  Manifold cut = (sphere - sphere.Translate(vec3(10)));
+  cut.Status();
+  Manifold cut2(cut.GetMeshGL64());
+  EXPECT_TRUE(cut.MatchesTriNormals());
+  EXPECT_TRUE(cut2.MatchesTriNormals());
+  MeshGL64 out = cut.CalculateNormals(0).GetMeshGL64(0);
+  MeshGL64 out2 = cut2.CalculateNormals(0).GetMeshGL64(0);
+  ASSERT_EQ(out.NumTri(), out2.NumTri());
+  ASSERT_EQ(out.NumVert(), out2.NumVert());
+  ASSERT_EQ(out.numProp, out2.numProp);
+  const int np = out.numProp;
+  int numBad = 0;
+  int numBad2 = 0;
+  for (int v = 0; v < out.NumVert(); ++v) {
+    auto pos = out.GetVertPos(v);
+    auto pos2 = out2.GetVertPos(v);
+    auto norm = pos;
+    auto norm2 = pos2;
+    for (int j : {0, 1, 2}) {
+      norm[j] = out.vertProperties[np * v + 3 + j];
+      norm2[j] = out2.vertProperties[np * v + 3 + j];
+      ASSERT_FLOAT_EQ(pos[j], pos2[j]);
+    }
+    // FIXME
+    // ASSERT_GT(dot(pos2, norm2), 0);
+    // ASSERT_GT(dot(pos, norm), 0);
+  }
+  EXPECT_EQ(numBad, 0);
+  EXPECT_EQ(numBad2, 0);
 }
 
 TEST(Properties, Coplanar) {

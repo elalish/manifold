@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-#include "../src/vec.h"
+#include "../src/execution_impl.h"
 #ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
 #endif
@@ -1331,5 +1331,6 @@ TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
   ctx.Cancel();
   EXPECT_EQ(m.WithContext(ctx).Status(), Manifold::Error::Cancelled);
   // kDepth + 1 leaves in the chain → kDepth booleans to reduce.
-  EXPECT_EQ(ctx.impl_->totalBooleans.load(), kDepth);
+  auto& privateCtx = *ctx.impl_;
+  EXPECT_EQ(privateCtx.totalBooleans.load(), kDepth);
 }

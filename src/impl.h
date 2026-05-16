@@ -489,12 +489,12 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
                     const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
-    out.runFlags.push_back(rel.backSide ? 1 : 0);
     if (updateNormals) {
       runNormalTransform.push_back(rel.GetNormalTransform());
     }
     // clear transforms if applying them to normals
     if (!isOriginal && !updateNormals) {
+      out.runFlags.push_back(rel.backSide ? 1 : 0);
       for (const int col : {0, 1, 2, 3}) {
         for (const int row : {0, 1, 2}) {
           out.runTransform.push_back(rel.transform[col][row]);
