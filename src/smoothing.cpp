@@ -465,6 +465,12 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<int> vertNumSharp(NumVert(), 0);
+  // Verts whose incident faces span at least two meshIDs need different
+  // per-group treatment than ordinary sharp-edge verts (e.g. cube corners),
+  // because the cross-product pseudo-normal accumulation produces an inward
+  // result that the rest of the smoothing pipeline tolerates for
+  // single-meshID groups but not for multi-meshID seam groups.
+  Vec<bool> vertIsCrossMesh(NumVert(), false);
   for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_.IsForward(e)) continue;
     const int pair = halfedge_.Pair(e);
@@ -472,7 +478,13 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const int tri2 = pair / 3;
     const double dihedral =
         degrees(AngleBetween(faceNormal_[tri1], faceNormal_[tri2]));
-    if (dihedral > minSharpAngle) {
+    const bool meshIDMismatch =
+        meshRelation_.triRef[tri1].meshID != meshRelation_.triRef[tri2].meshID;
+    if (meshIDMismatch) {
+      vertIsCrossMesh[halfedge_.Start(e)] = true;
+      vertIsCrossMesh[halfedge_.End(e)] = true;
+    }
+    if (dihedral > minSharpAngle || meshIDMismatch) {
       ++vertNumSharp[halfedge_.Start(e)];
       ++vertNumSharp[halfedge_.End(e)];
     } else {
@@ -555,6 +567,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
       const double dihedral =
           degrees(AngleBetween(faceNormal_[face], faceNormal_[prevFace]));
       if (dihedral > minSharpAngle ||
+          meshRelation_.triRef[face].meshID !=
+              meshRelation_.triRef[prevFace].meshID ||
           triIsFlatFace[face] != triIsFlatFace[prevFace] ||
           (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
            !meshRelation_.triRef[face].SameFace(
@@ -598,6 +612,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           const double dihedral = degrees(
               AngleBetween(faceNormal_[here.face], faceNormal_[next.face]));
           if (dihedral > minSharpAngle ||
+              meshRelation_.triRef[here.face].meshID !=
+                  meshRelation_.triRef[next.face].meshID ||
               triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
               (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
                !meshRelation_.triRef[here.face].SameFace(
@@ -607,10 +623,20 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           }
           groups.push_back(normals.size() - 1);
           if (std::isfinite(next.normalizedEdge.x)) {
-            normals.back() +=
-                SafeNormalize(
-                    la::cross(next.normalizedEdge, here.normalizedEdge)) *
-                AngleBetween(here.normalizedEdge, next.normalizedEdge);
+            if (vertIsCrossMesh[vert]) {
+              // Use face_normal directly for seam verts where the multi-
+              // normal split groups faces from different meshIDs. The
+              // cross-product pseudo-normal produces inward-pointing
+              // results for partial-fan groups across a Boolean seam.
+              normals.back() +=
+                  faceNormal_[next.face] *
+                  AngleBetween(here.normalizedEdge, next.normalizedEdge);
+            } else {
+              normals.back() +=
+                  SafeNormalize(
+                      la::cross(next.normalizedEdge, here.normalizedEdge)) *
+                  AngleBetween(here.normalizedEdge, next.normalizedEdge);
+            }
           } else {
             next.normalizedEdge = here.normalizedEdge;
           }
