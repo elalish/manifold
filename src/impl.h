@@ -54,7 +54,7 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
-  SharedVec<Halfedge> halfedge_;
+  Halfedges halfedge_;
   Vec<double> properties_;
   Vec<vec3> vertNormal_;
   Vec<vec3> faceNormal_;
@@ -139,8 +139,8 @@ struct Manifold::Impl {
   void ReorderHalfedges(ExecutionContext::Impl* ctx = nullptr);
 
   // face_op.cpp
-  void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef,
-                bool allowConvex = false,
+  void Face2Tri(const Vec<int>& faceEdge, const VecView<const Halfedge>&,
+                const Vec<TriRef>& halfedgeRef, bool allowConvex = false,
                 ExecutionContext::Impl* ctx = nullptr);
   Polygons Slice(double height) const;
   Polygons Project() const;
@@ -196,10 +196,11 @@ struct Manifold::Impl {
               ExecutionContext::Impl* ctx = nullptr);
 
   // quickhull.cpp
-  void Hull(VecView<const vec3> vertPos);
+  void Hull(VecView<const vec3> vertPos, ExecutionContext::Impl* ctx = nullptr);
 
   // minkowski.cpp
-  Manifold Minkowski(const Impl& other, bool inset) const;
+  Manifold Minkowski(const Impl& other, bool inset,
+                     ExecutionContext::Impl* ctx = nullptr) const;
 };
 
 extern std::mutex dump_lock;
@@ -212,7 +213,7 @@ template <typename F>
 inline void Manifold::Impl::ForVert(int halfedge, F func) {
   int current = halfedge;
   do {
-    current = NextHalfedge(halfedge_[current].pairedHalfedge);
+    current = NextHalfedge(halfedge_.Pair(current));
     func(current);
   } while (current != halfedge);
 }
@@ -224,7 +225,7 @@ void Manifold::Impl::ForVert(
   T here = transform(halfedge);
   int current = halfedge;
   do {
-    const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
+    const int nextHalfedge = NextHalfedge(halfedge_.Pair(current));
     T next = transform(nextHalfedge);
     binaryOp(current, here, next);
     here = next;
@@ -511,7 +512,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
     out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.coplanarID;
     for (const int i : {0, 1, 2})
-      out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
+      out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
 
     if (meshID != lastID) {
       manifold::Manifold::Impl::Relation rel;
@@ -548,7 +549,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
       for (const int i : {0, 1, 2}) {
-        const int prop = impl.halfedge_[3 * triNew2Old[tri] + i].propVert;
+        const int prop = impl.halfedge_.Prop(3 * triNew2Old[tri] + i);
         const int vert = out.triVerts[3 * tri + i];
 
         auto& bin = vertPropPair[vert];

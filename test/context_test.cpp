@@ -674,6 +674,98 @@ TEST(Manifold, ManifoldContextRefineDropsAttachmentFromResult) {
   EXPECT_EQ(other.impl_->totalBooleans.load(), kSentinel);
 }
 
+// Eager Hull observes attached ctx -- a pre-cancelled ctx aborts the
+// post-pass that runs after QuickHull's buildMesh, returning a Cancelled
+// result rather than a finished hull.
+TEST(Manifold, ManifoldContextCancelMidHull) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  // Non-trivial input so the post-buildMesh path is reached.
+  Manifold sphere = Manifold::Sphere(1.0, 64).WithContext(ctx);
+  Manifold hull = sphere.Hull();
+  EXPECT_EQ(hull.Status(), Manifold::Error::Cancelled);
+}
+
+// Eager Minkowski observes attached ctx -- a pre-cancelled ctx aborts
+// between the hull/Boolean phases. Cancel granularity is "one batch" of
+// per-face hulls.
+TEST(Manifold, ManifoldContextCancelMidMinkowski) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  // Two convex inputs hit the fast path; that's enough to exercise the
+  // up-front cancel check.
+  Manifold a = Manifold::Cube(vec3(1), true).WithContext(ctx);
+  Manifold b = Manifold::Cube(vec3(0.5), true);
+  Manifold sum = a.MinkowskiSum(b);
+  EXPECT_EQ(sum.Status(), Manifold::Error::Cancelled);
+}
+
+// Concurrent cancel mid-Hull: spawn a thread that fires cancel a short
+// delay after the main thread launches a Hull on a non-trivial input.
+// Cancel can fire at either the post-buildMesh checkpoint or inside
+// SortGeometry's per-phase checks; either way the result is Cancelled.
+//
+// MANIFOLD_PAR guard: same as the other concurrent tests -- requires
+// std::thread.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ManifoldContextCancelConcurrentHull) {
+  // High-resolution sphere so QuickHull + SortGeometry have measurable
+  // work to do.
+  Manifold sphere = Manifold::Sphere(1.0, 256);
+
+  ExecutionContext ctx;
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::thread evalThread(
+      [&] { result.store(sphere.WithContext(ctx).Hull().Status()); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  ctx.Cancel();
+  evalThread.join();
+
+  // Either NoError (eval raced past the 1ms sleep) or Cancelled
+  // (caught at one of the Hull cancel checkpoints).
+  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+              result.load() == Manifold::Error::NoError);
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Concurrent cancel mid-Minkowski: spawn a thread that fires cancel a
+// short delay after the main thread launches a non-convex Minkowski
+// (the slow path). The internal BatchBoolean calls observe ctx (via
+// the tree.GetCsgLeafNode(ctx) trigger in Impl::Minkowski), so cancel
+// fires inside Boolean3's per-phase checks rather than waiting for the
+// whole batch.
+//
+// MANIFOLD_PAR guard: same as the other concurrent tests -- requires
+// std::thread.
+#if MANIFOLD_PAR == 1
+TEST(Manifold, ManifoldContextCancelConcurrentMinkowski) {
+  // Two non-convex inputs to force the slow path. The tet-difference here
+  // produces near-degenerate geometry that fails the MANIFOLD_DEBUG
+  // triangulation CCW check on macOS without processOverlaps -- matches
+  // the workaround in Boolean.NonConvexNonConvexMinkowski{Sum,Difference}.
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
+  Manifold other = nonConvex.Scale(vec3(0.5));
+
+  ExecutionContext ctx;
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::thread evalThread([&] {
+    result.store(nonConvex.WithContext(ctx).MinkowskiSum(other).Status());
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  ctx.Cancel();
+  evalThread.join();
+
+  // Either NoError (eval raced past the 1ms sleep) or Cancelled
+  // (caught mid-Boolean inside Minkowski) is acceptable.
+  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+              result.load() == Manifold::Error::NoError);
+}
+#endif  // MANIFOLD_PAR == 1
+
 // Cancellation requested on the attached ctx after Status() begins (or
 // before, in the deferred-tree-root idiom) aborts evaluation.
 TEST(Manifold, ManifoldContextCancelMidEval) {

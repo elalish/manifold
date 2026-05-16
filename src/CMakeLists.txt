@@ -12,6 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(MANIFOLD_CROSS_SECTION_SRCS)
+if(MANIFOLD_CROSS_SECTION)
+  if(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
+    list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section.cpp)
+  elseif(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "boolean2")
+    list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section_boolean2.cpp)
+  endif()
+endif()
+
+set(MANIFOLD_CROSS_SECTION_LIBS)
+if(MANIFOLD_CROSS_SECTION AND MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
+  list(APPEND MANIFOLD_CROSS_SECTION_LIBS Clipper2::Clipper2)
+endif()
+
 set(
   MANIFOLD_SRCS
   boolean3.cpp
@@ -32,8 +46,7 @@ set(
   sort.cpp
   subdivision.cpp
   tree2d.cpp
-  # optional source files
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section/cross_section.cpp>
+  ${MANIFOLD_CROSS_SECTION_SRCS}
 )
 
 set(
@@ -47,6 +60,7 @@ set(
   iters.h
   mesh_fixes.h
   parallel.h
+  polygon_internal.h
   quickhull.h
   shared.h
   svd.h
@@ -68,7 +82,7 @@ target_link_libraries(
   PRIVATE
     # optional dependencies
     $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
-    $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:Clipper2::Clipper2>
+    ${MANIFOLD_CROSS_SECTION_LIBS}
 )
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})

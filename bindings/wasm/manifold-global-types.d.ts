@@ -125,10 +125,10 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
 /**
  * Observe and control a long-running Manifold evaluation. Attach to a
  * Manifold via Manifold.withContext(); the next eager op invoked on the
- * result (status(), or one of the refine* family) snapshots the ctx and
- * reports progress / observes cancellation through it. Deferred ops
- * (Boolean, transforms, batch ops) ignore any attached ctx. Safe to
- * read/write from any thread/worker.
+ * result (status(), one of the refine* family, hull(), or minkowskiSum() /
+ * minkowskiDifference()) snapshots the ctx and reports progress / observes
+ * cancellation through it. Deferred ops (Boolean, transforms, batch ops)
+ * ignore any attached ctx. Safe to read/write from any thread/worker.
  *
  * Cancellation is permanent for a Manifold: once cancelled and detected,
  * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.

@@ -22,6 +22,7 @@
 #include <limits>
 #include <unordered_map>
 
+#include "execution_impl.h"
 #include "impl.h"
 
 namespace manifold {
@@ -825,17 +826,39 @@ bool QuickHull::addPointToFace(typename MeshBuilder::Face& f,
 }
 
 // Wrapper to call the QuickHull algorithm with the given vertex data to build
-// the Impl
-void Manifold::Impl::Hull(VecView<const vec3> vertPos) {
+// the Impl. Cancellation is observed between QuickHull's hot kernel and the
+// SortGeometry post-pass, plus during SortGeometry itself (which is
+// ctx-aware). QuickHull's own loop is cancel-blind for now -- the
+// granularity is "after buildMesh returns", matching how Refine handles
+// Subdivide.
+void Manifold::Impl::Hull(VecView<const vec3> vertPos,
+                          ExecutionContext::Impl* ctx) {
   size_t numVert = vertPos.size();
   // empty hull
   if (vertPos.empty()) return;
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
   QuickHull qh(vertPos);
-  std::tie(halfedge_, vertPos_) = qh.buildMesh();
+  Vec<Halfedge> Halfedge;
+  std::tie(Halfedge, vertPos_) = qh.buildMesh();
+  halfedge_ = Halfedges(std::move(Halfedge));
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
-  SortGeometry();
+  SortGeometry(ctx);
+  // SortGeometry returns silently on cancel, leaving the Impl in a
+  // partial state; catch that here so SetNormalsAndCoplanar doesn't
+  // run on broken geometry and the caller sees a Cancelled result.
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
   SetNormalsAndCoplanar();
 }
 

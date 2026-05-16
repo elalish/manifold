@@ -176,9 +176,10 @@ struct RayHit {
  * @brief Observe and control a long-running Manifold evaluation.
  *
  * Attach to a Manifold via Manifold::WithContext(ctx); the next *eager* op
- * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance)
- * snapshots the ctx and reports progress and observes cancellation through
- * it. Safe to read/write from any thread.
+ * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance,
+ * Hull, MinkowskiSum / MinkowskiDifference) snapshots the ctx and reports
+ * progress and observes cancellation through it. Safe to read/write from any
+ * thread.
  *
  * Copyable and movable: copies share the same underlying state via a
  * shared_ptr, so one thread can evaluate while another holds a copy and
@@ -196,11 +197,13 @@ struct RayHit {
  * short-circuit to Error::Cancelled. Construct a fresh context to make a
  * new evaluation cancellable independently.
  *
- * Cancellation granularity is currently per-boolean-operation; a single
- * large boolean may run to completion before the flag is checked again.
- * This may improve in future versions.
+ * Cancellation granularity varies by op: Boolean trees check per
+ * sub-boolean (so a single very large boolean may run to completion
+ * before the next check); Hull checks at the boundaries of its main
+ * phases (post-buildMesh and post-SortGeometry); Minkowski checks per
+ * face of the first input and per internal BatchBoolean batch.
  *
- * Example: cancel from an observer thread.
+ * Example: cancel a long-running BatchBoolean from an observer thread.
  * @code
  * ExecutionContext ctx;
  * Manifold big = Manifold::BatchBoolean(items, OpType::Add).WithContext(ctx);
@@ -210,6 +213,19 @@ struct RayHit {
  *   }
  * });
  * // ...later, from the UI thread:
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
+ *
+ * Example: cancel a Minkowski sum mid-evaluation.
+ * @code
+ * ExecutionContext ctx;
+ * std::thread eval([&] {
+ *   if (a.WithContext(ctx).MinkowskiSum(b).Status() ==
+ *       Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
  * ctx.Cancel();
  * eval.join();
  * @endcode

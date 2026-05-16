@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
 
@@ -23,7 +24,33 @@ namespace manifold {
  * @param other The other Impl to minkowski sum/diff with this one.
  * @param inset Whether it should subtract (erode) rather than add (dilate).
  */
-Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
+Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
+                                   ExecutionContext::Impl* ctx) const {
+  // Helper to short-circuit on cancel. Cancellation is observed both at
+  // the boundaries between hull/Boolean phases and inside each
+  // BatchBoolean (via the same ctx threaded into GetCsgLeafNode, which
+  // routes into Boolean3's existing cancel checks). The per-hull work
+  // itself is currently not interrupted -- granularity inside a batch
+  // is "one Manifold::Hull(simpleHull) call."
+  auto cancelled = [] {
+    auto impl = std::make_shared<Impl>();
+    impl->status_ = Error::Cancelled;
+    return Manifold(impl);
+  };
+  // Build a BatchBoolean and force ctx-observed evaluation so an
+  // attached cancel fires inside Boolean3 rather than after the whole
+  // batch completes.
+  auto evalBatch = [ctx](std::vector<Manifold>&& items, OpType op) {
+    Manifold tree = Manifold::BatchBoolean(items, op);
+    // Trigger lazy eval with ctx. The returned leaf may have
+    // status_=Cancelled if cancel fired mid-Boolean; the caller still
+    // pushes it into composedHulls and the outer cancel check catches
+    // it.
+    tree.GetCsgLeafNode(ctx);
+    return tree;
+  };
+  if (IsCancelled(ctx)) return cancelled();
+
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
 
@@ -74,24 +101,24 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
     // do it in batches of 1000 meshes
     for (size_t offset = 0; offset < numTri; offset += BATCH_SIZE) {
+      if (IsCancelled(ctx)) return cancelled();
       size_t numIter = std::min(numTri - offset, BATCH_SIZE);
       std::vector<Manifold> newHulls(numIter);
-      for_each_n(
-          autoPolicy(numIter, 100), countAt(0), numIter,
-          [&newHulls, &aImpl, &verts, offset](const int iter) {
-            std::vector<vec3> simpleHull;
-            for (int i : {0, 1, 2}) {
-              const auto vertex =
-                  aImpl->vertPos_[aImpl->halfedge_[((offset + iter) * 3) + i]
-                                      .startVert];
-              auto t = [vertex](vec3 v) { return v + vertex; };
-              simpleHull.insert(simpleHull.end(),
-                                TransformIterator(verts.begin(), t),
-                                TransformIterator(verts.end(), t));
-            }
-            newHulls[iter] = Manifold::Hull(simpleHull);
-          });
-      composedHulls.push_back(Manifold::BatchBoolean(newHulls, OpType::Add));
+      for_each_n(autoPolicy(numIter, 100), countAt(0), numIter,
+                 [&newHulls, &aImpl, &verts, offset](const int iter) {
+                   std::vector<vec3> simpleHull;
+                   for (int i : {0, 1, 2}) {
+                     const int edge = ((offset + iter) * 3) + i;
+                     const auto vertex =
+                         aImpl->vertPos_[aImpl->halfedge_.Start(edge)];
+                     auto t = [vertex](vec3 v) { return v + vertex; };
+                     simpleHull.insert(simpleHull.end(),
+                                       TransformIterator(verts.begin(), t),
+                                       TransformIterator(verts.end(), t));
+                   }
+                   newHulls[iter] = Manifold::Hull(simpleHull);
+                 });
+      composedHulls.push_back(evalBatch(std::move(newHulls), OpType::Add));
     }
     // Non-Convex - Non-Convex Minkowski: Very Slow
     // Process A faces sequentially with periodic batch reduction to balance
@@ -109,9 +136,10 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
     // Process each A face sequentially
     for (size_t aFace = 0; aFace < numTriA; ++aFace) {
-      vec3 a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
-      vec3 a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
-      vec3 a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
+      if (IsCancelled(ctx)) return cancelled();
+      vec3 a1 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 0)];
+      vec3 a2 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 1)];
+      vec3 a3 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 2)];
       vec3 nA = aImpl->faceNormal_[aFace];
 
       // Create hulls for all B faces paired with this A face (parallel)
@@ -129,12 +157,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
                                   (std::abs(dotOpp - 1.0) < kCoplanarTol);
             if (coplanar) return;
 
-            vec3 b1 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
-            vec3 b2 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
-            vec3 b3 =
-                bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
+            vec3 b1 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 0)];
+            vec3 b2 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 1)];
+            vec3 b3 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 2)];
             faceHulls[bFace] =
                 Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
                                 a2 + b3, a3 + b1, a3 + b2, a3 + b3});
@@ -150,12 +175,12 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
       if (!validFaceHulls.empty()) {
         accumulated.push_back(
-            Manifold::BatchBoolean(validFaceHulls, OpType::Add));
+            evalBatch(std::move(validFaceHulls), OpType::Add));
       }
 
       // Periodically reduce to limit memory usage
       if (accumulated.size() >= REDUCE_THRESHOLD) {
-        Manifold reduced = Manifold::BatchBoolean(accumulated, OpType::Add);
+        Manifold reduced = evalBatch(std::move(accumulated), OpType::Add);
         accumulated.clear();
         accumulated.push_back(std::move(reduced));
       }
@@ -163,12 +188,12 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset) const {
 
     // Final merge of remaining accumulated results
     if (!accumulated.empty()) {
-      composedHulls.push_back(Manifold::BatchBoolean(accumulated, OpType::Add));
+      composedHulls.push_back(evalBatch(std::move(accumulated), OpType::Add));
     }
   }
-  return Manifold::BatchBoolean(composedHulls, inset
-                                                   ? manifold::OpType::Subtract
-                                                   : manifold::OpType::Add)
+  if (IsCancelled(ctx)) return cancelled();
+  return evalBatch(std::move(composedHulls),
+                   inset ? manifold::OpType::Subtract : manifold::OpType::Add)
       .AsOriginal();
 }
 

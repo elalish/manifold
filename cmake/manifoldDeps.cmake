@@ -85,8 +85,9 @@ if(MANIFOLD_PAR)
   endif()
 endif()
 
-# If we're building cross_section, we need Clipper2
-if(MANIFOLD_CROSS_SECTION)
+# The default CrossSection backend uses Clipper2. The experimental boolean2
+# backend is in-tree and does not need this dependency.
+if(MANIFOLD_CROSS_SECTION AND MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
   if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
     find_package(Clipper2 QUIET)
     if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
