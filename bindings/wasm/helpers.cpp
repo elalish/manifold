@@ -48,6 +48,7 @@ val MeshGL2JS(const MeshGL& mesh) {
              val(typed_memory_view(mesh.runFlags.size(), mesh.runFlags.data()))
                  .call<val>("slice"));
   meshJS.set("tolerance", mesh.tolerance);
+  meshJS.set("hasNormals", mesh.hasNormals);
 
   return meshJS;
 }
@@ -89,6 +90,9 @@ MeshGL MeshJS2GL(const val& mesh) {
   }
   if (mesh["tolerance"] != val::undefined()) {
     out.tolerance = mesh["tolerance"].as<float>();
+  }
+  if (mesh["hasNormals"] != val::undefined()) {
+    out.hasNormals = mesh["hasNormals"].as<bool>();
   }
   return out;
 }

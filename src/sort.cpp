@@ -612,11 +612,19 @@ bool MeshGL64::Merge() {
 
 template <>
 void MeshGL::UpdateNormals(int normalIdx) {
+  if (normalIdx < 0) {
+    if (hasNormals) UpdateNormalsMeshGLP(*this, 3);
+    return;
+  }
   UpdateNormalsMeshGLP(*this, normalIdx);
 }
 
 template <>
 void MeshGL64::UpdateNormals(int normalIdx) {
+  if (normalIdx < 0) {
+    if (hasNormals) UpdateNormalsMeshGLP(*this, 3);
+    return;
+  }
   UpdateNormalsMeshGLP(*this, normalIdx);
 }
 }  // namespace manifold

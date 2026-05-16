@@ -242,17 +242,20 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * forming the (x, y, z) normals, which will cause this output MeshGL to
  * automatically update these normals according to the applied transforms and
  * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1, meaning no
- * normals. If normals are selected, the runTransform matrices will be removed
- * from the output, to avoid them being double-applied when round-tripped.
+ * must use the same channels for their normals. Default is -1: if
+ * `CalculateNormals()` recorded normals at the standard slot, that slot is
+ * used automatically; otherwise no normals are applied. If normals are
+ * selected, the runTransform matrices will be removed from the output, to
+ * avoid them being double-applied when round-tripped.
  */
 MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
+  if (normalIdx < 0 && impl.hasNormals_) normalIdx = 0;
   return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
 
 /**
- * Returns a MeshGL that is designed
+ * Returns a MeshGL64 that is designed
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
@@ -262,13 +265,15 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  * forming the (x, y, z) normals, which will cause this output MeshGL to
  * automatically update these normals according to the applied transforms and
  * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1, meaning no
- * normals. If normals are selected, the runTransform matrices will be removed
- * from the output, to avoid them being double-applied when round-tripped.
-
+ * must use the same channels for their normals. Default is -1: if
+ * `CalculateNormals()` recorded normals at the standard slot, that slot is
+ * used automatically; otherwise no normals are applied. If normals are
+ * selected, the runTransform matrices will be removed from the output, to
+ * avoid them being double-applied when round-tripped.
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
+  if (normalIdx < 0 && impl.hasNormals_) normalIdx = 0;
   return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
 }
 
@@ -600,6 +605,10 @@ Manifold Manifold::SetProperties(
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->properties_;
+  // TODO: hasNormals_ is preserved across SetProperties, which is wrong if
+  // the user overwrote channels 0-2. Detecting this by comparing old vs new
+  // slot values is straightforward but deferred to a follow-up. For now,
+  // callers who rewrite normals should re-call CalculateNormals.
 
   if (numProp == 0) {
     pImpl->properties_.clear();
@@ -658,10 +667,14 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * Fills in vertex properties for normal vectors, calculated from the mesh
  * geometry. Flat faces composed of three or more triangles will remain flat.
  *
- * @param normalIdx The property channel in which to store the X
- * values of the normals. The X, Y, and Z channels will be sequential. The
- * property set will be automatically expanded such that NumProp will be at
- * least normalIdx + 3.
+ * @param normalIdx The property channel in which to store the X values of the
+ * normals. The X, Y, and Z channels will be sequential. The property set will
+ * be automatically expanded such that NumProp will be at least normalIdx + 3.
+ * Default is 0, the standard slot (MeshGL channels 3, 4, 5); the Manifold's
+ * hasNormals flag is set in that case so subsequent `GetMeshGL()` /
+ * `GetMeshGL64()` without an explicit normalIdx will return solid-frame
+ * normals (applying the runNormalTransform on export). Non-zero values are
+ * retained for compatibility and will not be supported in a future release.
  *
  * @param minSharpAngle Any edges with angles greater than this value will
  * remain sharp, getting different normal vector properties on each side of the
@@ -675,6 +688,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
+  // Only mark hasNormals when normals landed at the standard slot, so
+  // GetMeshGL(-1) can safely auto-substitute slot 0 on export.
+  if (normalIdx == 0) pImpl->hasNormals_ = true;
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -690,7 +706,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
- * agree will result in a sharp edge.
+ * agree will result in a sharp edge. Default is 0, the standard slot.
+ * Non-zero values are retained for compatibility and will not be supported in
+ * a future release.
  */
 Manifold Manifold::SmoothByNormals(int normalIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -751,7 +769,9 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * will not be immediately collapsed) unless the Mesh/Manifold has
  * halfedgeTangents specified (e.g. from the Smooth() constructor), in which
  * case the new vertices will be moved to the interpolated surface according to
- * their barycentric coordinates.
+ * their barycentric coordinates. If a normals recording was set by
+ * `CalculateNormals()`, it is cleared, since subdivision linearly interpolates
+ * the stored normals - re-call `CalculateNormals()` after refining if needed.
  *
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
@@ -763,6 +783,10 @@ Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (n > 1) {
     pImpl->Refine([n](vec3, vec4, vec4) { return n - 1; }, false, ctx.get());
+    // Subdivided verts get linearly interpolated property values, so any
+    // recorded normals at the standard slot no longer point at the surface.
+    // Caller should re-call CalculateNormals().
+    pImpl->hasNormals_ = false;
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -773,7 +797,8 @@ Manifold Manifold::Refine(int n) const {
  * triangulation edges also of roughly the same length. If halfedgeTangents are
  * present (e.g. from the Smooth() constructor), the new vertices will be moved
  * to the interpolated surface according to their barycentric coordinates. Quads
- * will ignore their interior triangle bisector.
+ * will ignore their interior triangle bisector. If a normals recording was set
+ * by `CalculateNormals()`, it is cleared.
  *
  * @param length The length that edges will be broken down to.
  */
@@ -789,6 +814,7 @@ Manifold Manifold::RefineToLength(double length) const {
         return static_cast<int>(la::length(edge) / length);
       },
       false, ctx.get());
+  pImpl->hasNormals_ = false;
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -798,7 +824,9 @@ Manifold Manifold::RefineToLength(double length) const {
  * smoothly curved surface defined by the tangent vectors. This means tightly
  * curving regions will be divided more finely than smoother regions. If
  * halfedgeTangents are not present, the result will simply be a copy of the
- * original. Quads will ignore their interior triangle bisector.
+ * original. Quads will ignore their interior triangle bisector. If a normals
+ * recording was set by `CalculateNormals()` and refinement actually occurs,
+ * it is cleared.
  *
  * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
@@ -827,6 +855,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
           return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
         },
         true, ctx.get());
+    pImpl->hasNormals_ = false;
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }

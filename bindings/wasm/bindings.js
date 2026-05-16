@@ -252,8 +252,12 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.calculateNormals = function(
-      normalIdx, minSharpAngle = 60) {
+      normalIdx = 0, minSharpAngle = 60) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
+  };
+
+  Module.Manifold.prototype.smoothByNormals = function(normalIdx = 0) {
+    return this._SmoothByNormals(normalIdx);
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {

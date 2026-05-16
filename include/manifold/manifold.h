@@ -245,7 +245,7 @@ class Manifold {
       int numProp,
       std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx, double minSharpAngle = 60) const;
+  Manifold CalculateNormals(int normalIdx = 0, double minSharpAngle = 60) const;
   ///@}
 
   /** @name Smoothing
@@ -256,7 +256,7 @@ class Manifold {
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
-  Manifold SmoothByNormals(int normalIdx) const;
+  Manifold SmoothByNormals(int normalIdx = 0) const;
   Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
   static Manifold Smooth(const MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});

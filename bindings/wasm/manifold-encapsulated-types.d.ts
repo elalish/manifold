@@ -739,10 +739,12 @@ export class Manifold {
    *
    * @param normalIdx The first property channel of the normals. NumProp must be
    * at least normalIdx + 3. Any vertex where multiple normals exist and don't
-   * agree will result in a sharp edge.
+   * agree will result in a sharp edge. Default is 0, the standard slot.
+   * Non-zero values are retained for compatibility and will not be supported
+   * in a future release.
    * @group Smoothing
    */
-  smoothByNormals(normalIdx: number): Manifold;
+  smoothByNormals(normalIdx?: number): Manifold;
 
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
@@ -846,10 +848,13 @@ export class Manifold {
    * Fills in vertex properties for normal vectors, calculated from the mesh
    * geometry. Flat faces composed of three or more triangles will remain flat.
    *
-   * @param normalIdx The property channel in which to store the X
-   * values of the normals. The X, Y, and Z channels will be sequential. The
-   * property set will be automatically expanded to include up through normalIdx
-   * + 2.
+   * @param normalIdx The property channel in which to store the X values of the
+   * normals. The X, Y, and Z channels will be sequential. The property set will
+   * be automatically expanded to include up through normalIdx + 2. Default is
+   * 0, the standard slot; in that case the Manifold's hasNormals flag is set,
+   * so a subsequent getMesh() without an explicit normalIdx returns solid-frame
+   * normals. Non-zero values are retained for compatibility and will not be
+   * supported in a future release.
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
@@ -859,7 +864,7 @@ export class Manifold {
    * all.
    * @group Properties
    */
-  calculateNormals(normalIdx: number, minSharpAngle?: number): Manifold;
+  calculateNormals(normalIdx?: number, minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 
@@ -1262,6 +1267,13 @@ export interface MeshOptions {
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   tolerance?: number;
+  /**
+   * True if the first three extra-property channels (slots 3, 4, 5) hold
+   * vertex normals. Set on output by getMesh() when normals were recorded on
+   * the Manifold (via calculateNormals); read on input by ofMesh() so the
+   * recording survives a round-trip.
+   */
+  hasNormals?: boolean;
 }
 
 /**
@@ -1360,6 +1372,14 @@ export class Mesh {
    * Tolerance may be enlarged when floating point error accumulates.
    */
   tolerance: number;
+
+  /**
+   * True if the first three extra-property channels (slots 3, 4, 5) hold
+   * vertex normals. Set on output by getMesh() when normals were recorded on
+   * the Manifold (via calculateNormals); read on input by ofMesh() so the
+   * recording survives a round-trip.
+   */
+  hasNormals: boolean;
 
   /**
    * Number of triangles

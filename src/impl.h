@@ -52,6 +52,10 @@ struct Manifold::Impl {
   double epsilon_ = -1;
   double tolerance_ = -1;
   int numProp_ = 0;
+  // True when normals live at the first three extra-property channels
+  // (MeshGL slots 3, 4, 5). Set by CalculateNormals at idx 0; survives
+  // transforms. Boolean output clears it.
+  bool hasNormals_ = false;
   Error status_ = Error::NoError;
   Vec<vec3> vertPos_;
   Halfedges halfedge_;
@@ -313,6 +317,10 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
 
   const auto numProp = meshGL.numProp - 3;
   numProp_ = numProp;
+  // Restore the recorded normals slot only if the input actually has room
+  // for it; defensive against callers who set the flag but didn't pack
+  // normals at slots 3-5.
+  hasNormals_ = meshGL.hasNormals && numProp >= 3;
   properties_.resize_nofill(meshGL.NumVert() * numProp);
   tolerance_ = meshGL.tolerance;
   // This will have unreferenced duplicate positions that will be removed by
@@ -450,6 +458,10 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
+  // Mirror the recorded slot to the output so an ofMesh+getMesh round-trip
+  // preserves the convention. Only meaningful when the standard slot is in use
+  // (which is also what GetMeshGL(-1) auto-substitutes for).
+  out.hasNormals = impl.hasNormals_ && normalIdx == 0;
   out.tolerance = impl.tolerance_;
   if (std::is_same<Precision, float>::value)
     out.tolerance =

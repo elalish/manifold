@@ -154,6 +154,11 @@ struct MeshGLP {
   /// the bounding box. Any edge shorter than tolerance may be collapsed.
   /// Tolerance may be enlarged when floating point error accumulates.
   Precision tolerance = 0;
+  /// True if the first three extra-property channels (slots 3, 4, 5) hold
+  /// vertex normals. Set on output by GetMeshGL/GetMeshGL64 when normals were
+  /// recorded on the Manifold (via CalculateNormals); read on input by the
+  /// MeshGL Manifold constructor so the recording survives a round-trip.
+  bool hasNormals = false;
 
   MeshGLP() = default;
 
@@ -164,9 +169,12 @@ struct MeshGLP {
    *
    * @param normalIdx Specifies the first of the three consecutive property
    * channels forming the (x, y, z) normals to update. NumProp must be at least
-   * normalIdx + 3 and normalIdx must be >= 3.
+   * normalIdx + 3. Default is -1, meaning "use the standard slot (3, 4, 5) if
+   * `hasNormals` is set; otherwise no-op." Pass a value >= 3 explicitly to
+   * update normals at a non-standard channel; that path is retained for
+   * compatibility and will not be supported in a future release.
    */
-  void UpdateNormals(int normalIdx);
+  void UpdateNormals(int normalIdx = -1);
 
   /**
    * Updates the mergeFromVert and mergeToVert vectors in order to create a

@@ -324,10 +324,10 @@ NB_MODULE(manifold3d, m) {
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
+           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           nb::arg("normal_idx"), manifold__smooth_by_normals__normal_idx)
+           nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
       .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
            nb::arg("min_smoothness") = 0,
            manifold__smooth_out__min_sharp_angle__min_smoothness)
@@ -523,7 +523,7 @@ NB_MODULE(manifold3d, m) {
                  nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
-             float tolerance) {
+             float tolerance, bool hasNormals) {
             new (self) MeshGL();
             MeshGL& out = *self;
             out.numProp = vertProp.shape(1);
@@ -562,6 +562,8 @@ NB_MODULE(manifold3d, m) {
               out.halfedgeTangent =
                   toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
+
+            out.hasNormals = hasNormals;
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
           nb::arg("merge_from_vert") = nb::none(),
@@ -570,7 +572,8 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
           nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
-          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
+          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0,
+          nb::arg("has_normals") = false)
       .def_prop_ro(
           "vert_properties",
           [](const MeshGL& self) {
@@ -610,6 +613,7 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("run_flags", &MeshGL::runFlags)
       .def_ro("face_id", &MeshGL::faceID)
+      .def_ro("has_normals", &MeshGL::hasNormals)
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::class_<MeshGL64>(m, "Mesh64")
@@ -636,7 +640,7 @@ NB_MODULE(manifold3d, m) {
                  nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
-             float tolerance) {
+             float tolerance, bool hasNormals) {
             new (self) MeshGL64();
             MeshGL64& out = *self;
             out.numProp = vertProp.shape(1);
@@ -675,6 +679,8 @@ NB_MODULE(manifold3d, m) {
               out.halfedgeTangent =
                   toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
+
+            out.hasNormals = hasNormals;
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
           nb::arg("merge_from_vert") = nb::none(),
@@ -683,7 +689,8 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
           nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
-          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
+          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0,
+          nb::arg("has_normals") = false)
       .def_prop_ro(
           "vert_properties",
           [](const MeshGL64& self) {
@@ -723,6 +730,7 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL64::runOriginalID)
       .def_ro("run_flags", &MeshGL64::runFlags)
       .def_ro("face_id", &MeshGL64::faceID)
+      .def_ro("has_normals", &MeshGL64::hasNormals)
       .def("merge", &MeshGL64::Merge, mesh_gl__merge);
 
   nb::class_<RayHit>(m, "RayHit")

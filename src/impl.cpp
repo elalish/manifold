@@ -584,6 +584,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
+  result.hasNormals_ = hasNormals_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;

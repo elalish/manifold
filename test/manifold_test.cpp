@@ -227,6 +227,144 @@ TEST(Manifold, ErrorPropagationCalculateNormals) {
             Manifold::Error::NonFiniteVertex);
 }
 
+// CalculateNormals(idx) followed by GetMeshGL() (no idx) used to drop
+// the transform-on-export step, returning input-frame data.
+TEST(Manifold, CalculateNormalsRoundTripsThroughGetMeshGL) {
+  // Cavity from a Boolean difference: inner-sphere normals should point
+  // toward the origin (outward from the surrounding solid).
+  Manifold cavity = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
+                        .CalculateNormals(0);
+  MeshGL cavityMesh = cavity.GetMeshGL();
+  ASSERT_GE(cavityMesh.numProp, 6);
+  int innerGood = 0, innerBad = 0;
+  for (size_t v = 0; v < cavityMesh.NumVert(); ++v) {
+    vec3 pos(cavityMesh.vertProperties[cavityMesh.numProp * v + 0],
+             cavityMesh.vertProperties[cavityMesh.numProp * v + 1],
+             cavityMesh.vertProperties[cavityMesh.numProp * v + 2]);
+    vec3 n(cavityMesh.vertProperties[cavityMesh.numProp * v + 3],
+           cavityMesh.vertProperties[cavityMesh.numProp * v + 4],
+           cavityMesh.vertProperties[cavityMesh.numProp * v + 5]);
+    if (std::abs(la::length(pos) - 3.0) < 0.05) {
+      if (la::dot(n, la::normalize(-pos)) > 0.9)
+        ++innerGood;
+      else
+        ++innerBad;
+    }
+  }
+  // Pre-fix all inner verts came out inverted; post-fix all align with the
+  // expected outward-from-solid direction.
+  EXPECT_GT(innerGood, 0);
+  EXPECT_EQ(innerBad, 0);
+
+  // Rotation before CalculateNormals: SetNormals stores input-frame
+  // (pre-rotation) normals; GetMeshGL must apply the forward transform
+  // on export to recover solid-frame.
+  Manifold rotated =
+      Manifold::Sphere(10.0, 32).Rotate(45, 0, 0).CalculateNormals(0);
+  MeshGL rotMesh = rotated.GetMeshGL();
+  int rotGood = 0, rotBad = 0;
+  for (size_t v = 0; v < rotMesh.NumVert(); ++v) {
+    vec3 pos(rotMesh.vertProperties[rotMesh.numProp * v + 0],
+             rotMesh.vertProperties[rotMesh.numProp * v + 1],
+             rotMesh.vertProperties[rotMesh.numProp * v + 2]);
+    vec3 n(rotMesh.vertProperties[rotMesh.numProp * v + 3],
+           rotMesh.vertProperties[rotMesh.numProp * v + 4],
+           rotMesh.vertProperties[rotMesh.numProp * v + 5]);
+    if (la::dot(n, la::normalize(pos)) > 0.9)
+      ++rotGood;
+    else
+      ++rotBad;
+  }
+  EXPECT_EQ(rotBad, 0);
+
+  // Rotation *after* CalculateNormals: exercises hasNormals_ propagation
+  // through Impl::Transform.
+  Manifold transformedAfter =
+      Manifold::Sphere(10.0, 32).CalculateNormals(0).Rotate(45, 0, 0);
+  MeshGL afterMesh = transformedAfter.GetMeshGL();
+  int afterGood = 0, afterBad = 0;
+  for (size_t v = 0; v < afterMesh.NumVert(); ++v) {
+    vec3 pos(afterMesh.vertProperties[afterMesh.numProp * v + 0],
+             afterMesh.vertProperties[afterMesh.numProp * v + 1],
+             afterMesh.vertProperties[afterMesh.numProp * v + 2]);
+    vec3 n(afterMesh.vertProperties[afterMesh.numProp * v + 3],
+           afterMesh.vertProperties[afterMesh.numProp * v + 4],
+           afterMesh.vertProperties[afterMesh.numProp * v + 5]);
+    if (la::dot(n, la::normalize(pos)) > 0.9)
+      ++afterGood;
+    else
+      ++afterBad;
+  }
+  EXPECT_EQ(afterBad, 0);
+
+  // No-arg invocation: defaults to slot 0 and sets hasNormals.
+  MeshGL noIdxMesh = Manifold::Sphere(10.0, 32).CalculateNormals().GetMeshGL();
+  EXPECT_TRUE(noIdxMesh.hasNormals);
+  ASSERT_GE(noIdxMesh.numProp, 6);
+
+  // Roundtrip: getMesh -> ofMesh -> getMesh should preserve hasNormals,
+  // so the second getMesh still applies the transform on export.
+  Manifold round = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
+                       .CalculateNormals();
+  MeshGL roundOut1 = round.GetMeshGL();
+  EXPECT_TRUE(roundOut1.hasNormals);
+  Manifold round2(roundOut1);
+  MeshGL roundOut2 = round2.GetMeshGL();
+  EXPECT_TRUE(roundOut2.hasNormals);
+  int rtGood = 0, rtBad = 0;
+  for (size_t v = 0; v < roundOut2.NumVert(); ++v) {
+    vec3 pos(roundOut2.vertProperties[roundOut2.numProp * v + 0],
+             roundOut2.vertProperties[roundOut2.numProp * v + 1],
+             roundOut2.vertProperties[roundOut2.numProp * v + 2]);
+    vec3 n(roundOut2.vertProperties[roundOut2.numProp * v + 3],
+           roundOut2.vertProperties[roundOut2.numProp * v + 4],
+           roundOut2.vertProperties[roundOut2.numProp * v + 5]);
+    if (std::abs(la::length(pos) - 3.0) < 0.05) {
+      if (la::dot(n, la::normalize(-pos)) > 0.9)
+        ++rtGood;
+      else
+        ++rtBad;
+    }
+  }
+  EXPECT_GT(rtGood, 0);
+  EXPECT_EQ(rtBad, 0);
+
+  // Refine clears hasNormals: linearly-interpolated normals at the new
+  // verts wouldn't be unit-length or follow the surface, so the auto-
+  // substitute path shouldn't return them.
+  MeshGL refinedMesh =
+      Manifold::Sphere(10.0, 32).CalculateNormals().Refine(2).GetMeshGL();
+  EXPECT_FALSE(refinedMesh.hasNormals);
+
+  // MeshGL::UpdateNormals() no-arg: callable on a mesh whose hasNormals
+  // flag is set. The path that actually has work to do (a MeshGL with
+  // runTransform intact and hasNormals true) doesn't arise from any
+  // in-repo flow today, so just exercise the no-op path.
+  roundOut1.UpdateNormals();
+
+  // SmoothByNormals() no-arg: smoke test that the new default-arg path is
+  // callable and produces a manifold (tangents at the standard slot).
+  Manifold smoothed =
+      Manifold::Sphere(10.0, 32).CalculateNormals().SmoothByNormals();
+  EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
+
+  // CalculateNormals(non-zero) does NOT set hasNormals_: the asymmetry
+  // is intentional, since non-standard-slot recordings can't be safely
+  // auto-substituted on GetMeshGL(-1).
+  MeshGL nonStd = Manifold::Sphere(10.0, 32).CalculateNormals(3).GetMeshGL();
+  EXPECT_FALSE(nonStd.hasNormals);
+
+  // Malformed MeshGL input: hasNormals=true with numProp < 6 (no room
+  // for 3 normal channels after position). The Manifold(MeshGL) ctor
+  // should defensively clear the flag rather than honor it and let
+  // downstream code read past the property bounds.
+  MeshGL malformed = Manifold::Cube().GetMeshGL();
+  ASSERT_EQ(malformed.numProp, 3);
+  malformed.hasNormals = true;
+  Manifold cube(malformed);
+  EXPECT_FALSE(cube.GetMeshGL().hasNormals);
+}
+
 TEST(Manifold, ErrorPropagationSmoothByNormals) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
