@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "prettier": "3.8.1",
     "vite-bundle-analyzer": "^1.3.7"
   }
 }
