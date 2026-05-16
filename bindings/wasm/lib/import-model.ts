@@ -35,14 +35,13 @@ import * as GLTFTransform from '@gltf-transform/core';
 
 import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 
-import {FetchError, ImportError, UnsupportedFormatError} from './error.ts';
-import {fetchWithRetry} from './fetch-with-retry.ts';
+import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
-import {findExtension, findMimeType, isNode} from './util.ts';
+import {fetchWithRetry, findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 /**
@@ -306,10 +305,6 @@ export async function fetchModel(
     uri: string, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? uri);
   const response = await fetchWithRetry(uri);
-  if (!response.ok) {
-    throw new FetchError(
-        response.status, response.statusText, uri, await response.text());
-  }
   const blob = await response.blob();
   return importTransform(
       await importer.fromArrayBuffer(await blob.arrayBuffer(), options));

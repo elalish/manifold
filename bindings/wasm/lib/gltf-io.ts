@@ -35,9 +35,8 @@ import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
 import type {Mesh as ManifoldMesh, MeshOptions} from '../manifold.d.ts';
 
-import {FetchError} from './error.ts';
-import {fetchWithRetry} from './fetch-with-retry.ts';
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
+import {fetchWithRetry} from './util.ts';
 
 const binaryFormat = {
   extension: 'glb',
@@ -474,10 +473,6 @@ export function disposeMesh(mesh: GLTFTransform.Mesh) {
  */
 export async function loadTexture(texture: GLTFTransform.Texture, uri: string) {
   const response = await fetchWithRetry(uri);
-  if (!response.ok) {
-    throw new FetchError(
-        response.status, response.statusText, uri, await response.text());
-  }
   const blob = await response.blob();
   texture.setMimeType(blob.type);
   texture.setImage(new Uint8Array(await blob.arrayBuffer()));
