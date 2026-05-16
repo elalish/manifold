@@ -196,10 +196,11 @@ struct Manifold::Impl {
               ExecutionContext::Impl* ctx = nullptr);
 
   // quickhull.cpp
-  void Hull(VecView<const vec3> vertPos);
+  void Hull(VecView<const vec3> vertPos, ExecutionContext::Impl* ctx = nullptr);
 
   // minkowski.cpp
-  Manifold Minkowski(const Impl& other, bool inset) const;
+  Manifold Minkowski(const Impl& other, bool inset,
+                     ExecutionContext::Impl* ctx = nullptr) const;
 };
 
 extern std::mutex dump_lock;

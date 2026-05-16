@@ -384,10 +384,11 @@ class Manifold {
 
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
   /// The attachment is consumed only by `Status()` (for deferred CSG trees)
-  /// and the `Refine()` / `RefineToLength()` / `RefineToTolerance()` family
-  /// (eager ops); those snapshot the ctx and report progress / observe
-  /// cancellation through it. Other queries that force evaluation (`Volume`,
-  /// `GetMeshGL`, `BoundingBox`, etc.) do not currently observe attached ctx.
+  /// and the eager ops (`Refine` / `RefineToLength` / `RefineToTolerance`,
+  /// `Hull`, `MinkowskiSum` / `MinkowskiDifference`); those snapshot the ctx
+  /// and report progress / observe cancellation through it. Other queries
+  /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
+  /// not currently observe attached ctx.
   ///
   /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
   /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the
@@ -400,6 +401,7 @@ class Manifold {
   /// while the idiom for observing an eager op is:
   ///
   ///   m.WithContext(ctx).Refine(n);
+  ///   m.WithContext(ctx).MinkowskiSum(other);
   ///
   /// Raw copy / assignment preserves the attachment (it's the same logical
   /// Manifold). Only ops that derive a *new* Manifold drop the attachment.

@@ -975,11 +975,12 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  * @param other The other manifold to minkowski sum to this one.
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
-  auto aImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
-  auto bImpl = other.GetCsgLeafNode().GetImpl();
+  auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return aImpl->Minkowski(*bImpl, false);
+  return aImpl->Minkowski(*bImpl, false, ctx.get());
 }
 
 /**
@@ -992,11 +993,12 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  * @param other The other manifold to minkowski subtract from this one.
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
-  auto aImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
-  auto bImpl = other.GetCsgLeafNode().GetImpl();
+  auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
   if (bImpl->status_ != Error::NoError) return PropagateStatus(bImpl->status_);
-  return aImpl->Minkowski(*bImpl, true);
+  return aImpl->Minkowski(*bImpl, true, ctx.get());
 }
 
 /**
@@ -1038,11 +1040,12 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
-  auto srcImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = std::atomic_load(&ctx_);
+  auto srcImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(srcImpl->vertPos_);
+  impl->Hull(srcImpl->vertPos_, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
