@@ -198,28 +198,25 @@ const delay = (ms: number) =>
  */
 export async function fetchWithRetry(
     input: RequestInfo|URL, init?: RequestInit): Promise<Response> {
+  let response: Response|undefined;
   for (let attempt = 0;; attempt++) {
     const isLast = attempt === FETCH_ATTEMPTS - 1;
-    let response: Response;
     try {
       response = await fetch(input, init);
+      if (!isRetryableStatus(response.status) || isLast) break;
     } catch (err) {
       // TypeError covers "Failed to fetch" / DNS / connection-reset
       // errors. Retry those unless out of attempts. AbortError and
       // NotAllowedError propagate untouched.
       if (!(err instanceof TypeError) || isLast) throw err;
-      await delay(FETCH_BASE_DELAY_MS * FETCH_FACTOR ** attempt);
-      continue;
     }
-    if (isRetryableStatus(response.status) && !isLast) {
-      await delay(FETCH_BASE_DELAY_MS * FETCH_FACTOR ** attempt);
-      continue;
-    }
-    if (!response.ok) {
-      throw new FetchError(
-          response.status, response.statusText, inputToUrl(input),
-          await response.text());
-    }
-    return response;
+    await delay(FETCH_BASE_DELAY_MS * FETCH_FACTOR ** attempt);
   }
+  // response is assigned on every path that reaches break.
+  const r = response!;
+  if (!r.ok) {
+    throw new FetchError(
+        r.status, r.statusText, inputToUrl(input), await r.text());
+  }
+  return r;
 }
