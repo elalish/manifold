@@ -41,7 +41,7 @@ import {VisualizationGLTFNode} from './gltf-node.ts';
 import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
-import {findExtension, findMimeType, isNode} from './util.ts';
+import {fetchWithRetry, findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 /**
@@ -304,7 +304,7 @@ export async function readModel(
 export async function fetchModel(
     uri: string, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? uri);
-  const response = await fetch(uri);
+  const response = await fetchWithRetry(uri);
   const blob = await response.blob();
   return importTransform(
       await importer.fromArrayBuffer(await blob.arrayBuffer(), options));

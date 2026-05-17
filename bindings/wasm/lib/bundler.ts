@@ -25,8 +25,8 @@ import resolve from '@jridgewell/resolve-uri';
 import * as esbuild from 'esbuild-wasm';
 import MagicString from 'magic-string';
 
-import {BundlerError} from './error.ts';
-import {isNode} from './util.ts';
+import {BundlerError, FetchError} from './error.ts';
+import {fetchWithRetry, isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
 let esbuildHasOwnWorker: boolean = false;
@@ -246,11 +246,14 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
       // Fetch urls.
       build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
-        const response = await fetch(args.path);
-        if (response.ok) {
+        try {
+          const response = await fetchWithRetry(args.path);
           return {contents: await response.text()};
-        } else {
-          return {errors: [{text: await response.text()}]};
+        } catch (err) {
+          if (err instanceof FetchError) {
+            return {errors: [{text: err.message}]};
+          }
+          throw err;
         }
       });
     }

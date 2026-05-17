@@ -20,6 +20,8 @@
 import {originalPositionFor, TraceMap} from '@jridgewell/trace-mapping';
 import convert from 'convert-source-map';
 
+import {FetchError} from './error.ts';
+
 /**
  * Are we in a web worker?
  *
@@ -168,4 +170,53 @@ export function formatVolume(mm3: number): string {
     })} m^3`;
   }
   return `${cm3.toLocaleString(undefined, {maximumFractionDigits: 2})} cm^3`;
+}
+
+const FETCH_ATTEMPTS = 3;
+const FETCH_BASE_DELAY_MS = 200;
+const FETCH_FACTOR = 3;
+
+const isRetryableStatus = (status: number): boolean =>
+    status >= 500 || status === 429;
+
+const inputToUrl = (input: RequestInfo|URL): string => {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+};
+
+const delay = (ms: number) =>
+    new Promise<void>(resolve => setTimeout(resolve, ms));
+
+/**
+ * Wraps `fetch` with retry-on-transient-failure and throws `FetchError` on
+ * non-2xx. Retries on HTTP 5xx, HTTP 429, and `TypeError` (network errors
+ * like "Failed to fetch"); returns immediately on other 4xx so typo'd URLs
+ * fail fast. AbortError and other exceptions propagate untouched.
+ *
+ * Exponential backoff: 200ms, 600ms; ~800ms worst-case added latency.
+ */
+export async function fetchWithRetry(
+    input: RequestInfo|URL, init?: RequestInit): Promise<Response> {
+  let response: Response|undefined;
+  for (let attempt = 0;; attempt++) {
+    const isLast = attempt === FETCH_ATTEMPTS - 1;
+    try {
+      response = await fetch(input, init);
+      if (!isRetryableStatus(response.status) || isLast) break;
+    } catch (err) {
+      // TypeError covers "Failed to fetch" / DNS / connection-reset
+      // errors. Retry those unless out of attempts. AbortError and
+      // NotAllowedError propagate untouched.
+      if (!(err instanceof TypeError) || isLast) throw err;
+    }
+    await delay(FETCH_BASE_DELAY_MS * FETCH_FACTOR ** attempt);
+  }
+  // response is assigned on every path that reaches break.
+  const r = response!;
+  if (!r.ok) {
+    throw new FetchError(
+        r.status, r.statusText, inputToUrl(input), await r.text());
+  }
+  return r;
 }
