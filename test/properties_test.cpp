@@ -144,9 +144,8 @@ TEST(Properties, CalculateNormals) {
       norm2[j] = out2.vertProperties[np * v + 3 + j];
       ASSERT_FLOAT_EQ(pos[j], pos2[j]);
     }
-    // FIXME
-    // ASSERT_GT(dot(pos2, norm2), 0);
-    // ASSERT_GT(dot(pos, norm), 0);
+    if (dot(pos, norm) <= 0) ++numBad;
+    if (dot(pos2, norm2) <= 0) ++numBad2;
   }
   EXPECT_EQ(numBad, 0);
   EXPECT_EQ(numBad2, 0);

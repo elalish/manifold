@@ -180,7 +180,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
       .function("refineToTolerance", &Manifold::RefineToTolerance)
-      .function("smoothByNormals", &Manifold::SmoothByNormals)
+      .function("_SmoothByNormals", &Manifold::SmoothByNormals)
       .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
       .function("_WarpBatch", &man_js::WarpBatch)

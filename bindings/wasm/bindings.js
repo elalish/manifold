@@ -252,8 +252,12 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.calculateNormals = function(
-      normalIdx, minSharpAngle = 60) {
+      normalIdx = 0, minSharpAngle = 60) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
+  };
+
+  Module.Manifold.prototype.smoothByNormals = function(normalIdx = 0) {
+    return this._SmoothByNormals(normalIdx);
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
@@ -446,6 +450,16 @@ Module.setup = function() {
       }
       mat4[15] = 1;
       return mat4;
+    }
+
+    backside(run) {
+      return this.runFlags != null && run < this.runFlags.length &&
+          (this.runFlags[run] & 1) !== 0;
+    }
+
+    hasNormals(run) {
+      return this.runFlags != null && run < this.runFlags.length &&
+          (this.runFlags[run] & 2) !== 0;
     }
   }
 

@@ -268,17 +268,21 @@ namespace manifold {
  * normalIdx shows the beginning of where normals are stored in the properties.
  */
 vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
-  const int meshID = meshRelation_.triRef[halfedge / 3].meshID;
-
-  const mat3 transform =
-      meshRelation_.meshIDtransform.find(meshID)->second.GetNormalTransform();
-
   const int prop = halfedge_.Prop(halfedge);
   vec3 normal;
   for (const int i : {0, 1, 2}) {
     normal[i] = properties_[prop * numProp_ + normalIdx + i];
   }
-  return transform * normal;
+  // hasNormals=true means CalculateNormals (or a flagged round-trip) wrote
+  // world-frame values, kept world-frame through Transform/Compose. Without
+  // the flag, treat the slot as per-mesh frame and re-rotate to world like
+  // pre-#1718 callers expected.
+  const int meshID = meshRelation_.triRef[halfedge / 3].meshID;
+  auto it = meshRelation_.meshIDtransform.find(meshID);
+  if (it != meshRelation_.meshIDtransform.end() && !it->second.hasNormals) {
+    normal = it->second.GetNormalTransform() * normal;
+  }
+  return normal;
 }
 
 /**
@@ -501,27 +505,43 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                halfedge_.SetProp(i, -1);
              });
 
+  // Cached per-meshID inverse-normal-transform for the legacy non-zero
+  // normalIdx path. Lazily populated on first lookup; reused across all
+  // verts in the loop below.
+  // TODO: drop this and its only caller below when the non-zero normalIdx
+  // parameter on CalculateNormals is removed.
   std::map<int, mat3> meshIDtoNormalTransform;
+  auto getTransform = [&](int meshID) {
+    if (meshIDtoNormalTransform.find(meshID) == meshIDtoNormalTransform.end()) {
+      meshIDtoNormalTransform[meshID] =
+          meshRelation_.meshIDtransform[meshID].GetInverseNormalTransform();
+    }
+    return meshIDtoNormalTransform[meshID];
+  };
 
   const int numEdge = halfedge_.size();
   for (int startEdge = 0; startEdge < numEdge; ++startEdge) {
     if (halfedge_.Prop(startEdge) >= 0) continue;
     const int vert = halfedge_.Start(startEdge);
 
-    auto getTransform = [&](int meshID) {
-      if (meshIDtoNormalTransform.find(meshID) ==
-          meshIDtoNormalTransform.end()) {
-        meshIDtoNormalTransform[meshID] =
-            meshRelation_.meshIDtransform[meshID].GetInverseNormalTransform();
-      }
-      return meshIDtoNormalTransform[meshID];
-    };
-
     if (vertNumSharp[vert] < 2) {  // vertex has single normal
+      const vec3 worldNormal = vertFlatFace[vert] >= 0
+                                   ? faceNormal_[vertFlatFace[vert]]
+                                   : vertNormal_[vert];
+      // Non-zero normalIdx is the legacy deferred-transform path: store in
+      // per-mesh frame so GetMeshGL's runTransform application on export
+      // recovers world frame even after later transforms. Standard slot 0
+      // uses the eager-transform contract: store world-frame directly.
+      // Caveat: for legacy idx!=0, if a single propVert is shared between
+      // triangles of different meshIDs, we pick startEdge's meshID for the
+      // per-mesh-frame mapping. Other meshIDs reading the same propVert
+      // through a different runTransform on export will get a wrong
+      // rotation. Same shape as master; out of scope here.
       const vec3 normal =
-          getTransform(meshRelation_.triRef[startEdge / 3].meshID) *
-          (vertFlatFace[vert] >= 0 ? faceNormal_[vertFlatFace[vert]]
-                                   : vertNormal_[vert]);
+          normalIdx == 0
+              ? worldNormal
+              : getTransform(meshRelation_.triRef[startEdge / 3].meshID) *
+                    worldNormal;
       int lastProp = -1;
       ForVert(startEdge, [&](int current) {
         const int prop = oldHalfedgeProp[current];
@@ -607,17 +627,25 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           }
           groups.push_back(normals.size() - 1);
           if (std::isfinite(next.normalizedEdge.x)) {
+            // Boolean subtractee triangles keep their original winding but
+            // have faceNormal_ negated, so the edge-cross points opposite to
+            // faceNormal_ there - flip to keep the accumulation outward-from-
+            // result.
+            vec3 dir = SafeNormalize(
+                la::cross(next.normalizedEdge, here.normalizedEdge));
+            if (la::dot(dir, faceNormal_[next.face]) < 0) dir = -dir;
             normals.back() +=
-                SafeNormalize(
-                    la::cross(next.normalizedEdge, here.normalizedEdge)) *
-                AngleBetween(here.normalizedEdge, next.normalizedEdge);
+                dir * AngleBetween(here.normalizedEdge, next.normalizedEdge);
           } else {
             next.normalizedEdge = here.normalizedEdge;
           }
         });
 
     for (int i = 0; i < normals.size(); ++i) {
-      normals[i] = getTransform(meshIds[i]) * SafeNormalize(normals[i]);
+      vec3 n = SafeNormalize(normals[i]);
+      // Same frame-storage rule as the single-normal path above.
+      if (normalIdx != 0) n = getTransform(meshIds[i]) * n;
+      normals[i] = n;
     }
 
     int lastGroup = 0;

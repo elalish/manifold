@@ -739,10 +739,12 @@ export class Manifold {
    *
    * @param normalIdx The first property channel of the normals. NumProp must be
    * at least normalIdx + 3. Any vertex where multiple normals exist and don't
-   * agree will result in a sharp edge.
+   * agree will result in a sharp edge. Default is 0, the standard slot.
+   * Non-zero values are retained for compatibility and will not be supported
+   * in a future release.
    * @group Smoothing
    */
-  smoothByNormals(normalIdx: number): Manifold;
+  smoothByNormals(normalIdx?: number): Manifold;
 
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
@@ -846,10 +848,13 @@ export class Manifold {
    * Fills in vertex properties for normal vectors, calculated from the mesh
    * geometry. Flat faces composed of three or more triangles will remain flat.
    *
-   * @param normalIdx The property channel in which to store the X
-   * values of the normals. The X, Y, and Z channels will be sequential. The
-   * property set will be automatically expanded to include up through normalIdx
-   * + 2.
+   * @param normalIdx The property channel in which to store the X values of the
+   * normals. The X, Y, and Z channels will be sequential. The property set will
+   * be automatically expanded to include up through normalIdx + 2. Default is
+   * 0, the standard slot; in that case the Manifold records the recording so
+   * a subsequent getMesh() without an explicit normalIdx returns solid-frame
+   * normals. Non-zero values are retained for compatibility and will not be
+   * supported in a future release.
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
@@ -859,7 +864,7 @@ export class Manifold {
    * all.
    * @group Properties
    */
-  calculateNormals(normalIdx: number, minSharpAngle?: number): Manifold;
+  calculateNormals(normalIdx?: number, minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 
@@ -1337,6 +1342,14 @@ export class Mesh {
   runTransform: Float32Array;
 
   /**
+   * Optional: For each run, a bitmask of flags. Bit 0 = backside (this run
+   * is on the backside of its original mesh, e.g. from a subtraction).
+   * Bit 1 = hasNormals (the first three extra-property channels of this run
+   * hold world-frame vertex normals). See `backside(run)` / `hasNormals(run)`.
+   */
+  runFlags: Uint8Array;
+
+  /**
    * Optional: Length NumTri, contains the source face ID this triangle comes
    * from. Simplification will maintain all edges between triangles with
    * different faceIDs. Input faceIDs will be maintained to the outputs, but if
@@ -1429,4 +1442,31 @@ export class Mesh {
    * @param run triangle run index.
    */
   transform(run: number): Mat4;
+
+  /**
+   * Returns true if this triangle run is on the backside compared to the
+   * original mesh, e.g. from a subtraction. Informational only - the
+   * framework already orients stored normals so the standard `getMesh()`
+   * flow returns world-frame values regardless of this bit.
+   *
+   * @param run triangle run index.
+   */
+  backside(run: number): boolean;
+
+  /**
+   * Returns true if the first three extra-property channels of this run
+   * carry world-frame vertex normals (set by `calculateNormals(0)` and
+   * round-tripped via `runFlags` bit 1). Consumers should treat the slot
+   * as normals and skip re-applying `runTransform` to it.
+   *
+   * hasNormals is per-run, so different runs may set it differently.
+   * Behavior is undefined when a single propVert is shared by triangles
+   * from runs that disagree - the slot has one interpretation, and a
+   * transform rotates it for hasNormals=true and clobbers any
+   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
+   * compose outputs never produce that shape.
+   *
+   * @param run triangle run index.
+   */
+  hasNormals(run: number): boolean;
 }

@@ -338,7 +338,31 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     runTransforms[run] = output.GetRunTransform(run);
   }
   if (updateNormals) {
-    output.UpdateNormals(3);
+    // Bring slot 3..5 into world frame on every run and normalize. Runs with
+    // hasNormals (runFlags bit 1) are already in world frame but may be off
+    // unit-length from barycentric interpolation at seam verts; the others
+    // need the inverse-transpose of the per-run linear transform applied
+    // (and a sign flip for backside).
+    std::vector<bool> vertUpdated(output.NumVert(), false);
+    for (size_t run = 0; run < output.NumRun(); ++run) {
+      const bool runHasN = output.HasNormals(run);
+      const mat3 t =
+          runHasN ? mat3(la::identity)
+                  : la::inverse(la::transpose(mat3(runTransforms[run]))) *
+                        (output.Backside(run) ? -1.0 : 1.0);
+      for (uint32_t* itr = &output.triVerts[output.runIndex[run]];
+           itr < &output.triVerts[output.runIndex[run + 1]]; ++itr) {
+        const uint32_t v = *itr;
+        if (vertUpdated[v]) continue;
+        vertUpdated[v] = true;
+        vec3 n;
+        for (int k : {0, 1, 2})
+          n[k] = output.vertProperties[v * output.numProp + 3 + k];
+        n = la::normalize(t * n);
+        for (int k : {0, 1, 2})
+          output.vertProperties[v * output.numProp + 3 + k] = n[k];
+      }
+    }
   }
 
   for (size_t run = 0; run < output.NumRun(); ++run) {

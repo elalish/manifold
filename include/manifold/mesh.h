@@ -158,17 +158,6 @@ struct MeshGLP {
   MeshGLP() = default;
 
   /**
-   * Updates the normals of the mesh based on the runTransform matrices and
-   * backside flags, which are then cleared to avoid double-applying them when
-   * round-tripping.
-   *
-   * @param normalIdx Specifies the first of the three consecutive property
-   * channels forming the (x, y, z) normals to update. NumProp must be at least
-   * normalIdx + 3 and normalIdx must be >= 3.
-   */
-  void UpdateNormals(int normalIdx);
-
-  /**
    * Updates the mergeFromVert and mergeToVert vectors in order to create a
    * manifold solid. If the MeshGL is already manifold, no change will occur
    * and the function will return false. Otherwise, this will merge verts
@@ -235,13 +224,34 @@ struct MeshGLP {
 
   /**
    * Returns true if this triangle run is on the backside compared to the
-   * original mesh, e.g. from a subtraction. In this case vertex normals will
-   * need to be flipped. UpdateNormals() will take care of this.
+   * original mesh, e.g. from a subtraction. Informational only - the framework
+   * already orients stored normals so the standard `getMesh()` flow returns
+   * world-frame values regardless of this bit.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
   bool Backside(size_t run) const {
-    return run < runFlags.size() && runFlags[run] == 1;
+    return run < runFlags.size() && (runFlags[run] & 1) != 0;
+  }
+
+  /**
+   * Returns true if the first three extra-property channels (slots 3, 4, 5)
+   * of this run carry world-frame vertex normals (set by
+   * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
+   * Consumers should treat the slot as normals and skip re-applying
+   * `runTransform` to it.
+   *
+   * hasNormals is per-run, so different runs may set it differently.
+   * Behavior is undefined when a single propVert is shared by triangles
+   * from runs that disagree - the slot has one interpretation, and a
+   * Transform rotates it for hasNormals=true and clobbers any
+   * hasNormals=false sharer. Standard `CalculateNormals` / Boolean /
+   * Compose outputs never produce that shape.
+   *
+   * @param run The index of the triangle run (0 <= run < runFlags.size()).
+   */
+  bool HasNormals(size_t run) const {
+    return run < runFlags.size() && (runFlags[run] & 2) != 0;
   }
 };
 

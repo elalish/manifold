@@ -659,44 +659,44 @@ TEST(CBIND, meshgl_run_accessors) {
   free(cube_tmp);
 }
 
-TEST(CBIND, meshgl_update_normals) {
-  // Get a mesh with normals, then verify UpdateNormals doesn't corrupt it.
+TEST(CBIND, run_flag_accessors) {
+  // CalculateNormals sets the per-run hasNormals bit; a subtractee cavity
+  // gets backside set. Exercise the C accessors for both bits.
   ManifoldManifold* cube =
-      manifold_cube(alloc_manifold_buffer(), 1.0, 1.0, 1.0, 0);
+      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1);
+  ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 32);
+  ManifoldManifold* cut =
+      manifold_difference(alloc_manifold_buffer(), cube, sphere);
   ManifoldManifold* with_normals =
-      manifold_calculate_normals(alloc_manifold_buffer(), cube, 3, 60.0);
-  EXPECT_EQ(manifold_status(with_normals), MANIFOLD_NO_ERROR);
-
-  // MeshGL with normals at channel 3
+      manifold_calculate_normals(alloc_manifold_buffer(), cut, 0, 60.0);
   ManifoldMeshGL* mesh =
-      manifold_get_meshgl_w_normals(alloc_meshgl_buffer(), with_normals, 3);
-  size_t tri_before = manifold_meshgl_num_tri(mesh);
-  manifold_meshgl_update_normals(mesh, 3);
-  EXPECT_EQ(manifold_meshgl_num_tri(mesh), tri_before);
+      manifold_get_meshgl(alloc_meshgl_buffer(), with_normals);
 
-  // Verify the mesh is still valid by constructing a Manifold from it.
-  ManifoldManifold* rebuilt = manifold_of_meshgl(alloc_manifold_buffer(), mesh);
-  EXPECT_EQ(manifold_status(rebuilt), MANIFOLD_NO_ERROR);
+  const size_t runs = manifold_meshgl_num_run(mesh);
+  ASSERT_GE(runs, 2u);
 
-  // MeshGL64 same test
-  ManifoldMeshGL64* mesh64 =
-      manifold_get_meshgl64_w_normals(alloc_meshgl64_buffer(), with_normals, 3);
-  manifold_meshgl64_update_normals(mesh64, 3);
-  ManifoldManifold* rebuilt64 =
-      manifold_of_meshgl64(alloc_manifold_buffer(), mesh64);
-  EXPECT_EQ(manifold_status(rebuilt64), MANIFOLD_NO_ERROR);
+  int backside_count = 0;
+  int has_normals_count = 0;
+  for (size_t r = 0; r < runs; ++r) {
+    if (manifold_meshgl_backside(mesh, r)) ++backside_count;
+    if (manifold_meshgl_has_normals(mesh, r)) ++has_normals_count;
+  }
+  EXPECT_EQ(backside_count, 1);
+  EXPECT_EQ(has_normals_count, static_cast<int>(runs));
 
-  manifold_destruct_manifold(rebuilt64);
-  manifold_destruct_meshgl64(mesh64);
-  manifold_destruct_manifold(rebuilt);
+  // Out-of-range returns false.
+  EXPECT_EQ(manifold_meshgl_backside(mesh, runs + 10), 0);
+  EXPECT_EQ(manifold_meshgl_has_normals(mesh, runs + 10), 0);
+
   manifold_destruct_meshgl(mesh);
   manifold_destruct_manifold(with_normals);
+  manifold_destruct_manifold(cut);
+  manifold_destruct_manifold(sphere);
   manifold_destruct_manifold(cube);
-  free(rebuilt64);
-  free(mesh64);
-  free(rebuilt);
   free(mesh);
   free(with_normals);
+  free(cut);
+  free(sphere);
   free(cube);
 }
 
