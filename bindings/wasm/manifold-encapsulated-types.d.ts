@@ -1459,11 +1459,6 @@ export class Mesh {
    * round-tripped via `runFlags` bit 1). Consumers should treat the slot
    * as normals and skip re-applying `runTransform` to it.
    *
-   * Mixed hasNormals across runs is supported: when ingesting a hand-built
-   * Mesh with shared propVerts spanning differing-flag runs, the
-   * `Manifold(Mesh)` ctor duplicates them so each camp's slot 0..2
-   * transforms independently.
-   *
    * @param run triangle run index.
    */
   hasNormals(run: number): boolean;
