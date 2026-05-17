@@ -452,8 +452,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
     bool myHasN = false;
     if (triRef.size() > 0) {
       auto it = meshRelation_.meshIDtransform.find(triRef[i].meshID);
-      myHasN = it != meshRelation_.meshIDtransform.end() &&
-               it->second.hasNormals;
+      myHasN =
+          it != meshRelation_.meshIDtransform.end() && it->second.hasNormals;
     }
     for (const size_t j : {0, 1, 2}) {
       uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
