@@ -147,8 +147,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 if(MANIFOLD_FUZZ)
   # we should enable debug checks
   set(MANIFOLD_DEBUG ON)
-  # enable fuzztest fuzzing mode
-  set(FUZZTEST_FUZZING_MODE ON)
+  # enable fuzztest's own engine unless caller picked a compatibility
+  # mode (e.g. -DFUZZTEST_COMPATIBILITY_MODE=libfuzzer for persistent
+  # corpus); fuzztest's CMakeLists rejects having both set.
+  if(NOT FUZZTEST_COMPATIBILITY_MODE)
+    set(FUZZTEST_FUZZING_MODE ON)
+  endif()
   # address sanitizer required
   add_compile_options(-fsanitize=address)
   add_link_options(-fsanitize=address)
