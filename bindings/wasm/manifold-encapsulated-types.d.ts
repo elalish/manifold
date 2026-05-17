@@ -1342,6 +1342,14 @@ export class Mesh {
   runTransform: Float32Array;
 
   /**
+   * Optional: For each run, a bitmask of flags. Bit 0 = backside (this run
+   * is on the backside of its original mesh, e.g. from a subtraction).
+   * Bit 1 = hasNormals (the first three extra-property channels of this run
+   * hold world-frame vertex normals). See `backside(run)` / `hasNormals(run)`.
+   */
+  runFlags: Uint8Array;
+
+  /**
    * Optional: Length NumTri, contains the source face ID this triangle comes
    * from. Simplification will maintain all edges between triangles with
    * different faceIDs. Input faceIDs will be maintained to the outputs, but if
@@ -1434,4 +1442,24 @@ export class Mesh {
    * @param run triangle run index.
    */
   transform(run: number): Mat4;
+
+  /**
+   * Returns true if this triangle run is on the backside compared to the
+   * original mesh, e.g. from a subtraction. Informational only - the
+   * framework already orients stored normals so the standard `getMesh()`
+   * flow returns world-frame values regardless of this bit.
+   *
+   * @param run triangle run index.
+   */
+  backside(run: number): boolean;
+
+  /**
+   * Returns true if the first three extra-property channels of this run
+   * carry world-frame vertex normals (set by `calculateNormals(0)` and
+   * round-tripped via `runFlags` bit 1). Consumers should treat the slot
+   * as normals and skip re-applying `runTransform` to it.
+   *
+   * @param run triangle run index.
+   */
+  hasNormals(run: number): boolean;
 }

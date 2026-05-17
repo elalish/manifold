@@ -224,9 +224,9 @@ struct MeshGLP {
 
   /**
    * Returns true if this triangle run is on the backside compared to the
-   * original mesh, e.g. from a subtraction. In this case vertex normals stored
-   * for the run point opposite to the result surface and consumers reading
-   * them via `runTransform` should multiply by -1.
+   * original mesh, e.g. from a subtraction. Informational only - the framework
+   * already orients stored normals so the standard `getMesh()` flow returns
+   * world-frame values regardless of this bit.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
@@ -240,13 +240,6 @@ struct MeshGLP {
    * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
-   *
-   * For hand-built MeshGL inputs: if multiple runs share propVerts (same
-   * vertex index used by triangles from different runs), all sharing runs
-   * must agree on what slot 3..5 represents. Mixing hasNormals=true and
-   * hasNormals=false across shared propVerts is undefined - the stored
-   * value can only have one interpretation. Outputs from CalculateNormals
-   * / Boolean / Compose never share propVerts across differing-flag runs.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */

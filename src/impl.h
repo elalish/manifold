@@ -58,11 +58,12 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
 
-  // True iff every meshID in meshRelation_.meshIDtransform has hasNormals
-  // set (i.e., slot 0..2 of properties_ holds world-frame normals across the
-  // whole impl). Set by CalculateNormals at idx 0; AND'd across inputs by
-  // Boolean and Compose; preserved by Transform/Refine.
-  bool HasNormals() const {
+  // True only when every meshID carries normals at slot 0..2 - the
+  // condition under which GetMeshGL(-1) can safely auto-substitute that
+  // slot. A mixed Boolean output (some meshIDs with normals, some
+  // without) returns false; the output MeshGL's per-run bit 1 still
+  // marks the with-normals runs individually.
+  bool AllHaveNormals() const {
     if (meshRelation_.meshIDtransform.empty()) return false;
     for (const auto& m : meshRelation_.meshIDtransform) {
       if (!m.second.hasNormals) return false;
@@ -620,6 +621,9 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
         // world-frame normals (hasNormals bit), just normalize; for legacy
         // callers asking to interpret a slot as normals on a run without
         // hasNormals, apply the per-run inverse-frame transform first.
+        // TODO: collapse the !runHasN branch into a no-op once the explicit-
+        // normalIdx parameter on GetMeshGL is removed and `updateNormals`
+        // becomes implied by the hasNormals bit.
         if (updateNormals) {
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;

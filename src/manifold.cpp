@@ -247,10 +247,14 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * used automatically; otherwise no normals are applied. If normals are
  * selected, the runTransform matrices will be removed from the output, to
  * avoid them being double-applied when round-tripped.
+ * Passing a non-negative `normalIdx` is the legacy interface from before
+ * `CalculateNormals` recorded the slot on the Manifold itself; prefer the
+ * no-arg form after `CalculateNormals(0)`. The explicit-idx path will be
+ * removed in a future release.
  */
 MeshGL Manifold::GetMeshGL(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.HasNormals()) normalIdx = 0;
+  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
   return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
 }
 
@@ -270,10 +274,12 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  * used automatically; otherwise no normals are applied. If normals are
  * selected, the runTransform matrices will be removed from the output, to
  * avoid them being double-applied when round-tripped.
+ * Same deprecation note as `GetMeshGL`: prefer the no-arg form after
+ * `CalculateNormals(0)`.
  */
 MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.HasNormals()) normalIdx = 0;
+  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
   return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
 }
 

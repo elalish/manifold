@@ -451,6 +451,16 @@ Module.setup = function() {
       mat4[15] = 1;
       return mat4;
     }
+
+    backside(run) {
+      return this.runFlags != null && run < this.runFlags.length &&
+          (this.runFlags[run] & 1) !== 0;
+    }
+
+    hasNormals(run) {
+      return this.runFlags != null && run < this.runFlags.length &&
+          (this.runFlags[run] & 2) !== 0;
+    }
   }
 
   Module.Mesh = Mesh;

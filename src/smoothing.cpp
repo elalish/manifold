@@ -508,6 +508,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
   // Cached per-meshID inverse-normal-transform for the legacy non-zero
   // normalIdx path. Lazily populated on first lookup; reused across all
   // verts in the loop below.
+  // TODO: drop this and its only caller below when the non-zero normalIdx
+  // parameter on CalculateNormals is removed.
   std::map<int, mat3> meshIDtoNormalTransform;
   auto getTransform = [&](int meshID) {
     if (meshIDtoNormalTransform.find(meshID) == meshIDtoNormalTransform.end()) {
