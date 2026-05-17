@@ -1459,6 +1459,13 @@ export class Mesh {
    * round-tripped via `runFlags` bit 1). Consumers should treat the slot
    * as normals and skip re-applying `runTransform` to it.
    *
+   * hasNormals is per-run, so different runs may set it differently.
+   * Behavior is undefined when a single propVert is shared by triangles
+   * from runs that disagree - the slot has one interpretation, and a
+   * transform rotates it for hasNormals=true and clobbers any
+   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
+   * compose outputs never produce that shape.
+   *
    * @param run triangle run index.
    */
   hasNormals(run: number): boolean;

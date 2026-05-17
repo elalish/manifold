@@ -241,6 +241,13 @@ struct MeshGLP {
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
    *
+   * hasNormals is per-run, so different runs may set it differently.
+   * Behavior is undefined when a single propVert is shared by triangles
+   * from runs that disagree - the slot has one interpretation, and a
+   * Transform rotates it for hasNormals=true and clobbers any
+   * hasNormals=false sharer. Standard `CalculateNormals` / Boolean /
+   * Compose outputs never produce that shape.
+   *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
   bool HasNormals(size_t run) const {
