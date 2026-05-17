@@ -29,6 +29,10 @@ struct Manifold::Impl {
     int originalID = -1;
     mat3x4 transform = la::identity;
     bool backSide = false;
+    // True when this meshID's contribution to properties_ slots 0..2 holds
+    // world-frame vertex normals (set by CalculateNormals at slot 0). Carries
+    // through Transforms and Booleans. Exported as runFlags bit 1.
+    bool hasNormals = false;
 
     mat3 GetNormalTransform() const {
       return NormalTransform(transform) * (backSide ? -1.0 : 1.0);
@@ -52,11 +56,27 @@ struct Manifold::Impl {
   double epsilon_ = -1;
   double tolerance_ = -1;
   int numProp_ = 0;
-  // True when normals live at the first three extra-property channels
-  // (MeshGL slots 3, 4, 5). Set by CalculateNormals at idx 0; survives
-  // transforms. Boolean output clears it.
-  bool hasNormals_ = false;
   Error status_ = Error::NoError;
+
+  // True iff every meshID in meshRelation_.meshIDtransform has hasNormals
+  // set (i.e., slot 0..2 of properties_ holds world-frame normals across the
+  // whole impl). Set by CalculateNormals at idx 0; AND'd across inputs by
+  // Boolean and Compose; preserved by Transform/Refine.
+  bool HasNormals() const {
+    if (meshRelation_.meshIDtransform.empty()) return false;
+    for (const auto& m : meshRelation_.meshIDtransform) {
+      if (!m.second.hasNormals) return false;
+    }
+    return true;
+  }
+
+  // True iff the meshID owning `tri` has hasNormals set. Returns false when
+  // the meshID isn't in meshRelation_.meshIDtransform (treat as no-normals).
+  static bool TriHasNormals(const MeshRelationD& meshRelation, int tri) {
+    const int meshID = meshRelation.triRef[tri].meshID;
+    auto it = meshRelation.meshIDtransform.find(meshID);
+    return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
+  }
   Vec<vec3> vertPos_;
   Halfedges halfedge_;
   Vec<double> properties_;
@@ -92,6 +112,19 @@ struct Manifold::Impl {
                        const Vec<ivec3>& triVert = {});
   void CalculateVertNormals();
   void IncrementMeshIDs();
+
+  // Eager-transform slot 0..2 of properties_ for propVerts whose meshID
+  // carries hasNormals. Used by both Impl::Transform and Compose. The buffer
+  // is laid out as `properties[(offset + propVert) * stride + i]` so the
+  // helper can target either an in-place properties_ vector (offset=0) or
+  // a per-node slice of a combined properties array (offset=propVertIndices,
+  // stride=numPropOut).
+  static void EagerTransformPropNormals(const Halfedges& halfedge,
+                                        const MeshRelationD& meshRelation,
+                                        const mat3& normalTransform,
+                                        Vec<double>& properties,
+                                        int numPropVert, int stride,
+                                        int offset = 0);
 
   void MakeEmpty(Error status);
   void Warp(std::function<void(vec3&)> warpFunc);
@@ -317,10 +350,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
 
   const auto numProp = meshGL.numProp - 3;
   numProp_ = numProp;
-  // Restore the recorded normals slot only if the input actually has room
-  // for it; defensive against callers who set the flag but didn't pack
-  // normals at slots 3-5.
-  hasNormals_ = meshGL.hasNormals && numProp >= 3;
   properties_.resize_nofill(meshGL.NumVert() * numProp);
   tolerance_ = meshGL.tolerance;
   // This will have unreferenced duplicate positions that will be removed by
@@ -364,6 +393,10 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
     const int meshID = startID + i;
     const int originalID = runOriginalID[i];
     const bool backside = meshGL.Backside(i);
+    // Per-run hasNormals (runFlags bit 1). Defensively require numProp >= 3
+    // so a caller setting the bit on a too-small MeshGL doesn't make us read
+    // past the property bounds.
+    const bool runHasN = meshGL.HasNormals(i) && numProp >= 3;
     for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
       TriRef& ref = triRef[tri];
       ref.meshID = meshID;
@@ -373,7 +406,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
     }
 
     if (meshGL.runTransform.empty()) {
-      meshRelation_.meshIDtransform[meshID] = {originalID};
+      meshRelation_.meshIDtransform[meshID] = {originalID, la::identity, false,
+                                               runHasN};
     } else {
       const Precision* m = meshGL.runTransform.data() + 12 * i;
       meshRelation_.meshIDtransform[meshID] = {originalID,
@@ -381,7 +415,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
                                                 {m[3], m[4], m[5]},
                                                 {m[6], m[7], m[8]},
                                                 {m[9], m[10], m[11]}},
-                                               backside};
+                                               backside,
+                                               runHasN};
     }
   }
 
@@ -458,10 +493,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
-  // Mirror the recorded slot to the output so an ofMesh+getMesh round-trip
-  // preserves the convention. Only meaningful when the standard slot is in use
-  // (which is also what GetMeshGL(-1) auto-substitutes for).
-  out.hasNormals = impl.hasNormals_ && normalIdx == 0;
   out.tolerance = impl.tolerance_;
   if (std::is_same<Precision, float>::value)
     out.tolerance =
@@ -494,19 +525,19 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
                      });
   }
 
-  std::vector<mat3> runNormalTransform;
-  auto addRun = [updateNormals, isOriginal](
-                    MeshGLP<Precision, I>& out,
-                    std::vector<mat3>& runNormalTransform, int tri,
-                    const manifold::Manifold::Impl::Relation& rel) {
+  // runFlags layout: bit 0 = backSide, bit 1 = hasNormals (slot 0..2 of the
+  // extra properties is world-frame vertex normals; consumers should skip
+  // re-applying runTransform to those channels).
+  auto addRun = [isOriginal](MeshGLP<Precision, I>& out, int tri,
+                             const manifold::Manifold::Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
-    if (updateNormals) {
-      runNormalTransform.push_back(rel.GetNormalTransform());
-    }
-    // clear transforms if applying them to normals
-    if (!isOriginal && !updateNormals) {
-      out.runFlags.push_back(rel.backSide ? 1 : 0);
+    // runFlags carries hasNormals (bit 1) which we want on originals too;
+    // runTransform is just metadata so skip it for originals where it would
+    // always be identity.
+    const uint8_t flags = (rel.backSide ? 1u : 0u) | (rel.hasNormals ? 2u : 0u);
+    out.runFlags.push_back(flags);
+    if (!isOriginal) {
       for (const int col : {0, 1, 2, 3}) {
         for (const int row : {0, 1, 2}) {
           out.runTransform.push_back(rel.transform[col][row]);
@@ -530,14 +561,14 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
       manifold::Manifold::Impl::Relation rel;
       auto it = meshIDtransform.find(meshID);
       if (it != meshIDtransform.end()) rel = it->second;
-      addRun(out, runNormalTransform, tri, rel);
+      addRun(out, tri, rel);
       meshIDtransform.erase(meshID);
       lastID = meshID;
     }
   }
   // Add runs for originals that did not contribute any faces to the output
   for (const auto& pair : meshIDtransform) {
-    addRun(out, runNormalTransform, numTri, pair.second);
+    addRun(out, numTri, pair.second);
   }
   out.runIndex.push_back(3 * numTri);
 
@@ -585,13 +616,25 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           out.vertProperties.push_back(impl.properties_[prop * numProp + p]);
         }
 
+        // Normalize the requested normal slot. For runs that already carry
+        // world-frame normals (hasNormals bit), just normalize; for legacy
+        // callers asking to interpret a slot as normals on a run without
+        // hasNormals, apply the per-run inverse-frame transform first.
         if (updateNormals) {
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + 3 + normalIdx + i];
           }
-          normal = SafeNormalize(runNormalTransform[run] * normal);
+          const bool runHasN = !isOriginal && (out.runFlags[run] & 2) != 0;
+          if (!isOriginal && !runHasN) {
+            const Precision* m = out.runTransform.data() + 12 * run;
+            const mat3x4 t({m[0], m[1], m[2]}, {m[3], m[4], m[5]},
+                           {m[6], m[7], m[8]}, {m[9], m[10], m[11]});
+            normal = NormalTransform(t) *
+                     ((out.runFlags[run] & 1) ? -1.0 : 1.0) * normal;
+          }
+          normal = SafeNormalize(normal);
           for (int i : {0, 1, 2}) {
             out.vertProperties[start + 3 + normalIdx + i] = normal[i];
           }

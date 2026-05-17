@@ -154,27 +154,8 @@ struct MeshGLP {
   /// the bounding box. Any edge shorter than tolerance may be collapsed.
   /// Tolerance may be enlarged when floating point error accumulates.
   Precision tolerance = 0;
-  /// True if the first three extra-property channels (slots 3, 4, 5) hold
-  /// vertex normals. Set on output by GetMeshGL/GetMeshGL64 when normals were
-  /// recorded on the Manifold (via CalculateNormals); read on input by the
-  /// MeshGL Manifold constructor so the recording survives a round-trip.
-  bool hasNormals = false;
 
   MeshGLP() = default;
-
-  /**
-   * Updates the normals of the mesh based on the runTransform matrices and
-   * backside flags, which are then cleared to avoid double-applying them when
-   * round-tripping.
-   *
-   * @param normalIdx Specifies the first of the three consecutive property
-   * channels forming the (x, y, z) normals to update. NumProp must be at least
-   * normalIdx + 3. Default is -1, meaning "use the standard slot (3, 4, 5) if
-   * `hasNormals` is set; otherwise no-op." Pass a value >= 3 explicitly to
-   * update normals at a non-standard channel; that path is retained for
-   * compatibility and will not be supported in a future release.
-   */
-  void UpdateNormals(int normalIdx = -1);
 
   /**
    * Updates the mergeFromVert and mergeToVert vectors in order to create a
@@ -243,13 +224,34 @@ struct MeshGLP {
 
   /**
    * Returns true if this triangle run is on the backside compared to the
-   * original mesh, e.g. from a subtraction. In this case vertex normals will
-   * need to be flipped. UpdateNormals() will take care of this.
+   * original mesh, e.g. from a subtraction. In this case vertex normals stored
+   * for the run point opposite to the result surface and consumers reading
+   * them via `runTransform` should multiply by -1.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
   bool Backside(size_t run) const {
-    return run < runFlags.size() && runFlags[run] == 1;
+    return run < runFlags.size() && (runFlags[run] & 1) != 0;
+  }
+
+  /**
+   * Returns true if the first three extra-property channels (slots 3, 4, 5)
+   * of this run carry world-frame vertex normals (set by
+   * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
+   * Consumers should treat the slot as normals and skip re-applying
+   * `runTransform` to it.
+   *
+   * For hand-built MeshGL inputs: if multiple runs share propVerts (same
+   * vertex index used by triangles from different runs), all sharing runs
+   * must agree on what slot 3..5 represents. Mixing hasNormals=true and
+   * hasNormals=false across shared propVerts is undefined - the stored
+   * value can only have one interpretation. Outputs from CalculateNormals
+   * / Boolean / Compose never share propVerts across differing-flag runs.
+   *
+   * @param run The index of the triangle run (0 <= run < runFlags.size()).
+   */
+  bool HasNormals(size_t run) const {
+    return run < runFlags.size() && (runFlags[run] & 2) != 0;
   }
 };
 

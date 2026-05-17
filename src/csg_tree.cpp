@@ -314,6 +314,18 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
                 newProp.end(), numPropOut);
             copy(oldRange.begin(), oldRange.end(), newRange.begin());
           }
+          // Properties copy above doesn't go through the on-the-fly transform
+          // applied to vertPos_/faceNormal_ below; eager-transform slot 0..2
+          // per-meshID so world-frame normals stay in sync. Covers mixed
+          // input nodes (some meshIDs with hasNormals, some without).
+          if (numProp >= 3 && node->transform_ != mat3x4(la::identity)) {
+            const mat3 normalTransform =
+                la::inverse(la::transpose(mat3(node->transform_)));
+            Manifold::Impl::EagerTransformPropNormals(
+                node->pImpl_->halfedge_, node->pImpl_->meshRelation_,
+                normalTransform, newProp, oldProp.size() / numProp, numPropOut,
+                propVertIndices[i]);
+          }
         }
 
         if (node->transform_ == mat3x4(la::identity)) {

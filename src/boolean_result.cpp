@@ -569,7 +569,8 @@ struct Barycentric {
 };
 
 void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
-                      const Manifold::Impl& inQ, ExecutionContext::Impl* ctx) {
+                      const Manifold::Impl& inQ, bool invertQ,
+                      ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
@@ -607,6 +608,15 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto& properties = PQ ? inP.properties_ : inQ.properties_;
     const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
+
+    // For Subtract, Q's triangles are flipped in the result, so Q's
+    // world-frame vertex normals (slot 0..2 when hasNormals) need a sign
+    // flip to point outward from the result's solid (into the cavity).
+    // Check is per-source-triangle, not whole input - inQ may be a mixed
+    // Boolean result.
+    const bool negateNormals =
+        !PQ && invertQ && oldNumProp >= 3 &&
+        Manifold::Impl::TriHasNormals(inQ.meshRelation_, ref.faceID);
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_.Start(3 * tri + i);
@@ -665,7 +675,9 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
           for (const int j : {0, 1, 2})
             oldProps[j] =
                 properties[oldNumProp * halfedge.Prop(3 * ref.faceID + j) + p];
-          outR.properties_.push_back(la::dot(uvw, oldProps));
+          double val = la::dot(uvw, oldProps);
+          if (negateNormals && p < 3) val = -val;
+          outR.properties_.push_back(val);
         } else {
           outR.properties_.push_back(0);
         }
@@ -936,7 +948,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
-  CreateProperties(outR, inP_, inQ_, ctx_);
+  CreateProperties(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase()) return *c;
 
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);

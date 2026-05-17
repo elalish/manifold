@@ -694,12 +694,12 @@ size_t manifold_meshgl_num_run(ManifoldMeshGL* m) {
   return from_c(m)->NumRun();
 }
 
-int manifold_meshgl_has_normals(ManifoldMeshGL* m) {
-  return from_c(m)->hasNormals ? 1 : 0;
+int manifold_meshgl_backside(ManifoldMeshGL* m, size_t run) {
+  return from_c(m)->Backside(run) ? 1 : 0;
 }
 
-void manifold_meshgl_update_normals(ManifoldMeshGL* m, int normal_idx) {
-  from_c(m)->UpdateNormals(normal_idx);
+int manifold_meshgl_has_normals(ManifoldMeshGL* m, size_t run) {
+  return from_c(m)->HasNormals(run) ? 1 : 0;
 }
 
 size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m) {
@@ -779,12 +779,12 @@ size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m) {
   return from_c(m)->NumRun();
 }
 
-int manifold_meshgl64_has_normals(ManifoldMeshGL64* m) {
-  return from_c(m)->hasNormals ? 1 : 0;
+int manifold_meshgl64_backside(ManifoldMeshGL64* m, size_t run) {
+  return from_c(m)->Backside(run) ? 1 : 0;
 }
 
-void manifold_meshgl64_update_normals(ManifoldMeshGL64* m, int normal_idx) {
-  from_c(m)->UpdateNormals(normal_idx);
+int manifold_meshgl64_has_normals(ManifoldMeshGL64* m, size_t run) {
+  return from_c(m)->HasNormals(run) ? 1 : 0;
 }
 
 ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {

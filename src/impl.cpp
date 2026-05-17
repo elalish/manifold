@@ -167,6 +167,36 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   });
 }
 
+void Manifold::Impl::EagerTransformPropNormals(
+    const Halfedges& halfedge, const MeshRelationD& meshRelation,
+    const mat3& normalTransform, Vec<double>& properties, int numPropVert,
+    int stride, int offset) {
+  // Short-circuit when no meshID carries normals. Note this is OR semantics
+  // (any has it), not AND like Impl::HasNormals() - mixed inputs still need
+  // the per-meshID iteration below to rotate the with-normals subset.
+  bool anyHasNormals = false;
+  for (const auto& m : meshRelation.meshIDtransform) {
+    if (m.second.hasNormals) {
+      anyHasNormals = true;
+      break;
+    }
+  }
+  if (!anyHasNormals) return;
+  Vec<bool> propVisited(numPropVert, false);
+  for (size_t e = 0; e < halfedge.size(); ++e) {
+    if (!TriHasNormals(meshRelation, e / 3)) continue;
+    const int prop = halfedge.Prop(e);
+    if (prop < 0 || propVisited[prop]) continue;
+    propVisited[prop] = true;
+    vec3 n;
+    for (const int i : {0, 1, 2})
+      n[i] = properties[(offset + prop) * stride + i];
+    n = normalTransform * n;
+    for (const int i : {0, 1, 2})
+      properties[(offset + prop) * stride + i] = n[i];
+  }
+}
+
 void Manifold::Impl::InitializeOriginal() {
   const int meshID = ReserveIDs(1);
   meshRelation_.originalID = meshID;
@@ -176,8 +206,13 @@ void Manifold::Impl::InitializeOriginal() {
              [meshID, &triRef](const int tri) {
                triRef[tri] = {meshID, meshID, -1, triRef[tri].coplanarID};
              });
+  // Preserve the AND-across-old-Relations state so AsOriginal keeps the
+  // recording when it builds a fresh Relation. Primitives start with an
+  // empty map, which HasNormals() returns false for.
+  const bool wasHasNormals = HasNormals();
   meshRelation_.meshIDtransform.clear();
-  meshRelation_.meshIDtransform[meshID] = {meshID};
+  meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
+                                           wasHasNormals};
 }
 
 void Manifold::Impl::SetNormalsAndCoplanar() {
@@ -584,7 +619,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.epsilon_ = epsilon_;
   result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
-  result.hasNormals_ = hasNormals_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
@@ -606,6 +640,14 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
             TransformNormals({normalTransform}));
   transform(vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
             TransformNormals({normalTransform}));
+
+  // Eager-transform property normals per-meshID. Mixed Boolean/Compose
+  // outputs leave HasNormals() false overall but still have hasNormals=true
+  // meshIDs whose stored world-frame values would otherwise go stale.
+  if (numProp_ >= 3) {
+    EagerTransformPropNormals(halfedge_, meshRelation_, normalTransform,
+                              result.properties_, NumPropVert(), numProp_);
+  }
 
   const bool invert = la::determinant(mat3(transform_)) < 0;
 

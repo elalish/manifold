@@ -447,9 +447,9 @@ float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m);
 float manifold_meshgl_tolerance(ManifoldMeshGL* m);
 size_t manifold_meshgl_run_flags_length(ManifoldMeshGL* m);
 uint8_t* manifold_meshgl_run_flags(void* mem, ManifoldMeshGL* m);
-int manifold_meshgl_has_normals(ManifoldMeshGL* m);
 size_t manifold_meshgl_num_run(ManifoldMeshGL* m);
-void manifold_meshgl_update_normals(ManifoldMeshGL* m, int normal_idx);
+int manifold_meshgl_backside(ManifoldMeshGL* m, size_t run);
+int manifold_meshgl_has_normals(ManifoldMeshGL* m, size_t run);
 
 size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m);
 size_t manifold_meshgl64_num_vert(ManifoldMeshGL64* m);
@@ -474,9 +474,9 @@ double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m);
 double manifold_meshgl64_tolerance(ManifoldMeshGL64* m);
 size_t manifold_meshgl64_run_flags_length(ManifoldMeshGL64* m);
 uint8_t* manifold_meshgl64_run_flags(void* mem, ManifoldMeshGL64* m);
-int manifold_meshgl64_has_normals(ManifoldMeshGL64* m);
 size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m);
-void manifold_meshgl64_update_normals(ManifoldMeshGL64* m, int normal_idx);
+int manifold_meshgl64_backside(ManifoldMeshGL64* m, size_t run);
+int manifold_meshgl64_has_normals(ManifoldMeshGL64* m, size_t run);
 
 // Triangulation
 
