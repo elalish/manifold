@@ -241,6 +241,12 @@ struct MeshGLP {
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
    *
+   * Mixed hasNormals values across runs are supported. If a propVert is
+   * shared between a hasNormals=true run and a hasNormals=false run (e.g. a
+   * hand-built MeshGL stitches a normals-bearing run to a color-only run at
+   * common vertices), the `Manifold(MeshGL)` ctor duplicates the propVert
+   * so each camp's slot 0..2 transforms independently.
+   *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
   bool HasNormals(size_t run) const {

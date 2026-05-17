@@ -352,17 +352,12 @@ TEST(Manifold, NormalsNonStandardSlotNotRecorded) {
 }
 
 TEST(Manifold, NormalsSharedPropVertMixedFlags) {
-  // Per-run hasNormals is intended to let runs interpret slot 0..2
-  // independently. The eager-transform contract stores ONE value per
-  // propVert, so a propVert shared between a hasNormals=true run (treats
-  // slot as normals) and a hasNormals=false run (treats slot as color)
-  // can only carry one interpretation through a subsequent Transform.
-  //
-  // Currently this test FAILS by design: Impl::Transform applies the
-  // rotation when it sees the hasNormals run, corrupting Run 1's color.
-  // Fixing requires splitting propVerts whose runs disagree on the flag,
-  // either during ctor or during Transform. Leaving as a discussion-driver
-  // for now (see PR #1718 review thread).
+  // Per-run hasNormals lets runs interpret slot 0..2 independently. The
+  // eager-transform contract stores ONE value per propVert, so a propVert
+  // shared between a hasNormals=true run (treats slot as normals) and a
+  // hasNormals=false run (treats slot as color) would otherwise be unable
+  // to carry both interpretations through a Transform. The MeshGL ctor
+  // therefore duplicates such propVerts so each camp gets its own slot.
   MeshGL gl;
   gl.numProp = 6;
   const float pts[4][3] = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};

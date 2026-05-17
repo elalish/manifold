@@ -424,19 +424,67 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
   Vec<ivec3> triProp;
   triProp.reserve(numTri);
   Vec<ivec3> triVert;
-  const bool needsPropMap = numProp > 0 && !prop2vert.empty();
+  // When there are properties, triProp indexes propVert space and triVert
+  // indexes (possibly merged) position space; CreateHalfedges needs both.
+  // When numProp == 0 there is no distinct prop space and the legacy single-
+  // array form (triProp only) is preserved.
+  const bool needsPropMap = numProp > 0;
   if (needsPropMap) triVert.reserve(numTri);
   if (triRef.size() > 0) meshRelation_.triRef.reserve(numTri);
+
+  // Per-propVert claim tracking. When a single input vertProperty is
+  // referenced by triangles from runs with differing hasNormals flags, the
+  // eager-transform contract can't track both interpretations through a
+  // single storage slot. Duplicate the propVert at ctor time so each
+  // hasNormals camp gets its own slot 0..2 to mutate independently.
+  // Triangles from the first-seen camp keep the original index; triangles
+  // from the opposite camp point at the appended alt copy.
+  struct PropClaim {
+    bool primaryHasN = false;
+    int altCopy = -1;
+    bool initialized = false;
+  };
+  // Vec's size-only ctor leaves elements uninitialized; use value-init.
+  Vec<PropClaim> propClaim(needsPropMap ? numVert : 0, PropClaim{});
+
   for (size_t i = 0; i < numTri; ++i) {
     ivec3 triP, triV;
+    bool myHasN = false;
+    if (triRef.size() > 0) {
+      auto it = meshRelation_.meshIDtransform.find(triRef[i].meshID);
+      myHasN = it != meshRelation_.meshIDtransform.end() &&
+               it->second.hasNormals;
+    }
     for (const size_t j : {0, 1, 2}) {
       uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
       if (vert >= numVert) {
         MakeEmpty(Error::VertexOutOfBounds);
         return;
       }
-      triP[j] = vert;
-      triV[j] = prop2vert.empty() ? vert : prop2vert[vert];
+      int propIdx = static_cast<int>(vert);
+      if (needsPropMap) {
+        auto& claim = propClaim[vert];
+        if (!claim.initialized) {
+          claim.primaryHasN = myHasN;
+          claim.initialized = true;
+        } else if (claim.primaryHasN != myHasN) {
+          if (claim.altCopy < 0) {
+            // Snapshot source values first - push_back may reallocate
+            // properties_ and invalidate the indexed reference.
+            std::vector<double> snapshot(numProp);
+            for (size_t k = 0; k < numProp; ++k) {
+              snapshot[k] = properties_[vert * numProp + k];
+            }
+            claim.altCopy = static_cast<int>(properties_.size() / numProp);
+            for (size_t k = 0; k < numProp; ++k) {
+              properties_.push_back(snapshot[k]);
+            }
+          }
+          propIdx = claim.altCopy;
+        }
+      }
+      triP[j] = propIdx;
+      triV[j] = prop2vert.empty() ? static_cast<int>(vert) : prop2vert[vert];
     }
     if (triV[0] != triV[1] && triV[1] != triV[2] && triV[2] != triV[0]) {
       if (needsPropMap) {
