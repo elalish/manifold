@@ -29,16 +29,38 @@ namespace boolean2 {
 
 namespace polyutils_detail {
 
+bool PointOnSegment(vec2 p, vec2 a, vec2 b, double eps) {
+  if (CCW(a, b, p, eps) != 0) return false;
+  return p.x >= std::min(a.x, b.x) - eps && p.x <= std::max(a.x, b.x) + eps &&
+         p.y >= std::min(a.y, b.y) - eps && p.y <= std::max(a.y, b.y) + eps;
+}
+
+double RingScale(const SimplePolygon& ring) {
+  if (ring.empty()) return 0.0;
+  vec2 bmin(std::numeric_limits<double>::infinity(),
+            std::numeric_limits<double>::infinity());
+  vec2 bmax(-bmin.x, -bmin.y);
+  for (const vec2& v : ring) {
+    bmin.x = std::min(bmin.x, v.x);
+    bmin.y = std::min(bmin.y, v.y);
+    bmax.x = std::max(bmax.x, v.x);
+    bmax.y = std::max(bmax.y, v.y);
+  }
+  return std::max(bmax.x - bmin.x, bmax.y - bmin.y) * 0.5;
+}
+
 // Standard ray-cast point-in-polygon: cast +x ray from `p`, count
-// crossings of `ring`'s edges. Returns true iff `p` is strictly inside
-// `ring` (boundary returns false, but we don't rely on that for the
-// containment-tree use; the test point is a vertex of a different
-// ring, well inside or outside).
+// crossings of `ring`'s edges. Returns true when `p` is inside `ring`
+// or on its boundary. Boundary inclusion matters for containment
+// grouping: boolean output can contain a hole ring touching its outer
+// ring at a vertex, and that hole still belongs to the outer component.
 bool PointInRing(vec2 p, const SimplePolygon& ring) {
+  const double eps = EpsilonFromScale(RingScale(ring));
   bool inside = false;
   const int n = static_cast<int>(ring.size());
   for (int i = 0, j = n - 1; i < n; j = i++) {
     const vec2 a = ring[i], b = ring[j];
+    if (PointOnSegment(p, a, b, eps)) return true;
     if (((a.y > p.y) != (b.y > p.y)) &&
         (p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)) {
       inside = !inside;
