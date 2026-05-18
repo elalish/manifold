@@ -72,7 +72,6 @@ bool PointInRing(vec2 p, const SimplePolygon& ring) {
 struct RingInfo {
   vec2 bmin, bmax;  // bbox
   double area;      // signed; CCW > 0, CW (hole) < 0
-  vec2 sample;      // first vertex; used for cheap containment test
 };
 
 RingInfo Summarize(const SimplePolygon& ring) {
@@ -90,13 +89,18 @@ RingInfo Summarize(const SimplePolygon& ring) {
   // Empty rings are dropped by FillByRule before reaching this code path
   // in production; the guard here is for direct callers of
   // DecomposeByContainment that may pass raw Polygons.
-  r.sample = ring.empty() ? vec2(0, 0) : ring[0];
   return r;
 }
 
 bool BoxInside(const RingInfo& a, const RingInfo& b) {
   return a.bmin.x >= b.bmin.x && a.bmin.y >= b.bmin.y && a.bmax.x <= b.bmax.x &&
          a.bmax.y <= b.bmax.y;
+}
+
+bool RingInside(const SimplePolygon& a, const SimplePolygon& b) {
+  return std::all_of(a.begin(), a.end(), [&](const vec2& p) {
+    return PointInRing(p, b);
+  });
 }
 
 }  // namespace polyutils_detail
@@ -118,7 +122,7 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
   for (const auto& r : polys) info.push_back(polyutils_detail::Summarize(r));
 
   // For each ring, find its parent: the smallest-area ring (by |area|)
-  // that contains it. O(n^2) bbox/point-in-poly check; fine for the
+  // that contains it. O(n^2) bbox/ring-in-poly check; fine for the
   // hundreds of rings typical of CrossSection inputs.
   std::vector<int> parent(n, -1);
   for (int i = 0; i < n; ++i) {
@@ -126,7 +130,7 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
     for (int j = 0; j < n; ++j) {
       if (i == j) continue;
       if (!polyutils_detail::BoxInside(info[i], info[j])) continue;
-      if (!polyutils_detail::PointInRing(info[i].sample, polys[j])) continue;
+      if (!polyutils_detail::RingInside(polys[i], polys[j])) continue;
       const double aj = std::fabs(info[j].area);
       if (aj < bestParentArea) {
         bestParentArea = aj;
