@@ -323,6 +323,12 @@ class Manifold {
 
   struct Impl;
 
+  /// @internal Wrap a fully-built Impl into a leaf-node Manifold.
+  /// Caller is responsible for the invariants the public ctors enforce
+  /// (in particular, calling `MakeEmpty(status)` on error). Used by
+  /// ctx-aware static factories on `ExecutionContext`.
+  static Manifold FromImpl(std::shared_ptr<Impl> pImpl);
+
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
