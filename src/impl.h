@@ -16,6 +16,7 @@
 #include <map>
 
 #include "collider.h"
+#include "execution_impl.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "shared.h"
@@ -95,7 +96,8 @@ struct Manifold::Impl {
   Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
-  Impl(const MeshGLP<Precision, I>& meshGL);
+  Impl(const MeshGLP<Precision, I>& meshGL,
+       ExecutionContext::Impl* ctx = nullptr);
 
   template <typename F>
   inline void ForVert(int halfedge, F func);
@@ -272,7 +274,15 @@ void Manifold::Impl::ForVert(
 }
 
 template <typename Precision, typename I>
-Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
+Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
+                     ExecutionContext::Impl* ctx) {
+  // Entry-time cancel wins over empty/malformed input; past this gate,
+  // validation errors win over races.
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+
   const uint32_t numVert = meshGL.NumVert();
   const uint32_t numTri = meshGL.NumTri();
 
@@ -451,11 +461,19 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
     }
   }
 
+  // Phase boundaries: cancel-check then credit the phase only on
+  // continue. Count of fetch_add sites below must equal
+  // kPhasesPerFromMesh.
   CreateHalfedges(triProp, triVert);
   if (!IsManifold()) {
     MakeEmpty(Error::NotManifold);
     return;
   }
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
 
   CalculateBBox();
   SetEpsilon(-1, std::is_same<Precision, float>::value);
@@ -463,13 +481,46 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
   CleanupTopology();
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
 
   DedupePropVerts();
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+
   SetNormalsAndCoplanar();
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
 
   RemoveDegenerates();
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+
   RemoveUnreferencedVerts();
-  SortGeometry();
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+
+  SortGeometry(ctx);
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
 
   if (!IsFinite()) {
     MakeEmpty(Error::NonFiniteVertex);

@@ -14,6 +14,25 @@
 
 #include "execution_impl.h"
 
+#include "impl.h"
+#include "manifold/manifold.h"
+#include "manifold/mesh.h"
+
+namespace {
+using namespace manifold;
+
+// Reset progress counters at the start of an eager static-factory call.
+// Done counters reset before totals so an observer never reads
+// Progress > 1.0 (it may briefly read 0). Cancel is intentionally
+// preserved - sticky across ops per the ExecutionContext contract.
+void ResetForStaticFactory(ExecutionContext::Impl* ctx, int totalPhases) {
+  ctx->doneBooleans.store(0, std::memory_order_relaxed);
+  ctx->donePhases.store(0, std::memory_order_relaxed);
+  ctx->totalBooleans.store(0, std::memory_order_relaxed);
+  ctx->totalPhases.store(totalPhases, std::memory_order_relaxed);
+}
+
+}  // namespace
 namespace manifold {
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}
@@ -39,6 +58,18 @@ double ExecutionContext::Progress() const {
   // returned `Status() == NoError` means the operation is done.
   if (total == 0) return 1.0;
   return double(impl_->donePhases.load(std::memory_order_relaxed)) / total;
+}
+
+Manifold ExecutionContext::FromMeshGL(const MeshGL& mesh) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
+  return Manifold::FromImpl(
+      std::make_shared<Manifold::Impl>(mesh, impl_.get()));
+}
+
+Manifold ExecutionContext::FromMeshGL(const MeshGL64& mesh) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
+  return Manifold::FromImpl(
+      std::make_shared<Manifold::Impl>(mesh, impl_.get()));
 }
 
 }  // namespace manifold

@@ -780,3 +780,135 @@ TEST(Manifold, ManifoldContextCancelMidEval) {
   Manifold attached = u.WithContext(ctx);
   EXPECT_EQ(attached.Status(), Manifold::Error::Cancelled);
 }
+
+// FromMeshGL: ctx-aware analog of the `Manifold(MeshGL)` ctor.
+TEST(ExecutionContextFromMeshGL, HappyPath) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.FromMeshGL(TetGL());
+  EXPECT_FALSE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Equivalent geometry to the plain ctor.
+TEST(ExecutionContextFromMeshGL, MatchesCtor) {
+  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  ExecutionContext ctx;
+  Manifold viaCtx = ctx.FromMeshGL(mesh);
+  Manifold viaCtor(mesh);
+  EXPECT_EQ(viaCtx.Status(), viaCtor.Status());
+  EXPECT_EQ(viaCtx.NumTri(), viaCtor.NumTri());
+  EXPECT_EQ(viaCtx.NumVert(), viaCtor.NumVert());
+}
+
+// Pre-cancel beats the heavy path on well-formed input.
+TEST(ExecutionContextFromMeshGL, CancelBeforeIngest) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.FromMeshGL(TetGL());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Pre-cancel beats the empty-input fast path (would otherwise be NoError).
+TEST(ExecutionContextFromMeshGL, CancelBeforeEmptyInputWinsOverNoError) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.FromMeshGL(MeshGL{});
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Trips `numProp < 3` validation but has enough verts/tris to clear the
+// empty/under-4 short-circuits first. Coupled to ingest validation
+// order: if MissingPositionProperties moved past NotManifold these
+// triVerts wouldn't form a closed tet.
+static MeshGL MalformedMissingPositionProperties() {
+  MeshGL bad;
+  bad.numProp = 2;
+  bad.vertProperties = {0, 0, 1, 0, 0, 1, 1, 1};  // 4 verts * 2 props
+  bad.triVerts = {0, 1, 2, 1, 2, 3, 2, 3, 0, 3, 0, 1};  // 4 tris
+  return bad;
+}
+
+// Pre-cancel beats validation errors.
+TEST(ExecutionContextFromMeshGL, CancelBeforeMalformedWinsOverValidation) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Validation errors surface unchanged when no cancel is in flight;
+// counters stay at 0/kPhasesPerFromMesh since no phase ran.
+TEST(ExecutionContextFromMeshGL, ValidationErrorWithoutCancel) {
+  ExecutionContext ctx;
+  Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
+  EXPECT_EQ(m.Status(), Manifold::Error::MissingPositionProperties);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), 0);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+}
+
+// Concurrent cancel mid-ingest. Adaptive backoff guarantees we observe
+// at least one Cancelled outcome (otherwise the cancel path is dead);
+// each Cancelled hit also pins donePhases < totalPhases.
+#if MANIFOLD_PAR == 1
+TEST(ExecutionContextFromMeshGL, CancelConcurrent) {
+  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
+  int cancelledHits = 0;
+  auto sleep = std::chrono::microseconds(100);
+  for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
+    ExecutionContext ctx;
+    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+    std::thread evalThread(
+        [&] { result.store(ctx.FromMeshGL(mesh).Status()); });
+    std::this_thread::sleep_for(sleep);
+    ctx.Cancel();
+    evalThread.join();
+    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+                result.load() == Manifold::Error::NoError);
+    if (result.load() == Manifold::Error::Cancelled) {
+      ++cancelledHits;
+      EXPECT_LT(ctx.impl_->donePhases.load(),
+                ctx.impl_->totalPhases.load());
+      EXPECT_LT(ctx.Progress(), 1.0);
+    }
+    sleep *= 2;  // 100us, 200us, 400us, ... 204800us at attempt 11
+  }
+  EXPECT_GT(cancelledHits, 0);
+}
+#endif  // MANIFOLD_PAR == 1
+
+// FromMeshGL then a Boolean on the same ctx: counters reset between.
+TEST(ExecutionContextFromMeshGL, ReuseForBoolean) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.FromMeshGL(TetGL());
+  ASSERT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+
+  Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Two FromMeshGL calls on the same ctx: counters reset between.
+TEST(ExecutionContextFromMeshGL, ReuseForSecondFromMeshGL) {
+  ExecutionContext ctx;
+  ASSERT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::NoError);
+  ASSERT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
+  Manifold second = ctx.FromMeshGL(TetGL());
+  EXPECT_EQ(second.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Sticky cancel survives across FromMeshGL calls.
+TEST(ExecutionContextFromMeshGL, StickyCancelAcrossCalls) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
+}
