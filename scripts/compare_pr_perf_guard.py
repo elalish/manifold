@@ -80,6 +80,30 @@ def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -
     return "\n".join(lines), regressed, payload
 
 
+def build_invalid_summary(reason: str) -> tuple[str, dict]:
+    lines = []
+    lines.append("### PR Benchmark Guard (perfTest)")
+    lines.append("")
+    lines.append("Result: WARNING (benchmark data invalid/skipped)")
+    lines.append("")
+    lines.append(f"Reason: {reason}")
+    lines.append("")
+
+    payload = {
+        "base": None,
+        "head": None,
+        "delta_sec": None,
+        "delta_ms": None,
+        "delta_pct": None,
+        "warn_pct": None,
+        "warn_abs_ms": None,
+        "regressed": False,
+        "data_valid": False,
+        "reason": reason,
+    }
+    return "\n".join(lines), payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compare perfTest runs for PR benchmark guard.")
     parser.add_argument("--base-dir", required=True, type=Path)
@@ -90,9 +114,19 @@ def main() -> int:
     parser.add_argument("--json-out", required=True, type=Path)
     args = parser.parse_args()
 
-    base = parse_suite(args.base_dir)
-    head = parse_suite(args.head_dir)
-    markdown, regressed, payload = build_summary(base, head, args.warn_pct, args.warn_abs_ms)
+    try:
+        base = parse_suite(args.base_dir)
+        head = parse_suite(args.head_dir)
+        if len(base["runs"]) != len(head["runs"]):
+            raise RuntimeError(
+                f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
+            )
+        markdown, regressed, payload = build_summary(base, head, args.warn_pct, args.warn_abs_ms)
+        payload["data_valid"] = True
+    except Exception as exc:
+        markdown, payload = build_invalid_summary(str(exc))
+        regressed = False
+        print(f"::warning::PR benchmark guard data invalid: {exc}")
 
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
     args.json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -101,7 +135,7 @@ def main() -> int:
         print(
             f"::warning::PR benchmark regression detected: {payload['delta_pct']:.2f}% ({payload['delta_ms']:.2f} ms) slower than base."
         )
-    else:
+    elif payload.get("data_valid", False):
         print("No benchmark regression above warning thresholds.")
     return 0
 
