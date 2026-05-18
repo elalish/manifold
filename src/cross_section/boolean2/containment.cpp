@@ -98,9 +98,8 @@ bool BoxInside(const RingInfo& a, const RingInfo& b) {
 }
 
 bool RingInside(const SimplePolygon& a, const SimplePolygon& b) {
-  return std::all_of(a.begin(), a.end(), [&](const vec2& p) {
-    return PointInRing(p, b);
-  });
+  return std::all_of(a.begin(), a.end(),
+                     [&](const vec2& p) { return PointInRing(p, b); });
 }
 
 }  // namespace polyutils_detail
