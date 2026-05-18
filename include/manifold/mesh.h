@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 #include "manifold/common.h"
@@ -91,7 +92,9 @@ namespace manifold {
  * MeshGL is an alias for the standard single-precision version. Use MeshGL64 to
  * output the full double precision that Manifold uses internally.
  */
-template <typename Precision, typename I = uint32_t>
+// MeshGLP / MeshGL / MeshGL64 are forward-declared in common.h; the
+// default `I = uint32_t` lives on the forward decl.
+template <typename Precision, typename I>
 struct MeshGLP {
   /// Number of property vertices
   I NumVert() const { return vertProperties.size() / numProp; };
@@ -255,14 +258,11 @@ struct MeshGLP {
   }
 };
 
-/**
- * @brief Single-precision - ideal for most uses, especially graphics.
- */
-using MeshGL = MeshGLP<float>;
-/**
- * @brief Double-precision, 64-bit indices - best for huge meshes.
- */
-using MeshGL64 = MeshGLP<double, uint64_t>;
+// MeshGL / MeshGL64 aliases live in common.h. Pin the default template
+// arg so dropping `I = uint32_t` breaks the build instead of silently
+// changing MeshGL's index type.
+static_assert(std::is_same<MeshGL, MeshGLP<float, uint32_t>>::value,
+              "MeshGL default index type must stay uint32_t");
 
 #ifndef MANIFOLD_NO_IOSTREAM
 MeshGL64 ReadOBJ(std::istream& stream);

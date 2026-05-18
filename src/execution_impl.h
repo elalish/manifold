@@ -31,6 +31,15 @@ constexpr int kPhasesPerBoolean = 11;
 
 /** @ingroup Private
  *
+ * Heavy phases in the `Manifold::Impl::Impl(MeshGLP, ctx)` ingest;
+ * credit is published only after a phase completes successfully. Bump
+ * in lockstep with the `donePhases.fetch_add(1, ...)` sites in the
+ * ctor body.
+ */
+constexpr int kPhasesPerFromMesh = 7;
+
+/** @ingroup Private
+ *
  * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
  * to read it -- this is the canonical reader, enforced by the type system.
  * `totalBooleans`, `doneBooleans`, `totalPhases`, and `donePhases` are
