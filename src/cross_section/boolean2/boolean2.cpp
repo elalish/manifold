@@ -112,6 +112,36 @@ bool CcwTurnLess(vec2 ref, vec2 a, int edgeA, vec2 b, int edgeB) {
   return edgeA < edgeB;
 }
 
+void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
+                             const std::vector<int>& loopVerts,
+                             Polygons* polys) {
+  if (loopVerts.size() >= 3) {
+    SimplePolygon loop;
+    loop.reserve(loopVerts.size());
+    for (int v : loopVerts) loop.push_back(verts[v]);
+    polys->push_back(std::move(loop));
+  }
+}
+
+void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
+                     Polygons* polys) {
+  for (;;) {
+    bool split = false;
+    for (size_t i = 1; i < loopVerts.size() && !split; ++i) {
+      for (size_t j = 0; j < i; ++j) {
+        if (loopVerts[i] != loopVerts[j]) continue;
+        std::vector<int> simple(loopVerts.begin() + j, loopVerts.begin() + i);
+        PushLoopIfNondegenerate(verts, simple, polys);
+        loopVerts.erase(loopVerts.begin() + j + 1, loopVerts.begin() + i + 1);
+        split = true;
+        break;
+      }
+    }
+    if (!split) break;
+  }
+  PushLoopIfNondegenerate(verts, loopVerts, polys);
+}
+
 }  // namespace detail
 
 // Flatten manifold::Polygons into the lower-level (verts, edges) input.
@@ -172,11 +202,11 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   Polygons polys;
   for (int start = 0; start < nE; ++start) {
     if (visited[start]) continue;
-    SimplePolygon loop;
+    std::vector<int> loopVerts;
     int cur = start;
     while (cur >= 0 && !visited[cur]) {
       visited[cur] = true;
-      loop.push_back(verts[edges[cur].v0]);
+      loopVerts.push_back(edges[cur].v0);
       const int destV = edges[cur].v1;
       if (destV < 0 || destV >= (int)outgoing.size() ||
           outgoing[destV].empty()) {
@@ -202,8 +232,8 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       }
       cur = next;
     }
-    if (loop.size() >= 3) {
-      polys.push_back(std::move(loop));
+    if (loopVerts.size() >= 3) {
+      detail::PushSimpleLoops(verts, std::move(loopVerts), &polys);
     } else {
       // Regularization drop: the loop is a zero-area degenerate (1-vert
       // self-loop or 2-vert lens). With straight-line-segment edges,
@@ -211,7 +241,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       // convention. The assert exists to flag if a future change ever
       // produces a positive-area sub-3-vert loop, which would be an
       // upstream bug.
-      assert(std::fabs(SignedArea(loop)) < 1e-12 &&
+      assert(loopVerts.size() < 3 &&
              "regularized-drop loop should have zero area");
     }
   }
