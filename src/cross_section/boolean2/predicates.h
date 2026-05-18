@@ -32,8 +32,6 @@ using OutEdge = EdgeM;
 
 double SignedArea(const SimplePolygon& loop);
 double TotalSignedArea(const Polygons& polys);
-double SignedAreaFromEdges(const std::vector<vec2>& verts,
-                           const std::vector<OutEdge>& edges);
 double EpsilonFromScale(double L, int k_budget = 1000);
 double Coord(vec2 p, int axis);
 bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
