@@ -54,61 +54,6 @@ double TotalSignedArea(const Polygons& polys) {
   return total;
 }
 
-// Signed area of an OverlapResult-style edge set, computed directly from
-// the OutEdge list without round-tripping through OutEdgesToPolygons.
-//
-// Walks closed cycles in the directed edge graph (one unvisited outgoing
-// edge per step) and centers each cycle's shoelace on its starting
-// vertex. The cycles we trace may or may not match the true DCEL faces -
-// at a vertex of degree >= 3 (intersection point with multiple loops
-// passing through) the "first unvisited" pick can cross between cycles -
-// but the per-cycle centering preserves correctness regardless because
-// the closed-walk identity Sigma(b - a) = 0 holds for any closed sub-walk,
-// not just true face cycles. So each per-cycle r contributes zero to the
-// total area; only the unmoved-coordinate cross products do.
-//
-// FP precision: products are O(cycle_extent^2) instead of O(diameter^2).
-// For multi-component output where components are far apart, each
-// component traces its own cycle and gets local centering; products
-// stay at O(component_extent^2). The old single-reference form had
-// each edge's products scale with the global bbox diameter, losing
-// log2(diameter/component_extent) bits of precision per edge.
-double SignedAreaFromOutEdges(const std::vector<vec2>& verts,
-                              const std::vector<OutEdge>& edges) {
-  if (edges.empty() || verts.empty()) return 0.0;
-  const int nE = static_cast<int>(edges.size());
-  std::vector<std::vector<int>> outgoing(verts.size());
-  for (int i = 0; i < nE; ++i) outgoing[edges[i].v0].push_back(i);
-  std::vector<bool> visited(nE, false);
-  double sum = 0.0;
-  for (int start = 0; start < nE; ++start) {
-    if (visited[start]) continue;
-    const vec2 r = verts[edges[start].v0];
-    int cur = start;
-    while (cur >= 0 && !visited[cur]) {
-      visited[cur] = true;
-      const auto& oe = edges[cur];
-      const vec2& a = verts[oe.v0];
-      const vec2& b = verts[oe.v1];
-      const double ax = a.x - r.x, ay = a.y - r.y;
-      const double bx = b.x - r.x, by = b.y - r.y;
-      sum += oe.mult * (ax * by - bx * ay);
-      // Continue: pick any unvisited outgoing edge at b. v1 is dense in
-      // [0, verts.size()) per OverlapResult convention.
-      cur = -1;
-      if (oe.v1 >= 0 && oe.v1 < static_cast<int>(outgoing.size())) {
-        for (int e : outgoing[oe.v1]) {
-          if (!visited[e]) {
-            cur = e;
-            break;
-          }
-        }
-      }
-    }
-  }
-  return 0.5 * sum;
-}
-
 // Choose epsilon for the operation. L = bounding box half-extent rounded
 // up to power of 2. k_budget is the user's expected upper bound on how
 // many times any one edge may be adjusted (default 1000 ~= 10^-12 L).
