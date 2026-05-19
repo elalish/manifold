@@ -31,9 +31,9 @@
 class DisjointSets {
  public:
   DisjointSets(uint32_t size) : mData(size) {
-    using namespace manifold;
-    for_each(autoPolicy(size), countAt(0), countAt(size),
-             [this](uint32_t i) { mData[i] = i; });
+    for (uint32_t i = 0; i < size; ++i) {
+      mData[i] = i;
+    }
   }
 
   uint32_t find(uint32_t id) const {

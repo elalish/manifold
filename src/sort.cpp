@@ -153,7 +153,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   Permute(openVerts, vertNew2Old);
 
   Collider collider(vertBox, vertMorton);
-  DisjointSets uf(numVert);
+  DisjointSets uf(static_cast<uint32_t>(numVert));
 
   auto f = [&uf, &openVerts](int a, int b) {
     return uf.unite(openVerts[a], openVerts[b]);
@@ -169,7 +169,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   mesh.mergeToVert.clear();
   mesh.mergeFromVert.clear();
   for (size_t v = 0; v < numVert; ++v) {
-    const size_t mergeTo = uf.find(v);
+    const size_t mergeTo = uf.find(static_cast<uint32_t>(v));
     if (mergeTo != v) {
       mesh.mergeFromVert.push_back(v);
       mesh.mergeToVert.push_back(mergeTo);
@@ -523,7 +523,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
 
   // step 1: reorder within the same face, such that the halfedge with the
   // smallest starting vertex is placed first
-  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0_uz),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              std::array<Halfedge, 3> face = {halfedge_.Get(tri * 3),
                                              halfedge_.Get(tri * 3 + 1),
@@ -540,7 +540,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
            });
   if (IsCancelled(ctx)) return;
   // step 2: fix paired halfedge
-  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0_uz),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              for (int i : {0, 1, 2}) {
                const int currIdx = tri * 3 + i;

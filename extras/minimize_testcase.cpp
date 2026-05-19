@@ -89,7 +89,7 @@ bool safeToRemove(const Polygons& polys, size_t i, size_t j, double precision) {
 std::pair<int, int> findIndex(const Polygons& polys, size_t i) {
   size_t outer = 0;
   while (i >= polys[outer].size()) i -= polys[outer++].size();
-  return std::make_pair(outer, i);
+  return std::make_pair(static_cast<int>(outer), static_cast<int>(i));
 }
 
 void Dump(const Polygons& polys, const double epsilon) {

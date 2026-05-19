@@ -824,9 +824,9 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
   std::vector<ivec3> triangles;
   triangles.reserve(mesh.NumTri());
   for (size_t i = 0; i < mesh.NumTri(); i++)
-    triangles.emplace_back(mesh.triVerts[3 * i] + 1,
-                           mesh.triVerts[3 * i + 1] + 1,
-                           mesh.triVerts[3 * i + 2] + 1);
+    triangles.emplace_back(static_cast<int>(mesh.triVerts[3 * i] + 1),
+                           static_cast<int>(mesh.triVerts[3 * i + 1] + 1),
+                           static_cast<int>(mesh.triVerts[3 * i + 2] + 1));
   sort(triangles.begin(), triangles.end());
   for (const auto& tri : triangles)
     stream << "f " << tri.x << " " << tri.y << " " << tri.z << std::endl;

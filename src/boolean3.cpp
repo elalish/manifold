@@ -387,7 +387,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   sequence(i12.begin(), i12.end());
 
   int index = forward ? 0 : 1;
-  stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
+  stable_sort(i12.begin(), i12.end(), [&](size_t a, size_t b) {
     return p1q2[a][index] < p1q2[b][index] ||
            (p1q2[a][index] == p1q2[b][index] &&
             p1q2[a][1 - index] < p1q2[b][1 - index]);
@@ -420,9 +420,9 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
-  DisjointSets uA(a.vertPos_.size());
+  DisjointSets uA(static_cast<uint32_t>(a.vertPos_.size()));
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
-           countAt(a.halfedge_.size()), ctx, [&](int edge) {
+           countAt(static_cast<int>(a.halfedge_.size())), ctx, [&](int edge) {
              const int start = a.halfedge_.Start(edge);
              const int end = a.halfedge_.End(edge);
              if (start >= end) return;
@@ -442,7 +442,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (a.vertPos_.size() > 1e5) {
     tbb::combinable<std::unordered_set<int>> componentsShared;
     for_each(autoPolicy(a.vertPos_.size()), countAt(0),
-             countAt(a.vertPos_.size()), ctx,
+             countAt(static_cast<int>(a.vertPos_.size())), ctx,
              [&](int v) { componentsShared.local().insert(uA.find(v)); });
     componentsShared.combine_each([&](const std::unordered_set<int>& data) {
       components.insert(data.begin(), data.end());
@@ -451,7 +451,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #endif
   {
     for (size_t v = 0; v < a.vertPos_.size(); v++)
-      components.insert(uA.find(v));
+      components.insert(uA.find(static_cast<uint32_t>(v)));
   }
   if (IsCancelled(ctx)) return Vec<int>{};
   Vec<int> verts;
@@ -471,10 +471,10 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
-  for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()), ctx,
+  for_each(autoPolicy(w03.size()), countAt(0_uz), countAt(w03.size()), ctx,
            [&](size_t i) {
-             size_t root = uA.find(i);
-             if (root == i) return;
+             uint32_t root = uA.find(static_cast<uint32_t>(i));
+             if (root == static_cast<uint32_t>(i)) return;
              w03[i] = w03[root];
            });
   if (IsCancelled(ctx)) return Vec<int>{};

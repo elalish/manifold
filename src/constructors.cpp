@@ -490,7 +490,7 @@ std::vector<Manifold> Manifold::Decompose() const {
   if (pImpl_->status_ != Error::NoError) {
     return {PropagateStatus(pImpl_->status_)};
   }
-  DisjointSets uf(NumVert());
+  DisjointSets uf(static_cast<uint32_t>(NumVert()));
   for (size_t edge = 0; edge < pImpl_->halfedge_.size(); ++edge) {
     if (pImpl_->halfedge_.IsForward(edge)) {
       uf.unite(pImpl_->halfedge_.Start(edge), pImpl_->halfedge_.End(edge));
@@ -529,12 +529,12 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     Vec<int> faceNew2Old(NumTri());
     const auto& halfedge = pImpl_->halfedge_;
-    const int nFace =
-        copy_if(countAt(0_uz), countAt(NumTri()), faceNew2Old.begin(),
-                [i, &vertLabel, &halfedge](int face) {
-                  return vertLabel[halfedge.Start(3 * face)] == i;
-                }) -
-        faceNew2Old.begin();
+    const int nFace = copy_if(countAt(0), countAt(static_cast<int>(NumTri())),
+                              faceNew2Old.begin(),
+                              [i, &vertLabel, &halfedge](int face) {
+                                return vertLabel[halfedge.Start(3 * face)] == i;
+                              }) -
+                      faceNew2Old.begin();
 
     if (nFace == 0) continue;
     faceNew2Old.resize(nFace);

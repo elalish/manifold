@@ -309,7 +309,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   if (IsCancelled(ctx)) return;
 #else
   std::unordered_map<int, HalfedgeTriangulation> results;
-  for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
+  for (int face = 0; face < static_cast<int>(faceEdge.size()) - 1; ++face) {
     if (IsCancelled(ctx)) return;
     const int numEdge = faceEdge[face + 1] - faceEdge[face];
     if (numEdge == 0) {

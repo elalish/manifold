@@ -208,6 +208,8 @@ struct CountingIterator {
   }
 };
 
+constexpr CountingIterator<int> countAt(int i) { return CountingIterator(i); }
+
 constexpr CountingIterator<size_t> countAt(size_t i) {
   return CountingIterator(i);
 }

@@ -192,6 +192,9 @@ endif()
 
 if(MSVC)
   list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj /fp:precise)
+  if(MANIFOLD_STRICT)
+    list(APPEND MANIFOLD_FLAGS /WX)
+  endif()
 else()
   list(
     APPEND
