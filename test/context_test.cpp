@@ -826,7 +826,7 @@ TEST(ExecutionContextFromMeshGL, CancelBeforeEmptyInputWinsOverNoError) {
 static MeshGL MalformedMissingPositionProperties() {
   MeshGL bad;
   bad.numProp = 2;
-  bad.vertProperties = {0, 0, 1, 0, 0, 1, 1, 1};  // 4 verts * 2 props
+  bad.vertProperties = {0, 0, 1, 0, 0, 1, 1, 1};        // 4 verts * 2 props
   bad.triVerts = {0, 1, 2, 1, 2, 3, 2, 3, 0, 3, 0, 1};  // 4 tris
   return bad;
 }
@@ -869,8 +869,7 @@ TEST(ExecutionContextFromMeshGL, CancelConcurrent) {
                 result.load() == Manifold::Error::NoError);
     if (result.load() == Manifold::Error::Cancelled) {
       ++cancelledHits;
-      EXPECT_LT(ctx.impl_->donePhases.load(),
-                ctx.impl_->totalPhases.load());
+      EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
       EXPECT_LT(ctx.Progress(), 1.0);
     }
     sleep *= 2;  // 100us, 200us, 400us, ... 204800us at attempt 11
