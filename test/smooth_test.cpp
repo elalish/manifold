@@ -69,8 +69,8 @@ TEST(Smooth, RefineQuads) {
 TEST(Smooth, TruncatedCone) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
   Manifold smooth = cone.SmoothOut().RefineToLength(0.5).CalculateNormals(0);
-  EXPECT_NEAR(smooth.Volume(), 1158.61, 0.01);
-  EXPECT_NEAR(smooth.SurfaceArea(), 768.12, 0.01);
+  EXPECT_NEAR(smooth.Volume(), 1163.53, 0.01);
+  EXPECT_NEAR(smooth.SurfaceArea(), 769.33, 0.01);
   CheckGL(smooth, false);
 
   Manifold smooth1 = cone.SmoothOut(180, 1).RefineToLength(0.5);
@@ -78,7 +78,7 @@ TEST(Smooth, TruncatedCone) {
   EXPECT_NEAR(smooth2.Volume(), smooth1.Volume(), 0.01);
   EXPECT_NEAR(smooth2.SurfaceArea(), smooth1.SurfaceArea(), 0.01);
 
-  if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth1);
+  if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -90,8 +90,8 @@ TEST(Smooth, ToLength) {
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
-  EXPECT_NEAR(smooth.Volume(), 4505, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1337, 1);
+  EXPECT_NEAR(smooth.Volume(), 4570, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -99,7 +99,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 2.32, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }
@@ -216,8 +216,8 @@ TEST(Smooth, MissingNormalsCone) {
   Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0, 60);
   Manifold diff = cone - Manifold::Cube(vec3(10), true).Translate({0, 0, 10});
   Manifold out = diff.SmoothByNormals(0).Refine(20);
-  EXPECT_NEAR(out.Volume(), 1092, 1);
-  EXPECT_NEAR(out.SurfaceArea(), 748, 1);
+  EXPECT_NEAR(out.Volume(), 1009, 1);
+  EXPECT_NEAR(out.SurfaceArea(), 736, 1);
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 

@@ -21,6 +21,10 @@
 
 namespace manifold {
 
+/** @addtogroup Core
+ *  @{
+ */
+
 /**
  * @brief Mesh input/output suitable for pushing directly into graphics
  * libraries.
@@ -268,5 +272,5 @@ using MeshGL64 = MeshGLP<double, uint64_t>;
 MeshGL64 ReadOBJ(std::istream& stream);
 bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh);
 #endif
-
+/** @} */
 }  // namespace manifold

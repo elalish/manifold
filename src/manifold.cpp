@@ -718,11 +718,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
- * supplied vertex normal properties to define the tangent vectors. Faces of two
- * coplanar triangles will be marked as quads, while faces with three or more
- * will be flat. Zero-length normals are considered missing and will defer to
- * their neighboring normals instead. If all normals are missing, the vertex
- * pseudonormal will be used.
+ * supplied vertex normal properties to define the tangent vectors. Zero-length
+ * normals are considered missing and will defer to their neighboring normals
+ * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
@@ -746,7 +744,8 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
  * geometry of the triangles and pseudo-normals to define the tangent vectors.
- * Faces of two coplanar triangles will be marked as quads.
+ * Faces of two coplanar triangles will be marked as quads, while faces with
+ * three or more will be flat.
  *
  * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
  * than this value will remain sharp. The rest will be smoothed to G1
@@ -764,19 +763,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
-    if (minSmoothness == 0) {
-      const int numProp = pImpl->numProp_;
-      Vec<double> properties = pImpl->properties_;
-      Halfedges halfedge(pImpl->halfedge_.ToData());
-      pImpl->SetNormals(0, minSharpAngle);
-      pImpl->CreateTangents(0);
-      // Reset the properties to the original values, removing temporary normals
-      pImpl->numProp_ = numProp;
-      pImpl->properties_ = std::move(properties);
-      pImpl->halfedge_ = std::move(halfedge);
-    } else {
-      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
-    }
+    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
