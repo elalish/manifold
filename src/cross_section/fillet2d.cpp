@@ -720,12 +720,28 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     const Polygons& loops, const std::vector<size_t>& loopOffsetVec,
     const size_t edgeCount, const std::vector<EdgePair>& intersectEdgePair,
     const ColliderContext& collider, double radius, bool invert) {
+#ifdef MANIFOLD_DEBUG
   resultOutputFile << std::setprecision(
                           std::numeric_limits<double>::max_digits10)
                    << radius << std::endl;
+#endif
 
   std::vector<vec2> removedCircleCenter;
   std::vector<vec2> resultCircleCenter;
+
+#ifdef MANIFOLD_DEBUG
+  auto saveCircleCenters = [&]() {
+    resultOutputFile << removedCircleCenter.size() << std::endl;
+    for (const auto& e : removedCircleCenter) {
+      resultOutputFile << e.x << " " << e.y << std::endl;
+    }
+
+    resultOutputFile << resultCircleCenter.size() << std::endl;
+    for (const auto& e : resultCircleCenter) {
+      resultOutputFile << e.x << " " << e.y << std::endl;
+    }
+  };
+#endif
 
   std::vector<TopoConnectionPair> topoConnetionVec;
 
@@ -816,10 +832,14 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     }
   }
 
-  if (topoConnetionVec.empty())
+  if (topoConnetionVec.empty()) {
+#ifdef MANIFOLD_DEBUG
+    saveCircleCenters();
+#endif
     return std::vector<std::vector<TopoConnectionPair>>();
+  }
 
-  const bool disableCircleCluster = false;
+  const bool disableCircleCluster = true;
   std::vector<CircleCluster> circleClusters;
 
   if (disableCircleCluster) {
@@ -1024,18 +1044,9 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
   }
 
 #ifdef MANIFOLD_DEBUG
-  if (true && ManifoldParams().verbose) {
-    resultOutputFile << removedCircleCenter.size() << std::endl;
-    for (const auto& e : removedCircleCenter) {
-      resultOutputFile << e.x << " " << e.y << std::endl;
-    }
+  saveCircleCenters();
 
-    resultOutputFile << resultCircleCenter.size() << std::endl;
-
-    for (const auto& e : resultCircleCenter) {
-      resultOutputFile << e.x << " " << e.y << std::endl;
-    }
-
+  if (ManifoldParams().verbose) {
     for (size_t i = 0; i != arcConnection.size(); i++) {
       std::cout << i << " " << arcConnection[i].size();
       for (size_t j = 0; j != arcConnection[i].size(); j++) {
@@ -1552,8 +1563,12 @@ void SaveCrossSection(std::ofstream& outFile,
     }
   }
 
-  std::cout << "Successfully saved " << result.size() << " CrossSections. "
-            << std::endl;
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    std::cout << "Successfully saved " << result.size() << " CrossSections. "
+              << std::endl;
+  }
+#endif
 }
 
 std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
@@ -1627,9 +1642,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   auto result = Tracing(polygons, loopOffsetVec, arcConnection, n, radius);
   // auto result = std::vector<CrossSection>();
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose) {
-    SaveCrossSection(resultOutputFile, result);
-  }
+  SaveCrossSection(resultOutputFile, result);
   resultOutputFile.close();
 #endif
 

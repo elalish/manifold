@@ -89,13 +89,6 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
   const double inArea = manifold::CrossSection(polys).Area();
   const double outArea = rc.Area();
 
-  std::cout << std::setprecision(17) << "radius = " << radius << "\n"
-            << "inArea = " << inArea << "\n"
-            << "outArea = " << outArea << "\n"
-            << "delta = " << (outArea - inArea) << "\n"
-            << "relative delta = "
-            << (outArea - inArea) / std::max(1.0, std::abs(inArea)) << "\n";
-
   EXPECT_TRUE((manifold::CrossSection(polys).Area() == 0) ||
               (rc.Area() < manifold::CrossSection(polys).Area()));
 
@@ -151,8 +144,8 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
   const CrossSection input = CrossSection(polys);
 
 #ifdef MANIFOLD_DEBUG
-  manifold::ManifoldParams().verbose = true;
-  int idx = 2;
+  manifold::ManifoldParams().verbose = false;
+  int idx = 1;
 
   if (idx == 0) {
     double radius = 0.10000000000000001;
@@ -338,8 +331,10 @@ void RegisterPolygonTests() {
 }
 
 void RegisterFilletTests() {
-  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
-                         "zebra3.txt"};
+  std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
+                         "zebra.txt", "zebra3.txt"};
+
+  // std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
