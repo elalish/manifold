@@ -121,13 +121,14 @@ TEST(Properties, CalculateCurvature) {
 
 TEST(Properties, CalculateNormals) {
   Manifold sphere = Manifold::Sphere(10);
-  Manifold cut = (sphere - sphere.Translate(vec3(10)));
+  vec3 center(10);
+  Manifold cut = (sphere - sphere.Translate(center));
   cut.Status();
   Manifold cut2(cut.GetMeshGL64());
   EXPECT_TRUE(cut.MatchesTriNormals());
   EXPECT_TRUE(cut2.MatchesTriNormals());
-  MeshGL64 out = cut.CalculateNormals(0).GetMeshGL64(0);
-  MeshGL64 out2 = cut2.CalculateNormals(0).GetMeshGL64(0);
+  MeshGL64 out = cut.CalculateNormals().GetMeshGL64();
+  MeshGL64 out2 = cut2.CalculateNormals().GetMeshGL64();
   ASSERT_EQ(out.NumTri(), out2.NumTri());
   ASSERT_EQ(out.NumVert(), out2.NumVert());
   ASSERT_EQ(out.numProp, out2.numProp);
@@ -143,12 +144,26 @@ TEST(Properties, CalculateNormals) {
       norm[j] = out.vertProperties[np * v + 3 + j];
       norm2[j] = out2.vertProperties[np * v + 3 + j];
       ASSERT_FLOAT_EQ(pos[j], pos2[j]);
+      ASSERT_NEAR(norm[j], norm2[j], 1e-14);
     }
     if (dot(pos, norm) <= 0) ++numBad;
     if (dot(pos2, norm2) <= 0) ++numBad2;
+    EXPECT_FLOAT_EQ(la::length(norm), 1.0);
+    EXPECT_TRUE(dot(la::normalize(pos), norm) > 0.99 ||
+                dot(la::normalize(center - pos), norm) > 0.99);
   }
   EXPECT_EQ(numBad, 0);
   EXPECT_EQ(numBad2, 0);
+  for (int tv = out2.runIndex[0]; tv < out2.runIndex[1]; ++tv) {
+    const int v = out2.triVerts[tv];
+    auto pos = out2.GetVertPos(v);
+    auto norm = pos;
+    for (int j : {0, 1, 2}) {
+      norm[j] = out2.vertProperties[np * v + 3 + j];
+    }
+    EXPECT_FLOAT_EQ(la::length(norm), 1.0);
+    EXPECT_GT(dot(la::normalize(pos), norm), 0.99);
+  }
 }
 
 TEST(Properties, Coplanar) {

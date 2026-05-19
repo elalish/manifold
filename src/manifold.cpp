@@ -680,7 +680,7 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
 
 /**
  * Fills in vertex properties for normal vectors, calculated from the mesh
- * geometry. Flat faces composed of three or more triangles will remain flat.
+ * geometry.
  *
  * @param normalIdx The property channel in which to store the X values of the
  * normals. The X, Y, and Z channels will be sequential. The property set will
@@ -748,11 +748,10 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * geometry of the triangles and pseudo-normals to define the tangent vectors.
  * Faces of two coplanar triangles will be marked as quads.
  *
- * @param minSharpAngle degrees, default 60. Any edges with angles greater than
- * this value will remain sharp. The rest will be smoothed to G1 continuity,
- * with the caveat that flat faces of three or more triangles will always remain
- * flat. With a value of zero, the model is faceted, but in this case there is
- * no point in smoothing.
+ * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
+ * than this value will remain sharp. The rest will be smoothed to G1
+ * continuity. With a value of zero, the model is faceted, but in this case
+ * there is no point in smoothing.
  *
  * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
  * angles. The default gives a hard edge, while values > 0 will give a small

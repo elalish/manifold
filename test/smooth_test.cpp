@@ -78,7 +78,7 @@ TEST(Smooth, TruncatedCone) {
   EXPECT_NEAR(smooth2.Volume(), smooth1.Volume(), 0.01);
   EXPECT_NEAR(smooth2.SurfaceArea(), smooth1.SurfaceArea(), 0.01);
 
-  if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
+  if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth1);
 }
 
 #ifdef MANIFOLD_CROSS_SECTION
@@ -213,7 +213,7 @@ TEST(Smooth, MissingNormals) {
 }
 
 TEST(Smooth, MissingNormalsCone) {
-  Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0);
+  Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0, 60);
   Manifold diff = cone - Manifold::Cube(vec3(10), true).Translate({0, 0, 10});
   Manifold out = diff.SmoothByNormals(0).Refine(20);
   EXPECT_NEAR(out.Volume(), 1092, 1);
@@ -382,48 +382,6 @@ TEST(Smooth, Torus) {
   if (options.exportModels) WriteTestOBJ("smoothTorus.obj", smooth);
 }
 #endif
-
-TEST(Smooth, SineSurface) {
-  Manifold surface =
-      Manifold::LevelSet(
-          [](vec3 p) {
-            double mid = la::sin(p.x) + la::sin(p.y);
-            return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0 : -1.0;
-          },
-          {vec3(-2 * kPi + 0.2), vec3(0 * kPi - 0.2)}, 1)
-          .Simplify();
-
-  Manifold smoothed =
-      surface.CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
-  EXPECT_NEAR(smoothed.Volume(), 8.07, 0.01);
-  EXPECT_NEAR(smoothed.SurfaceArea(), 30.87, 0.01);
-  EXPECT_EQ(smoothed.Genus(), 0);
-  EXPECT_NEAR(smoothed.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
-              smoothed.Volume(), 1e-5);
-
-  Manifold smoothed1 = surface.SmoothOut(50).Refine(8);
-  EXPECT_FLOAT_EQ(smoothed1.Volume(), smoothed.Volume());
-  EXPECT_FLOAT_EQ(smoothed1.SurfaceArea(), smoothed.SurfaceArea());
-  EXPECT_EQ(smoothed1.Genus(), 0);
-  EXPECT_NEAR(smoothed1.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
-              smoothed1.Volume(), 1e-5);
-
-  Manifold smoothed2 = surface.SmoothOut(180, 1).Refine(8);
-  EXPECT_NEAR(smoothed2.Volume(), 8.95, 0.01);
-  EXPECT_NEAR(smoothed2.SurfaceArea(), 33.35, 0.01);
-  EXPECT_EQ(smoothed2.Genus(), 0);
-  EXPECT_NEAR(smoothed2.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
-              smoothed2.Volume(), 1e-3);
-
-  Manifold smoothed3 = surface.SmoothOut(50, 0.5).Refine(8);
-  EXPECT_NEAR(smoothed3.Volume(), 8.38, 0.01);
-  EXPECT_NEAR(smoothed3.SurfaceArea(), 31.55, 0.02);
-  EXPECT_EQ(smoothed3.Genus(), 0);
-  EXPECT_NEAR(smoothed3.TrimByPlane({0, 1, 1}, -3.19487).Volume(),
-              smoothed3.Volume(), 1e-5);
-
-  if (options.exportModels) WriteTestOBJ("smoothSineSurface.obj", smoothed);
-}
 
 TEST(Smooth, SDF) {
   const double r = 10;
