@@ -200,7 +200,8 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
       tlist.clear();
       tlist.reserve(list.size());
       // The list is sorted by t (invariant maintained by
-      // BuildEdgeVertLists and FindAndInsertIntersections's lower_bound
+      // BuildEdgeVertListsFromEdgePairs and FindAndInsertIntersections's
+      // lower_bound
       // insertion); filter to intersection verts only.
       for (int v : list) {
         if (v >= (int)vertEdges.size() || vertEdges[v].empty()) continue;

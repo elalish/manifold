@@ -17,7 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include "bvh.h"
 #include "predicates.h"
 #include "vertex_merge.h"
 
@@ -25,10 +24,6 @@ namespace manifold {
 namespace boolean2 {
 
 extern const size_t kFusedNarrowParallelMin;
-
-std::vector<std::vector<int>> BuildEdgeVertLists(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<Box2>& edgeBoxes, const BVH& bvh);
 
 std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
