@@ -17,6 +17,8 @@
 // pipeline; operates on already-regularized `Polygons` produced by
 // FillByRule.
 
+#include "containment.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>

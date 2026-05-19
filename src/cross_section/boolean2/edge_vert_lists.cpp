@@ -16,6 +16,8 @@
 // list of vertices that lie within eps of the edge interior. Candidates are
 // derived from the same edge-pair broad phase used for intersections.
 
+#include "edge_vert_lists.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <vector>

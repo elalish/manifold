@@ -18,6 +18,8 @@
 // edges' parameter lists). Eager-propagation re-sweeps any vert that
 // snapped onto its k-th edge to detect k+1 incidences in one pass.
 
+#include "intersections.h"
+
 #include <algorithm>
 #include <chrono>
 #include <utility>
