@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#define _USE_MATH_DEFINES
+
 #include "manifold/polygon.h"
 
 #include <algorithm>
-#ifndef MANIFOLD_NO_IOSTREAM
+#include <cmath>
 #include <fstream>
-#endif
-#include <limits>
+#include <iomanip>
 
+#include "../src/vec.h"
+#include "manifold/cross_section.h"
 #include "test.h"
 
 namespace {
@@ -70,19 +73,216 @@ void TestPoly(const Polygons& polys, int expectedNumTri,
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 }
 
+bool TestFillet(const Polygons& polys, CrossSection input, double radius,
+                int inputCircularSegments) {
+  const int circularSegments = inputCircularSegments > 2
+                                   ? inputCircularSegments
+                                   : Quality::GetCircularSegments(radius);
+
+  auto r = input.Fillet(radius, circularSegments);
+  auto rc = manifold::CrossSection::Compose(r);
+
+#ifdef MANIFOLD_DEBUG
+  std::cout << "[==========] Testing radius: " << radius << std::endl;
+#endif
+
+  const double inArea = manifold::CrossSection(polys).Area();
+  const double outArea = rc.Area();
+
+  std::cout << std::setprecision(17) << "radius = " << radius << "\n"
+            << "inArea = " << inArea << "\n"
+            << "outArea = " << outArea << "\n"
+            << "delta = " << (outArea - inArea) << "\n"
+            << "relative delta = "
+            << (outArea - inArea) / std::max(1.0, std::abs(inArea)) << "\n";
+
+  EXPECT_TRUE((manifold::CrossSection(polys).Area() == 0) ||
+              (rc.Area() < manifold::CrossSection(polys).Area()));
+
+  auto toRad = [](const vec2& v) -> double { return atan2(v.y, v.x); };
+
+  auto normalizeAngle = [](double angle) -> double {
+    while (angle < 0) angle += 2.0 * M_PI;
+    while (angle >= 2.0 * M_PI) angle -= 2.0 * M_PI;
+    return angle;
+  };
+
+  for (const auto& crossSection : r) {
+    auto polygon = crossSection.ToPolygons();
+    for (const auto& loop : polygon) {
+      const auto& cs = CrossSection(loop);
+
+      bool isCCW = cs.Area() > 0;
+
+      for (size_t i = 0; i != loop.size(); i++) {
+        vec2 p1 = loop[i], p2 = loop[(i + 1) % loop.size()],
+             p3 = loop[(i + 2) % loop.size()];
+
+        vec2 e1 = p2 - p1, e2 = p3 - p2;
+
+        // Check angle between edge
+        double angle = normalizeAngle(toRad(e2) - toRad(e1));
+
+        const double dPhi = 2.0 * M_PI / circularSegments;
+
+        // Is the threshold too low?
+        // Specify to Polygon.Fillet.CoincidentHole4
+        EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.1));
+      }
+    }
+  }
+
+  // Use the result run again, check the result is almost same.
+  // Check idempotent
+  if (false) {
+    auto rr = rc.Fillet(radius, circularSegments);
+    auto rrc = manifold::CrossSection::Compose(rr);
+
+    EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
+  }
+
+  return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
+};
+
+void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
+  std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
+
+  const int inputCircularSegments = 20;
+  const CrossSection input = CrossSection(polys);
+
+#ifdef MANIFOLD_DEBUG
+  manifold::ManifoldParams().verbose = true;
+  int idx = 2;
+
+  if (idx == 0) {
+    double radius = 0.10000000000000001;
+    TestFillet(polys, input, radius, inputCircularSegments);
+  } else if (idx == 1) {
+    auto bbox = input.Bounds().Size();
+
+    double min = std::min(bbox.x, bbox.y), max = std::max(bbox.x, bbox.y);
+
+    std::vector<double> radiusVec;
+    if (true) {
+      std::array<double, 6> multipliers{1E-4, 1E-3, 1E-2, 0.1, 0.5, 1};
+      // std::array<double, 1> multipliers{1E-3};
+      for (auto it = multipliers.begin(); it != multipliers.end(); it++) {
+        double mmin = *it * min, mmax = *it * max;
+        if (std::abs(mmin - mmax) < 1E-6) {
+          radiusVec.push_back(mmin);
+          // radiusVec.push_back(-1.0 * mmin);
+        } else {
+          radiusVec.push_back(min);
+          // radiusVec.push_back(max);
+
+          // radiusVec.push_back(-1.0 * mmin);
+          // radiusVec.push_back(-1.0 * mmax);
+        }
+      }
+    } else {
+      radiusVec.push_back(0.7);
+    }
+
+    std::sort(radiusVec.begin(), radiusVec.end());
+
+    for (auto it = radiusVec.begin(); it != radiusVec.end(); it++)
+      TestFillet(polys, input, *it, inputCircularSegments);
+  } else {
+#endif
+
+    const vec2 bbox = input.Bounds().Size();
+    const double min = std::min(bbox.x, bbox.y);
+
+    // Testing Positive Radius
+
+    double low = 1E-6, high = 0.8 * min;
+
+    TestFillet(polys, input, low, inputCircularSegments);
+
+    // Maximum attempt 20 times
+    // Early stop if 10 case result non zero.
+
+    const size_t MAXIMUM = 100, EARLYSTOP = 100;
+    for (size_t i = 0, j = 0; i != MAXIMUM && j != EARLYSTOP; i++) {
+      double mid = low + (high - low) * 0.5;
+
+      if (std::abs(low - mid) < 1E-12) break;
+
+      // Area non zero
+      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+        low = mid;
+        j++;
+      } else {
+        high = mid;
+      }
+    }
+
+    return;
+
+    // Testing Negative Radius
+
+    low = -1E-6, high = -0.8 * min;
+
+    TestFillet(polys, input, low, inputCircularSegments);
+
+    // Maximum attempt 20 times
+    // Early stop if 10 case result non zero.
+    for (size_t i = 0, j = 0; i != MAXIMUM && j != EARLYSTOP; i++) {
+      double mid = low + (high - low) * 0.5;
+
+      // Area non zero
+      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+        high = mid;
+        j++;
+      } else {
+        low = mid;
+      }
+    }
+
+#ifdef MANIFOLD_DEBUG
+  }
+#endif
+}
+
+}  // namespace
+
 class PolygonTestFixture : public testing::Test {
  public:
   Polygons polys;
   double epsilon;
   int expectedNumTri;
+  std::string name;
+
   explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri)
-      : polys(polys), epsilon(epsilon), expectedNumTri(expectedNumTri) {}
+                              int expectedNumTri, const std::string& name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
-#ifndef MANIFOLD_NO_IOSTREAM
-void RegisterPolygonTestsFile(const std::string& filename) {
+class FilletTestFixture : public testing::Test {
+ public:
+  Polygons polys;
+  double epsilon;
+  int expectedNumTri;
+  std::string name;
+
+  explicit FilletTestFixture(Polygons polys, double epsilon, int expectedNumTri,
+                             const std::string& name)
+      : polys(polys),
+        epsilon(epsilon),
+        expectedNumTri(expectedNumTri),
+        name(name) {}
+
+  void TestBody() { BuildFillet(polys, epsilon); }
+};
+
+template <typename TestFixture>
+void RegisterPolygonTestsFile(const std::string& suitename,
+                              const std::string& filename) {
   auto f = std::ifstream(filename);
   EXPECT_TRUE(f.is_open());
 
@@ -113,17 +313,14 @@ void RegisterPolygonTestsFile(const std::string& filename) {
       }
     }
     testing::RegisterTest(
-        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
-          return new PolygonTestFixture(polys, epsilon, expectedNumTri);
+        suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> TestFixture* {
+          return new TestFixture(polys, epsilon, expectedNumTri, name);
         });
   }
   f.close();
 }
-#endif
-}  // namespace
 
-#ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
                          "zebra3.txt"};
@@ -134,12 +331,24 @@ void RegisterPolygonTests() {
   std::string file = __FILE__;
   auto end = std::min(file.rfind('\\'), file.rfind('/'));
   std::string dir = file.substr(0, end);
-  for (auto f : files) RegisterPolygonTestsFile(dir + "/polygons/" + f);
+  for (auto f : files)
+    RegisterPolygonTestsFile<PolygonTestFixture>("Polygon",
+                                                 dir + "/polygons/" + f);
 #endif
 }
+
+void RegisterFilletTests() {
+  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
+                         "zebra3.txt"};
+
+#ifdef __EMSCRIPTEN__
+  for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
 #else
-// Stub when MANIFOLD_NO_IOSTREAM is set: polygon corpus tests need
-// std::ifstream to load fixtures, so they're skipped. test_main.cpp
-// still calls RegisterPolygonTests(); this stub keeps the link clean.
-void RegisterPolygonTests() {}
+  std::string file = __FILE__;
+  auto end = std::min(file.rfind('\\'), file.rfind('/'));
+  std::string dir = file.substr(0, end);
+  for (auto f : files)
+    RegisterPolygonTestsFile<FilletTestFixture>("Polygon.Fillet",
+                                                dir + "/polygons/" + f);
 #endif
+}
