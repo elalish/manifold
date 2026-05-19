@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenSCAD to Manifold Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #222; font-family: sans-serif; color: white; }
+    #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    #ui h2 { margin: 0 0 10px 0; font-size: 16px; }
+    input[type="text"] { width: 250px; padding: 6px; border: 1px solid #555; border-radius: 4px; background: #333; color: white; }
+    button { padding: 6px 12px; cursor: pointer; background: #007bff; border: none; color: white; border-radius: 4px; font-weight: bold; }
+    button:hover { background: #0056b3; }
+    #errorMsg { color: #ff6b6b; margin-top: 10px; font-size: 14px; max-width: 300px; display: none; }
+    #axisIndicator { position: absolute; bottom: 10px; left: 10px; width: 100px; height: 100px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; background: rgba(0,0,0,0.5); z-index: 5; }
+    #axisIndicator canvas { display: block; }
+    .axisLabel { position: absolute; font-weight: bold; font-size: 12px; pointer-events: none; }
+    #axisLabelX { color: #ff0000; bottom: 35px; left: 75px; }
+    #axisLabelY { color: #00ff00; bottom: 75px; left: 45px; }
+    #axisLabelZ { color: #0088ff; bottom: 45px; left: 25px; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "manifold-3d": "https://unpkg.com/manifold-3d@3.3.2/manifold.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <h2>Manifold Viewer</h2>
+    <label for="filename">Compiled Manifold JS Object:</label><br>
+    <div style="margin-top: 5px;">
+      <!-- Change this file name at will -->
+      <input type="text" id="filename" value="out/cube.ts" placeholder="out/cube.ts">
+      <button id="loadBtn">Load</button>
+    </div>
+    <div id="errorMsg"></div>
+  </div>
+  
+  <div id="axisIndicator">
+    <div id="axisLabelX" class="axisLabel">X</div>
+    <div id="axisLabelY" class="axisLabel">Y</div>
+    <div id="axisLabelZ" class="axisLabel">Z</div>
+  </div>
+  
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222222);
+    
+    // Keep reference to generated module and mesh
+    let currentMesh = null;
+    let currentModule = null; 
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.up.set(0, 0, 1);
+    camera.position.set(50, 50, 50);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    // Axis indicator setup
+    const axisIndicatorElement = document.getElementById('axisIndicator');
+    const axisRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    axisRenderer.setSize(100, 100);
+    axisRenderer.setPixelRatio(window.devicePixelRatio);
+    axisRenderer.setClearColor(0x000000, 0);
+    axisRenderer.domElement.style.display = 'block';
+    axisRenderer.domElement.style.width = '100px';
+    axisRenderer.domElement.style.height = '100px';
+    axisIndicatorElement.appendChild(axisRenderer.domElement);
+
+    const axisScene = new THREE.Scene();
+    const axisCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    axisCamera.up.set(0, 0, 1);
+    axisCamera.position.set(0, 0, 2);
+
+    const axisHelper = new THREE.AxesHelper(1);
+    axisScene.add(axisHelper);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemiLight.position.set(0, 200, 0);
+    scene.add(hemiLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(0, 100, 50);
+    scene.add(dirLight);
+
+    // Helpers
+    scene.add(new THREE.AxesHelper(20));
+    const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x333333);
+    // OpenSCAD is Z-up, so place the ground grid on the XY plane (z = 0).
+    gridHelper.rotation.x = Math.PI / 2;
+    scene.add(gridHelper);
+
+    const errorMsgInfo = document.getElementById('errorMsg');
+
+    function showError(msg) {
+      errorMsgInfo.textContent = msg;
+      errorMsgInfo.style.display = 'block';
+    }
+
+    function hideError() {
+      errorMsgInfo.style.display = 'none';
+      errorMsgInfo.textContent = '';
+    }
+
+    function stripGeneratedTypeScript(code) {
+      return code
+        .replace(/:\s*any(?:\[\])?/g, '')
+        .replace(/:\s*import\([^)]*\)\.[A-Za-z_$][\w$]*(?:\[\])?/g, '');
+    }
+
+    async function importGeneratedTs(filename) {
+      const sourceUrl = new URL(filename, window.location.href);
+      sourceUrl.searchParams.set('t', Date.now());
+      const tsCode = await fetch(sourceUrl).then(res => {
+        if (!res.ok) throw new Error(`Failed to load ${filename}`);
+        return res.text();
+      });
+
+      const runtimeMatch = tsCode.match(/^\s*import\s+\*\s+as\s+__rt\s+from\s+['"]([^'"]+)['"]\s*;/m);
+      if (!runtimeMatch) {
+        throw new Error(`The file '${filename}' does not import runtime.js in the expected format.`);
+      }
+
+      const runtimeUrl = new URL(runtimeMatch[1], sourceUrl);
+      runtimeUrl.searchParams.set('t', Date.now());
+      const __rt = await import(runtimeUrl.href);
+
+      let jsCode = tsCode
+        .replace(runtimeMatch[0], '')
+        .replace(/export\s+const\s+result\s*=/, 'const result =');
+      jsCode = stripGeneratedTypeScript(jsCode);
+
+      const AsyncFunction = async function () {}.constructor;
+      const evaluate = new AsyncFunction('__rt', `${jsCode}\nreturn { result };`);
+      return evaluate(__rt);
+    }
+
+    async function loadMesh(filename) {
+      hideError();
+      const btn = document.getElementById('loadBtn');
+      const originalText = btn.textContent;
+      btn.textContent = 'Loading...';
+      btn.disabled = true;
+      const previousMesh = currentMesh;
+
+      try {
+        let module;
+        if (filename.endsWith('.ts')) {
+          module = await importGeneratedTs(filename);
+        } else {
+          // Dynamic import with cache busting so changes auto-reflect
+          module = await import(`./${filename}?t=${Date.now()}`);
+        }
+        
+        if (!module.result) {
+          throw new Error(`The file '${filename}' does not export 'result'. Please make sure you generated it after the recent compiler update.`);
+        }
+
+        let manifoldDef = module.result;
+        // CrossSection (2D) has extrude but not getMesh; extrude for display
+        if (manifoldDef && typeof manifoldDef.extrude === 'function' && typeof manifoldDef.getMesh !== 'function') {
+          manifoldDef = manifoldDef.extrude(0.1);
+        }
+        // Ensure we retrieve the mesh representation
+        const manifoldMesh = manifoldDef.getMesh({});
+        if (!manifoldMesh || manifoldMesh.numVert === 0 || manifoldMesh.numTri === 0) {
+          throw new Error(`'${filename}' contains empty geometry (0 vertices / 0 triangles).`);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        
+        const numProp = manifoldMesh.numProp;
+        const positions = new Float32Array(manifoldMesh.numVert * 3);
+        
+        // Extract xyz from interleaved properties array
+        for (let i = 0; i < manifoldMesh.numVert; i++) {
+          positions[i * 3 + 0] = manifoldMesh.vertProperties[i * numProp + 0];
+          positions[i * 3 + 1] = manifoldMesh.vertProperties[i * numProp + 1];
+          positions[i * 3 + 2] = manifoldMesh.vertProperties[i * numProp + 2];
+        }
+
+        // Custom color layout is appended as [r,g,b,a,marker] at the end.
+        let hasVertexColor = numProp >= 5;
+        let averageAlpha = 1;
+        if (hasVertexColor) {
+          const colorOffset = numProp - 5;
+          const markerOffset = numProp - 1;
+          const colors = new Float32Array(manifoldMesh.numVert * 3);
+          let alphaSum = 0;
+          let markedColorCount = 0;
+          const fallbackColor = new THREE.Color(0x00d2ff);
+
+          const clamp01 = (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return 0;
+            if (n <= 0) return 0;
+            if (n >= 1) return 1;
+            return n;
+          };
+
+          for (let i = 0; i < manifoldMesh.numVert; i++) {
+            const offset = i * numProp;
+            const marker = Number(manifoldMesh.vertProperties[offset + markerOffset]);
+            const hasMarkedColor = Number.isFinite(marker) && marker > 0.5;
+            const rawR = Number(manifoldMesh.vertProperties[offset + colorOffset]);
+            const rawG = Number(manifoldMesh.vertProperties[offset + colorOffset + 1]);
+            const rawB = Number(manifoldMesh.vertProperties[offset + colorOffset + 2]);
+            const hasFiniteRGB = Number.isFinite(rawR) && Number.isFinite(rawG) && Number.isFinite(rawB);
+            const useCustomColor = hasMarkedColor && hasFiniteRGB;
+            const r = useCustomColor ? clamp01(rawR) : fallbackColor.r;
+            const g = useCustomColor ? clamp01(rawG) : fallbackColor.g;
+            const b = useCustomColor ? clamp01(rawB) : fallbackColor.b;
+            if (useCustomColor) markedColorCount++;
+            colors[i * 3 + 0] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
+            const rawA = Number(manifoldMesh.vertProperties[offset + colorOffset + 3]);
+            alphaSum += useCustomColor && Number.isFinite(rawA) ? clamp01(rawA) : 1;
+          }
+
+          if (markedColorCount > 0) {
+            averageAlpha = manifoldMesh.numVert > 0 ? alphaSum / manifoldMesh.numVert : 1;
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          } else {
+            hasVertexColor = false;
+          }
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(new THREE.BufferAttribute(manifoldMesh.triVerts, 1));
+        geometry.computeVertexNormals();
+
+        // Material with beautiful wireframe combo or normal coloring
+        const material = new THREE.MeshStandardMaterial({
+          color: hasVertexColor ? 0xffffff : 0x00d2ff,
+          vertexColors: hasVertexColor,
+          opacity: hasVertexColor ? averageAlpha : 1,
+          transparent: hasVertexColor && averageAlpha < 0.999,
+          roughness: 0.4,
+          metalness: 0.2,
+          side: THREE.DoubleSide
+        });
+        
+        const wireframeMaterial = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.1
+        });
+
+        currentMesh = new THREE.Group();
+        currentMesh.add(new THREE.Mesh(geometry, material));
+        currentMesh.add(new THREE.Mesh(geometry, wireframeMaterial));
+
+        scene.add(currentMesh);
+        if (previousMesh) {
+          scene.remove(previousMesh);
+          previousMesh.children.forEach(child => {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => m.dispose());
+            } else {
+              child.material.dispose();
+            }
+          });
+        }
+
+        // Center the camera on the object
+        geometry.computeBoundingBox();
+        if (!geometry.boundingBox) {
+          throw new Error(`'${filename}' did not produce a valid bounding box.`);
+        }
+        const center = new THREE.Vector3();
+        geometry.boundingBox.getCenter(center);
+        controls.target.copy(center);
+        
+        // Adjust camera position based on bounding sphere
+        geometry.computeBoundingSphere();
+        if (!geometry.boundingSphere) {
+          throw new Error(`'${filename}' did not produce a valid bounding sphere.`);
+        }
+        const radius = geometry.boundingSphere.radius;
+        camera.position.copy(center).add(new THREE.Vector3(radius * 1.5, radius * 1.5, radius * 1.5));
+
+      } catch (err) {
+        currentMesh = previousMesh;
+        console.error(err);
+        showError(err.message);
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    // Connect UI
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      loadMesh(document.getElementById('filename').value);
+    });
+
+    document.getElementById('filename').addEventListener('keypress', (e) => {
+      if(e.key === 'Enter') {
+        loadMesh(document.getElementById('filename').value);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      axisRenderer.setSize(100, 100);
+    }, false);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      
+      // Sync axis indicator with main camera rotation
+      axisCamera.position.copy(camera.position);
+      axisCamera.position.sub(controls.target);
+      axisCamera.position.setLength(2);
+      axisCamera.lookAt(axisScene.position);
+      
+      renderer.render(scene, camera);
+      axisRenderer.render(axisScene, axisCamera);
+    }
+    animate();
+    
+    // Fetch file right away at start
+    setTimeout(() => loadMesh(document.getElementById('filename').value), 500);
+
+  </script>
+</body>
+</html>
