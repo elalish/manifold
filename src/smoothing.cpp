@@ -466,8 +466,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
   const int oldNumProp = NumProp();
 
-  Vec<bool> triIsFlatFace = FlatFaces();
-  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<int> vertNumSharp(NumVert(), 0);
   for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_.IsForward(e)) continue;
@@ -479,17 +477,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     if (dihedral > minSharpAngle) {
       ++vertNumSharp[halfedge_.Start(e)];
       ++vertNumSharp[halfedge_.End(e)];
-    } else {
-      const bool faceSplit =
-          triIsFlatFace[tri1] != triIsFlatFace[tri2] ||
-          (triIsFlatFace[tri1] && triIsFlatFace[tri2] &&
-           !meshRelation_.triRef[tri1].SameFace(meshRelation_.triRef[tri2]));
-      if (vertFlatFace[halfedge_.Start(e)] == -2 && faceSplit) {
-        ++vertNumSharp[halfedge_.Start(e)];
-      }
-      if (vertFlatFace[halfedge_.End(e)] == -2 && faceSplit) {
-        ++vertNumSharp[halfedge_.End(e)];
-      }
     }
   }
 
@@ -525,9 +512,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const int vert = halfedge_.Start(startEdge);
 
     if (vertNumSharp[vert] < 2) {  // vertex has single normal
-      const vec3 worldNormal = vertFlatFace[vert] >= 0
-                                   ? faceNormal_[vertFlatFace[vert]]
-                                   : vertNormal_[vert];
+      const vec3 worldNormal = vertNormal_[vert];
       // Non-zero normalIdx is the legacy deferred-transform path: store in
       // per-mesh frame so GetMeshGL's runTransform application on export
       // recovers world frame even after later transforms. Standard slot 0
@@ -574,11 +559,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
       const double dihedral =
           degrees(AngleBetween(faceNormal_[face], faceNormal_[prevFace]));
-      if (dihedral > minSharpAngle ||
-          triIsFlatFace[face] != triIsFlatFace[prevFace] ||
-          (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
-           !meshRelation_.triRef[face].SameFace(
-               meshRelation_.triRef[prevFace]))) {
+      if (dihedral > minSharpAngle) {
         break;
       }
       current = next;
@@ -596,44 +577,21 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     ForVert<FaceEdge>(
         endEdge,
         [&](int current) {
-          if (IsInsideQuad(current)) {
-            return FaceEdge({current / 3, vec3(NAN)});
-          }
           const int vert = halfedge_.End(current);
-          vec3 pos = vertPos_[vert];
-          if (vertNumSharp[vert] < 2) {
-            // opposite vert has fixed normal
-            const vec3 normal = vertFlatFace[vert] >= 0
-                                    ? faceNormal_[vertFlatFace[vert]]
-                                    : vertNormal_[vert];
-            // Flair out the normal we're calculating to give the edge a
-            // more constant curvature to meet the opposite normal. Achieve
-            // this by pointing the tangent toward the opposite bezier
-            // control point instead of the vert itself.
-            pos += vec3(TangentFromNormal(normal, halfedge_.Pair(current)));
-          }
-          return FaceEdge({current / 3, SafeNormalize(pos - centerPos)});
+          return FaceEdge(
+              {current / 3, SafeNormalize(vertPos_[vert] - centerPos)});
         },
         [&](int, const FaceEdge& here, FaceEdge& next) {
           const double dihedral = degrees(
               AngleBetween(faceNormal_[here.face], faceNormal_[next.face]));
-          if (dihedral > minSharpAngle ||
-              triIsFlatFace[here.face] != triIsFlatFace[next.face] ||
-              (triIsFlatFace[here.face] && triIsFlatFace[next.face] &&
-               !meshRelation_.triRef[here.face].SameFace(
-                   meshRelation_.triRef[next.face]))) {
+          if (dihedral > minSharpAngle) {
             normals.push_back(vec3(0.0));
             meshIds.push_back(meshRelation_.triRef[next.face].meshID);
           }
           groups.push_back(normals.size() - 1);
           if (std::isfinite(next.normalizedEdge.x)) {
-            // Boolean subtractee triangles keep their original winding but
-            // have faceNormal_ negated, so the edge-cross points opposite to
-            // faceNormal_ there - flip to keep the accumulation outward-from-
-            // result.
             vec3 dir = SafeNormalize(
                 la::cross(next.normalizedEdge, here.normalizedEdge));
-            if (la::dot(dir, faceNormal_[next.face]) < 0) dir = -dir;
             normals.back() +=
                 dir * AngleBetween(here.normalizedEdge, next.normalizedEdge);
           } else {
@@ -642,10 +600,10 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         });
 
     for (int i = 0; i < normals.size(); ++i) {
-      vec3 n = SafeNormalize(normals[i]);
+      vec3 n = normals[i];
       // Same frame-storage rule as the single-normal path above.
       if (normalIdx != 0) n = getTransform(meshIds[i]) * n;
-      normals[i] = n;
+      normals[i] = SafeNormalize(n);
     }
 
     int lastGroup = 0;

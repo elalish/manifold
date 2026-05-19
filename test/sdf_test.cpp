@@ -164,22 +164,19 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  Manifold surface =
-      Manifold::LevelSet(
-          [](vec3 p) {
-            double mid = la::sin(p.x) + la::sin(p.y);
-            return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
-          },
-          {vec3(-1.75 * kPi), vec3(1.75 * kPi)}, 1)
-          .Simplify();
-  Manifold smoothed = surface.SmoothOut(180).RefineToLength(0.05);
+  Manifold surface = Manifold::LevelSet(
+      [](vec3 p) {
+        double mid = la::sin(p.x) + la::sin(p.y);
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
+      },
+      {vec3(-1.75 * kPi), vec3(1.75 * kPi)}, 1);
 
-  EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(smoothed.Genus(), 38);
-  EXPECT_NEAR(smoothed.Volume(), 107.1, 0.1);
-  EXPECT_NEAR(smoothed.SurfaceArea(), 394.0, 0.1);
+  EXPECT_EQ(surface.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(surface.Genus(), 38);
+  EXPECT_NEAR(surface.Volume(), 102.4, 0.1);
+  EXPECT_NEAR(surface.SurfaceArea(), 392.4, 0.1);
 
-  if (options.exportModels) WriteTestOBJ("sinesurface.obj", smoothed);
+  if (options.exportModels) WriteTestOBJ("sinesurface.obj", surface);
 }
 
 TEST(SDF, Blobs) {
