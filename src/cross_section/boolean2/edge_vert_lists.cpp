@@ -123,96 +123,11 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
     narrow(v, e);
   };
 
-#if (MANIFOLD_PAR == 1)
-  // Gate the parallel pair-walk on a candidate-count threshold. Each pair
-  // emits 4 (v, e) narrow tests; at 4096 pairs that's 16k candidates - enough
-  // to amortize TBB task-spawn overhead. Below it, stay serial.
-  constexpr size_t kPairsParallelMin = 4096;
-  if (pairs.size() >= kPairsParallelMin) {
-    // Bind `adjRef` below before launching workers; direct `adj` access inside
-    // the lambda would resolve to each worker's thread-local copy.
-    if ((int)adj.size() < nV) adj.resize(nV);
-    for (int i = 0; i < nV; ++i) adj[i].clear();
-    for (const auto& edge : edges) {
-      VESetInsert(&adj[edge.v0], edge.v1);
-      VESetInsert(&adj[edge.v1], edge.v0);
-    }
-    auto& adjRef = adj;
-    struct Local {
-      std::vector<Hit> hits;
-      int64_t candCount = 0;
-      int64_t endpointRejects = 0;
-      int64_t degenerateRejects = 0;
-      int64_t tRangeRejects = 0;
-      int64_t distanceRejects = 0;
-      int64_t apexRejects = 0;
-      int64_t hitCount = 0;
-    };
-    tbb::combinable<Local> tls;
-    auto narrowLocal = [&](int v, int e, Local& l) {
-      if (timing) ++l.candCount;
-      if (v == edges[e].v0 || v == edges[e].v1) {
-        if (timing) ++l.endpointRejects;
-        return;
-      }
-      const auto& g = edgeG[e];
-      if (g.abLen2 == 0) {
-        if (timing) ++l.degenerateRejects;
-        return;
-      }
-      const vec2 ap = verts[v] - g.a;
-      const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
-      if (dotAB <= 0 || dotAB >= g.abLen2) {
-        if (timing) ++l.tRangeRejects;
-        return;
-      }
-      const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
-      const double cross2 = cross * cross;
-      const double eps2_abLen2 = eps2 * g.abLen2;
-      if (cross2 > eps2_abLen2) {
-        if (timing) ++l.distanceRejects;
-        return;
-      }
-      if (cross2 >= eps2_abLen2 * 1e-4) {
-        if (VESetContains(adjRef[v], edges[e].v0) &&
-            VESetContains(adjRef[v], edges[e].v1)) {
-          if (timing) ++l.apexRejects;
-          return;
-        }
-      }
-      if (timing) ++l.hitCount;
-      l.hits.push_back({e, dotAB / g.abLen2, v});
-    };
-    manifold::for_each_n(autoPolicy(pairs.size(), 512), countAt(size_t{0}),
-                         pairs.size(), [&](size_t idx) {
-                           auto& l = tls.local();
-                           const auto [i, j] = pairs[idx];
-                           narrowLocal(edges[i].v0, j, l);
-                           narrowLocal(edges[i].v1, j, l);
-                           narrowLocal(edges[j].v0, i, l);
-                           narrowLocal(edges[j].v1, i, l);
-                         });
-    tls.combine_each([&](const Local& l) {
-      flatHits.insert(flatHits.end(), l.hits.begin(), l.hits.end());
-      if (timing) {
-        candCount += l.candCount;
-        endpointRejects += l.endpointRejects;
-        degenerateRejects += l.degenerateRejects;
-        tRangeRejects += l.tRangeRejects;
-        distanceRejects += l.distanceRejects;
-        apexRejects += l.apexRejects;
-        hitCount += l.hitCount;
-      }
-    });
-  } else
-#endif
-  {
-    for (const auto& [i, j] : pairs) {
-      narrowIfNonEndpoint(edges[i].v0, j);
-      narrowIfNonEndpoint(edges[i].v1, j);
-      narrowIfNonEndpoint(edges[j].v0, i);
-      narrowIfNonEndpoint(edges[j].v1, i);
-    }
+  for (const auto& [i, j] : pairs) {
+    narrowIfNonEndpoint(edges[i].v0, j);
+    narrowIfNonEndpoint(edges[i].v1, j);
+    narrowIfNonEndpoint(edges[j].v0, i);
+    narrowIfNonEndpoint(edges[j].v1, i);
   }
 
   manifold::stable_sort(flatHits.begin(), flatHits.end(),
@@ -265,11 +180,9 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
   return lists;
 }
 
-// Pair-count threshold above which the driver dispatches to the
-// fused parallel pass below. Lower than the standalone narrow-only
-// threshold (`kPairsParallelMin` = 4096) because the fused pass does
-// roughly 2x the per-pair work (narrow + intersect), so it amortizes
-// TBB setup at smaller pair counts.
+// Pair-count threshold above which the driver dispatches to the fused
+// parallel pass below. Smaller inputs stay on the serial two-pass path to
+// avoid TBB setup overhead.
 extern const size_t kFusedNarrowParallelMin = 1024;
 
 // Combined parallel narrow + IntersectSegments. Each pair gets its 4
@@ -278,9 +191,8 @@ extern const size_t kFusedNarrowParallelMin = 1024;
 // hold both outputs.
 //
 // Used when the input is large enough to justify parallel (the
-// caller's pair list is >= kFusedNarrowParallelMin). Eliminates one
-// parallel section's TBB setup vs running BuildEdgeVertListsFromEdgePairs
-// and FindAndInsertIntersections's parallel-compute stage separately.
+// caller's pair list is >= kFusedNarrowParallelMin). Keeps large inputs out
+// of the serial BuildEdgeVertListsFromEdgePairs path.
 //
 // Output:
 //   - `*lists` = per-edge sorted-by-parameter vert list (deduped)
