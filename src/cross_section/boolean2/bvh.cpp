@@ -19,6 +19,12 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
+constexpr int kRadixTreeBuildGrainSize = 10000;
+
+}  // namespace
+
 Box2 BoxOf2DPoint(vec2 p, double eps) {
   const vec2 pad(eps, eps);
   return Box2(p - pad, p + pad);
@@ -63,8 +69,11 @@ BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
   out.nodeBBox.resize(numNodes);
   std::vector<int> nodeParent(numNodes, -1);
   out.internalChildren.resize(n - 1, std::make_pair(-1, -1));
+  // Radix-tree node creation does little work per index, so use a coarser
+  // grain than BVH query traversal/narrow predicates to avoid scheduling
+  // overhead dominating construction.
   manifold::for_each_n(
-      autoPolicy(n - 1, 1e4), countAt(0), n - 1,
+      autoPolicy(n - 1, kRadixTreeBuildGrainSize), countAt(0), n - 1,
       CreateRadixTree(
           {VecView<int>(nodeParent.data(), nodeParent.size()),
            VecView<std::pair<int, int>>(out.internalChildren.data(),

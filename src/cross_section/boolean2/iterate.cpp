@@ -37,6 +37,15 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
+// Fingerprints need to ignore sub-eps floating-point noise between cleanup
+// iterations while still detecting eps-scale topology changes. eps/100 leaves
+// two decimal digits inside the algorithm's geometric tolerance.
+constexpr double kFingerprintQuantumEpsFraction = 0.01;
+
+}  // namespace
+
 // =============================================================================
 // Iterate-to-fixed-point.
 //
@@ -85,7 +94,7 @@ FingerprintData FingerprintAt(const OverlapResult& r, double quantum) {
 // Fine-grained fingerprint used for idempotence detection. Empirical:
 // anything finer than ~eps/100 starts catching pure FP-noise differences.
 FingerprintData Fingerprint(const OverlapResult& r, double eps) {
-  return FingerprintAt(r, eps * 0.01);
+  return FingerprintAt(r, eps * kFingerprintQuantumEpsFraction);
 }
 
 // Smith §7.7 / fig 7.16 proves convergence in ≤2 iterations under his

@@ -43,6 +43,14 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
+constexpr double kSeedStepCoordScaleUlps = 16.0;
+constexpr double kSeedStepEpsFraction = 0.25;
+constexpr double kSeedStepEdgeLengthFraction = 1e-3;
+
+}  // namespace
+
 // =============================================================================
 // Ray-cast winding-number primitives (legacy seed; the BFS face traversal
 // below is the primary path).
@@ -461,9 +469,11 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
       0.5 * std::max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y);
   // Cap the normal offset by local geometry scale so seed samples stay in
   // narrow faces; keep a coordinate-scale floor so displaced inputs still move
-  // by several ULPs.
+  // by several ULPs. The per-edge step below is also capped at 0.1% of edge
+  // length so short boundary edges seed inside their adjacent face.
   const double seedStepCap =
-      std::max(16.0 * kU * coordScale, 0.25 * EpsilonFromScale(bboxHalfExtent));
+      std::max(kSeedStepCoordScaleUlps * kU * coordScale,
+               kSeedStepEpsFraction * EpsilonFromScale(bboxHalfExtent));
   auto castFaceHalfedge = [&](int h) {
     if (h < 0) return 0;
     const vec2 a = verts[halfedges[h].origin];
@@ -473,7 +483,8 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
     const double len = length(d);
     if (len == 0) return 0;
     const vec2 perp(-d.y / len, d.x / len);
-    const double step = std::min(len * 1e-3, seedStepCap);
+    const double step =
+        std::min(len * kSeedStepEdgeLengthFraction, seedStepCap);
     const vec2 pInF = mid + perp * step;
     ensureFastEdges();
     return CastWindingRayFast(pInF, fastEdges);

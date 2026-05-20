@@ -61,6 +61,34 @@ namespace boolean2 {
 
 namespace offset_detail {
 
+constexpr double kStraightAngleSinTol = 1e-12;
+// denom = 1 + dot(normals) = 2*cos^2(half-angle). Below this, the miter
+// extension is at least ~1.4e6 * |delta|, so treat the corner as a reversal.
+constexpr double kNearOppositeNormalsDenomTol = 1e-12;
+constexpr double kMiterLimitDotTolUlp = 64.0;
+
+double Perimeter(const SimplePolygon& loop) {
+  if (loop.size() < 2) return 0.0;
+  double total = 0.0;
+  for (size_t i = 0; i < loop.size(); ++i) {
+    total += length(loop[(i + 1) % loop.size()] - loop[i]);
+  }
+  return total;
+}
+
+double TotalPerimeter(const Polygons& polys) {
+  double total = 0.0;
+  for (const auto& loop : polys) total += Perimeter(loop);
+  return total;
+}
+
+double AreaComparisonTol(const Polygons& a, const Polygons& b, double eps) {
+  // If boundary vertices drift by O(eps), the induced first-order area change
+  // is bounded by perimeter * eps. Use both operands' perimeters because this
+  // tolerance compares two already-regularized polygon sets.
+  return eps * (TotalPerimeter(a) + TotalPerimeter(b)) + eps * eps;
+}
+
 // Outward normal of a directed edge (right-perpendicular, unit length).
 // For a CCW polygon, this points away from the interior.
 vec2 OutwardNormal(vec2 edge) {
@@ -166,7 +194,7 @@ vec2 MiterPoint(vec2 V, vec2 nPrev, vec2 nNext, double delta) {
   // the bisector at distance delta / cos(half-angle).
   const double dotN = nPrev.x * nNext.x + nPrev.y * nNext.y;
   const double denom = 1.0 + dotN;
-  if (denom <= 1e-12) {
+  if (denom <= kNearOppositeNormalsDenomTol) {
     // Nearly opposite normals (sharp ~180-degree corner); miter is
     // unbounded. Caller should detect and fall back.
     return V + delta * nPrev;
@@ -224,7 +252,8 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     // until RemoveCollinear cleans them up downstream.
     const double ePrevLen2 = dot(ePrev, ePrev);
     const double eNextLen2 = dot(eNext, eNext);
-    if (cross * cross < 1e-24 * ePrevLen2 * eNextLen2) {
+    if (cross * cross <
+        kStraightAngleSinTol * kStraightAngleSinTol * ePrevLen2 * eNextLen2) {
       // Collinear: nPrev == nNext, endPrev == startNext.
       out.push_back(endPrev);
       continue;
@@ -258,7 +287,8 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
         // so rounded unit normals do not spuriously square the join.
         const double miterTol =
             std::isfinite(miterCosThresh)
-                ? 64.0 * kU * std::max(1.0, std::fabs(miterCosThresh))
+                ? kMiterLimitDotTolUlp * kU *
+                      std::max(1.0, std::fabs(miterCosThresh))
                 : 0.0;
         if (dotN + miterTol < miterCosThresh) {
           AppendSquareJoin(out, V, nPrev, nNext, delta);
@@ -395,7 +425,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
     // regularized expanded boundary in that case.
     const double inArea = std::fabs(TotalSignedArea(in));
     const double outArea = std::fabs(TotalSignedArea(unioned));
-    if (outArea + eps < inArea) {
+    if (outArea + offset_detail::AreaComparisonTol(in, unioned, eps) < inArea) {
       unioned = FillByRule(offsetRings, WindRule::NonZero, eps);
     }
   } else {
@@ -406,7 +436,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
     // the remaining interior islands.
     const double inArea = std::fabs(TotalSignedArea(in));
     const double outArea = std::fabs(TotalSignedArea(unioned));
-    if (outArea > inArea + eps) {
+    if (outArea > inArea + offset_detail::AreaComparisonTol(in, unioned, eps)) {
       unioned = FillByRule(offsetRings, WindRule::Negative, eps);
     }
   }
