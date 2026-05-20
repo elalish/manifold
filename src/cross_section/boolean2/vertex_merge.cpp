@@ -34,6 +34,7 @@
 #include "../../parallel.h"
 #include "bvh.h"
 #include "diagnostics.h"
+#include "parallel_policy.h"
 #include "predicates.h"
 
 namespace manifold {
@@ -90,22 +91,23 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
       // worker's thread-local copy.
       auto& idxRef = idx;
       tbb::combinable<std::vector<std::pair<int, int>>> tls;
-      manifold::for_each_n(autoPolicy(n, 512), countAt(0), n, [&](int i) {
-        const int ai = idxRef[i];
-        const double ax = in[ai].x;
-        const double ay = in[ai].y;
-        auto& local = tls.local();
-        for (int j = i + 1; j < n; ++j) {
-          const int bi = idxRef[j];
-          const double dx = in[bi].x - ax;
-          if (dx > thresh) break;
-          if (std::fabs(in[bi].y - ay) > thresh) continue;
-          if (ai < bi)
-            local.emplace_back(ai, bi);
-          else
-            local.emplace_back(bi, ai);
-        }
-      });
+      manifold::for_each_n(autoPolicy(n, kFineParallelGrainSize), countAt(0), n,
+                           [&](int i) {
+                             const int ai = idxRef[i];
+                             const double ax = in[ai].x;
+                             const double ay = in[ai].y;
+                             auto& local = tls.local();
+                             for (int j = i + 1; j < n; ++j) {
+                               const int bi = idxRef[j];
+                               const double dx = in[bi].x - ax;
+                               if (dx > thresh) break;
+                               if (std::fabs(in[bi].y - ay) > thresh) continue;
+                               if (ai < bi)
+                                 local.emplace_back(ai, bi);
+                               else
+                                 local.emplace_back(bi, ai);
+                             }
+                           });
       tls.combine_each([&](const std::vector<std::pair<int, int>>& l) {
         pairs.insert(pairs.end(), l.begin(), l.end());
       });

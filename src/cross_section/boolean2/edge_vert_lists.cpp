@@ -24,6 +24,7 @@
 
 #include "../../parallel.h"
 #include "diagnostics.h"
+#include "parallel_policy.h"
 #include "predicates.h"
 #include "vertex_merge.h"
 
@@ -34,7 +35,10 @@ namespace {
 
 // Only reject an adjacent-edge apex once the tested vertex is clearly away
 // from the candidate edge's line. Extremely near-line apexes are valid
-// T-junction candidates and must stay in the edge-vert list.
+// T-junction candidates and must stay in the edge-vert list. The cutoff is
+// 1% of the eps distance, squared for the cross^2 compare: lower values admit
+// too many ordinary adjacent-edge apexes as split candidates, while larger
+// values drop the near-line apex regression exercised by ApexSkipNearLine.
 constexpr double kApexRejectMinDistance2Frac = 1e-4;
 
 bool FarEnoughFromLineForApexReject(double cross2, double eps2_abLen2) {
@@ -310,8 +314,8 @@ void BuildListsAndFindIntersectionsParallel(
     std::vector<IntersectionPoint> ix;
   };
   tbb::combinable<Local> tls;
-  manifold::for_each_n(autoPolicy(pairs.size(), 512), countAt(size_t{0}),
-                       pairs.size(), [&](size_t idx) {
+  manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
+                       countAt(size_t{0}), pairs.size(), [&](size_t idx) {
                          auto& l = tls.local();
                          processPair(idx, l.hits, l.ix);
                        });

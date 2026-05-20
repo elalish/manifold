@@ -29,6 +29,7 @@
 #include "bvh.h"
 #include "diagnostics.h"
 #include "edge_vert_lists.h"
+#include "parallel_policy.h"
 #include "predicates.h"
 #include "vertex_merge.h"
 
@@ -280,8 +281,8 @@ void FindAndInsertIntersectionsImpl(
 #if (MANIFOLD_PAR == 1)
     if (pairs.size() >= kParallelIxMin) {
       tbb::combinable<std::vector<PairIx>> tls;
-      manifold::for_each_n(autoPolicy(pairs.size(), 512), countAt(size_t{0}),
-                           pairs.size(),
+      manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
+                           countAt(size_t{0}), pairs.size(),
                            [&](size_t k) { pairIx(k, tls.local()); });
       tls.combine_each([&](const std::vector<PairIx>& l) {
         intersections.insert(intersections.end(), l.begin(), l.end());

@@ -469,8 +469,12 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
       0.5 * std::max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y);
   // Cap the normal offset by local geometry scale so seed samples stay in
   // narrow faces; keep a coordinate-scale floor so displaced inputs still move
-  // by several ULPs. The per-edge step below is also capped at 0.1% of edge
-  // length so short boundary edges seed inside their adjacent face.
+  // by several ULPs. The eps fraction keeps the sample close to the boundary
+  // features created by the boolean2 epsilon budget, while the ULP floor avoids
+  // sampling the original edge again at large translated coordinates. The
+  // per-edge step below is also capped at 0.1% of edge length so short boundary
+  // edges seed inside their adjacent face; larger fractions can jump across
+  // thin faces in disconnected-component winding seeds.
   const double seedStepCap =
       std::max(kSeedStepCoordScaleUlps * kU * coordScale,
                kSeedStepEpsFraction * EpsilonFromScale(bboxHalfExtent));

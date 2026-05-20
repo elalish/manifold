@@ -23,6 +23,7 @@
 
 #include "../../collider.h"
 #include "../../parallel.h"
+#include "parallel_policy.h"
 
 namespace manifold {
 namespace boolean2 {
@@ -106,8 +107,9 @@ inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
       }
     }
   };
-  manifold::for_each_n(parallel ? autoPolicy(n, 512) : ExecutionPolicy::Seq,
-                       countAt(0), n, collideOne);
+  manifold::for_each_n(
+      parallel ? autoPolicy(n, kFineParallelGrainSize) : ExecutionPolicy::Seq,
+      countAt(0), n, collideOne);
 }
 
 template <typename F>
