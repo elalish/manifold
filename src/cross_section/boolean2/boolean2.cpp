@@ -123,27 +123,10 @@ void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
   }
 }
 
-double LoopMergeTol(const std::vector<vec2>& verts,
-                    const std::vector<int>& loopVerts) {
-  if (loopVerts.empty()) return 0.0;
-  vec2 bmin(std::numeric_limits<double>::infinity(),
-            std::numeric_limits<double>::infinity());
-  vec2 bmax(-bmin.x, -bmin.y);
-  for (int v : loopVerts) {
-    bmin.x = std::min(bmin.x, verts[v].x);
-    bmin.y = std::min(bmin.y, verts[v].y);
-    bmax.x = std::max(bmax.x, verts[v].x);
-    bmax.y = std::max(bmax.y, verts[v].y);
-  }
-  const double halfExtent = 0.5 * std::max(bmax.x - bmin.x, bmax.y - bmin.y);
-  return 4.0 * EpsilonFromScale(halfExtent);
-}
-
 void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
-                     bool splitNearRepeatedVerts, Polygons* polys) {
+                     double nearRepeatedVertexTol, Polygons* polys) {
   for (;;) {
-    const double mergeTol = detail::LoopMergeTol(verts, loopVerts);
-    const double mergeTol2 = mergeTol * mergeTol;
+    const double mergeTol2 = nearRepeatedVertexTol * nearRepeatedVertexTol;
     bool split = false;
     for (size_t i = 1; i < loopVerts.size() && !split; ++i) {
       for (size_t j = 0; j < i; ++j) {
@@ -151,7 +134,7 @@ void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
             i == j + 1 || (j == 0 && i + 1 == loopVerts.size());
         const vec2 delta = verts[loopVerts[i]] - verts[loopVerts[j]];
         if (loopVerts[i] != loopVerts[j] &&
-            (!splitNearRepeatedVerts || adjacent ||
+            (nearRepeatedVertexTol <= 0.0 || adjacent ||
              Dot(delta, delta) > mergeTol2)) {
           continue;
         }
@@ -215,7 +198,7 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 // from the incoming direction.
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges,
-                            bool splitNearRepeatedVerts) {
+                            double nearRepeatedVertexTol) {
   const int nE = static_cast<int>(edges.size());
   // Per-vertex outgoing edges, sorted CCW by direction angle. Vert ids
   // are dense in [0, verts.size()), so a vector-of-vector indexed by
@@ -260,7 +243,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
     }
     if (loopVerts.size() >= 3) {
       detail::PushSimpleLoops(verts, std::move(loopVerts),
-                              splitNearRepeatedVerts, &polys);
+                              nearRepeatedVertexTol, &polys);
     } else {
       // Regularization drop: the loop is a zero-area degenerate (1-vert
       // self-loop or 2-vert lens). With straight-line-segment edges,
@@ -288,7 +271,7 @@ Polygons Simplify(const Polygons& in, double eps) {
   if (verts.empty()) return {};
   auto r = IterateToFixedPoint(verts, edges, eps);
   return detail::TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*splitNearRepeatedVerts=*/false),
+      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);
 }
 
@@ -348,11 +331,19 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
   auto r =
       IterateToFixedPoint(verts, edges, eps, /*maxIter=*/2,
                           /*outIters=*/nullptr, /*outStatus=*/nullptr, rule);
-  // Binary operations combine independently-generated inputs. Equivalent
-  // operation orderings can leave epsilon-width slits at contour touch points,
-  // so split near-repeated vertices while extracting result loops.
+  // Binary operations can consume earlier binary results. If two output
+  // endpoints should meet at the same true point, their separation can include
+  // one eps of drift per endpoint from the producer op plus one eps per
+  // endpoint from this op. Split those near-repeated vertices during polygon
+  // extraction; this does not merge vertices in the arrangement itself.
+  constexpr double kComparedEndpoints = 2.0;
+  constexpr double kPriorOpDriftPerEndpoint = 1.0;
+  constexpr double kThisOpDriftPerEndpoint = 1.0;
+  const double nearRepeatedVertexTol =
+      kComparedEndpoints *
+      (kPriorOpDriftPerEndpoint + kThisOpDriftPerEndpoint) * eps;
   return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*splitNearRepeatedVerts=*/true),
+      OutEdgesToPolygons(r.verts, r.edges, nearRepeatedVertexTol),
       frame.origin);
 }
 }  // namespace detail
@@ -374,7 +365,7 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
       IterateToFixedPoint(verts, edges, eps, /*maxIter=*/2,
                           /*outIters=*/nullptr, /*outStatus=*/nullptr, rule);
   return detail::TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*splitNearRepeatedVerts=*/false),
+      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);
 }
 
