@@ -292,7 +292,6 @@ void BuildListsAndFindIntersectionsParallel(
     }
   };
 
-#if (MANIFOLD_PAR == 1)
   struct Local {
     std::vector<Hit> hits;
     std::vector<IntersectionPoint> ix;
@@ -307,13 +306,6 @@ void BuildListsAndFindIntersectionsParallel(
     flatHits.insert(flatHits.end(), l.hits.begin(), l.hits.end());
     intersections->insert(intersections->end(), l.ix.begin(), l.ix.end());
   });
-#else
-  // Serial fallback: same per-pair work, no TBB. Keeps the function
-  // callable from any caller regardless of MANIFOLD_PAR.
-  for (size_t idx = 0; idx < pairs.size(); ++idx) {
-    processPair(idx, flatHits, *intersections);
-  }
-#endif
 
   // Sort hits by (e, t, v), build per-edge lists, dedupe.
   manifold::stable_sort(flatHits.begin(), flatHits.end(),
