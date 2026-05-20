@@ -110,7 +110,7 @@ In the viewer:
   - [examples/](file:///d:/manifold/bindings/wasm/openscad-compiler/test/examples): OpenSCAD sample files.
   - [out/](file:///d:/manifold/bindings/wasm/openscad-compiler/test/out): Destination folder for compiled TypeScript mesh scripts.
 - [index.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/index.ts): Main CLI entry point.
-- [runtime.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime.ts) & [runtime.js](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime.js): OpenSCAD-to-Manifold bridge runtime.
+- [runtime.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime/runtime.ts) & [runtime.js](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime/runtime.js): OpenSCAD-to-Manifold bridge runtime.
 - [tsconfig.json](file:///d:/manifold/bindings/wasm/openscad-compiler/tsconfig.json): TypeScript configuration.
 - [package.json](file:///d:/manifold/bindings/wasm/openscad-compiler/package.json): Package manifest and build scripts.
 - [viewer.html](file:///d:/manifold/bindings/wasm/openscad-compiler/viewer.html): 3D Three.js mesh visualizer.

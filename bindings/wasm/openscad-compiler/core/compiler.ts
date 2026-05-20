@@ -458,7 +458,7 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
   const declarations = declOrder.map(k => declMap.get(k)!);
 
   const RUNTIME_IMPORT =
-    `import * as __rt from "${options?.runtimePath ?? "./runtime.js"}";\n` +
+    `import * as __rt from "${options?.runtimePath ?? "./runtime/runtime.js"}";\n` +
     `const { Manifold, CrossSection, wasm, is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn, ` +
     `sin_fn, cos_fn, tan_fn, asin_fn, acos_fn, atan_fn, atan2_fn, abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn, ` +
     `min_fn, max_fn, norm_fn, cross_fn, len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn, openscad_assert_fn, ` +

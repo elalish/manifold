@@ -53,7 +53,7 @@ compileSingleFileCommand.name("compile")
                 if (!runtimePath.startsWith(".") && !runtimePath.startsWith("/")) {
                     runtimePath = "./" + runtimePath;
                 }
-                const runtimeJSPath = runtimePath + "/runtime.js";
+                const runtimeJSPath = runtimePath + "/runtime/runtime.js";
 
                 const ast = { kind: "program" as const, statements: resolved.statements };
                 const js = compile(ast, { runtimePath: runtimeJSPath });
