@@ -24,6 +24,8 @@
 namespace manifold {
 namespace boolean2 {
 
+inline constexpr double kIntersectionMergeEpsFactor = 10.0;
+
 void RadixSortPairs(std::vector<std::pair<int, int>>* pairs);
 void SortSmallInts(std::vector<int>* values);
 bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,

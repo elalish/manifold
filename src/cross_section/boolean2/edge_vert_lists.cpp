@@ -30,6 +30,19 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
+// Only reject an adjacent-edge apex once the tested vertex is clearly away
+// from the candidate edge's line. Extremely near-line apexes are valid
+// T-junction candidates and must stay in the edge-vert list.
+constexpr double kApexRejectMinDistance2Frac = 1e-4;
+
+bool FarEnoughFromLineForApexReject(double cross2, double eps2_abLen2) {
+  return cross2 >= eps2_abLen2 * kApexRejectMinDistance2Frac;
+}
+
+}  // namespace
+
 std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs) {
@@ -102,7 +115,7 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
       if (timing) ++distanceRejects;
       return;
     }
-    if (cross2 >= eps2_abLen2 * 1e-4) {
+    if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2)) {
       ensureAdj();
       if (VESetContains(adj[v], edges[e].v0) &&
           VESetContains(adj[v], edges[e].v1)) {
@@ -251,7 +264,7 @@ void BuildListsAndFindIntersectionsParallel(
     const double cross2 = cross * cross;
     const double eps2_abLen2 = eps2 * g.abLen2;
     if (cross2 > eps2_abLen2) return;
-    if (cross2 >= eps2_abLen2 * 1e-4) {
+    if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2)) {
       if (VESetContains(adjRef[v], edges[e].v0) &&
           VESetContains(adjRef[v], edges[e].v1))
         return;

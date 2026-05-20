@@ -170,13 +170,14 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     DisjointSets uf(static_cast<int>(merge.verts.size()));
     // The geometric upper bound for "same true point" is eps/sin(theta)
     // where theta is the crossing angle. For shallow crossings this can
-    // be large; we use a generous 10*eps cutoff which covers theta down
+    // be large; kIntersectionMergeEpsFactor covers theta down
     // to ~6 degrees. The structural gate prevents over-merging
     // legitimately-distinct intersections (e.g. edge A crosses B at one
     // point and C at a different point along A: vAB and vAC share edge A
     // but are at different true points and shouldn't merge unless they
     // ALSO geometrically coincide). A sweep across the displacement fuzz
-    // showed 10*eps gives the best iteration count (1:448 2:2) without
+    // showed kIntersectionMergeEpsFactor gives the best iteration count
+    // (1:448 2:2) without
     // over-merging; tightening below 3*eps causes single-pass failures,
     // loosening to 100*eps causes new over-merge failures.
     //
@@ -185,7 +186,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     // that's intentional (we WANT the merged point to land at the average)
     // and is the source of the residual iter=2 cases. Smith's bound
     // proves convergence in ≤2 iterations under his α-budget framework.
-    const double mergeThresh = 10.0 * eps;
+    const double mergeThresh = kIntersectionMergeEpsFactor * eps;
     const double mergeThresh2 = mergeThresh * mergeThresh;
     // Duplicate intersection verts that should merge share an incident edge.
     // Sweep each edge's sorted list and distance-check nearby candidates.

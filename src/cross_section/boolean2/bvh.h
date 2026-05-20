@@ -15,6 +15,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -27,6 +28,9 @@ namespace manifold {
 namespace boolean2 {
 
 inline constexpr int kEdgePairBvhThreshold = 1024;
+// The radix-tree BVH is binary and has at most 32 Morton-code bits plus
+// 32 index tie-breaker bits, so a depth-first traversal stack of 64 is enough.
+inline constexpr int kBvhTraversalStackCapacity = 64;
 
 struct Box2 {
   vec2 min = vec2(std::numeric_limits<double>::infinity());
@@ -71,7 +75,7 @@ inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
   if (bvh.Empty()) return;
   auto collideOne = [&](int queryIdx) {
     const Box2 query = queryBox(queryIdx);
-    int stack[64];
+    int stack[kBvhTraversalStackCapacity];
     int top = -1;
     int node = kRoot;
     auto& local = recorder.local();
@@ -95,7 +99,10 @@ inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
         node = stack[top--];
       } else {
         node = traverse1 ? child1 : child2;
-        if (traverse1 && traverse2) stack[++top] = child2;
+        if (traverse1 && traverse2) {
+          assert(top + 1 < kBvhTraversalStackCapacity);
+          stack[++top] = child2;
+        }
       }
     }
   };

@@ -28,6 +28,7 @@
 #include "../../parallel.h"
 #include "bvh.h"
 #include "diagnostics.h"
+#include "edge_vert_lists.h"
 #include "predicates.h"
 #include "vertex_merge.h"
 
@@ -273,9 +274,9 @@ void FindAndInsertIntersectionsImpl(
         return;
       out.push_back({i, j, p});
     };
-    // Below this pair-count threshold, the parallel split's combine_each +
-    // sort overhead dominates; stay serial. Above it, parallel pays off.
-    constexpr size_t kParallelIxMin = 1024;
+    // Match the fused narrow-pass threshold used by the in-tree driver. Direct
+    // callers that bypass the fused path still use the same parallel policy.
+    const size_t kParallelIxMin = kFusedNarrowParallelMin;
 #if (MANIFOLD_PAR == 1)
     if (pairs.size() >= kParallelIxMin) {
       tbb::combinable<std::vector<PairIx>> tls;
@@ -396,7 +397,7 @@ void FindAndInsertIntersectionsImpl(
   const int numNewVerts = static_cast<int>(verts->size()) - origNumVerts;
   if (timing)
     GlobalPhases().propagationCalls.fetch_add(1, std::memory_order_relaxed);
-  const double propagationDupThresh = 10.0 * eps;
+  const double propagationDupThresh = kIntersectionMergeEpsFactor * eps;
   const double propagationDupThresh2 =
       propagationDupThresh * propagationDupThresh;
 
