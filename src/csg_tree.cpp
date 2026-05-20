@@ -157,7 +157,7 @@ std::shared_ptr<CsgLeafNode> ErrorLeaf(Manifold::Error err) {
 std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
                                            const Manifold::Impl& b, OpType op,
                                            ExecutionContext::Impl* ctx) {
-  RETURN_IF_CANCELLED(ctx, ErrorLeaf(Manifold::Error::Cancelled));
+  RETURN_IF_CANCELLED_VAL(ctx, ErrorLeaf(Manifold::Error::Cancelled));
 #ifdef MANIFOLD_DEBUG
   auto dump = [&]() {
     dump_lock.lock();
@@ -445,7 +445,7 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   for (int i = 0; i < 4; i++) parallelSerial.push_back(0);
 #endif
   while (heapNodes.size() > 1) {
-    RETURN_IF_CANCELLED(ctx, ErrorLeaf(Manifold::Error::Cancelled));
+    RETURN_IF_CANCELLED_VAL(ctx, ErrorLeaf(Manifold::Error::Cancelled));
     for (size_t i = 0; i < 4 && heapNodes.size() > 1; i++) {
       std::pop_heap(heapNodes.begin(), heapNodes.end(), cmpFn);
       auto a = std::move(heapNodes.back());
@@ -496,7 +496,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
   DEBUG_ASSERT(!children.empty(), logicErr,
                "BatchUnion should not have empty children");
   while (children.size() > 1) {
-    RETURN_IF_CANCELLED(ctx, ErrorLeaf(Manifold::Error::Cancelled));
+    RETURN_IF_CANCELLED_VAL(ctx, ErrorLeaf(Manifold::Error::Cancelled));
     const size_t start = (children.size() > kMaxUnionSize)
                              ? (children.size() - kMaxUnionSize)
                              : 0;
