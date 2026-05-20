@@ -144,11 +144,11 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
   const CrossSection input = CrossSection(polys);
 
 #ifdef MANIFOLD_DEBUG
-  manifold::ManifoldParams().verbose = false;
-  int idx = 1;
+  manifold::ManifoldParams().verbose = true;
+  int idx = 0;
 
   if (idx == 0) {
-    double radius = 0.10000000000000001;
+    double radius = 1.2368517001458557;
     TestFillet(polys, input, radius, inputCircularSegments);
   } else if (idx == 1) {
     auto bbox = input.Bounds().Size();
@@ -199,7 +199,7 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
     for (size_t i = 0, j = 0; i != MAXIMUM && j != EARLYSTOP; i++) {
       double mid = low + (high - low) * 0.5;
 
-      if (std::abs(low - mid) < 1E-12) break;
+      if (std::abs(low - mid) < 1E-20) break;
 
       // Area non zero
       if (TestFillet(polys, input, mid, inputCircularSegments)) {
@@ -331,10 +331,10 @@ void RegisterPolygonTests() {
 }
 
 void RegisterFilletTests() {
-  std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
-                         "zebra.txt", "zebra3.txt"};
+  // std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
+  //                        "zebra.txt", "zebra3.txt"};
 
-  // std::string files[] = {"fillet.txt"};
+  std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);

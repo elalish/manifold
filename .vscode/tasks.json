@@ -33,7 +33,7 @@
       // Executes the compiled test program.
       // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3:Polygon.Fillet.Precision2:Polygon.Fillet.Sponge:Polygon.Fillet.Sponge2 || true",
       // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.ExtraTriangle:Polygon.Fillet.Simple1:Polygon.Fillet.Precision:Polygon.Fillet.Sponge3b:Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3 || true",
-      "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.Precision || true",
+      "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.UShape || true",
       // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.BigSponge:Polygon.Fillet.Zebra1:Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3 || true",
       "options": {
         // Sets the working directory for the command.

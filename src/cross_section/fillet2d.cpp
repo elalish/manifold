@@ -196,9 +196,7 @@ double distancePointSegment(const vec2& p, const vec2& p1, const vec2& p2) {
   return length(closestPoint - p);
 }
 
-double filletNumericalTolerance(double radius) {
-  return std::max(1e-12, 1e-10 * std::max(1.0, radius));
-}
+double filletNumericalTolerance(double radius) { return 1e-15; }
 
 vec2 chebyshevCenter(const std::vector<vec2>& points) {
   if (points.empty()) return {};
@@ -675,14 +673,13 @@ std::vector<CircleCluster> ClusterFilletCircles(
   if (n == 0) return clusters;
 
   const double clusterTol = filletNumericalTolerance(radius);
-  const double clusterTolSq = clusterTol * clusterTol;
 
   DisjointSets circleSets(static_cast<uint32_t>(n));
 
   for (size_t i = 0; i < n; ++i) {
     for (size_t j = i + 1; j < n; ++j) {
-      if (length2(topoConnectionVec[i].CircleCenter -
-                  topoConnectionVec[j].CircleCenter) <= clusterTolSq) {
+      if (length(topoConnectionVec[i].CircleCenter -
+                 topoConnectionVec[j].CircleCenter) <= clusterTol) {
         circleSets.unite(static_cast<uint32_t>(i), static_cast<uint32_t>(j));
       }
     }
@@ -839,7 +836,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     return std::vector<std::vector<TopoConnectionPair>>();
   }
 
-  const bool disableCircleCluster = true;
+  const bool disableCircleCluster = false;
   std::vector<CircleCluster> circleClusters;
 
   if (disableCircleCluster) {
@@ -854,6 +851,31 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
     // different keep/remove decisions against neighboring edges.
     circleClusters = ClusterFilletCircles(topoConnetionVec, loops, radius);
   }
+
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose) {
+    std::cout << "circleClusters " << circleClusters.size()
+              << " from candidates " << topoConnetionVec.size()
+              << " radius=" << radius
+              << " tol=" << filletNumericalTolerance(radius)
+              << " disabled=" << disableCircleCluster << std::endl;
+
+    for (size_t clusterIndex = 0; clusterIndex < circleClusters.size();
+         ++clusterIndex) {
+      const CircleCluster& cluster = circleClusters[clusterIndex];
+      std::cout << "  cluster " << clusterIndex << " center=" << cluster.Center
+                << " members=" << cluster.Members.size() << std::endl;
+
+      for (const size_t member : cluster.Members) {
+        const TopoConnectionPair& pair = topoConnetionVec[member];
+        std::cout << "    member " << member << " center=" << pair.CircleCenter
+                  << " arc [" << pair.LoopIndex[0] << ", " << pair.EdgeIndex[0]
+                  << "] -> [" << pair.LoopIndex[1] << ", " << pair.EdgeIndex[1]
+                  << "]" << std::endl;
+      }
+    }
+  }
+#endif
 
   // NOTE: Filter invalid fillet circles per cluster.
   std::vector<uint8_t> mark(topoConnetionVec.size(), 0);
@@ -910,7 +932,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
         const double gap = distance - radius;
         const double tol = filletNumericalTolerance(radius);
 
-        if (gap <= tol) {
+        if (gap <= 0) {
 #ifdef MANIFOLD_DEBUG
           if (ManifoldParams().verbose) {
             const TopoConnectionPair& pair =
@@ -930,7 +952,7 @@ std::vector<std::vector<TopoConnectionPair>> CalculateFilletArc(
 
       auto recorder = MakeSimpleRecorder(markInvalidCircle);
 
-      collider.Collider.Collisions(recorder, circleBoxVec.cview());
+      collider.Collider.Collisions(recorder, circleBoxVec.cview(), false);
 
       for (size_t clusterIndex = 0; clusterIndex < circleClusters.size();
            ++clusterIndex) {

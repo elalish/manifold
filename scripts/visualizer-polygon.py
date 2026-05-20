@@ -337,6 +337,10 @@ def read_circles_and_results(filename: str) -> (float, List[List[float]], List[L
             print(f"Error: Could not read radius from first line of {filename}")
             return None, [], [], [] # Return None for radius to signal error
 
+        if line_idx >= len(lines):
+            print(f"Warning: {filename} only contains a radius; skipping incomplete result file.")
+            return None, [], [], []
+
         # --- 2. Read Removed Circles ---
         n_removed_circles = int(lines[line_idx])
         line_idx += 1
@@ -402,7 +406,7 @@ def read_circles_and_results(filename: str) -> (float, List[List[float]], List[L
         return None, [], [], []
     except (ValueError, IndexError) as e:
         print(f"Error parsing result file at line {line_idx + 1}: {e}. The file might be malformed.")
-        return radius, removed_circles, fillet_circles, [] # Return partial data if possible
+        return None, removed_circles, fillet_circles, []
 
 def plot_circles(ax, centers: List[List[float]], radius: float, **kwargs):
     """
@@ -436,7 +440,7 @@ def plot_circle_centers(ax, centers: List[List[float]], color: str, label: str, 
 if __name__ == "__main__":
     input_file = "Testing/Fillet/input.txt" # Hardcoded as per request
     min_file_index = 0
-    max_file_index = 41      # Hardcoded scan from 0 to 10
+    max_file_index = 54      # Hardcoded scan from 0 to 10
 
     # --- Read Input Data ONCE ---
     print(f"Reading base input file: {input_file}")
@@ -447,7 +451,7 @@ if __name__ == "__main__":
     
     # --- Collect all valid result files first ---
     results_to_plot = []
-    print("Scanning for result files (0.txt to 10.txt)...")
+    print(f"Scanning for result files ({min_file_index}.txt to {max_file_index}.txt)...")
     for i in range(min_file_index, max_file_index + 1):
         result_file = f"Testing/Fillet/{i}.txt"
         radius, removed, fillet, res_data = read_circles_and_results(result_file)
