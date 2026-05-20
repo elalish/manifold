@@ -20,7 +20,7 @@ compileSingleFileCommand.name("compile")
             const userGivenOutPutPath = options.output;
 
             // check userGivenOuputPath is valid ts file path
-            if (userGivenOutPutPath && userGivenOutPutPath.endsWith(".ts")) {
+            if (userGivenOutPutPath && !userGivenOutPutPath.endsWith(".ts")) {
                 console.log("Error: Output file path is not valid");
                 process.exit(1);
             }
@@ -45,14 +45,18 @@ compileSingleFileCommand.name("compile")
                     }
                 }
 
-                const outputFile = userGivenOutPutPath || path.join("out", path.basename(file, path.extname(file)) + ".ts");
+                const outputFile = userGivenOutPutPath || path.join("test/out", path.basename(file, path.extname(file)) + ".ts");
 
-                let relativePath = path.relative(path.dirname(outputFile), "out");
+                let relativePath = path.relative(path.dirname(outputFile), process.cwd());
                 if (relativePath === "") relativePath = ".";
-                const runtimePath = relativePath.replace(/\\/g, "/") + "/runtime.js";
+                let runtimePath = relativePath.replace(/\\/g, "/");
+                if (!runtimePath.startsWith(".") && !runtimePath.startsWith("/")) {
+                    runtimePath = "./" + runtimePath;
+                }
+                const runtimeJSPath = runtimePath + "/runtime.js";
 
                 const ast = { kind: "program" as const, statements: resolved.statements };
-                const js = compile(ast, { runtimePath });
+                const js = compile(ast, { runtimePath: runtimeJSPath });
                 console.log(`Generated TypeScript (${js.length.toLocaleString()} chars)`);
                 fs.mkdirSync(path.dirname(outputFile), { recursive: true });
                 fs.writeFileSync(outputFile, js);
