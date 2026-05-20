@@ -445,7 +445,7 @@ jobs:
         cmake --build build
     - name: Test (small sanitizer subset)
       env:
-        ASAN_OPTIONS: detect_container_overflow=0
+        ASAN_OPTIONS: detect_container_overflow=0:strict_init_order=1
         UBSAN_OPTIONS: print_stacktrace=1
       run: |
         source ./scripts/sanitizer_cases.sh
