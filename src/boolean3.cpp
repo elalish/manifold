@@ -387,7 +387,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   sequence(i12.begin(), i12.end());
 
   int index = forward ? 0 : 1;
-  stable_sort(i12.begin(), i12.end(), [&](size_t a, size_t b) {
+  stable_sort(i12.begin(), i12.end(), [&](auto a, auto b) {
     return p1q2[a][index] < p1q2[b][index] ||
            (p1q2[a][index] == p1q2[b][index] &&
             p1q2[a][1 - index] < p1q2[b][1 - index]);
@@ -420,7 +420,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
-  DisjointSets uA(static_cast<uint32_t>(a.vertPos_.size()));
+  DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
            countAt(static_cast<int>(a.halfedge_.size())), ctx, [&](int edge) {
              const int start = a.halfedge_.Start(edge);
@@ -437,26 +437,26 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (IsCancelled(ctx)) return Vec<int>{};
 
   // find components, the hope is the number of components should be small
-  std::unordered_set<int> components;
+  std::unordered_set<size_t> components;
 #if (MANIFOLD_PAR == 1)
   if (a.vertPos_.size() > 1e5) {
-    tbb::combinable<std::unordered_set<int>> componentsShared;
-    for_each(autoPolicy(a.vertPos_.size()), countAt(0),
-             countAt(static_cast<int>(a.vertPos_.size())), ctx,
-             [&](int v) { componentsShared.local().insert(uA.find(v)); });
-    componentsShared.combine_each([&](const std::unordered_set<int>& data) {
+    tbb::combinable<std::unordered_set<size_t>> componentsShared;
+    for_each(autoPolicy(a.vertPos_.size()), countAt(0_uz),
+             countAt(a.vertPos_.size()), ctx,
+             [&](size_t v) { componentsShared.local().insert(uA.find(v)); });
+    componentsShared.combine_each([&](const std::unordered_set<size_t>& data) {
       components.insert(data.begin(), data.end());
     });
   } else
 #endif
   {
     for (size_t v = 0; v < a.vertPos_.size(); v++)
-      components.insert(uA.find(static_cast<uint32_t>(v)));
+      components.insert(uA.find(v));
   }
   if (IsCancelled(ctx)) return Vec<int>{};
   Vec<int> verts;
   verts.reserve(components.size());
-  for (int c : components) verts.push_back(c);
+  for (size_t c : components) verts.push_back(static_cast<int>(c));
 
   Vec<int> w03(a.NumVert(), 0);
   Kernel02<expandP, forward> k02{a, b};
@@ -473,8 +473,8 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0_uz), countAt(w03.size()), ctx,
            [&](size_t i) {
-             uint32_t root = uA.find(static_cast<uint32_t>(i));
-             if (root == static_cast<uint32_t>(i)) return;
+             size_t root = uA.find(i);
+             if (root == i) return;
              w03[i] = w03[root];
            });
   if (IsCancelled(ctx)) return Vec<int>{};

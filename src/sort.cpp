@@ -153,7 +153,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   Permute(openVerts, vertNew2Old);
 
   Collider collider(vertBox, vertMorton);
-  DisjointSets uf(static_cast<uint32_t>(numVert));
+  DisjointSets uf(numVert);
 
   auto f = [&uf, &openVerts](int a, int b) {
     return uf.unite(openVerts[a], openVerts[b]);
@@ -169,7 +169,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   mesh.mergeToVert.clear();
   mesh.mergeFromVert.clear();
   for (size_t v = 0; v < numVert; ++v) {
-    const size_t mergeTo = uf.find(static_cast<uint32_t>(v));
+    const size_t mergeTo = uf.find(v);
     if (mergeTo != v) {
       mesh.mergeFromVert.push_back(v);
       mesh.mergeToVert.push_back(mergeTo);

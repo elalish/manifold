@@ -86,10 +86,10 @@ bool safeToRemove(const Polygons& polys, size_t i, size_t j, double precision) {
   return true;
 }
 
-std::pair<int, int> findIndex(const Polygons& polys, size_t i) {
+std::pair<size_t, size_t> findIndex(const Polygons& polys, size_t i) {
   size_t outer = 0;
   while (i >= polys[outer].size()) i -= polys[outer++].size();
-  return std::make_pair(static_cast<int>(outer), static_cast<int>(i));
+  return std::make_pair(outer, i);
 }
 
 void Dump(const Polygons& polys, const double epsilon) {
@@ -117,9 +117,9 @@ void DumpTriangulation(const Polygons& polys, double precision) {
   std::vector<ivec3> result = Triangulate(polys);
   ManifoldParams() = oldParams;
   for (const ivec3& tri : result) {
-    std::pair<int, int> xid = findIndex(polys, tri.x);
-    std::pair<int, int> yid = findIndex(polys, tri.y);
-    std::pair<int, int> zid = findIndex(polys, tri.z);
+    std::pair<size_t, size_t> xid = findIndex(polys, tri.x);
+    std::pair<size_t, size_t> yid = findIndex(polys, tri.y);
+    std::pair<size_t, size_t> zid = findIndex(polys, tri.z);
     vec2 x = polys[xid.first][xid.second];
     vec2 y = polys[yid.first][yid.second];
     vec2 z = polys[zid.first][zid.second];

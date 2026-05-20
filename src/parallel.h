@@ -1151,7 +1151,7 @@ template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
              InputIterator2 mapFirst, OutputIterator outputFirst) {
-  for_each(policy, countAt(size_t{0}),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first, mapFirst, outputFirst](size_t i) {
              outputFirst[mapFirst[i]] = first[i];
@@ -1183,7 +1183,7 @@ template <typename InputIterator, typename RandomAccessIterator,
 void gather(ExecutionPolicy policy, InputIterator mapFirst,
             InputIterator mapLast, RandomAccessIterator inputFirst,
             OutputIterator outputFirst) {
-  for_each(policy, countAt(size_t{0}),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
            [mapFirst, inputFirst, outputFirst](size_t i) {
              outputFirst[i] = inputFirst[mapFirst[i]];
@@ -1207,7 +1207,7 @@ void gather(InputIterator mapFirst, InputIterator mapLast,
 // Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
-  for_each(policy, countAt(size_t{0}),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
 }
