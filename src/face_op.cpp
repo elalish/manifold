@@ -189,7 +189,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                               const Vec<TriRef>& halfedgeRef, bool allowConvex,
                               ExecutionContext::Impl* ctx) {
   ZoneScoped;
-  if (IsCancelled(ctx)) return;
+  RETURN_IF_CANCELLED(ctx);
   Vec<vec3> triNormal;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
@@ -298,7 +298,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
              triOffset[face] = numEdge - 2;
              if (numEdge > 4)
                group.run([&, face] {
-                 if (IsCancelled(ctx)) return;
+                 RETURN_IF_CANCELLED(ctx);
                  HalfedgeTriangulation triangulation =
                      generalTriangulation(face);
                  triOffset[face] = triangulation.NumTri();
@@ -306,11 +306,11 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                });
            });
   group.wait();
-  if (IsCancelled(ctx)) return;
+  RETURN_IF_CANCELLED(ctx);
 #else
   std::unordered_map<int, HalfedgeTriangulation> results;
   for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
-    if (IsCancelled(ctx)) return;
+    RETURN_IF_CANCELLED(ctx);
     const int numEdge = faceEdge[face + 1] - faceEdge[face];
     if (numEdge == 0) {
       triOffset[face] = 0;
@@ -343,7 +343,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
            countAt(faceEdge.size() - 1), ctx, processFace2);
 #else
   for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
-    if (IsCancelled(ctx)) return;
+    RETURN_IF_CANCELLED(ctx);
     const HalfedgeTriangulation* resultPtr = nullptr;
     auto result = results.find(face);
     if (result != results.end()) resultPtr = &result->second;
@@ -351,7 +351,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   }
 #endif
 
-  if (IsCancelled(ctx)) return;
+  RETURN_IF_CANCELLED(ctx);
   for_each(autoPolicy(faceHalfedge.size(), 1e5), countAt(0_uz),
            countAt(faceHalfedge.size()), ctx, [&](size_t edge) {
              const int triEdge = contour2Tri[edge];
@@ -363,7 +363,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                           "boundary edge did not triangulate with its pair");
              halfedge_.SetPair(triEdge, pairTri);
            });
-  if (IsCancelled(ctx)) return;
+  RETURN_IF_CANCELLED(ctx);
   faceNormal_ = std::move(triNormal);
 }
 

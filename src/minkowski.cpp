@@ -49,7 +49,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     tree.GetCsgLeafNode(ctx);
     return tree;
   };
-  if (IsCancelled(ctx)) return cancelled();
+  RETURN_IF_CANCELLED(ctx, cancelled());
 
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
@@ -101,7 +101,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
     // do it in batches of 1000 meshes
     for (size_t offset = 0; offset < numTri; offset += BATCH_SIZE) {
-      if (IsCancelled(ctx)) return cancelled();
+      RETURN_IF_CANCELLED(ctx, cancelled());
       size_t numIter = std::min(numTri - offset, BATCH_SIZE);
       std::vector<Manifold> newHulls(numIter);
       for_each_n(autoPolicy(numIter, 100), countAt(0), numIter,
@@ -136,7 +136,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
     // Process each A face sequentially
     for (size_t aFace = 0; aFace < numTriA; ++aFace) {
-      if (IsCancelled(ctx)) return cancelled();
+      RETURN_IF_CANCELLED(ctx, cancelled());
       vec3 a1 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 0)];
       vec3 a2 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 1)];
       vec3 a3 = aImpl->vertPos_[aImpl->halfedge_.Start((aFace * 3) + 2)];
@@ -191,7 +191,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
       composedHulls.push_back(evalBatch(std::move(accumulated), OpType::Add));
     }
   }
-  if (IsCancelled(ctx)) return cancelled();
+  RETURN_IF_CANCELLED(ctx, cancelled());
   return evalBatch(std::move(composedHulls),
                    inset ? manifold::OpType::Subtract : manifold::OpType::Add)
       .AsOriginal();
