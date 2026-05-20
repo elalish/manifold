@@ -461,10 +461,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     }
   }
 
-  // Phase boundaries: ADVANCE_PHASE_OR_RETURN (from execution_impl.h)
-  // does cancel-check + MakeEmpty + return on cancel, then credits one
-  // phase on the continue path. Count of calls below must equal
-  // kPhasesPerFromMesh.
+  // Phase boundaries; count of ADVANCE_PHASE_OR_RETURN calls below must
+  // equal kPhasesPerFromMesh.
   CreateHalfedges(triProp, triVert);
   if (!IsManifold()) {
     MakeEmpty(Error::NotManifold);
