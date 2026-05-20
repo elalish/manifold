@@ -1,104 +1,80 @@
 # OpenSCAD to Manifold.js Prototype Compiler
 
-Early-stage experimental prototype for:
-https://github.com/opencax/GSoC/issues/117
 
-## Current Project State
+## Setup and Running Locally
 
-This project parses OpenSCAD source, resolves recursive include/use dependencies, and compiles to JavaScript that runs with manifold-3d.
+To get the OpenSCAD compiler running on your local machine, follow these steps:
 
-Pipeline:
-
-```text
-OpenSCAD (.scad) -> Lexer -> Parser -> AST -> Compiler -> Manifold JS (.js)
-```
-
-Generated files in out/ export:
-
-```js
-export const result = ...
-```
-
-Each compiled file imports out/runtime.js.
-
-## Supported Constructs
-
-### Geometry and Modules
-- Primitives: cube, sphere, cylinder, circle, square, polygon, polyhedron, text
-- Transforms: translate, rotate, scale, mirror, multmatrix, resize
-- Boolean ops: union, difference, intersection, hull, minkowski
-- Extrusion: linear_extrude, rotate_extrude
-- Other modules: projection, offset, color, render, children, echo, assert, let
-
-### Language Features
-- Variables, functions, modules
-- for statements
-- List-comprehension forms: for, C-style for, if, let, each
-- if/else
-- Expressions: arithmetic, comparison, logical, ternary, unary, indexing, member access
-- Named arguments and default parameters
-- Vectors and ranges
-- Lambdas and dynamic calls, for example expr(args)
-- Strings, booleans, undef, comments
-- include <...> and use <...> (resolved recursively before compile)
-
-## Include and Use Resolution
-
-demo.ts resolves dependencies via src/resolver.ts using:
-- The current file directory
-- The workspace root
-- OPENSCADPATH
-- Default OpenSCAD user library locations by OS
-
-include imports declarations and top-level geometry.
-
-use imports declarations only (modules/functions).
-
-## Setup and Run
-
-Install dependencies:
-
+### 1. Install Dependencies
+Ensure you have Node.js installed, then install the package dependencies:
 ```bash
 npm install
 ```
 
-Set OPENSCADPATH in your shell before running compile commands.
+### 2. Configure Libraries Search Path (Optional)
+If you want to use external libraries (such as BOSL2), configure the `OPENSCADPATH` environment variable in your terminal:
+- **PowerShell**:
+  ```powershell
+  $env:OPENSCADPATH = "C:\Users\<you>\Documents\OpenSCAD\libraries"
+  ```
+- **Bash**:
+  ```bash
+  export OPENSCADPATH="$HOME/Documents/OpenSCAD/libraries"
+  ```
 
-PowerShell example:
-
-```powershell
-$env:OPENSCADPATH = "C:\Users\<you>\Documents\OpenSCAD\libraries"
+### 3. Build the CLI Tool
+Build the compiler script into its final CommonJS bundle:
+```bash
+npm run build
 ```
 
-Bash example:
+## Available Commands
+
+The CLI is built using `commander`. It exposes two main commands:
+
+### 1. `compile`
+Compiles a single OpenSCAD source file to an executable TypeScript file.
 
 ```bash
-export OPENSCADPATH="$HOME/Documents/OpenSCAD/libraries"
+# General syntax
+npx tsx index.ts compile <input-file> [--output <output-file>]
+
+# Example (default output is test/out/cube.ts)
+npx tsx index.ts compile test/examples/cube.scad
+
+# Example with custom output
+npx tsx index.ts compile test/examples/cube.scad --output test/out/custom_cube.ts
 ```
 
-Compile common examples via package scripts:
+- **Arguments**:
+  - `<input>`: The path to the source `.scad` file to compile.
+- **Options**:
+  - `--output <path>`: The output `.ts` file path. **Note:** The target file must end with the `.ts` extension. If omitted, the output defaults to `test/out/<input-filename>.ts`.
+
+### 2. `compile-all`
+Discovers and compiles all `.scad` files in the `test/examples/` folder.
 
 ```bash
-npm run dev:cube
-npm run dev:advanced
-npm run dev:boolean_ops
+npx tsx index.ts compile-all
 ```
+---
 
-Compile all files under examples/:
+## Architecture & Compilation Flow
 
-```bash
-npm run compile-all-examples
+The compiler acts as a translator converting OpenSCAD declarative models into executable TypeScript files that leverage the `manifold-3d` mesh libraries.
+
+The compilation process flows through the following phases:
+
+```mermaid
+graph TD
+    A[Entry .scad file] --> B[core/resolver.ts]
+    B -->|Resolves include/use| C[core/lexer.ts]
+    C -->|Token stream| D[core/parser.ts]
+    D -->|Statements AST| B
+    B -->|Consolidated Program AST| E[core/compiler.ts]
+    E -->|CodeGen & Runtime Imports| F[Output .ts file]
 ```
-
-Compile any .scad file:
-
-```bash
-npx tsx demo.ts path/to/file.scad
-```
-
-Compiler output behavior:
-- Writes generated JavaScript to out/<input-name>.js
-- Prints status/progress logs to stdout (not the full generated source)
+---
 
 ## Viewer
 
@@ -112,61 +88,30 @@ Then open:
 - http://localhost:3000/viewer.html
 
 In the viewer:
-- Enter a compiled output file path such as out/cube.js
-- Click Load
+- Enter a compiled output file path such as `test/out/cube.ts`
+- Click **Load**
 
-## Visual Comparison Assets
+---
 
-- BOSL2-oriented examples are in examples/
-- Comparison images are in images/
-- Comparison write-up is in comparison.md
-
-## 2D Support
-
-2D primitives (circle, square, polygon, text) and 2D operations (offset, projection, boolean ops on 2D) use Manifold CrossSection APIs. They stay 2D until linear_extrude or rotate_extrude is used.
-
-## Current Limitations
-
-- This is still a prototype and does not fully match OpenSCAD semantics in all cases.
-- Full BOSL2 compatibility is not guaranteed.
-- text() is approximated as a simple box-like CrossSection based on text length and size.
-- render() and resize() are currently passthrough stubs and do not implement full OpenSCAD behavior.
-- 2D minkowski() falls back to hull (CrossSection has no native Minkowski operation).
-- 3D minkowski() may use approximation fallback paths depending on runtime support.
-- Unknown modules are ignored with a warning and compile to empty geometry.
-- Statement modifiers (#, !, %, *) are parsed but not currently applied during compilation.
-- surface() and import() signatures exist, but builtin implementations are not wired yet.
-- compile-all-examples currently includes examples/err.scad, which intentionally fails to parse and causes a non-zero exit code.
-- OPENSCADPATH is read from the environment at runtime. A .env file exists, but it is not automatically loaded by these scripts.
-- Compiled outputs import ./runtime.js, so out/runtime.js must be present.
-
-## Future Work
-
-- Implement full semantics for statement modifiers (#, !, %, *).
-- Add builtin support for additional modules such as surface() and import().
-- Improve text() geometry generation (font-aware outlines instead of box approximation).
-- Improve Minkowski behavior and robustness for both 2D and 3D cases.
-- Add stricter diagnostics mode (for example, fail on unknown modules instead of warning-only fallback).
-- Add automated tests and CI coverage for parser, resolver, and compiler output.
-- Improve compile-all-examples UX (skip known negative tests by default, or separate them into a dedicated failure test set).
-- Add dedicated scripts for more examples and remove or fix outdated scripts.
-- Improve documentation and contributor workflow for keeping out/runtime.js in sync.
 
 ## Project Layout
 
-```text
-src/
-  lexer.ts
-  parser.ts
-  ast.ts
-  compiler.ts
-  resolver.ts
-demo.ts
-compile_all_examples.ts
-examples/
-images/
-out/
-  runtime.js
-viewer.html
-comparison.md
-```
+- [core/](file:///d:/manifold/bindings/wasm/openscad-compiler/core): The compiler core directory.
+  - [ast.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/ast.ts): Syntax Tree node definitions.
+  - [lexer.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/lexer.ts): Tokenizer for OpenSCAD source.
+  - [parser.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/parser.ts): OpenSCAD parser building the AST.
+  - [resolver.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/resolver.ts): Resolves include/use paths and builds consolidated statements.
+  - [compiler.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/compiler.ts): Generates TypeScript output from the AST.
+  - [ir.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/core/ir.ts): Intermediate representation node definitions.
+- [commands/](file:///d:/manifold/bindings/wasm/openscad-compiler/commands): Commander CLI command definitions.
+  - [compile.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/commands/compile.ts): Single file compile command.
+  - [compile_all.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/commands/compile_all.ts): Bulk compile command.
+- [test/](file:///d:/manifold/bindings/wasm/openscad-compiler/test): Test materials and compiler outputs.
+  - [examples/](file:///d:/manifold/bindings/wasm/openscad-compiler/test/examples): OpenSCAD sample files.
+  - [out/](file:///d:/manifold/bindings/wasm/openscad-compiler/test/out): Destination folder for compiled TypeScript mesh scripts.
+- [index.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/index.ts): Main CLI entry point.
+- [runtime.ts](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime.ts) & [runtime.js](file:///d:/manifold/bindings/wasm/openscad-compiler/runtime.js): OpenSCAD-to-Manifold bridge runtime.
+- [tsconfig.json](file:///d:/manifold/bindings/wasm/openscad-compiler/tsconfig.json): TypeScript configuration.
+- [package.json](file:///d:/manifold/bindings/wasm/openscad-compiler/package.json): Package manifest and build scripts.
+- [viewer.html](file:///d:/manifold/bindings/wasm/openscad-compiler/viewer.html): 3D Three.js mesh visualizer.
+- [comparison.md](file:///d:/manifold/bindings/wasm/openscad-compiler/comparison.md): Feature comparison report.
