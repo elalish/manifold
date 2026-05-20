@@ -84,3 +84,44 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 }
 
 }  // namespace manifold
+
+/** @ingroup Private
+ *
+ * Early-return on cancel. Pass the same expression the surrounding
+ * function would `return` with: for void context, omit it; for non-void
+ * context, supply the cancelled-state value (e.g. `ErrorLeaf(...)`,
+ * `Vec<int>{}`, `cancelled()`).
+ *
+ * The `_IF_CANCELLED` and `_OR_RETURN` naming is deliberate - macros
+ * that hide a `return` should name the early exit at the call site so
+ * the reader isn't surprised by what looks like a function call.
+ *
+ * Used in ctx-aware loops and at phase boundaries across the library;
+ * see callers across the .cpp files.
+ */
+#define RETURN_IF_CANCELLED(ctx, ...)             \
+  do {                                            \
+    if (manifold::IsCancelled(ctx)) return __VA_ARGS__; \
+  } while (0)
+
+/** @ingroup Private
+ *
+ * Phase-boundary checkpoint for `Manifold::Impl` methods that count
+ * progress: cancel-check (with `MakeEmpty(Cancelled)` + return on
+ * cancel), then publish one phase of progress on the continue path.
+ * Only usable from non-static `Impl` methods (relies on `this->MakeEmpty`).
+ *
+ * The count of `ADVANCE_PHASE_OR_RETURN(ctx)` sites in a given method
+ * must equal that method's `kPhasesPer*` constant; see
+ * `kPhasesPerFromMesh` above and the `Manifold::Impl::Impl(MeshGLP, ctx)`
+ * ctor body for the canonical example.
+ */
+#define ADVANCE_PHASE_OR_RETURN(ctx)                              \
+  do {                                                            \
+    if (manifold::IsCancelled(ctx)) {                             \
+      MakeEmpty(manifold::Manifold::Error::Cancelled);            \
+      return;                                                     \
+    }                                                             \
+    if (ctx)                                                      \
+      (ctx)->donePhases.fetch_add(1, std::memory_order_relaxed);  \
+  } while (0)

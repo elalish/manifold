@@ -461,19 +461,16 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     }
   }
 
-  // Phase boundaries: cancel-check then credit the phase only on
-  // continue. Count of fetch_add sites below must equal
+  // Phase boundaries: ADVANCE_PHASE_OR_RETURN (from execution_impl.h)
+  // does cancel-check + MakeEmpty + return on cancel, then credits one
+  // phase on the continue path. Count of calls below must equal
   // kPhasesPerFromMesh.
   CreateHalfedges(triProp, triVert);
   if (!IsManifold()) {
     MakeEmpty(Error::NotManifold);
     return;
   }
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   CalculateBBox();
   SetEpsilon(-1, std::is_same<Precision, float>::value);
@@ -481,46 +478,22 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
   CleanupTopology();
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   DedupePropVerts();
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   SetNormalsAndCoplanar();
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveDegenerates();
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveUnreferencedVerts();
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   SortGeometry(ctx);
-  if (IsCancelled(ctx)) {
-    MakeEmpty(Error::Cancelled);
-    return;
-  }
-  if (ctx) ctx->donePhases.fetch_add(1, std::memory_order_relaxed);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   if (!IsFinite()) {
     MakeEmpty(Error::NonFiniteVertex);
