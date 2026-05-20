@@ -52,12 +52,6 @@ namespace boolean2 {
 //
 // Fingerprint quantizes vert positions to multiples of eps/100 so that
 // cross-iteration vert renumbering doesn't break comparison.
-// =============================================================================
-// Quantum-parameterized fingerprint. `Fingerprint` (default) uses eps/100;
-// `CoarseFingerprint` (eps quantum) captures only topology, i.e., two
-// runs differing by sub-eps position drift will have identical coarse
-// fingerprints, which is the right test for "did pass 2 actually change
-// the topology, or just shift positions by a few ULPs?"
 //
 // Returns the sorted (vMin.x, vMin.y, vMax.x, vMax.y, mult) tuple
 // vector directly: vector equality / lexicographic less-than give us
@@ -88,16 +82,8 @@ FingerprintData FingerprintAt(const OverlapResult& r, double quantum) {
   return subs;
 }
 
-FingerprintData CoarseFingerprint(const OverlapResult& r, double eps) {
-  return FingerprintAt(r, eps);
-}
-
-// Fine-grained fingerprint used for idempotence detection. The eps/100
-// factor lets two iterations at the same coarse-eps tolerance still
-// produce distinguishable fingerprints if their snap decisions landed
-// at different sub-eps positions; CoarseFingerprint above lumps any
-// such pair together. Empirical: anything finer than ~eps/100 starts
-// catching pure FP-noise differences.
+// Fine-grained fingerprint used for idempotence detection. Empirical:
+// anything finer than ~eps/100 starts catching pure FP-noise differences.
 FingerprintData Fingerprint(const OverlapResult& r, double eps) {
   return FingerprintAt(r, eps * 0.01);
 }

@@ -201,27 +201,14 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
     return;
   }
 #if (MANIFOLD_PAR == 1)
-  // Only enable the parallel BVH walk when the work justifies the per-thread
-  // accumulator + combine_each overhead. Below the threshold, use the serial
-  // adapter.
-  if (nE >= kEdgeBvhThreshold) {
-    intersection_pair_recorder::PairsRecorder rec{
-        bvh.leafToOrig, edges, verts, eps, {}};
-    auto qf = [&](int i) { return edgeBoxes[i]; };
-    BVHCollisions<false>(bvh, rec, qf, nE, /*parallel=*/true);
-    rec.tls.combine_each([&](const auto& localPairs) {
-      pairs->insert(pairs->end(), localPairs.begin(), localPairs.end());
-    });
-    RadixSortPairs(pairs);
-  } else {
-    CollidePairs(bvh, edgeBoxes, [&](int qi, int li) {
-      if (qi >= li) return;
-      if (SharedEndpointSafelySkippable(edges[qi], edges[li], verts, eps))
-        return;
-      pairs->emplace_back(qi, li);
-    });
-    RadixSortPairs(pairs);
-  }
+  intersection_pair_recorder::PairsRecorder rec{
+      bvh.leafToOrig, edges, verts, eps, {}};
+  auto qf = [&](int i) { return edgeBoxes[i]; };
+  BVHCollisions<false>(bvh, rec, qf, nE, /*parallel=*/true);
+  rec.tls.combine_each([&](const auto& localPairs) {
+    pairs->insert(pairs->end(), localPairs.begin(), localPairs.end());
+  });
+  RadixSortPairs(pairs);
 #else
   CollidePairs(bvh, edgeBoxes, [&](int qi, int li) {
     if (qi >= li) return;
@@ -230,14 +217,6 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
   });
   RadixSortPairs(pairs);
 #endif
-}
-
-std::vector<std::pair<int, int>> CollectIntersectionPairs(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<Box2>& edgeBoxes, const BVH& bvh) {
-  std::vector<std::pair<int, int>> pairs;
-  CollectIntersectionPairs(edges, verts, eps, edgeBoxes, bvh, &pairs);
-  return pairs;
 }
 
 // Internal: takes either `pairs` (and computes intersections inline) or
@@ -529,9 +508,7 @@ void FindAndInsertIntersections(const std::vector<EdgeM>& edges,
                                  bvh, &pairs, nullptr);
 }
 
-// Public wrapper: caller already has precomputed intersections (e.g.
-// from a fused parallel pass over pairs); skip the recompute and go
-// straight to serial snap+insert + propagation.
+#if (MANIFOLD_PAR == 1)
 void FindAndInsertIntersectionsFromPrecomputed(
     const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
     std::vector<std::vector<int>>* lists,
@@ -541,6 +518,7 @@ void FindAndInsertIntersectionsFromPrecomputed(
   FindAndInsertIntersectionsImpl(edges, verts, lists, vertEdges, eps, edgeBoxes,
                                  bvh, nullptr, &precomputed);
 }
+#endif
 
 }  // namespace boolean2
 }  // namespace manifold

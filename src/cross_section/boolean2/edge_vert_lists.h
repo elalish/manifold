@@ -29,11 +29,13 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs);
 
+#if (MANIFOLD_PAR == 1)
 void BuildListsAndFindIntersectionsParallel(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs,
     std::vector<std::vector<int>>* lists,
     std::vector<IntersectionPoint>* intersections);
+#endif
 
 }  // namespace boolean2
 }  // namespace manifold

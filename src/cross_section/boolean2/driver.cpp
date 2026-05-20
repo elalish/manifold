@@ -128,14 +128,18 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   auto t3 = timing ? Clock::now() : Clock::time_point{};
   if (timing) P.buildListsNs.fetch_add(Ns(t2, t3), std::memory_order_relaxed);
   std::vector<std::vector<int>> vertEdges;
+#if (MANIFOLD_PAR == 1)
   if (useFused) {
     FindAndInsertIntersectionsFromPrecomputed(edges, &merge.verts, &lists,
                                               &vertEdges, eps, edgeBoxes, bvh,
                                               fusedIntersections);
   } else {
+#endif
     FindAndInsertIntersections(edges, &merge.verts, &lists, &vertEdges, eps,
                                edgeBoxes, bvh, intersectionPairs);
+#if (MANIFOLD_PAR == 1)
   }
+#endif
   auto t4 = timing ? Clock::now() : Clock::time_point{};
   if (timing) P.findIxNs.fetch_add(Ns(t3, t4), std::memory_order_relaxed);
 

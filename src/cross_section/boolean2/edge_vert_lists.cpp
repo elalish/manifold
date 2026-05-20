@@ -185,6 +185,7 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
 // avoid TBB setup overhead.
 extern const size_t kFusedNarrowParallelMin = 1024;
 
+#if (MANIFOLD_PAR == 1)
 // Combined parallel narrow + IntersectSegments. Each pair gets its 4
 // vert-on-edge narrow tests AND a segment-segment intersection test
 // in a single parallel pass over `pairs`. Thread-local accumulators
@@ -343,6 +344,7 @@ void BuildListsAndFindIntersectionsParallel(
         return a.j < b.j;
       });
 }
+#endif
 
 }  // namespace boolean2
 }  // namespace manifold

@@ -26,10 +26,6 @@
 namespace manifold {
 namespace boolean2 {
 
-#ifndef BOOLEAN2_EDGE_BVH_THRESHOLD
-#define BOOLEAN2_EDGE_BVH_THRESHOLD 256
-#endif
-inline constexpr int kEdgeBvhThreshold = BOOLEAN2_EDGE_BVH_THRESHOLD;
 inline constexpr int kEdgePairBvhThreshold = 1024;
 
 struct Box2 {

@@ -45,12 +45,5 @@ void Canonicalize(const std::vector<EdgeM>& edges,
   out->Finalize();
 }
 
-CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
-                               const std::vector<std::vector<int>>& lists) {
-  CanonicalSubEdges out;
-  Canonicalize(edges, lists, &out);
-  return out;
-}
-
 }  // namespace boolean2
 }  // namespace manifold

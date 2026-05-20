@@ -67,8 +67,6 @@ struct CanonicalSubEdges {
 void Canonicalize(const std::vector<EdgeM>& edges,
                   const std::vector<std::vector<int>>& lists,
                   CanonicalSubEdges* out);
-CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
-                               const std::vector<std::vector<int>>& lists);
 
 }  // namespace boolean2
 }  // namespace manifold

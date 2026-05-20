@@ -27,7 +27,6 @@ using FingerprintData =
     std::vector<std::tuple<int64_t, int64_t, int64_t, int64_t, int>>;
 
 FingerprintData FingerprintAt(const OverlapResult& r, double quantum);
-FingerprintData CoarseFingerprint(const OverlapResult& r, double eps);
 FingerprintData Fingerprint(const OverlapResult& r, double eps);
 
 enum class IterStatus {
