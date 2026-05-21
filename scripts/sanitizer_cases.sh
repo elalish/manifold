@@ -5,9 +5,8 @@
 
 SANITIZER_GTEST_FILTER_CORE="Boolean.DeterminismSimpleSubtract:Boolean.DeterminismSimpleUnion:Boolean.DeterminismSimpleIntersect:Boolean.MultiCoplanar:Boolean.NonIntersecting:Manifold.MeshDeterminism"
 
-# Reserved for follow-up expansion if we split PR/scheduled lanes.
-SANITIZER_GTEST_FILTER_EXTENDED="${SANITIZER_GTEST_FILTER_CORE}"
+# Broader set for scheduled/manual runs.
+SANITIZER_GTEST_FILTER_EXTENDED="${SANITIZER_GTEST_FILTER_CORE}:Boolean.AlmostCoplanar"
 
 # Default filter used by workflow/test helpers.
 SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_CORE}"
-
