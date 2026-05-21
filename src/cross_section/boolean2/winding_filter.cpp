@@ -29,6 +29,7 @@
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
 #include <map>
+#include <string>
 #endif
 #include <utility>
 #include <vector>
@@ -195,7 +196,8 @@ namespace detail {
 // The DCEL filter body, parameterized by the winding rule.
 std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
                                              const std::vector<vec2>& verts,
-                                             bool debug, WindRule rule) {
+                                             bool debug, WindRule rule,
+                                             Trace* trace) {
   using dcel_internal::HalfEdge;
 #ifdef MANIFOLD_DEBUG
   if (debug && DebugVerbose()) {
@@ -606,6 +608,29 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
     }
     std::cout << "\n";
   }
+  if (trace) {
+    TracePhase& phase = trace->AddPhase("dcel_faces");
+    for (int f = 0; f < nFaces; ++f) {
+      SimplePolygon loop;
+      const int h0 = faceStartHE[f];
+      if (h0 >= 0) {
+        int h = h0;
+        int safety = 0;
+        do {
+          loop.push_back(verts[halfedges[h].origin]);
+          h = halfedges[h].next;
+          if (h < 0 || ++safety > (int)halfedges.size()) break;
+        } while (h != h0);
+      }
+      const bool isOuter = f == outerFace;
+      phase.polygons.push_back(
+          {std::string("face") + std::to_string(f), std::move(loop),
+           isOuter ? "outer_face_unbounded" : "face", "", faceWind[f],
+           IsInside(rule, faceWind[f]), isOuter ? "unbounded outer face" : ""});
+      phase.annotations.push_back({std::string("face") + std::to_string(f),
+                                   "area", std::to_string(faceArea[f])});
+    }
+  }
 #endif
 
   // 7. Filter canonical sub-edges by left/right face windings. The first
@@ -640,8 +665,12 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
 // Xor / Simplify) go through here.
 std::vector<OutEdge> FilterByWindingDCEL(const CanonicalSubEdges& canon,
                                          const std::vector<vec2>& verts,
-                                         bool debug, WindRule rule) {
-  return detail::FilterByWindingDCELImpl(canon, verts, debug, rule);
+                                         bool debug, WindRule rule,
+                                         Trace* trace) {
+#ifndef MANIFOLD_DEBUG
+  (void)trace;
+#endif
+  return detail::FilterByWindingDCELImpl(canon, verts, debug, rule, trace);
 }
 
 }  // namespace boolean2

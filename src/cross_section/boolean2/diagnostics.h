@@ -21,11 +21,20 @@
 #include <cstdint>
 
 #ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "manifold/manifold.h"
 #endif
 
 namespace manifold {
 namespace boolean2 {
+
+struct Trace;
 
 struct PhaseAcc {
   std::atomic<int64_t> mergeNs{0};
@@ -137,6 +146,208 @@ inline bool DebugVerbose(int level = 2) {
   return false;
 #endif
 }
+
+#ifdef MANIFOLD_DEBUG
+struct TracePoint {
+  std::string id;
+  vec2 p;
+  std::string kind;
+  std::string source;
+  std::string label;
+};
+
+struct TraceSegment {
+  std::string id;
+  vec2 a;
+  vec2 b;
+  std::string kind;
+  std::string source;
+  int mult = 0;
+  std::string label;
+};
+
+struct TracePolygon {
+  std::string id;
+  std::vector<vec2> verts;
+  std::string kind;
+  std::string source;
+  int winding = 0;
+  bool inside = false;
+  std::string label;
+};
+
+struct TraceAnnotation {
+  std::string target;
+  std::string key;
+  std::string value;
+};
+
+struct TracePhase {
+  std::string name;
+  std::vector<TracePoint> points;
+  std::vector<TraceSegment> segments;
+  std::vector<TracePolygon> polygons;
+  std::vector<TraceAnnotation> annotations;
+};
+
+struct Trace {
+  double eps = 0.0;
+  std::string rule;
+  std::vector<TracePhase> phases;
+
+  TracePhase& AddPhase(std::string name) {
+    phases.push_back({});
+    phases.back().name = std::move(name);
+    return phases.back();
+  }
+};
+
+namespace trace_detail {
+inline void WriteEscaped(std::ostream& os, const std::string& s) {
+  os << '"';
+  for (char c : s) {
+    switch (c) {
+      case '"':
+        os << "\\\"";
+        break;
+      case '\\':
+        os << "\\\\";
+        break;
+      case '\n':
+        os << "\\n";
+        break;
+      case '\r':
+        os << "\\r";
+        break;
+      case '\t':
+        os << "\\t";
+        break;
+      default:
+        os << c;
+        break;
+    }
+  }
+  os << '"';
+}
+
+inline void WriteVec2(std::ostream& os, const vec2& p) {
+  os << '[' << p.x << ',' << p.y << ']';
+}
+
+inline void WriteField(std::ostream& os, const char* name,
+                       const std::string& value, bool comma = true) {
+  WriteEscaped(os, name);
+  os << ':';
+  WriteEscaped(os, value);
+  if (comma) os << ',';
+}
+
+inline void WritePoint(std::ostream& os, const TracePoint& p) {
+  os << '{';
+  WriteField(os, "id", p.id);
+  WriteEscaped(os, "xy");
+  os << ':';
+  WriteVec2(os, p.p);
+  os << ',';
+  WriteField(os, "kind", p.kind);
+  WriteField(os, "source", p.source);
+  WriteField(os, "label", p.label, false);
+  os << '}';
+}
+
+inline void WriteSegment(std::ostream& os, const TraceSegment& s) {
+  os << '{';
+  WriteField(os, "id", s.id);
+  WriteEscaped(os, "a");
+  os << ':';
+  WriteVec2(os, s.a);
+  os << ',';
+  WriteEscaped(os, "b");
+  os << ':';
+  WriteVec2(os, s.b);
+  os << ',';
+  WriteField(os, "kind", s.kind);
+  WriteField(os, "source", s.source);
+  WriteEscaped(os, "mult");
+  os << ':' << s.mult << ',';
+  WriteField(os, "label", s.label, false);
+  os << '}';
+}
+
+inline void WritePolygon(std::ostream& os, const TracePolygon& p) {
+  os << '{';
+  WriteField(os, "id", p.id);
+  WriteEscaped(os, "verts");
+  os << ":[";
+  for (size_t i = 0; i < p.verts.size(); ++i) {
+    if (i > 0) os << ',';
+    WriteVec2(os, p.verts[i]);
+  }
+  os << "],";
+  WriteField(os, "kind", p.kind);
+  WriteField(os, "source", p.source);
+  WriteEscaped(os, "winding");
+  os << ':' << p.winding << ',';
+  WriteEscaped(os, "inside");
+  os << ':' << (p.inside ? "true" : "false") << ',';
+  WriteField(os, "label", p.label, false);
+  os << '}';
+}
+
+inline void WriteAnnotation(std::ostream& os, const TraceAnnotation& a) {
+  os << '{';
+  WriteField(os, "target", a.target);
+  WriteField(os, "key", a.key);
+  WriteField(os, "value", a.value, false);
+  os << '}';
+}
+
+template <typename T, typename F>
+void WriteArray(std::ostream& os, const std::vector<T>& items, F writeItem) {
+  os << '[';
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) os << ',';
+    writeItem(os, items[i]);
+  }
+  os << ']';
+}
+}  // namespace trace_detail
+
+inline void WriteTraceJson(std::ostream& os, const Trace& trace) {
+  os << std::setprecision(17);
+  os << "{\n";
+  trace_detail::WriteEscaped(os, "eps");
+  os << ':' << trace.eps << ",\n";
+  trace_detail::WriteField(os, "rule", trace.rule);
+  os << "\n";
+  trace_detail::WriteEscaped(os, "phases");
+  os << ":[\n";
+  for (size_t i = 0; i < trace.phases.size(); ++i) {
+    const TracePhase& phase = trace.phases[i];
+    if (i > 0) os << ",\n";
+    os << '{';
+    trace_detail::WriteField(os, "name", phase.name);
+    trace_detail::WriteEscaped(os, "points");
+    os << ':';
+    trace_detail::WriteArray(os, phase.points, trace_detail::WritePoint);
+    os << ',';
+    trace_detail::WriteEscaped(os, "segments");
+    os << ':';
+    trace_detail::WriteArray(os, phase.segments, trace_detail::WriteSegment);
+    os << ',';
+    trace_detail::WriteEscaped(os, "polygons");
+    os << ':';
+    trace_detail::WriteArray(os, phase.polygons, trace_detail::WritePolygon);
+    os << ',';
+    trace_detail::WriteEscaped(os, "annotations");
+    os << ':';
+    trace_detail::WriteArray(os, phase.annotations,
+                             trace_detail::WriteAnnotation);
+    os << '}';
+  }
+  os << "\n]\n}\n";
+}
+#endif
 
 namespace timing_detail {
 using Clock = std::chrono::steady_clock;

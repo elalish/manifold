@@ -22,6 +22,8 @@
 namespace manifold {
 namespace boolean2 {
 
+struct Trace;
+
 struct OverlapResult {
   std::vector<vec2> verts;
   std::vector<OutEdge> edges;
@@ -32,7 +34,8 @@ struct OverlapResult {
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
                                bool debug = false,
-                               WindRule pred = WindRule::Add);
+                               WindRule pred = WindRule::Add,
+                               Trace* trace = nullptr);
 
 }  // namespace boolean2
 }  // namespace manifold
