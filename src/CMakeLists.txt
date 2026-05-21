@@ -79,6 +79,7 @@ set(
   cross_section/boolean2/intersections.h
   cross_section/boolean2/iterate.h
   cross_section/boolean2/offset.h
+  cross_section/boolean2/parallel_policy.h
   cross_section/boolean2/predicates.h
   cross_section/boolean2/vertex_merge.h
   cross_section/boolean2/winding_filter.h
