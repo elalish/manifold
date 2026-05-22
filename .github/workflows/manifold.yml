@@ -498,6 +498,7 @@ jobs:
         SANITIZER_TEST_BIN=""
         for CANDIDATE in \
           ./build/test/manifold_test \
+          ./test/manifold_test \
           ./sanitizer-build/test/manifold_test \
           ./sanitizer-build/build/test/manifold_test; do
           if [ -f "${CANDIDATE}" ]; then
@@ -517,6 +518,29 @@ jobs:
         fi
         chmod +x "${SANITIZER_TEST_BIN}" || true
 
+        BIN_DIR="$(dirname "${SANITIZER_TEST_BIN}")"
+        LIB_CANDIDATES=(
+          "${BIN_DIR}/../lib"
+          ./build/lib
+          ./lib
+          ./sanitizer-build/lib
+          ./sanitizer-build/build/lib
+        )
+        LIB_PATHS=()
+        for LIB_DIR in "${LIB_CANDIDATES[@]}"; do
+          if [ -d "${LIB_DIR}" ]; then
+            LIB_PATHS+=("${LIB_DIR}")
+          fi
+        done
+        if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
+          SANITIZER_LD_PATH="$(IFS=:; echo "${LIB_PATHS[*]}")"
+          if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+            export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}:${LD_LIBRARY_PATH}"
+          else
+            export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}"
+          fi
+        fi
+
         START_TS="$(date +%s)"
         set +e
         timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
@@ -531,6 +555,7 @@ jobs:
           echo ""
           echo "- subset: \`${SANITIZER_SUBSET}\`"
           echo "- test_bin: \`${SANITIZER_TEST_BIN}\`"
+          echo "- ld_library_path: \`${LD_LIBRARY_PATH:-<unset>}\`"
           echo "- elapsed_sec: \`${ELAPSED_SEC}\`"
           echo "- budget_sec: \`${SANITIZER_RUNTIME_BUDGET_SEC}\`"
         } >> "$GITHUB_STEP_SUMMARY"
