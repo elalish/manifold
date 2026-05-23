@@ -66,6 +66,34 @@ those edges back into regularized `manifold::Polygons`. Offset and containment
 helpers live in `offset.h` and `containment.h`; they are included by the
 follow-up backend wiring rather than by `boolean2.h`.
 
+## Architecture
+
+```mermaid
+flowchart TD
+  API["boolean2.h\nFillByRule / Boolean2D / Xor"]
+  Wrapper["boolean2.cpp\nPolygons -> vertices + directed edges"]
+  Iterate["iterate.cpp\nbounded fixed-point cleanup"]
+  Driver["driver.cpp\nsingle arrangement pass"]
+  Merge["vertex_merge.cpp\nmerge vertices within eps"]
+  Pairs["bvh.cpp\nedge-pair broad phase"]
+  Lists["edge_vert_lists.cpp\nvertices lying on edges"]
+  Ix["intersections.cpp\nisolated crossings + propagation"]
+  Canon["canonicalize.cpp\nsub-edges + multiplicity cancel"]
+  Filter["winding_filter.cpp\nhalfedge face walk + winding rule"]
+  Output["boolean2.cpp\nretained edges -> regularized Polygons"]
+
+  API --> Wrapper --> Iterate --> Driver
+  Driver --> Merge --> Pairs
+  Pairs --> Lists
+  Pairs --> Ix
+  Lists --> Canon
+  Ix --> Canon --> Filter --> Output
+```
+
+Shared leaf utilities live in `predicates.*`, and debug/performance tracing
+lives in `diagnostics.h`. `offset.*` and `containment.*` are sibling helpers
+used by the later backend-wiring PR for the rest of the `CrossSection` API.
+
 ## Relationship To The Sketch
 
 This implementation follows the six-step 2D overlap-removal sketch from
