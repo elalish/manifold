@@ -560,9 +560,11 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   thread_local static std::vector<int> componentQ;
   thread_local static std::vector<int> componentFaces;
   thread_local static std::vector<uint8_t> componentSeen;
+  thread_local static std::vector<uint8_t> componentLocalOuter;
   componentQ.clear();
   componentFaces.clear();
   componentSeen.assign(nFaces, 0);
+  componentLocalOuter.assign(nFaces, 0);
   auto collectComponent = [&](int seed) {
     componentQ.clear();
     componentFaces.clear();
@@ -594,6 +596,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
       for (int cf : componentFaces) {
         if (faceArea[cf] < faceArea[localOuter]) localOuter = cf;
       }
+      componentLocalOuter[localOuter] = 1;
       seedRayCastLeastBiased(localOuter);
       propagateFrom(localOuter);
     }
@@ -645,8 +648,18 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const int leftFace = halfedges[hA].face;
     const int rightFace = halfedges[hB].face;
     if (leftFace < 0 || rightFace < 0) continue;
-    const int wL = faceWind[leftFace];
-    const int wR = faceWind[rightFace];
+    // A disconnected component's local outer cycle is not a single global
+    // face: other components can split the space it surrounds. For those
+    // local outers, classify the side adjacent to this particular edge instead
+    // of reusing one propagated winding for the whole cycle.
+    const auto faceWindingAtHalfedge = [&](int face, int halfedge) {
+      if (rule == WindRule::NonZero && componentLocalOuter[face]) {
+        return castFaceHalfedge(halfedge);
+      }
+      return faceWind[face];
+    };
+    const int wL = faceWindingAtHalfedge(leftFace, hA);
+    const int wR = faceWindingAtHalfedge(rightFace, hB);
     const bool leftIn = IsInside(rule, wL);
     const bool rightIn = IsInside(rule, wR);
     if (leftIn == rightIn) continue;
