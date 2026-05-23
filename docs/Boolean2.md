@@ -70,17 +70,28 @@ follow-up backend wiring rather than by `boolean2.h`.
 
 ```mermaid
 flowchart TD
-  API["boolean2.h<br/>FillByRule / Boolean2D / Xor"]
-  Wrapper["boolean2.cpp<br/>Polygons to vertices + edges"]
-  Iterate["iterate.cpp<br/>fixed-point cleanup"]
-  Driver["driver.cpp<br/>one arrangement pass"]
-  Merge["vertex_merge.cpp<br/>merge within eps"]
-  Pairs["bvh.cpp<br/>edge-pair broad phase"]
-  Lists["edge_vert_lists.cpp<br/>vertices on edges"]
-  Ix["intersections.cpp<br/>crossings + propagation"]
-  Canon["canonicalize.cpp<br/>sub-edges + cancellation"]
-  Filter["winding_filter.cpp<br/>halfedge face walk"]
-  Output["boolean2.cpp<br/>regularized Polygons"]
+  API["`boolean2.h
+  FillByRule / Boolean2D / Xor`"]
+  Wrapper["`boolean2.cpp
+  Polygons to vertices + edges`"]
+  Iterate["`iterate.cpp
+  fixed-point cleanup`"]
+  Driver["`driver.cpp
+  one arrangement pass`"]
+  Merge["`vertex_merge.cpp
+  merge within eps`"]
+  Pairs["`bvh.cpp
+  edge-pair broad phase`"]
+  Lists["`edge_vert_lists.cpp
+  vertices on edges`"]
+  Ix["`intersections.cpp
+  crossings + propagation`"]
+  Canon["`canonicalize.cpp
+  sub-edges + cancellation`"]
+  Filter["`winding_filter.cpp
+  halfedge face walk`"]
+  Output["`boolean2.cpp
+  regularized Polygons`"]
 
   API --> Wrapper --> Iterate --> Driver
   Driver --> Merge --> Pairs
