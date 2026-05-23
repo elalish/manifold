@@ -324,12 +324,12 @@ NB_MODULE(manifold3d, m) {
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 60,
+           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
            nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
-      .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
-           nb::arg("min_smoothness") = 0,
+      .def("smooth_out", &Manifold::SmoothOut,
+           nb::arg("min_sharp_angle") = 52.5, nb::arg("min_smoothness") = 0,
            manifold__smooth_out__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),

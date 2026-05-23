@@ -205,7 +205,7 @@ Module.setup = function() {
   // Manifold methods
 
   Module.Manifold.prototype.smoothOut = function(
-      minSharpAngle = 60, minSmoothness = 0) {
+      minSharpAngle = 52.5, minSmoothness = 0) {
     return this._SmoothOut(minSharpAngle, minSmoothness);
   };
 
@@ -252,7 +252,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.calculateNormals = function(
-      normalIdx = 0, minSharpAngle = 60) {
+      normalIdx = 0, minSharpAngle = 52.5) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
