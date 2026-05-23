@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Winding-rule filter over the canonical sub-edges. Builds the half-edge
+// Winding-rule filter over the canonical sub-edges. Builds the halfedge
 // arrangement, walks each face once via BFS to propagate winding numbers
 // (seeded by one ray-cast per connected component on the outer face),
 // then keeps only the sub-edges that separate "inside" from "outside"
 // under the chosen rule (Add / Intersect / EvenOdd / NonZero / Negative).
 //
 // FastEdge + CastWindingRayFast are the ray-cast helpers for the outer-
-// face seed; FilterByWindingDCEL is the entry point. iostream usage
+// face seed; FilterByWindingHalfedges is the entry point. iostream usage
 // gated by MANIFOLD_DEBUG.
 
 #include <algorithm>
@@ -63,8 +63,8 @@ constexpr double kSeedStepEdgeLengthFraction = 1e-3;
 // canonical (vMin, vMax) form, "upward" = vMin's y < vMax's y when
 // crossed from below), -m if downward.
 //
-// Used per-face by `FilterByWindingDCEL`: the origin is offset
-// perpendicularly LEFT of a boundary half-edge, which puts it strictly
+// Used per-face by `FilterByWindingHalfedges`: the origin is offset
+// perpendicularly LEFT of a boundary halfedge, which puts it strictly
 // inside the face and away from any vertex, so the ray never hits a
 // vertex exactly under non-adversarial inputs.
 int CastWindingRay(vec2 origin, const CanonicalSubEdges& canon,
@@ -146,25 +146,24 @@ int CastWindingRayFast(vec2 origin, const std::vector<FastEdge>& edges) {
 }
 
 // =============================================================================
-// Planar face traversal (DCEL). The actual winding-rule filter.
+// Planar halfedge face traversal. The actual winding-rule filter.
 //
-// Builds a DCEL (doubly-connected edge list, the same structure
-// manifold's 3D mesh `Manifold::Impl::halfedge_` uses) from the
-// canonical sub-edges, walks face cycles to identify each planar face,
-// seeds one face per connected component by ray-cast, and propagates winding
-// numbers across half-edge twins. An edge is kept iff its left and right faces
-// disagree under the selected rule.
+// Builds the same halfedge structure manifold's 3D mesh
+// `Manifold::Impl::halfedge_` uses from the canonical sub-edges, walks face
+// cycles to identify each planar face, seeds one face per connected component
+// by ray-cast, and propagates winding numbers across halfedge twins. An edge
+// is kept iff its left and right faces disagree under the selected rule.
 // =============================================================================
 
-namespace dcel_internal {
-struct HalfEdge {
-  int twin;    // index of the twin half-edge in halfedges[]
-  int next;    // next half-edge along the same face's CCW boundary
-  int origin;  // vertex this half-edge starts at
+namespace halfedge_internal {
+struct Halfedge {
+  int twin;    // index of the twin halfedge in halfedges[]
+  int next;    // next halfedge along the same face's CCW boundary
+  int origin;  // vertex this halfedge starts at
   int face;    // face id (-1 until assigned)
   int mult;    // signed multiplicity in this direction
 };
-}  // namespace dcel_internal
+}  // namespace halfedge_internal
 
 // Internal predicate over a face's winding number, deciding whether
 // the face is "inside" the result region. Five rules cover production
@@ -193,24 +192,23 @@ bool IsInside(WindRule rule, int w) {
 }
 
 namespace detail {
-// The DCEL filter body, parameterized by the winding rule.
-std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
-                                             const std::vector<vec2>& verts,
-                                             bool debug, WindRule rule,
-                                             Trace* trace) {
-  using dcel_internal::HalfEdge;
+// The halfedge filter body, parameterized by the winding rule.
+std::vector<OutEdge> FilterByWindingHalfedgesImpl(
+    const CanonicalSubEdges& canon, const std::vector<vec2>& verts, bool debug,
+    WindRule rule, Trace* trace) {
+  using halfedge_internal::Halfedge;
 #ifdef MANIFOLD_DEBUG
   if (debug && DebugVerbose()) {
-    std::cout << "[FilterByWindingDCEL] canon.edges.size()="
+    std::cout << "[FilterByWindingHalfedges] canon.edges.size()="
               << canon.edges.size() << " verts.size()=" << verts.size() << "\n";
   }
 #endif
-  // 1. Build half-edges. Each canonical (vMin, vMax) with mult m becomes:
+  // 1. Build halfedges. Each canonical (vMin, vMax) with mult m becomes:
   //    - hA: vMin -> vMax, mult = m
   //    - hB: vMax -> vMin, mult = -m
   //    Twins are paired (hA.twin = hB, hB.twin = hA).
   //
-  thread_local static std::vector<HalfEdge> halfedgesBuf;
+  thread_local static std::vector<Halfedge> halfedgesBuf;
   auto& halfedges = halfedgesBuf;
   halfedges.resize(2 * canon.edges.size());
   for (size_t i = 0; i < canon.edges.size(); ++i) {
@@ -221,7 +219,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
   }
   if (halfedges.empty()) return {};
 
-  // 2. Group half-edges by origin vertex; sort each group by direction angle
+  // 2. Group halfedges by origin vertex; sort each group by direction angle
   //    (CCW). This is the "rotational order" needed to compute next pointers.
   //    Flat CSR layout (outOff[v]..outOff[v+1] indexes into outFlat) avoids
   //    the per-vert vector<int> allocations a vector-of-vector would pay.
@@ -289,11 +287,11 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
             });
       });
 
-  // 3. Compute next pointers. For half-edge h arriving at vertex v
+  // 3. Compute next pointers. For halfedge h arriving at vertex v
   //    (= h.twin.origin), h.next must be the outgoing edge that makes
   //    the SMALLEST LEFT TURN from h's incoming direction. h.incoming
   //    direction is opposite of h.twin's outgoing direction; the smallest
-  //    CCW rotation from h.incoming visits half-edges starting from
+  //    CCW rotation from h.incoming visits halfedges starting from
   //    "h.incoming + small CCW" and finds the first entry. In the sorted
   //    CCW outgoing list, this corresponds to **one step CW** from
   //    h.twin (with wraparound).
@@ -302,7 +300,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
   //    by ε, look up the first sorted entry. That entry is at sorted-list
   //    position one before h.twin (= it - 1, with wraparound).
   //
-  //    Using "it+1" instead of "it-1" picks the half-edge ALMOST A FULL
+  //    Using "it+1" instead of "it-1" picks the halfedge ALMOST A FULL
   //    REVOLUTION CCW from h.twin = a RIGHT turn at v. For degree-2
   //    vertices (chains, simple polygon corners), N=2 symmetry makes
   //    "it+1" and "it-1" equivalent and both work. For degree-≥3
@@ -331,7 +329,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
         halfedges[i].next = *prevIt;
       });
 
-  // 4. Walk face cycles, assign face IDs. Each unmarked half-edge starts a
+  // 4. Walk face cycles, assign face IDs. Each unmarked halfedge starts a
   //    new face; follow `next` chain back to the start.
   int nFaces = 0;
   for (int i = 0; i < (int)halfedges.size(); ++i) {
@@ -354,10 +352,11 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
     } while (h != i);
 #ifdef MANIFOLD_DEBUG
     if (malformed && DebugVerbose()) {
-      std::cout << "[FilterByWindingDCEL] malformed face cycle starting at "
-                   "halfedge "
-                << i << " (face " << nFaces << " safety=" << safety
-                << " halfedges=" << halfedges.size() << ")\n";
+      std::cout
+          << "[FilterByWindingHalfedges] malformed face cycle starting at "
+             "halfedge "
+          << i << " (face " << nFaces << " safety=" << safety
+          << " halfedges=" << halfedges.size() << ")\n";
     }
 #endif
     ++nFaces;
@@ -371,8 +370,8 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
   //    Fix: center each face's coordinates relative to its first vertex
   //    before summing. With centered coords O(edge length), products
   //    are O((edge length)²) and the sum is precise.
-  // First half-edge encountered per face. Used both as the centering
-  // reference for the shoelace area (below) and as the starting half-edge
+  // First halfedge encountered per face. Used both as the centering
+  // reference for the shoelace area (below) and as the starting halfedge
   // for the per-face winding ray-cast.
   thread_local static std::vector<int> faceStartHE;
   thread_local static std::vector<double> faceArea;
@@ -397,7 +396,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
   }
 #ifdef MANIFOLD_DEBUG
   if (debug && DebugVerbose()) {
-    std::cout << "DCEL: " << halfedges.size() << " halfedges, " << nFaces
+    std::cout << "Halfedges: " << halfedges.size() << " halfedges, " << nFaces
               << " faces\n";
     int negAreaCount = 0;
     for (int f = 0; f < nFaces; ++f) {
@@ -410,7 +409,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
                 << " bounded face(s) have negative signed area; cycle "
                    "convention may be inverted\n";
     }
-    // Group half-edges by face, count mults.
+    // Group halfedges by face, count mults.
     std::map<int, std::map<int, int>> faceMults;
     for (int i = 0; i < (int)halfedges.size(); ++i) {
       faceMults[halfedges[i].face][halfedges[i].mult]++;
@@ -427,7 +426,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
   //
   //    Earlier this did F independent ray-casts (one per face), which
   //    is O(F·E) work. Replace with: ray-cast a single seed face per
-  //    connected component of the DCEL, then BFS-propagate to all
+  //    connected component of the halfedge graph, then BFS-propagate to all
   //    other faces in the component. Stepping from face_A to face_B
   //    across a halfedge h (h.face=A, h.twin.face=B) crosses h's
   //    canonical-edge contribution, so faceWind[B] = faceWind[A] -
@@ -609,7 +608,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
     std::cout << "\n";
   }
   if (trace) {
-    TracePhase& phase = trace->AddPhase("dcel_faces");
+    TracePhase& phase = trace->AddPhase("halfedge_faces");
     for (int f = 0; f < nFaces; ++f) {
       SimplePolygon loop;
       const int h0 = faceStartHE[f];
@@ -634,7 +633,7 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
 #endif
 
   // 7. Filter canonical sub-edges by left/right face windings. The first
-  //    half-edge of each pair (the (vMin -> vMax) direction) is at index
+  //    halfedge of each pair (the (vMin -> vMax) direction) is at index
   //    2*i; its twin (vMax -> vMin) is at 2*i + 1.
   std::vector<OutEdge> out;
   out.reserve(canon.edges.size());
@@ -663,14 +662,14 @@ std::vector<OutEdge> FilterByWindingDCELImpl(const CanonicalSubEdges& canon,
 
 // Primary entry: dispatch on WindRule. Production callers (Boolean2D /
 // Xor / Simplify) go through here.
-std::vector<OutEdge> FilterByWindingDCEL(const CanonicalSubEdges& canon,
-                                         const std::vector<vec2>& verts,
-                                         bool debug, WindRule rule,
-                                         Trace* trace) {
+std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
+                                              const std::vector<vec2>& verts,
+                                              bool debug, WindRule rule,
+                                              Trace* trace) {
 #ifndef MANIFOLD_DEBUG
   (void)trace;
 #endif
-  return detail::FilterByWindingDCELImpl(canon, verts, debug, rule, trace);
+  return detail::FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
 }
 
 }  // namespace boolean2

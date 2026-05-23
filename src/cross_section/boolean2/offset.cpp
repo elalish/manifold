@@ -389,7 +389,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   if (delta == 0 || in.empty()) return in;
   // Reject non-finite delta and non-finite input verts. Garbage in
   // produces NaN-laden output and `assert(isfinite(...))` failures
-  // downstream in DCEL face area centering; clean rejection is safer.
+  // downstream in halfedge face area centering; clean rejection is safer.
   // `miterLimit` and `arcTol` are clamped/treated as nonsense-but-OK
   // inside OffsetContour (negative or zero arcTol falls through to
   // GetCircularSegments default; miterLimit < 1 still produces a

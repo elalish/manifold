@@ -43,7 +43,7 @@ struct PhaseAcc {
   std::atomic<int64_t> findIxNs{0};
   std::atomic<int64_t> restructNs{0};
   std::atomic<int64_t> canonNs{0};
-  std::atomic<int64_t> filterDcelNs{0};
+  std::atomic<int64_t> filterHalfedgeNs{0};
   std::atomic<int64_t> totalNs{0};
   std::atomic<int64_t> cases{0};
   std::atomic<int64_t> bvhBuildNs{0};
@@ -89,7 +89,7 @@ struct PhaseAcc {
     findIxNs = 0;
     restructNs = 0;
     canonNs = 0;
-    filterDcelNs = 0;
+    filterHalfedgeNs = 0;
     totalNs = 0;
     cases = 0;
     bvhBuildNs = 0;

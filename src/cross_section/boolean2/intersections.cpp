@@ -376,7 +376,7 @@ void FindAndInsertIntersectionsImpl(
   // order, but misses the "no shared edge" case (A,B vs E,F both at P).
   // Without propagation, edge C ends up with no on-edge vert at P even though
   // P geometrically lies on C; canonicalization then emits C as one un-split
-  // sub-edge and the resulting DCEL has the wrong incidence at P.
+  // sub-edge and the resulting halfedge graph has the wrong incidence at P.
   //
   // When newly-created intersection verts contain near-duplicates, query the
   // edge BVH for all edges within eps and add those verts to their on-edge

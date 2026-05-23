@@ -56,7 +56,7 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
 6. Structurally re-merge duplicate intersection vertices that share an incident
    edge and are within tolerance.
 7. Canonicalize sub-edges and cancel opposing multiplicities.
-8. Traverse DCEL faces, propagate winding numbers, and retain boundary edges
+8. Traverse halfedge faces, propagate winding numbers, and retain boundary edges
    whose adjacent faces disagree under the requested rule.
 
 The high-level fill/Boolean/XOR core API is in
@@ -108,7 +108,7 @@ The main implementation differences are:
   Bentley-Ottmann sweep. Endpoint-on-edge and collinear degeneracies are
   handled by the edge vertex lists; isolated crossings are inserted or snapped
   to neighboring list vertices.
-- Output filtering uses a DCEL face traversal and winding propagation instead
+- Output filtering uses a halfedge face traversal and winding propagation instead
   of independent midpoint ray casts for every sub-edge. This makes one winding
   decision per face, avoids per-edge disagreement around high-valence
   intersection vertices, and still retains exactly the edges whose adjacent
@@ -116,8 +116,8 @@ The main implementation differences are:
 
 ## Winding Rules
 
-The DCEL filter keeps an edge iff the face on one side is inside the result and
-the face on the other side is outside. The built-in predicates are:
+The halfedge filter keeps an edge iff the face on one side is inside the
+result and the face on the other side is outside. The built-in predicates are:
 
 - `Add`: `w > 0`, used for union/fill under the default positive-winding rule.
 - `Subtract`: implemented by appending the second input with negative

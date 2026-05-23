@@ -498,8 +498,8 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
 #endif
   auto t5 = timing ? Clock::now() : Clock::time_point{};
   if (timing) P.canonNs.fetch_add(Ns(t4b, t5), std::memory_order_relaxed);
-  // DCEL face-traversal winding filter.
-  auto out = FilterByWindingDCEL(canon, merge.verts, debug, pred, trace);
+  // Halfedge face-traversal winding filter.
+  auto out = FilterByWindingHalfedges(canon, merge.verts, debug, pred, trace);
 #ifdef MANIFOLD_DEBUG
   if (trace) {
     TracePhase& phase = trace->AddPhase("filtered_output_edges");
@@ -509,7 +509,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
 #endif
   auto t6 = timing ? Clock::now() : Clock::time_point{};
   if (timing) {
-    P.filterDcelNs.fetch_add(Ns(t5, t6), std::memory_order_relaxed);
+    P.filterHalfedgeNs.fetch_add(Ns(t5, t6), std::memory_order_relaxed);
     P.totalNs.fetch_add(Ns(tStart, t6), std::memory_order_relaxed);
     P.cases.fetch_add(1, std::memory_order_relaxed);
   }

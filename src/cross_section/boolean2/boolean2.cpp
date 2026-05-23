@@ -190,10 +190,10 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 //
 // At a vertex of degree >= 4 (e.g., an X-cross between two triangles in
 // a figure-8 boundary), arbitrarily picking "any unvisited outgoing
-// edge" would jump between distinct loops. Same DCEL convention as the
+// edge" would jump between distinct loops. Same halfedge convention as the
 // winding filter: the next outgoing edge that continues the same loop is the
 // one
-// **immediately CW from the incoming half-edge's reverse direction** in
+// **immediately CW from the incoming halfedge's reverse direction** in
 // the vertex's CCW-sorted angular order, i.e., "smallest left turn"
 // from the incoming direction.
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,

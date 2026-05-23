@@ -33,11 +33,11 @@ enum class WindRule {
 
 bool IsInside(WindRule rule, int w);
 
-std::vector<OutEdge> FilterByWindingDCEL(const CanonicalSubEdges& canon,
-                                         const std::vector<vec2>& verts,
-                                         bool debug = false,
-                                         WindRule rule = WindRule::Add,
-                                         Trace* trace = nullptr);
+std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
+                                              const std::vector<vec2>& verts,
+                                              bool debug = false,
+                                              WindRule rule = WindRule::Add,
+                                              Trace* trace = nullptr);
 
 }  // namespace boolean2
 }  // namespace manifold
