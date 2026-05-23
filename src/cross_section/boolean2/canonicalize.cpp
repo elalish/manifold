@@ -13,9 +13,9 @@
 // limitations under the License.
 //
 // Sub-edge canonicalization. Each input edge is split into segments at
-// its on-edge intersection verts; segments with matching (vMin, vMax) are
-// merged by summing signed multiplicities, and any whose summed mult is
-// zero is dropped (Smith Table 7.3, PolySet2 form).
+// its on-edge split vertices; segments with matching (vMin, vMax) are merged
+// by summing signed multiplicities, and any whose summed mult is zero is
+// dropped (Smith Table 7.3, PolySet2 form).
 //
 // Output `CanonicalSubEdges::edges` is sorted lex-ascending by (vMin,
 // vMax), giving the downstream halfedge build and winding filter

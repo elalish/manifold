@@ -47,19 +47,19 @@ public `CrossSection` dispatch still lands in the follow-up backend-wiring PR.
 
 Boolean2 builds a planar arrangement and filters it by per-face winding:
 
-1. Merge vertices within the operation tolerance.
+1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
-3. Collect overlapping edge pairs with a sweep/BVH broad phase.
+3. Collect eps-padded AABB candidate edge pairs with a sweep/BVH broad phase.
 4. Build per-edge lists of vertices that lie on each edge, optionally fused
    with the intersection narrow phase for large parallel cases.
-5. Insert edge-edge intersections using the shared symbolic predicates.
+5. Insert proper edge-edge crossing points using the shared symbolic predicates.
 6. Structurally re-merge duplicate intersection vertices that share an incident
-   edge and are within tolerance.
+   edge and are within epsilon.
 7. Canonicalize sub-edges and cancel opposing multiplicities.
 8. Traverse halfedge faces, propagate winding numbers, and retain boundary edges
    whose adjacent faces disagree under the requested rule.
 
-The high-level fill/Boolean/XOR core API is in
+The private fill/Boolean/XOR core entry points are in
 `src/cross_section/boolean2/boolean2.h`. The lower-level driver returns
 retained directed sub-edges plus the merged vertex map, and the wrapper turns
 those edges back into regularized `manifold::Polygons`. Offset and containment
@@ -75,7 +75,7 @@ The main dataflow is:
 
 | Layer | Files | Role |
 | --- | --- | --- |
-| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes the fixed-point driver, and turns retained edges back into regularized output. |
+| Private core entry points | `boolean2.h`, `boolean2.cpp` | Convert `Polygons` to local vertices plus directed edges, invoke the fixed-point driver, and turn retained edges back into regularized output. |
 | Fixed-point cleanup | `iterate.cpp` | Repeats the arrangement pass until the topology stabilizes or a bounded cycle is detected. |
 | Arrangement coordinator | `driver.cpp` | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
 | Geometry leaves | `vertex_merge.cpp`, `bvh.cpp`, `edge_vert_lists.cpp`, `intersections.cpp` | Provide the local geometric operations used by the arrangement pass. |
@@ -88,23 +88,23 @@ lives in `diagnostics.h`.
 ## Relationship To The Sketch
 
 This implementation follows the six-step 2D overlap-removal sketch from
-upstream issue #289: tolerance-based vertex merge, collapsed-edge removal,
-ordered edge vertex lists, snapped edge-edge intersections, multiplicity-based
+upstream issue #289: epsilon-based vertex merge, collapsed-edge removal,
+ordered edge vertex lists, snapped proper crossings, multiplicity-based
 sub-edge canonicalization, and positive-winding output. The current code
 generalizes the final filter so the same arrangement can serve union,
 subtract, intersect, XOR, and construction-time fill rules.
 
 The main implementation differences are:
 
-- Vertex merging uses deterministic union-find over all pairs within
-  tolerance, then places each cluster at its centroid. The sketch called out
+- Vertex merging uses deterministic union-find over all pairs within epsilon,
+  then places each cluster at its centroid. The sketch called out
   weighted, up-to-date positions for chains of nearby vertices; the bounded
   fixed-point cleanup below is the mechanism that keeps any residual movement
   from leaking into stale output topology.
 - Broad phases use the local boolean2 sweep/BVH helpers. This keeps the core
   independent from the 3D `Collider` surface while preserving the intended
   sub-quadratic candidate search.
-- Intersections are discovered from broad-phase edge pairs rather than a
+- Proper crossings are discovered from broad-phase edge pairs rather than a
   Bentley-Ottmann sweep. Endpoint-on-edge and collinear degeneracies are
   handled by the edge vertex lists; isolated crossings are inserted or snapped
   to neighboring list vertices.
@@ -122,7 +122,8 @@ result and the face on the other side is outside. The built-in predicates are:
 - `Add`: `w > 0`, used for union/fill under the default positive-winding rule.
 - `Subtract`: implemented by appending the second input with negative
   multiplicity, then using `Add`.
-- `Intersect`: `w > 1`, keeping faces covered by both inputs.
+- `Intersect`: `w > 1`, which corresponds to both operands covering the face
+  for normalized unit-winding operands.
 - `EvenOdd`: `w & 1`, used by the Boolean2 core XOR helper and available for
   construction-time fill.
 - `NonZero`: `w != 0`, available for construction-time fill and offset cleanup.
@@ -133,13 +134,13 @@ Construction-time fill rules are exposed through `FillByRule`. The public
 `CrossSection` backend mapping from `FillRule`, `OpType`, decomposition, and
 offset is staged in the backend-wiring branch.
 
-## Regularization And Tolerance
+## Regularization And Epsilon
 
 The core operates on `manifold::Polygons`, which cannot encode isolated
 one-dimensional features. Output is therefore regularized: zero-area loops,
 collapsed edges, and cancelled opposing sub-edges are dropped.
 
-Callers may pass an explicit tolerance. A non-positive tolerance asks the core
+Callers may pass an explicit epsilon. A non-positive epsilon asks the core
 to infer an operation scale and apply the local floating-point budget used by
 the Boolean2 predicates. Inputs are translated into a local frame before the
 arrangement is built, then translated back on output.

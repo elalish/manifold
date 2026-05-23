@@ -169,7 +169,7 @@ struct Halfedge {
 // the face is "inside" the result region. Five rules cover production
 // and diagnostic-driver corpus needs:
 //   - Add:       w > 0     (default; Smith's wind > 0 union)
-//   - Intersect: w > 1     (Boolean2D::Intersect, both inputs cover)
+//   - Intersect: w > 1     (both normalized operands cover)
 //   - EvenOdd:   w & 1     (used internally by Xor; SVG/Clipper2 EVENODD)
 //   - NonZero:   w != 0    (Clipper2 NONZERO, mfogel union of pre-filled)
 //   - Negative:  w < 0     (Clipper2 NEGATIVE; CW-oriented input regions)

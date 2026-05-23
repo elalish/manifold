@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Standalone polygon utilities used by `CrossSection::Decompose`
-// (containment grouping). Not part of the boolean-overlap algorithm
-// pipeline; operates on already-regularized `Polygons` produced by
+// Standalone polygon utilities intended for the later
+// `CrossSection::Decompose` backend mapping. Not part of the boolean-overlap
+// algorithm pipeline; operates on already-regularized `Polygons` produced by
 // FillByRule.
 
 #include "containment.h"
@@ -107,12 +107,11 @@ bool RingInside(const SimplePolygon& a, const SimplePolygon& b) {
 
 }  // namespace polyutils_detail
 
-// Decompose a `Polygons` set into connected components by ring
-// containment. Input is assumed canonical (output of FillByRule or
-// similar): CCW outer rings + CW hole rings, non-self-intersecting,
-// non-overlapping except at containment boundaries. Each outermost
-// CCW ring plus its directly-contained CW holes form one component;
-// CCW rings nested inside holes start new components.
+// Decompose a regularized `Polygons` set into containment components. Input is
+// assumed to be simple-loop output from FillByRule or similar: CCW outer rings
+// + CW hole rings, non-self-intersecting, non-overlapping except at containment
+// boundaries. Each outermost CCW ring plus its directly-contained CW holes form
+// one component; CCW rings nested inside holes start new components.
 //
 // Returns: one vector<SimplePolygon> per component, with the outer
 // ring first and any holes following.
@@ -162,10 +161,10 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
   for (int i = 0; i < n; ++i) {
     if (info[i].area > 0) continue;  // skip outers
     int p = parent[i];
-    // Walk up until we find a positive ring; that's the containing
-    // component. Canonical input from FillByRule shouldn't produce
-    // hole-inside-hole, but a malformed parent chain would loop here
-    // forever; bound by the ring count.
+    // Walk up until we find a positive ring; that's the containing component.
+    // Simple-loop output from FillByRule shouldn't produce hole-inside-hole,
+    // but a malformed parent chain would loop here forever; bound by the ring
+    // count.
     for (int hops = 0; p >= 0 && info[p].area < 0 && hops <= n; ++hops) {
       p = parent[p];
     }

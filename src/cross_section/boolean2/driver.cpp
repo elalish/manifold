@@ -13,8 +13,8 @@
 // limitations under the License.
 //
 // End-to-end Boolean2 driver. Stitches together vertex merging,
-// edge collapse, near-vertex indexing, edge-edge intersection insertion,
-// structural re-merge of intersection verts, sub-edge canonicalization,
+// edge collapse, near-vertex indexing, proper edge-edge crossing insertion,
+// structural re-merge of crossing verts, sub-edge canonicalization,
 // and winding-rule filtering.
 // Returns an OverlapResult holding the merged-vert list, the retained
 // directed sub-edges, the input->output vert remap, and the merged-vert

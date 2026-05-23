@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Polygon offset (a.k.a. inflate/inset, Clipper2's `InflatePaths`
-// analog). Backs `CrossSection::Offset`.
+// Private polygon offset helper (a.k.a. inflate/inset, Clipper2's
+// `InflatePaths` analog), intended for the later `CrossSection::Offset`
+// backend mapping.
 //
 // Algorithm:
 //   1. For each input contour, walk vertex by vertex emitting one offset
 //      polygon ring. Each edge contributes a parallel segment at distance
-//      |delta| along its outward normal (for CCW outer; flipped sign for
-//      CW hole). Each corner contributes a join cap (Square / Round /
+//      |delta| along its outward normal: for CW holes, the directed edge's
+//      right normal points into the hole, which is outward from the solid.
+//      Each corner contributes a join cap (Square / Round /
 //      Miter / Bevel) on the convex side, or a single miter point on the
 //      concave side.
 //   2. Fill all offset rings to resolve self-intersections introduced by
@@ -31,8 +33,8 @@
 //   - "Outward" is to the right of the directed edge for a CCW contour
 //     (interior of a CCW outer ring is to the left of edges).
 //   - Positive delta inflates; negative shrinks.
-//   - Holes (CW rings) get the sign flipped because their "outward"
-//     points the opposite direction in 2D.
+//   - Holes are CW, so the same directed-edge right normal points into the
+//     hole, which is outward from the solid.
 //
 // Join styles:
 //   - Round:  arc centered at vertex, radius |delta|. Subdivided so each
@@ -85,7 +87,7 @@ double TotalPerimeter(const Polygons& polys) {
 double AreaComparisonTol(const Polygons& a, const Polygons& b, double eps) {
   // If boundary vertices drift by O(eps), the induced first-order area change
   // is bounded by perimeter * eps. Use both operands' perimeters because this
-  // tolerance compares two already-regularized polygon sets.
+  // epsilon compares two already-regularized polygon sets.
   return eps * (TotalPerimeter(a) + TotalPerimeter(b)) + eps * eps;
 }
 
@@ -314,7 +316,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
 namespace offset_detail {
 
 // Remove vertices that are collinear with their immediate neighbours
-// (within tolerance `eps`). Offset output frequently contains such
+// (within epsilon `eps`). Offset output frequently contains such
 // vertices because each input edge contributes a separate offset
 // segment whose endpoints lie along a straight side. Clipper2's
 // `InflatePaths` strips them as part of its finishing pass; replicating
@@ -380,10 +382,11 @@ Polygons RemoveCollinear(Polygons polys, double eps) {
 // the maximum perpendicular chord-error for Round joins; same semantics
 // as Clipper2's `arc_tolerance`.
 //
-// Each input contour produces one offset ring, then all rings are
-// unioned via the NonZero fill rule to resolve self-intersections, and
-// a final pass strips collinear vertices (matching Clipper2's
-// `InflatePaths` finishing behaviour so callers see the same NumVert).
+// Each input contour produces one offset ring, then all rings are regularized
+// with the fill strategy below: positive offsets use Add with NonZero fallback;
+// negative offsets use NonZero with Negative fallback. A final pass strips
+// collinear vertices (matching Clipper2's `InflatePaths` finishing behaviour
+// so callers see the same NumVert).
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, double arcTol) {
   if (delta == 0 || in.empty()) return in;
