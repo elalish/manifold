@@ -16,6 +16,7 @@
 #include <map>
 
 #include "collider.h"
+#include "execution_impl.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "shared.h"
@@ -95,7 +96,8 @@ struct Manifold::Impl {
   Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
-  Impl(const MeshGLP<Precision, I>& meshGL);
+  Impl(const MeshGLP<Precision, I>& meshGL,
+       ExecutionContext::Impl* ctx = nullptr);
 
   template <typename F>
   inline void ForVert(int halfedge, F func);
@@ -272,7 +274,15 @@ void Manifold::Impl::ForVert(
 }
 
 template <typename Precision, typename I>
-Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
+Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
+                     ExecutionContext::Impl* ctx) {
+  // Entry-time cancel wins over empty/malformed input; past this gate,
+  // validation errors win over races.
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+
   const uint32_t numVert = meshGL.NumVert();
   const uint32_t numTri = meshGL.NumTri();
 
@@ -451,11 +461,14 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
     }
   }
 
+  // Phase boundaries; count of ADVANCE_PHASE_OR_RETURN calls below must
+  // equal kPhasesPerFromMesh.
   CreateHalfedges(triProp, triVert);
   if (!IsManifold()) {
     MakeEmpty(Error::NotManifold);
     return;
   }
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   CalculateBBox();
   SetEpsilon(-1, std::is_same<Precision, float>::value);
@@ -463,13 +476,22 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL) {
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
   CleanupTopology();
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   DedupePropVerts();
+  ADVANCE_PHASE_OR_RETURN(ctx);
+
   SetNormalsAndCoplanar();
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveDegenerates();
+  ADVANCE_PHASE_OR_RETURN(ctx);
+
   RemoveUnreferencedVerts();
-  SortGeometry();
+  ADVANCE_PHASE_OR_RETURN(ctx);
+
+  SortGeometry(ctx);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   if (!IsFinite()) {
     MakeEmpty(Error::NonFiniteVertex);

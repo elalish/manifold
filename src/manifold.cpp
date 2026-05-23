@@ -146,6 +146,10 @@ Manifold Manifold::PropagateStatus(Error status) {
   return Manifold(pImpl);
 }
 
+Manifold Manifold::FromImpl(std::shared_ptr<Impl> pImpl) {
+  return Manifold(std::move(pImpl));
+}
+
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
