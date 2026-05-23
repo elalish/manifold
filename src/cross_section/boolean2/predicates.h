@@ -36,7 +36,6 @@ double EpsilonFromScale(double L, int k_budget = 1000);
 double Coord(vec2 p, int axis);
 bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
                        vec2* out);
-int CCW(vec2 a, vec2 b, vec2 c, double eps);
 
 }  // namespace boolean2
 }  // namespace manifold

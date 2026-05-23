@@ -24,6 +24,7 @@
 #include <limits>
 #include <vector>
 
+#include "../../utils.h"
 #include "predicates.h"
 
 namespace manifold {

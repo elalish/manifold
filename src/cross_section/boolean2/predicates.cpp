@@ -94,10 +94,6 @@ double EpsilonFromScale(double L, int k_budget) {
 // satisfied even for the nested-axis cases that arise from BVH pairs.
 double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
 
-int CCW(vec2 a, vec2 b, vec2 c, double eps) {
-  return manifold::CCW(a, b, c, eps);
-}
-
 bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
                        vec2* out) {
   // Cross-detection: CCW(A,B,C) is sign of (B-A) x (C-A) with a
@@ -105,11 +101,6 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
   // endpoints lie on the other segment's line (T-junction or fully
   // collinear). Real point-intersection requires endpoints strictly on
   // opposite sides of each other.
-  const int s1 = CCW(a0, a1, b0, eps);
-  const int s2 = CCW(a0, a1, b1, eps);
-  const int s3 = CCW(b0, b1, a0, eps);
-  const int s4 = CCW(b0, b1, a1, eps);
-  const int zeros = (s1 == 0) + (s2 == 0) + (s3 == 0) + (s4 == 0);
   const auto sameNonZeroSign = [](int a, int b) {
     return (a > 0 && b > 0) || (a < 0 && b < 0);
   };
@@ -120,13 +111,26 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
     return (a > 0 && b < 0) || (a < 0 && b > 0);
   };
   const auto cross = [](vec2 u, vec2 v) { return u.x * v.y - u.y * v.x; };
+  const int s1 = manifold::CCW(a0, a1, b0, eps);
+  const int s2 = manifold::CCW(a0, a1, b1, eps);
+  if ((s1 == 0) != (s2 == 0)) return false;
+  if (sameNonZeroSign(s1, s2)) return false;
+
+  const int s3 = manifold::CCW(b0, b1, a0, eps);
+  if (s3 == 0 && (s1 != 0 || s2 != 0)) return false;
+  if (s3 != 0 && (s1 == 0 || s2 == 0)) return false;
+
+  const int s4 = manifold::CCW(b0, b1, a1, eps);
+  if ((s3 == 0) != (s4 == 0)) return false;
+  if (sameNonZeroSign(s3, s4)) return false;
+
   // Fully collinear means the segments are coincident or overlapping along a
   // 1D segment, with no isolated point-intersection. However, the tolerant
   // CCW predicate can classify all four tests as zero for very shallow long
   // edges even when the raw segment lines cross. Fall back to raw signs only
   // to distinguish that case from true collinearity; the intersection
   // position is still computed by the trimmed kernel below.
-  if (zeros == 4) {
+  if (s1 == 0 && s2 == 0 && s3 == 0 && s4 == 0) {
     const double r1 = cross(a1 - a0, b0 - a0);
     const double r2 = cross(a1 - a0, b1 - a0);
     const double r3 = cross(b1 - b0, a0 - b0);
@@ -134,10 +138,7 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
     if (r1 == 0.0 && r2 == 0.0 && r3 == 0.0 && r4 == 0.0) return false;
     if (sameRawSign(r1, r2) || sameRawSign(r3, r4)) return false;
     if (!oppositeRawSign(r1, r2) || !oppositeRawSign(r3, r4)) return false;
-  } else if (zeros > 0) {
-    return false;
   }
-  if (sameNonZeroSign(s1, s2) || sameNonZeroSign(s3, s4)) return false;
 
   // Pick the axis where BOTH segments have non-zero spread, with
   // the larger spread of the two preferring stability (smaller |dy| works
