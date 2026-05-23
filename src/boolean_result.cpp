@@ -137,7 +137,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                CountNewVerts<true, false>{sidesPerFaceQ, sidesPerFaceP, i21,
                                           p2q1, inQ.halfedge_});
   }
-  RETURN_IF_CANCELLED(ctx, std::make_tuple(Vec<int>{}, Vec<int>{}));
+  if (IsCancelled(ctx)) return std::make_tuple(Vec<int>{}, Vec<int>{});
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
@@ -263,20 +263,20 @@ void AddNewEdgeVerts(
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t>& range) {
-          RETURN_IF_CANCELLED(ctx);
+          if (IsCancelled(ctx)) return;
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },
         ap);
     return;
   }
 #endif
-  RETURN_IF_CANCELLED(ctx);
+  if (IsCancelled(ctx)) return;
   auto processFun =
       std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
   // Per-iter cancel check; the caller's post-call IsCancelled discards the
   // partial edgesP/edgesNew.
   for (size_t i = 0; i < p1q2.size(); ++i) {
-    RETURN_IF_CANCELLED(ctx);
+    if (IsCancelled(ctx)) return;
     processFun(i);
   }
 }
@@ -320,7 +320,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<Halfedge>& halfedgeR,
   // Per-iter cancel check; the caller's post-call IsCancelled discards the
   // partial outR.
   for (auto& value : edgesP) {
-    RETURN_IF_CANCELLED(ctx);
+    if (IsCancelled(ctx)) return;
     const int edgeP = value.first;
     std::vector<EdgePos> edgePosP = value.second;
     std::stable_sort(edgePosP.begin(), edgePosP.end());
@@ -394,7 +394,7 @@ void AppendNewEdges(
   // Per-iter cancel check; the caller's post-call IsCancelled discards the
   // partial outR.
   for (auto& value : edgesNew) {
-    RETURN_IF_CANCELLED(ctx);
+    if (IsCancelled(ctx)) return;
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
@@ -525,7 +525,7 @@ void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
       autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
       outR.NumTri(), ctx,
       MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
-  RETURN_IF_CANCELLED(ctx);
+  if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
@@ -586,7 +586,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
              Barycentric{bary, outR.meshRelation_.triRef, inP.vertPos_,
                          inQ.vertPos_, outR.vertPos_, inP.halfedge_,
                          inQ.halfedge_, outR.halfedge_, outR.epsilon_});
-  RETURN_IF_CANCELLED(ctx);
+  if (IsCancelled(ctx)) return;
 
   using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -599,7 +599,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
-    RETURN_IF_CANCELLED(ctx);
+    if (IsCancelled(ctx)) return;
     // Skip collapsed triangles
     if (outR.halfedge_.Start(3 * tri) < 0) continue;
 
@@ -714,7 +714,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     bool fullPath = false;
     ~PhaseBalance() {
       if (!ctx) return;
-      RETURN_IF_CANCELLED(ctx);  // partial publication is intentional
+      if (IsCancelled(ctx)) return;  // partial publication is intentional
       if (fullPath) {
         DEBUG_ASSERT(published == kPhasesPerBoolean, logicErr,
                      "Boolean3::Result phase count drift; "

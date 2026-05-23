@@ -410,7 +410,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last,
     tbb::this_task_arena::isolate([&]() {
       tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
                         [&f, ctx](const tbb::blocked_range<Iter>& range) {
-                          RETURN_IF_CANCELLED(ctx);
+                          if (IsCancelled(ctx)) return;
                           for (Iter i = range.begin(); i != range.end(); i++)
                             f(*i);
                         });
@@ -422,7 +422,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last,
   // elements. Bounded latency for MANIFOLD_PAR=OFF builds and for the
   // small-input branch under PAR=ON.
   constexpr size_t kSeqCancelChunk = 1024;
-  RETURN_IF_CANCELLED(ctx);
+  if (IsCancelled(ctx)) return;
   if (ctx == nullptr) {
     std::for_each(first, last, f);
     return;
@@ -430,7 +430,7 @@ void for_each(ExecutionPolicy policy, Iter first, Iter last,
   size_t since_check = 0;
   for (Iter i = first; i != last; ++i) {
     if (++since_check == kSeqCancelChunk) {
-      RETURN_IF_CANCELLED(ctx);
+      if (IsCancelled(ctx)) return;
       since_check = 0;
     }
     f(*i);

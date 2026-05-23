@@ -378,7 +378,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     return start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
-  RETURN_IF_CANCELLED(ctx, Intersections{});
+  if (IsCancelled(ctx)) return Intersections{};
 
   Intersections result = recorder.get();
   auto& p1q2 = result.p1q2;
@@ -434,7 +434,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
                  });
              if (it == p1q2.end() || (*it)[index] != edge) uA.unite(start, end);
            });
-  RETURN_IF_CANCELLED(ctx, Vec<int>{});
+  if (IsCancelled(ctx)) return Vec<int>{};
 
   // find components, the hope is the number of components should be small
   std::unordered_set<int> components;
@@ -453,7 +453,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     for (size_t v = 0; v < a.vertPos_.size(); v++)
       components.insert(uA.find(v));
   }
-  RETURN_IF_CANCELLED(ctx, Vec<int>{});
+  if (IsCancelled(ctx)) return Vec<int>{};
   Vec<int> verts;
   verts.reserve(components.size());
   for (int c : components) verts.push_back(c);
@@ -469,7 +469,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&](int i) { return a.vertPos_[verts[i]]; };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
-  RETURN_IF_CANCELLED(ctx, Vec<int>{});
+  if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
   for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()), ctx,
            [&](size_t i) {
@@ -477,7 +477,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
              if (root == i) return;
              w03[i] = w03[root];
            });
-  RETURN_IF_CANCELLED(ctx, Vec<int>{});
+  if (IsCancelled(ctx)) return Vec<int>{};
   return w03;
 }
 
@@ -527,13 +527,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  RETURN_IF_CANCELLED(ctx_);
+  if (IsCancelled(ctx_)) return;
   xv12_ = Intersect12<true>(inP, inQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12P.Stop();
   intersect12Q.Start();
 #endif
-  RETURN_IF_CANCELLED(ctx_);
+  if (IsCancelled(ctx_)) return;
   xv21_ = Intersect12<false>(inP, inQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12Q.Stop();
@@ -549,13 +549,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Start();
 #endif
-  RETURN_IF_CANCELLED(ctx_);
+  if (IsCancelled(ctx_)) return;
   w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Stop();
   winding03Q.Start();
 #endif
-  RETURN_IF_CANCELLED(ctx_);
+  if (IsCancelled(ctx_)) return;
   w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_, ctx_);
   // No trailing check: Winding03_ already returns empty on cancel and
   // Boolean3::Result re-checks on entry.
