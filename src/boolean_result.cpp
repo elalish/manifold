@@ -137,7 +137,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                CountNewVerts<true, false>{sidesPerFaceQ, sidesPerFaceP, i21,
                                           p2q1, inQ.halfedge_});
   }
-  RETURN_IF_CANCELLED_VAL(ctx, std::make_tuple(Vec<int>{}, Vec<int>{}));
+  RETURN_IF_CANCELLED(ctx, std::make_tuple(Vec<int>{}, Vec<int>{}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),

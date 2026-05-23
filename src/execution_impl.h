@@ -87,24 +87,12 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 
 /** @ingroup Private
  *
- * Early-return on cancel from a void-returning function. Use the _VAL
- * form for value-returning functions.
+ * Early-return on cancel. Variadic: omit value for void context, supply
+ * a cancelled-state value otherwise (`Vec<int>{}`, `ErrorLeaf(...)`, ...).
  */
-#define RETURN_IF_CANCELLED(ctx)            \
-  do {                                      \
-    if (manifold::IsCancelled(ctx)) return; \
-  } while (0)
-
-/** @ingroup Private
- *
- * Early-return on cancel from a value-returning function; `val` is the
- * cancelled-state value (`Vec<int>{}`, `ErrorLeaf(...)`, `cancelled()`,
- * ...). Split from the bare form to keep both standards-clean under
- * -Wpedantic (empty `__VA_ARGS__` is a warning in ISO C++17).
- */
-#define RETURN_IF_CANCELLED_VAL(ctx, val)       \
-  do {                                          \
-    if (manifold::IsCancelled(ctx)) return val; \
+#define RETURN_IF_CANCELLED(ctx, ...)                   \
+  do {                                                  \
+    if (manifold::IsCancelled(ctx)) return __VA_ARGS__; \
   } while (0)
 
 /** @ingroup Private
