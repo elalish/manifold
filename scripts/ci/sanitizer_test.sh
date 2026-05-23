@@ -88,28 +88,11 @@ if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
   fi
 fi
 
-START_TS="$(date +%s)"
 set +e
 timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
   "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
 TEST_RC="$?"
 set -e
-END_TS="$(date +%s)"
-ELAPSED_SEC="$((END_TS - START_TS))"
-
-{
-  echo "### Sanitizer Runtime"
-  echo ""
-  echo "- subset: \`${SANITIZER_SUBSET}\`"
-  echo "- test_bin: \`${SANITIZER_TEST_BIN}\`"
-  echo "- ld_library_path: \`${LD_LIBRARY_PATH:-<unset>}\`"
-  echo "- elapsed_sec: \`${ELAPSED_SEC}\`"
-  echo "- budget_sec: \`${SANITIZER_RUNTIME_BUDGET_SEC}\`"
-} >> "${GITHUB_STEP_SUMMARY}"
-
-if [ "${ELAPSED_SEC}" -gt "${SANITIZER_RUNTIME_BUDGET_SEC}" ]; then
-  echo "::warning::Sanitizer runtime exceeded budget: ${ELAPSED_SEC}s > ${SANITIZER_RUNTIME_BUDGET_SEC}s."
-fi
 if [ "${TEST_RC}" -eq 124 ]; then
   echo "::warning::Sanitizer test timed out after ${SANITIZER_TEST_TIMEOUT_SEC}s."
 fi

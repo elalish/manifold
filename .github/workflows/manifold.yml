@@ -451,7 +451,6 @@ jobs:
       ASAN_OPTIONS: detect_container_overflow=0:strict_init_order=1
       UBSAN_OPTIONS: print_stacktrace=1
       SANITIZER_TEST_TIMEOUT_SEC: 1200
-      SANITIZER_RUNTIME_BUDGET_SEC: 900
       SANITIZER_SUBSET: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'extended' || 'core' }}
     steps:
     - uses: actions/checkout@v6
@@ -463,10 +462,6 @@ jobs:
     - name: Test sanitizer subset
       shell: bash
       run: bash ./scripts/ci/sanitizer_test.sh
-    - name: Repro hint (on sanitizer failure)
-      if: failure()
-      shell: bash
-      run: bash ./scripts/ci/sanitizer_repro_hint.sh
 
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})
