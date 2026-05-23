@@ -428,28 +428,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: build/
-        key: sanitizer-build-${{ runner.os }}-clang18-${{ hashFiles('src/**', 'bindings/c/**', 'include/**', 'cmake/**', 'test/**', 'CMakeLists.txt', 'scripts/sanitizer_cases.sh') }}
+        key: sanitizer-build-${{ runner.os }}-clang18-${{ hashFiles('src/**', 'bindings/c/**', 'include/**', 'cmake/**', 'test/**', 'CMakeLists.txt', 'scripts/sanitizer_cases.sh', 'scripts/ci/sanitizer_build.sh') }}
     - name: Build (clang-18 + asan/ubsan)
       if: steps.sanitizer-build-cache.outputs.cache-hit != 'true'
-      run: |
-        cmake \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DBUILD_SHARED_LIBS=ON \
-          -DMANIFOLD_STRICT=ON \
-          -DMANIFOLD_PYBIND=OFF \
-          -DMANIFOLD_DEBUG=ON \
-          -DMANIFOLD_ASSERT=ON \
-          -DMANIFOLD_CROSS_SECTION=ON \
-          -DMANIFOLD_PAR=OFF \
-          -DCMAKE_C_COMPILER=clang-18 \
-          -DCMAKE_CXX_COMPILER=clang++-18 \
-          -DCMAKE_C_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
-          . -B build
-        cmake --build build
+      run: bash ./scripts/ci/sanitizer_build.sh
     - name: Cache hit info
       if: steps.sanitizer-build-cache.outputs.cache-hit == 'true'
       run: echo "Reusing cached sanitizer build directory (src/bindings unchanged)."
@@ -480,146 +462,11 @@ jobs:
         path: .
     - name: Test sanitizer subset
       shell: bash
-      run: |
-        source ./scripts/sanitizer_cases.sh
-        case "${SANITIZER_SUBSET}" in
-          core)
-            SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_CORE}"
-            ;;
-          extended)
-            SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_EXTENDED}"
-            ;;
-          *)
-            echo "::warning::Unknown SANITIZER_SUBSET=${SANITIZER_SUBSET}, falling back to core."
-            SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_CORE}"
-            ;;
-        esac
-
-        SANITIZER_TEST_BIN=""
-        for CANDIDATE in \
-          ./build/test/manifold_test \
-          ./test/manifold_test \
-          ./sanitizer-build/test/manifold_test \
-          ./sanitizer-build/build/test/manifold_test; do
-          if [ -f "${CANDIDATE}" ]; then
-            SANITIZER_TEST_BIN="${CANDIDATE}"
-            break
-          fi
-        done
-        if [ -z "${SANITIZER_TEST_BIN}" ]; then
-          SANITIZER_TEST_BIN="$(find . -type f -name manifold_test | head -n 1)"
-        fi
-        if [ -z "${SANITIZER_TEST_BIN}" ]; then
-          echo "::error::Could not find manifold_test after downloading sanitizer artifacts."
-          echo "::group::Artifact layout"
-          find . -maxdepth 4 -type d | sort
-          echo "::endgroup::"
-          exit 127
-        fi
-        chmod +x "${SANITIZER_TEST_BIN}" || true
-
-        BIN_DIR="$(dirname "${SANITIZER_TEST_BIN}")"
-        LIB_CANDIDATES=(
-          "${BIN_DIR}/../lib"
-          "${BIN_DIR}/../src"
-          "${BIN_DIR}/../bindings/c"
-          ./build/lib
-          ./build/src
-          ./build/bindings/c
-          ./lib
-          ./src
-          ./bindings/c
-          ./sanitizer-build/lib
-          ./sanitizer-build/src
-          ./sanitizer-build/bindings/c
-          ./sanitizer-build/build/lib
-          ./sanitizer-build/build/src
-          ./sanitizer-build/build/bindings/c
-        )
-        LIB_PATHS=()
-        for LIB_DIR in "${LIB_CANDIDATES[@]}"; do
-          if [ -d "${LIB_DIR}" ]; then
-            LIB_PATHS+=("${LIB_DIR}")
-          fi
-        done
-        # Discover actual shared-library output dirs from artifact layout.
-        while IFS= read -r SO_DIR; do
-          [ -n "${SO_DIR}" ] && LIB_PATHS+=("${SO_DIR}")
-        done < <(
-          find . -type f \( -name 'libmanifold*.so*' -o -name 'libsamples.so*' -o -name 'libmanifoldc.so*' \) \
-            -printf '%h\n' | sort -u
-        )
-        if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
-          # De-duplicate while preserving order.
-          mapfile -t LIB_PATHS < <(printf '%s\n' "${LIB_PATHS[@]}" | awk '!seen[$0]++')
-        fi
-        if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
-          SANITIZER_LD_PATH="$(IFS=:; echo "${LIB_PATHS[*]}")"
-          if [ -n "${LD_LIBRARY_PATH:-}" ]; then
-            export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}:${LD_LIBRARY_PATH}"
-          else
-            export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}"
-          fi
-        fi
-
-        START_TS="$(date +%s)"
-        set +e
-        timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
-          "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
-        TEST_RC="$?"
-        set -e
-        END_TS="$(date +%s)"
-        ELAPSED_SEC="$((END_TS - START_TS))"
-
-        {
-          echo "### Sanitizer Runtime"
-          echo ""
-          echo "- subset: \`${SANITIZER_SUBSET}\`"
-          echo "- test_bin: \`${SANITIZER_TEST_BIN}\`"
-          echo "- ld_library_path: \`${LD_LIBRARY_PATH:-<unset>}\`"
-          echo "- elapsed_sec: \`${ELAPSED_SEC}\`"
-          echo "- budget_sec: \`${SANITIZER_RUNTIME_BUDGET_SEC}\`"
-        } >> "$GITHUB_STEP_SUMMARY"
-
-        if [ "${ELAPSED_SEC}" -gt "${SANITIZER_RUNTIME_BUDGET_SEC}" ]; then
-          echo "::warning::Sanitizer runtime exceeded budget: ${ELAPSED_SEC}s > ${SANITIZER_RUNTIME_BUDGET_SEC}s."
-        fi
-        if [ "${TEST_RC}" -eq 124 ]; then
-          echo "::warning::Sanitizer test timed out after ${SANITIZER_TEST_TIMEOUT_SEC}s."
-        fi
-        exit "${TEST_RC}"
+      run: bash ./scripts/ci/sanitizer_test.sh
     - name: Repro hint (on sanitizer failure)
       if: failure()
-      run: |
-        cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
-        ### Sanitizer Reproduction
-
-        Reproduce locally from repo root:
-
-        ```bash
-        cmake \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DBUILD_SHARED_LIBS=ON \
-          -DMANIFOLD_STRICT=ON \
-          -DMANIFOLD_PYBIND=OFF \
-          -DMANIFOLD_DEBUG=ON \
-          -DMANIFOLD_ASSERT=ON \
-          -DMANIFOLD_CROSS_SECTION=ON \
-          -DMANIFOLD_PAR=OFF \
-          -DCMAKE_C_COMPILER=clang-18 \
-          -DCMAKE_CXX_COMPILER=clang++-18 \
-          -DCMAKE_C_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
-          . -B build
-        cmake --build build
-        source ./scripts/sanitizer_cases.sh
-        ASAN_OPTIONS=detect_container_overflow=0:strict_init_order=1 \
-        UBSAN_OPTIONS=print_stacktrace=1 \
-        ./build/test/manifold_test --gtest_filter="${SANITIZER_GTEST_FILTER_CORE}"
-        ```
-        EOF
+      shell: bash
+      run: bash ./scripts/ci/sanitizer_repro_hint.sh
 
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})
