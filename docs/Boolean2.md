@@ -68,54 +68,22 @@ follow-up backend wiring rather than by `boolean2.h`.
 
 ## Architecture
 
-```mermaid
-%%{init: {"flowchart": {"wrappingWidth": 320}} }%%
-flowchart TD
-  API["`boolean2.h
-FillByRule / Boolean2D
-Xor`"]
-  Wrapper["`boolean2.cpp
-Polygons to vertices
-and edges`"]
-  Iterate["`iterate.cpp
-fixed-point
-cleanup`"]
-  Driver["`driver.cpp
-one arrangement
-pass`"]
-  Merge["`vertex_merge.cpp
-merge vertices
-within eps`"]
-  Pairs["`bvh.cpp
-edge-pair
-broad phase`"]
-  Lists["`edge_vert_lists.cpp
-vertices
-on edges`"]
-  Ix["`intersections.cpp
-crossings
-propagation`"]
-  Canon["`canonicalize.cpp
-sub-edges
-cancellation`"]
-  Filter["`winding_filter.cpp
-halfedge
-face walk`"]
-  Output["`boolean2.cpp
-regularized
-Polygons`"]
+The main dataflow is:
 
-  API --> Wrapper --> Iterate --> Driver
-  Driver --> Merge --> Pairs
-  Pairs --> Lists
-  Pairs --> Ix
-  Lists --> Canon
-  Ix --> Canon --> Filter --> Output
-```
+`boolean2.h` -> `boolean2.cpp` -> `iterate.cpp` -> `driver.cpp` ->
+`canonicalize.cpp` -> `winding_filter.cpp` -> regularized `Polygons`.
+
+| Layer | Files | Role |
+| --- | --- | --- |
+| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes the fixed-point driver, and turns retained edges back into regularized output. |
+| Fixed-point cleanup | `iterate.cpp` | Repeats the arrangement pass until the topology stabilizes or a bounded cycle is detected. |
+| Arrangement coordinator | `driver.cpp` | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
+| Geometry leaves | `vertex_merge.cpp`, `bvh.cpp`, `edge_vert_lists.cpp`, `intersections.cpp` | Provide the local geometric operations used by the arrangement pass. |
+| Output filter | `canonicalize.cpp`, `winding_filter.cpp` | Splits directed edges into canonical sub-edges, builds halfedges, propagates winding, and keeps result boundary edges. |
+| Sibling helpers | `offset.cpp`, `containment.cpp` | Used by the later backend-wiring PR for offset and decomposition support in the rest of the `CrossSection` API. |
 
 Shared leaf utilities live in `predicates.*`, and debug/performance tracing
-lives in `diagnostics.h`. `offset.*` and `containment.*` are sibling helpers
-used by the later backend-wiring PR for the rest of the `CrossSection` API.
+lives in `diagnostics.h`.
 
 ## Relationship To The Sketch
 
