@@ -69,6 +69,7 @@ follow-up backend wiring rather than by `boolean2.h`.
 ## Architecture
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 320}} }%%
 flowchart TD
   API["`boolean2.h
   FillByRule / Boolean2D / Xor`"]
