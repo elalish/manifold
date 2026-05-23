@@ -87,16 +87,6 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 
 /** @ingroup Private
  *
- * Early-return on cancel. Variadic: omit value for void context, supply
- * a cancelled-state value otherwise (`Vec<int>{}`, `ErrorLeaf(...)`, ...).
- */
-#define RETURN_IF_CANCELLED(ctx, ...)                   \
-  do {                                                  \
-    if (manifold::IsCancelled(ctx)) return __VA_ARGS__; \
-  } while (0)
-
-/** @ingroup Private
- *
  * Phase-boundary checkpoint for `Manifold::Impl` methods (relies on
  * `this->MakeEmpty`). Call count must equal the method's `kPhasesPer*`.
  */
