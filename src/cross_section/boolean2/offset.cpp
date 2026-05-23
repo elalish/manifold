@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Private polygon offset helper (a.k.a. inflate/inset, Clipper2's
-// `InflatePaths` analog), intended for the later `CrossSection::Offset`
-// backend mapping.
+// Polygon offset (a.k.a. inflate/inset, Clipper2's `InflatePaths`
+// analog). Backs `CrossSection::Offset`.
 //
 // Algorithm:
 //   1. For each input contour, walk vertex by vertex emitting one offset

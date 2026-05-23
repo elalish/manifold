@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Standalone polygon utilities intended for the later
-// `CrossSection::Decompose` backend mapping. Not part of the boolean-overlap
-// algorithm pipeline; operates on already-regularized `Polygons` produced by
-// FillByRule.
+// Standalone polygon utilities used by `CrossSection::Decompose`
+// (containment grouping). Not part of the boolean-overlap algorithm
+// pipeline; operates on already-regularized `Polygons` produced by FillByRule.
 
 #include "containment.h"
 

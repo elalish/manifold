@@ -59,7 +59,7 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
 8. Traverse halfedge faces, propagate winding numbers, and retain boundary edges
    whose adjacent faces disagree under the requested rule.
 
-The private fill/Boolean/XOR core entry points are in
+The high-level fill/Boolean/XOR core API is in
 `src/cross_section/boolean2/boolean2.h`. The lower-level driver returns
 retained directed sub-edges plus the merged vertex map, and the wrapper turns
 those edges back into regularized `manifold::Polygons`. Offset and containment
@@ -75,7 +75,7 @@ The main dataflow is:
 
 | Layer | Files | Role |
 | --- | --- | --- |
-| Private core entry points | `boolean2.h`, `boolean2.cpp` | Convert `Polygons` to local vertices plus directed edges, invoke the fixed-point driver, and turn retained edges back into regularized output. |
+| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes the fixed-point driver, and turns retained edges back into regularized output. |
 | Fixed-point cleanup | `iterate.cpp` | Repeats the arrangement pass until the topology stabilizes or a bounded cycle is detected. |
 | Arrangement coordinator | `driver.cpp` | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
 | Geometry leaves | `vertex_merge.cpp`, `bvh.cpp`, `edge_vert_lists.cpp`, `intersections.cpp` | Provide the local geometric operations used by the arrangement pass. |

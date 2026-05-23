@@ -258,9 +258,9 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   return polys;
 }
 
-// Single-input regularization intended for the later
-// `CrossSection::Simplify(eps)` backend mapping: one input, one eps, returns
-// the regularized positive-winding boundary. No public fill-rule parameter,
+// Single-input regularization. Matches `CrossSection::Simplify(eps)`:
+// one input, one eps, returns the regularized positive-winding boundary.
+// No public fill-rule parameter,
 // since CrossSection's existing API has none.
 Polygons Simplify(const Polygons& in, double eps) {
   if (!detail::AllFinite(in)) return {};
@@ -350,9 +350,10 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
 }  // namespace detail
 
 // Regularize a single Polygons input under an explicit winding rule.
-// This is the analog of Clipper2's `Union(paths, fill_rule)` and is intended
-// for the later `CrossSection` `(contour, FillRule)` / `(contours, FillRule)`
-// backend mapping.
+// This is the analog of Clipper2's `Union(paths, fill_rule)` and is used by
+// `CrossSection`'s `(contour, FillRule)` / `(contours, FillRule)` constructors
+// to honor the four CrossSection fill rules (EvenOdd / NonZero / Positive /
+// Negative) at construction time.
 // `eps <= 0` auto-infers from the input bbox.
 Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
   if (!detail::AllFinite(in)) return {};
