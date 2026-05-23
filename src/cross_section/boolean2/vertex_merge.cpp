@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Vertex-merge and edge-collapse passes. MergeVerts buckets verts within
-// eps of each other onto a representative position; CollapseDegenerateEdges
-// drops any input edge whose endpoints merged to the same vert. Both runs
-// before the BVH-broad intersection discovery.
+// Vertex-merge and edge-collapse passes. MergeVerts buckets verts within eps of
+// each other onto an existing representative vertex; CollapseDegenerateEdges
+// drops any input edge whose endpoints merged to the same vert. Both run before
+// the BVH-broad intersection discovery.
 //
 // Also hosts the tiny "sorted-vector as set" helpers (VESetContains,
 // VESetInsert) used by the per-edge / per-vert adjacency tracking in
@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 #include <utility>
 #include <vector>
@@ -41,6 +42,18 @@ namespace manifold {
 namespace boolean2 {
 
 using manifold::la::dot;
+
+namespace {
+
+void AtomicMax(std::atomic<int64_t>* target, int64_t value) {
+  int64_t observed = target->load(std::memory_order_relaxed);
+  while (observed < value && !target->compare_exchange_weak(
+                                 observed, value, std::memory_order_relaxed,
+                                 std::memory_order_relaxed)) {
+  }
+}
+
+}  // namespace
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   using timing_detail::Clock;
@@ -172,7 +185,14 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     std::iota(remap.begin(), remap.end(), 0);
     return {std::move(remap), in};
   }
-  // Compute centroid per cluster.
+  // Compute representative per cluster.
+  //
+  // Contract note: this is a transitive proximity merge. If A is within eps of
+  // B and B is within eps of C, all three collapse even when A and C are more
+  // than eps apart. Representatives must be chosen from existing component
+  // vertices rather than from a centroid: centroids can create a new within-eps
+  // pair between two already-merged components on a second MergeVerts pass even
+  // when no such pair existed in the original input.
   std::vector<vec2> sumPos(n, vec2{0, 0});
   std::vector<int> sumCnt(n, 0);
   for (int i = 0; i < n; ++i) {
@@ -180,6 +200,25 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     sumPos[r] = sumPos[r] + in[i];
     sumCnt[r] += 1;
   }
+  // Pick the source vertex closest to the component centroid. This keeps the
+  // representative near the center while preserving idempotence: any output
+  // representative was an input vertex, so two representatives can be within
+  // eps only if their original components should already have been connected.
+  std::vector<int> representative(n, -1);
+  std::vector<double> representativeDist2(
+      n, std::numeric_limits<double>::infinity());
+  for (int i = 0; i < n; ++i) {
+    const int r = uf.find(i);
+    const vec2 centroid = sumPos[r] * (1.0 / sumCnt[r]);
+    const vec2 d = in[i] - centroid;
+    const double dist2 = dot(d, d);
+    if (dist2 < representativeDist2[r] ||
+        (dist2 == representativeDist2[r] && i < representative[r])) {
+      representative[r] = i;
+      representativeDist2[r] = dist2;
+    }
+  }
+
   // Assign new indices in ascending root-id order so output ordering is
   // deterministic and matches what the old std::map iteration produced.
   std::vector<int> rootToNew(n, -1);
@@ -188,7 +227,46 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   for (int r = 0; r < n; ++r) {
     if (sumCnt[r] == 0) continue;
     rootToNew[r] = static_cast<int>(verts.size());
-    verts.push_back(sumPos[r] * (1.0 / sumCnt[r]));
+    verts.push_back(in[representative[r]]);
+  }
+  if (timing) {
+    auto& P = GlobalPhases();
+    const double invEps = eps > 0.0 ? 1.0 / eps : 0.0;
+    std::vector<vec2> bmin(n, vec2{0, 0});
+    std::vector<vec2> bmax(n, vec2{0, 0});
+    std::vector<double> maxDrift2(n, 0.0);
+    std::vector<uint8_t> sawRoot(n, 0);
+    for (int i = 0; i < n; ++i) {
+      const int r = uf.find(i);
+      const vec2 rep = in[representative[r]];
+      if (!sawRoot[r]) {
+        bmin[r] = in[i];
+        bmax[r] = in[i];
+        sawRoot[r] = 1;
+      } else {
+        bmin[r].x = std::min(bmin[r].x, in[i].x);
+        bmin[r].y = std::min(bmin[r].y, in[i].y);
+        bmax[r].x = std::max(bmax[r].x, in[i].x);
+        bmax[r].y = std::max(bmax[r].y, in[i].y);
+      }
+      const vec2 d = in[i] - rep;
+      maxDrift2[r] = std::max(maxDrift2[r], dot(d, d));
+    }
+    for (int r = 0; r < n; ++r) {
+      if (sumCnt[r] <= 1) continue;
+      P.mergeMergedComponents.fetch_add(1, std::memory_order_relaxed);
+      AtomicMax(&P.mergeMaxMergedComponentVerts, sumCnt[r]);
+      const double maxDrift = std::sqrt(maxDrift2[r]);
+      if (maxDrift > eps)
+        P.mergeMergedComponentsDriftGtEps.fetch_add(1,
+                                                    std::memory_order_relaxed);
+      const vec2 diag = bmax[r] - bmin[r];
+      AtomicMax(&P.mergeMaxMergedRepresentativeDriftMilliEps,
+                static_cast<int64_t>(std::ceil(1000.0 * maxDrift * invEps)));
+      AtomicMax(&P.mergeMaxMergedBboxDiagMilliEps,
+                static_cast<int64_t>(
+                    std::ceil(1000.0 * std::sqrt(dot(diag, diag)) * invEps)));
+    }
   }
   std::vector<int> remap(n);
   for (int i = 0; i < n; ++i) remap[i] = rootToNew[uf.find(i)];

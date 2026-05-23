@@ -110,15 +110,34 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
   const int s3 = CCW(b0, b1, a0, eps);
   const int s4 = CCW(b0, b1, a1, eps);
   const int zeros = (s1 == 0) + (s2 == 0) + (s3 == 0) + (s4 == 0);
-  // Any collinear case: no isolated point intersection. Fully collinear
-  // (zeros==4) means the segments are coincident or overlapping along a
-  // 1D segment, with no point-intersection; partial collinear (one or
-  // more but not all zero) means a T-junction. Both are handled by
-  // BuildEdgeVertLists (vertex-on-edge insertion) and Canonicalize
-  // (sub-edge multiplicity sum). Returning false here avoids unstable,
-  // order-dependent point intersections from collinear inputs.
-  if (zeros > 0) return false;
-  if (s1 == s2 || s3 == s4) return false;
+  const auto sameNonZeroSign = [](int a, int b) {
+    return (a > 0 && b > 0) || (a < 0 && b < 0);
+  };
+  const auto sameRawSign = [](double a, double b) {
+    return (a > 0 && b > 0) || (a < 0 && b < 0);
+  };
+  const auto oppositeRawSign = [](double a, double b) {
+    return (a > 0 && b < 0) || (a < 0 && b > 0);
+  };
+  const auto cross = [](vec2 u, vec2 v) { return u.x * v.y - u.y * v.x; };
+  // Fully collinear means the segments are coincident or overlapping along a
+  // 1D segment, with no isolated point-intersection. However, the tolerant
+  // CCW predicate can classify all four tests as zero for very shallow long
+  // edges even when the raw segment lines cross. Fall back to raw signs only
+  // to distinguish that case from true collinearity; the intersection
+  // position is still computed by the trimmed kernel below.
+  if (zeros == 4) {
+    const double r1 = cross(a1 - a0, b0 - a0);
+    const double r2 = cross(a1 - a0, b1 - a0);
+    const double r3 = cross(b1 - b0, a0 - b0);
+    const double r4 = cross(b1 - b0, a1 - b0);
+    if (r1 == 0.0 && r2 == 0.0 && r3 == 0.0 && r4 == 0.0) return false;
+    if (sameRawSign(r1, r2) || sameRawSign(r3, r4)) return false;
+    if (!oppositeRawSign(r1, r2) || !oppositeRawSign(r3, r4)) return false;
+  } else if (zeros > 0) {
+    return false;
+  }
+  if (sameNonZeroSign(s1, s2) || sameNonZeroSign(s3, s4)) return false;
 
   // Pick the axis where BOTH segments have non-zero spread, with
   // the larger spread of the two preferring stability (smaller |dy| works

@@ -55,6 +55,11 @@ struct PhaseAcc {
   std::atomic<int64_t> mergeBvhBuildNs{0};
   std::atomic<int64_t> mergeCollideNs{0};
   std::atomic<int64_t> mergeRestNs{0};
+  std::atomic<int64_t> mergeMergedComponents{0};
+  std::atomic<int64_t> mergeMergedComponentsDriftGtEps{0};
+  std::atomic<int64_t> mergeMaxMergedComponentVerts{0};
+  std::atomic<int64_t> mergeMaxMergedRepresentativeDriftMilliEps{0};
+  std::atomic<int64_t> mergeMaxMergedBboxDiagMilliEps{0};
   std::atomic<int64_t> edgeVertCandidates{0};
   std::atomic<int64_t> edgeVertEndpointRejects{0};
   std::atomic<int64_t> edgeVertDegenerateRejects{0};
@@ -96,6 +101,11 @@ struct PhaseAcc {
     mergeBvhBuildNs = 0;
     mergeCollideNs = 0;
     mergeRestNs = 0;
+    mergeMergedComponents = 0;
+    mergeMergedComponentsDriftGtEps = 0;
+    mergeMaxMergedComponentVerts = 0;
+    mergeMaxMergedRepresentativeDriftMilliEps = 0;
+    mergeMaxMergedBboxDiagMilliEps = 0;
     edgeVertCandidates = 0;
     edgeVertEndpointRejects = 0;
     edgeVertDegenerateRejects = 0;

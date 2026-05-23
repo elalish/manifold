@@ -75,7 +75,7 @@ LocalFrame MakeLocalFrame(const Polygons& a, const Polygons& b = {}) {
   AccumulateBounds(b, &min, &max, &any);
   LocalFrame frame;
   frame.hasVerts = any;
-  if (any) frame.origin = (min + max) * 0.5;
+  if (any) frame.origin = min * 0.5 + max * 0.5;
   return frame;
 }
 
@@ -295,8 +295,9 @@ double InferEps(const Polygons& a, const Polygons& b) {
   bound(a);
   bound(b);
   if (!std::isfinite(xMin)) return 0.0;
-  const double L = std::max(std::max(std::fabs(xMin), std::fabs(xMax)),
-                            std::max(std::fabs(yMin), std::fabs(yMax)));
+  const double halfX = xMax * 0.5 - xMin * 0.5;
+  const double halfY = yMax * 0.5 - yMin * 0.5;
+  const double L = std::max(halfX, halfY);
   return EpsilonFromScale(L);
 }
 
