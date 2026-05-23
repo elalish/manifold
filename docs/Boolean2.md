@@ -72,27 +72,38 @@ follow-up backend wiring rather than by `boolean2.h`.
 %%{init: {"flowchart": {"wrappingWidth": 320}} }%%
 flowchart TD
   API["`boolean2.h
-  FillByRule / Boolean2D / Xor`"]
+FillByRule / Boolean2D
+Xor`"]
   Wrapper["`boolean2.cpp
-  Polygons to vertices + edges`"]
+Polygons to vertices
+and edges`"]
   Iterate["`iterate.cpp
-  fixed-point cleanup`"]
+fixed-point
+cleanup`"]
   Driver["`driver.cpp
-  one arrangement pass`"]
+one arrangement
+pass`"]
   Merge["`vertex_merge.cpp
-  merge within eps`"]
+merge vertices
+within eps`"]
   Pairs["`bvh.cpp
-  edge-pair broad phase`"]
+edge-pair
+broad phase`"]
   Lists["`edge_vert_lists.cpp
-  vertices on edges`"]
+vertices
+on edges`"]
   Ix["`intersections.cpp
-  crossings + propagation`"]
+crossings
+propagation`"]
   Canon["`canonicalize.cpp
-  sub-edges + cancellation`"]
+sub-edges
+cancellation`"]
   Filter["`winding_filter.cpp
-  halfedge face walk`"]
+halfedge
+face walk`"]
   Output["`boolean2.cpp
-  regularized Polygons`"]
+regularized
+Polygons`"]
 
   API --> Wrapper --> Iterate --> Driver
   Driver --> Merge --> Pairs
