@@ -523,7 +523,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
 
   // step 1: reorder within the same face, such that the halfedge with the
   // smallest starting vertex is placed first
-  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0_uz),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              std::array<Halfedge, 3> face = {halfedge_.Get(tri * 3),
                                              halfedge_.Get(tri * 3 + 1),
@@ -540,7 +540,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
            });
   if (IsCancelled(ctx)) return;
   // step 2: fix paired halfedge
-  for_each(autoPolicy(halfedge_.size() / 3), countAt(0),
+  for_each(autoPolicy(halfedge_.size() / 3), countAt(0_uz),
            countAt(halfedge_.size() / 3), ctx, [this](size_t tri) {
              for (int i : {0, 1, 2}) {
                const int currIdx = tri * 3 + i;

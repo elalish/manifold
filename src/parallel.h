@@ -451,7 +451,8 @@ void for_each_n(ExecutionPolicy policy, Iter first, size_t n,
                     typename std::iterator_traits<Iter>::iterator_category,
                     std::random_access_iterator_tag>,
                 "You can only parallelize RandomAccessIterator.");
-  for_each(policy, first, first + n, ctx, f);
+  using Difference = typename std::iterator_traits<Iter>::difference_type;
+  for_each(policy, first, first + static_cast<Difference>(n), ctx, f);
 }
 
 // Non-cancellable shim.
@@ -811,7 +812,8 @@ size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
 #if (MANIFOLD_PAR == 1)
   if (policy == ExecutionPolicy::Par) {
     return reduce(policy, TransformIterator(first, pred),
-                  TransformIterator(last, pred), 0, std::plus<size_t>());
+                  TransformIterator(last, pred), size_t{0},
+                  std::plus<size_t>());
   }
 #endif
   return std::count_if(first, last, pred);
@@ -1149,7 +1151,7 @@ template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
              InputIterator2 mapFirst, OutputIterator outputFirst) {
-  for_each(policy, countAt(0),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first, mapFirst, outputFirst](size_t i) {
              outputFirst[mapFirst[i]] = first[i];
@@ -1181,7 +1183,7 @@ template <typename InputIterator, typename RandomAccessIterator,
 void gather(ExecutionPolicy policy, InputIterator mapFirst,
             InputIterator mapLast, RandomAccessIterator inputFirst,
             OutputIterator outputFirst) {
-  for_each(policy, countAt(0),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
            [mapFirst, inputFirst, outputFirst](size_t i) {
              outputFirst[i] = inputFirst[mapFirst[i]];
@@ -1205,7 +1207,7 @@ void gather(InputIterator mapFirst, InputIterator mapLast,
 // Write `[0, last - first)` to the range `[first, last)`.
 template <typename Iterator>
 void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
-  for_each(policy, countAt(0),
+  for_each(policy, countAt(0_uz),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first](size_t i) { first[i] = i; });
 }
