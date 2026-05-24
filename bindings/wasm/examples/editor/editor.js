@@ -845,9 +845,9 @@ mv.addEventListener('before-render', async () => {
     mv.cameraTarget = 'auto auto auto';
     resetCamera = false;
   } else {
-    mv.fieldOfView = camera.fov.toString() + 'deg';
     scene.setTarget(camera.target.x, camera.target.y, camera.target.z);
     mv.cameraOrbit = camera.orbit.toString();
+    mv.fieldOfView = camera.fov.toString() + 'deg';
   }
   mv.jumpCameraToGoal();
 });
@@ -1296,6 +1296,7 @@ function createWorker() {
         camera.orbit = mv.getCameraOrbit();
         camera.target = mv.getCameraTarget();
         camera.fov = mv.getFieldOfView();
+        mv.fieldOfView = 'auto';
 
         mv.src = output.glbURL;
       } else if (message?.extension === '3mf') {
