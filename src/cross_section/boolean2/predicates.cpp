@@ -76,7 +76,7 @@ double EpsilonFromScale(double L, int k_budget) {
 //
 // This kernel works for any pair by trimming both segments to their
 // projection-axis overlap before applying Intersect. Steps:
-//   1. CCW + SoS for cross-or-not (existing predicate, untouched).
+//   1. Projected graph order plus SoS for cross-or-not.
 //   2. Pick the axis (x or y) where BOTH segments have non-zero spread,
 //      preferring the larger min-spread for stability.
 //   3. Sort each segment's endpoints L-to-R along that axis.
@@ -94,52 +94,153 @@ double EpsilonFromScale(double L, int k_budget) {
 // satisfied even for the nested-axis cases that arise from BVH pairs.
 double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
 
-bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
-                       vec2* out) {
-  // Cross-detection: CCW(A,B,C) is sign of (B-A) x (C-A) with a
-  // collinearity threshold; we reject any case where one or more
-  // endpoints lie on the other segment's line (T-junction or fully
-  // collinear). Real point-intersection requires endpoints strictly on
-  // opposite sides of each other.
-  const auto sameNonZeroSign = [](int a, int b) {
-    return (a > 0 && b > 0) || (a < 0 && b < 0);
-  };
-  const auto sameRawSign = [](double a, double b) {
-    return (a > 0 && b > 0) || (a < 0 && b < 0);
-  };
-  const auto oppositeRawSign = [](double a, double b) {
-    return (a > 0 && b < 0) || (a < 0 && b > 0);
-  };
-  const auto cross = [](vec2 u, vec2 v) { return u.x * v.y - u.y * v.x; };
-  const int s1 = manifold::CCW(a0, a1, b0, eps);
-  const int s2 = manifold::CCW(a0, a1, b1, eps);
-  if ((s1 == 0) != (s2 == 0)) return false;
-  if (sameNonZeroSign(s1, s2)) return false;
+namespace {
 
-  const int s3 = manifold::CCW(b0, b1, a0, eps);
-  if (s3 == 0 && (s1 != 0 || s2 != 0)) return false;
-  if (s3 != 0 && (s1 == 0 || s2 == 0)) return false;
+vec2 SortLeftRight(vec2 p0, vec2 p1, int axis) {
+  if (Coord(p1, axis) < Coord(p0, axis)) std::swap(p0, p1);
+  return p0;
+}
 
-  const int s4 = manifold::CCW(b0, b1, a1, eps);
-  if ((s3 == 0) != (s4 == 0)) return false;
-  if (sameNonZeroSign(s3, s4)) return false;
+vec2 SortRight(vec2 p0, vec2 p1, int axis) {
+  if (Coord(p1, axis) < Coord(p0, axis)) std::swap(p0, p1);
+  return p1;
+}
 
-  // Fully collinear means the segments are coincident or overlapping along a
-  // 1D segment, with no isolated point-intersection. However, the tolerant
-  // CCW predicate can classify all four tests as zero for very shallow long
-  // edges even when the raw segment lines cross. Fall back to raw signs only
-  // to distinguish that case from true collinearity; the intersection
-  // position is still computed by the trimmed kernel below.
-  if (s1 == 0 && s2 == 0 && s3 == 0 && s4 == 0) {
-    const double r1 = cross(a1 - a0, b0 - a0);
-    const double r2 = cross(a1 - a0, b1 - a0);
-    const double r3 = cross(b1 - b0, a0 - b0);
-    const double r4 = cross(b1 - b0, a1 - b0);
-    if (r1 == 0.0 && r2 == 0.0 && r3 == 0.0 && r4 == 0.0) return false;
-    if (sameRawSign(r1, r2) || sameRawSign(r3, r4)) return false;
-    if (!oppositeRawSign(r1, r2) || !oppositeRawSign(r3, r4)) return false;
+bool NearlyEqual(double a, double b, double eps) {
+  return std::fabs(a - b) <= eps;
+}
+
+bool IsEndpointProjection(vec2 p, double x, int axis, double eps) {
+  return NearlyEqual(Coord(p, axis), x, eps);
+}
+
+GraphOrderKind StrictOrder(double gap) {
+  return gap > 0.0 ? GraphOrderKind::ALessOrtho : GraphOrderKind::AGreaterOrtho;
+}
+
+bool OppositeSigns(double a, double b) {
+  return (a < 0.0 && b > 0.0) || (a > 0.0 && b < 0.0);
+}
+
+bool StrictlyBetweenWithEndpointBand(double x, double p, double q, double eps) {
+  return std::min(p, q) + eps < x && x < std::max(p, q) - eps;
+}
+
+bool AwayFromEndpoints(vec2 p, vec2 a, vec2 b, double eps) {
+  const double eps2 = eps * eps;
+  return dot(p - a, p - a) > eps2 && dot(p - b, p - b) > eps2;
+}
+
+int CompareDouble(double a, double b) { return (a > b) - (a < b); }
+
+int ComparePointKey(vec2 a, vec2 b) {
+  if (int c = CompareDouble(a.x, b.x)) return c;
+  return CompareDouble(a.y, b.y);
+}
+
+int CompareSegmentKey(GraphSegment2D a, GraphSegment2D b) {
+  if (ComparePointKey(a.p1, a.p0) < 0) std::swap(a.p0, a.p1);
+  if (ComparePointKey(b.p1, b.p0) < 0) std::swap(b.p0, b.p1);
+  if (int c = ComparePointKey(a.p0, b.p0)) return c;
+  return ComparePointKey(a.p1, b.p1);
+}
+
+GraphOrderKind SymbolicTieOrder(const GraphSegment2D& a,
+                                const GraphSegment2D& b) {
+  const int segmentOrder = CompareSegmentKey(a, b);
+  if (segmentOrder != 0) {
+    const double tieDir = segmentOrder < 0 ? -1.0 : 1.0;
+    return Shadows(0.0, 0.0, tieDir) ? GraphOrderKind::ALessOrtho
+                                     : GraphOrderKind::AGreaterOrtho;
   }
 
+  DEBUG_ASSERT(
+      a.perturbRank != b.perturbRank || a.stableEdgeId != b.stableEdgeId,
+      logicErr, "Boolean2 graph order has unresolved symbolic tie");
+  const int aRank =
+      a.perturbRank != b.perturbRank ? a.perturbRank : a.stableEdgeId;
+  const int bRank =
+      a.perturbRank != b.perturbRank ? b.perturbRank : b.stableEdgeId;
+  const double tieDir = aRank < bRank ? -1.0 : 1.0;
+  return Shadows(0.0, 0.0, tieDir) ? GraphOrderKind::ALessOrtho
+                                   : GraphOrderKind::AGreaterOrtho;
+}
+
+}  // namespace
+
+GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
+                                   const GraphSegment2D& b, int axis,
+                                   double overlapL, double overlapR,
+                                   double eps) {
+  GraphOrder2D order;
+  DEBUG_ASSERT(axis == 0 || axis == 1, logicErr,
+               "Boolean2 graph order requires a 2D projection axis");
+  if (overlapR <= overlapL) return order;
+
+  const vec2 aL = SortLeftRight(a.p0, a.p1, axis);
+  const vec2 aR = SortRight(a.p0, a.p1, axis);
+  const vec2 bL = SortLeftRight(b.p0, b.p1, axis);
+  const vec2 bR = SortRight(b.p0, b.p1, axis);
+  DEBUG_ASSERT(
+      Coord(aL, axis) < Coord(aR, axis) && Coord(bL, axis) < Coord(bR, axis),
+      logicErr, "Boolean2 graph order requires nonzero axis spread");
+  DEBUG_ASSERT(Coord(aL, axis) <= overlapL && overlapR <= Coord(aR, axis) &&
+                   Coord(bL, axis) <= overlapL && overlapR <= Coord(bR, axis),
+               logicErr, "Boolean2 graph order interval outside domain");
+  const auto embed = [&](vec2 p) {
+    return axis == 0 ? vec3(p.x, p.y, 0.0) : vec3(p.y, p.x, 0.0);
+  };
+
+  const vec3 aL3 = embed(aL), aR3 = embed(aR);
+  const vec3 bL3 = embed(bL), bR3 = embed(bR);
+  const double aOL = manifold::Interpolate(aL3, aR3, overlapL).x;
+  const double aOR = manifold::Interpolate(aL3, aR3, overlapR).x;
+  const double bOL = manifold::Interpolate(bL3, bR3, overlapL).x;
+  const double bOR = manifold::Interpolate(bL3, bR3, overlapR).x;
+  const double gapL = bOL - aOL;
+  const double gapR = bOR - aOR;
+  const bool tieL = NearlyEqual(gapL, 0.0, eps);
+  const bool tieR = NearlyEqual(gapR, 0.0, eps);
+  const bool signChanging = OppositeSigns(gapL, gapR);
+
+  if (tieL && tieR && !signChanging) {
+    order.coincidentOverlap = true;
+    order.atMinProjection = SymbolicTieOrder(a, b);
+    order.atMaxProjection = order.atMinProjection;
+    return order;
+  }
+
+  const bool endpointL = IsEndpointProjection(aL, overlapL, axis, eps) ||
+                         IsEndpointProjection(aR, overlapL, axis, eps) ||
+                         IsEndpointProjection(bL, overlapL, axis, eps) ||
+                         IsEndpointProjection(bR, overlapL, axis, eps);
+  const bool endpointR = IsEndpointProjection(aL, overlapR, axis, eps) ||
+                         IsEndpointProjection(aR, overlapR, axis, eps) ||
+                         IsEndpointProjection(bL, overlapR, axis, eps) ||
+                         IsEndpointProjection(bR, overlapR, axis, eps);
+  const bool symbolicTieL = tieL && !signChanging;
+  const bool symbolicTieR = tieR && !signChanging;
+
+  order.atMinProjection =
+      symbolicTieL
+          ? (endpointL ? GraphOrderKind::EndpointTouch : SymbolicTieOrder(a, b))
+          : StrictOrder(gapL);
+  order.atMaxProjection =
+      symbolicTieR
+          ? (endpointR ? GraphOrderKind::EndpointTouch : SymbolicTieOrder(a, b))
+          : StrictOrder(gapR);
+
+  order.properCrossing =
+      (order.atMinProjection == GraphOrderKind::ALessOrtho &&
+       order.atMaxProjection == GraphOrderKind::AGreaterOrtho) ||
+      (order.atMinProjection == GraphOrderKind::AGreaterOrtho &&
+       order.atMaxProjection == GraphOrderKind::ALessOrtho);
+  return order;
+}
+
+bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
+                       double eps, vec2* out) {
+  const vec2 a0 = a.p0, a1 = a.p1, b0 = b.p0, b1 = b.p1;
   // Pick the axis where BOTH segments have non-zero spread, with
   // the larger spread of the two preferring stability (smaller |dy| works
   // better in Intersect when the trimmed segments are well-separated).
@@ -158,10 +259,9 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
   // Special case: both segments are axis-aligned to opposite axes (one
   // horizontal, one vertical, exactly), so neither axis has both
   // segments contributing spread. Trim-and-Interpolate would degenerate
-  // (zero-width overlap interval). Compute the intersection directly:
-  // it's the cross of the vertical segment's constant x and the
-  // horizontal segment's constant y. Common in real CAD/SVG inputs
-  // (axis-aligned rectangles overlapping each other).
+  // (zero-width overlap interval). Compute only strict interior crossings
+  // directly; endpoint/T-junction contacts are degeneracies for the
+  // vertex-on-edge phase.
   if (xUsable == 0 && yUsable == 0) {
     const bool aHoriz = aSpreadX > 0 && aSpreadY == 0;
     const bool aVert = aSpreadY > 0 && aSpreadX == 0;
@@ -170,6 +270,14 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
     if ((aHoriz && bVert) || (aVert && bHoriz)) {
       const double ix = aVert ? a0.x : b0.x;
       const double iy = aHoriz ? a0.y : b0.y;
+      if (!StrictlyBetweenWithEndpointBand(ix, a0.x, a1.x, eps) &&
+          !StrictlyBetweenWithEndpointBand(iy, a0.y, a1.y, eps)) {
+        return false;
+      }
+      if (!StrictlyBetweenWithEndpointBand(ix, b0.x, b1.x, eps) &&
+          !StrictlyBetweenWithEndpointBand(iy, b0.y, b1.y, eps)) {
+        return false;
+      }
       *out = vec2(ix, iy);
       return std::isfinite(out->x) && std::isfinite(out->y);
     }
@@ -183,11 +291,15 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
   if (Coord(aR, axis) < Coord(aL, axis)) std::swap(aL, aR);
   if (Coord(bR, axis) < Coord(bL, axis)) std::swap(bL, bR);
 
-  // Axis-overlap interval. CCW already confirmed crossing, so the
-  // overlap is non-empty (modulo FP noise; clamp on hairline).
+  // Axis-overlap interval. A proper crossing needs a positive-width shared
+  // projection interval; endpoint-only contact is a degeneracy.
   const double overlapL = std::max(Coord(aL, axis), Coord(bL, axis));
   const double overlapR = std::min(Coord(aR, axis), Coord(bR, axis));
   if (overlapR <= overlapL) return false;
+
+  const GraphOrder2D order =
+      CompareProjectedOrder(a, b, axis, overlapL, overlapR, eps);
+  if (!order.properCrossing) return false;
 
   // Trim each segment to the overlap. Interpolate(aL, aR, x) wants
   // a vec3 with the projection axis as its x-component, so we permute when
@@ -220,7 +332,14 @@ bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
   const double outOrtho = lambda * (useA ? aDy : bDy) +
                           (useL ? (useA ? aOL : bOL) : (useA ? aOR : bOR));
   *out = axis == 0 ? vec2(outProj, outOrtho) : vec2(outOrtho, outProj);
-  return std::isfinite(out->x) && std::isfinite(out->y);
+  return std::isfinite(out->x) && std::isfinite(out->y) &&
+         AwayFromEndpoints(*out, a0, a1, eps) &&
+         AwayFromEndpoints(*out, b0, b1, eps);
+}
+
+bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
+                       vec2* out) {
+  return IntersectSegments({a0, a1, 0, 0}, {b0, b1, 1, 1}, eps, out);
 }
 
 }  // namespace boolean2

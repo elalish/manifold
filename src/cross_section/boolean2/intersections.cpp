@@ -270,8 +270,8 @@ void FindAndInsertIntersectionsImpl(
       if (ei.v0 == ej.v0 || ei.v0 == ej.v1 || ei.v1 == ej.v0 || ei.v1 == ej.v1)
         return;
       vec2 p;
-      if (!IntersectSegments((*verts)[ei.v0], (*verts)[ei.v1], (*verts)[ej.v0],
-                             (*verts)[ej.v1], eps, &p))
+      if (!IntersectSegments({(*verts)[ei.v0], (*verts)[ei.v1], 0, i},
+                             {(*verts)[ej.v0], (*verts)[ej.v1], 0, j}, eps, &p))
         return;
       out.push_back({i, j, p});
     };

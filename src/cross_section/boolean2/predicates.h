@@ -30,10 +30,45 @@ struct EdgeM {
 };
 using OutEdge = EdgeM;
 
+enum class GraphOrderKind {
+  ALessOrtho,
+  AGreaterOrtho,
+  EndpointTouch,
+  NoProjectionOverlap
+};
+
+struct GraphSegment2D {
+  vec2 p0;
+  vec2 p1;
+  // Higher rank shadows lower rank on exact orthogonal-coordinate equality.
+  // This must come from a stable symbolic perturbation policy, not BVH pair
+  // order.
+  int perturbRank = 0;
+  // Final stable fallback for equal-rank, geometrically identical ties and
+  // diagnostics; not BVH pair order.
+  int stableEdgeId = -1;
+};
+
+struct GraphOrder2D {
+  GraphOrderKind atMinProjection = GraphOrderKind::NoProjectionOverlap;
+  GraphOrderKind atMaxProjection = GraphOrderKind::NoProjectionOverlap;
+  bool coincidentOverlap = false;
+  bool properCrossing = false;
+};
+
 double SignedArea(const SimplePolygon& loop);
 double TotalSignedArea(const Polygons& polys);
 double EpsilonFromScale(double L, int k_budget = 1000);
 double Coord(vec2 p, int axis);
+// Projection-frame graph order over a positive-width shared projection
+// interval. `ALessOrtho`/`AGreaterOrtho` compare the coordinate orthogonal to
+// `axis`, so for axis==1 they compare x over a y interval.
+GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
+                                   const GraphSegment2D& b, int axis,
+                                   double overlapL, double overlapR,
+                                   double eps = 0.0);
+bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
+                       double eps, vec2* out);
 bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
                        vec2* out);
 

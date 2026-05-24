@@ -16,7 +16,7 @@ landing the core library before that public backend wiring is enabled.
 
 - Keep Clipper2 available while the new backend bakes upstream.
 - Reuse manifold's geometric primitives where practical:
-  BVH/sweep broad phase queries, `DisjointSets` for vertex equality, and
+  BVH broad phase queries, `DisjointSets` for vertex equality, and
   symbolic predicates from `shared.h`.
 - Keep the core independent from Clipper2 so the follow-up backend can compile
   either implementation from the same public API surface.
@@ -49,10 +49,13 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
 
 1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
-3. Collect eps-padded AABB candidate edge pairs with a sweep/BVH broad phase.
+3. Collect eps-padded AABB candidate edge pairs with a BVH broad phase.
 4. Build per-edge lists of vertices that lie on each edge, optionally fused
    with the intersection narrow phase for large parallel cases.
-5. Insert proper edge-edge crossing points using the shared symbolic predicates.
+5. Insert strict proper edge-edge crossings using Boolean2's projected
+   graph-order oracle, with shared symbolic `Interpolate`/`Shadows` helpers.
+   Endpoint, T-junction, and coincident-overlap degeneracies stay in the
+   vertex-on-edge/canonicalization path.
 6. Structurally re-merge duplicate intersection vertices that share an incident
    edge and are within epsilon.
 7. Canonicalize sub-edges and cancel opposing multiplicities.
@@ -139,6 +142,12 @@ offset is staged in the backend-wiring branch.
 The core operates on `manifold::Polygons`, which cannot encode isolated
 one-dimensional features. Output is therefore regularized: zero-area loops,
 collapsed edges, and cancelled opposing sub-edges are dropped.
+
+Segment crossings are decided over a positive-width shared projection interval.
+Orthogonal-coordinate ties within epsilon are treated as symbolic ties, not raw
+CCW fallbacks. The current tie policy first uses canonical segment geometry,
+then falls back to explicit rank or stable edge ID only for geometrically
+identical ties.
 
 Callers may pass an explicit epsilon. A non-positive epsilon asks the core
 to infer an operation scale and apply the local floating-point budget used by
