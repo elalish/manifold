@@ -26,10 +26,6 @@ namespace boolean2 {
 
 inline constexpr double kIntersectionMergeEpsFactor = 10.0;
 
-void RadixSortPairs(std::vector<std::pair<int, int>>* pairs);
-void SortSmallInts(std::vector<int>* values);
-bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
-                                   const std::vector<vec2>& verts, double eps);
 void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
                               const std::vector<Box2>& edgeBoxes,

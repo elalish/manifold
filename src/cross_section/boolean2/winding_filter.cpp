@@ -18,11 +18,12 @@
 // then keeps only the sub-edges that separate "inside" from "outside"
 // under the chosen rule (Add / Intersect / EvenOdd / NonZero / Negative).
 //
-// FastEdge + CastWindingRayFast are the ray-cast helpers for the outer-
+// FastEdge + CastWindingRay are the ray-cast helpers for the outer-
 // face seed; FilterByWindingHalfedges is the entry point. iostream usage
 // gated by MANIFOLD_DEBUG.
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -44,6 +45,12 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
+constexpr double kSeedStepCoordScaleUlps = 16.0;
+constexpr double kSeedStepEpsFraction = 0.25;
+constexpr double kSeedStepEdgeLengthFraction = 1e-3;
+
 bool IsInside(WindRule rule, int w) {
   switch (rule) {
     case WindRule::Add:
@@ -58,57 +65,6 @@ bool IsInside(WindRule rule, int w) {
       return w < 0;
   }
   return false;
-}
-
-namespace {
-
-constexpr double kSeedStepCoordScaleUlps = 16.0;
-constexpr double kSeedStepEpsFraction = 0.25;
-constexpr double kSeedStepEdgeLengthFraction = 1e-3;
-
-// =============================================================================
-// Ray-cast winding-number primitives (legacy seed; the BFS face traversal
-// below is the primary path).
-// =============================================================================
-
-// Cast a horizontal ray to +x from `origin`. Count signed crossings of
-// directed sub-edges. For each sub-edge (vMin, vMax) with signed
-// multiplicity m, the contribution is +m if the edge goes upward (in
-// canonical (vMin, vMax) form, "upward" = vMin's y < vMax's y when
-// crossed from below), -m if downward.
-//
-// Used per-face by `FilterByWindingHalfedges`: the origin is offset
-// perpendicularly LEFT of a boundary halfedge, which puts it strictly
-// inside the face and away from any vertex, so the ray never hits a
-// vertex exactly under non-adversarial inputs.
-int CastWindingRay(vec2 origin, const CanonicalSubEdges& canon,
-                   const std::vector<vec2>& verts) {
-  int winding = 0;
-  for (const auto& edge : canon.edges) {
-    const int mult = edge.mult;
-    vec2 p0 = verts[edge.vMin];
-    vec2 p1 = verts[edge.vMax];
-    // Order so p0.y <= p1.y for crossing test.
-    bool upward = p0.y < p1.y;
-    if (!upward) std::swap(p0, p1);
-    // Strictly half-open in y to avoid double-counting at vertices.
-    if (origin.y < p0.y || origin.y >= p1.y) continue;
-    // Compute x of the segment at origin.y.
-    double t = (origin.y - p0.y) / (p1.y - p0.y);
-    double xCross = p0.x + t * (p1.x - p0.x);
-    if (xCross < origin.x) continue;
-    // Crossing direction: original direction was upward iff key.first <
-    // key.second and positions matched -- already encoded in `mult`'s sign. We
-    // need the signed contribution to the winding number when crossing
-    // left-to-right. For a positive-multiplicity edge oriented (vMin -> vMax)
-    // in canonical form, an upward crossing (with origin to the left of the
-    // edge) increments the winding number on the right side by mult. Since we
-    // cast +x, we are computing winding on the LEFT of the ray, which is the
-    // side we're at the origin. This is +mult per upward crossing, -mult per
-    // downward crossing.
-    winding += upward ? mult : -mult;
-  }
-  return winding;
 }
 
 // Pre-flattened canonical sub-edges for seed ray-casts. Hoisting to a flat
@@ -148,12 +104,12 @@ std::vector<FastEdge> BuildFastEdges(const CanonicalSubEdges& canon,
   return out;
 }
 
-int CastWindingRayFast(vec2 origin, const std::vector<FastEdge>& edges) {
+int CastWindingRay(vec2 origin, const std::vector<FastEdge>& edges) {
   int winding = 0;
   for (const auto& e : edges) {
     if (origin.y < e.yMin || origin.y >= e.yMax) continue;
     const double xCross = e.x0 + e.dxdy * (origin.y - e.yMin);
-    if (xCross < origin.x) continue;
+    if (xCross <= origin.x) continue;
     winding += e.signedMult;
   }
   return winding;
@@ -347,6 +303,10 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
           << " halfedges=" << halfedges.size() << ")\n";
     }
 #endif
+    if (malformed) {
+      assert(false && "malformed halfedge cycle");
+      return {};
+    }
     ++nFaces;
   }
 
@@ -449,7 +409,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
         std::min(len * kSeedStepEdgeLengthFraction, seedStepCap);
     const vec2 pInF = mid + perp * step;
     ensureFastEdges();
-    return CastWindingRayFast(pInF, fastEdges);
+    return CastWindingRay(pInF, fastEdges);
   };
   auto seedRayCastLeastBiased = [&](int f) {
     int h0 = faceStartHE[f];

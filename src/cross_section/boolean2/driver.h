@@ -27,7 +27,7 @@ struct Trace;
 struct OverlapResult {
   std::vector<vec2> verts;
   std::vector<OutEdge> edges;
-  std::vector<int> inputRemap;
+  std::vector<int> inputVert2Merged;
   int numMergedVerts;
 };
 

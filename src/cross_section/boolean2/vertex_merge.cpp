@@ -214,12 +214,12 @@ void VESetInsert(std::vector<int>* vec, int x) {
 
 // Drop edges whose endpoints map to the same vertex after MergeVerts.
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
-                                    const std::vector<int>& remap) {
+                                    const std::vector<int>& inputVert2Merged) {
   std::vector<EdgeM> out;
   out.reserve(edges.size());
   for (const auto& e : edges) {
-    int a = remap[e.v0];
-    int b = remap[e.v1];
+    int a = inputVert2Merged[e.v0];
+    int b = inputVert2Merged[e.v1];
     if (a != b) out.push_back({a, b, e.mult});
   }
   return out;

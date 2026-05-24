@@ -99,10 +99,11 @@ subtract, intersect, XOR, and construction-time fill rules.
 The main implementation differences are:
 
 - Vertex merging uses deterministic union-find over all pairs within epsilon,
-  then places each cluster at its centroid. The sketch called out weighted,
-  up-to-date positions for chains of nearby vertices; Boolean2 treats the first
-  arrangement pass as the robustness boundary rather than relying on a
-  production fixed-point cleanup loop.
+  then chooses the source vertex nearest each cluster centroid as the
+  representative. The sketch called out weighted, up-to-date positions for
+  chains of nearby vertices; Boolean2 treats the first arrangement pass as the
+  robustness boundary rather than relying on a production fixed-point cleanup
+  loop.
 - Broad phases use the local boolean2 sweep/BVH helpers. This keeps the core
   independent from the 3D `Collider` surface while preserving the intended
   sub-quadratic candidate search.

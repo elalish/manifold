@@ -196,20 +196,20 @@ void TraceRecorder::RecordInput(const std::vector<vec2>& verts,
 #endif
 }
 
-void TraceRecorder::RecordMergedVertices(const std::vector<vec2>& verts,
-                                         const std::vector<int>& remap) {
+void TraceRecorder::RecordMergedVertices(
+    const std::vector<vec2>& verts, const std::vector<int>& inputVert2Merged) {
 #ifdef MANIFOLD_DEBUG
   if (!trace_) return;
   TracePhase& phase = trace_->AddPhase("merged_vertices");
   AddPoints(&phase, verts, "merged_vertex");
-  phase.annotations.reserve(remap.size());
-  for (int i = 0; i < static_cast<int>(remap.size()); ++i) {
+  phase.annotations.reserve(inputVert2Merged.size());
+  for (int i = 0; i < static_cast<int>(inputVert2Merged.size()); ++i) {
     phase.annotations.push_back(
-        {Id("in", i), "remap", std::to_string(remap[i])});
+        {Id("in", i), "remap", std::to_string(inputVert2Merged[i])});
   }
 #else
   (void)verts;
-  (void)remap;
+  (void)inputVert2Merged;
 #endif
 }
 

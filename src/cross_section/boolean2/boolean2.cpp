@@ -217,12 +217,21 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   Polygons polys;
   for (int start = 0; start < nE; ++start) {
     if (visited[start]) continue;
+    const int startV = edges[start].v0;
     std::vector<int> loopVerts;
     int cur = start;
+    bool closed = false;
     while (cur >= 0 && !visited[cur]) {
       visited[cur] = true;
       loopVerts.push_back(edges[cur].v0);
       const int destV = edges[cur].v1;
+      // The next-pointer scan skips visited edges (including `start`), so
+      // detect closure by the walk reaching startV rather than by re-selecting
+      // the start edge as `next`.
+      if (destV == startV) {
+        closed = true;
+        break;
+      }
       if (destV < 0 || destV >= (int)outgoing.size() ||
           outgoing[destV].empty()) {
         cur = -1;
@@ -244,6 +253,10 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
         }
       }
       cur = next;
+    }
+    if (!closed) {
+      assert(false && "retained directed edges must form closed walks");
+      continue;
     }
     if (loopVerts.size() >= 3) {
       PushSimpleLoops(verts, std::move(loopVerts), nearRepeatedVertexTol,

@@ -189,7 +189,7 @@ class TraceRecorder {
   void RecordInput(const std::vector<vec2>& verts,
                    const std::vector<EdgeM>& edges);
   void RecordMergedVertices(const std::vector<vec2>& verts,
-                            const std::vector<int>& remap);
+                            const std::vector<int>& inputVert2Merged);
   void RecordCollapsedEdges(const std::vector<vec2>& verts,
                             const std::vector<EdgeM>& edges);
   void RecordBroadPhasePairs(const std::vector<vec2>& verts,

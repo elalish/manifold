@@ -56,12 +56,12 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     merge = MergeVerts(vertsIn, eps);
   }
   const int numMerged = static_cast<int>(merge.verts.size());
-  traceRecorder.RecordMergedVertices(merge.verts, merge.remap);
+  traceRecorder.RecordMergedVertices(merge.verts, merge.inputVert2Merged);
   // Edge collapse.
   std::vector<EdgeM> edges;
   {
     ScopedTiming timing(P.remapNs);
-    edges = RemapAndCollapse(edgesIn, merge.remap);
+    edges = RemapAndCollapse(edgesIn, merge.inputVert2Merged);
   }
   traceRecorder.RecordCollapsedEdges(merge.verts, edges);
   // Build a shared edge-box array for edge-edge broad phase and near-vertex
@@ -220,7 +220,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
         for (auto& v : list) v = remap[v];
         list.erase(std::unique(list.begin(), list.end()), list.end());
       }
-      for (auto& r : merge.remap) r = remap[r];
+      for (auto& r : merge.inputVert2Merged) r = remap[r];
       merge.verts = std::move(newVerts);
     }
   }
@@ -240,8 +240,8 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   }
   traceRecorder.RecordFilteredOutput(merge.verts, out);
   CountTimingCase();
-  return {std::move(merge.verts), std::move(out), std::move(merge.remap),
-          numMerged};
+  return {std::move(merge.verts), std::move(out),
+          std::move(merge.inputVert2Merged), numMerged};
 }
 
 }  // namespace boolean2

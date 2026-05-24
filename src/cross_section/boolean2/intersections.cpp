@@ -34,6 +34,8 @@
 namespace manifold {
 namespace boolean2 {
 
+namespace {
+
 // Encode (first, second) as uint64 and run manifold::stable_sort, which
 // dispatches to the LSB-radix specialization for integral types - much
 // faster than the comparator path for pair<int,int>. Casts through
@@ -118,7 +120,6 @@ bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
 // Broad phase: find overlapping edge AABBs, drop safe shared-endpoint pairs,
 // and return lex-sorted pairs for deterministic insertion.
 #if (MANIFOLD_PAR == 1)
-namespace intersection_pair_recorder {
 struct PairsRecorder {
   using Local = std::vector<std::pair<int, int>>;
   const std::vector<int>& leafToOrig;
@@ -135,8 +136,9 @@ struct PairsRecorder {
   }
   Local& local() { return tls.local(); }
 };
-}  // namespace intersection_pair_recorder
 #endif
+
+}  // namespace
 
 void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
@@ -185,8 +187,7 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
     return;
   }
 #if (MANIFOLD_PAR == 1)
-  intersection_pair_recorder::PairsRecorder rec{
-      bvh.leafToOrig, edges, verts, eps, {}};
+  PairsRecorder rec{bvh.leafToOrig, edges, verts, eps, {}};
   auto qf = [&](int i) { return edgeBoxes[i]; };
   BVHCollisions<false>(bvh, rec, qf, nE, /*parallel=*/true);
   rec.tls.combine_each([&](const auto& localPairs) {
@@ -322,13 +323,14 @@ void FindAndInsertIntersectionsImpl(
     VESetInsert(&(*vertEdges)[vNew], j);
     auto insertSorted = [&](int eIdx) {
       if (vNew == edges[eIdx].v0 || vNew == edges[eIdx].v1) return;
+      auto& lst = (*lists)[eIdx];
+      if (VESetContains(lst, vNew)) return;
       vec2 a = (*verts)[edges[eIdx].v0];
       vec2 b = (*verts)[edges[eIdx].v1];
       vec2 ab = b - a;
       double abLen2 = dot(ab, ab);
       if (abLen2 == 0) return;
       double tNew = dot(p - a, ab) / abLen2;
-      auto& lst = (*lists)[eIdx];
       auto pos =
           std::lower_bound(lst.begin(), lst.end(), tNew, [&](int v, double t) {
             double tv = dot((*verts)[v] - a, ab) / abLen2;

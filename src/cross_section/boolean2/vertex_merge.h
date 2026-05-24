@@ -28,7 +28,7 @@ struct IntersectionPoint {
 };
 
 struct VertexMerge {
-  std::vector<int> remap;
+  std::vector<int> inputVert2Merged;
   std::vector<vec2> verts;
 };
 
@@ -36,7 +36,7 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
 bool VESetContains(const std::vector<int>& vec, int x);
 void VESetInsert(std::vector<int>* vec, int x);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
-                                    const std::vector<int>& remap);
+                                    const std::vector<int>& inputVert2Merged);
 
 }  // namespace boolean2
 }  // namespace manifold

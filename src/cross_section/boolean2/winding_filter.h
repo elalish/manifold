@@ -31,8 +31,6 @@ enum class WindRule {
   Negative,
 };
 
-bool IsInside(WindRule rule, int w);
-
 std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
                                               const std::vector<vec2>& verts,
                                               bool debug = false,
