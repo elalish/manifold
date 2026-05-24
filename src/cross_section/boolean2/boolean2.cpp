@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "driver.h"
-#include "iterate.h"
 #include "predicates.h"
 #include "winding_filter.h"
 
@@ -269,7 +268,7 @@ Polygons Simplify(const Polygons& in, double eps) {
   if (eps <= 0.0) eps = InferEps(local, {});
   auto [verts, edges] = PolygonsToInput(local);
   if (verts.empty()) return {};
-  auto r = IterateToFixedPoint(verts, edges, eps);
+  auto r = RemoveOverlaps2D(verts, edges, eps);
   return detail::TranslatePolygons(
       OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);
@@ -329,9 +328,7 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
   AppendInput(localB, bMult, &verts, &edges);
   if (verts.empty()) return {};
 
-  auto r =
-      IterateToFixedPoint(verts, edges, eps, /*maxIter=*/2,
-                          /*outIters=*/nullptr, /*outStatus=*/nullptr, rule);
+  auto r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
   // Binary operations can consume earlier binary results. If two output
   // endpoints should meet at the same true point, their separation can include
   // one eps of drift per endpoint from the producer op plus one eps per
@@ -362,9 +359,7 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
   if (eps <= 0.0) eps = InferEps(local, {});
   auto [verts, edges] = PolygonsToInput(local);
   if (verts.empty()) return {};
-  auto r =
-      IterateToFixedPoint(verts, edges, eps, /*maxIter=*/2,
-                          /*outIters=*/nullptr, /*outStatus=*/nullptr, rule);
+  auto r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
   return detail::TranslatePolygons(
       OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);

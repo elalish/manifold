@@ -73,13 +73,12 @@ follow-up backend wiring rather than by `boolean2.h`.
 
 The main dataflow is:
 
-`boolean2.h` -> `boolean2.cpp` -> `iterate.cpp` -> `driver.cpp` ->
+`boolean2.h` -> `boolean2.cpp` -> `driver.cpp` ->
 `canonicalize.cpp` -> `winding_filter.cpp` -> regularized `Polygons`.
 
 | Layer | Files | Role |
 | --- | --- | --- |
-| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes the fixed-point driver, and turns retained edges back into regularized output. |
-| Fixed-point cleanup | `iterate.cpp` | Repeats the arrangement pass until the topology stabilizes or a bounded cycle is detected. |
+| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes one arrangement pass, and turns retained edges back into regularized output. |
 | Arrangement coordinator | `driver.cpp` | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
 | Geometry leaves | `vertex_merge.cpp`, `bvh.cpp`, `edge_vert_lists.cpp`, `intersections.cpp` | Provide the local geometric operations used by the arrangement pass. |
 | Output filter | `canonicalize.cpp`, `winding_filter.cpp` | Splits directed edges into canonical sub-edges, builds halfedges, propagates winding, and keeps result boundary edges. |
@@ -100,10 +99,10 @@ subtract, intersect, XOR, and construction-time fill rules.
 The main implementation differences are:
 
 - Vertex merging uses deterministic union-find over all pairs within epsilon,
-  then places each cluster at its centroid. The sketch called out
-  weighted, up-to-date positions for chains of nearby vertices; the bounded
-  fixed-point cleanup below is the mechanism that keeps any residual movement
-  from leaking into stale output topology.
+  then places each cluster at its centroid. The sketch called out weighted,
+  up-to-date positions for chains of nearby vertices; Boolean2 treats the first
+  arrangement pass as the robustness boundary rather than relying on a
+  production fixed-point cleanup loop.
 - Broad phases use the local boolean2 sweep/BVH helpers. This keeps the core
   independent from the 3D `Collider` surface while preserving the intended
   sub-quadratic candidate search.
@@ -154,10 +153,10 @@ to infer an operation scale and apply the local floating-point budget used by
 the Boolean2 predicates. Inputs are translated into a local frame before the
 arrangement is built, then translated back on output.
 
-The core runs the arrangement to a fixed point with a bounded cleanup pass. If
-floating-point residuals keep moving within a small cycle, the fixed-point
-helper returns a deterministic representative while preserving the composed
-input-to-output vertex remap.
+The core runs one arrangement pass and returns that regularized output. Repeated
+`Simplify()` calls are not part of the public contract: tiny perturbations from
+floating-point arithmetic, transforms, or serialization can legitimately change
+future cleanup decisions within the epsilon regime.
 
 ## Validation
 

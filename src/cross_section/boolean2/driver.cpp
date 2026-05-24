@@ -380,17 +380,16 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     // legitimately-distinct intersections (e.g. edge A crosses B at one
     // point and C at a different point along A: vAB and vAC share edge A
     // but are at different true points and shouldn't merge unless they
-    // ALSO geometrically coincide). A sweep across the displacement fuzz
-    // showed kIntersectionMergeEpsFactor gives the best iteration count
-    // (1:448 2:2) without
-    // over-merging; tightening below 3*eps causes single-pass failures,
-    // loosening to 100*eps causes new over-merge failures.
+    // ALSO geometrically coincide). A sweep across displacement fuzz showed
+    // kIntersectionMergeEpsFactor preserves the strongest retained-graph
+    // validity results without over-merging; tightening below 3*eps caused
+    // single-pass failures, while loosening to 100*eps caused new over-merge
+    // failures.
     //
     // Note: when union-find creates a multi-vert cluster, the centroid
     // computed below is offset from the original positions by up to ~eps;
     // that's intentional (we WANT the merged point to land at the average)
-    // and is the source of the residual iter=2 cases. Smith's bound
-    // proves convergence in ≤2 iterations under his α-budget framework.
+    // and is accounted for by the retained-graph validity checks.
     const double mergeThresh = kIntersectionMergeEpsFactor * eps;
     const double mergeThresh2 = mergeThresh * mergeThresh;
     // Duplicate intersection verts that should merge share an incident edge.
