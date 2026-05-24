@@ -28,7 +28,6 @@ if(MANIFOLD_CROSS_SECTION)
       cross_section/boolean2/driver.cpp
       cross_section/boolean2/edge_vert_lists.cpp
       cross_section/boolean2/intersections.cpp
-      cross_section/boolean2/iterate.cpp
       cross_section/boolean2/offset.cpp
       cross_section/boolean2/predicates.cpp
       cross_section/boolean2/vertex_merge.cpp
@@ -77,7 +76,6 @@ set(
   cross_section/boolean2/driver.h
   cross_section/boolean2/edge_vert_lists.h
   cross_section/boolean2/intersections.h
-  cross_section/boolean2/iterate.h
   cross_section/boolean2/offset.h
   cross_section/boolean2/parallel_policy.h
   cross_section/boolean2/predicates.h
