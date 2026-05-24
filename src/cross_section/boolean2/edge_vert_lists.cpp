@@ -19,11 +19,9 @@
 #include "edge_vert_lists.h"
 
 #include <algorithm>
-#include <cstdint>
 #include <vector>
 
 #include "../../parallel.h"
-#include "diagnostics.h"
 #include "parallel_policy.h"
 #include "predicates.h"
 #include "vertex_merge.h"
@@ -54,14 +52,6 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
   const int nV = static_cast<int>(verts.size());
   const double eps2 = eps * eps;
   std::vector<std::vector<int>> lists(nE);
-  const bool timing = TimingEnabled();
-  int64_t candCount = 0;
-  int64_t endpointRejects = 0;
-  int64_t degenerateRejects = 0;
-  int64_t tRangeRejects = 0;
-  int64_t distanceRejects = 0;
-  int64_t apexRejects = 0;
-  int64_t hitCount = 0;
 
   thread_local static std::vector<std::vector<int>> adj;
 
@@ -96,45 +86,36 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
   };
 
   auto narrow = [&](int v, int e) {
-    if (timing) ++candCount;
     if (v == edges[e].v0 || v == edges[e].v1) {
-      if (timing) ++endpointRejects;
       return;
     }
     const auto& g = edgeG[e];
     if (g.abLen2 == 0) {
-      if (timing) ++degenerateRejects;
       return;
     }
     const vec2 ap = verts[v] - g.a;
     const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
     if (dotAB <= 0 || dotAB >= g.abLen2) {
-      if (timing) ++tRangeRejects;
       return;
     }
     const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
     const double cross2 = cross * cross;
     const double eps2_abLen2 = eps2 * g.abLen2;
     if (cross2 > eps2_abLen2) {
-      if (timing) ++distanceRejects;
       return;
     }
     if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2)) {
       ensureAdj();
       if (VESetContains(adj[v], edges[e].v0) &&
           VESetContains(adj[v], edges[e].v1)) {
-        if (timing) ++apexRejects;
         return;
       }
     }
-    if (timing) ++hitCount;
     flatHits.push_back({e, dotAB / g.abLen2, v});
   };
 
   auto narrowIfNonEndpoint = [&](int v, int e) {
     if (v == edges[e].v0 || v == edges[e].v1) {
-      if (timing) ++candCount;
-      if (timing) ++endpointRejects;
       return;
     }
     narrow(v, e);
@@ -165,34 +146,6 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
       lastV = flatHits[k].v;
     }
     i = j;
-  }
-  if (timing) {
-    auto& P = GlobalPhases();
-    P.edgeVertCalls.fetch_add(1, std::memory_order_relaxed);
-    P.edgeVertPairDerivedCalls.fetch_add(1, std::memory_order_relaxed);
-    P.edgeVertTotalEdges.fetch_add(nE, std::memory_order_relaxed);
-    P.edgeVertTotalVerts.fetch_add(nV, std::memory_order_relaxed);
-    P.edgeVertHitsFlat.fetch_add(static_cast<int64_t>(flatHits.size()),
-                                 std::memory_order_relaxed);
-    if (nE < 64) {
-      P.edgeVertBucketLt64.fetch_add(1, std::memory_order_relaxed);
-    } else if (nE < 256) {
-      P.edgeVertBucketLt256.fetch_add(1, std::memory_order_relaxed);
-    } else if (nE < 1024) {
-      P.edgeVertBucketLt1024.fetch_add(1, std::memory_order_relaxed);
-    } else {
-      P.edgeVertBucketGe1024.fetch_add(1, std::memory_order_relaxed);
-    }
-    P.edgeVertCandidates.fetch_add(candCount, std::memory_order_relaxed);
-    P.edgeVertEndpointRejects.fetch_add(endpointRejects,
-                                        std::memory_order_relaxed);
-    P.edgeVertDegenerateRejects.fetch_add(degenerateRejects,
-                                          std::memory_order_relaxed);
-    P.edgeVertTRangeRejects.fetch_add(tRangeRejects, std::memory_order_relaxed);
-    P.edgeVertDistanceRejects.fetch_add(distanceRejects,
-                                        std::memory_order_relaxed);
-    P.edgeVertApexRejects.fetch_add(apexRejects, std::memory_order_relaxed);
-    P.edgeVertHits.fetch_add(hitCount, std::memory_order_relaxed);
   }
   return lists;
 }

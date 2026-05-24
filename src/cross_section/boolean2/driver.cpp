@@ -23,15 +23,9 @@
 #include "driver.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <utility>
 #include <vector>
-
-#ifdef MANIFOLD_DEBUG
-#include <sstream>
-#include <string>
-#endif
 
 #include "../../disjoint_sets.h"
 #include "../../parallel.h"
@@ -47,199 +41,29 @@
 namespace manifold {
 namespace boolean2 {
 
-#ifdef MANIFOLD_DEBUG
-namespace {
-
-std::string Id(const char* prefix, int i) {
-  return std::string(prefix) + std::to_string(i);
-}
-
-std::string WindRuleName(WindRule rule) {
-  switch (rule) {
-    case WindRule::Add:
-      return "Add";
-    case WindRule::Intersect:
-      return "Intersect";
-    case WindRule::EvenOdd:
-      return "EvenOdd";
-    case WindRule::NonZero:
-      return "NonZero";
-    case WindRule::Negative:
-      return "Negative";
-  }
-  return "Unknown";
-}
-
-void AddPoints(TracePhase* phase, const std::vector<vec2>& verts,
-               const std::string& kind) {
-  phase->points.reserve(phase->points.size() + verts.size());
-  for (int i = 0; i < static_cast<int>(verts.size()); ++i) {
-    phase->points.push_back({Id("v", i), verts[i], kind, "", ""});
-  }
-}
-
-void AddInputEdges(TracePhase* phase, const std::vector<vec2>& verts,
-                   const std::vector<EdgeM>& edges, const std::string& kind) {
-  phase->segments.reserve(phase->segments.size() + edges.size());
-  for (int i = 0; i < static_cast<int>(edges.size()); ++i) {
-    const EdgeM& e = edges[i];
-    if (e.v0 < 0 || e.v1 < 0 || e.v0 >= static_cast<int>(verts.size()) ||
-        e.v1 >= static_cast<int>(verts.size())) {
-      continue;
-    }
-    phase->segments.push_back(
-        {Id("e", i), verts[e.v0], verts[e.v1], kind, "", e.mult, ""});
-  }
-}
-
-void AddSplitSubsegments(TracePhase* phase, const std::vector<vec2>& verts,
-                         const std::vector<EdgeM>& edges,
-                         const std::vector<std::vector<int>>& lists,
-                         const std::string& kind) {
-  for (int eId = 0; eId < static_cast<int>(edges.size()); ++eId) {
-    const EdgeM& edge = edges[eId];
-    if (edge.v0 < 0 || edge.v1 < 0 ||
-        edge.v0 >= static_cast<int>(verts.size()) ||
-        edge.v1 >= static_cast<int>(verts.size())) {
-      continue;
-    }
-    if (eId >= static_cast<int>(lists.size()) || lists[eId].size() < 2) {
-      phase->segments.push_back({Id("e", eId), verts[edge.v0], verts[edge.v1],
-                                 kind + "_unsplit", "", edge.mult, ""});
-      continue;
-    }
-    const auto& list = lists[eId];
-    for (int i = 0; i + 1 < static_cast<int>(list.size()); ++i) {
-      const int v0 = list[i];
-      const int v1 = list[i + 1];
-      if (v0 < 0 || v1 < 0 || v0 >= static_cast<int>(verts.size()) ||
-          v1 >= static_cast<int>(verts.size()) || v0 == v1) {
-        continue;
-      }
-      std::ostringstream label;
-      label << "edge " << eId << " split " << i;
-      phase->segments.push_back(
-          {std::string("s") + std::to_string(eId) + "_" + std::to_string(i),
-           verts[v0], verts[v1], kind, "", edge.mult, label.str()});
-    }
-  }
-}
-
-void AddOutEdges(TracePhase* phase, const std::vector<vec2>& verts,
-                 const std::vector<OutEdge>& edges, const std::string& kind) {
-  phase->segments.reserve(phase->segments.size() + edges.size());
-  for (int i = 0; i < static_cast<int>(edges.size()); ++i) {
-    const OutEdge& e = edges[i];
-    if (e.v0 < 0 || e.v1 < 0 || e.v0 >= static_cast<int>(verts.size()) ||
-        e.v1 >= static_cast<int>(verts.size())) {
-      continue;
-    }
-    phase->segments.push_back(
-        {Id("out", i), verts[e.v0], verts[e.v1], kind, "", e.mult, ""});
-  }
-}
-
-void AddCanonicalEdges(TracePhase* phase, const std::vector<vec2>& verts,
-                       const CanonicalSubEdges& canon) {
-  phase->segments.reserve(phase->segments.size() + canon.edges.size());
-  for (int i = 0; i < static_cast<int>(canon.edges.size()); ++i) {
-    const CanonEdge& e = canon.edges[i];
-    if (e.vMin < 0 || e.vMax < 0 || e.vMin >= static_cast<int>(verts.size()) ||
-        e.vMax >= static_cast<int>(verts.size())) {
-      continue;
-    }
-    phase->segments.push_back({Id("c", i), verts[e.vMin], verts[e.vMax],
-                               "canonical_subedge", "", e.mult, ""});
-  }
-}
-
-void AddCandidatePairs(TracePhase* phase, const std::vector<vec2>& verts,
-                       const std::vector<EdgeM>& edges,
-                       const std::vector<std::pair<int, int>>& pairs) {
-  phase->segments.reserve(phase->segments.size() + 2 * pairs.size());
-  for (int i = 0; i < static_cast<int>(pairs.size()); ++i) {
-    const auto& pair = pairs[i];
-    const int edgeIds[2] = {pair.first, pair.second};
-    for (int side = 0; side < 2; ++side) {
-      const int edgeId = edgeIds[side];
-      if (edgeId < 0 || edgeId >= static_cast<int>(edges.size())) continue;
-      const EdgeM& e = edges[edgeId];
-      if (e.v0 < 0 || e.v1 < 0 || e.v0 >= static_cast<int>(verts.size()) ||
-          e.v1 >= static_cast<int>(verts.size())) {
-        continue;
-      }
-      std::ostringstream label;
-      label << "candidate pair " << pair.first << "," << pair.second;
-      phase->segments.push_back({Id("pair", i * 2 + side), verts[e.v0],
-                                 verts[e.v1], "candidate_edge", "", e.mult,
-                                 label.str()});
-    }
-  }
-}
-
-void AddEdgeVertListAnnotations(TracePhase* phase,
-                                const std::vector<std::vector<int>>& lists) {
-  phase->annotations.reserve(phase->annotations.size() + lists.size());
-  for (int i = 0; i < static_cast<int>(lists.size()); ++i) {
-    std::ostringstream value;
-    for (size_t j = 0; j < lists[i].size(); ++j) {
-      if (j > 0) value << ",";
-      value << lists[i][j];
-    }
-    phase->annotations.push_back({Id("e", i), "edgeVertList", value.str()});
-  }
-}
-
-}  // namespace
-#endif
-
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
                                bool debug, WindRule pred, Trace* trace) {
-#ifndef MANIFOLD_DEBUG
-  (void)trace;
-#else
-  if (trace) {
-    trace->eps = eps;
-    trace->rule = WindRuleName(pred);
-    TracePhase& phase = trace->AddPhase("input");
-    AddPoints(&phase, vertsIn, "input_vertex");
-    AddInputEdges(&phase, vertsIn, edgesIn, "input_edge");
-  }
-#endif
-  using timing_detail::Clock;
-  using timing_detail::Ns;
-  const bool timing = TimingEnabled();
   auto& P = GlobalPhases();
-  const auto tStart = timing ? Clock::now() : Clock::time_point{};
+  ScopedTiming totalTiming(P.totalNs);
+  TraceRecorder traceRecorder(trace, eps, pred);
+  traceRecorder.RecordInput(vertsIn, edgesIn);
+
   // Vertex merge.
-  auto t0 = timing ? Clock::now() : Clock::time_point{};
-  auto merge = MergeVerts(vertsIn, eps);
-  auto t1 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.mergeNs.fetch_add(Ns(t0, t1), std::memory_order_relaxed);
+  VertexMerge merge;
+  {
+    ScopedTiming timing(P.mergeNs);
+    merge = MergeVerts(vertsIn, eps);
+  }
   const int numMerged = static_cast<int>(merge.verts.size());
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("merged_vertices");
-    AddPoints(&phase, merge.verts, "merged_vertex");
-    phase.annotations.reserve(merge.remap.size());
-    for (int i = 0; i < static_cast<int>(merge.remap.size()); ++i) {
-      phase.annotations.push_back(
-          {Id("in", i), "remap", std::to_string(merge.remap[i])});
-    }
-  }
-#endif
+  traceRecorder.RecordMergedVertices(merge.verts, merge.remap);
   // Edge collapse.
-  auto edges = RemapAndCollapse(edgesIn, merge.remap);
-  auto t2 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.remapNs.fetch_add(Ns(t1, t2), std::memory_order_relaxed);
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("collapsed_edges");
-    AddPoints(&phase, merge.verts, "merged_vertex");
-    AddInputEdges(&phase, merge.verts, edges, "collapsed_edge");
+  std::vector<EdgeM> edges;
+  {
+    ScopedTiming timing(P.remapNs);
+    edges = RemapAndCollapse(edgesIn, merge.remap);
   }
-#endif
+  traceRecorder.RecordCollapsedEdges(merge.verts, edges);
   // Build a shared edge-box array for edge-edge broad phase and near-vertex
   // derivation. Medium cases use a sweep over these boxes; very large cases
   // build a BVH when tree construction amortizes over enough queries.
@@ -249,12 +73,12 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     edgeBoxes[e] =
         BoxOf2DEdge(merge.verts[edges[e].v0], merge.verts[edges[e].v1], eps);
   }
-  auto tBvhStart = timing ? Clock::now() : Clock::time_point{};
   BVH bvh;
-  if (edges.size() >= kEdgePairBvhThreshold) bvh = BVHBuildFromBoxes(edgeBoxes);
-  auto tBvhEnd = timing ? Clock::now() : Clock::time_point{};
-  if (timing)
-    P.bvhBuildNs.fetch_add(Ns(tBvhStart, tBvhEnd), std::memory_order_relaxed);
+  {
+    ScopedTiming timing(P.bvhBuildNs);
+    if (edges.size() >= kEdgePairBvhThreshold)
+      bvh = BVHBuildFromBoxes(edgeBoxes);
+  }
   std::vector<std::vector<int>> lists;
   thread_local static std::vector<std::pair<int, int>> intersectionPairs;
   thread_local static std::vector<IntersectionPoint> fusedIntersections;
@@ -263,24 +87,12 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   // that can split a non-incident edge must have an eps-padded vertex box
   // overlapping that edge's eps-padded box, so it appears as one endpoint of
   // an overlapping edge pair.
-  auto tBroadPairWorkStart = timing ? Clock::now() : Clock::time_point{};
   {
-    const auto tWorkStart = timing ? Clock::now() : Clock::time_point{};
+    ScopedTiming timing(P.broadPairWorkNs);
     CollectIntersectionPairs(edges, merge.verts, eps, edgeBoxes, bvh,
                              &intersectionPairs);
-    const auto tWorkEnd = timing ? Clock::now() : Clock::time_point{};
-    if (timing)
-      P.intersectionBroadNs.fetch_add(Ns(tWorkStart, tWorkEnd),
-                                      std::memory_order_relaxed);
   }
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("broad_phase_pairs");
-    AddPoints(&phase, merge.verts, "merged_vertex");
-    AddInputEdges(&phase, merge.verts, edges, "collapsed_edge");
-    AddCandidatePairs(&phase, merge.verts, edges, intersectionPairs);
-  }
-#endif
+  traceRecorder.RecordBroadPhasePairs(merge.verts, edges, intersectionPairs);
   // Fused parallel pass: narrow vert-on-edge tests AND IntersectSegments
   // run in one parallel for over `pairs`, producing `lists` and the
   // precomputed intersection points in a single TBB section. Gated at
@@ -291,7 +103,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   fusedIntersections.clear();
   bool useFused = false;
   {
-    const auto tWorkStart = timing ? Clock::now() : Clock::time_point{};
+    ScopedTiming timing(P.edgeVertListsNs);
 #if (MANIFOLD_PAR == 1)
     if (intersectionPairs.size() >= kFusedNarrowParallelMin) {
       BuildListsAndFindIntersectionsParallel(edges, merge.verts, eps,
@@ -304,49 +116,25 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
       lists = BuildEdgeVertListsFromEdgePairs(edges, merge.verts, eps,
                                               intersectionPairs);
     }
-    const auto tWorkEnd = timing ? Clock::now() : Clock::time_point{};
-    if (timing)
-      P.edgeVertListsNs.fetch_add(Ns(tWorkStart, tWorkEnd),
-                                  std::memory_order_relaxed);
   }
-  auto tBroadPairWorkEnd = timing ? Clock::now() : Clock::time_point{};
-  if (timing)
-    P.broadPairWorkNs.fetch_add(Ns(tBroadPairWorkStart, tBroadPairWorkEnd),
-                                std::memory_order_relaxed);
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("edge_vert_lists");
-    AddPoints(&phase, merge.verts, "list_vertex");
-    AddSplitSubsegments(&phase, merge.verts, edges, lists, "listed_subsegment");
-    AddEdgeVertListAnnotations(&phase, lists);
-  }
-#endif
-  auto t3 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.buildListsNs.fetch_add(Ns(t2, t3), std::memory_order_relaxed);
+  traceRecorder.RecordEdgeVertLists(merge.verts, edges, lists);
   std::vector<std::vector<int>> vertEdges;
+  {
+    ScopedTiming timing(P.findIxNs);
 #if (MANIFOLD_PAR == 1)
-  if (useFused) {
-    FindAndInsertIntersectionsFromPrecomputed(edges, &merge.verts, &lists,
-                                              &vertEdges, eps, edgeBoxes, bvh,
-                                              fusedIntersections);
-  } else {
+    if (useFused) {
+      FindAndInsertIntersectionsFromPrecomputed(edges, &merge.verts, &lists,
+                                                &vertEdges, eps, edgeBoxes, bvh,
+                                                fusedIntersections);
+    } else {
 #endif
-    FindAndInsertIntersections(edges, &merge.verts, &lists, &vertEdges, eps,
-                               edgeBoxes, bvh, intersectionPairs);
+      FindAndInsertIntersections(edges, &merge.verts, &lists, &vertEdges, eps,
+                                 edgeBoxes, bvh, intersectionPairs);
 #if (MANIFOLD_PAR == 1)
-  }
+    }
 #endif
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("inserted_intersections");
-    AddPoints(&phase, merge.verts, "arrangement_vertex");
-    AddSplitSubsegments(&phase, merge.verts, edges, lists,
-                        "arrangement_subsegment");
-    AddEdgeVertListAnnotations(&phase, lists);
   }
-#endif
-  auto t4 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.findIxNs.fetch_add(Ns(t3, t4), std::memory_order_relaxed);
+  traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
 
   // Structural re-merge of intersection verts. FindAndInsertIntersections
   // above inserts each intersection at the time its parent edge pair is
@@ -372,6 +160,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   // propagation, but they are not unioned here unless a shared-edge pair
   // links them.
   {
+    ScopedTiming timing(P.restructNs);
     DisjointSets uf(static_cast<int>(merge.verts.size()));
     // The geometric upper bound for "same true point" is eps/sin(theta)
     // where theta is the crossing angle. For shallow crossings this can
@@ -473,45 +262,22 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
       merge.verts = std::move(newVerts);
     }
   }
-
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("structural_remerge");
-    AddPoints(&phase, merge.verts, "remerged_vertex");
-    AddSplitSubsegments(&phase, merge.verts, edges, lists,
-                        "remerged_subsegment");
-    AddEdgeVertListAnnotations(&phase, lists);
-  }
-#endif
-  auto t4b = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.restructNs.fetch_add(Ns(t4, t4b), std::memory_order_relaxed);
+  traceRecorder.RecordStructuralRemerge(merge.verts, edges, lists);
   // Sub-edge canonicalization.
   thread_local static CanonicalSubEdges canon;
-  Canonicalize(edges, lists, &canon);
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("canonical_subedges");
-    AddPoints(&phase, merge.verts, "canonical_vertex");
-    AddCanonicalEdges(&phase, merge.verts, canon);
+  {
+    ScopedTiming timing(P.canonNs);
+    Canonicalize(edges, lists, &canon);
   }
-#endif
-  auto t5 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) P.canonNs.fetch_add(Ns(t4b, t5), std::memory_order_relaxed);
+  traceRecorder.RecordCanonicalSubedges(merge.verts, canon);
   // Halfedge face-traversal winding filter.
-  auto out = FilterByWindingHalfedges(canon, merge.verts, debug, pred, trace);
-#ifdef MANIFOLD_DEBUG
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("filtered_output_edges");
-    AddPoints(&phase, merge.verts, "output_vertex");
-    AddOutEdges(&phase, merge.verts, out, "retained_edge");
+  std::vector<OutEdge> out;
+  {
+    ScopedTiming timing(P.filterHalfedgeNs);
+    out = FilterByWindingHalfedges(canon, merge.verts, debug, pred, trace);
   }
-#endif
-  auto t6 = timing ? Clock::now() : Clock::time_point{};
-  if (timing) {
-    P.filterHalfedgeNs.fetch_add(Ns(t5, t6), std::memory_order_relaxed);
-    P.totalNs.fetch_add(Ns(tStart, t6), std::memory_order_relaxed);
-    P.cases.fetch_add(1, std::memory_order_relaxed);
-  }
+  traceRecorder.RecordFilteredOutput(merge.verts, out);
+  CountTimingCase();
   return {std::move(merge.verts), std::move(out), std::move(merge.remap),
           numMerged};
 }

@@ -34,7 +34,6 @@
 #include "../../disjoint_sets.h"
 #include "../../parallel.h"
 #include "bvh.h"
-#include "diagnostics.h"
 #include "parallel_policy.h"
 #include "predicates.h"
 
@@ -43,23 +42,7 @@ namespace boolean2 {
 
 using manifold::la::dot;
 
-namespace {
-
-void AtomicMax(std::atomic<int64_t>* target, int64_t value) {
-  int64_t observed = target->load(std::memory_order_relaxed);
-  while (observed < value && !target->compare_exchange_weak(
-                                 observed, value, std::memory_order_relaxed,
-                                 std::memory_order_relaxed)) {
-  }
-}
-
-}  // namespace
-
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
-  using timing_detail::Clock;
-  using timing_detail::Ns;
-  const bool timing = TimingEnabled();
-  auto t0 = timing ? Clock::now() : Clock::time_point{};
   const int n = static_cast<int>(in.size());
   DisjointSets uf(n);
   const double eps2 = eps * eps;
@@ -83,17 +66,11 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   } else {
     // Sort by x and scan forward until x-distance exceeds 2*eps. Pairs are
     // sorted at the end so the unite step below stays deterministic.
-    auto tBvhStart = timing ? Clock::now() : Clock::time_point{};
     thread_local static std::vector<int> idx;
     idx.resize(n);
     std::iota(idx.begin(), idx.end(), 0);
     manifold::stable_sort(idx.begin(), idx.end(),
                           [&](int a, int b) { return in[a].x < in[b].x; });
-    auto tBvhEnd = timing ? Clock::now() : Clock::time_point{};
-    if (timing)
-      GlobalPhases().mergeBvhBuildNs.fetch_add(Ns(tBvhStart, tBvhEnd),
-                                               std::memory_order_relaxed);
-    auto tCollideStart = timing ? Clock::now() : Clock::time_point{};
     const double thresh = 2 * eps;
     // Each i iteration writes only to its local pair buffer, so large inputs
     // can collect candidates in parallel.
@@ -144,17 +121,9 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
       }
     }
     manifold::stable_sort(pairs.begin(), pairs.end());
-    auto tCollideEnd = timing ? Clock::now() : Clock::time_point{};
-    if (timing)
-      GlobalPhases().mergeCollideNs.fetch_add(Ns(tCollideStart, tCollideEnd),
-                                              std::memory_order_relaxed);
   }
   // Fast path: no candidates means no merges, identity remap.
   if (pairs.empty()) {
-    auto tRest = timing ? Clock::now() : Clock::time_point{};
-    if (timing)
-      GlobalPhases().mergeRestNs.fetch_add(Ns(t0, tRest),
-                                           std::memory_order_relaxed);
     std::vector<int> remap(n);
     std::iota(remap.begin(), remap.end(), 0);
     return {std::move(remap), in};
@@ -228,45 +197,6 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     if (sumCnt[r] == 0) continue;
     rootToNew[r] = static_cast<int>(verts.size());
     verts.push_back(in[representative[r]]);
-  }
-  if (timing) {
-    auto& P = GlobalPhases();
-    const double invEps = eps > 0.0 ? 1.0 / eps : 0.0;
-    std::vector<vec2> bmin(n, vec2{0, 0});
-    std::vector<vec2> bmax(n, vec2{0, 0});
-    std::vector<double> maxDrift2(n, 0.0);
-    std::vector<uint8_t> sawRoot(n, 0);
-    for (int i = 0; i < n; ++i) {
-      const int r = uf.find(i);
-      const vec2 rep = in[representative[r]];
-      if (!sawRoot[r]) {
-        bmin[r] = in[i];
-        bmax[r] = in[i];
-        sawRoot[r] = 1;
-      } else {
-        bmin[r].x = std::min(bmin[r].x, in[i].x);
-        bmin[r].y = std::min(bmin[r].y, in[i].y);
-        bmax[r].x = std::max(bmax[r].x, in[i].x);
-        bmax[r].y = std::max(bmax[r].y, in[i].y);
-      }
-      const vec2 d = in[i] - rep;
-      maxDrift2[r] = std::max(maxDrift2[r], dot(d, d));
-    }
-    for (int r = 0; r < n; ++r) {
-      if (sumCnt[r] <= 1) continue;
-      P.mergeMergedComponents.fetch_add(1, std::memory_order_relaxed);
-      AtomicMax(&P.mergeMaxMergedComponentVerts, sumCnt[r]);
-      const double maxDrift = std::sqrt(maxDrift2[r]);
-      if (maxDrift > eps)
-        P.mergeMergedComponentsDriftGtEps.fetch_add(1,
-                                                    std::memory_order_relaxed);
-      const vec2 diag = bmax[r] - bmin[r];
-      AtomicMax(&P.mergeMaxMergedRepresentativeDriftMilliEps,
-                static_cast<int64_t>(std::ceil(1000.0 * maxDrift * invEps)));
-      AtomicMax(&P.mergeMaxMergedBboxDiagMilliEps,
-                static_cast<int64_t>(
-                    std::ceil(1000.0 * std::sqrt(dot(diag, diag)) * invEps)));
-    }
   }
   std::vector<int> remap(n);
   for (int i = 0; i < n; ++i) remap[i] = rootToNew[uf.find(i)];

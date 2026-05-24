@@ -21,13 +21,11 @@
 #include "intersections.h"
 
 #include <algorithm>
-#include <chrono>
 #include <utility>
 #include <vector>
 
 #include "../../parallel.h"
 #include "bvh.h"
-#include "diagnostics.h"
 #include "edge_vert_lists.h"
 #include "parallel_policy.h"
 #include "predicates.h"
@@ -232,12 +230,6 @@ void FindAndInsertIntersectionsImpl(
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
     const std::vector<std::pair<int, int>>* pairsIn,
     const std::vector<IntersectionPoint>* precomputedIntersections) {
-  using Clock = std::chrono::steady_clock;
-  auto Ns = [](Clock::time_point a, Clock::time_point b) {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(b - a).count();
-  };
-  const bool timing = TimingEnabled();
-  auto tNarrowStart = timing ? Clock::now() : Clock::time_point{};
   const int nE = static_cast<int>(edges.size());
   const double eps2 = eps * eps;
   vertEdges->resize(verts->size());
@@ -389,15 +381,8 @@ void FindAndInsertIntersectionsImpl(
   // projection-distance gate as BuildEdgeVertLists.
   // Fast-path: if no new intersection verts were created in the main
   // loop, the propagation pass has nothing to do.
-  auto tNarrowEnd = timing ? Clock::now() : Clock::time_point{};
-  if (timing)
-    GlobalPhases().intersectionNarrowNs.fetch_add(Ns(tNarrowStart, tNarrowEnd),
-                                                  std::memory_order_relaxed);
   if ((int)verts->size() == origNumVerts) return;
-  auto tPropStart = timing ? Clock::now() : Clock::time_point{};
   const int numNewVerts = static_cast<int>(verts->size()) - origNumVerts;
-  if (timing)
-    GlobalPhases().propagationCalls.fetch_add(1, std::memory_order_relaxed);
   const double propagationDupThresh = kIntersectionMergeEpsFactor * eps;
   const double propagationDupThresh2 =
       propagationDupThresh * propagationDupThresh;
@@ -440,12 +425,6 @@ void FindAndInsertIntersectionsImpl(
   };
 
   if (!hasNearDuplicateNewVert()) {
-    if (timing) {
-      auto& P = GlobalPhases();
-      P.propagationSkippedNoNearDup.fetch_add(1, std::memory_order_relaxed);
-      P.intersectionPropagationNs.fetch_add(Ns(tPropStart, Clock::now()),
-                                            std::memory_order_relaxed);
-    }
     return;
   }
 
@@ -492,10 +471,6 @@ void FindAndInsertIntersectionsImpl(
     };
     BVHCollisions<false>(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
   }
-  auto tPropEnd = timing ? Clock::now() : Clock::time_point{};
-  if (timing)
-    GlobalPhases().intersectionPropagationNs.fetch_add(
-        Ns(tPropStart, tPropEnd), std::memory_order_relaxed);
 }
 
 // Public wrapper: compute intersections inline from `pairs`.

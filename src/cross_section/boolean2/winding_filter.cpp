@@ -192,6 +192,38 @@ bool IsInside(WindRule rule, int w) {
 }
 
 namespace detail {
+#ifdef MANIFOLD_DEBUG
+void RecordHalfedgeFaces(
+    Trace* trace, WindRule rule, const std::vector<vec2>& verts,
+    const std::vector<halfedge_internal::Halfedge>& halfedges,
+    const std::vector<int>& faceStartHE, const std::vector<int>& faceWind,
+    const std::vector<double>& faceArea, int outerFace) {
+  if (!trace) return;
+  TracePhase& phase = trace->AddPhase("halfedge_faces");
+  const int nFaces = static_cast<int>(faceStartHE.size());
+  for (int f = 0; f < nFaces; ++f) {
+    SimplePolygon loop;
+    const int h0 = faceStartHE[f];
+    if (h0 >= 0) {
+      int h = h0;
+      int safety = 0;
+      do {
+        loop.push_back(verts[halfedges[h].origin]);
+        h = halfedges[h].next;
+        if (h < 0 || ++safety > static_cast<int>(halfedges.size())) break;
+      } while (h != h0);
+    }
+    const bool isOuter = f == outerFace;
+    phase.polygons.push_back(
+        {std::string("face") + std::to_string(f), std::move(loop),
+         isOuter ? "outer_face_unbounded" : "face", "", faceWind[f],
+         IsInside(rule, faceWind[f]), isOuter ? "unbounded outer face" : ""});
+    phase.annotations.push_back({std::string("face") + std::to_string(f),
+                                 "area", std::to_string(faceArea[f])});
+  }
+}
+#endif
+
 // The halfedge filter body, parameterized by the winding rule.
 std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const CanonicalSubEdges& canon, const std::vector<vec2>& verts, bool debug,
@@ -611,29 +643,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     }
     std::cout << "\n";
   }
-  if (trace) {
-    TracePhase& phase = trace->AddPhase("halfedge_faces");
-    for (int f = 0; f < nFaces; ++f) {
-      SimplePolygon loop;
-      const int h0 = faceStartHE[f];
-      if (h0 >= 0) {
-        int h = h0;
-        int safety = 0;
-        do {
-          loop.push_back(verts[halfedges[h].origin]);
-          h = halfedges[h].next;
-          if (h < 0 || ++safety > (int)halfedges.size()) break;
-        } while (h != h0);
-      }
-      const bool isOuter = f == outerFace;
-      phase.polygons.push_back(
-          {std::string("face") + std::to_string(f), std::move(loop),
-           isOuter ? "outer_face_unbounded" : "face", "", faceWind[f],
-           IsInside(rule, faceWind[f]), isOuter ? "unbounded outer face" : ""});
-      phase.annotations.push_back({std::string("face") + std::to_string(f),
-                                   "area", std::to_string(faceArea[f])});
-    }
-  }
+  RecordHalfedgeFaces(trace, rule, verts, halfedges, faceStartHE, faceWind,
+                      faceArea, outerFace);
 #endif
 
   // 7. Filter canonical sub-edges by left/right face windings. The first
