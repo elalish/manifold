@@ -156,18 +156,8 @@ std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
 extern const size_t kFusedNarrowParallelMin = 1024;
 
 #if (MANIFOLD_PAR == 1)
-// Combined parallel narrow + IntersectSegments. Each pair gets its 4
-// vert-on-edge narrow tests AND a segment-segment intersection test
-// in a single parallel pass over `pairs`. Thread-local accumulators
-// hold both outputs.
-//
-// Used when the input is large enough to justify parallel (the
-// caller's pair list is >= kFusedNarrowParallelMin). Keeps large inputs out
-// of the serial BuildEdgeVertListsFromEdgePairs path.
-//
-// Output:
-//   - `*lists` = per-edge sorted-by-parameter vert list (deduped)
-//   - `*intersections` = (i, j, p) intersection points, sorted by (i, j)
+// Combined parallel narrow + IntersectSegments pass for large pair lists.
+// Outputs per-edge split lists and sorted (i, j, p) intersection points.
 void BuildListsAndFindIntersectionsParallel(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs,

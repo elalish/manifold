@@ -154,14 +154,8 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     std::iota(remap.begin(), remap.end(), 0);
     return {std::move(remap), in};
   }
-  // Compute representative per cluster.
-  //
-  // Contract note: this is a transitive proximity merge. If A is within eps of
-  // B and B is within eps of C, all three collapse even when A and C are more
-  // than eps apart. Representatives must be chosen from existing component
-  // vertices rather than from a centroid: centroids can create a new within-eps
-  // pair between two already-merged components on a second MergeVerts pass even
-  // when no such pair existed in the original input.
+  // Transitive proximity merge: pick an existing component vertex so a second
+  // MergeVerts pass cannot create a new within-eps pair via centroid drift.
   std::vector<vec2> sumPos(n, vec2{0, 0});
   std::vector<int> sumCnt(n, 0);
   for (int i = 0; i < n; ++i) {

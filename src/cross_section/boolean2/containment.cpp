@@ -29,7 +29,7 @@
 namespace manifold {
 namespace boolean2 {
 
-namespace polyutils_detail {
+namespace {
 
 bool PointOnSegment(vec2 p, vec2 a, vec2 b, double eps) {
   if (CCW(a, b, p, eps) != 0) return false;
@@ -104,22 +104,16 @@ bool RingInside(const SimplePolygon& a, const SimplePolygon& b) {
                      [&](const vec2& p) { return PointInRing(p, b); });
 }
 
-}  // namespace polyutils_detail
+}  // namespace
 
-// Decompose a regularized `Polygons` set into containment components. Input is
-// assumed to be simple-loop output from FillByRule or similar: CCW outer rings
-// + CW hole rings, non-self-intersecting, non-overlapping except at containment
-// boundaries. Each outermost CCW ring plus its directly-contained CW holes form
-// one component; CCW rings nested inside holes start new components.
-//
-// Returns: one vector<SimplePolygon> per component, with the outer
-// ring first and any holes following.
+// Decompose regularized simple loops into outer-ring components with their
+// directly contained holes.
 std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
   const int n = static_cast<int>(polys.size());
   if (n == 0) return {};
-  std::vector<polyutils_detail::RingInfo> info;
+  std::vector<RingInfo> info;
   info.reserve(n);
-  for (const auto& r : polys) info.push_back(polyutils_detail::Summarize(r));
+  for (const auto& r : polys) info.push_back(Summarize(r));
 
   // For each ring, find its parent: the smallest-area ring (by |area|)
   // that contains it. O(n^2) bbox/ring-in-poly check; fine for the
@@ -129,8 +123,8 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
     double bestParentArea = std::numeric_limits<double>::infinity();
     for (int j = 0; j < n; ++j) {
       if (i == j) continue;
-      if (!polyutils_detail::BoxInside(info[i], info[j])) continue;
-      if (!polyutils_detail::RingInside(polys[i], polys[j])) continue;
+      if (!BoxInside(info[i], info[j])) continue;
+      if (!RingInside(polys[i], polys[j])) continue;
       const double aj = std::fabs(info[j].area);
       if (aj < bestParentArea) {
         bestParentArea = aj;

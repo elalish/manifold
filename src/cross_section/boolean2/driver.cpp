@@ -136,49 +136,14 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   }
   traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
 
-  // Structural re-merge of intersection verts. FindAndInsertIntersections
-  // above inserts each intersection at the time its parent edge pair is
-  // processed; if pairs
-  // (A, B) and (A, C) both produce intersections at the same true point P*
-  // (i.e. three edges meet there) they may land FP-close but not snap to
-  // each other because neither saw the other yet at insertion time.
-  //
-  // Two intersections that should be the same true point share at least one
-  // common edge in their incidence list (any two of {AB, AC, BC} share an
-  // edge). Two intersections from disjoint edge sets cannot be the same
-  // true point, regardless of geometric distance. So we union-find verts
-  // that share an edge AND fall within eps; this avoids the angle-dependent
-  // threshold of a pure-geometric merge (a fixed factor like 1.5*eps fails
-  // for shallow crossings; large factors over-merge legitimately-distinct
-  // intersections from unrelated edge pairs).
-  //
-  // Eager propagation in FindAndInsertIntersections handles k-way
-  // incidence by inserting each new intersection vert into every edge it
-  // lies on. This structural re-merge has a narrower job: merge FP-close
-  // duplicate intersection verts that share an edge. Independent edge
-  // pairs that geometrically meet at the same point are split by
-  // propagation, but they are not unioned here unless a shared-edge pair
-  // links them.
+  // Structural re-merge: after insertion, duplicate intersection verts that
+  // share an incident edge and still land FP-close represent one true point.
   {
     ScopedTiming timing(P.restructNs);
     DisjointSets uf(static_cast<int>(merge.verts.size()));
-    // The geometric upper bound for "same true point" is eps/sin(theta)
-    // where theta is the crossing angle. For shallow crossings this can
-    // be large; kIntersectionMergeEpsFactor covers theta down
-    // to ~6 degrees. The structural gate prevents over-merging
-    // legitimately-distinct intersections (e.g. edge A crosses B at one
-    // point and C at a different point along A: vAB and vAC share edge A
-    // but are at different true points and shouldn't merge unless they
-    // ALSO geometrically coincide). A sweep across displacement fuzz showed
-    // kIntersectionMergeEpsFactor preserves the strongest retained-graph
-    // validity results without over-merging; tightening below 3*eps caused
-    // single-pass failures, while loosening to 100*eps caused new over-merge
-    // failures.
-    //
-    // Note: when union-find creates a multi-vert cluster, the centroid
-    // computed below is offset from the original positions by up to ~eps;
-    // that's intentional (we WANT the merged point to land at the average)
-    // and is accounted for by the retained-graph validity checks.
+    // Shallow crossings can put duplicates up to eps/sin(theta) apart; the
+    // shared-edge gate prevents that wider threshold from merging unrelated
+    // intersections.
     const double mergeThresh = kIntersectionMergeEpsFactor * eps;
     const double mergeThresh2 = mergeThresh * mergeThresh;
     // Duplicate intersection verts that should merge share an incident edge.
@@ -197,10 +162,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
       const double tThresh = mergeThresh / abLen;
       tlist.clear();
       tlist.reserve(list.size());
-      // The list is sorted by t (invariant maintained by
-      // BuildEdgeVertListsFromEdgePairs and FindAndInsertIntersections's
-      // lower_bound
-      // insertion); filter to intersection verts only.
+      // Lists are sorted by t; filter to intersection verts only.
       for (int v : list) {
         if (v >= (int)vertEdges.size() || vertEdges[v].empty()) continue;
         const vec2 p = merge.verts[v];

@@ -12,41 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Polygon offset (a.k.a. inflate/inset, Clipper2's `InflatePaths`
-// analog). Backs `CrossSection::Offset`.
-//
-// Algorithm:
-//   1. For each input contour, walk vertex by vertex emitting one offset
-//      polygon ring. Each edge contributes a parallel segment at distance
-//      |delta| along its outward normal: for CW holes, the directed edge's
-//      right normal points into the hole, which is outward from the solid.
-//      Each corner contributes a join cap (Square / Round /
-//      Miter / Bevel) on the convex side, or a single miter point on the
-//      concave side.
-//   2. Fill all offset rings to resolve self-intersections introduced by
-//      sharp concavities or large |delta|. Positive offsets use additive
-//      winding; negative offsets use NonZero with a negative-winding fallback
-//      for collapsed insets.
-//
-// Corner convention (per Clipper2):
-//   - "Outward" is to the right of the directed edge for a CCW contour
-//     (interior of a CCW outer ring is to the left of edges).
-//   - Positive delta inflates; negative shrinks.
-//   - Holes are CW, so the same directed-edge right normal points into the
-//     hole, which is outward from the solid.
-//
-// Join styles:
-//   - Round:  arc centered at vertex, radius |delta|. Subdivided so each
-//             chord's perpendicular error <= arc_tol. Matches Clipper2's
-//             arc-tolerance semantics.
-//   - Miter:  intersect the two adjacent offset edges; cap at
-//             miter_limit * |delta| from the vertex by falling back to a
-//             square chord.
-//   - Bevel:  single straight chord between the two offset edge
-//             endpoints, no extension. Always works.
-//   - Square: like miter but pre-emptively capped at distance |delta|
-//             from the vertex with a chord perpendicular to the
-//             bisector.
+// Polygon offset backing `CrossSection::Offset`.
 
 #include "offset.h"
 
@@ -60,7 +26,7 @@
 namespace manifold {
 namespace boolean2 {
 
-namespace offset_detail {
+namespace {
 
 constexpr double kStraightAngleSinTol = 1e-12;
 // denom = 1 + dot(normals) = 2*cos^2(half-angle). Below this, the miter
@@ -152,14 +118,6 @@ void AppendRoundJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
     if (!BeforeSweepTarget(dir, nNext, rotSign)) break;
     out.push_back(V + delta * dir);
   }
-}
-
-// Bevel join: single chord, no extra vertices between endPrev and
-// startNext. Caller is responsible for pushing those endpoints.
-void AppendBevelJoin(SimplePolygon& /*out*/, vec2 /*V*/, vec2 /*nPrev*/,
-                     vec2 /*nNext*/, double /*delta*/) {
-  // intentionally empty: the chord is implicit in pushing
-  // endPrev and startNext consecutively.
 }
 
 // Square join: two extra vertices forming a chord tangent to a circle
@@ -302,7 +260,6 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
         AppendSquareJoin(out, V, nPrev, nNext, delta);
         break;
       case JoinType::Bevel:
-        AppendBevelJoin(out, V, nPrev, nNext, delta);
         break;
     }
     out.push_back(startNext);
@@ -310,16 +267,6 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
   return out;
 }
 
-}  // namespace offset_detail
-
-namespace offset_detail {
-
-// Remove vertices that are collinear with their immediate neighbours
-// (within epsilon `eps`). Offset output frequently contains such
-// vertices because each input edge contributes a separate offset
-// segment whose endpoints lie along a straight side. Clipper2's
-// `InflatePaths` strips them as part of its finishing pass; replicating
-// here keeps `NumVert()` parity for callers comparing vertex counts.
 Polygons RemoveCollinear(Polygons polys, double eps) {
   const double eps2 = eps * eps;
   for (auto& loop : polys) {
@@ -374,7 +321,7 @@ Polygons RemoveCollinear(Polygons polys, double eps) {
   return polys;
 }
 
-}  // namespace offset_detail
+}  // namespace
 
 // Public Offset API. `delta` is the offset distance (positive = inflate,
 // negative = inset). `miterLimit` is relative to |delta|. `arcTol` is
@@ -389,13 +336,8 @@ Polygons RemoveCollinear(Polygons polys, double eps) {
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, double arcTol) {
   if (delta == 0 || in.empty()) return in;
-  // Reject non-finite delta and non-finite input verts. Garbage in
-  // produces NaN-laden output and `assert(isfinite(...))` failures
-  // downstream in halfedge face area centering; clean rejection is safer.
-  // `miterLimit` and `arcTol` are clamped/treated as nonsense-but-OK
-  // inside OffsetContour (negative or zero arcTol falls through to
-  // GetCircularSegments default; miterLimit < 1 still produces a
-  // bounded square fallback).
+  // Reject NaN/Inf input; miterLimit and arcTol are clamped inside
+  // OffsetContour to match existing CrossSection tolerance behavior.
   if (!std::isfinite(delta)) return {};
   for (const auto& ring : in) {
     for (const auto& v : ring) {
@@ -405,8 +347,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   Polygons offsetRings;
   offsetRings.reserve(in.size());
   for (const auto& ring : in) {
-    auto off =
-        offset_detail::OffsetContour(ring, delta, jt, miterLimit, arcTol);
+    auto off = OffsetContour(ring, delta, jt, miterLimit, arcTol);
     if (off.size() >= 3) offsetRings.push_back(std::move(off));
   }
   if (offsetRings.empty()) return {};
@@ -427,7 +368,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
     // regularized expanded boundary in that case.
     const double inArea = std::fabs(TotalSignedArea(in));
     const double outArea = std::fabs(TotalSignedArea(unioned));
-    if (outArea + offset_detail::AreaComparisonTol(in, unioned, eps) < inArea) {
+    if (outArea + AreaComparisonTol(in, unioned, eps) < inArea) {
       unioned = FillByRule(offsetRings, WindRule::NonZero, eps);
     }
   } else {
@@ -438,11 +379,11 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
     // the remaining interior islands.
     const double inArea = std::fabs(TotalSignedArea(in));
     const double outArea = std::fabs(TotalSignedArea(unioned));
-    if (outArea > inArea + offset_detail::AreaComparisonTol(in, unioned, eps)) {
+    if (outArea > inArea + AreaComparisonTol(in, unioned, eps)) {
       unioned = FillByRule(offsetRings, WindRule::Negative, eps);
     }
   }
-  return offset_detail::RemoveCollinear(std::move(unioned), eps);
+  return RemoveCollinear(std::move(unioned), eps);
 }
 
 }  // namespace boolean2

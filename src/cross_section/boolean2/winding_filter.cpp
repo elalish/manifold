@@ -44,13 +44,27 @@
 namespace manifold {
 namespace boolean2 {
 
+bool IsInside(WindRule rule, int w) {
+  switch (rule) {
+    case WindRule::Add:
+      return w > 0;
+    case WindRule::Intersect:
+      return w > 1;
+    case WindRule::EvenOdd:
+      return (w & 1) != 0;
+    case WindRule::NonZero:
+      return w != 0;
+    case WindRule::Negative:
+      return w < 0;
+  }
+  return false;
+}
+
 namespace {
 
 constexpr double kSeedStepCoordScaleUlps = 16.0;
 constexpr double kSeedStepEpsFraction = 0.25;
 constexpr double kSeedStepEdgeLengthFraction = 1e-3;
-
-}  // namespace
 
 // =============================================================================
 // Ray-cast winding-number primitives (legacy seed; the BFS face traversal
@@ -155,7 +169,6 @@ int CastWindingRayFast(vec2 origin, const std::vector<FastEdge>& edges) {
 // is kept iff its left and right faces disagree under the selected rule.
 // =============================================================================
 
-namespace halfedge_internal {
 struct Halfedge {
   int twin;    // index of the twin halfedge in halfedges[]
   int next;    // next halfedge along the same face's CCW boundary
@@ -163,41 +176,14 @@ struct Halfedge {
   int face;    // face id (-1 until assigned)
   int mult;    // signed multiplicity in this direction
 };
-}  // namespace halfedge_internal
 
-// Internal predicate over a face's winding number, deciding whether
-// the face is "inside" the result region. Five rules cover production
-// and diagnostic-driver corpus needs:
-//   - Add:       w > 0     (default; Smith's wind > 0 union)
-//   - Intersect: w > 1     (both normalized operands cover)
-//   - EvenOdd:   w & 1     (used internally by Xor; SVG/Clipper2 EVENODD)
-//   - NonZero:   w != 0    (Clipper2 NONZERO, mfogel union of pre-filled)
-//   - Negative:  w < 0     (Clipper2 NEGATIVE; CW-oriented input regions)
-// An edge is retained iff its left and right faces disagree on the
-// rule.
-bool IsInside(WindRule rule, int w) {
-  switch (rule) {
-    case WindRule::Add:
-      return w > 0;
-    case WindRule::Intersect:
-      return w > 1;
-    case WindRule::EvenOdd:
-      return (w & 1) != 0;
-    case WindRule::NonZero:
-      return w != 0;
-    case WindRule::Negative:
-      return w < 0;
-  }
-  return false;
-}
-
-namespace detail {
 #ifdef MANIFOLD_DEBUG
-void RecordHalfedgeFaces(
-    Trace* trace, WindRule rule, const std::vector<vec2>& verts,
-    const std::vector<halfedge_internal::Halfedge>& halfedges,
-    const std::vector<int>& faceStartHE, const std::vector<int>& faceWind,
-    const std::vector<double>& faceArea, int outerFace) {
+void RecordHalfedgeFaces(Trace* trace, WindRule rule,
+                         const std::vector<vec2>& verts,
+                         const std::vector<Halfedge>& halfedges,
+                         const std::vector<int>& faceStartHE,
+                         const std::vector<int>& faceWind,
+                         const std::vector<double>& faceArea, int outerFace) {
   if (!trace) return;
   TracePhase& phase = trace->AddPhase("halfedge_faces");
   const int nFaces = static_cast<int>(faceStartHE.size());
@@ -228,7 +214,6 @@ void RecordHalfedgeFaces(
 std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const CanonicalSubEdges& canon, const std::vector<vec2>& verts, bool debug,
     WindRule rule, Trace* trace) {
-  using halfedge_internal::Halfedge;
 #ifdef MANIFOLD_DEBUG
   if (debug && DebugVerbose()) {
     std::cout << "[FilterByWindingHalfedges] canon.edges.size()="
@@ -272,16 +257,9 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   for (int i = 0; i < (int)halfedges.size(); ++i) {
     outFlat[outCur[halfedges[i].origin]++] = i;
   }
-  // Per-vertex angular sort: each vertex's outgoing list is independent
-  // (read-only on halfedges/verts; writes only its own slot). atan2 is
-  // expensive and the inner sort is O(d log d) per vertex of degree d;
-  // for big arrangements the total is the second-largest cost inside
-  // this filter. Output is deterministic because the sort is pure.
-  // atan2-free angular comparator: split the plane into two half-planes
-  // (bucket 0 = upper + +x axis, bucket 1 = lower + -x axis); within a
-  // bucket, compare by sign of the cross product. Sorts CCW from +x.
-  // Same monotone order as atan2 but no transcendental in the per-
-  // comparison hot path.
+  // atan2-free angular comparator: split the plane into two half-planes, then
+  // compare by cross product. Same CCW order from +x, without libm in the
+  // per-comparison hot path.
   auto bucketOf = [](const vec2& d) {
     return (d.y > 0 || (d.y == 0 && d.x > 0)) ? 0 : 1;
   };
@@ -319,32 +297,10 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
             });
       });
 
-  // 3. Compute next pointers. For halfedge h arriving at vertex v
-  //    (= h.twin.origin), h.next must be the outgoing edge that makes
-  //    the SMALLEST LEFT TURN from h's incoming direction. h.incoming
-  //    direction is opposite of h.twin's outgoing direction; the smallest
-  //    CCW rotation from h.incoming visits halfedges starting from
-  //    "h.incoming + small CCW" and finds the first entry. In the sorted
-  //    CCW outgoing list, this corresponds to **one step CW** from
-  //    h.twin (with wraparound).
-  //
-  //    Equivalent: starting at angle (h.twin + π) = h.incoming, sweep CCW
-  //    by ε, look up the first sorted entry. That entry is at sorted-list
-  //    position one before h.twin (= it - 1, with wraparound).
-  //
-  //    Using "it+1" instead of "it-1" picks the halfedge ALMOST A FULL
-  //    REVOLUTION CCW from h.twin = a RIGHT turn at v. For degree-2
-  //    vertices (chains, simple polygon corners), N=2 symmetry makes
-  //    "it+1" and "it-1" equivalent and both work. For degree-≥3
-  //    vertices (intersection points after FindAndInsertIntersections),
-  //    "it+1" and "it-1" differ and
-  //    only "it-1" produces correctly-oriented face cycles.
-  // Each halfedge's .next is determined independently by reading the
-  // (now-sorted) outgoing list at its destination vertex. Writes are to
-  // independent slots; reads are read-only. Tried caching position-of-
-  // self in an int-per-halfedge array - for the typical degree-2
-  // polygon-corner case the std::find on a 2-element vector is faster
-  // than building the cache, so kept the find.
+  // 3. Compute next pointers: each halfedge takes the smallest left turn at
+  //    its destination, which is the entry just before its twin in the CCW
+  //    outgoing list. Degree-2 vertices hide this choice; intersections do not.
+  // Each .next write is independent; reads are from the sorted outgoing CSR.
   manifold::for_each(
       manifold::autoPolicy(halfedges.size()), manifold::countAt(0),
       manifold::countAt(static_cast<int>(halfedges.size())), [&](int i) {
@@ -394,14 +350,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     ++nFaces;
   }
 
-  // 5. Compute signed area per face. Outer face has the most negative area.
-  //    CRITICAL: at displaced coords (e.g. 1.5e9), the raw shoelace
-  //    `a.x * b.y - b.x * a.y` has each product on order 2.25e18 with
-  //    ULP ~2000, so summation precision swamps a typical face area of
-  //    O(1). The sign becomes random and outer-face detection breaks.
-  //    Fix: center each face's coordinates relative to its first vertex
-  //    before summing. With centered coords O(edge length), products
-  //    are O((edge length)²) and the sum is precise.
+  // 5. Compute signed area per face. Centered shoelace keeps displaced
+  // coordinates from swamping small face areas with product-rounding error.
   // First halfedge encountered per face. Used both as the centering
   // reference for the shoelace area (below) and as the starting halfedge
   // for the per-face winding ray-cast.
@@ -454,28 +404,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   }
 #endif
 
-  // 6. Compute winding per face by propagation through twin pointers.
-  //
-  //    Earlier this did F independent ray-casts (one per face), which
-  //    is O(F·E) work. Replace with: ray-cast a single seed face per
-  //    connected component of the halfedge graph, then BFS-propagate to all
-  //    other faces in the component. Stepping from face_A to face_B
-  //    across a halfedge h (h.face=A, h.twin.face=B) crosses h's
-  //    canonical-edge contribution, so faceWind[B] = faceWind[A] -
-  //    h.mult (we're stepping from LEFT of h, where +mult contributes,
-  //    to RIGHT, where 0 does). BFS reaches every face in the
-  //    component exactly once, so total work is O(E + F) instead of
-  //    O(F·E).
-  //
-  //    Multi-component arrangements (real for self-intersecting input
-  //    whose result has multiple disjoint regions): when BFS finishes,
-  //    any unvisited face is in another component; ray-cast its
-  //    interior to seed and BFS again. Most cases are single-component
-  //    so this fallback rarely fires.
-  //
-  //    The FastEdge hoist is only needed for disconnected components after
-  //    the outer-face propagation. Most arrangements are one component, so
-  //    build it lazily when a second seed is actually needed.
+  // 6. Seed one face per connected component, then propagate winding across
+  // twin pointers: crossing h from left to right subtracts h.mult.
   std::vector<FastEdge> fastEdges;
   bool fastEdgesBuilt = false;
   auto ensureFastEdges = [&]() {
@@ -500,14 +430,9 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   }
   const double bboxHalfExtent =
       0.5 * std::max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y);
-  // Cap the normal offset by local geometry scale so seed samples stay in
-  // narrow faces; keep a coordinate-scale floor so displaced inputs still move
-  // by several ULPs. The eps fraction keeps the sample close to the boundary
-  // features created by the boolean2 epsilon budget, while the ULP floor avoids
-  // sampling the original edge again at large translated coordinates. The
-  // per-edge step below is also capped at 0.1% of edge length so short boundary
-  // edges seed inside their adjacent face; larger fractions can jump across
-  // thin faces in disconnected-component winding seeds.
+  // Keep seed samples close to boundary features, but at least several ULPs
+  // from displaced input edges and never more than a small edge-length
+  // fraction.
   const double seedStepCap =
       std::max(kSeedStepCoordScaleUlps * kU * coordScale,
                kSeedStepEpsFraction * EpsilonFromScale(bboxHalfExtent));
@@ -551,12 +476,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     faceWind[f] = best;
     wAssigned[f] = 1;
   };
-  // Outer face is the convention-fixed seed: by topology it sits
-  // outside the arrangement, so faceWind = 0. The shoelace area test
-  // identified it above.
-  //
-  // By topology the outer face is unbounded, so winding=0 is the convention.
-  // Using that directly avoids a numerically sensitive seed ray-cast.
+  // The unbounded outer face is conventionally outside, so winding = 0.
   faceWind[outerFace] = 0;
   wAssigned[outerFace] = 1;
   thread_local static std::vector<int> bfsQ;
@@ -660,10 +580,9 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const int leftFace = halfedges[hA].face;
     const int rightFace = halfedges[hB].face;
     if (leftFace < 0 || rightFace < 0) continue;
-    // A component's local outer cycle is not necessarily a single global face:
-    // other disconnected components can split the space it surrounds. For
-    // local outers, classify the side adjacent to this particular edge instead
-    // of reusing one propagated winding for the whole cycle.
+    // A component's local outer cycle can be split by other components;
+    // classify the side adjacent to this edge instead of reusing one propagated
+    // winding.
     const auto faceWindingAtHalfedge = [&](int face, int halfedge) {
       if (rule == WindRule::NonZero && componentLocalOuter[face]) {
         return castFaceHalfedge(halfedge);
@@ -683,10 +602,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   }
   return out;
 }
-}  // namespace detail
+}  // namespace
 
-// Primary entry: dispatch on WindRule. Production callers (Boolean2D /
-// Xor / Simplify) go through here.
 std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
                                               const std::vector<vec2>& verts,
                                               bool debug, WindRule rule,
@@ -694,7 +611,7 @@ std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
 #ifndef MANIFOLD_DEBUG
   (void)trace;
 #endif
-  return detail::FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
+  return FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
 }
 
 }  // namespace boolean2

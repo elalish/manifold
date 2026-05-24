@@ -73,16 +73,8 @@ void SortSmallInts(std::vector<int>* values) {
   }
 }
 
-// Broad-phase filter for shared-endpoint pairs: when two edges share a vertex
-// and are not near-collinear there, no T-junction is possible. Returns true
-// when the pair can be safely dropped.
-//
-// Distance from the non-shared endpoint w_A to the line through
-// (v_shared, w_B) is |cross(w_A - v, w_B - v)| / |w_B - v|; T-junction
-// requires distance <= eps, i.e. cross^2 <= eps^2 * |w_B - v|^2. The
-// symmetric condition tests w_B against A's line; both must fail for
-// the pair to be safely dropped, which collapses to a single compare
-// against eps^2 * max(|d_A|^2, |d_B|^2).
+// Drop shared-endpoint pairs when both non-shared endpoints are more than eps
+// from the opposite edge line; then no T-junction is possible.
 bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
                                    const std::vector<vec2>& verts, double eps) {
   int vS, wA, wB;
@@ -123,16 +115,8 @@ bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
   return cross2 > eps2 * std::max(lenA2, lenB2);
 }
 
-// Broad phase: find candidate (i, j) edge pairs whose AABBs overlap.
-// Output is sorted lex-ascending so downstream insertion is
-// deterministic. Shared-endpoint pairs that fail the collinearity
-// gate (above) are dropped here.
-//
-// For the BVH path, uses boolean2's parallel-capable 2D collision walk
-// with a thread-local accumulator (tbb::combinable). Each thread emits
-// pairs into its own vector; combine_each merges them, then a single
-// sort re-establishes lex order. This is used only when the candidate
-// count justifies the parallel overhead.
+// Broad phase: find overlapping edge AABBs, drop safe shared-endpoint pairs,
+// and return lex-sorted pairs for deterministic insertion.
 #if (MANIFOLD_PAR == 1)
 namespace intersection_pair_recorder {
 struct PairsRecorder {
@@ -219,10 +203,7 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 #endif
 }
 
-// Internal: takes either `pairs` (and computes intersections inline) or
-// `precomputedIntersections` (when the caller has already run the
-// parallel compute, e.g. fused into the per-pair narrow pass). Exactly
-// one of the two should be supplied.
+// Exactly one of `pairsIn` or `precomputedIntersections` must be supplied.
 void FindAndInsertIntersectionsImpl(
     const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
     std::vector<std::vector<int>>* lists,
@@ -359,28 +340,8 @@ void FindAndInsertIntersectionsImpl(
     insertSorted(j);
   }
 
-  // Eager propagation pass (2D analog of boolean_result.cpp::AddNewEdgeVerts).
-  // The pair-by-pair loop above only adds each new intersection vert to the
-  // two edges in its source pair. But k>=3 input edges can be concurrent at
-  // one true point: e.g., edges A, B, C all crossing at P generates three
-  // pair-intersections (A,B), (A,C), (B,C); the snap-to-existing logic
-  // catches duplicates within eps when they share an edge in the iteration
-  // order, but misses the "no shared edge" case (A,B vs E,F both at P).
-  // Without propagation, edge C ends up with no on-edge vert at P even though
-  // P geometrically lies on C; canonicalization then emits C as one un-split
-  // sub-edge and the resulting halfedge graph has the wrong incidence at P.
-  //
-  // When newly-created intersection verts contain near-duplicates, query the
-  // edge BVH for all edges within eps and add those verts to their on-edge
-  // lists. Non-duplicate new intersections already got their two incident
-  // edges in the pair loop above; the expensive global propagation is for the
-  // rare case where independent edge pairs discover the same geometric point.
-  // Use the same generous same-point cutoff as the structural+geometric
-  // re-merge in driver.h when deciding whether propagation is needed. The
-  // propagation itself still uses eps-padded edge queries and the same exact
-  // projection-distance gate as BuildEdgeVertLists.
-  // Fast-path: if no new intersection verts were created in the main
-  // loop, the propagation pass has nothing to do.
+  // Eager propagation: if independent edge pairs create near-duplicate
+  // intersection verts, add those verts to every edge they geometrically split.
   if ((int)verts->size() == origNumVerts) return;
   const int numNewVerts = static_cast<int>(verts->size()) - origNumVerts;
   const double propagationDupThresh = kIntersectionMergeEpsFactor * eps;

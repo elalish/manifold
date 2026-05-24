@@ -26,74 +26,6 @@
 namespace manifold {
 namespace boolean2 {
 
-// Centered-shoelace signed area of a closed polygon loop. Same FP trick
-// as the per-face area computation in winding_filter.h: subtract a
-// reference vert
-// before multiplying so products stay at edge-length scale instead of
-// blowing up to O(L^2) at displaced coordinates. Total telescopes to the
-// same answer as the raw shoelace because Sigma(b - a) around any closed
-// loop is zero. Used by area-preservation regression tests and the
-// area-drift tracking in DeepFuzz.
-double SignedArea(const SimplePolygon& loop) {
-  if (loop.size() < 3) return 0.0;
-  const auto& r = loop[0];
-  double sum = 0.0;
-  for (size_t i = 0; i < loop.size(); ++i) {
-    const auto& a = loop[i];
-    const auto& b = loop[(i + 1) % loop.size()];
-    const double ax = a.x - r.x, ay = a.y - r.y;
-    const double bx = b.x - r.x, by = b.y - r.y;
-    sum += ax * by - bx * ay;
-  }
-  return 0.5 * sum;
-}
-
-double TotalSignedArea(const Polygons& polys) {
-  double total = 0.0;
-  for (const auto& loop : polys) total += SignedArea(loop);
-  return total;
-}
-
-// Choose epsilon for the operation. L = bounding box half-extent rounded
-// up to power of 2. k_budget is the user's expected upper bound on how
-// many times any one edge may be adjusted (default 1000 ~= 10^-12 L).
-double EpsilonFromScale(double L, int k_budget) {
-  // Round L up to power of 2 (Smith's analysis assumes this).
-  if (L <= 0) return 0;
-  int expBits;
-  std::frexp(L, &expBits);
-  const double L_pow2 = std::ldexp(1.0, expBits);
-  return (k_budget + 1) * kAlphaCoeff * kU * L_pow2;
-}
-
-// 2D edge-edge symbolic intersection (BVH-friendly).
-//
-// The classical Kernel11 from boolean3.cpp can't be used in BVH-pair-query
-// context: it requires "one endpoint inside, one outside" the other
-// segment's projection, which sweep-line guarantees but BVH pair queries
-// don't (most pairs have one segment fully nested in the other's
-// projection).
-//
-// This kernel works for any pair by trimming both segments to their
-// projection-axis overlap before applying Intersect. Steps:
-//   1. Projected graph order plus SoS for cross-or-not.
-//   2. Pick the axis (x or y) where BOTH segments have non-zero spread,
-//      preferring the larger min-spread for stability.
-//   3. Sort each segment's endpoints L-to-R along that axis.
-//   4. Compute axis-overlap interval [overlapL, overlapR] = intersection
-//      of a's and b's axis spans.
-//   5. Use `Interpolate` (from shared.h) to evaluate each segment's
-//      orthogonal coord at overlapL and overlapR. This produces four
-//      (axis, ortho) points all spanning the same axis interval, which
-//      is the precondition Intersect's closed-form expects.
-//   6. Apply the Boolean intersection closed-form (smaller |dy| endpoint
-//      picked for FP stability) to compute the intersection position.
-//
-// Trimming makes both segments span the same axis interval by
-// construction, so the Kernel11 "inside/outside endpoint" precondition is
-// satisfied even for the nested-axis cases that arise from BVH pairs.
-double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
-
 namespace {
 
 vec2 SortLeftRight(vec2 p0, vec2 p1, int axis) {
@@ -167,6 +99,41 @@ GraphOrderKind SymbolicTieOrder(const GraphSegment2D& a,
 }
 
 }  // namespace
+
+// Centered-shoelace signed area of a closed polygon loop. Same FP trick
+// as the per-face area computation in winding_filter.h: subtract a
+// reference vert before multiplying so products stay at edge-length scale.
+double SignedArea(const SimplePolygon& loop) {
+  if (loop.size() < 3) return 0.0;
+  const auto& r = loop[0];
+  double sum = 0.0;
+  for (size_t i = 0; i < loop.size(); ++i) {
+    const auto& a = loop[i];
+    const auto& b = loop[(i + 1) % loop.size()];
+    const double ax = a.x - r.x, ay = a.y - r.y;
+    const double bx = b.x - r.x, by = b.y - r.y;
+    sum += ax * by - bx * ay;
+  }
+  return 0.5 * sum;
+}
+
+double TotalSignedArea(const Polygons& polys) {
+  double total = 0.0;
+  for (const auto& loop : polys) total += SignedArea(loop);
+  return total;
+}
+
+// Choose epsilon from the operation scale using Smith's rounded power-of-two
+// length bound and the caller's adjustment budget.
+double EpsilonFromScale(double L, int k_budget) {
+  if (L <= 0) return 0;
+  int expBits;
+  std::frexp(L, &expBits);
+  const double L_pow2 = std::ldexp(1.0, expBits);
+  return (k_budget + 1) * kAlphaCoeff * kU * L_pow2;
+}
+
+double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
 
 GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
                                    const GraphSegment2D& b, int axis,
