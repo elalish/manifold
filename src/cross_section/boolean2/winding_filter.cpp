@@ -565,6 +565,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   componentFaces.clear();
   componentSeen.assign(nFaces, 0);
   componentLocalOuter.assign(nFaces, 0);
+  componentLocalOuter[outerFace] = 1;
   auto collectComponent = [&](int seed) {
     componentQ.clear();
     componentFaces.clear();
@@ -648,8 +649,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const int leftFace = halfedges[hA].face;
     const int rightFace = halfedges[hB].face;
     if (leftFace < 0 || rightFace < 0) continue;
-    // A disconnected component's local outer cycle is not a single global
-    // face: other components can split the space it surrounds. For those
+    // A component's local outer cycle is not necessarily a single global face:
+    // other disconnected components can split the space it surrounds. For
     // local outers, classify the side adjacent to this particular edge instead
     // of reusing one propagated winding for the whole cycle.
     const auto faceWindingAtHalfedge = [&](int face, int halfedge) {
