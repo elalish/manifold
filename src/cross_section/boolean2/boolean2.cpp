@@ -374,7 +374,7 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
 // multiplicity flipped for Subtract, then applies the Boolean2
 // pipeline with an op-specific winding-rule filter:
 //
-//   - Add(A, B):       w != 0      (regularized set union)
+//   - Add(A, B):       w > 0       (regularized positive-winding union)
 //   - Subtract(A, B):  w > 0       (A covers but B's flipped mult cancels)
 //   - Intersect(A, B): w > 1       (both normalized operands cover the face)
 //
@@ -384,7 +384,7 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
   const int bMult = op == OpType::Subtract ? -1 : 1;
   const WindRule rule = op == OpType::Intersect  ? WindRule::Intersect
                         : op == OpType::Subtract ? WindRule::Add
-                                                 : WindRule::NonZero;
+                                                 : WindRule::Add;
   return detail::BinaryOpByRule(a, b, bMult, rule, eps);
 }
 
