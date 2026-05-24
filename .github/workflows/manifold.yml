@@ -612,6 +612,7 @@ jobs:
         version: 1
     - *clone-clipper2
     - name: Prepare base and head worktrees
+      continue-on-error: true
       shell: bash
       run: |
         set -euo pipefail
@@ -620,12 +621,15 @@ jobs:
         git worktree add wt-base "$BASE_SHA"
         git worktree add wt-head "$HEAD_SHA"
     - name: Benchmark base and head
+      if: always()
+      continue-on-error: true
       shell: bash
       run: |
         for variant in base head; do
           bash ./scripts/run_pr_perf_guard.sh "./wt-${variant}" ./clipper2 "./bench/${variant}" "${PERF_REPEATS}"
         done
     - name: Compare benchmark results
+      if: always()
       shell: bash
       run: |
         python3 ./scripts/compare_pr_perf_guard.py \

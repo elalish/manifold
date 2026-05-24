@@ -43,8 +43,9 @@ def parse_suite(suite_dir: Path) -> dict:
 
 
 def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -> tuple[str, bool, dict]:
-    base_mean = base["median_run_mean_sec"]
-    head_mean = head["median_run_mean_sec"]
+    # Primary comparison metric: mean of run means.
+    base_mean = base["mean_of_run_means_sec"]
+    head_mean = head["mean_of_run_means_sec"]
     delta_sec = head_mean - base_mean
     delta_ms = delta_sec * 1000.0
     pct = (delta_sec / base_mean * 100.0) if base_mean > 0 else 0.0
@@ -56,11 +57,11 @@ def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -
     lines.append("| Metric | Base | Head | Delta |")
     lines.append("|---|---:|---:|---:|")
     lines.append(
-        f"| Median of run means (sec) | {base_mean:.6f} | {head_mean:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) |"
+        f"| Mean of run means (sec) [primary] | {base_mean:.6f} | {head_mean:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) |"
     )
     lines.append(
-        f"| Mean of run means (sec) | {base['mean_of_run_means_sec']:.6f} | {head['mean_of_run_means_sec']:.6f} | "
-        f"{(head['mean_of_run_means_sec'] - base['mean_of_run_means_sec']):+.6f} |"
+        f"| Median of run means (sec) | {base['median_run_mean_sec']:.6f} | {head['median_run_mean_sec']:.6f} | "
+        f"{(head['median_run_mean_sec'] - base['median_run_mean_sec']):+.6f} |"
     )
     lines.append("")
     lines.append(f"Thresholds: warn if regression >= {warn_pct:.1f}% and >= {warn_abs_ms:.1f} ms.")
@@ -68,6 +69,7 @@ def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -
     lines.append("")
 
     payload = {
+        "primary_metric": "mean_of_run_means_sec",
         "base": base,
         "head": head,
         "delta_sec": delta_sec,
