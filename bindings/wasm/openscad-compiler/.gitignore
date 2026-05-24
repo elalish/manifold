@@ -2,4 +2,5 @@
 .env
 .env.local
 /test/out
+/test/output.3mf
 /runtime/runtime.js

@@ -1,3 +1,4 @@
+// Volume: 38359.1657077922, SurfaceArea: 17616.989089956693
 // chopped_blocks.stl is derived from Basics/LetterBlock.scad
 // The exported STL was converted to binary using MeshLab
 

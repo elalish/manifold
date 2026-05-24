@@ -1,3 +1,4 @@
+// Volume: 17590.35549678037, SurfaceArea: 6656.888963666461
 wall = 2;
 size = 30;
 hole_r = 10;

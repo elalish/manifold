@@ -1,3 +1,4 @@
+// Volume: 4352.5834862507245, SurfaceArea: 3170.3863608375777
 echo(version=version());
 
 // surface() can import images, the pixel values are converted

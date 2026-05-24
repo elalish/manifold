@@ -1,3 +1,4 @@
+// Volume: 18241.624224613235, SurfaceArea: 9499.830128986907
 module example001()
 {
   function r_from_dia(d) = d / 2;

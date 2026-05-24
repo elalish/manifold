@@ -1,3 +1,4 @@
+// Volume: 4790.000566938627, SurfaceArea: 9656.000370822181
 // Example combining MCAD/fonts.scad with search() function.
 
 use <MCAD/fonts.scad>

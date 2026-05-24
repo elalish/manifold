@@ -1,3 +1,4 @@
+// Volume: 267249.60655156564, SurfaceArea: 77057.8702914879
 // logo_and_text.scad - Example for use<> and text()
 
 use <logo.scad> // Imports the Logo() module from logo.scad into this namespace

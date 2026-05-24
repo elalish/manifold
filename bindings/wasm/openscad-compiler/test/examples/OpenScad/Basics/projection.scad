@@ -1,3 +1,4 @@
+// Volume: 5115.495113048576, SurfaceArea: 6631.041325633304
 echo(version=version());
 
 %import("projection.stl");

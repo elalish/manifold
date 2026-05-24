@@ -1,3 +1,4 @@
+// Volume: 8568.70603603878, SurfaceArea: 3162.4227260005123
 // Hull Example
 // The hull of a toy sailboat
 $fs = .1;

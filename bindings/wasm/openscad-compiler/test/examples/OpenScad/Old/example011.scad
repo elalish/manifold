@@ -1,3 +1,4 @@
+// Volume: 666.6666666666666, SurfaceArea: 546.4101615137754
 echo(version=version());
 
 polyhedron(

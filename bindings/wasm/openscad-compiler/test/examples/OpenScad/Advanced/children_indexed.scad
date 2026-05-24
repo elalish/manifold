@@ -1,3 +1,4 @@
+// Volume: 6876.597729531793, SurfaceArea: 5629.966825664757
 // children_indexed.scad - Usage of indexed children()
 
 // children() with a parameter allows access to a specific child

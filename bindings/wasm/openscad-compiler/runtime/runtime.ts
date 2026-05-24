@@ -585,6 +585,26 @@ function __minkowski2d3d(items) {
   return acc;
 }
 
+function __extrude(shape, height = 1, options: { twist?: number, nDivisions?: number, scale?: any, center?: boolean } = {}) {
+  if (__isEmpty(shape)) {
+    return Manifold.union([]);
+  }
+  if (__is2D(shape)) {
+    return shape.extrude(height, options.nDivisions, options.twist, options.scale, options.center);
+  }
+  return shape;
+}
+
+function __revolve(shape, fn = 0, angle = 360) {
+  if (__isEmpty(shape)) {
+    return Manifold.union([]);
+  }
+  if (__is2D(shape)) {
+    return shape.revolve(fn, angle);
+  }
+  return shape;
+}
+
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
@@ -600,5 +620,6 @@ export {
   __is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4,
   __safe_attach_transform, __safe_offset2d, __safe_project3d,
   __apply_color,
-  __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d
+  __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
+  __extrude, __revolve
 };

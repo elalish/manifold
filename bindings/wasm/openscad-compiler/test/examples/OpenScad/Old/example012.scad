@@ -1,3 +1,4 @@
+// Volume: 25589.13398737373, SurfaceArea: 6732.133919427506
 // example012.stl is generated from Basics/LetterBlock.scad
 
 echo(version=version());

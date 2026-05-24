@@ -1,7 +1,8 @@
- module simple_tree(size, dna, n) {   
+// Volume: 17379.024658299717, SurfaceArea: 17593.608838033084
+module simple_tree(size, dna, n) {   
         if (n > 0) {
             // trunk
-            cylinder(r1=size/10, r2=size/12, h=size, $fn=24);
+            cylinder(r1=size/10, r2=size/12, h=size, $fn=12);
             // branches
             translate([0,0,size])
                 for(bd = dna) {
@@ -26,4 +27,4 @@
     //      bd[2] - relative scale of the branch
     dna = [ [12,  80, 0.85], [55,    0, 0.6], 
             [62, 125, 0.6], [57, -125, 0.6] ];
-    simple_tree(50, dna, 5);
+    simple_tree(50, dna, 3);

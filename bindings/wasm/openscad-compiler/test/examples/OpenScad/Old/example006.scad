@@ -1,3 +1,4 @@
+// Volume: 930476.0072618698, SurfaceArea: 61163.99004583014
 module rounded_cube(size,r,center=false)
 {
   s = is_list(size) ? size : [size,size,size];

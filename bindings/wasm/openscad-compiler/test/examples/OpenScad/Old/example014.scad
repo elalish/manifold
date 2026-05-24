@@ -1,3 +1,4 @@
+// Volume: 5936.762601334455, SurfaceArea: 1781.0288207079655
 echo(version=version());
 
 intersection_for(i = [

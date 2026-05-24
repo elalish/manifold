@@ -1,3 +1,4 @@
+// Volume: 7881.557992833725, SurfaceArea: 7161.271614345969
 echo(version=version());
 
 // rotate_extrude() rotates a 2D shape around the Z axis. 

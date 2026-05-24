@@ -1,3 +1,4 @@
+// Volume: 426.4934719833984, SurfaceArea: 1378.26562362803
 echo(version=version());
 
 // Functions can be defined to simplify code using lots of

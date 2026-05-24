@@ -1,3 +1,4 @@
+// Volume: 12375.997994183868, SurfaceArea: 9911.998977287582
 echo(version=version());
 
 function size(x) = assert(x % 2 == 0, "Size must be an even number") x;

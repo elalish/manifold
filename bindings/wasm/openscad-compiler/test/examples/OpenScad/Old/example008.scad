@@ -1,3 +1,4 @@
+// Volume: 43145.833333333336, SurfaceArea: 17796.320343559644
 echo(version=version());
 
 difference() {

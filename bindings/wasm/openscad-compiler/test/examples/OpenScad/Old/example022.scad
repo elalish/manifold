@@ -1,3 +1,4 @@
+// Volume: 45145.425983921334, SurfaceArea: 9188.245199203082
 // size is a vector [w, h, d]
 module roundedBox(size, radius, sidesonly)
 {

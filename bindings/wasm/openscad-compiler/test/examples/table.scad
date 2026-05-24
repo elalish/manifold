@@ -1,3 +1,4 @@
+// Volume: 16494.879516308847, SurfaceArea: 11791.08604753301
 module leg(h = 40, r = 3) {
     cylinder(h=h, r=r, $fn=32);
 }

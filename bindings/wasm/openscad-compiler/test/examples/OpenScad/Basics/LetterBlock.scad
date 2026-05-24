@@ -1,3 +1,4 @@
+// Volume: 12100.545766757488, SurfaceArea: 4402.934767529764
 // LetterBlock.scad - Basic usage of text() and linear_extrude()
 
 // Module instantiation
