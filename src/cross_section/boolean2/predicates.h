@@ -40,12 +40,9 @@ enum class GraphOrderKind {
 struct GraphSegment2D {
   vec2 p0;
   vec2 p1;
-  // Higher rank shadows lower rank on exact orthogonal-coordinate equality.
-  // This must come from a stable symbolic perturbation policy, not BVH pair
+  // Stable fallback for geometrically identical ties (e.g. two input loops
+  // sharing an edge). Must come from a deterministic source, not BVH pair
   // order.
-  int perturbRank = 0;
-  // Final stable fallback for equal-rank, geometrically identical ties and
-  // diagnostics; not BVH pair order.
   int stableEdgeId = -1;
 };
 
@@ -69,8 +66,6 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
                                    double eps = 0.0);
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
                        double eps, vec2* out);
-bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
-                       vec2* out);
 
 }  // namespace boolean2
 }  // namespace manifold

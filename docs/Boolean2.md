@@ -146,8 +146,7 @@ collapsed edges, and cancelled opposing sub-edges are dropped.
 Segment crossings are decided over a positive-width shared projection interval.
 Orthogonal-coordinate ties within epsilon are treated as symbolic ties, not raw
 CCW fallbacks. The current tie policy first uses canonical segment geometry,
-then falls back to explicit rank or stable edge ID only for geometrically
-identical ties.
+then falls back to stable edge ID for geometrically identical ties.
 
 Callers may pass an explicit epsilon. A non-positive epsilon asks the core
 to infer an operation scale and apply the local floating-point budget used by

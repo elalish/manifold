@@ -79,23 +79,13 @@ int CompareSegmentKey(GraphSegment2D a, GraphSegment2D b) {
 
 GraphOrderKind SymbolicTieOrder(const GraphSegment2D& a,
                                 const GraphSegment2D& b) {
-  const int segmentOrder = CompareSegmentKey(a, b);
-  if (segmentOrder != 0) {
-    const double tieDir = segmentOrder < 0 ? -1.0 : 1.0;
-    return Shadows(0.0, 0.0, tieDir) ? GraphOrderKind::ALessOrtho
-                                     : GraphOrderKind::AGreaterOrtho;
+  int order = CompareSegmentKey(a, b);
+  if (order == 0) {
+    DEBUG_ASSERT(a.stableEdgeId != b.stableEdgeId, logicErr,
+                 "Boolean2 graph order has unresolved symbolic tie");
+    order = a.stableEdgeId < b.stableEdgeId ? -1 : 1;
   }
-
-  DEBUG_ASSERT(
-      a.perturbRank != b.perturbRank || a.stableEdgeId != b.stableEdgeId,
-      logicErr, "Boolean2 graph order has unresolved symbolic tie");
-  const int aRank =
-      a.perturbRank != b.perturbRank ? a.perturbRank : a.stableEdgeId;
-  const int bRank =
-      a.perturbRank != b.perturbRank ? b.perturbRank : b.stableEdgeId;
-  const double tieDir = aRank < bRank ? -1.0 : 1.0;
-  return Shadows(0.0, 0.0, tieDir) ? GraphOrderKind::ALessOrtho
-                                   : GraphOrderKind::AGreaterOrtho;
+  return order < 0 ? GraphOrderKind::ALessOrtho : GraphOrderKind::AGreaterOrtho;
 }
 
 }  // namespace
@@ -302,11 +292,6 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   return std::isfinite(out->x) && std::isfinite(out->y) &&
          AwayFromEndpoints(*out, a0, a1, eps) &&
          AwayFromEndpoints(*out, b0, b1, eps);
-}
-
-bool IntersectSegments(vec2 a0, vec2 a1, vec2 b0, vec2 b1, double eps,
-                       vec2* out) {
-  return IntersectSegments({a0, a1, 0, 0}, {b0, b1, 1, 1}, eps, out);
 }
 
 }  // namespace boolean2
