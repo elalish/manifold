@@ -161,6 +161,105 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   CalculateVertNormals();
 }
 
+Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
+                                                   int firstNewVert) const {
+  const int pair = halfedge_.Pair(edge);
+  if (pair < 0 || !halfedge_.IsForward(edge)) {
+    return {std::numeric_limits<double>::infinity(), vec3(NAN)};
+  }
+  const int start = halfedge_.Start(edge);
+  const int end = halfedge_.End(edge);
+  if (start < firstNewVert && end < firstNewVert) {
+    return {std::numeric_limits<double>::infinity(), vec3(NAN)};
+  }
+  const vec3 delta = vertPos_[end] - vertPos_[start];
+  const double lenSq = la::dot(delta, delta);
+  if (lenSq < epsilon_ * epsilon_) {
+    return {0, vertPos_[start] + delta / 2};
+  }
+  vec3 areaNormal(0.);
+  mat3 A(0.);
+  vec3 b(0.);
+  double c = 0;
+  int firstEdge = edge;
+  auto addTri = [&](int current) {
+    if (current == firstEdge) {
+      return;  // don't double-count the collapsing triangles.
+    }
+    const vec3 center = vertPos_[halfedge_.Start(current)];
+    const vec3 triAreaNormal =
+        la::cross(vertPos_[halfedge_.End(current)] - center,
+                  vertPos_[halfedge_.End(NextHalfedge(current))] - center);
+    areaNormal += triAreaNormal;
+    A += la::outerprod(triAreaNormal, triAreaNormal);
+    double d = la::dot(triAreaNormal, center);
+    b += triAreaNormal * d;
+    c += d * d;
+  };
+  ForVert(firstEdge, addTri);
+  firstEdge = halfedge_.Pair(edge);
+  ForVert(firstEdge, addTri);
+
+  const vec3 v = la::inverse(A) * b;
+  // cost units: volume^2 / area^2 = length^2
+  const double cost =
+      (la::dot(v, A * v) - 2 * la::dot(b, v) + c) / la::length2(areaNormal);
+  return {cost, v};
+}
+
+void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
+  if (!halfedge_.size()) return;
+  halfedge_.MakeUnique();
+
+  CleanupTopology();
+  ZoneScopedN("CollapseEdges");
+
+  Vec<int> edges(halfedge_.size());
+  auto end = edges.end();
+  std::iota(edges.begin(), end, 0);
+  Vec<bool> vertsVisited(vertPos_.size(), false);
+  size_t numCollapsed = 0;
+  Vec<double> cost(edges.size());
+  Vec<vec3> newPos(edges.size());
+  const double maxCost = tolerance_ * tolerance_;
+  Vec<int> scratchBuffer;
+  scratchBuffer.reserve(10);
+
+  while (edges.begin() != end) {
+    for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
+             [&](int edge) {
+               const auto edgeCost = CheckEdge(edge, firstNewVert);
+               cost[edge] = edgeCost.cost;
+               newPos[edge] = edgeCost.newPos;
+             });
+    stable_sort(edges.begin(), end,
+                [&](int a, int b) { return cost[a] < cost[b]; });
+    std::fill(vertsVisited.begin(), vertsVisited.end(), false);
+    for (int i = 0; cost[edges[i]] < maxCost && i < end - edges.begin(); ++i) {
+      const int edge = edges[i];
+      if (vertsVisited[halfedge_.Start(edge)] ||
+          vertsVisited[halfedge_.End(edge)]) {
+        continue;
+      }
+      cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+      const bool didCollapse = CollapseEdge2(edge, scratchBuffer);
+      if (didCollapse) {
+        vertPos_[halfedge_.End(edge)] = newPos[edge];
+        vertsVisited[halfedge_.Start(edge)] = true;
+        vertsVisited[halfedge_.End(edge)] = true;
+        ++numCollapsed;
+      }
+    }
+    end = std::partition(edges.begin(), end,
+                         [&](int edge) { return cost[edge] < maxCost; });
+  }
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose >= 2 && numCollapsed > 0) {
+    std::cout << "collapsed " << numCollapsed << " short edges" << std::endl;
+  }
+#endif
+}
+
 void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
   ZoneScopedN("CollapseShortEdge");
   FlagStore s;
@@ -573,6 +672,73 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
   const int tri0 = edge / 3;
   const int tri1 = pair / 3;
   current = start;
+  while (current != tri0edge[2]) {
+    current = NextHalfedge(current);
+
+    if (NumProp() > 0) {
+      // Update the shifted triangles to the vertBary of endVert
+      const int tri = current / 3;
+      if (triRef[tri].SameFace(triRef[tri0])) {
+        halfedge_.SetProp(current, halfedge_.Prop(NextHalfedge(edge)));
+      } else if (triRef[tri].SameFace(triRef[tri1])) {
+        halfedge_.SetProp(current, halfedge_.Prop(pair));
+      }
+    }
+
+    const int vert = halfedge_.End(current);
+    const int next = halfedge_.Pair(current);
+    for (size_t i = 0; i < edges.size(); ++i) {
+      if (vert == halfedge_.End(edges[i])) {
+        FormLoop(edges[i], current);
+        start = next;
+        edges.resize(i);
+        break;
+      }
+    }
+    current = next;
+  }
+
+  UpdateVert(endVert, start, tri0edge[2]);
+  CollapseTri(tri0edge);
+  RemoveIfFolded(start);
+  return true;
+}
+
+// Collapses the given edge by removing startVert - returns false if the edge
+// cannot be collapsed. May split the mesh topologically if the collapse would
+// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
+// pinched - the vert would be marked NaN, but other edges could still be
+// pointing to it.
+bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
+  Vec<TriRef>& triRef = meshRelation_.triRef;
+
+  const int pair = halfedge_.Pair(edge);
+  if (pair < 0) return false;
+
+  const ivec3 tri0edge = TriOf(edge);
+  const ivec3 tri1edge = TriOf(pair);
+  const int startVert = halfedge_.Start(tri0edge[0]);
+  const int endVert = halfedge_.Start(tri0edge[1]);
+
+  // Orbit endVert
+  {
+    int current = halfedge_.Pair(tri0edge[1]);
+    while (current != tri1edge[2]) {
+      current = NextHalfedge(current);
+      edges.push_back(current);
+      current = halfedge_.Pair(current);
+    }
+  }
+
+  // Remove toRemove.startVert and replace with endVert.
+  vertPos_[startVert] = vec3(NAN);
+  CollapseTri(tri1edge);
+
+  // Orbit startVert
+  const int tri0 = edge / 3;
+  const int tri1 = pair / 3;
+  int start = halfedge_.Pair(tri1edge[1]);
+  int current = tri1edge[2];
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
