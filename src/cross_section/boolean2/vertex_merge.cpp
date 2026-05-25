@@ -122,11 +122,11 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     }
     manifold::stable_sort(pairs.begin(), pairs.end());
   }
-  // Fast path: no candidates means no merges, identity remap.
+  // Fast path: no candidates means no merges, identity inputVert2Merged.
   if (pairs.empty()) {
-    std::vector<int> remap(n);
-    std::iota(remap.begin(), remap.end(), 0);
-    return {std::move(remap), in};
+    std::vector<int> inputVert2Merged(n);
+    std::iota(inputVert2Merged.begin(), inputVert2Merged.end(), 0);
+    return {std::move(inputVert2Merged), in};
   }
   // Parallelize the geometric distance gate (read-only on `in`); unite
   // serially in sorted pair order so cluster roots are deterministic
@@ -150,9 +150,9 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     }
   }
   if (!anyMerge) {
-    std::vector<int> remap(n);
-    std::iota(remap.begin(), remap.end(), 0);
-    return {std::move(remap), in};
+    std::vector<int> inputVert2Merged(n);
+    std::iota(inputVert2Merged.begin(), inputVert2Merged.end(), 0);
+    return {std::move(inputVert2Merged), in};
   }
   // Transitive proximity merge: pick an existing component vertex so a second
   // MergeVerts pass cannot create a new within-eps pair via centroid drift.
@@ -192,9 +192,9 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     rootToNew[r] = static_cast<int>(verts.size());
     verts.push_back(in[representative[r]]);
   }
-  std::vector<int> remap(n);
-  for (int i = 0; i < n; ++i) remap[i] = rootToNew[uf.find(i)];
-  return {std::move(remap), std::move(verts)};
+  std::vector<int> inputVert2Merged(n);
+  for (int i = 0; i < n; ++i) inputVert2Merged[i] = rootToNew[uf.find(i)];
+  return {std::move(inputVert2Merged), std::move(verts)};
 }
 
 // vertEdges[v] (filled by FindAndInsertIntersections) and adj[v] (filled

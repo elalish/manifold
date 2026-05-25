@@ -17,8 +17,7 @@
 // structural re-merge of crossing verts, sub-edge canonicalization,
 // and winding-rule filtering.
 // Returns an OverlapResult holding the merged-vert list, the retained
-// directed sub-edges, the input->output vert remap, and the merged-vert
-// count.
+// directed sub-edges, the inputVert2Merged remap, and the merged-vert count.
 
 #include "driver.h"
 
@@ -188,8 +187,8 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     manifold::stable_sort(pairs.begin(), pairs.end());
     pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
     for (const auto& pr : pairs) uf.unite(pr.first, pr.second);
-    // Build remap from union-find clusters; cluster position is centroid.
-    // Vector-by-root-id replaces std::map (same fix as MergeVerts).
+    // Build preRestruct2Post from union-find clusters; cluster position is
+    // centroid. Vector-by-root-id replaces std::map (same fix as MergeVerts).
     const int nV = static_cast<int>(merge.verts.size());
     std::vector<vec2> sumPos(nV, vec2{0, 0});
     std::vector<int> sumCnt(nV, 0);
@@ -209,18 +208,18 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
         rootToNew[r] = static_cast<int>(newVerts.size());
         newVerts.push_back(sumPos[r] * (1.0 / sumCnt[r]));
       }
-      std::vector<int> remap(nV);
-      for (int i = 0; i < nV; ++i) remap[i] = rootToNew[uf.find(i)];
-      // Apply remap to edges + lists + composed input remap.
+      std::vector<int> preRestruct2Post(nV);
+      for (int i = 0; i < nV; ++i) preRestruct2Post[i] = rootToNew[uf.find(i)];
+      // Apply preRestruct2Post to edges + lists + composed input remap.
       for (auto& e : edges) {
-        e.v0 = remap[e.v0];
-        e.v1 = remap[e.v1];
+        e.v0 = preRestruct2Post[e.v0];
+        e.v1 = preRestruct2Post[e.v1];
       }
       for (auto& list : lists) {
-        for (auto& v : list) v = remap[v];
+        for (auto& v : list) v = preRestruct2Post[v];
         list.erase(std::unique(list.begin(), list.end()), list.end());
       }
-      for (auto& r : merge.inputVert2Merged) r = remap[r];
+      for (auto& r : merge.inputVert2Merged) r = preRestruct2Post[r];
       merge.verts = std::move(newVerts);
     }
   }
