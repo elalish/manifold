@@ -42,7 +42,9 @@ namespace boolean2 {
 
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
-                               bool debug, WindRule pred, Trace* trace) {
+                               double tolerance, bool debug, WindRule pred,
+                               Trace* trace) {
+  if (tolerance < eps) tolerance = eps;
   auto& P = GlobalPhases();
   ScopedTiming totalTiming(P.totalNs);
   TraceRecorder traceRecorder(trace, eps, pred);
@@ -135,41 +137,52 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   }
   traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
 
-  // Structural re-merge: after insertion, duplicate intersection verts that
-  // share an incident edge and still land FP-close represent one true point.
   {
     ScopedTiming timing(P.restructNs);
     DisjointSets uf(static_cast<int>(merge.verts.size()));
-    // Shallow crossings can put duplicates up to eps/sin(theta) apart; the
-    // shared-edge gate prevents that wider threshold from merging unrelated
-    // intersections.
-    const double mergeThresh = kIntersectionMergeEpsFactor * eps;
-    const double mergeThresh2 = mergeThresh * mergeThresh;
-    // Duplicate intersection verts that should merge share an incident edge.
-    // Sweep each edge's sorted list and distance-check nearby candidates.
+    const double newToNewThresh = kIntersectionMergeEpsFactor * eps;
+    const double newToNewThresh2 = newToNewThresh * newToNewThresh;
+    const double newToOldThresh = tolerance;
+    const double newToOldThresh2 = newToOldThresh * newToOldThresh;
     std::vector<std::pair<int, int>> pairs;
-    std::vector<std::pair<double, int>> tlist;  // reused per edge
+    std::vector<std::pair<double, int>> tlist;
     for (size_t e = 0; e < edges.size(); ++e) {
       const auto& list = lists[e];
-      if (list.size() < 2) continue;
-      const vec2 a = merge.verts[edges[e].v0];
-      const vec2 b = merge.verts[edges[e].v1];
+      const int v0 = edges[e].v0;
+      const int v1 = edges[e].v1;
+      const vec2 a = merge.verts[v0];
+      const vec2 b = merge.verts[v1];
       const vec2 ab = b - a;
       const double abLen2 = dot(ab, ab);
       if (abLen2 == 0) continue;
       const double abLen = std::sqrt(abLen2);
-      const double tThresh = mergeThresh / abLen;
+      const double tThresh = newToNewThresh / abLen;
       tlist.clear();
       tlist.reserve(list.size());
-      // Lists are sorted by t; filter to intersection verts only.
       for (int v : list) {
+        // Skip pure-old verts; keep snapped-onto-old for new-to-new pairing.
         if (v >= (int)vertEdges.size() || vertEdges[v].empty()) continue;
         const vec2 p = merge.verts[v];
         const double t = dot(p - a, ab) / abLen2;
         tlist.emplace_back(t, v);
+        // Only truly-new verts: widening old-old would stack error across ops.
+        if (v >= numMerged && newToOldThresh > 0.0) {
+          const vec2 dA = p - a;
+          if (dot(dA, dA) <= newToOldThresh2) {
+            const int p0 = std::min(v, v0);
+            const int q0 = std::max(v, v0);
+            if (p0 != q0) pairs.emplace_back(p0, q0);
+          }
+          const vec2 dB = p - b;
+          if (dot(dB, dB) <= newToOldThresh2) {
+            const int p0 = std::min(v, v1);
+            const int q0 = std::max(v, v1);
+            if (p0 != q0) pairs.emplace_back(p0, q0);
+          }
+        }
       }
       if (tlist.size() < 2) continue;
-      // Sweep window: for each i, advance j while along-edge gap ≤ tThresh.
+      // Sweep window: for each i, advance j while along-edge gap <= tThresh.
       for (size_t i = 0; i < tlist.size(); ++i) {
         for (size_t j = i + 1;
              j < tlist.size() && tlist[j].first - tlist[i].first <= tThresh;
@@ -177,7 +190,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
           const int va = tlist[i].second;
           const int vb = tlist[j].second;
           const vec2 d = merge.verts[vb] - merge.verts[va];
-          if (dot(d, d) > mergeThresh2) continue;
+          if (dot(d, d) > newToNewThresh2) continue;
           const int p = std::min(va, vb);
           const int q = std::max(va, vb);
           pairs.emplace_back(p, q);

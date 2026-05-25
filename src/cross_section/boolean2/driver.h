@@ -31,9 +31,13 @@ struct OverlapResult {
   int numMergedVerts;
 };
 
+// `eps` is the fresh per-op FP-noise bound (3D analogue: Impl::epsilon_).
+// `tolerance` is the propagated drift bound (3D analogue: Impl::tolerance_);
+// floored to `eps` if smaller. structural_remerge widens new-to-old snaps to
+// `tolerance`, MergeVerts stays at `eps`.
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
-                               bool debug = false,
+                               double tolerance = 0.0, bool debug = false,
                                WindRule pred = WindRule::Add,
                                Trace* trace = nullptr);
 

@@ -163,12 +163,13 @@ void AppendInput(const Polygons& polys, int mult, std::vector<vec2>* verts,
 }
 
 Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
-                        WindRule rule, double eps) {
+                        WindRule rule, double eps, double tolerance) {
   if (!AllFinite(a) || !AllFinite(b)) return {};
   const auto frame = MakeLocalFrame(a, b);
   Polygons localA = TranslatePolygons(a, -frame.origin);
   Polygons localB = TranslatePolygons(b, -frame.origin);
   if (eps <= 0.0) eps = InferEps(localA, localB);
+  if (tolerance < eps) tolerance = eps;
 
   std::vector<vec2> verts;
   std::vector<EdgeM> edges;
@@ -176,21 +177,11 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
   AppendInput(localB, bMult, &verts, &edges);
   if (verts.empty()) return {};
 
-  auto r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
-  // Binary operations can consume earlier binary results. If two output
-  // endpoints should meet at the same true point, their separation can include
-  // one eps of drift per endpoint from the producer op plus one eps per
-  // endpoint from this op. Split those near-repeated vertices during polygon
-  // extraction; this does not merge vertices in the arrangement itself.
-  constexpr double kComparedEndpoints = 2.0;
-  constexpr double kPriorOpDriftPerEndpoint = 1.0;
-  constexpr double kThisOpDriftPerEndpoint = 1.0;
-  const double nearRepeatedVertexTol =
-      kComparedEndpoints *
-      (kPriorOpDriftPerEndpoint + kThisOpDriftPerEndpoint) * eps;
+  auto r =
+      RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
+  // Pair distance bound: two endpoints each drifting up to `tolerance`.
   return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, nearRepeatedVertexTol),
-      frame.origin);
+      OutEdgesToPolygons(r.verts, r.edges, 2.0 * tolerance), frame.origin);
 }
 }  // namespace
 
@@ -272,14 +263,15 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
 }
 
 // Single-input regularization used by `CrossSection::Simplify(eps)`.
-Polygons Simplify(const Polygons& in, double eps) {
+Polygons Simplify(const Polygons& in, double eps, double tolerance) {
   if (!AllFinite(in)) return {};
   const auto frame = MakeLocalFrame(in);
   Polygons local = TranslatePolygons(in, -frame.origin);
   if (eps <= 0.0) eps = InferEps(local, {});
+  if (tolerance < eps) tolerance = eps;
   auto [verts, edges] = PolygonsToInput(local);
   if (verts.empty()) return {};
-  auto r = RemoveOverlaps2D(verts, edges, eps);
+  auto r = RemoveOverlaps2D(verts, edges, eps, tolerance);
   return TranslatePolygons(
       OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);
@@ -317,27 +309,28 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
   if (eps <= 0.0) eps = InferEps(local, {});
   auto [verts, edges] = PolygonsToInput(local);
   if (verts.empty()) return {};
-  auto r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
+  auto r = RemoveOverlaps2D(verts, edges, eps, eps, /*debug=*/false, rule);
   return TranslatePolygons(
       OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
       frame.origin);
 }
 
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.
-Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
-                   double eps) {
+Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
+                   double tolerance) {
   const int bMult = op == OpType::Subtract ? -1 : 1;
   const WindRule rule = op == OpType::Intersect  ? WindRule::Intersect
                         : op == OpType::Subtract ? WindRule::Add
                                                  : WindRule::Add;
-  return BinaryOpByRule(a, b, bMult, rule, eps);
+  return BinaryOpByRule(a, b, bMult, rule, eps, tolerance);
 }
 
 // Symmetric difference (XOR): the region covered by A or B but not both.
 // `manifold::OpType` only has three values (Add/Subtract/Intersect), so
 // XOR is exposed as a separate core helper.
-Polygons Xor(const Polygons& a, const Polygons& b, double eps) {
-  return BinaryOpByRule(a, b, 1, WindRule::EvenOdd, eps);
+Polygons Xor(const Polygons& a, const Polygons& b, double eps,
+             double tolerance) {
+  return BinaryOpByRule(a, b, 1, WindRule::EvenOdd, eps, tolerance);
 }
 
 }  // namespace boolean2
