@@ -411,29 +411,9 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     ensureFastEdges();
     return CastWindingRay(pInF, fastEdges);
   };
-  auto seedRayCastLeastBiased = [&](int f) {
-    int h0 = faceStartHE[f];
-    if (h0 < 0) {
-      faceWind[f] = 0;
-      wAssigned[f] = 1;
-      return;
-    }
-    // A disconnected component's local outer face can pass through regions
-    // separated by other components. Sample each boundary edge and use the
-    // least-biased absolute winding so cleanup passes keep disjoint islands
-    // instead of inheriting a neighboring component's winding.
-    int best = castFaceHalfedge(h0);
-    int hh = halfedges[h0].next;
-    int safety = 0;
-    while (hh >= 0 && hh != h0 && ++safety <= (int)halfedges.size()) {
-      const int w = castFaceHalfedge(hh);
-      if (std::abs(w) < std::abs(best) ||
-          (std::abs(w) == std::abs(best) && w < best)) {
-        best = w;
-      }
-      hh = halfedges[hh].next;
-    }
-    faceWind[f] = best;
+  auto seedRayCast = [&](int f) {
+    const int h0 = faceStartHE[f];
+    faceWind[f] = h0 < 0 ? 0 : castFaceHalfedge(h0);
     wAssigned[f] = 1;
   };
   // The unbounded outer face is conventionally outside, so winding = 0.
@@ -510,7 +490,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
         if (faceArea[cf] < faceArea[localOuter]) localOuter = cf;
       }
       componentLocalOuter[localOuter] = 1;
-      seedRayCastLeastBiased(localOuter);
+      seedRayCast(localOuter);
       propagateFrom(localOuter);
     }
   }
