@@ -47,7 +47,7 @@ struct PhaseAcc {
   std::atomic<int64_t> cases{0};
   std::atomic<int64_t> bvhBuildNs{0};
   std::atomic<int64_t> broadPairWorkNs{0};
-  std::atomic<int64_t> edgeVertListsNs{0};
+  std::atomic<int64_t> narrowPhaseNs{0};
 
   void Reset() {
     mergeNs = 0;
@@ -60,7 +60,7 @@ struct PhaseAcc {
     cases = 0;
     bvhBuildNs = 0;
     broadPairWorkNs = 0;
-    edgeVertListsNs = 0;
+    narrowPhaseNs = 0;
   }
 };
 

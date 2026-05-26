@@ -203,7 +203,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   // decides internally whether the pair loop is serial or TBB.
   intersections.clear();
   {
-    ScopedTiming timing(P.edgeVertListsNs);
+    ScopedTiming timing(P.narrowPhaseNs);
     BuildListsAndFindIntersections(edges, merge.verts, eps, intersectionPairs,
                                    &lists, &intersections);
   }
