@@ -236,22 +236,32 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
                 [&](int a, int b) { return cost[a] < cost[b]; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     for (int i = 0; cost[edges[i]] < maxCost && i < end - edges.begin(); ++i) {
+      // std::cout << "checking edge " << edges[i] << " with cost "
+      //           << cost[edges[i]] << std::endl;
       const int edge = edges[i];
+      if (halfedge_.Pair(edge) < 0) {
+        cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+        continue;
+      }
       if (vertsVisited[halfedge_.Start(edge)] ||
           vertsVisited[halfedge_.End(edge)]) {
         continue;
       }
       cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+      const int startV = halfedge_.Start(edge);
+      const int endV = halfedge_.End(edge);
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer);
+      vertsVisited.resize(vertPos_.size(), false);
       if (didCollapse) {
-        vertPos_[halfedge_.End(edge)] = newPos[edge];
-        vertsVisited[halfedge_.Start(edge)] = true;
-        vertsVisited[halfedge_.End(edge)] = true;
+        vertPos_[endV] = newPos[edge];
+        vertsVisited[startV] = true;
+        vertsVisited[endV] = true;
         ++numCollapsed;
       }
     }
     end = std::partition(edges.begin(), end,
                          [&](int edge) { return cost[edge] < maxCost; });
+    std::cout << "edges left: " << (end - edges.begin()) << std::endl;
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2 && numCollapsed > 0) {
@@ -710,6 +720,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
 bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
+  edges.resize(0);
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
   const int pair = halfedge_.Pair(edge);
@@ -730,6 +741,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
     }
   }
 
+  int start = halfedge_.Pair(tri1edge[1]);
   // Remove toRemove.startVert and replace with endVert.
   vertPos_[startVert] = vec3(NAN);
   CollapseTri(tri1edge);
@@ -737,8 +749,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
   // Orbit startVert
   const int tri0 = edge / 3;
   const int tri1 = pair / 3;
-  int start = halfedge_.Pair(tri1edge[1]);
-  int current = tri1edge[2];
+  int current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
