@@ -5,8 +5,8 @@ default backend remains `clipper2`; this branch only adds the Boolean2 library
 and a staged, empty-returning `boolean2` backend translation unit. A later PR
 wires that translation unit into the public `CrossSection` methods.
 
-Boolean2 is a manifold-native 2D arrangement pipeline for polygon fill,
-Boolean, and XOR operations. Sibling utilities in
+Boolean2 is a manifold-native 2D arrangement pipeline for polygon fill and
+Boolean operations. Sibling utilities in
 `src/cross_section/boolean2/` provide the decomposition and offset pieces that
 the follow-up backend wiring uses to cover the rest of the public
 `CrossSection` API. The current branch keeps the implementation reviewable by
@@ -95,7 +95,7 @@ upstream issue #289: epsilon-based vertex merge, collapsed-edge removal,
 ordered edge vertex lists, snapped proper crossings, multiplicity-based
 sub-edge canonicalization, and positive-winding output. The current code
 generalizes the final filter so the same arrangement can serve union,
-subtract, intersect, XOR, and construction-time fill rules.
+subtract, intersect, and construction-time fill rules.
 
 The main implementation differences are:
 
@@ -128,8 +128,7 @@ result and the face on the other side is outside. The built-in predicates are:
   multiplicity, then using `Add`.
 - `Intersect`: `w > 1`, which corresponds to both operands covering the face
   for normalized unit-winding operands.
-- `EvenOdd`: `w & 1`, used by the Boolean2 core XOR helper and available for
-  construction-time fill.
+- `EvenOdd`: `w & 1`, available for construction-time fill.
 - `NonZero`: `w != 0`, available for construction-time fill and offset cleanup.
 - `Negative`: `w < 0`, available for construction-time fill and negative-offset
   fallback.
