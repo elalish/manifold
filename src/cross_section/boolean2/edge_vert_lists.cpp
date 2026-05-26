@@ -195,6 +195,8 @@ void BuildListsAndFindIntersections(
   BuildEdgeGeometry(edges, verts, &edgeG);
   thread_local static std::vector<std::vector<int>> adj;
   BuildAdjacency(edges, nV, &adj);
+  const auto& edgeGRef = edgeG;
+  const auto& adjRef = adj;
 
   std::vector<EdgeVertHit> flatHits;
 
@@ -208,7 +210,7 @@ void BuildListsAndFindIntersections(
     manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
                          countAt(size_t{0}), pairs.size(), [&](size_t idx) {
                            auto& l = tls.local();
-                           ProcessEdgePair(edges, verts, edgeG, adj, eps,
+                           ProcessEdgePair(edges, verts, edgeGRef, adjRef, eps,
                                            pairs[idx], &l.hits, &l.ix);
                          });
     tls.combine_each([&](const Local& l) {
@@ -219,7 +221,7 @@ void BuildListsAndFindIntersections(
 #endif
   {
     for (const auto& pr : pairs) {
-      ProcessEdgePair(edges, verts, edgeG, adj, eps, pr, &flatHits,
+      ProcessEdgePair(edges, verts, edgeGRef, adjRef, eps, pr, &flatHits,
                       intersections);
     }
   }
