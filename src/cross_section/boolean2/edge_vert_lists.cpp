@@ -43,252 +43,116 @@ bool FarEnoughFromLineForApexReject(double cross2, double eps2_abLen2) {
   return cross2 >= eps2_abLen2 * kApexRejectMinDistance2Frac;
 }
 
-}  // namespace
+struct EdgeGeom {
+  vec2 a, ab;
+  double abLen2;
+};
 
-std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs) {
+struct EdgeVertHit {
+  int e;
+  double t;
+  int v;
+};
+
+void BuildEdgeGeometry(const std::vector<EdgeM>& edges,
+                       const std::vector<vec2>& verts,
+                       std::vector<EdgeGeom>* edgeG) {
   const int nE = static_cast<int>(edges.size());
-  const int nV = static_cast<int>(verts.size());
-  const double eps2 = eps * eps;
-  std::vector<std::vector<int>> lists(nE);
-
-  thread_local static std::vector<std::vector<int>> adj;
-
-  struct Hit {
-    int e;
-    double t;
-    int v;
-  };
-  std::vector<Hit> flatHits;
-
-  struct EdgeG {
-    vec2 a, ab;
-    double abLen2;
-  };
-  std::vector<EdgeG> edgeG(nE);
+  edgeG->resize(nE);
   for (int e = 0; e < nE; ++e) {
-    edgeG[e].a = verts[edges[e].v0];
-    edgeG[e].ab = verts[edges[e].v1] - edgeG[e].a;
-    edgeG[e].abLen2 = dot(edgeG[e].ab, edgeG[e].ab);
+    (*edgeG)[e].a = verts[edges[e].v0];
+    (*edgeG)[e].ab = verts[edges[e].v1] - (*edgeG)[e].a;
+    (*edgeG)[e].abLen2 = dot((*edgeG)[e].ab, (*edgeG)[e].ab);
   }
-
-  bool adjBuilt = false;
-  auto ensureAdj = [&]() {
-    if (adjBuilt) return;
-    if ((int)adj.size() < nV) adj.resize(nV);
-    for (int i = 0; i < nV; ++i) adj[i].clear();
-    for (const auto& e : edges) {
-      VESetInsert(&adj[e.v0], e.v1);
-      VESetInsert(&adj[e.v1], e.v0);
-    }
-    adjBuilt = true;
-  };
-
-  auto narrow = [&](int v, int e) {
-    if (v == edges[e].v0 || v == edges[e].v1) {
-      return;
-    }
-    const auto& g = edgeG[e];
-    if (g.abLen2 == 0) {
-      return;
-    }
-    const vec2 ap = verts[v] - g.a;
-    const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
-    if (dotAB <= 0 || dotAB >= g.abLen2) {
-      return;
-    }
-    const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
-    const double cross2 = cross * cross;
-    const double eps2_abLen2 = eps2 * g.abLen2;
-    if (cross2 > eps2_abLen2) {
-      return;
-    }
-    if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2)) {
-      ensureAdj();
-      if (VESetContains(adj[v], edges[e].v0) &&
-          VESetContains(adj[v], edges[e].v1)) {
-        return;
-      }
-    }
-    flatHits.push_back({e, dotAB / g.abLen2, v});
-  };
-
-  auto narrowIfNonEndpoint = [&](int v, int e) {
-    if (v == edges[e].v0 || v == edges[e].v1) {
-      return;
-    }
-    narrow(v, e);
-  };
-
-  for (const auto& [i, j] : pairs) {
-    narrowIfNonEndpoint(edges[i].v0, j);
-    narrowIfNonEndpoint(edges[i].v1, j);
-    narrowIfNonEndpoint(edges[j].v0, i);
-    narrowIfNonEndpoint(edges[j].v1, i);
-  }
-
-  manifold::stable_sort(flatHits.begin(), flatHits.end(),
-                        [](const Hit& a, const Hit& b) {
-                          if (a.e != b.e) return a.e < b.e;
-                          if (a.t != b.t) return a.t < b.t;
-                          return a.v < b.v;
-                        });
-  for (size_t i = 0; i < flatHits.size();) {
-    const int e = flatHits[i].e;
-    size_t j = i;
-    while (j < flatHits.size() && flatHits[j].e == e) ++j;
-    lists[e].reserve(j - i);
-    int lastV = -1;
-    for (size_t k = i; k < j; ++k) {
-      if (flatHits[k].v == lastV) continue;
-      lists[e].push_back(flatHits[k].v);
-      lastV = flatHits[k].v;
-    }
-    i = j;
-  }
-  return lists;
 }
 
-// Pair-count threshold above which the driver dispatches to the fused
-// parallel pass below. Smaller inputs stay on the serial two-pass path to
-// avoid TBB setup overhead.
-extern const size_t kFusedNarrowParallelMin = 1024;
-
-#if (MANIFOLD_PAR == 1)
-// Combined parallel narrow + IntersectSegments pass for large pair lists.
-// Outputs per-edge split lists and sorted (i, j, p) intersection points.
-void BuildListsAndFindIntersectionsParallel(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs,
-    std::vector<std::vector<int>>* lists,
-    std::vector<IntersectionPoint>* intersections) {
-  const int nE = static_cast<int>(edges.size());
-  const int nV = static_cast<int>(verts.size());
-  const double eps2 = eps * eps;
-  lists->assign(nE, {});
-  intersections->clear();
-
-  // Per-calling-thread scratch; workers read it only through `edgeGRef`.
-  struct EdgeG {
-    vec2 a, ab;
-    double abLen2;
-  };
-  thread_local static std::vector<EdgeG> edgeG;
-  edgeG.resize(nE);
-  for (int e = 0; e < nE; ++e) {
-    edgeG[e].a = verts[edges[e].v0];
-    edgeG[e].ab = verts[edges[e].v1] - edgeG[e].a;
-    edgeG[e].abLen2 = dot(edgeG[e].ab, edgeG[e].ab);
-  }
-
-  // Build adj eagerly for the apex check.
-  thread_local static std::vector<std::vector<int>> adj;
-  if ((int)adj.size() < nV) adj.resize(nV);
-  for (int i = 0; i < nV; ++i) adj[i].clear();
+void BuildAdjacency(const std::vector<EdgeM>& edges, int nV,
+                    std::vector<std::vector<int>>* adj) {
+  if ((int)adj->size() < nV) adj->resize(nV);
+  for (int i = 0; i < nV; ++i) (*adj)[i].clear();
   for (const auto& e : edges) {
-    VESetInsert(&adj[e.v0], e.v1);
-    VESetInsert(&adj[e.v1], e.v0);
+    VESetInsert(&(*adj)[e.v0], e.v1);
+    VESetInsert(&(*adj)[e.v1], e.v0);
   }
-  // References bind the calling thread's scratch before worker dispatch.
-  auto& adjRef = adj;
-  auto& edgeGRef = edgeG;
+}
 
-  struct Hit {
-    int e;
-    double t;
-    int v;
-  };
+void RecordEdgeVertHit(const std::vector<EdgeM>& edges,
+                       const std::vector<vec2>& verts,
+                       const std::vector<EdgeGeom>& edgeG,
+                       const std::vector<std::vector<int>>& adj, double eps2,
+                       int v, int e, std::vector<EdgeVertHit>* hits) {
+  if (v == edges[e].v0 || v == edges[e].v1) return;
+  const auto& g = edgeG[e];
+  if (g.abLen2 == 0) return;
+  const vec2 ap = verts[v] - g.a;
+  const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
+  if (dotAB <= 0 || dotAB >= g.abLen2) return;
+  const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
+  const double cross2 = cross * cross;
+  const double eps2_abLen2 = eps2 * g.abLen2;
+  if (cross2 > eps2_abLen2) return;
+  if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2) &&
+      VESetContains(adj[v], edges[e].v0) &&
+      VESetContains(adj[v], edges[e].v1)) {
+    return;
+  }
+  hits->push_back({e, dotAB / g.abLen2, v});
+}
 
-  auto narrowLocal = [&](int v, int e, std::vector<Hit>& out) {
-    if (v == edges[e].v0 || v == edges[e].v1) return;
-    const auto& g = edgeGRef[e];
-    if (g.abLen2 == 0) return;
-    const vec2 ap = verts[v] - g.a;
-    const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
-    if (dotAB <= 0 || dotAB >= g.abLen2) return;
-    const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
-    const double cross2 = cross * cross;
-    const double eps2_abLen2 = eps2 * g.abLen2;
-    if (cross2 > eps2_abLen2) return;
-    if (FarEnoughFromLineForApexReject(cross2, eps2_abLen2)) {
-      if (VESetContains(adjRef[v], edges[e].v0) &&
-          VESetContains(adjRef[v], edges[e].v1))
-        return;
-    }
-    out.push_back({e, dotAB / g.abLen2, v});
-  };
+bool SharesEndpoint(const EdgeM& a, const EdgeM& b) {
+  return a.v0 == b.v0 || a.v0 == b.v1 || a.v1 == b.v0 || a.v1 == b.v1;
+}
 
-  std::vector<Hit> flatHits;
+void ProcessEdgePair(const std::vector<EdgeM>& edges,
+                     const std::vector<vec2>& verts,
+                     const std::vector<EdgeGeom>& edgeG,
+                     const std::vector<std::vector<int>>& adj, double eps,
+                     const std::pair<int, int>& pr,
+                     std::vector<EdgeVertHit>* hits,
+                     std::vector<IntersectionPoint>* intersections) {
+  const int i = pr.first;
+  const int j = pr.second;
+  const auto& ei = edges[i];
+  const auto& ej = edges[j];
+  const double eps2 = eps * eps;
+  RecordEdgeVertHit(edges, verts, edgeG, adj, eps2, ei.v0, j, hits);
+  RecordEdgeVertHit(edges, verts, edgeG, adj, eps2, ei.v1, j, hits);
+  RecordEdgeVertHit(edges, verts, edgeG, adj, eps2, ej.v0, i, hits);
+  RecordEdgeVertHit(edges, verts, edgeG, adj, eps2, ej.v1, i, hits);
+  if (SharesEndpoint(ei, ej)) return;
+  vec2 p;
+  if (IntersectSegments({verts[ei.v0], verts[ei.v1], i},
+                        {verts[ej.v0], verts[ej.v1], j}, eps, &p)) {
+    intersections->push_back({i, j, p});
+  }
+}
 
-  // Per-pair work: four vert-on-edge narrow tests plus an
-  // IntersectSegments call gated on the pair not sharing an endpoint.
-  // The narrow tests always run because T-junctions and butterfly
-  // polygons with cancel-pair retraces can put the non-shared endpoint
-  // of one edge on the interior of the other, even when the pair
-  // shares a vertex. IntersectSegments is skipped for shared-endpoint
-  // pairs: it would produce a bogus intersection at the shared vertex
-  // itself. CollectIntersectionPairs has already pruned shared-
-  // endpoint pairs that aren't near-collinear at the shared vertex
-  // (no possible T-junction), so by the time we get here, shared
-  // pairs are a small minority.
-  auto processPair = [&](size_t idx, std::vector<Hit>& hitsOut,
-                         std::vector<IntersectionPoint>& ixOut) {
-    const auto& pr = pairs[idx];
-    const int i = pr.first;
-    const int j = pr.second;
-    const auto& ei = edges[i];
-    const auto& ej = edges[j];
-    narrowLocal(ei.v0, j, hitsOut);
-    narrowLocal(ei.v1, j, hitsOut);
-    narrowLocal(ej.v0, i, hitsOut);
-    narrowLocal(ej.v1, i, hitsOut);
-    if (ei.v0 == ej.v0 || ei.v0 == ej.v1 || ei.v1 == ej.v0 || ei.v1 == ej.v1)
-      return;
-    vec2 p;
-    if (IntersectSegments({verts[ei.v0], verts[ei.v1], i},
-                          {verts[ej.v0], verts[ej.v1], j}, eps, &p)) {
-      ixOut.push_back({i, j, p});
-    }
-  };
-
-  struct Local {
-    std::vector<Hit> hits;
-    std::vector<IntersectionPoint> ix;
-  };
-  tbb::combinable<Local> tls;
-  manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
-                       countAt(size_t{0}), pairs.size(), [&](size_t idx) {
-                         auto& l = tls.local();
-                         processPair(idx, l.hits, l.ix);
-                       });
-  tls.combine_each([&](const Local& l) {
-    flatHits.insert(flatHits.end(), l.hits.begin(), l.hits.end());
-    intersections->insert(intersections->end(), l.ix.begin(), l.ix.end());
-  });
-
-  // Sort hits by (e, t, v), build per-edge lists, dedupe.
-  manifold::stable_sort(flatHits.begin(), flatHits.end(),
-                        [](const Hit& a, const Hit& b) {
+void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>* flatHits,
+                              std::vector<std::vector<int>>* lists) {
+  lists->assign(nE, {});
+  manifold::stable_sort(flatHits->begin(), flatHits->end(),
+                        [](const EdgeVertHit& a, const EdgeVertHit& b) {
                           if (a.e != b.e) return a.e < b.e;
                           if (a.t != b.t) return a.t < b.t;
                           return a.v < b.v;
                         });
-  for (size_t i = 0; i < flatHits.size();) {
-    const int e = flatHits[i].e;
+  for (size_t i = 0; i < flatHits->size();) {
+    const int e = (*flatHits)[i].e;
     size_t j = i;
-    while (j < flatHits.size() && flatHits[j].e == e) ++j;
+    while (j < flatHits->size() && (*flatHits)[j].e == e) ++j;
     auto& lst = (*lists)[e];
     lst.reserve(j - i);
     int lastV = -1;
     for (size_t k = i; k < j; ++k) {
-      if (flatHits[k].v == lastV) continue;
-      lst.push_back(flatHits[k].v);
-      lastV = flatHits[k].v;
+      if ((*flatHits)[k].v == lastV) continue;
+      lst.push_back((*flatHits)[k].v);
+      lastV = (*flatHits)[k].v;
     }
     i = j;
   }
-  // Sort intersections by (i, j) for deterministic serial snap+insert.
+}
+
+void SortIntersections(std::vector<IntersectionPoint>* intersections) {
   manifold::stable_sort(
       intersections->begin(), intersections->end(),
       [](const IntersectionPoint& a, const IntersectionPoint& b) {
@@ -296,7 +160,72 @@ void BuildListsAndFindIntersectionsParallel(
         return a.j < b.j;
       });
 }
+
+}  // namespace
+
+// Pair-count threshold above which the combined helper uses TBB. Smaller
+// inputs stay serial to avoid setup overhead.
+extern const size_t kFusedNarrowParallelMin = 1024;
+
+std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
+    const std::vector<std::pair<int, int>>& pairs) {
+  std::vector<std::vector<int>> lists;
+  std::vector<IntersectionPoint> unusedIntersections;
+  BuildListsAndFindIntersections(edges, verts, eps, pairs, &lists,
+                                 &unusedIntersections);
+  return lists;
+}
+
+// Combined narrow phase: four vert-on-edge tests plus the independent
+// IntersectSegments precompute for each broad-phase pair. The algorithmic
+// result is serially materialized later; TBB is only an execution choice for
+// large pair sets.
+void BuildListsAndFindIntersections(
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
+    const std::vector<std::pair<int, int>>& pairs,
+    std::vector<std::vector<int>>* lists,
+    std::vector<IntersectionPoint>* intersections) {
+  const int nE = static_cast<int>(edges.size());
+  const int nV = static_cast<int>(verts.size());
+  intersections->clear();
+
+  // Per-calling-thread scratch; workers read these only through const refs.
+  thread_local static std::vector<EdgeGeom> edgeG;
+  BuildEdgeGeometry(edges, verts, &edgeG);
+  thread_local static std::vector<std::vector<int>> adj;
+  BuildAdjacency(edges, nV, &adj);
+
+  std::vector<EdgeVertHit> flatHits;
+
+#if (MANIFOLD_PAR == 1)
+  if (pairs.size() >= kFusedNarrowParallelMin) {
+    struct Local {
+      std::vector<EdgeVertHit> hits;
+      std::vector<IntersectionPoint> ix;
+    };
+    tbb::combinable<Local> tls;
+    manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
+                         countAt(size_t{0}), pairs.size(), [&](size_t idx) {
+                           auto& l = tls.local();
+                           ProcessEdgePair(edges, verts, edgeG, adj, eps,
+                                           pairs[idx], &l.hits, &l.ix);
+                         });
+    tls.combine_each([&](const Local& l) {
+      flatHits.insert(flatHits.end(), l.hits.begin(), l.hits.end());
+      intersections->insert(intersections->end(), l.ix.begin(), l.ix.end());
+    });
+  } else
 #endif
+  {
+    for (const auto& pr : pairs) {
+      ProcessEdgePair(edges, verts, edgeG, adj, eps, pr, &flatHits,
+                      intersections);
+    }
+  }
+  MaterializeEdgeVertLists(nE, &flatHits, lists);
+  SortIntersections(intersections);
+}
 
 }  // namespace boolean2
 }  // namespace manifold

@@ -37,8 +37,6 @@ Polygons Simplify(const Polygons& in, double eps, double tolerance = 0.0);
 Polygons FillByRule(const Polygons& in, WindRule rule, double eps = 0.0);
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
                    double eps = 0.0, double tolerance = 0.0);
-Polygons Xor(const Polygons& a, const Polygons& b, double eps = 0.0,
-             double tolerance = 0.0);
 
 }  // namespace boolean2
 }  // namespace manifold

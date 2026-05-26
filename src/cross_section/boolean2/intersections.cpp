@@ -13,10 +13,10 @@
 // limitations under the License.
 //
 // Edge-edge intersection discovery: broad phase collects candidate edge
-// pairs; FindAndInsertIntersections runs the per-pair narrow phase
-// (IntersectSegments + snap-to-existing-vert + sorted insertion into both
-// edges' parameter lists). Eager-propagation re-sweeps any vert that
-// snapped onto its k-th edge to detect k+1 incidences in one pass.
+// pairs; the edge-vertex narrow phase precomputes proper intersections;
+// FindAndInsertIntersections then snaps/inserts them into both edges'
+// parameter lists. Eager-propagation re-sweeps any vert that snapped onto
+// its k-th edge to detect k+1 incidences in one pass.
 
 #include "intersections.h"
 
@@ -26,8 +26,6 @@
 
 #include "../../parallel.h"
 #include "bvh.h"
-#include "edge_vert_lists.h"
-#include "parallel_policy.h"
 #include "predicates.h"
 #include "vertex_merge.h"
 
@@ -204,81 +202,21 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 #endif
 }
 
-// Exactly one of `pairsIn` or `precomputedIntersections` must be supplied.
-void FindAndInsertIntersectionsImpl(
+void FindAndInsertIntersections(
     const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
     std::vector<std::vector<int>>* lists,
     std::vector<std::vector<int>>* vertEdges, double eps,
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
-    const std::vector<std::pair<int, int>>* pairsIn,
-    const std::vector<IntersectionPoint>* precomputedIntersections) {
+    const std::vector<IntersectionPoint>& precomputedIntersections) {
   const int nE = static_cast<int>(edges.size());
   const double eps2 = eps * eps;
   vertEdges->resize(verts->size());
   const int origNumVerts = static_cast<int>(verts->size());
 
-  // Compute intersections independently, then snap/insert in a deterministic
-  // serial pass because insertion mutates shared vertex and edge lists.
-  using PairIx = IntersectionPoint;
-  thread_local static std::vector<PairIx> intersections;
-  // If caller already computed intersections via the fused parallel
-  // pass, use them directly; otherwise compute below.
-  if (precomputedIntersections != nullptr) {
-    // Just point at the supplied data; the serial pass below reads it.
-    // We can't quite assign-from-ref since the loop reads `intersections`
-    // by name; copy is cheap relative to recomputing.
-    intersections = *precomputedIntersections;
-  } else {
-    intersections.clear();
-    const auto& pairs = *pairsIn;
-    // Per-pair work: compute the segment-segment intersection point, gated
-    // on the pair not sharing an endpoint. Shared-endpoint pairs would
-    // produce a bogus intersection at the shared vertex itself; their
-    // vertex-on-edge interactions are handled separately by the narrow
-    // phase in BuildEdgeVertListsFromEdgePairs.
-    auto pairIx = [&](size_t k, std::vector<PairIx>& out) {
-      const int i = pairs[k].first;
-      const int j = pairs[k].second;
-      const auto& ei = edges[i];
-      const auto& ej = edges[j];
-      if (ei.v0 == ej.v0 || ei.v0 == ej.v1 || ei.v1 == ej.v0 || ei.v1 == ej.v1)
-        return;
-      vec2 p;
-      if (!IntersectSegments({(*verts)[ei.v0], (*verts)[ei.v1], i},
-                             {(*verts)[ej.v0], (*verts)[ej.v1], j}, eps, &p))
-        return;
-      out.push_back({i, j, p});
-    };
-    // Match the fused narrow-pass threshold used by the in-tree driver. Direct
-    // callers that bypass the fused path still use the same parallel policy.
-    const size_t kParallelIxMin = kFusedNarrowParallelMin;
-#if (MANIFOLD_PAR == 1)
-    if (pairs.size() >= kParallelIxMin) {
-      tbb::combinable<std::vector<PairIx>> tls;
-      manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
-                           countAt(size_t{0}), pairs.size(),
-                           [&](size_t k) { pairIx(k, tls.local()); });
-      tls.combine_each([&](const std::vector<PairIx>& l) {
-        intersections.insert(intersections.end(), l.begin(), l.end());
-      });
-      // Re-sort by (i, j) so the serial pass below sees a deterministic
-      // order (matches the order the sequential path would have produced).
-      manifold::stable_sort(intersections.begin(), intersections.end(),
-                            [](const PairIx& a, const PairIx& b) {
-                              if (a.i != b.i) return a.i < b.i;
-                              return a.j < b.j;
-                            });
-    } else
-#endif
-    {
-      for (size_t k = 0; k < pairs.size(); ++k) pairIx(k, intersections);
-    }
-  }  // end else (precomputedIntersections == nullptr)
-
   // Serial snap+insert pass. Each iteration may push to `verts` and
   // mutate `lists[*]`, so subsequent iterations see the latest state.
   // Avoid structured-binding capture (C++20-only) by naming locals.
-  for (const PairIx& ix : intersections) {
+  for (const IntersectionPoint& ix : precomputedIntersections) {
     const int i = ix.i;
     const int j = ix.j;
     const vec2 p = ix.p;
@@ -435,30 +373,6 @@ void FindAndInsertIntersectionsImpl(
     BVHCollisions<false>(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
   }
 }
-
-// Public wrapper: compute intersections inline from `pairs`.
-void FindAndInsertIntersections(const std::vector<EdgeM>& edges,
-                                std::vector<vec2>* verts,
-                                std::vector<std::vector<int>>* lists,
-                                std::vector<std::vector<int>>* vertEdges,
-                                double eps, const std::vector<Box2>& edgeBoxes,
-                                const BVH& bvh,
-                                const std::vector<std::pair<int, int>>& pairs) {
-  FindAndInsertIntersectionsImpl(edges, verts, lists, vertEdges, eps, edgeBoxes,
-                                 bvh, &pairs, nullptr);
-}
-
-#if (MANIFOLD_PAR == 1)
-void FindAndInsertIntersectionsFromPrecomputed(
-    const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
-    std::vector<std::vector<int>>* lists,
-    std::vector<std::vector<int>>* vertEdges, double eps,
-    const std::vector<Box2>& edgeBoxes, const BVH& bvh,
-    const std::vector<IntersectionPoint>& precomputed) {
-  FindAndInsertIntersectionsImpl(edges, verts, lists, vertEdges, eps, edgeBoxes,
-                                 bvh, nullptr, &precomputed);
-}
-#endif
 
 }  // namespace boolean2
 }  // namespace manifold

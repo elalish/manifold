@@ -31,21 +31,12 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<Box2>& edgeBoxes,
                               const BVH& bvh,
                               std::vector<std::pair<int, int>>* pairs);
-void FindAndInsertIntersections(const std::vector<EdgeM>& edges,
-                                std::vector<vec2>* verts,
-                                std::vector<std::vector<int>>* lists,
-                                std::vector<std::vector<int>>* vertEdges,
-                                double eps, const std::vector<Box2>& edgeBoxes,
-                                const BVH& bvh,
-                                const std::vector<std::pair<int, int>>& pairs);
-#if (MANIFOLD_PAR == 1)
-void FindAndInsertIntersectionsFromPrecomputed(
+void FindAndInsertIntersections(
     const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
     std::vector<std::vector<int>>* lists,
     std::vector<std::vector<int>>* vertEdges, double eps,
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
-    const std::vector<IntersectionPoint>& precomputed);
-#endif
+    const std::vector<IntersectionPoint>& precomputedIntersections);
 
 }  // namespace boolean2
 }  // namespace manifold

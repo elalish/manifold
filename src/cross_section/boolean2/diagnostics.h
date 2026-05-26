@@ -40,7 +40,7 @@ struct PhaseAcc {
   std::atomic<int64_t> mergeNs{0};
   std::atomic<int64_t> remapNs{0};
   std::atomic<int64_t> findIxNs{0};
-  std::atomic<int64_t> restructNs{0};
+  std::atomic<int64_t> duplicateIxMergeNs{0};
   std::atomic<int64_t> canonNs{0};
   std::atomic<int64_t> filterHalfedgeNs{0};
   std::atomic<int64_t> totalNs{0};
@@ -53,7 +53,7 @@ struct PhaseAcc {
     mergeNs = 0;
     remapNs = 0;
     findIxNs = 0;
-    restructNs = 0;
+    duplicateIxMergeNs = 0;
     canonNs = 0;
     filterHalfedgeNs = 0;
     totalNs = 0;
@@ -201,9 +201,9 @@ class TraceRecorder {
   void RecordInsertedIntersections(const std::vector<vec2>& verts,
                                    const std::vector<EdgeM>& edges,
                                    const std::vector<std::vector<int>>& lists);
-  void RecordStructuralRemerge(const std::vector<vec2>& verts,
-                               const std::vector<EdgeM>& edges,
-                               const std::vector<std::vector<int>>& lists);
+  void RecordDuplicateIntersectionMerge(
+      const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
+      const std::vector<std::vector<int>>& lists);
   void RecordCanonicalSubedges(const std::vector<vec2>& verts,
                                const CanonicalSubEdges& canon);
   void RecordFilteredOutput(const std::vector<vec2>& verts,

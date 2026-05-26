@@ -274,14 +274,14 @@ void TraceRecorder::RecordInsertedIntersections(
 #endif
 }
 
-void TraceRecorder::RecordStructuralRemerge(
+void TraceRecorder::RecordDuplicateIntersectionMerge(
     const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
     const std::vector<std::vector<int>>& lists) {
 #ifdef MANIFOLD_DEBUG
   if (!trace_) return;
-  TracePhase& phase = trace_->AddPhase("structural_remerge");
-  AddPoints(&phase, verts, "remerged_vertex");
-  AddSplitSubsegments(&phase, verts, edges, lists, "remerged_subsegment");
+  TracePhase& phase = trace_->AddPhase("duplicate_intersection_merge");
+  AddPoints(&phase, verts, "merged_intersection_vertex");
+  AddSplitSubsegments(&phase, verts, edges, lists, "merged_intersection");
   AddEdgeVertListAnnotations(&phase, lists);
 #else
   (void)verts;

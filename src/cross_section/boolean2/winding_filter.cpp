@@ -78,7 +78,7 @@ bool IsInside(WindRule rule, int w) {
 struct FastEdge {
   double yMin, yMax;  // canonical orientation: yMin < yMax
   double x0;          // x at y = yMin
-  double dxdy;        // (x1 - x0) / (yMax - yMin)
+  double xSlope;      // segment dx/dy, used to interpolate x at ray y
   int signedMult;     // mult if upward in canonical form, else -mult
 };
 
@@ -97,7 +97,7 @@ std::vector<FastEdge> BuildFastEdges(const CanonicalSubEdges& canon,
     e.yMin = p0.y;
     e.yMax = p1.y;
     e.x0 = p0.x;
-    e.dxdy = (p1.x - p0.x) / (p1.y - p0.y);
+    e.xSlope = (p1.x - p0.x) / (p1.y - p0.y);
     e.signedMult = upward ? mult : -mult;
     out.push_back(e);
   }
@@ -108,7 +108,7 @@ int CastWindingRay(vec2 origin, const std::vector<FastEdge>& edges) {
   int winding = 0;
   for (const auto& e : edges) {
     if (origin.y < e.yMin || origin.y >= e.yMax) continue;
-    const double xCross = e.x0 + e.dxdy * (origin.y - e.yMin);
+    const double xCross = e.x0 + e.xSlope * (origin.y - e.yMin);
     if (xCross <= origin.x) continue;
     winding += e.signedMult;
   }
@@ -310,8 +310,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     ++nFaces;
   }
 
-  // 5. Compute signed area per face. Centered shoelace keeps displaced
-  // coordinates from swamping small face areas with product-rounding error.
+  // 5. Compute signed area per face. Centering the shoelace sum avoids
+  // cancellation from large translations or skinny-but-valid faces.
   // First halfedge encountered per face. Used both as the centering
   // reference for the shoelace area (below) and as the starting halfedge
   // for the per-face winding ray-cast.

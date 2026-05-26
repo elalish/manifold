@@ -50,19 +50,20 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
 1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
 3. Collect eps-padded AABB candidate edge pairs with a BVH broad phase.
-4. Build per-edge lists of vertices that lie on each edge, optionally fused
-   with the intersection narrow phase for large parallel cases.
+4. Build per-edge lists of vertices that lie on each edge and precompute
+   proper crossings from the same pair set; the helper chooses serial or TBB
+   execution internally.
 5. Insert strict proper edge-edge crossings using Boolean2's projected
    graph-order oracle, with shared symbolic `Interpolate`/`Shadows` helpers.
    Endpoint, T-junction, and coincident-overlap degeneracies stay in the
    vertex-on-edge/canonicalization path.
-6. Structurally re-merge duplicate intersection vertices that share an incident
-   edge and are within epsilon.
+6. Merge duplicate generated intersection vertices that share an incident edge
+   and are within epsilon.
 7. Canonicalize sub-edges and cancel opposing multiplicities.
 8. Traverse halfedge faces, propagate winding numbers, and retain boundary edges
    whose adjacent faces disagree under the requested rule.
 
-The high-level fill/Boolean/XOR core API is in
+The high-level fill/Boolean core API is in
 `src/cross_section/boolean2/boolean2.h`. The lower-level driver returns
 retained directed sub-edges plus the merged vertex map, and the wrapper turns
 those edges back into regularized `manifold::Polygons`. Offset and containment

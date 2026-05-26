@@ -130,8 +130,8 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   }
   // Parallelize the geometric distance gate (read-only on `in`); unite
   // serially in sorted pair order so cluster roots are deterministic
-  // regardless of thread scheduling. Same pattern as the structural
-  // re-merge in driver.h (after intersections).
+  // regardless of thread scheduling. Same pattern as the duplicate-
+  // intersection merge in driver.cpp (after intersection insertion).
   //
   // Written by worker threads, so this must be shared storage.
   std::vector<uint8_t> doUnite;

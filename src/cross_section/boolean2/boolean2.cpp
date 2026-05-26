@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <limits>
 #include <utility>
 #include <vector>
 
@@ -50,31 +49,21 @@ struct LocalFrame {
   bool hasVerts = false;
 };
 
-void AccumulateBounds(const Polygons& polys, vec2* min, vec2* max, bool* any) {
+void AccumulateBounds(const Polygons& polys, Rect* box) {
   for (const auto& loop : polys) {
     for (const vec2& v : loop) {
-      if (!*any) {
-        *min = v;
-        *max = v;
-        *any = true;
-      } else {
-        min->x = std::min(min->x, v.x);
-        min->y = std::min(min->y, v.y);
-        max->x = std::max(max->x, v.x);
-        max->y = std::max(max->y, v.y);
-      }
+      box->Union(v);
     }
   }
 }
 
 LocalFrame MakeLocalFrame(const Polygons& a, const Polygons& b = {}) {
-  vec2 min(0.0), max(0.0);
-  bool any = false;
-  AccumulateBounds(a, &min, &max, &any);
-  AccumulateBounds(b, &min, &max, &any);
+  Rect box;
+  AccumulateBounds(a, &box);
+  AccumulateBounds(b, &box);
   LocalFrame frame;
-  frame.hasVerts = any;
-  if (any) frame.origin = min * 0.5 + max * 0.5;
+  frame.hasVerts = box.IsFinite();
+  if (frame.hasVerts) frame.origin = box.Center();
   return frame;
 }
 
@@ -183,6 +172,22 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
   return TranslatePolygons(
       OutEdgesToPolygons(r.verts, r.edges, 2.0 * tolerance), frame.origin);
 }
+
+Polygons RegularizeByRule(const Polygons& in, WindRule rule, double eps,
+                          double tolerance) {
+  if (!AllFinite(in)) return {};
+  const auto frame = MakeLocalFrame(in);
+  Polygons local = TranslatePolygons(in, -frame.origin);
+  if (eps <= 0.0) eps = InferEps(local, {});
+  if (tolerance < eps) tolerance = eps;
+  auto [verts, edges] = PolygonsToInput(local);
+  if (verts.empty()) return {};
+  auto r =
+      RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
+  return TranslatePolygons(
+      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
+      frame.origin);
+}
 }  // namespace
 
 // Flatten manifold::Polygons into the lower-level (verts, edges) input.
@@ -252,11 +257,6 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
     if (loopVerts.size() >= 3) {
       PushSimpleLoops(verts, std::move(loopVerts), nearRepeatedVertexTol,
                       &polys);
-    } else {
-      // Regularization drop: straight-line 1- or 2-vert loops enclose zero
-      // area and cannot be represented in manifold::Polygons.
-      assert(loopVerts.size() < 3 &&
-             "regularized-drop loop should have zero area");
     }
   }
   return polys;
@@ -264,55 +264,24 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
 
 // Single-input regularization used by `CrossSection::Simplify(eps)`.
 Polygons Simplify(const Polygons& in, double eps, double tolerance) {
-  if (!AllFinite(in)) return {};
-  const auto frame = MakeLocalFrame(in);
-  Polygons local = TranslatePolygons(in, -frame.origin);
-  if (eps <= 0.0) eps = InferEps(local, {});
-  if (tolerance < eps) tolerance = eps;
-  auto [verts, edges] = PolygonsToInput(local);
-  if (verts.empty()) return {};
-  auto r = RemoveOverlaps2D(verts, edges, eps, tolerance);
-  return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
-      frame.origin);
+  return RegularizeByRule(in, WindRule::Add, eps, tolerance);
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
 // alpha-budget formula. Callers translate to a local frame first.
 double InferEps(const Polygons& a, const Polygons& b) {
-  double xMin = std::numeric_limits<double>::infinity();
-  double yMin = xMin, xMax = -xMin, yMax = -xMin;
-  auto bound = [&](const Polygons& polys) {
-    for (const auto& loop : polys) {
-      for (const auto& v : loop) {
-        xMin = std::min(xMin, v.x);
-        yMin = std::min(yMin, v.y);
-        xMax = std::max(xMax, v.x);
-        yMax = std::max(yMax, v.y);
-      }
-    }
-  };
-  bound(a);
-  bound(b);
-  if (!std::isfinite(xMin)) return 0.0;
-  const double halfX = xMax * 0.5 - xMin * 0.5;
-  const double halfY = yMax * 0.5 - yMin * 0.5;
-  const double L = std::max(halfX, halfY);
+  Rect box;
+  AccumulateBounds(a, &box);
+  AccumulateBounds(b, &box);
+  if (!box.IsFinite()) return 0.0;
+  const vec2 size = box.Size();
+  const double L = 0.5 * std::max(size.x, size.y);
   return EpsilonFromScale(L);
 }
 
 // Regularize one Polygons input under an explicit CrossSection fill rule.
 Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
-  if (!AllFinite(in)) return {};
-  const auto frame = MakeLocalFrame(in);
-  Polygons local = TranslatePolygons(in, -frame.origin);
-  if (eps <= 0.0) eps = InferEps(local, {});
-  auto [verts, edges] = PolygonsToInput(local);
-  if (verts.empty()) return {};
-  auto r = RemoveOverlaps2D(verts, edges, eps, eps, /*debug=*/false, rule);
-  return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
-      frame.origin);
+  return RegularizeByRule(in, rule, eps, eps);
 }
 
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.
@@ -323,14 +292,6 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
                         : op == OpType::Subtract ? WindRule::Add
                                                  : WindRule::Add;
   return BinaryOpByRule(a, b, bMult, rule, eps, tolerance);
-}
-
-// Symmetric difference (XOR): the region covered by A or B but not both.
-// `manifold::OpType` only has three values (Add/Subtract/Intersect), so
-// XOR is exposed as a separate core helper.
-Polygons Xor(const Polygons& a, const Polygons& b, double eps,
-             double tolerance) {
-  return BinaryOpByRule(a, b, 1, WindRule::EvenOdd, eps, tolerance);
 }
 
 }  // namespace boolean2
