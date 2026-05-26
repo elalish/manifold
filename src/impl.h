@@ -679,12 +679,8 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   return out;
 }
 
-// Shared implementation of Manifold::Smooth(MeshGL[64]) and
-// ExecutionContext::Smooth(MeshGL[64]). Builds the Impl via the ctx-aware
-// MeshGLP ctor, runs CreateTangents with the same ctx, then restores the
-// caller's faceID mapping. Cancel-precedence mirrors the FromMeshGL pattern:
-// entry-time cancel wins; past the entry gate, validation errors from the
-// inner ctor win over a racing cancel.
+// Entry-time cancel wins over empty/malformed input; past this gate,
+// validation errors win over races.
 template <typename P, typename I>
 std::shared_ptr<Manifold::Impl> MakeSmoothImpl(
     const MeshGLP<P, I>& meshGL, const std::vector<Smoothness>& sharpenedEdges,
@@ -705,13 +701,11 @@ std::shared_ptr<Manifold::Impl> MakeSmoothImpl(
 
   std::shared_ptr<Manifold::Impl> impl =
       std::make_shared<Manifold::Impl>(meshTmp, ctx);
-  // Validation errors from the inner ctor (and cancel observed there)
-  // skip tangent creation so phase counters stay honest -- a Cancelled
-  // ingest must not credit smoothing phases that never ran.
+  // Skip tangent creation if ingest failed; phase counters must not
+  // credit smoothing phases that never ran.
   if (impl->status_ != Manifold::Error::NoError) return impl;
   impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges), ctx);
-  // Restore the original faceID. If CreateTangents was cancelled or the
-  // ingest produced an empty Impl, NumTri() is 0 and this loop is a no-op.
+  // NumTri() is 0 after MakeEmpty, so this loop is a no-op on cancel.
   const size_t numTri = impl->NumTri();
   for (size_t i = 0; i < numTri; ++i) {
     if (meshGL.faceID.size() == numTri) {

@@ -44,9 +44,7 @@ constexpr int kPhasesPerFromMesh = 7;
  * `kPhasesPerFromMesh` ingest phases followed by 7 tangent-creation
  * phases in `Manifold::Impl::CreateTangents(sharpenedEdges, ctx)`.
  * Bump in lockstep with `ADVANCE_PHASE_OR_RETURN(ctx)` sites in that
- * function. Note: Phase 4 of CreateTangents contains two sequential
- * sub-loops (sharpenedEdges then edges) that count as one phase
- * boundary at this granularity.
+ * function.
  */
 constexpr int kPhasesPerSmooth = kPhasesPerFromMesh + 7;
 
