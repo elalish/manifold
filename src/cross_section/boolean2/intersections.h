@@ -31,6 +31,12 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<Box2>& edgeBoxes,
                               const BVH& bvh,
                               std::vector<std::pair<int, int>>* pairs);
+
+// Serially materialize precomputed proper intersections into `verts` and the
+// edge split `lists`. Also records which edges meet at each materialized or
+// snapped intersection vertex in `vertEdges`; nearby-intersection merge uses
+// that incidence to distinguish unrelated near vertices from vertices that
+// share an intersection source.
 void FindAndInsertIntersections(
     const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
     std::vector<std::vector<int>>* lists,

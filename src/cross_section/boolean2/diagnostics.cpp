@@ -274,14 +274,14 @@ void TraceRecorder::RecordInsertedIntersections(
 #endif
 }
 
-void TraceRecorder::RecordDuplicateIntersectionMerge(
+void TraceRecorder::RecordNearbyIntersectionMerge(
     const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
     const std::vector<std::vector<int>>& lists) {
 #ifdef MANIFOLD_DEBUG
   if (!trace_) return;
-  TracePhase& phase = trace_->AddPhase("duplicate_intersection_merge");
-  AddPoints(&phase, verts, "merged_intersection_vertex");
-  AddSplitSubsegments(&phase, verts, edges, lists, "merged_intersection");
+  TracePhase& phase = trace_->AddPhase("nearby_intersection_merge");
+  AddPoints(&phase, verts, "nearby_intersection_vertex");
+  AddSplitSubsegments(&phase, verts, edges, lists, "nearby_intersection");
   AddEdgeVertListAnnotations(&phase, lists);
 #else
   (void)verts;

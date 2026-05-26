@@ -64,9 +64,14 @@ struct CanonicalSubEdges {
   }
 };
 
-void Canonicalize(const std::vector<EdgeM>& edges,
-                  const std::vector<std::vector<int>>& lists,
-                  CanonicalSubEdges* out);
+// Split each directed input edge at the vertices in `lists[e]`, then merge
+// matching undirected sub-edges by summing signed multiplicities.
+//
+// `edges` are the collapsed input edges. `lists[e]` is the sorted list of
+// interior vertices that split edge `e`. The returned `edges` vector is sorted
+// by `(vMin, vMax)` and omits sub-edges whose summed multiplicity is zero.
+CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
+                               const std::vector<std::vector<int>>& lists);
 
 }  // namespace boolean2
 }  // namespace manifold

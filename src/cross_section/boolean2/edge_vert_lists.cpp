@@ -39,6 +39,10 @@ namespace {
 // values drop the near-line apex regression exercised by ApexSkipNearLine.
 constexpr double kApexRejectMinDistance2Frac = 1e-4;
 
+// Pair-count threshold above which the combined helper uses TBB. Smaller
+// inputs stay serial to avoid setup overhead.
+constexpr size_t kFusedNarrowParallelMin = 1024;
+
 bool FarEnoughFromLineForApexReject(double cross2, double eps2_abLen2) {
   return cross2 >= eps2_abLen2 * kApexRejectMinDistance2Frac;
 }
@@ -163,24 +167,6 @@ void SortIntersections(std::vector<IntersectionPoint>* intersections) {
 
 }  // namespace
 
-// Pair-count threshold above which the combined helper uses TBB. Smaller
-// inputs stay serial to avoid setup overhead.
-extern const size_t kFusedNarrowParallelMin = 1024;
-
-std::vector<std::vector<int>> BuildEdgeVertListsFromEdgePairs(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs) {
-  std::vector<std::vector<int>> lists;
-  std::vector<IntersectionPoint> unusedIntersections;
-  BuildListsAndFindIntersections(edges, verts, eps, pairs, &lists,
-                                 &unusedIntersections);
-  return lists;
-}
-
-// Combined narrow phase: four vert-on-edge tests plus the independent
-// IntersectSegments precompute for each broad-phase pair. The algorithmic
-// result is serially materialized later; TBB is only an execution choice for
-// large pair sets.
 void BuildListsAndFindIntersections(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs,

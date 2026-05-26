@@ -14,7 +14,7 @@
 //
 // End-to-end Boolean2 driver. Stitches together vertex merging,
 // edge collapse, near-vertex indexing, proper edge-edge crossing insertion,
-// duplicate-intersection merging, sub-edge canonicalization,
+// nearby-intersection merging, sub-edge canonicalization,
 // and winding-rule filtering.
 // Returns an OverlapResult holding the merged-vert list, the retained
 // directed sub-edges, the inputVert2Merged remap, and the merged-vert count.
@@ -42,24 +42,24 @@ namespace boolean2 {
 
 namespace {
 
-void MergeDuplicateIntersectionVerts(
-    std::vector<vec2>* verts, std::vector<EdgeM>* edges,
-    std::vector<std::vector<int>>* lists,
+void MergeNearbyIntersectionVerts(
+    std::vector<vec2>& verts, std::vector<EdgeM>& edges,
+    std::vector<std::vector<int>>& lists,
     const std::vector<std::vector<int>>& vertEdges, int oldVertEnd, double eps,
-    double tolerance, std::vector<int>* inputVert2Merged) {
-  DisjointSets uf(static_cast<int>(verts->size()));
+    double tolerance, std::vector<int>& inputVert2Merged) {
+  DisjointSets uf(static_cast<int>(verts.size()));
   const double newToNewThresh = kIntersectionMergeEpsFactor * eps;
   const double newToNewThresh2 = newToNewThresh * newToNewThresh;
   const double newToOldThresh = tolerance;
   const double newToOldThresh2 = newToOldThresh * newToOldThresh;
   std::vector<std::pair<int, int>> pairs;
   std::vector<std::pair<double, int>> tlist;
-  for (size_t e = 0; e < edges->size(); ++e) {
-    const auto& list = (*lists)[e];
-    const int v0 = (*edges)[e].v0;
-    const int v1 = (*edges)[e].v1;
-    const vec2 a = (*verts)[v0];
-    const vec2 b = (*verts)[v1];
+  for (size_t e = 0; e < edges.size(); ++e) {
+    const auto& list = lists[e];
+    const int v0 = edges[e].v0;
+    const int v1 = edges[e].v1;
+    const vec2 a = verts[v0];
+    const vec2 b = verts[v1];
     const vec2 ab = b - a;
     const double abLen2 = dot(ab, ab);
     if (abLen2 == 0) continue;
@@ -70,7 +70,7 @@ void MergeDuplicateIntersectionVerts(
     for (int v : list) {
       // Skip pure-old verts; keep snapped-onto-old for new-to-new pairing.
       if (v >= (int)vertEdges.size() || vertEdges[v].empty()) continue;
-      const vec2 p = (*verts)[v];
+      const vec2 p = verts[v];
       const double t = dot(p - a, ab) / abLen2;
       tlist.emplace_back(t, v);
       // Only truly-new verts: widening old-old would stack error across ops.
@@ -96,7 +96,7 @@ void MergeDuplicateIntersectionVerts(
            ++j) {
         const int va = tlist[i].second;
         const int vb = tlist[j].second;
-        const vec2 d = (*verts)[vb] - (*verts)[va];
+        const vec2 d = verts[vb] - verts[va];
         if (dot(d, d) > newToNewThresh2) continue;
         const int p = std::min(va, vb);
         const int q = std::max(va, vb);
@@ -108,14 +108,14 @@ void MergeDuplicateIntersectionVerts(
   pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
   for (const auto& pr : pairs) uf.unite(pr.first, pr.second);
 
-  const int nV = static_cast<int>(verts->size());
+  const int nV = static_cast<int>(verts.size());
   std::vector<vec2> sumPos(nV, vec2{0, 0});
   std::vector<int> sumCnt(nV, 0);
   int distinctClusters = 0;
   for (int i = 0; i < nV; ++i) {
     int r = uf.find(i);
     if (sumCnt[r] == 0) ++distinctClusters;
-    sumPos[r] = sumPos[r] + (*verts)[i];
+    sumPos[r] = sumPos[r] + verts[i];
     sumCnt[r] += 1;
   }
   if (distinctClusters == nV) return;
@@ -130,16 +130,16 @@ void MergeDuplicateIntersectionVerts(
   }
   std::vector<int> preMergeToPost(nV);
   for (int i = 0; i < nV; ++i) preMergeToPost[i] = rootToNew[uf.find(i)];
-  for (auto& e : *edges) {
+  for (auto& e : edges) {
     e.v0 = preMergeToPost[e.v0];
     e.v1 = preMergeToPost[e.v1];
   }
-  for (auto& list : *lists) {
+  for (auto& list : lists) {
     for (auto& v : list) v = preMergeToPost[v];
     list.erase(std::unique(list.begin(), list.end()), list.end());
   }
-  for (auto& r : *inputVert2Merged) r = preMergeToPost[r];
-  *verts = std::move(newVerts);
+  for (auto& r : inputVert2Merged) r = preMergeToPost[r];
+  verts = std::move(newVerts);
 }
 
 }  // namespace
@@ -217,17 +217,17 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
 
   {
-    ScopedTiming timing(P.duplicateIxMergeNs);
-    MergeDuplicateIntersectionVerts(&merge.verts, &edges, &lists, vertEdges,
-                                    numMerged, eps, tolerance,
-                                    &merge.inputVert2Merged);
+    ScopedTiming timing(P.nearbyIxMergeNs);
+    MergeNearbyIntersectionVerts(merge.verts, edges, lists, vertEdges,
+                                 numMerged, eps, tolerance,
+                                 merge.inputVert2Merged);
   }
-  traceRecorder.RecordDuplicateIntersectionMerge(merge.verts, edges, lists);
+  traceRecorder.RecordNearbyIntersectionMerge(merge.verts, edges, lists);
   // Sub-edge canonicalization.
-  thread_local static CanonicalSubEdges canon;
+  CanonicalSubEdges canon;
   {
     ScopedTiming timing(P.canonNs);
-    Canonicalize(edges, lists, &canon);
+    canon = Canonicalize(edges, lists);
   }
   traceRecorder.RecordCanonicalSubedges(merge.verts, canon);
   // Halfedge face-traversal winding filter.

@@ -33,7 +33,7 @@ struct OverlapResult {
 
 // `eps` is the fresh per-op FP-noise bound (3D analogue: Impl::epsilon_).
 // `tolerance` is the propagated drift bound (3D analogue: Impl::tolerance_);
-// floored to `eps` if smaller. Duplicate-intersection merging widens
+// floored to `eps` if smaller. Nearby-intersection merging widens
 // new-to-old snaps to `tolerance`; MergeVerts stays at `eps`.
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
