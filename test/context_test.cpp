@@ -911,3 +911,155 @@ TEST(ExecutionContextFromMeshGL, StickyCancelAcrossCalls) {
   EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
   EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
 }
+
+// Smooth: ctx-aware analog of `Manifold::Smooth(MeshGL[64])`. Mirrors the
+// FromMeshGL cluster above; the ingest phases are reused and the
+// tangent-creation pass adds another set of phase boundaries.
+TEST(ExecutionContextSmooth, HappyPath) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.Smooth(TetGL());
+  EXPECT_FALSE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerSmooth);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerSmooth);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Equivalent geometry to the plain factory.
+TEST(ExecutionContextSmooth, MatchesCtor) {
+  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  ExecutionContext ctx;
+  Manifold viaCtx = ctx.Smooth(mesh);
+  Manifold viaFactory = Manifold::Smooth(mesh);
+  EXPECT_EQ(viaCtx.Status(), viaFactory.Status());
+  EXPECT_EQ(viaCtx.NumTri(), viaFactory.NumTri());
+  EXPECT_EQ(viaCtx.NumVert(), viaFactory.NumVert());
+}
+
+// Pre-cancel beats the heavy path on well-formed input.
+TEST(ExecutionContextSmooth, CancelBeforeIngest) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.Smooth(TetGL());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Pre-cancel beats the empty-input fast path (would otherwise be NoError).
+TEST(ExecutionContextSmooth, CancelBeforeEmptyInputWinsOverNoError) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.Smooth(MeshGL{});
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Pre-cancel beats validation errors.
+TEST(ExecutionContextSmooth, CancelBeforeMalformedWinsOverValidation) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.Smooth(MalformedMissingPositionProperties());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Validation errors surface unchanged when no cancel is in flight;
+// counters stay at 0/kPhasesPerSmooth since no phase ran.
+TEST(ExecutionContextSmooth, ValidationErrorWithoutCancel) {
+  ExecutionContext ctx;
+  Manifold m = ctx.Smooth(MalformedMissingPositionProperties());
+  EXPECT_EQ(m.Status(), Manifold::Error::MissingPositionProperties);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), 0);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerSmooth);
+}
+
+// Concurrent cancel mid-smooth. Adaptive backoff guarantees we observe
+// at least one Cancelled outcome; each Cancelled hit pins donePhases <
+// totalPhases.
+#if MANIFOLD_PAR == 1
+TEST(ExecutionContextSmooth, CancelConcurrent) {
+  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
+  int cancelledHits = 0;
+  auto sleep = std::chrono::microseconds(100);
+  for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
+    ExecutionContext ctx;
+    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+    std::thread evalThread([&] { result.store(ctx.Smooth(mesh).Status()); });
+    std::this_thread::sleep_for(sleep);
+    ctx.Cancel();
+    evalThread.join();
+    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+                result.load() == Manifold::Error::NoError);
+    if (result.load() == Manifold::Error::Cancelled) {
+      ++cancelledHits;
+      EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
+      EXPECT_LT(ctx.Progress(), 1.0);
+    }
+    sleep *= 2;
+  }
+  EXPECT_GT(cancelledHits, 0);
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Smooth then a Boolean on the same ctx: counters reset between.
+TEST(ExecutionContextSmooth, ReuseForBoolean) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.Smooth(TetGL());
+  ASSERT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerSmooth);
+
+  Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
+  EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerBoolean);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Two Smooth calls on the same ctx: counters reset between.
+TEST(ExecutionContextSmooth, ReuseForSecondSmooth) {
+  ExecutionContext ctx;
+  ASSERT_EQ(ctx.Smooth(TetGL()).Status(), Manifold::Error::NoError);
+  ASSERT_EQ(ctx.impl_->donePhases.load(), kPhasesPerSmooth);
+  Manifold second = ctx.Smooth(TetGL());
+  EXPECT_EQ(second.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerSmooth);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerSmooth);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Sticky cancel survives across Smooth calls.
+TEST(ExecutionContextSmooth, StickyCancelAcrossCalls) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(ctx.Smooth(TetGL()).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.Smooth(TetGL()).Status(), Manifold::Error::Cancelled);
+}
+
+// Smooth-specific: cancel mid-flight with a non-empty sharpenedEdges
+// vector. Asserts NumTri() == 0 on Cancelled to lock in that the
+// faceID-restoration loop in MakeSmoothImpl is a natural no-op after
+// MakeEmpty.
+#if MANIFOLD_PAR == 1
+TEST(ExecutionContextSmooth, CancelWithSharpenedEdges) {
+  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();
+  std::vector<Smoothness> sharpenedEdges = {{0, 0.0}, {3, 0.5}, {6, 0.0}};
+  int cancelledHits = 0;
+  auto sleep = std::chrono::microseconds(100);
+  for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
+    ExecutionContext ctx;
+    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+    std::atomic<size_t> numTri{0};
+    std::thread evalThread([&] {
+      Manifold m = ctx.Smooth(mesh, sharpenedEdges);
+      result.store(m.Status());
+      numTri.store(m.NumTri());
+    });
+    std::this_thread::sleep_for(sleep);
+    ctx.Cancel();
+    evalThread.join();
+    if (result.load() == Manifold::Error::Cancelled) {
+      ++cancelledHits;
+      EXPECT_EQ(numTri.load(), 0u);
+    }
+    sleep *= 2;
+  }
+  EXPECT_GT(cancelledHits, 0);
+}
+#endif  // MANIFOLD_PAR == 1

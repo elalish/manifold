@@ -40,6 +40,18 @@ constexpr int kPhasesPerFromMesh = 7;
 
 /** @ingroup Private
  *
+ * Heavy phases in `ExecutionContext::Smooth(MeshGL[64])`: the
+ * `kPhasesPerFromMesh` ingest phases followed by 7 tangent-creation
+ * phases in `Manifold::Impl::CreateTangents(sharpenedEdges, ctx)`.
+ * Bump in lockstep with `ADVANCE_PHASE_OR_RETURN(ctx)` sites in that
+ * function. Note: Phase 4 of CreateTangents contains two sequential
+ * sub-loops (sharpenedEdges then edges) that count as one phase
+ * boundary at this granularity.
+ */
+constexpr int kPhasesPerSmooth = kPhasesPerFromMesh + 7;
+
+/** @ingroup Private
+ *
  * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
  * to read it -- this is the canonical reader, enforced by the type system.
  * `totalBooleans`, `doneBooleans`, `totalPhases`, and `donePhases` are

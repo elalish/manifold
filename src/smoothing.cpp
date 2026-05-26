@@ -933,7 +933,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
  * curvature there, while the tangents of the sharp edges themselves are aligned
  * for continuity.
  */
-void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
+void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
+                                    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.clear();
@@ -949,8 +950,9 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       vertNormal[v] = faceNormal_[vertFlatFace[v]];
     }
   }
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
-  for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
+  for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, ctx,
              [&tangent, &vertNormal, this](const int edgeIdx) {
                tangent[edgeIdx] =
                    IsInsideQuad(edgeIdx)
@@ -960,6 +962,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
              });
 
   halfedgeTangent_ = std::move(tangent);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   // Add sharpened edges around faces, just on the face side.
   for (size_t tri = 0; tri < NumTri(); ++tri) {
@@ -972,6 +975,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       }
     }
   }
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   using Pair = std::pair<Smoothness, Smoothness>;
   // Fill in missing pairs with default smoothness = 1.
@@ -997,10 +1001,11 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     vertTangents[halfedge_.Start(edge.second.halfedge)].push_back(
         {edge.second, edge.first});
   }
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   const int numVert = NumVert();
   for_each_n(
-      autoPolicy(numVert, 1e4), countAt(0), numVert,
+      autoPolicy(numVert, 1e4), countAt(0), numVert, ctx,
       [this, &vertTangents, &fixedHalfedge, &vertHalfedge,
        &triIsFlatFace](int v) {
         auto it = vertTangents.find(v);
@@ -1059,9 +1064,13 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
                   });
         }
       });
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   LinearizeFlatTangents();
+  ADVANCE_PHASE_OR_RETURN(ctx);
+
   DistributeTangents(fixedHalfedge);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 }
 
 bool Manifold::Impl::ValidTangents() const {
