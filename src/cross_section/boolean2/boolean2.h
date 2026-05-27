@@ -30,8 +30,7 @@ double InferEps(const Polygons& a, const Polygons& b);
 std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
     const Polygons& polys);
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
-                            const std::vector<OutEdge>& edges,
-                            double nearRepeatedVertexTol = 0.0);
+                            const std::vector<OutEdge>& edges);
 
 Polygons Simplify(const Polygons& in, double eps, double tolerance = 0.0);
 Polygons FillByRule(const Polygons& in, WindRule rule, double eps = 0.0);

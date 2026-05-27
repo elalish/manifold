@@ -112,20 +112,12 @@ void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
 }
 
 void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
-                     double nearRepeatedVertexTol, Polygons* polys) {
+                     Polygons* polys) {
   for (;;) {
-    const double mergeTol2 = nearRepeatedVertexTol * nearRepeatedVertexTol;
     bool split = false;
     for (size_t i = 1; i < loopVerts.size() && !split; ++i) {
       for (size_t j = 0; j < i; ++j) {
-        const bool adjacent =
-            i == j + 1 || (j == 0 && i + 1 == loopVerts.size());
-        const vec2 delta = verts[loopVerts[i]] - verts[loopVerts[j]];
-        if (loopVerts[i] != loopVerts[j] &&
-            (nearRepeatedVertexTol <= 0.0 || adjacent ||
-             Dot(delta, delta) > mergeTol2)) {
-          continue;
-        }
+        if (loopVerts[i] != loopVerts[j]) continue;
         std::vector<int> simple(loopVerts.begin() + j, loopVerts.begin() + i);
         PushLoopIfNondegenerate(verts, simple, polys);
         loopVerts.erase(loopVerts.begin() + j + 1, loopVerts.begin() + i + 1);
@@ -168,9 +160,7 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
 
   auto r =
       RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
-  // Pair distance bound: two endpoints each drifting up to `tolerance`.
-  return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, 2.0 * tolerance), frame.origin);
+  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), frame.origin);
 }
 
 Polygons RegularizeByRule(const Polygons& in, WindRule rule, double eps,
@@ -184,9 +174,7 @@ Polygons RegularizeByRule(const Polygons& in, WindRule rule, double eps,
   if (verts.empty()) return {};
   auto r =
       RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
-  return TranslatePolygons(
-      OutEdgesToPolygons(r.verts, r.edges, /*nearRepeatedVertexTol=*/0.0),
-      frame.origin);
+  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), frame.origin);
 }
 }  // namespace
 
@@ -202,8 +190,7 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 
 // Walk retained directed sub-edges into regularized polygon loops.
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
-                            const std::vector<OutEdge>& edges,
-                            double nearRepeatedVertexTol) {
+                            const std::vector<OutEdge>& edges) {
   const int nE = static_cast<int>(edges.size());
   // Per-vertex outgoing edges; the next-pointer loop scans each list with
   // deterministic cross/dot comparisons.
@@ -255,8 +242,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       continue;
     }
     if (loopVerts.size() >= 3) {
-      PushSimpleLoops(verts, std::move(loopVerts), nearRepeatedVertexTol,
-                      &polys);
+      PushSimpleLoops(verts, std::move(loopVerts), &polys);
     }
   }
   return polys;
