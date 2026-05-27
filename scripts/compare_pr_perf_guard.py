@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
 import json
+import os
 import re
 import statistics
+import subprocess
 from pathlib import Path
 
-TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec") #only extracts time values(for fallback)
+SCHEMA_VERSION = "1.0.0"
+# fallback: extract only time value when nTri label is not present
+TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
+# primary: extract both nTri bucket and timing from perfTest output
 TRI_TIME_PATTERN = re.compile(
-    r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+)\s*sec"#extracts nTri and time values
+    r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+)\s*sec"
 )
 
 
@@ -15,19 +21,31 @@ def mean(values: list[float]) -> float:
     return statistics.fmean(values)
 
 
-def parse_run(run_path: Path) -> dict:#parses run*.txt files to extract benchmark timings
+def stdev(values: list[float]) -> float:
+    # keep stdev defined even for single-sample cases
+    if len(values) <= 1:
+        return 0.0
+    return statistics.stdev(values)
+
+
+def parse_run(run_path: Path, run_index: int) -> dict:
+    # parse one run*.txt into ordered benchmark samples
     benchmarks = []
     for line in run_path.read_text(encoding="utf-8").splitlines():
         tri_match = TRI_TIME_PATTERN.search(line)
         if tri_match:
             benchmark_key = f"nTri={tri_match.group(1)}"
-            benchmarks.append({"benchmark": benchmark_key, "time_sec": float(tri_match.group(2))})
+            benchmarks.append(
+                {"benchmark": benchmark_key, "time_sec": float(tri_match.group(2))}
+            )
             continue
-            
+
         time_match = TIME_PATTERN.search(line)
         if time_match:
             benchmark_key = f"benchmark_{len(benchmarks) + 1}"
-            benchmarks.append({"benchmark": benchmark_key, "time_sec": float(time_match.group(1))})
+            benchmarks.append(
+                {"benchmark": benchmark_key, "time_sec": float(time_match.group(1))}
+            )
 
     if not benchmarks:
         raise RuntimeError(f"No perf timing lines found in {run_path}")
@@ -38,16 +56,18 @@ def parse_run(run_path: Path) -> dict:#parses run*.txt files to extract benchmar
 
     return {
         "path": str(run_path),
+        "run_index": run_index,
         "benchmarks": benchmarks,
     }
 
 
-def parse_suite(suite_dir: Path) -> dict:#calls parse_run for each run*.txt file in the given directory and arranges the data for head and base runs
+def parse_suite(suite_dir: Path) -> dict:
+    # parse all run*.txt and build per-benchmark aggregates across repeats
     run_files = sorted(suite_dir.glob("run*.txt"))
     if not run_files:
         raise RuntimeError(f"No run*.txt files found in {suite_dir}")
 
-    runs = [parse_run(run_file) for run_file in run_files]
+    runs = [parse_run(run_file, i + 1) for i, run_file in enumerate(run_files)]
     benchmark_order = [entry["benchmark"] for entry in runs[0]["benchmarks"]]
 
     for run in runs[1:]:
@@ -69,7 +89,9 @@ def parse_suite(suite_dir: Path) -> dict:#calls parse_run for each run*.txt file
             "samples_sec": samples,
             "mean_sec": mean(samples),
             "median_sec": statistics.median(samples),
+            "stdev_sec": stdev(samples),
             "max_sec": max(samples),
+            "n_runs": len(samples),
         }
 
     return {
@@ -79,7 +101,10 @@ def parse_suite(suite_dir: Path) -> dict:#calls parse_run for each run*.txt file
     }
 
 
-def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -> tuple[str, bool, dict]:#arranges everything
+def build_summary(
+    base: dict, head: dict, warn_pct: float, warn_abs_ms: float
+) -> tuple[str, bool, dict]:
+    # compare benchmark means between base and head with dual-threshold warnings
     if base["benchmark_order"] != head["benchmark_order"]:
         raise RuntimeError(
             "Benchmark set/order mismatch between base and head: "
@@ -145,6 +170,7 @@ def build_summary(base: dict, head: dict, warn_pct: float, warn_abs_ms: float) -
 
 
 def build_invalid_summary(reason: str) -> tuple[str, dict]:
+    # non-blocking fallback payload when data is missing/invalid
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
@@ -168,6 +194,37 @@ def build_invalid_summary(reason: str) -> tuple[str, dict]:
     return "\n".join(lines), payload
 
 
+def detect_compiler() -> str | None:
+    # best compiler fingerprint for metadata (first available binary wins)
+    for binary in ("c++", "g++", "clang++"):
+        try:
+            result = subprocess.run(
+                [binary, "--version"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (subprocess.CalledProcessError, OSError):
+            continue
+        first_line = result.stdout.splitlines()[0].strip() if result.stdout else ""
+        if first_line:
+            return first_line
+    return None
+
+
+def resolve_metadata(args: argparse.Namespace) -> dict:
+    # resolve metadata from explicit args first, then GitHub env vars
+    timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    return {
+        "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
+        "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
+        "runner": args.runner or os.getenv("RUNNER_NAME"),
+        "os": args.os_name or os.getenv("RUNNER_OS"),
+        "compiler": args.compiler or detect_compiler(),
+        "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compare perfTest runs for PR benchmark guard.")
     parser.add_argument("--base-dir", required=True, type=Path)
@@ -176,7 +233,13 @@ def main() -> int:
     parser.add_argument("--warn-abs-ms", type=float, default=10.0)
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
+    parser.add_argument("--commit-sha")
+    parser.add_argument("--workflow")
+    parser.add_argument("--runner")
+    parser.add_argument("--os-name")
+    parser.add_argument("--compiler")
     args = parser.parse_args()
+    metadata = resolve_metadata(args)
 
     try:
         base = parse_suite(args.base_dir)
@@ -192,6 +255,8 @@ def main() -> int:
         regressed = False
         print(f"::warning::PR benchmark guard data invalid: {exc}")
 
+    payload["schema_version"] = SCHEMA_VERSION
+    payload["metadata"] = metadata
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
     args.json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
