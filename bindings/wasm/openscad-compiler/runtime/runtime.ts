@@ -457,7 +457,7 @@ function __apply_color(shape: any, c: any, alpha: any) {
 // OpenSCAD iteration can target lists, strings, and occasionally scalars.
 function __flat_map_iter(v: any, fn: any) {
   if (v === undefined || v === null) return [];
-  if (Array.isArray(v)) return v.flatMap(fn);
+  if (Array.isArray(v)) return v.flatMap((item, i) => fn(item, i));
   if (typeof v === "string") return Array.from(v).flatMap(fn);
   return [v].flatMap(fn);
 }
@@ -1201,6 +1201,14 @@ function __polygon(points: any, paths?: any) {
   return CrossSection.ofPolygons([ccwPoints]);
 }
 
+function __parse_color_for_scope(c: any, alpha: any): any {
+  const base = __parse_color_value(c);
+  if (!base) return undefined;
+  const a = (alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha)))
+    ? Number(alpha) : base[3];
+  return [base[0], base[1], base[2], a];
+}
+
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
@@ -1219,5 +1227,5 @@ export {
   __apply_color,
   __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
   __extrude, __revolve,
-  __text
+  __text, __parse_color_for_scope
 };

@@ -543,7 +543,7 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     `min_fn, max_fn, norm_fn, cross_fn, len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn, parent_module_fn, openscad_assert_fn, ` +
     `__eq, __add, __sub, __mul, __div, __mod, __neg, __pos, version_fn, version_num_fn, ` +
     `__children_stack, __with_children, ` +
-    `__is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4, __safe_attach_transform, __safe_offset2d, __safe_project3d, __apply_color, __flat_map_iter, __range, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d, __extrude, __revolve, __rotate, __translate, __scale, __mirror, __text } = __rt;\n`;
+    `__is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4, __safe_attach_transform, __safe_offset2d, __safe_project3d, __apply_color, __flat_map_iter, __range, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d, __extrude, __revolve, __rotate, __translate, __scale, __mirror, __text, __parse_color_for_scope } = __rt;\n`;
 
   let output = RUNTIME_IMPORT;
 
@@ -565,7 +565,9 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
   output += `var $fn: any = 0, $fa: any = 12, $fs: any = 2;\n`;
   output += `var $vpr: any = [0, 0, 0], $vpt: any = [0, 0, 0], $vpd: any = 500, $vpf: any = 22.5;\n`;
   output += `var $parent_modules: any = 0;\n`;
-  output += `var $t: any = 0, $preview: any = false;\n\n`;
+  output += `var $t: any = 0, $preview: any = false;\n`;
+  output += `var $color: any = undefined;\n`;
+  output += `var $idx: any = undefined;\n`;
 
   if (declarations.length) {
     output += declarations.join("\n") + "\n\n";
@@ -1070,7 +1072,7 @@ function compileIRTransform(node: IRTransformNode): string {
       const alpha = findArg(node.args, "alpha", 1);
       const cExpr = c ? compileExpr(c.value) : "undefined";
       const aExpr = alpha ? compileExpr(alpha.value) : "undefined";
-      return `__apply_color(${child}, ${cExpr}, ${aExpr})`;
+      return `(() => { var __save_$color: any = $color; $color = __parse_color_for_scope(${cExpr}, ${aExpr}); try { return __apply_color(${child}, ${cExpr}, ${aExpr}); } finally { $color = __save_$color; } })()`;
     }
     case "render":
       return `/* render(${node.args.map(a => compileExpr(a.value)).join(", ")}) */ ${child}`;
@@ -1517,7 +1519,7 @@ function compileColor(stmt: ModuleCallStmt): string {
   const alpha = findArg(stmt.args, "alpha", 1);
   const cExpr = c ? compileExpr(c.value) : "undefined";
   const aExpr = alpha ? compileExpr(alpha.value) : "undefined";
-  return `__apply_color(${child}, ${cExpr}, ${aExpr})`;
+  return `(() => { var __save_$color: any = $color; $color = __parse_color_for_scope(${cExpr}, ${aExpr}); try { return __apply_color(${child}, ${cExpr}, ${aExpr}); } finally { $color = __save_$color; } })()`;
 }
 
 function compilePassthrough(stmt: ModuleCallStmt, tag: string): string {
@@ -1737,7 +1739,7 @@ function buildNestedFor(vars: ForVariable[], idx: number, body: string): string 
 
   // vector iteration
   const rangeExpr = compileExpr(v.range);
-  return `__union2d3d(__flat_map_iter(${rangeExpr}, (${escapeName(v.name)}: any) => [${inner}]))`;
+  return `__union2d3d(__flat_map_iter(${rangeExpr}, (${escapeName(v.name)}: any, __i: any) => { var __save_$idx: any = $idx; $idx = __i; try { return [${inner}]; } finally { $idx = __save_$idx; } }))`;
 }
 
 function buildNestedForStatements(
@@ -1772,11 +1774,16 @@ function buildNestedForStatements(
   }
 
   const iterName = `__iter_${idx}`;
+  const idxName = `__idx_${idx}`;
   return [
     `${indent}{`,
     `${indent}  const ${iterName}: any = ${compileExpr(v.range)};`,
-    `${indent}  for (const ${vName} of ${iterName}) {`,
-    ...buildNestedForStatements(vars, idx + 1, body, indentLevel + 2),
+    `${indent}  for (let ${idxName} = 0; ${idxName} < ${iterName}.length; ${idxName}++) {`,
+    `${indent}    const ${vName}: any = ${iterName}[${idxName}];`,
+    `${indent}    var __save_$idx: any = $idx; $idx = ${idxName};`,
+    `${indent}    try {`,
+    ...buildNestedForStatements(vars, idx + 1, body, indentLevel + 3),
+    `${indent}    } finally { $idx = __save_$idx; }`,
     `${indent}  }`,
     `${indent}}`,
   ];
