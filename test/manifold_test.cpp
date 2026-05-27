@@ -429,8 +429,11 @@ TEST(Manifold, GetNormalLegacyContract) {
         la::inverse(la::transpose(mat3(gl_legacy.GetRunTransform(run)))) *
         (gl_legacy.Backside(run) ? -1.0 : 1.0);
     const mat3 inv = la::inverse(fwd);
-    for (uint32_t* itr = &gl_legacy.triVerts[gl_legacy.runIndex[run]];
-         itr < &gl_legacy.triVerts[gl_legacy.runIndex[run + 1]]; ++itr) {
+    // `data() + i` rather than `&v[i]`: the latter is UB when `i == size()`
+    // (one-past-the-end of the final run) and traps under libc++ fast
+    // hardening - see #1735.
+    for (uint32_t* itr = gl_legacy.triVerts.data() + gl_legacy.runIndex[run];
+         itr < gl_legacy.triVerts.data() + gl_legacy.runIndex[run + 1]; ++itr) {
       const uint32_t v = *itr;
       if (visited[v]) continue;
       visited[v] = true;
