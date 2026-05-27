@@ -216,6 +216,7 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
     # resolve metadata from explicit args first, then GitHub env vars
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     return {
+        "schema_version": SCHEMA_VERSION,
         "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
         "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
         "runner": args.runner or os.getenv("RUNNER_NAME"),
@@ -255,7 +256,6 @@ def main() -> int:
         regressed = False
         print(f"::warning::PR benchmark guard data invalid: {exc}")
 
-    payload["schema_version"] = SCHEMA_VERSION
     payload["metadata"] = metadata
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
     args.json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
