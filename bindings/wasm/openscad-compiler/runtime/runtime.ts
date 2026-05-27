@@ -4,27 +4,32 @@
  * OpenSCAD built-ins and helpers. Exports all symbols for use by compiled code.
  */
 import Module from "manifold-3d";
+import * as opentype from "opentype.js";
+
+declare const document: any;
+declare const OffscreenCanvas: any;
+declare const _attach_transform_fn: any;
 
 const wasm = await Module();
 wasm.setup();
 const { Manifold, CrossSection } = wasm;
 
 // Type checks (OpenSCAD built-ins)
-function is_undef_fn(x) { return x === undefined || x === null; }
-function is_bool_fn(x) { return typeof x === "boolean"; }
-function is_num_fn(x) { return typeof x === "number" && !Number.isNaN(x); }
-function is_string_fn(x) { return typeof x === "string"; }
-function is_list_fn(x) { return Array.isArray(x); }
-function is_function_fn(x) { return typeof x === "function"; }
+function is_undef_fn(x: any) { return x === undefined || x === null; }
+function is_bool_fn(x: any) { return typeof x === "boolean"; }
+function is_num_fn(x: any) { return typeof x === "number" && !Number.isNaN(x); }
+function is_string_fn(x: any) { return typeof x === "string"; }
+function is_list_fn(x: any) { return Array.isArray(x); }
+function is_function_fn(x: any) { return typeof x === "function"; }
 
 // Trig (OpenSCAD uses degrees!)
-function sin_fn(x) { return Math.sin(x * Math.PI / 180); }
-function cos_fn(x) { return Math.cos(x * Math.PI / 180); }
-function tan_fn(x) { return Math.tan(x * Math.PI / 180); }
-function asin_fn(x) { return Math.asin(x) * 180 / Math.PI; }
-function acos_fn(x) { return Math.acos(x) * 180 / Math.PI; }
-function atan_fn(x) { return Math.atan(x) * 180 / Math.PI; }
-function atan2_fn(y, x) { return Math.atan2(y, x) * 180 / Math.PI; }
+function sin_fn(x: any) { return Math.sin(x * Math.PI / 180); }
+function cos_fn(x: any) { return Math.cos(x * Math.PI / 180); }
+function tan_fn(x: any) { return Math.tan(x * Math.PI / 180); }
+function asin_fn(x: any) { return Math.asin(x) * 180 / Math.PI; }
+function acos_fn(x: any) { return Math.acos(x) * 180 / Math.PI; }
+function atan_fn(x: any) { return Math.atan(x) * 180 / Math.PI; }
+function atan2_fn(y: any, x: any) { return Math.atan2(y, x) * 180 / Math.PI; }
 
 // Math (OpenSCAD built-ins)
 var abs_fn = Math.abs;
@@ -34,25 +39,25 @@ var ceil_fn = Math.ceil;
 var round_fn = Math.round;
 var sqrt_fn = Math.sqrt;
 var exp_fn = Math.exp;
-function ln_fn(x) { return Math.log(x); }
-function log_fn(x) { return Math.log(x); }
-function min_fn(...a) { return a.length === 1 && Array.isArray(a[0]) ? Math.min(...a[0]) : Math.min(...a); }
-function max_fn(...a) { return a.length === 1 && Array.isArray(a[0]) ? Math.max(...a[0]) : Math.max(...a); }
-function norm_fn(v) { return Math.sqrt(v.reduce((s, x) => s + x * x, 0)); }
-function cross_fn(a, b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function ln_fn(x: any) { return Math.log(x); }
+function log_fn(x: any) { return Math.log(x); }
+function min_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.min(...a[0]) : Math.min(...a); }
+function max_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.max(...a[0]) : Math.max(...a); }
+function norm_fn(v: any) { return Math.sqrt(v.reduce((s: any, x: any) => s + x * x, 0)); }
+function cross_fn(a: any, b: any) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
 
 // String & list (OpenSCAD built-ins)
-function len_fn(x) {
+function len_fn(x: any) {
   if (typeof x === "string" || Array.isArray(x)) return x.length;
   // OpenSCAD returns undef and emits a warning for non-string/non-list inputs.
   console.warn("WARNING: len() parameter could not be converted");
   return undefined;
 }
-function str_fn(...a) { return a.map(x => x === undefined ? "undef" : String(x)).join(""); }
-function chr_fn(n) { return Array.isArray(n) ? n.map(c => String.fromCharCode(c)).join("") : String.fromCharCode(n); }
-function ord_fn(s) { return s == null || s.length === 0 ? undefined : s.charCodeAt(0); }
-function concat_fn(...a) { return [].concat(...a); }
-function search_fn(needle, haystack, num_returns, idx_col) {
+function str_fn(...a: any[]) { return a.map(x => x === undefined ? "undef" : String(x)).join(""); }
+function chr_fn(n: any) { return Array.isArray(n) ? n.map(c => String.fromCharCode(c)).join("") : String.fromCharCode(n); }
+function ord_fn(s: any) { return s == null || s.length === 0 ? undefined : s.charCodeAt(0); }
+function concat_fn(...a: any[]) { return [].concat(...a); }
+function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   if (is_string_fn(needle) && is_string_fn(haystack)) {
     var result = [];
     for (var ch of needle) {
@@ -72,14 +77,27 @@ function search_fn(needle, haystack, num_returns, idx_col) {
       return num_returns === 0 ? indices : (indices.length > 0 ? indices[0] : []);
     });
   }
-  return [];
+  if (is_string_fn(needle) && is_list_fn(haystack)) {
+    return [...needle].map(function(n) {
+      var indices = [];
+
+      for (var i = 0; i < haystack.length; i++) {
+        var item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
+
+        if (__eq(item, n)) indices.push(i);
+      }
+
+      return num_returns === 0 ? indices : (indices.length > 0 ? indices[0] : undefined);
+    });
+  }
+  return undefined;
 }
-function lookup_fn(key, table) {
+function lookup_fn(key: any, table: any) {
   if (key <= table[0][0]) return table[0][1];
-  if (key >= table[table.length-1][0]) return table[table.length-1][1];
+  if (key >= table[table.length - 1][0]) return table[table.length - 1][1];
   for (var i = 0; i < table.length - 1; i++) {
-    if (table[i][0] <= key && key <= table[i+1][0]) {
-      var t = (key - table[i][0]) / (table[i+1][0] - table[i][0]);
+    if (table[i][0] <= key && key <= table[i + 1][0]) {
+      var t = (key - table[i][0]) / (table[i + 1][0] - table[i][0]);
       return table[i][1] + t * (table[i+1][1] - table[i][1]);
     }
   }
@@ -87,8 +105,8 @@ function lookup_fn(key, table) {
 }
 
 // Control
-function openscad_assert_fn(cond, msg) { if (!cond) { console.trace("Assertion failed:", msg); throw new Error(msg || "Assertion failed"); } }
-function __eq(a, b) {
+function openscad_assert_fn(cond: any, msg: any) { if (!cond) { console.trace("Assertion failed:", msg); throw new Error(msg || "Assertion failed"); } }
+function __eq(a: any, b: any) {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
@@ -97,28 +115,28 @@ function __eq(a, b) {
   }
   return false;
 }
-function __add(a, b) {
+function __add(a: any, b: any): any {
   if (Array.isArray(a)) {
     if (Array.isArray(b)) return a.map((x, i) => __add(x, b[i]));
     return a.map(x => __add(x, b));
   }
-  if (Array.isArray(b)) return b.map(x => __add(a, x));
+  if (Array.isArray(b)) return b.map((x: any): any => __add(a, x));
   return a + b;
 }
-function __sub(a, b) {
+function __sub(a: any, b: any): any {
   if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i) => __sub(x, b[i]));
-    return a.map(x => __sub(x, b));
+    if (Array.isArray(b)) return a.map((x, i): any => __sub(x, b[i]));
+    return a.map((x: any): any => __sub(x, b));
   }
-  if (Array.isArray(b)) return b.map(x => __sub(a, x));
+  if (Array.isArray(b)) return b.map((x: any): any => __sub(a, x));
   return a - b;
 }
-function __mul(a, b) {
+function __mul(a: any, b: any) {
   if (Array.isArray(a)) {
     if (Array.isArray(b)) {
       if (a.length > 0 && Array.isArray(a[0])) {
         if (b.length > 0 && Array.isArray(b[0])) {
-          var res = [];
+          var res: any[] = [];
           for (var i = 0; i < a.length; i++) {
             res[i] = [];
             for (var j = 0; j < b[0].length; j++) {
@@ -129,7 +147,7 @@ function __mul(a, b) {
           }
           return res;
         } else {
-          return a.map(row => __mul(row, b));
+          return a.map((row: any): any => __mul(row, b));
         }
       } else {
         if (b.length > 0 && Array.isArray(b[0])) {
@@ -147,20 +165,20 @@ function __mul(a, b) {
         }
       }
     }
-    return a.map(x => __mul(x, b));
+    return a.map((x: any): any => __mul(x, b));
   }
-  if (Array.isArray(b)) return b.map(x => __mul(a, x));
+  if (Array.isArray(b)) return b.map((x: any): any => __mul(a, x));
   return a * b;
 }
-function __div(a, b) {
+function __div(a: any, b: any) {
   if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i) => __div(x, b[i]));
-    return a.map(x => __div(x, b));
+    if (Array.isArray(b)) return a.map((x, i): any => __div(x, b[i]));
+    return a.map((x: any): any => __div(x, b));
   }
-  if (Array.isArray(b)) return b.map(x => __div(a, x));
+  if (Array.isArray(b)) return b.map((x: any): any => __div(a, x));
   return a / b;
 }
-function __mod(a, b) {
+function __mod(a: any, b: any): any {
   if (Array.isArray(a)) {
     if (Array.isArray(b)) return a.map((x, i) => __mod(x, b[i]));
     return a.map(x => __mod(x, b));
@@ -168,11 +186,11 @@ function __mod(a, b) {
   if (Array.isArray(b)) return b.map(x => __mod(a, x));
   return a % b;
 }
-function __neg(a) {
+function __neg(a: any): any {
   if (Array.isArray(a)) return a.map(__neg);
   return -a;
 }
-function __pos(a) {
+function __pos(a: any): any {
   if (Array.isArray(a)) return a.map(__pos);
   return +a;
 }
@@ -189,10 +207,10 @@ var undef = undefined;
 var _EPSILON = 1e-9;
 
 // Children stack for module calls
-var __children_stack = [];
+var __children_stack: any[] = [];
 const __color_prop_layout = new WeakMap();
-function __with_children(fn, count, call) {
-  __children_stack.push({ fn: fn, count: count });
+function __with_children(fn: any, count: any, call: any, name?: string) {
+  __children_stack.push({ fn: fn, count: count, name: name });
   try {
     return call();
   } finally {
@@ -200,16 +218,24 @@ function __with_children(fn, count, call) {
   }
 }
 
-function __is_finite_matrix4(m) {
+function parent_module_fn(d: any = 1) {
+  const depth = Number(d);
+  if (!Number.isInteger(depth) || depth < 0) return "";
+  const idx = __children_stack.length - 1 - depth;
+  if (idx < 0 || idx >= __children_stack.length) return "";
+  return __children_stack[idx].name || "";
+}
+
+function __is_finite_matrix4(m: any) {
   return Array.isArray(m) &&
     m.length === 4 &&
-    m.every((row) => Array.isArray(row) &&
+    m.every((row: any) => Array.isArray(row) &&
       row.length === 4 &&
-      row.every((v) => typeof v === "number" && Number.isFinite(v)));
+      row.every((v: any) => typeof v === "number" && Number.isFinite(v)));
 }
 
 // Manifold expects a flat 4x4 matrix in column-major order.
-function __to_manifold_mat4(m) {
+function __to_manifold_mat4(m: any) {
   if (!__is_finite_matrix4(m)) return undefined;
   const out = new Array(16);
   for (let row = 0; row < 4; row++) {
@@ -221,7 +247,7 @@ function __to_manifold_mat4(m) {
 }
 
 // Guard transform() against invalid matrices produced by complex attachment math.
-function __safe_transform(shape, m) {
+function __safe_transform(shape: any, m: any) {
   const mm = __to_manifold_mat4(m);
   if (!mm) return shape;
   try {
@@ -235,7 +261,7 @@ function __identity4() {
   return [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 }
 
-function __safe_attach_transform(...args) {
+function __safe_attach_transform(...args: any[]) {
   try {
     const m = _attach_transform_fn(...args);
     return __is_finite_matrix4(m) ? m : __identity4();
@@ -245,16 +271,19 @@ function __safe_attach_transform(...args) {
 }
 
 // 2D helpers used by offset()/projection() fallbacks.
-function __safe_offset2d(shape, delta, joinType = "Round", miterLimit = 2, circularSegments = 0) {
+function __safe_offset2d(shape: any, delta: any, joinType = "Round", miterLimit = 2, circularSegments = 0, fa = 12, fs = 2) {
   try {
     if (shape && typeof shape.offset === "function") {
+      if (circularSegments <= 0) {
+        __sync_quality(fa, fs);
+      }
       return shape.offset(delta, joinType, miterLimit, circularSegments);
     }
   } catch {}
   return shape;
 }
 
-function __safe_project3d(shape) {
+function __safe_project3d(shape: any) {
   try {
     if (shape && typeof shape.project === "function") return shape.project();
   } catch {}
@@ -262,7 +291,7 @@ function __safe_project3d(shape) {
 }
 
 // Common OpenSCAD/CSS color names mapped to linearized [0, 1] RGB.
-const __named_colors = {
+const __named_colors: Record<string, number[]> = {
   aqua: [0, 1, 1],
   beige: [0.9608, 0.9608, 0.8627],
   black: [0, 0, 0],
@@ -298,7 +327,7 @@ const __named_colors = {
   yellow: [1, 1, 0],
 };
 
-function __clamp01(v) {
+function __clamp01(v: any) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
   if (n <= 0) return 0;
@@ -306,7 +335,7 @@ function __clamp01(v) {
   return n;
 }
 
-function __parse_hex_color(s) {
+function __parse_hex_color(s: any) {
   if (!s.startsWith("#")) return undefined;
   const h = s.slice(1);
   if (h.length === 3 || h.length === 4) {
@@ -328,7 +357,7 @@ function __parse_hex_color(s) {
   return undefined;
 }
 
-function __parse_color_value(c) {
+function __parse_color_value(c: any) {
   if (Array.isArray(c)) {
     if (c.length < 3) return undefined;
     let r = Number(c[0]);
@@ -361,7 +390,7 @@ function __parse_color_value(c) {
 }
 
 // Apply OpenSCAD color() by appending custom RGBA + marker channels.
-function __apply_color(shape, c, alpha) {
+function __apply_color(shape: any, c: any, alpha: any) {
   if (!shape || typeof shape.setProperties !== "function" || typeof shape.numProp !== "function") {
     return shape;
   }
@@ -401,7 +430,7 @@ function __apply_color(shape, c, alpha) {
   }
 
   try {
-    const painted = shape.setProperties(newNumProp, (newProp, position, oldProp) => {
+    const painted = shape.setProperties(newNumProp, (newProp: any, position: any, oldProp: any) => {
       for (let i = 0; i < newNumProp; i++) {
         if (i < oldProp.length) {
           newProp[i] = oldProp[i];
@@ -426,7 +455,7 @@ function __apply_color(shape, c, alpha) {
 }
 
 // OpenSCAD iteration can target lists, strings, and occasionally scalars.
-function __flat_map_iter(v, fn) {
+function __flat_map_iter(v: any, fn: any) {
   if (v === undefined || v === null) return [];
   if (Array.isArray(v)) return v.flatMap(fn);
   if (typeof v === "string") return Array.from(v).flatMap(fn);
@@ -434,7 +463,7 @@ function __flat_map_iter(v, fn) {
 }
 
 // Range expansion: convert OpenSCAD range [start:step:end] to an actual array
-function __range(start, step, end) {
+function __range(start: any, step: any, end: any) {
   var result = [];
   if (step > 0) { for (var i = start; i <= end; i += step) result.push(i); }
   else if (step < 0) { for (var i = start; i >= end; i += step) result.push(i); }
@@ -442,11 +471,11 @@ function __range(start, step, end) {
 }
 
 // Detect CrossSection (2D) vs Manifold (3D) for dispatch
-function __is2D(x) {
+function __is2D(x: any) {
   return x != null && typeof x.offset === "function" && typeof x.toPolygons === "function";
 }
 
-function __isEmpty(x) {
+function __isEmpty(x: any) {
   if (!x) return true;
   if (typeof x.isEmpty === 'function' && x.isEmpty()) return true;
   if (typeof x.numTri === 'function' && x.numTri() === 0) return true;
@@ -455,19 +484,19 @@ function __isEmpty(x) {
 }
 
 // Boolean ops: use CrossSection for 2D, Manifold for 3D (no thin extrusion of 2D)
-function __union2d3d(items) {
+function __union2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
   return __is2D(valid[0]) ? CrossSection.union(valid) : Manifold.union(valid);
 }
-function __difference2d3d(first, rest) {
+function __difference2d3d(first: any, rest: any[]) {
   if (__isEmpty(first)) return first;
   const validRest = rest.filter(x => !__isEmpty(x));
   if (validRest.length === 0) return first;
   if (__is2D(first)) return CrossSection.difference([first, ...validRest]);
   return validRest.length === 1 ? first.subtract(validRest[0]) : first.subtract(Manifold.union(validRest));
 }
-function __intersection2d3d(items) {
+function __intersection2d3d(items: any[]) {
   if (items.length === 0) return Manifold.union([]);
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length < items.length) {
@@ -476,13 +505,13 @@ function __intersection2d3d(items) {
   }
   return __is2D(valid[0]) ? CrossSection.intersection(valid) : Manifold.intersection(valid);
 }
-function __hull2d3d(items) {
+function __hull2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
   return __is2D(valid[0]) ? CrossSection.hull(valid) : Manifold.hull(valid);
 }
 
-function __mesh_points3d(manifold, maxPoints = 192) {
+function __mesh_points3d(manifold: any, maxPoints = 192) {
   if (!manifold || typeof manifold.getMesh !== "function") return [];
   const mesh = manifold.getMesh();
   const numProp = (mesh && typeof mesh.numProp === "number" && mesh.numProp >= 3) ? mesh.numProp : 3;
@@ -518,7 +547,7 @@ function __mesh_points3d(manifold, maxPoints = 192) {
   return points;
 }
 
-function __is_likely_convex3d(manifold) {
+function __is_likely_convex3d(manifold: any) {
   if (!manifold || typeof manifold.hull !== "function" || typeof manifold.volume !== "function") return false;
   if (typeof manifold.isEmpty === "function" && manifold.isEmpty()) return true;
   try {
@@ -532,23 +561,23 @@ function __is_likely_convex3d(manifold) {
   }
 }
 
-function __minkowski_convex_pair3d(a, b) {
+function __minkowski_convex_pair3d(a: any, b: any) {
   const pointsA = __mesh_points3d(a);
   const pointsB = __mesh_points3d(b);
   if (pointsA.length === 0 || pointsB.length === 0) return Manifold.union([]);
 
   const sums = [];
   for (let i = 0; i < pointsA.length; i++) {
-    const pa = pointsA[i];
+    const pa = pointsA[i]!;
     for (let j = 0; j < pointsB.length; j++) {
-      const pb = pointsB[j];
+      const pb = pointsB[j]!;
       sums.push([pa[0] + pb[0], pa[1] + pb[1], pa[2] + pb[2]]);
     }
   }
-  return Manifold.hull(sums);
+  return Manifold.hull(sums as any);
 }
 
-function __minkowski_convex_chain3d(items) {
+function __minkowski_convex_chain3d(items: any[]) {
   let acc = items[0];
   for (let i = 1; i < items.length; i++) {
     acc = __minkowski_convex_pair3d(acc, items[i]);
@@ -557,7 +586,7 @@ function __minkowski_convex_chain3d(items) {
 }
 
 // Minkowski sum: native API when available; otherwise use a convex approximation.
-function __minkowski2d3d(items) {
+function __minkowski2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
   if (valid.length === 1) return valid[0];
@@ -585,7 +614,7 @@ function __minkowski2d3d(items) {
   return acc;
 }
 
-function __extrude(shape, height = 1, options: { twist?: number, nDivisions?: number, scale?: any, center?: boolean } = {}) {
+function __extrude(shape: any, height = 1, options: { twist?: number, nDivisions?: number, scale?: any, center?: boolean } = {}) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
@@ -595,19 +624,587 @@ function __extrude(shape, height = 1, options: { twist?: number, nDivisions?: nu
   return shape;
 }
 
-function __revolve(shape, fn = 0, angle = 360) {
+function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
   if (__is2D(shape)) {
+    if (fn <= 0) {
+      __sync_quality(fa, fs);
+    }
     return shape.revolve(fn, angle);
   }
   return shape;
 }
 
+function __sampleQuadratic(x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, steps: number): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, mt = 1 - t;
+    pts.push([
+      mt*mt*x0 + 2*mt*t*x1 + t*t*x2,
+      mt*mt*y0 + 2*mt*t*y1 + t*t*y2,
+    ]);
+  }
+  return pts;
+}
+
+function __sampleCubic(x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, steps: number): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, mt = 1 - t;
+    pts.push([
+      mt*mt*mt*x0 + 3*mt*mt*t*x1 + 3*mt*t*t*x2 + t*t*t*x3,
+      mt*mt*mt*y0 + 3*mt*mt*t*y1 + 3*mt*t*t*y2 + t*t*t*y3,
+    ]);
+  }
+  return pts;
+}
+
+function __pathToContours(commands: any[], fn: number): [number, number][][] {
+  const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 8);
+  const contours: [number, number][][] = [];
+  let current: [number, number][] | null = null;
+  let cx = 0, cy = 0; // current point (Y-up coords)
+ 
+  for (const cmd of commands) {
+    switch (cmd.type) {
+      case "M": // Move to — starts a new contour
+        if (current && current.length >= 3) contours.push(current);
+        cx = cmd.x; cy = -cmd.y;
+        current = [[cx, cy]];
+        break;
+ 
+      case "L": // Line to
+        cx = cmd.x; cy = -cmd.y;
+        current?.push([cx, cy]);
+        break;
+ 
+      case "Q": { // Quadratic bezier
+        if (!current) break;
+        const prev = current[current.length - 1]!;
+        const pts = __sampleQuadratic(prev[0], -prev[1], cmd.x1, -cmd.y1, cmd.x, cmd.y, steps);
+        for (const [px, py] of pts) current.push([px, -py]);
+        cx = cmd.x; cy = -cmd.y;
+        break;
+      }
+ 
+      case "C": { // Cubic bezier
+        if (!current) break;
+        const prev = current[current.length - 1]!;
+        const pts = __sampleCubic(prev[0], -prev[1], cmd.x1, -cmd.y1, cmd.x2, -cmd.y2, cmd.x, cmd.y, steps);
+        for (const [px, py] of pts) current.push([px, -py]);
+        cx = cmd.x; cy = -cmd.y;
+        break;
+      }
+ 
+      case "Z": // Close contour
+        if (current && current.length >= 3) contours.push(current);
+        current = null;
+        break;
+    }
+  }
+  if (current && current.length >= 3) contours.push(current);
+  return contours;
+}
+
+const __opentypeFontCache = new Map<string, any>();
+
+function __getOpentypeFont(base64DataUrl: string): any | undefined {
+  const cached = __opentypeFontCache.get(base64DataUrl);
+  if (cached) return cached;
+
+  try {
+    const base64 = base64DataUrl.replace(/^data:[^;]+;base64,/, "");
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const font = opentype.parse(bytes.buffer as ArrayBuffer);
+    __opentypeFontCache.set(base64DataUrl, font);
+    return font;
+  } catch {
+    return undefined;
+  }
+}
+
+function __opentypeGlyphContours(ch: string, font: any, size: number, fn: number): { contours: [number, number][][]; width: number } | undefined {
+  if (ch === " ") {
+    const spaceGlyph = font.charToGlyph(" ");
+    const scale = size / font.unitsPerEm;
+    const spaceWidth = (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
+    return { contours: [], width: spaceWidth };
+  }
+
+  const glyph = font.charToGlyph(ch);
+  if (!glyph || glyph.index === 0) return undefined;
+
+  const scale = size / font.unitsPerEm;
+  const advance = (glyph.advanceWidth ?? 0) * scale;
+  const glyphPath = glyph.getPath(0, 0, size);
+  const commands = glyphPath.commands;
+
+  if (!commands || commands.length === 0) {
+    return { contours: [], width: advance };
+  }
+
+  const contours = __pathToContours(commands, fn);
+  return { contours, width: advance };
+}
+
+function __opentypeTextContours(chars: string[], size: number, spacing: number, direction: string, fontBase64: string, fn: number): [number, number][][] | undefined {
+  const font = __getOpentypeFont(fontBase64);
+  if (!font) return undefined;
+
+  const contours: [number, number][][] = [];
+  const isVertical = direction === "ttb" || direction === "btt";
+
+  if (isVertical) {
+    const ySign = direction === "ttb" ? -1 : 1;
+    let cursorY = 0;
+    for (const ch of chars) {
+      const glyph = __opentypeGlyphContours(ch, font, size, fn);
+      if (!glyph) return undefined;
+      const xOffset = -glyph.width / 2;
+      for (const contour of glyph.contours) {
+        contours.push(contour.map(([x, y]): [number, number] => [x + xOffset, cursorY + y * ySign]));
+      }
+      cursorY += size * spacing * ySign;
+    }
+  } else {
+    let cursorX = 0;
+    for (const ch of chars) {
+      const glyph = __opentypeGlyphContours(ch, font, size, fn);
+      if (!glyph) return undefined;
+      for (const contour of glyph.contours) {
+        contours.push(contour.map(([x, y]): [number, number] => [x + cursorX, y]));
+      }
+      cursorX += glyph.width * spacing;
+    }
+  }
+
+  return contours;
+}
+
+const __canvasGlyphCache = new Map<string, { contours: [number, number][][], width: number }>();
+
+function __fontToCss(font: string, px: number): string {
+  const spec = String(font || "Liberation Sans");
+  const family = (spec.split(":")[0] || "Liberation Sans").replace(/"/g, "");
+  const styleSpec = spec.toLowerCase();
+  const weight = styleSpec.includes("bold") ? "700" : "400";
+  const style = styleSpec.includes("italic") ? "italic" : "normal";
+  return `${style} ${weight} ${px}px "${family}", Arial, sans-serif`;
+}
+
+function __canvasForText(): any {
+  if (typeof document !== "undefined" && typeof document.createElement === "function") {
+    return document.createElement("canvas");
+  }
+  if (typeof OffscreenCanvas !== "undefined") {
+    return new OffscreenCanvas(1, 1);
+  }
+  return undefined;
+}
+
+function __canvasGlyphContours(ch: string, font: string, size: number): { contours: [number, number][][], width: number } | undefined {
+  if (ch === " ") return { contours: [], width: size * 0.35 };
+
+  const px = 128;
+  const cacheKey = `${font}|${ch}|${px}`;
+  const cached = __canvasGlyphCache.get(cacheKey);
+  if (cached) return cached;
+
+  const canvas = __canvasForText();
+  const ctx = canvas?.getContext("2d", { willReadFrequently: true } as any) as any;
+  if (!canvas || !ctx) return undefined;
+
+  ctx.font = __fontToCss(font, px);
+  const metrics = ctx.measureText(ch);
+  const ascent = Math.ceil(metrics.actualBoundingBoxAscent || px * 0.8);
+  const descent = Math.ceil(metrics.actualBoundingBoxDescent || px * 0.25);
+  const leftBearing = Math.ceil(metrics.actualBoundingBoxLeft || 0);
+  const rightBearing = Math.ceil(metrics.actualBoundingBoxRight || metrics.width || px * 0.6);
+  const pad = 8;
+  const widthPx = Math.max(1, Math.ceil(leftBearing + rightBearing + pad * 2));
+  const heightPx = Math.max(1, ascent + descent + pad * 2);
+
+  canvas.width = widthPx;
+  canvas.height = heightPx;
+  ctx.clearRect(0, 0, widthPx, heightPx);
+  ctx.font = __fontToCss(font, px);
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(ch, pad + leftBearing, pad + ascent);
+
+  const image = ctx.getImageData(0, 0, widthPx, heightPx);
+  let minX = widthPx, minY = heightPx, maxX = -1, maxY = -1;
+  for (let y = 0; y < heightPx; y++) {
+    for (let x = 0; x < widthPx; x++) {
+      if (image.data[(y * widthPx + x) * 4 + 3] > 32) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  const scale = size / px;
+  const result = { contours: [] as [number, number][][], width: Math.max(1, metrics.width) * scale };
+  if (maxX < minX || maxY < minY) {
+    __canvasGlyphCache.set(cacheKey, result);
+    return result;
+  }
+
+  for (let y = minY; y <= maxY; y++) {
+    let x = minX;
+    while (x <= maxX) {
+      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3] <= 32) x++;
+      const start = x;
+      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3] > 32) x++;
+      if (start < x) {
+        const x0 = (start - minX) * scale;
+        const x1 = (x - minX) * scale;
+        const y0 = (maxY - y) * scale;
+        const y1 = (maxY - y + 1) * scale;
+        result.contours.push([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+      }
+    }
+  }
+
+  __canvasGlyphCache.set(cacheKey, result);
+  return result;
+}
+
+function __canvasTextContours(chars: string[], size: number, spacing: number, direction: string, font: string): [number, number][][] | undefined {
+  if (typeof document === "undefined" && typeof OffscreenCanvas === "undefined") return undefined;
+
+  const contours: [number, number][][] = [];
+  const isVertical = direction === "ttb" || direction === "btt";
+  if (isVertical) {
+    const ySign = direction === "ttb" ? -1 : 1;
+    let cursorY = 0;
+    for (const ch of chars) {
+      const glyph = __canvasGlyphContours(ch, font, size);
+      if (!glyph) return undefined;
+      const xOffset = -glyph.width / 2;
+      for (const contour of glyph.contours) {
+        contours.push(contour.map(([x, y]): [number, number] => [x + xOffset, cursorY + y * ySign]));
+      }
+      cursorY += size * spacing * ySign;
+    }
+  } else {
+    let cursorX = 0;
+    for (const ch of chars) {
+      const glyph = __canvasGlyphContours(ch, font, size);
+      if (!glyph) return undefined;
+      for (const contour of glyph.contours) {
+        contours.push(contour.map(([x, y]): [number, number] => [x + cursorX, y]));
+      }
+      cursorX += glyph.width * spacing;
+    }
+  }
+
+  return contours;
+}
+
+function __text(text: string, size: number = 10, font: string, halign: string = "left", valign: string = "baseline", spacing: number = 1, direction: string = "ltr", fn: number = 0, fontBase64Data: string | undefined = undefined): any {
+  if (!text || text.length === 0) return CrossSection.square([0.001, 0.001], false);
+
+  void fn;
+
+  const dir = (direction || "ltr").toLowerCase();
+  const chars = dir === "rtl" ? Array.from(text).reverse() : Array.from(text);
+
+  let contours: [number, number][][] | undefined;
+
+  contours = __canvasTextContours(chars, size, spacing, dir, font);
+
+  if (!contours && fontBase64Data) {
+    contours = __opentypeTextContours(chars, size, spacing, dir, fontBase64Data, fn);
+  }
+  if (!contours || contours.length === 0) return CrossSection.square([0.001, 0.001], false);
+
+  let left = Infinity, right = -Infinity, top = -Infinity, bottom = Infinity;
+  for (const c of contours) {
+    for (const [x, y] of c) {
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y > top) top = y;
+      if (y < bottom) bottom = y;
+    }
+  }
+
+  let dx = 0;
+  if      (halign === "center") dx = -(left + right) / 2;
+  else if (halign === "right")  dx = -right;
+  else                          dx = -left;
+
+  let dy = 0;
+  if (valign === "center") dy = -(top + bottom) / 2;
+  else if (valign === "top")    dy = -top;
+  else if (valign === "bottom") dy = -bottom;
+
+  const shifted = contours.map(c => c.map(([x, y]): [number, number] => [x + dx, y + dy]));
+  return CrossSection.ofPolygons(shifted);
+}
+
+function __sync_quality(fa: any, fs: any) {
+  if (typeof wasm.setMinCircularAngle === "function") {
+    if (typeof fa === "number" && fa > 0) {
+      wasm.setMinCircularAngle(fa);
+    }
+  }
+  if (typeof wasm.setMinCircularEdgeLength === "function") {
+    if (typeof fs === "number" && fs > 0) {
+      wasm.setMinCircularEdgeLength(fs);
+    }
+  }
+}
+
+function __rotate(shape: any, a: any, v?: any) {
+  if (!shape) return shape;
+
+  if (__is2D(shape)) {
+    if (v !== undefined) {
+      const vz = Array.isArray(v) ? v[2] : (v && typeof v === 'object' ? (v.z || v[2]) : 0);
+      const vzNum = Number(vz) || 0;
+      if (Math.abs(vzNum) > 1e-9) {
+        return shape.rotate(Number(a) * Math.sign(vzNum));
+      }
+      return shape;
+    }
+    if (Array.isArray(a)) {
+      return shape.rotate(Number(a[2]) || 0);
+    }
+    return shape.rotate(Number(a) || 0);
+  }
+
+  // 3D shape
+  if (v !== undefined) {
+    const theta = (Number(a) || 0) * Math.PI / 180;
+    const cosT = Math.cos(theta);
+    const sinT = Math.sin(theta);
+    const oneMinusCosT = 1 - cosT;
+
+    let vx = 0, vy = 0, vz = 0;
+    if (Array.isArray(v)) {
+      vx = Number(v[0]) || 0;
+      vy = Number(v[1]) || 0;
+      vz = Number(v[2]) || 0;
+    } else if (v && typeof v === 'object') {
+      vx = Number(v.x || v[0]) || 0;
+      vy = Number(v.y || v[1]) || 0;
+      vz = Number(v.z || v[2]) || 0;
+    } else {
+      vx = Number(v) || 0;
+    }
+
+    const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    if (len < 1e-9) return shape;
+
+    const ux = vx / len;
+    const uy = vy / len;
+    const uz = vz / len;
+
+    const R = [
+      [oneMinusCosT * ux * ux + cosT, oneMinusCosT * ux * uy - sinT * uz, oneMinusCosT * ux * uz + sinT * uy, 0],
+      [oneMinusCosT * ux * uy + sinT * uz, oneMinusCosT * uy * uy + cosT, oneMinusCosT * uy * uz - sinT * ux, 0],
+      [oneMinusCosT * ux * uz - sinT * uy, oneMinusCosT * uy * uz + sinT * ux, oneMinusCosT * uz * uz + cosT, 0],
+      [0, 0, 0, 1]
+    ];
+
+    return __safe_transform(shape, R);
+  } else {
+    if (Array.isArray(a)) {
+      return shape.rotate(a);
+    }
+    return shape.rotate([0, 0, Number(a) || 0]);
+  }
+}
+
+function __translate(shape: any, v: any) {
+  if (!shape) return shape;
+  if (__is2D(shape)) {
+    let x = 0, y = 0;
+    if (Array.isArray(v)) {
+      x = Number(v[0]) || 0;
+      y = Number(v[1]) || 0;
+    } else if (v && typeof v === "object") {
+      x = Number(v.x || v[0]) || 0;
+      y = Number(v.y || v[1]) || 0;
+    } else {
+      x = Number(v) || 0;
+    }
+    return shape.translate([x, y]);
+  } else {
+    let x = 0, y = 0, z = 0;
+    if (Array.isArray(v)) {
+      x = Number(v[0]) || 0;
+      y = Number(v[1]) || 0;
+      z = Number(v[2]) || 0;
+    } else if (v && typeof v === "object") {
+      x = Number(v.x || v[0]) || 0;
+      y = Number(v.y || v[1]) || 0;
+      z = Number(v.z || v[2]) || 0;
+    } else {
+      x = Number(v) || 0;
+    }
+    return shape.translate([x, y, z]);
+  }
+}
+
+function __scale(shape: any, v: any) {
+  if (!shape) return shape;
+  if (__is2D(shape)) {
+    let x = 1, y = 1;
+    if (Array.isArray(v)) {
+      x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
+      y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
+    } else if (v && typeof v === "object") {
+      x = (v.x !== undefined ? v.x : v[0]) !== undefined ? Number(v.x !== undefined ? v.x : v[0]) : 1;
+      y = (v.y !== undefined ? v.y : v[1]) !== undefined ? Number(v.y !== undefined ? v.y : v[1]) : 1;
+    } else if (typeof v === "number" && !Number.isNaN(v)) {
+      x = y = v;
+    }
+    return shape.scale([x, y]);
+  } else {
+    let x = 1, y = 1, z = 1;
+    if (Array.isArray(v)) {
+      x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
+      y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
+      z = v[2] !== undefined && v[2] !== null ? Number(v[2]) : 1;
+    } else if (v && typeof v === "object") {
+      x = (v.x !== undefined ? v.x : v[0]) !== undefined ? Number(v.x !== undefined ? v.x : v[0]) : 1;
+      y = (v.y !== undefined ? v.y : v[1]) !== undefined ? Number(v.y !== undefined ? v.y : v[1]) : 1;
+      z = (v.z !== undefined ? v.z : v[2]) !== undefined ? Number(v.z !== undefined ? v.z : v[2]) : 1;
+    } else if (typeof v === "number" && !Number.isNaN(v)) {
+      x = y = z = v;
+    }
+    return shape.scale([x, y, z]);
+  }
+}
+
+function __mirror(shape: any, v: any) {
+  if (!shape) return shape;
+  if (__is2D(shape)) {
+    let x = 0, y = 0;
+    if (Array.isArray(v)) {
+      x = Number(v[0]) || 0;
+      y = Number(v[1]) || 0;
+    } else if (v && typeof v === "object") {
+      x = Number(v.x || v[0]) || 0;
+      y = Number(v.y || v[1]) || 0;
+    } else {
+      x = Number(v) || 0;
+    }
+    return shape.mirror([x, y]);
+  } else {
+    let x = 0, y = 0, z = 0;
+    if (Array.isArray(v)) {
+      x = Number(v[0]) || 0;
+      y = Number(v[1]) || 0;
+      z = Number(v[2]) || 0;
+    } else if (v && typeof v === "object") {
+      x = Number(v.x || v[0]) || 0;
+      y = Number(v.y || v[1]) || 0;
+      z = Number(v.z || v[2]) || 0;
+    } else {
+      x = Number(v) || 0;
+    }
+    return shape.mirror([x, y, z]);
+  }
+}
+
+function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
+  if (fn <= 0) {
+    __sync_quality(fa, fs);
+  }
+  return Manifold.sphere(radius, fn);
+}
+
+function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, circularSegments = 0, center = false, fa = 12, fs = 2) {
+  if (circularSegments <= 0) {
+    __sync_quality(fa, fs);
+  }
+  return Manifold.cylinder(height, radiusLow, radiusHigh, circularSegments, center);
+}
+
+function __circle(radius: number, circularSegments = 0, fa = 12, fs = 2) {
+  if (circularSegments <= 0) {
+    __sync_quality(fa, fs);
+  }
+  return CrossSection.circle(radius, circularSegments);
+}
+
+function __getSignedArea(contour: [number, number][]): number {
+  let area = 0;
+  const n = contour.length;
+  for (let i = 0; i < n; i++) {
+    const p1 = contour[i]!;
+    const p2 = contour[(i + 1) % n]!;
+    area += p1[0] * p2[1] - p2[0] * p1[1];
+  }
+  return area / 2;
+}
+
+function __forceWinding(contour: [number, number][], ccw: boolean): [number, number][] {
+  const area = __getSignedArea(contour);
+  if (ccw && area < 0) {
+    contour.reverse();
+  } else if (!ccw && area > 0) {
+    contour.reverse();
+  }
+  return contour;
+}
+
+function __polygon(points: any, paths?: any) {
+  if (!points || !Array.isArray(points) || points.length === 0) {
+    return CrossSection.ofPolygons([]);
+  }
+
+  // If paths is not specified
+  if (paths === undefined || paths === null) {
+    const ccwPoints = __forceWinding([...points], true);
+    return CrossSection.ofPolygons([ccwPoints]);
+  }
+
+  // If paths is a 1D array of indices (e.g. [0, 1, 2, 3])
+  if (Array.isArray(paths) && paths.length > 0 && !Array.isArray(paths[0])) {
+    const contour = paths.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
+    const ccwContour = __forceWinding(contour, true);
+    return CrossSection.ofPolygons([ccwContour]);
+  }
+
+  // If paths is a 2D array of indices (e.g. [[0, 1, 2], [3, 4, 5]])
+  if (Array.isArray(paths)) {
+    const contours = paths.map((path: any, pathIdx: number) => {
+      let contour: any[] = [];
+      if (Array.isArray(path)) {
+        contour = path.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
+      } else if (typeof path === "number") {
+        contour = [points[path]];
+      }
+      if (contour.length > 0) {
+        // First path is outer boundary (CCW), subsequent paths are holes (CW)
+        return __forceWinding(contour, pathIdx === 0);
+      }
+      return [];
+    }).filter((c: any) => c.length > 0);
+    return CrossSection.ofPolygons(contours);
+  }
+
+  // Fallback
+  const ccwPoints = __forceWinding([...points], true);
+  return CrossSection.ofPolygons([ccwPoints]);
+}
+
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
+  __sphere, __cylinder, __circle, __rotate, __polygon, __translate, __scale, __mirror,
   is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn,
   sin_fn, cos_fn, tan_fn, asin_fn, acos_fn, atan_fn, atan2_fn,
   abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn,
@@ -616,10 +1213,11 @@ export {
   openscad_assert_fn, __eq, __add, __sub, __mul, __div, __mod, __neg, __pos,
   version_fn, version_num_fn,
   PI, INF, NAN, undef, _EPSILON,
-  __children_stack, __with_children,
+  __children_stack, __with_children, parent_module_fn,
   __is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4,
   __safe_attach_transform, __safe_offset2d, __safe_project3d,
   __apply_color,
   __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
-  __extrude, __revolve
+  __extrude, __revolve,
+  __text
 };

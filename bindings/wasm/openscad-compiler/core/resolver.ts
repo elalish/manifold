@@ -5,6 +5,32 @@ import { Lexer } from "./lexer.js";
 import { Parser } from "./parser.js";
 import type { Program, Statement } from "./ast.js";
 
+let dotEnvLoaded = false;
+export function loadDotEnv(): void {
+  if (dotEnvLoaded) return;
+  dotEnvLoaded = true;
+  const envFile = path.resolve(process.cwd(), ".env");
+  if (!fs.existsSync(envFile)) return;
+  const content = fs.readFileSync(envFile, "utf8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx < 0) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (key && process.env[key] === undefined) {
+      process.env[key] = val;
+    }
+  }
+}
+
+export function getFontPath(): string | undefined {
+  loadDotEnv();
+  const fp = process.env["FONTPATH"];
+  return fp && fp.trim() !== "" ? fp.trim() : undefined;
+}
+
 // Resolves and recursively parses OpenSCAD include/use directives
 export interface ResolvedProgram {
   // All statements from included files + the main file, in order
@@ -14,6 +40,7 @@ export interface ResolvedProgram {
 }
 
 export function getOpenSCADLibraryPaths(): string[] {
+  loadDotEnv();
   const paths: string[] = [];
 
   // OPENSCADPATH environment variable

@@ -90,42 +90,22 @@ function expectApproximatelyEqual(
   expect(relativeError).toBeLessThan(relativeTolerance);
 }
 
-function getAllFiles(dir: string): string[] {
-    let results: string[] = [];
+suite('Single Compiled Example', async () => {
+  const fileName = process.env.TEST_FILE;
 
-    const items = fs.readdirSync(dir, {
-      withFileTypes: true
-    });
-
-    for (const item of items) {
-      const fullPath = path.join(dir, item.name);
-
-      if (item.isDirectory()) {
-        results = results.concat(getAllFiles(fullPath));
-      } else {
-        results.push(fullPath);
-      }
-    }
-
-    return results;
-}
-
-suite('Compiled Examples', async () => {
-  const openscadFiles = getAllFiles("./examples");
-
-  for (const file of openscadFiles) {
-    if (file.endsWith(".scad")) {
-      const {volume, surfaceArea} = await getOpenScadProperties(file);
-
-      if (volume == undefined || surfaceArea == undefined) continue;
-
-      test(`Test for ${file}`, async () => {
-        const compiledFile = file.replace(".scad", ".ts").replace("examples", "out");
-        const { volume: compiledVolume, surfaceArea: compiledSurfaceArea } = await getCompiledManifoldProperties(compiledFile);
-
-        expectApproximatelyEqual(volume, compiledVolume, 0.2);
-        expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, 0.2);
-      });
-    }
+  if (!fileName) {
+    throw new Error("TEST_FILE not provided");
   }
+
+  test(`Test for ${fileName}`, async () => {
+    const {volume, surfaceArea} = await getOpenScadProperties(fileName);
+
+    if (volume == undefined || surfaceArea == undefined) return;
+
+    const compiledFile = fileName.replace(".scad", ".ts").replace("examples", "out");
+    const { volume: compiledVolume, surfaceArea: compiledSurfaceArea } = await getCompiledManifoldProperties(compiledFile);
+
+    expectApproximatelyEqual(volume, compiledVolume, 0.2);
+    expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, 0.2);
+  });
 });

@@ -7,8 +7,9 @@
     "openscad-to-manifold": "./dist/index.cjs"
   },
   "scripts": {
-    "build": "tsup index.ts --format cjs",
-    "serve": "npx serve ."
+    "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
+    "serve": "npx serve .",
+    "test": "cd test && npx vitest run compiler.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,10 +17,12 @@
   "type": "module",
   "dependencies": {
     "commander": "^14.0.3",
-    "manifold-3d": "^3.3.2"
+    "manifold-3d": "^3.3.2",
+    "opentype.js": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",
+    "@types/opentype.js": "^1.3.9",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",

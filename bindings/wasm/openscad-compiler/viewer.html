@@ -23,7 +23,8 @@
       "imports": {
         "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
         "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-        "manifold-3d": "https://unpkg.com/manifold-3d@3.3.2/manifold.js"
+        "manifold-3d": "./node_modules/manifold-3d/manifold.js",
+        "opentype.js": "./node_modules/opentype.js/dist/opentype.mjs"
       }
     }
   </script>
@@ -141,13 +142,11 @@
       runtimeUrl.searchParams.set('t', Date.now());
       const __rt = await import(runtimeUrl.href);
 
-      let jsCode = tsCode
-        .replace(runtimeMatch[0], '')
-        .replace(/export\s+const\s+result\s*=/, 'const result =');
+      let jsCode = tsCode.replace(runtimeMatch[0], '').replace(/export\s+const\s+result\s*=/, 'const result =').replace(/export\s+const\s+__viewport\s*=/, 'const __viewport =');
       jsCode = stripGeneratedTypeScript(jsCode);
 
       const AsyncFunction = async function () {}.constructor;
-      const evaluate = new AsyncFunction('__rt', `${jsCode}\nreturn { result };`);
+      const evaluate = new AsyncFunction('__rt', `${jsCode}\nreturn { result, __viewport };`);
       return evaluate(__rt);
     }
 
@@ -178,7 +177,7 @@
           manifoldDef = manifoldDef.extrude(0.1);
         }
         // Ensure we retrieve the mesh representation
-        const manifoldMesh = manifoldDef.getMesh({});
+        const manifoldMesh = manifoldDef.getMesh();
         if (!manifoldMesh || manifoldMesh.numVert === 0 || manifoldMesh.numTri === 0) {
           throw new Error(`'${filename}' contains empty geometry (0 vertices / 0 triangles).`);
         }
@@ -254,7 +253,8 @@
           transparent: hasVertexColor && averageAlpha < 0.999,
           roughness: 0.4,
           metalness: 0.2,
-          side: THREE.DoubleSide
+          side: THREE.DoubleSide,
+          flatShading: true
         });
         
         const wireframeMaterial = new THREE.MeshBasicMaterial({
@@ -281,22 +281,48 @@
           });
         }
 
-        // Center the camera on the object
+        // Compute bounding geometry
         geometry.computeBoundingBox();
         if (!geometry.boundingBox) {
           throw new Error(`'${filename}' did not produce a valid bounding box.`);
         }
         const center = new THREE.Vector3();
         geometry.boundingBox.getCenter(center);
-        controls.target.copy(center);
-        
-        // Adjust camera position based on bounding sphere
+
         geometry.computeBoundingSphere();
         if (!geometry.boundingSphere) {
           throw new Error(`'${filename}' did not produce a valid bounding sphere.`);
         }
         const radius = geometry.boundingSphere.radius;
-        camera.position.copy(center).add(new THREE.Vector3(radius * 1.5, radius * 1.5, radius * 1.5));
+
+        // Apply viewport variables exported by the compiled module
+        const vp = module.__viewport;
+        const hasExplicitViewport = vp && (
+          vp.vpd !== 500 ||
+          vp.vpr[0] !== 0 || vp.vpr[1] !== 0 || vp.vpr[2] !== 0 ||
+          vp.vpt[0] !== 0 || vp.vpt[1] !== 0 || vp.vpt[2] !== 0
+        );
+
+        if (hasExplicitViewport) {
+          controls.target.set(vp.vpt[0], vp.vpt[1], vp.vpt[2]);
+
+          const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(vp.vpr[0]),
+            THREE.MathUtils.degToRad(vp.vpr[1]),
+            THREE.MathUtils.degToRad(vp.vpr[2]),
+            'ZYX'
+          );
+          const dir = new THREE.Vector3(0, 0, 1).applyEuler(euler);
+          camera.position.copy(controls.target).addScaledVector(dir, vp.vpd);
+          camera.fov = (vp.vpf > 0 && vp.vpf < 180) ? vp.vpf : 22.5;
+          camera.updateProjectionMatrix();
+        } else {
+          controls.target.copy(center);
+          camera.position.copy(center).add(new THREE.Vector3(radius * 1.5, radius * 1.5, radius * 1.5));
+          camera.fov = 45;
+          camera.updateProjectionMatrix();
+        }
+        controls.update();
 
       } catch (err) {
         currentMesh = previousMesh;
