@@ -350,11 +350,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           runHasN ? mat3(la::identity)
                   : la::inverse(la::transpose(mat3(runTransforms[run]))) *
                         (output.Backside(run) ? -1.0 : 1.0);
-      // `data() + i` rather than `&v[i]`: the latter is UB when
-      // `i == size()` (one-past-the-end of the final run) and traps under
-      // libc++ fast hardening - see #1735.
-      for (uint32_t* itr = output.triVerts.data() + output.runIndex[run];
-           itr < output.triVerts.data() + output.runIndex[run + 1]; ++itr) {
+      for (uint32_t* itr = &output.triVerts[output.runIndex[run]];
+           itr < &output.triVerts[output.runIndex[run + 1]]; ++itr) {
         const uint32_t v = *itr;
         if (vertUpdated[v]) continue;
         vertUpdated[v] = true;
