@@ -656,3 +656,4 @@ jobs:
         cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
 ###Inspect Raw Benchmark Logs
 Open the `Compare benchmark results` step in this workflow run.
+        EOF
