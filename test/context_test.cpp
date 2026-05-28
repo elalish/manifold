@@ -21,7 +21,6 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
-#include <type_traits>
 
 #include "../src/execution_impl.h"
 #include "../src/parallel.h"
@@ -782,6 +781,44 @@ TEST(Manifold, ManifoldContextCancelMidEval) {
   EXPECT_EQ(attached.Status(), Manifold::Error::Cancelled);
 }
 
+// FromMeshGL: ctx-aware analog of the `Manifold(MeshGL)` ctor.
+TEST(ExecutionContextFromMeshGL, HappyPath) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.FromMeshGL(TetGL());
+  EXPECT_FALSE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Equivalent geometry to the plain ctor.
+TEST(ExecutionContextFromMeshGL, MatchesCtor) {
+  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  ExecutionContext ctx;
+  Manifold viaCtx = ctx.FromMeshGL(mesh);
+  Manifold viaCtor(mesh);
+  EXPECT_EQ(viaCtx.Status(), viaCtor.Status());
+  EXPECT_EQ(viaCtx.NumTri(), viaCtor.NumTri());
+  EXPECT_EQ(viaCtx.NumVert(), viaCtor.NumVert());
+}
+
+// Pre-cancel beats the heavy path on well-formed input.
+TEST(ExecutionContextFromMeshGL, CancelBeforeIngest) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.FromMeshGL(TetGL());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Pre-cancel beats the empty-input fast path (would otherwise be NoError).
+TEST(ExecutionContextFromMeshGL, CancelBeforeEmptyInputWinsOverNoError) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.FromMeshGL(MeshGL{});
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
 // Trips `numProp < 3` validation but has enough verts/tris to clear the
 // empty/under-4 short-circuits first. Coupled to ingest validation
 // order: if MissingPositionProperties moved past NotManifold these
@@ -794,126 +831,29 @@ static MeshGL MalformedMissingPositionProperties() {
   return bad;
 }
 
-// Traits describing each ctx-aware static factory: the ctx call, the plain
-// (non-ctx) equivalent for the parity test, and the expected phase count.
-//
-// TODO: this contract is `(ExecutionContext&, const MeshGL&) -> Manifold`
-// only. When a 3rd ctx static factory lands with a non-MeshGL signature
-// (LevelSet takes `(sdf, bounds, edgeLength)`, Hull takes a vector, etc.),
-// either add a parallel typed suite for that shape or refactor to
-// fixture-based traits where each `SmallValid`/`Empty`/`Malformed` is a
-// trait method returning a Manifold. Until then the duplication cost of a
-// per-factory cluster is lower than the generalization cost.
-struct FromMeshGLTraits {
-  static constexpr int kPhases = kPhasesPerFromMesh;
-  static constexpr const char* kName = "FromMeshGL";
-  static Manifold ViaCtx(ExecutionContext& ctx, const MeshGL& mesh) {
-    return ctx.FromMeshGL(mesh);
-  }
-  static Manifold ViaPlain(const MeshGL& mesh) { return Manifold(mesh); }
-};
-
-struct SmoothTraits {
-  static constexpr int kPhases = kPhasesPerSmooth;
-  static constexpr const char* kName = "Smooth";
-  static Manifold ViaCtx(ExecutionContext& ctx, const MeshGL& mesh) {
-    return ctx.Smooth(mesh);
-  }
-  static Manifold ViaPlain(const MeshGL& mesh) {
-    return Manifold::Smooth(mesh);
-  }
-};
-
-// Compile-time contract check: each traits struct must expose `kPhases`
-// (int), `kName` (const char*), and the two static factory methods.
-template <typename T>
-inline constexpr bool kIsStaticFactoryTraits =
-    std::is_same_v<decltype(T::kPhases), const int> &&
-    std::is_convertible_v<decltype(T::kName), const char*> &&
-    std::is_invocable_r_v<Manifold, decltype(&T::ViaCtx), ExecutionContext&,
-                          const MeshGL&> &&
-    std::is_invocable_r_v<Manifold, decltype(&T::ViaPlain), const MeshGL&>;
-static_assert(kIsStaticFactoryTraits<FromMeshGLTraits>);
-static_assert(kIsStaticFactoryTraits<SmoothTraits>);
-
-template <typename Factory>
-class ExecutionContextStaticFactory : public ::testing::Test {};
-
-class FactoryNameGenerator {
- public:
-  template <typename T>
-  static std::string GetName(int) {
-    return T::kName;
-  }
-};
-
-using StaticFactories = ::testing::Types<FromMeshGLTraits, SmoothTraits>;
-TYPED_TEST_SUITE(ExecutionContextStaticFactory, StaticFactories,
-                 FactoryNameGenerator);
-
-TYPED_TEST(ExecutionContextStaticFactory, HappyPath) {
-  ExecutionContext ctx;
-  Manifold m = TypeParam::ViaCtx(ctx, TetGL());
-  EXPECT_FALSE(m.IsEmpty());
-  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(ctx.impl_->totalPhases.load(), TypeParam::kPhases);
-  EXPECT_EQ(ctx.impl_->donePhases.load(), TypeParam::kPhases);
-  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
-}
-
-// Equivalent geometry to the plain (non-ctx) call.
-TYPED_TEST(ExecutionContextStaticFactory, MatchesPlain) {
-  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
-  ExecutionContext ctx;
-  Manifold viaCtx = TypeParam::ViaCtx(ctx, mesh);
-  Manifold viaPlain = TypeParam::ViaPlain(mesh);
-  EXPECT_EQ(viaCtx.Status(), viaPlain.Status());
-  EXPECT_EQ(viaCtx.NumTri(), viaPlain.NumTri());
-  EXPECT_EQ(viaCtx.NumVert(), viaPlain.NumVert());
-}
-
-// Pre-cancel beats the heavy path on well-formed input.
-TYPED_TEST(ExecutionContextStaticFactory, CancelBeforeIngest) {
-  ExecutionContext ctx;
-  ctx.Cancel();
-  EXPECT_EQ(TypeParam::ViaCtx(ctx, TetGL()).Status(),
-            Manifold::Error::Cancelled);
-}
-
-// Pre-cancel beats the empty-input fast path (would otherwise be NoError).
-TYPED_TEST(ExecutionContextStaticFactory,
-           CancelBeforeEmptyInputWinsOverNoError) {
-  ExecutionContext ctx;
-  ctx.Cancel();
-  EXPECT_EQ(TypeParam::ViaCtx(ctx, MeshGL{}).Status(),
-            Manifold::Error::Cancelled);
-}
-
 // Pre-cancel beats validation errors.
-TYPED_TEST(ExecutionContextStaticFactory,
-           CancelBeforeMalformedWinsOverValidation) {
+TEST(ExecutionContextFromMeshGL, CancelBeforeMalformedWinsOverValidation) {
   ExecutionContext ctx;
   ctx.Cancel();
-  EXPECT_EQ(
-      TypeParam::ViaCtx(ctx, MalformedMissingPositionProperties()).Status(),
-      Manifold::Error::Cancelled);
+  Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
 }
 
-// Validation errors surface unchanged when no cancel is in flight; counters
-// stay at 0/kPhases since no phase ran.
-TYPED_TEST(ExecutionContextStaticFactory, ValidationErrorWithoutCancel) {
+// Validation errors surface unchanged when no cancel is in flight;
+// counters stay at 0/kPhasesPerFromMesh since no phase ran.
+TEST(ExecutionContextFromMeshGL, ValidationErrorWithoutCancel) {
   ExecutionContext ctx;
-  Manifold m = TypeParam::ViaCtx(ctx, MalformedMissingPositionProperties());
+  Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
   EXPECT_EQ(m.Status(), Manifold::Error::MissingPositionProperties);
   EXPECT_EQ(ctx.impl_->donePhases.load(), 0);
-  EXPECT_EQ(ctx.impl_->totalPhases.load(), TypeParam::kPhases);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
 }
 
-// Concurrent cancel mid-flight. Adaptive backoff guarantees we observe at
-// least one Cancelled outcome; each Cancelled hit pins donePhases <
-// totalPhases.
+// Concurrent cancel mid-ingest. Adaptive backoff guarantees we observe
+// at least one Cancelled outcome (otherwise the cancel path is dead);
+// each Cancelled hit also pins donePhases < totalPhases.
 #if MANIFOLD_PAR == 1
-TYPED_TEST(ExecutionContextStaticFactory, CancelConcurrent) {
+TEST(ExecutionContextFromMeshGL, CancelConcurrent) {
   MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
   int cancelledHits = 0;
   auto sleep = std::chrono::microseconds(100);
@@ -921,7 +861,7 @@ TYPED_TEST(ExecutionContextStaticFactory, CancelConcurrent) {
     ExecutionContext ctx;
     std::atomic<Manifold::Error> result{Manifold::Error::NoError};
     std::thread evalThread(
-        [&] { result.store(TypeParam::ViaCtx(ctx, mesh).Status()); });
+        [&] { result.store(ctx.FromMeshGL(mesh).Status()); });
     std::this_thread::sleep_for(sleep);
     ctx.Cancel();
     evalThread.join();
@@ -938,11 +878,12 @@ TYPED_TEST(ExecutionContextStaticFactory, CancelConcurrent) {
 }
 #endif  // MANIFOLD_PAR == 1
 
-// Factory then a Boolean on the same ctx: counters reset between.
-TYPED_TEST(ExecutionContextStaticFactory, ReuseForBoolean) {
+// FromMeshGL then a Boolean on the same ctx: counters reset between.
+TEST(ExecutionContextFromMeshGL, ReuseForBoolean) {
   ExecutionContext ctx;
-  ASSERT_EQ(TypeParam::ViaCtx(ctx, TetGL()).Status(), Manifold::Error::NoError);
-  EXPECT_EQ(ctx.impl_->totalPhases.load(), TypeParam::kPhases);
+  Manifold tet = ctx.FromMeshGL(TetGL());
+  ASSERT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
 
   Manifold u = Manifold::Cube() + Manifold::Sphere(0.5);
   EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::NoError);
@@ -951,35 +892,96 @@ TYPED_TEST(ExecutionContextStaticFactory, ReuseForBoolean) {
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
-// Two factory calls on the same ctx: counters reset between.
-TYPED_TEST(ExecutionContextStaticFactory, ReuseForSecondCall) {
+// Two FromMeshGL calls on the same ctx: counters reset between.
+TEST(ExecutionContextFromMeshGL, ReuseForSecondFromMeshGL) {
   ExecutionContext ctx;
-  ASSERT_EQ(TypeParam::ViaCtx(ctx, TetGL()).Status(), Manifold::Error::NoError);
-  ASSERT_EQ(ctx.impl_->donePhases.load(), TypeParam::kPhases);
-  Manifold second = TypeParam::ViaCtx(ctx, TetGL());
+  ASSERT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::NoError);
+  ASSERT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
+  Manifold second = ctx.FromMeshGL(TetGL());
   EXPECT_EQ(second.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(ctx.impl_->totalPhases.load(), TypeParam::kPhases);
-  EXPECT_EQ(ctx.impl_->donePhases.load(), TypeParam::kPhases);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerFromMesh);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
-// Sticky cancel survives across factory calls.
-TYPED_TEST(ExecutionContextStaticFactory, StickyCancelAcrossCalls) {
+// Sticky cancel survives across FromMeshGL calls.
+TEST(ExecutionContextFromMeshGL, StickyCancelAcrossCalls) {
   ExecutionContext ctx;
   ctx.Cancel();
-  EXPECT_EQ(TypeParam::ViaCtx(ctx, TetGL()).Status(),
-            Manifold::Error::Cancelled);
-  EXPECT_EQ(TypeParam::ViaCtx(ctx, TetGL()).Status(),
-            Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
 }
 
-// Smooth-only extras (outside the typed suite because no other factory
-// takes a `sharpenedEdges` argument). Cancels mid-flight with a non-empty
-// `sharpenedEdges` and asserts `NumTri() == 0` on Cancelled to lock in
-// that the faceID-restoration loop in `MakeSmoothImpl` is a natural no-op
-// after `MakeEmpty`.
+// Smooth: ctx-aware analog of `Manifold::Smooth(MeshGL[64])`. The shared
+// counter/reuse/validation machinery is the same as FromMeshGL and is covered
+// by that cluster above, so here we only test Smooth's unique paths: the happy
+// path, parity with the plain factory, the entry-time cancel gate in
+// MakeSmoothImpl (distinct from the shared Impl-ctor gate), concurrent cancel
+// through the extra tangent-creation phases, and the sharpenedEdges argument.
+TEST(ExecutionContextSmooth, HappyPath) {
+  ExecutionContext ctx;
+  Manifold tet = ctx.Smooth(TetGL());
+  EXPECT_FALSE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerSmooth);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerSmooth);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Equivalent geometry to the plain factory.
+TEST(ExecutionContextSmooth, MatchesFactory) {
+  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  ExecutionContext ctx;
+  Manifold viaCtx = ctx.Smooth(mesh);
+  Manifold viaFactory = Manifold::Smooth(mesh);
+  EXPECT_EQ(viaCtx.Status(), viaFactory.Status());
+  EXPECT_EQ(viaCtx.NumTri(), viaFactory.NumTri());
+  EXPECT_EQ(viaCtx.NumVert(), viaFactory.NumVert());
+}
+
+// Pre-cancel hits Smooth's own entry gate in MakeSmoothImpl and returns
+// before ingest - distinct from the shared Impl-ctor gate FromMeshGL covers.
+TEST(ExecutionContextSmooth, CancelBeforeIngest) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.Smooth(TetGL());
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Concurrent cancel mid-smooth. Adaptive backoff guarantees we observe
+// at least one Cancelled outcome; each Cancelled hit pins donePhases <
+// totalPhases.
 #if MANIFOLD_PAR == 1
-TEST(ExecutionContextSmoothExtras, CancelWithSharpenedEdges) {
+TEST(ExecutionContextSmooth, CancelConcurrent) {
+  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
+  int cancelledHits = 0;
+  auto sleep = std::chrono::microseconds(100);
+  for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
+    ExecutionContext ctx;
+    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+    std::thread evalThread([&] { result.store(ctx.Smooth(mesh).Status()); });
+    std::this_thread::sleep_for(sleep);
+    ctx.Cancel();
+    evalThread.join();
+    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+                result.load() == Manifold::Error::NoError);
+    if (result.load() == Manifold::Error::Cancelled) {
+      ++cancelledHits;
+      EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
+      EXPECT_LT(ctx.Progress(), 1.0);
+    }
+    sleep *= 2;
+  }
+  EXPECT_GT(cancelledHits, 0);
+}
+#endif  // MANIFOLD_PAR == 1
+
+// Smooth-specific: cancel mid-flight with a non-empty sharpenedEdges
+// vector. Asserts NumTri() == 0 on Cancelled to lock in that the
+// faceID-restoration loop in MakeSmoothImpl is a natural no-op after
+// MakeEmpty.
+#if MANIFOLD_PAR == 1
+TEST(ExecutionContextSmooth, CancelWithSharpenedEdges) {
   MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();
   std::vector<Smoothness> sharpenedEdges = {{0, 0.0}, {3, 0.5}, {6, 0.0}};
   int cancelledHits = 0;
