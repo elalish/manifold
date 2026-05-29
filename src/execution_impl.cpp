@@ -84,4 +84,14 @@ Manifold ExecutionContext::Smooth(
   return Manifold::FromImpl(MakeSmoothImpl(mesh, sharpenedEdges, impl_.get()));
 }
 
+Manifold ExecutionContext::LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                                    double edgeLength, double level,
+                                    double tolerance, bool canParallel) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerLevelSet);
+  auto pImpl = std::make_shared<Manifold::Impl>();
+  pImpl->CreateLevelSet(sdf, bounds, edgeLength, level, tolerance, canParallel,
+                        impl_.get());
+  return Manifold::FromImpl(pImpl);
+}
+
 }  // namespace manifold

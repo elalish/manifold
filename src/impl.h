@@ -99,6 +99,13 @@ struct Manifold::Impl {
   Impl(const MeshGLP<Precision, I>& meshGL,
        ExecutionContext::Impl* ctx = nullptr);
 
+  // sdf.cpp. Populates an empty Impl with the level set of `sdf`. `ctx`
+  // (when non-null) checks cancel and credits Progress() between the five
+  // phases counted by kPhasesPerLevelSet.
+  void CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
+                      double edgeLength, double level, double tolerance,
+                      bool canParallel, ExecutionContext::Impl* ctx = nullptr);
+
   template <typename F>
   inline void ForVert(int halfedge, F func);
 
