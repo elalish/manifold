@@ -268,6 +268,15 @@ class ExecutionContext {
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
 
+  /// Eager ctx-aware `Manifold::Smooth(MeshGL[64])`. The ingest phases
+  /// plus the tangent-creation phases check cancel and credit
+  /// `Progress()` between phases. Same cancel-vs-validation precedence
+  /// as `FromMeshGL`.
+  Manifold Smooth(const MeshGL& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
+  Manifold Smooth(const MeshGL64& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
+
   /// @internal Opaque implementation. Defined in src/execution_impl.h;
   /// accessible only to internal code that includes that header.
   struct Impl;

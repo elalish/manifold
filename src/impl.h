@@ -231,7 +231,8 @@ struct Manifold::Impl {
   void LinearizeFlatTangents();
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
-  void CreateTangents(std::vector<Smoothness>);
+  void CreateTangents(std::vector<Smoothness>,
+                      ExecutionContext::Impl* ctx = nullptr);
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false,
               ExecutionContext::Impl* ctx = nullptr);
 
@@ -676,5 +677,44 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     }
   }
   return out;
+}
+
+// Entry-time cancel wins over empty/malformed input; past this gate,
+// validation errors win over races.
+template <typename P, typename I>
+std::shared_ptr<Manifold::Impl> MakeSmoothImpl(
+    const MeshGLP<P, I>& meshGL, const std::vector<Smoothness>& sharpenedEdges,
+    ExecutionContext::Impl* ctx = nullptr) {
+  if (IsCancelled(ctx)) {
+    auto impl = std::make_shared<Manifold::Impl>();
+    impl->MakeEmpty(Manifold::Error::Cancelled);
+    return impl;
+  }
+
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
+
+  MeshGLP<P, I> meshTmp = meshGL;
+  meshTmp.faceID.resize(meshGL.NumTri());
+  std::iota(meshTmp.faceID.begin(), meshTmp.faceID.end(), 0);
+
+  std::shared_ptr<Manifold::Impl> impl =
+      std::make_shared<Manifold::Impl>(meshTmp, ctx);
+  // Skip tangent creation if ingest failed; phase counters must not
+  // credit smoothing phases that never ran.
+  if (impl->status_ != Manifold::Error::NoError) return impl;
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges), ctx);
+  // NumTri() is 0 after MakeEmpty, so this loop is a no-op on cancel.
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (meshGL.faceID.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          meshGL.faceID[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
+  return impl;
 }
 }  // namespace manifold
