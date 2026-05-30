@@ -653,7 +653,5 @@ jobs:
         done
         echo "::endgroup::"
         cat ./bench/summary.md >> "$GITHUB_STEP_SUMMARY"
-        cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
-###Inspect Raw Benchmark Logs
-Open the `Compare benchmark results` step in this workflow run.
-        EOF
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "Raw logs: open this step and expand \`PR benchmark result.json\` and \`PR benchmark raw outputs\` groups." >> "$GITHUB_STEP_SUMMARY"
