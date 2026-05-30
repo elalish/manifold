@@ -177,7 +177,6 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   if (lenSq < epsilon_ * epsilon_) {
     return {0, vertPos_[start] + delta / 2};
   }
-  vec3 areaNormal(0.);
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
@@ -190,20 +189,19 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
     const vec3 triAreaNormal =
         la::cross(vertPos_[halfedge_.End(current)] - center,
                   vertPos_[halfedge_.End(NextHalfedge(current))] - center);
-    areaNormal += triAreaNormal;
-    A += la::outerprod(triAreaNormal, triAreaNormal);
+
+    double area2inv = 1 / la::length2(triAreaNormal);
+    A += area2inv * la::outerprod(triAreaNormal, triAreaNormal);
     double d = la::dot(triAreaNormal, center);
-    b += triAreaNormal * d;
-    c += d * d;
+    b += area2inv * triAreaNormal * d;
+    c += area2inv * d * d;
   };
   ForVert(firstEdge, addTri);
   firstEdge = halfedge_.Pair(edge);
   ForVert(firstEdge, addTri);
 
   const vec3 v = la::inverse(A) * b;
-  // cost units: volume^2 / area^2 = length^2
-  const double cost =
-      (la::dot(v, A * v) - 2 * la::dot(b, v) + c) / la::length2(areaNormal);
+  const double cost = la::dot(v, A * v) - 2 * la::dot(b, v) + c;  // len^2
   return {cost, v};
 }
 
@@ -225,6 +223,8 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
+  int i = 0;
+  std::cout << maxCost << std::endl;
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
@@ -235,7 +235,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     stable_sort(edges.begin(), end,
                 [&](int a, int b) { return cost[a] < cost[b]; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
-    for (int i = 0; cost[edges[i]] < maxCost && i < end - edges.begin(); ++i) {
+    for (int i = 0; i < end - edges.begin() && cost[edges[i]] < maxCost; ++i) {
       // std::cout << "checking edge " << edges[i] << " with cost "
       //           << cost[edges[i]] << std::endl;
       const int edge = edges[i];
@@ -250,10 +250,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
-      const bool didCollapse = CollapseEdge2(edge, scratchBuffer);
+      const bool didCollapse = CollapseEdge2(edge, scratchBuffer, newPos[edge]);
       vertsVisited.resize(vertPos_.size(), false);
       if (didCollapse) {
-        vertPos_[endV] = newPos[edge];
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
         ++numCollapsed;
@@ -262,10 +261,11 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     end = std::partition(edges.begin(), end,
                          [&](int edge) { return cost[edge] < maxCost; });
     std::cout << "edges left: " << (end - edges.begin()) << std::endl;
+    // if (++i > 0) break;
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2 && numCollapsed > 0) {
-    std::cout << "collapsed " << numCollapsed << " short edges" << std::endl;
+    std::cout << "collapsed " << numCollapsed << " edges" << std::endl;
   }
 #endif
 }
@@ -719,7 +719,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
 // have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
+bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
   edges.resize(0);
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
@@ -730,6 +730,29 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
   const ivec3 tri1edge = TriOf(pair);
   const int startVert = halfedge_.Start(tri0edge[0]);
   const int endVert = halfedge_.Start(tri0edge[1]);
+
+  int firstEdge = edge;
+  bool collapse = true;
+  auto checkTri = [&](int current) {
+    const int next = NextHalfedge(halfedge_.Pair(current));
+    if (current == firstEdge || next == firstEdge) {
+      return;  // ignore the collapsing triangles.
+    }
+    const vec3 center = vertPos_[halfedge_.Start(current)];
+    const int tri = current / 3;
+    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+
+    // Don't collapse edge if it would cause a triangle to invert.
+    if (CCW(projection * vertPos_[halfedge_.End(next)],
+            projection * vertPos_[halfedge_.End(current)], projection * pNew,
+            epsilon_) < 0)
+      collapse = false;
+  };
+  ForVert(firstEdge, checkTri);
+  if (!collapse) return false;
+  firstEdge = halfedge_.Pair(edge);
+  ForVert(firstEdge, checkTri);
+  if (!collapse) return false;
 
   // Orbit endVert
   {
@@ -744,6 +767,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges) {
   int start = halfedge_.Pair(tri1edge[1]);
   // Remove toRemove.startVert and replace with endVert.
   vertPos_[startVert] = vec3(NAN);
+  vertPos_[endVert] = pNew;
   CollapseTri(tri1edge);
 
   // Orbit startVert

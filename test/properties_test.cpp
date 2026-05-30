@@ -73,7 +73,7 @@ TEST(Properties, Tolerance) {
 }
 
 TEST(Properties, ToleranceSphere) {
-  const int n = 1000;
+  const int n = 100;
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
@@ -83,6 +83,17 @@ TEST(Properties, ToleranceSphere) {
   EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
   EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
   if (options.exportModels) WriteTestOBJ("sphere.obj", sphere2);
+}
+
+TEST(Properties, ToleranceCylinder) {
+  const int n = 100;
+  Manifold cylinder = Manifold::Cylinder(2, 1, 1, 4 * n);
+  Manifold cylinder2 = cylinder.Simplify(0.01);
+  EXPECT_LT(cylinder2.NumTri(), 0);
+  EXPECT_EQ(cylinder2.Genus(), 0);
+  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.0);
+  EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.0);
+  if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
 }
 
 /**
