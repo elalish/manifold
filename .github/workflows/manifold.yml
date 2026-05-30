@@ -423,18 +423,8 @@ jobs:
         packages: libgtest-dev libtbb-dev clang-18 cmake
         version: 1
     - *clone-clipper2
-    - name: Restore sanitizer build cache
-      id: sanitizer-build-cache
-      uses: actions/cache@v4
-      with:
-        path: build/
-        key: sanitizer-build-${{ runner.os }}-clang18-${{ hashFiles('src/**', 'bindings/c/**', 'include/**', 'cmake/**', 'test/**', 'CMakeLists.txt', 'scripts/sanitizer_cases.sh', 'scripts/ci/sanitizer_build.sh') }}
     - name: Build (clang-18 + asan/ubsan)
-      if: steps.sanitizer-build-cache.outputs.cache-hit != 'true'
       run: bash ./scripts/ci/sanitizer_build.sh
-    - name: Cache hit info
-      if: steps.sanitizer-build-cache.outputs.cache-hit == 'true'
-      run: echo "Reusing cached sanitizer build directory (src/bindings unchanged)."
     - name: Upload sanitizer build artifacts
       uses: actions/upload-artifact@v4
       with:
