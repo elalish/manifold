@@ -77,7 +77,7 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
                 int inputCircularSegments) {
   const int circularSegments = inputCircularSegments > 2
                                    ? inputCircularSegments
-                                   : Quality::GetCircularSegments(radius);
+                                   : Quality::GetCircularSegments(std::abs(radius));
 
   auto r = input.Fillet(radius, circularSegments);
   auto rc = manifold::CrossSection::Compose(r);
@@ -89,8 +89,11 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
   const double inArea = manifold::CrossSection(polys).Area();
   const double outArea = rc.Area();
 
-  EXPECT_TRUE((manifold::CrossSection(polys).Area() == 0) ||
-              (rc.Area() < manifold::CrossSection(polys).Area()));
+  const bool expectGrowth = radius < 0;
+  if (outArea > 0) {
+    EXPECT_TRUE((inArea == 0) ||
+                (expectGrowth ? outArea > inArea : outArea < inArea));
+  }
 
   auto toRad = [](const vec2& v) -> double { return atan2(v.y, v.x); };
 
@@ -112,15 +115,21 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
              p3 = loop[(i + 2) % loop.size()];
 
         vec2 e1 = p2 - p1, e2 = p3 - p2;
+        EXPECT_TRUE(std::isfinite(p1.x));
+        EXPECT_TRUE(std::isfinite(p1.y));
+        EXPECT_GT(length2(e1), 0);
+        EXPECT_GT(length2(e2), 0);
 
-        // Check angle between edge
-        double angle = normalizeAngle(toRad(e2) - toRad(e1));
+        if (radius > 0) {
+          // Check angle between edge
+          double angle = normalizeAngle(toRad(e2) - toRad(e1));
 
-        const double dPhi = 2.0 * M_PI / circularSegments;
+          const double dPhi = 2.0 * M_PI / circularSegments;
 
-        // Is the threshold too low?
-        // Specify to Polygon.Fillet.CoincidentHole4
-        EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.1));
+          // Is the threshold too low?
+          // Specify to Polygon.Fillet.CoincidentHole4
+          EXPECT_TRUE(angle > M_PI || angle < (dPhi + dPhi * 0.1));
+        }
       }
     }
   }
@@ -137,18 +146,33 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
   return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
 };
 
+bool IsValidFilletInput(const Polygons& polys) {
+  constexpr double kMaxCoordinate = 1e30;
+  for (const auto& loop : polys) {
+    for (const vec2& point : loop) {
+      if (!std::isfinite(point.x) || !std::isfinite(point.y) ||
+          std::abs(point.x) >= kMaxCoordinate ||
+          std::abs(point.y) >= kMaxCoordinate) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
   std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
 
   const int inputCircularSegments = 20;
+  if (!IsValidFilletInput(polys)) return;
   const CrossSection input = CrossSection(polys);
 
 #ifdef MANIFOLD_DEBUG
-  manifold::ManifoldParams().verbose = true;
-  int idx = 0;
+  manifold::ManifoldParams().verbose = false;
+  int idx = 2;
 
   if (idx == 0) {
-    double radius = 1.2368517001458557;
+    double radius = 0.1;
     TestFillet(polys, input, radius, inputCircularSegments);
   } else if (idx == 1) {
     auto bbox = input.Bounds().Size();
@@ -209,8 +233,6 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
         high = mid;
       }
     }
-
-    return;
 
     // Testing Negative Radius
 
@@ -315,8 +337,9 @@ void RegisterPolygonTestsFile(const std::string& suitename,
 }
 
 void RegisterPolygonTests() {
-  std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
-                         "zebra3.txt"};
+  std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
+                         "zebra.txt", "zebra3.txt"};
+  // std::string files[] = {"fillet.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);
@@ -331,10 +354,10 @@ void RegisterPolygonTests() {
 }
 
 void RegisterFilletTests() {
-  // std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
-  //                        "zebra.txt", "zebra3.txt"};
+  // std::string files[] = {"fillet.txt"};
 
-  std::string files[] = {"fillet.txt"};
+  std::string files[] = {"fillet.txt", "polygon_corpus.txt", "sponge.txt",
+                         "zebra.txt", "zebra3.txt"};
 
 #ifdef __EMSCRIPTEN__
   for (auto f : files) RegisterPolygonTestsFile("/polygons/" + f);

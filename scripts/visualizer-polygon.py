@@ -290,6 +290,46 @@ def read_input_file(filename: str) -> List[Dict[str, Any]]:
         print(f"Error parsing input file at line {line_idx + 1}: {e}. The file might be malformed.")
         return []
 
+def read_cross_section_lines(lines: List[str], line_idx: int, filename: str):
+    """Reads SaveCrossSection output starting at line_idx."""
+    n_cross_sections = int(lines[line_idx])
+    line_idx += 1
+    print(f"  Found {n_cross_sections} cross-section(s).")
+
+    all_cross_sections = []
+    for cs_idx in range(n_cross_sections):
+        n_polygons = int(lines[line_idx])
+        line_idx += 1
+        print(f"    Cross-section {cs_idx} has {n_polygons} polygon(s).")
+
+        current_cross_section_paths = []
+        for poly_idx in range(n_polygons):
+            n_points = int(lines[line_idx])
+            line_idx += 1
+
+            if n_points == 0:
+                print(f"    Skipping result polygon {poly_idx} in CS {cs_idx} (0 points).")
+                continue
+
+            current_polygon = []
+            for _ in range(n_points):
+                point_coords = lines[line_idx].split()
+                x = float(point_coords[0])
+                y = float(point_coords[1])
+                current_polygon.append([x, y])
+                line_idx += 1
+
+            current_cross_section_paths.append(current_polygon)
+            print(f"    Added result polygon {poly_idx} (CS {cs_idx}) with {n_points} points.")
+
+        all_cross_sections.append(current_cross_section_paths)
+
+    return line_idx, [{
+        "name": f"Result ({filename})",
+        "polygons": all_cross_sections
+    }]
+
+
 def read_circles_and_results(filename: str) -> (float, List[List[float]], List[List[float]], List[Dict[str, Any]]):
     """
     Reads a result file containing circles and SaveCrossSection data.
@@ -328,11 +368,11 @@ def read_circles_and_results(filename: str) -> (float, List[List[float]], List[L
             print("Error: File is empty.")
             return None, [], [], []
 
-        # --- 1. Read Radius (NEW) ---
+        # --- 1. Read Radius ---
         try:
             radius = float(lines[line_idx])
             line_idx += 1
-            print(f"  Read radius: {radius}")
+            print(f"  Read radius: {radius:.17g}")
         except (ValueError, IndexError):
             print(f"Error: Could not read radius from first line of {filename}")
             return None, [], [], [] # Return None for radius to signal error
@@ -341,65 +381,47 @@ def read_circles_and_results(filename: str) -> (float, List[List[float]], List[L
             print(f"Warning: {filename} only contains a radius; skipping incomplete result file.")
             return None, [], [], []
 
-        # --- 2. Read Removed Circles ---
-        n_removed_circles = int(lines[line_idx])
-        line_idx += 1
-        print(f"  Found {n_removed_circles} removed circle(s).")
-        for _ in range(n_removed_circles):
-            x, y = map(float, lines[line_idx].split())
-            removed_circles.append([x, y])
-            line_idx += 1
+        cross_section_start = line_idx
 
-        # --- 3. Read Fillet Circles ---
-        n_fillet_circles = int(lines[line_idx])
-        line_idx += 1
-        print(f"  Found {n_fillet_circles} fillet circle(s).")
-        for _ in range(n_fillet_circles):
-            x, y = map(float, lines[line_idx].split())
-            fillet_circles.append([x, y])
-            line_idx += 1
+        # Current output format is radius followed directly by SaveCrossSection.
+        # Keep the circle-debug parser below for older generated files.
+        try:
+            next_line, polygon_data = read_cross_section_lines(lines, line_idx, filename)
+            if next_line == len(lines):
+                return radius, [], [], polygon_data
+        except (ValueError, IndexError):
+            pass
 
-        # --- 4. Read Result Polygons (SaveCrossSection format) ---
-        n_cross_sections = int(lines[line_idx])
-        line_idx += 1
-        print(f"  Found {n_cross_sections} cross-section(s).")
+        try:
+            line_idx = cross_section_start
 
-        all_cross_sections = []
-        for cs_idx in range(n_cross_sections):
-            n_polygons = int(lines[line_idx])
+            # --- 2. Read Removed Circles (legacy circle-debug format) ---
+            n_removed_circles = int(lines[line_idx])
             line_idx += 1
-            print(f"    Cross-section {cs_idx} has {n_polygons} polygon(s).")
-            
-            current_cross_section_paths = []
-            for poly_idx in range(n_polygons):
-                n_points = int(lines[line_idx])
+            print(f"  Found {n_removed_circles} removed circle(s).")
+            for _ in range(n_removed_circles):
+                x, y = map(float, lines[line_idx].split())
+                removed_circles.append([x, y])
                 line_idx += 1
-                
-                if n_points == 0:
-                    print(f"    Skipping result polygon {poly_idx} in CS {cs_idx} (0 points).")
-                    continue
-                
-                current_polygon = []
-                for _ in range(n_points):
-                    point_coords = lines[line_idx].split()
-                    x = float(point_coords[0])
-                    y = float(point_coords[1])
-                    current_polygon.append([x, y])
-                    line_idx += 1
-                
-                current_cross_section_paths.append(current_polygon)
-                print(f"    Added result polygon {poly_idx} (CS {cs_idx}) with {n_points} points.")
-            
-            all_cross_sections.append(current_cross_section_paths)
 
-        # Wrap in the expected return format
-        current_test = {
-            "name": f"Result ({filename})",
-            "polygons": all_cross_sections # Multiple cross-sections
-        }
-        polygon_data = [current_test]
+            # --- 3. Read Fillet Circles ---
+            n_fillet_circles = int(lines[line_idx])
+            line_idx += 1
+            print(f"  Found {n_fillet_circles} fillet circle(s).")
+            for _ in range(n_fillet_circles):
+                x, y = map(float, lines[line_idx].split())
+                fillet_circles.append([x, y])
+                line_idx += 1
 
-        return radius, removed_circles, fillet_circles, polygon_data
+            # --- 4. Read Result Polygons (SaveCrossSection format) ---
+            _, polygon_data = read_cross_section_lines(lines, line_idx, filename)
+            return radius, removed_circles, fillet_circles, polygon_data
+        except (ValueError, IndexError):
+            # Older generated files may be plain SaveCrossSection data with no radius.
+            next_line, polygon_data = read_cross_section_lines(lines, 0, filename)
+            if next_line == len(lines):
+                return None, [], [], polygon_data
+            raise
 
     except FileNotFoundError:
         # print(f"Error: The file '{filename}' was not found.")
@@ -438,7 +460,10 @@ def plot_circle_centers(ax, centers: List[List[float]], color: str, label: str, 
 
 
 if __name__ == "__main__":
-    input_file = "Testing/Fillet/input.txt" # Hardcoded as per request
+    input_file = sys.argv[1] if len(sys.argv) > 1 else "Testing/Fillet/input.txt"
+    result_dir = sys.argv[2] if len(sys.argv) > 2 else "Testing/Fillet"
+    if os.path.isfile(result_dir):
+        result_dir = os.path.dirname(result_dir)
     min_file_index = 0
     max_file_index = 54      # Hardcoded scan from 0 to 10
 
@@ -453,11 +478,10 @@ if __name__ == "__main__":
     results_to_plot = []
     print(f"Scanning for result files ({min_file_index}.txt to {max_file_index}.txt)...")
     for i in range(min_file_index, max_file_index + 1):
-        result_file = f"Testing/Fillet/{i}.txt"
+        result_file = os.path.join(result_dir, f"{i}.txt")
         radius, removed, fillet, res_data = read_circles_and_results(result_file)
         
-        # If radius is None, file wasn't found or was invalid
-        if radius is not None:
+        if res_data:
             results_to_plot.append((result_file, radius, removed, fillet, res_data))
         else:
             # print(f"Skipping {result_file} (could not be read or radius not found).")
@@ -536,13 +560,15 @@ if __name__ == "__main__":
                               show_indices=True, fill_polygon=False)
 
         # --- Plot Circles ---
-        plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
-        plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
+        if radius is not None:
+            plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
+            plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
         plot_circle_centers(ax, removed_circles, color='red', label='Removed center', marker='x')
         plot_circle_centers(ax, fillet_circles, color='green', label='Fillet center', marker='o')
 
         # --- Subplot Finalization ---
-        ax.set_title(f"{os.path.basename(result_file)} (r={radius:.17g})")
+        radius_label = f"r={radius:.17g}" if radius is not None else "r=n/a"
+        ax.set_title(f"{os.path.basename(result_file)} ({radius_label})")
         ax.set_xlabel("X Coordinate")
         ax.set_ylabel("Y Coordinate")
 
@@ -561,7 +587,7 @@ if __name__ == "__main__":
     # Adjust layout to prevent title overlap
     plt.tight_layout(rect=[0, 0.03, 1, 0.95]) 
     
-    save_name = "all_results.png"
+    save_name = os.path.join(result_dir, "all_results.png")
     try:
         plt.savefig(save_name)
         print(f"\nSuccessfully saved combined plot to {save_name}")
@@ -612,13 +638,15 @@ if __name__ == "__main__":
                                   show_indices=True, fill_polygon=False)
 
             # --- Plot Circles ---
-            plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
-            plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
+            if radius is not None:
+                plot_circles(ax, removed_circles, radius, color='red', linestyle='--', alpha=0.35, linewidth=1)
+                plot_circles(ax, fillet_circles, radius, color='green', linestyle=':', alpha=0.35, linewidth=1)
             plot_circle_centers(ax, removed_circles, color='red', label='Removed center', marker='x')
             plot_circle_centers(ax, fillet_circles, color='green', label='Fillet center', marker='o')
 
             # --- Subplot Finalization ---
-            ax.set_title(f"{os.path.basename(result_file)} (r={radius:.17g})")
+            radius_label = f"r={radius:.17g}" if radius is not None else "r=n/a"
+            ax.set_title(f"{os.path.basename(result_file)} ({radius_label})")
             ax.set_xlabel("X Coordinate")
             ax.set_ylabel("Y Coordinate")
 
@@ -635,7 +663,7 @@ if __name__ == "__main__":
         fig_zoom.suptitle(f"Zoomed View (Center: {center_x}, {center_y}, Size: {ZOOM_CONFIG['size']})", fontsize=20)
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         
-        save_name_zoom = "all_results_zoom.png"
+        save_name_zoom = os.path.join(result_dir, "all_results_zoom.png")
         try:
             fig_zoom.savefig(save_name_zoom)
             print(f"Successfully saved zoomed plot to {save_name_zoom}")
