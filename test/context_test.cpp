@@ -1007,3 +1007,81 @@ TEST(ExecutionContextSmooth, CancelWithSharpenedEdges) {
   EXPECT_GT(cancelledHits, 0);
 }
 #endif  // MANIFOLD_PAR == 1
+
+// LevelSet: ctx-aware analog of `Manifold::LevelSet`. The shared
+// counter/reuse/validation machinery is the same as FromMeshGL and is covered
+// by that cluster above, so here we only test LevelSet's unique paths: the
+// happy path, parity with the plain factory, the entry-time cancel gate in
+// CreateLevelSet, and concurrent cancel through the dominant voxel-sampling
+// phase.
+TEST(ExecutionContextLevelSet, HappyPath) {
+  // Sphere SDF: positive inside, negative outside.
+  auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
+  ExecutionContext ctx;
+  Manifold m = ctx.LevelSet(sphere, {vec3(-1.1), vec3(1.1)}, 0.1);
+  EXPECT_FALSE(m.IsEmpty());
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerLevelSet);
+  EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerLevelSet);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+// Equivalent geometry to the plain factory. (Named MatchesFactory, not
+// MatchesCtor - LevelSet has no constructor form.)
+TEST(ExecutionContextLevelSet, MatchesFactory) {
+  auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
+  const Box bounds = {vec3(-1.1), vec3(1.1)};
+  const double edgeLength = 0.1;
+  ExecutionContext ctx;
+  Manifold viaCtx = ctx.LevelSet(sphere, bounds, edgeLength);
+  Manifold viaFactory = Manifold::LevelSet(sphere, bounds, edgeLength);
+  EXPECT_EQ(viaCtx.Status(), viaFactory.Status());
+  EXPECT_EQ(viaCtx.NumTri(), viaFactory.NumTri());
+  EXPECT_EQ(viaCtx.NumVert(), viaFactory.NumVert());
+}
+
+// Pre-cancel hits CreateLevelSet's entry gate and returns before allocating or
+// sampling the voxel grid - LevelSet's analog of Smooth's CancelBeforeIngest.
+TEST(ExecutionContextLevelSet, CancelBeforeSampling) {
+  auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
+  ExecutionContext ctx;
+  ctx.Cancel();
+  Manifold m = ctx.LevelSet(sphere, {vec3(-1.1), vec3(1.1)}, 0.1);
+  EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Concurrent cancel mid-sampling. A deliberately slow sdf (a few us per
+// evaluation) over a largish grid keeps the voxel-sampling phase running long
+// enough that cancel reliably lands before the first phase boundary. Adaptive
+// backoff guarantees at least one Cancelled outcome; each pins donePhases <
+// totalPhases.
+#if MANIFOLD_PAR == 1
+TEST(ExecutionContextLevelSet, CancelConcurrent) {
+  auto slowSphere = [](vec3 p) {
+    std::this_thread::sleep_for(std::chrono::microseconds(5));
+    return 1.0 - la::length(p);
+  };
+  int cancelledHits = 0;
+  auto sleep = std::chrono::microseconds(100);
+  for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
+    ExecutionContext ctx;
+    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+    std::thread evalThread([&] {
+      result.store(
+          ctx.LevelSet(slowSphere, {vec3(-1), vec3(1)}, 0.05).Status());
+    });
+    std::this_thread::sleep_for(sleep);
+    ctx.Cancel();
+    evalThread.join();
+    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
+                result.load() == Manifold::Error::NoError);
+    if (result.load() == Manifold::Error::Cancelled) {
+      ++cancelledHits;
+      EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
+      EXPECT_LT(ctx.Progress(), 1.0);
+    }
+    sleep *= 2;
+  }
+  EXPECT_GT(cancelledHits, 0);
+}
+#endif  // MANIFOLD_PAR == 1

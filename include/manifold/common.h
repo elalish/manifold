@@ -14,6 +14,7 @@
 
 #pragma once
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -35,6 +36,7 @@ template <typename Precision, typename I = uint32_t>
 struct MeshGLP;
 using MeshGL = MeshGLP<float>;
 using MeshGL64 = MeshGLP<double, uint64_t>;
+struct Box;  // defined below; needed by ExecutionContext::LevelSet
 
 /** @addtogroup Math
  * @ingroup Core
@@ -276,6 +278,13 @@ class ExecutionContext {
                   const std::vector<Smoothness>& sharpenedEdges = {});
   Manifold Smooth(const MeshGL64& mesh,
                   const std::vector<Smoothness>& sharpenedEdges = {});
+
+  /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
+  /// mesh-extraction phases check cancel and credit `Progress()` between
+  /// phases. A Cancel() before or during the call yields a Cancelled result.
+  Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                    double edgeLength, double level = 0, double tolerance = -1,
+                    bool canParallel = true);
 
   /// @internal Opaque implementation. Defined in src/execution_impl.h;
   /// accessible only to internal code that includes that header.

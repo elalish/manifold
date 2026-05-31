@@ -50,6 +50,17 @@ constexpr int kPhasesPerSmooth = kPhasesPerFromMesh + 7;
 
 /** @ingroup Private
  *
+ * Heavy phases in `Manifold::Impl::CreateLevelSet(...)`: the four grid
+ * loops (voxel SDF sampling, NearSurface, ComputeVerts, BuildTris)
+ * followed by one lumped finalize phase (CreateHalfedges through
+ * SetNormalsAndCoplanar). The NearSurface hash-table resize loop may
+ * re-run NearSurface, but counts as a single phase regardless. Bump in
+ * lockstep with `ADVANCE_PHASE_OR_RETURN(ctx)` sites in CreateLevelSet.
+ */
+constexpr int kPhasesPerLevelSet = 5;
+
+/** @ingroup Private
+ *
  * Pimpl for ExecutionContext. `cancel` is private; use `IsCancelled(ctx)`
  * to read it -- this is the canonical reader, enforced by the type system.
  * `totalBooleans`, `doneBooleans`, `totalPhases`, and `donePhases` are
