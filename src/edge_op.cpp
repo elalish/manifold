@@ -248,21 +248,18 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     stable_sort(edges.begin(), end,
                 [&](int a, int b) { return cost[a] < cost[b]; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
-    for (int i = 0; i < end - edges.begin() && cost[edges[i]] < maxCost; ++i) {
-      const int edge = edges[i];
+    auto itr = edges.begin();
+    for (; itr != end && std::isfinite(cost[*itr]); ++itr) {
+      const int edge = *itr;
       if (halfedge_.Pair(edge) < 0) {
         cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
         continue;
       }
-      if (vertsVisited[halfedge_.Start(edge)] ||
-          vertsVisited[halfedge_.End(edge)]) {
-        continue;
-      }
-      const vec3 len = vertPos_[halfedge_.End(edges[i])] -
-                       vertPos_[halfedge_.Start(edges[i])];
-
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
+      if (vertsVisited[startV] || vertsVisited[endV]) {
+        continue;
+      }
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer, newPos[edge]);
       vertsVisited.resize(vertPos_.size(), false);
       totalCost.resize(vertPos_.size(), 0);
@@ -271,13 +268,15 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         totalCost[endV] += cost[edge];
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
+        cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
         ++numCollapsed;
       }
-      cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
     }
     end = std::partition(edges.begin(), end,
-                         [&](int edge) { return cost[edge] < maxCost; });
-    std::cout << "edges left: " << (end - edges.begin()) << std::endl;
+                         [&](int edge) { return std::isfinite(cost[edge]); });
+    // std::cout << "edges left: " << (end - edges.begin()) << ", " << itr - end
+    //           << std::endl;
+    if (itr == end) break;
     // if (++i > 0) break;
   }
 #ifdef MANIFOLD_DEBUG
@@ -749,22 +748,41 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
   const int endVert = halfedge_.Start(tri0edge[1]);
 
   int firstEdge = edge;
+  double oldWorst = 0;
+  double newWorst = 0;
   bool collapse = true;
   auto checkTri = [&](int current) {
     const int last = halfedge_.Pair(PrevHalfedge(current));
-    if (current == firstEdge || last == firstEdge) {
+    if (!collapse || current == firstEdge || last == firstEdge) {
       return;  // ignore the collapsing triangles.
     }
-    const vec3 eLast = vertPos_[halfedge_.End(last)] - pNew;
-    const vec3 eCurr = vertPos_[halfedge_.End(current)] - pNew;
-    if (la::dot(la::cross(eCurr, eLast), faceNormal_[current / 3]) < 0)
+    const vec3 pOld = vertPos_[halfedge_.Start(current)];
+    const vec3 pCurr = vertPos_[halfedge_.End(current)];
+    const vec3 pLast = vertPos_[halfedge_.End(last)];
+    const mat3 oldEdges(normalize(pOld - pLast), normalize(pLast - pCurr),
+                        normalize(pCurr - pOld));
+    const mat3 newEdges(normalize(pNew - pLast), normalize(pLast - pCurr),
+                        normalize(pCurr - pNew));
+    if (la::dot(la::cross(newEdges[1], newEdges[0]), faceNormal_[current / 3]) <
+        0) {
       collapse = false;
+      return;
+    }
+    for (const int i : {0, 1, 2}) {
+      oldWorst = std::max(oldWorst, la::dot(oldEdges[i], oldEdges[Next3(i)]));
+      newWorst = std::max(newWorst, la::dot(newEdges[i], newEdges[Next3(i)]));
+    }
   };
   ForVert(firstEdge, checkTri);
   if (!collapse) return false;
   firstEdge = halfedge_.Pair(edge);
   ForVert(firstEdge, checkTri);
   if (!collapse) return false;
+  // Reject a collapse that would worsen the Delaunay condition too much, which
+  // is equivalent to having no obtuse angles. This would be a threshold of zero
+  // on this dot product, but 0.5 is used to allow obtuse angles up to 120
+  // degrees to allow more edges to collapse.
+  if (newWorst > 0.5 && newWorst > oldWorst) return false;
 
   // Orbit endVert
   {
