@@ -94,7 +94,14 @@ CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
                          mat3x4 transform_)
     : pImpl_(pImpl_), transform_(transform_) {}
 
+CsgLeafNode::CsgLeafNode(const CsgLeafNode& other) {
+  std::lock_guard<std::mutex> lock(other.mutex_);
+  pImpl_ = other.pImpl_;
+  transform_ = other.transform_;
+}
+
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (transform_ == mat3x4(la::identity)) return pImpl_;
   pImpl_ =
       std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
@@ -108,6 +115,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode(
 }
 
 std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_));
 }
 
@@ -117,6 +125,7 @@ Box CsgLeafNode::GetBoundingBox() const {
   // Compute transformed bounding box without triggering full mesh transform.
   // This is an approximation - the actual bounding box of the transformed mesh
   // may be tighter, but this is sufficient for overlap checks.
+  std::lock_guard<std::mutex> lock(mutex_);
   const Box& box = pImpl_->bBox_;
   if (transform_ == mat3x4(la::identity)) {
     return box;
@@ -139,7 +148,10 @@ Box CsgLeafNode::GetBoundingBox() const {
   return Box{newMin, newMax};
 }
 
-size_t CsgLeafNode::NumVert() const { return pImpl_->NumVert(); }
+size_t CsgLeafNode::NumVert() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return pImpl_->NumVert();
+}
 
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
   return std::make_shared<CsgLeafNode>(
@@ -631,7 +643,12 @@ struct CsgStackFrame {
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
     ExecutionContext::Impl* ctx) const {
   ZoneScoped;
-  if (cache_ != nullptr) return cache_;
+  {
+    // cache_ is published under impl_'s guard below; read it under the same
+    // lock so a concurrent eval of a shared op node can't tear it.
+    auto guard = impl_.GetGuard();
+    if (cache_ != nullptr) return cache_;
+  }
 
   // Note: We do need a pointer here to avoid vector pointers from being
   // invalidated after pushing elements into the explicit stack.
