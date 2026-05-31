@@ -180,11 +180,13 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
+  int numTri = 0;
   int firstEdge = edge;
   auto addTri = [&](int current) {
     if (current == firstEdge) {
       return;  // don't double-count the collapsing triangles.
     }
+    ++numTri;
     const vec3 center = vertPos_[halfedge_.Start(current)];
     const vec3 triAreaNormal =
         la::cross(vertPos_[halfedge_.End(current)] - center,
@@ -201,7 +203,8 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   ForVert(firstEdge, addTri);
 
   const vec3 v = la::inverse(A) * b;
-  const double cost = la::dot(v, A * v) - 2 * la::dot(b, v) + c;  // len^2
+  // Cost has units of length^2.
+  const double cost = (la::dot(v, A * v) - 2 * la::dot(b, v) + c);
   return {cost, v};
 }
 
@@ -216,6 +219,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   auto end = edges.end();
   std::iota(edges.begin(), end, 0);
   Vec<bool> vertsVisited(vertPos_.size(), false);
+  Vec<double> totalCost(vertPos_.size(), 0);
   size_t numCollapsed = 0;
   Vec<double> cost(edges.size());
   Vec<vec3> newPos(edges.size());
@@ -228,16 +232,23 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
+               if (halfedge_.Pair(edge) < 0) {
+                 cost[edge] = std::numeric_limits<double>::infinity();
+                 return;
+               }
                const auto edgeCost = CheckEdge(edge, firstNewVert);
-               cost[edge] = edgeCost.cost;
-               newPos[edge] = edgeCost.newPos;
+               if (totalCost[halfedge_.Start(edge)] + edgeCost.cost < maxCost &&
+                   totalCost[halfedge_.End(edge)] + edgeCost.cost < maxCost) {
+                 cost[edge] = edgeCost.cost;
+                 newPos[edge] = edgeCost.newPos;
+               } else {
+                 cost[edge] = std::numeric_limits<double>::infinity();
+               }
              });
     stable_sort(edges.begin(), end,
                 [&](int a, int b) { return cost[a] < cost[b]; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     for (int i = 0; i < end - edges.begin() && cost[edges[i]] < maxCost; ++i) {
-      // std::cout << "checking edge " << edges[i] << " with cost "
-      //           << cost[edges[i]] << std::endl;
       const int edge = edges[i];
       if (halfedge_.Pair(edge) < 0) {
         cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
@@ -247,16 +258,22 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           vertsVisited[halfedge_.End(edge)]) {
         continue;
       }
-      cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+      const vec3 len = vertPos_[halfedge_.End(edges[i])] -
+                       vertPos_[halfedge_.Start(edges[i])];
+
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer, newPos[edge]);
       vertsVisited.resize(vertPos_.size(), false);
+      totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
+        totalCost[startV] += cost[edge];
+        totalCost[endV] += cost[edge];
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
         ++numCollapsed;
       }
+      cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
     }
     end = std::partition(edges.begin(), end,
                          [&](int edge) { return cost[edge] < maxCost; });
@@ -734,18 +751,13 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
   int firstEdge = edge;
   bool collapse = true;
   auto checkTri = [&](int current) {
-    const int next = NextHalfedge(halfedge_.Pair(current));
-    if (current == firstEdge || next == firstEdge) {
+    const int last = halfedge_.Pair(PrevHalfedge(current));
+    if (current == firstEdge || last == firstEdge) {
       return;  // ignore the collapsing triangles.
     }
-    const vec3 center = vertPos_[halfedge_.Start(current)];
-    const int tri = current / 3;
-    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
-
-    // Don't collapse edge if it would cause a triangle to invert.
-    if (CCW(projection * vertPos_[halfedge_.End(next)],
-            projection * vertPos_[halfedge_.End(current)], projection * pNew,
-            epsilon_) < 0)
+    const vec3 eLast = vertPos_[halfedge_.End(last)] - pNew;
+    const vec3 eCurr = vertPos_[halfedge_.End(current)] - pNew;
+    if (la::dot(la::cross(eCurr, eLast), faceNormal_[current / 3]) < 0)
       collapse = false;
   };
   ForVert(firstEdge, checkTri);
