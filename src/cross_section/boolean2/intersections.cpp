@@ -280,54 +280,13 @@ void FindAndInsertIntersections(
     insertSorted(j);
   }
 
-  // Eager propagation: if independent edge pairs create near-duplicate
-  // intersection verts, add those verts to every edge they geometrically split.
+  // Eager propagation: after all independent edge-pair intersections are
+  // inserted, add each new intersection vertex to every other edge it
+  // geometrically splits. Otherwise a later canonical sub-edge can pass through
+  // a new vertex without being split there, leaving the halfedge arrangement
+  // dependent on tiny angular-sort differences.
   if ((int)verts->size() == origNumVerts) return;
   const int numNewVerts = static_cast<int>(verts->size()) - origNumVerts;
-  const double propagationDupThresh = kIntersectionMergeEpsFactor * eps;
-  const double propagationDupThresh2 =
-      propagationDupThresh * propagationDupThresh;
-
-  auto hasNearDuplicateNewVert = [&]() {
-    if (numNewVerts < 2) return false;
-    if (numNewVerts < 16) {
-      for (int i = 0; i < numNewVerts; ++i) {
-        const vec2 pi = (*verts)[origNumVerts + i];
-        for (int j = i + 1; j < numNewVerts; ++j) {
-          const vec2 d = pi - (*verts)[origNumVerts + j];
-          if (dot(d, d) <= propagationDupThresh2) return true;
-        }
-      }
-      return false;
-    }
-    thread_local static std::vector<int> order;
-    order.resize(numNewVerts);
-    for (int i = 0; i < numNewVerts; ++i) order[i] = i;
-    manifold::stable_sort(order.begin(), order.end(), [&](int a, int b) {
-      const vec2 pa = (*verts)[origNumVerts + a];
-      const vec2 pb = (*verts)[origNumVerts + b];
-      if (pa.x != pb.x) return pa.x < pb.x;
-      if (pa.y != pb.y) return pa.y < pb.y;
-      return a < b;
-    });
-    for (int oi = 0; oi < numNewVerts; ++oi) {
-      const int i = order[oi];
-      const vec2 pi = (*verts)[origNumVerts + i];
-      for (int oj = oi + 1; oj < numNewVerts; ++oj) {
-        const int j = order[oj];
-        const vec2 pj = (*verts)[origNumVerts + j];
-        if (pj.x - pi.x > propagationDupThresh) break;
-        if (std::abs(pj.y - pi.y) > propagationDupThresh) continue;
-        const vec2 d = pi - pj;
-        if (dot(d, d) <= propagationDupThresh2) return true;
-      }
-    }
-    return false;
-  };
-
-  if (!hasNearDuplicateNewVert()) {
-    return;
-  }
 
   // Per-(qi, eIdx) propagation step. Same logic for BVH and brute-force
   // broad phases.
