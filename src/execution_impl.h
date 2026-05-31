@@ -14,6 +14,9 @@
 
 #pragma once
 #include <atomic>
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+#include <chrono>
+#endif
 
 #include "manifold/common.h"
 
@@ -81,6 +84,12 @@ struct ExecutionContext::Impl {
   std::atomic<int> doneBooleans{0};
   std::atomic<int> totalPhases{0};
   std::atomic<int> donePhases{0};
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  // Wall-clock of the last phase boundary, for per-phase timing via
+  // ADVANCE_PHASE_OR_RETURN. Stamped at the static-factory reset; touched only
+  // by the op's own thread.
+  std::chrono::high_resolution_clock::time_point lastPhase{};
+#endif
 
  private:
   std::atomic<bool> cancel{false};
@@ -104,6 +113,14 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
   return ctx && ctx->cancel.load(std::memory_order_relaxed);
 }
 
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+// Times the span since the previous phase boundary (or the static-factory
+// reset) and prints it when verbose >= 2. Called by ADVANCE_PHASE_OR_RETURN;
+// defined in execution_impl.cpp so <chrono>/<iostream> stay out of this
+// widely-included header.
+void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line);
+#endif
+
 }  // namespace manifold
 
 /** @ingroup Private
@@ -111,11 +128,21 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
  * Phase-boundary checkpoint for `Manifold::Impl` methods (relies on
  * `this->MakeEmpty`). Call count must equal the method's `kPhasesPer*`.
  */
-#define ADVANCE_PHASE_OR_RETURN(ctx)                                    \
-  do {                                                                  \
-    if (manifold::IsCancelled(ctx)) {                                   \
-      MakeEmpty(manifold::Manifold::Error::Cancelled);                  \
-      return;                                                           \
-    }                                                                   \
-    if (ctx) (ctx)->donePhases.fetch_add(1, std::memory_order_relaxed); \
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+#define MANIFOLD_RECORD_PHASE(ctx) \
+  manifold::RecordPhase((ctx), __FILE__, __LINE__)
+#else
+#define MANIFOLD_RECORD_PHASE(ctx) ((void)0)
+#endif
+
+#define ADVANCE_PHASE_OR_RETURN(ctx)                             \
+  do {                                                           \
+    if (manifold::IsCancelled(ctx)) {                            \
+      MakeEmpty(manifold::Manifold::Error::Cancelled);           \
+      return;                                                    \
+    }                                                            \
+    if (ctx) {                                                   \
+      (ctx)->donePhases.fetch_add(1, std::memory_order_relaxed); \
+      MANIFOLD_RECORD_PHASE(ctx);                                \
+    }                                                            \
   } while (0)
