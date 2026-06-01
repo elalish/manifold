@@ -55,7 +55,8 @@ void MergeNearbyIntersectionVerts(
   DisjointSets uf(static_cast<int>(verts.size()));
   const double newToNewThresh = kIntersectionMergeEpsFactor * eps;
   const double newToNewThresh2 = newToNewThresh * newToNewThresh;
-  const double newToOldThresh = tolerance;
+  // Fresh intersection vs old endpoint: prior drift plus current-op error.
+  const double newToOldThresh = tolerance + eps;
   const double newToOldThresh2 = newToOldThresh * newToOldThresh;
   std::vector<std::pair<int, int>> pairs;
   std::vector<std::pair<double, int>> tlist;
