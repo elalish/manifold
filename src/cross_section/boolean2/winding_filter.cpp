@@ -392,9 +392,9 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   }
   const double bboxHalfExtent =
       0.5 * std::max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y);
-  // Keep seed samples close to boundary features, but at least several ULPs
-  // from displaced input edges and never more than a small edge-length
-  // fraction.
+  // Bound the inward seed offset. The cap is at least several ULPs at the
+  // coordinate scale, while the chosen step stays no larger than a small
+  // edge-length fraction so the sample remains next to the boundary feature.
   const double seedStepCap =
       std::max(kSeedStepCoordScaleUlps * kU * coordScale,
                kSeedStepEpsFraction * EpsilonFromScale(bboxHalfExtent));

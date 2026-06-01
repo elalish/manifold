@@ -240,8 +240,8 @@ Polygons Simplify(const Polygons& in, double eps, double tolerance) {
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
-// alpha-budget formula. Keep this translation invariant because CrossSection
-// methods call it before localizing coordinates.
+// alpha-budget formula. Keep this translation invariant so callers can safely
+// use it before any local-origin translation.
 double InferEps(const Polygons& a, const Polygons& b) {
   Rect box;
   AccumulateBounds(a, box);
