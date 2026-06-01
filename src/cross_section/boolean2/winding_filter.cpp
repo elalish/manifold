@@ -14,18 +14,16 @@
 //
 // Winding-rule filter over the canonical sub-edges. Builds the halfedge
 // arrangement, walks each face once via BFS to propagate winding numbers
-// (seeded by one ray-cast per connected component on the outer face),
+// (seeded by symbolic ray-casts from local outer faces),
 // then keeps only the sub-edges that separate "inside" from "outside"
 // under the chosen rule (Add / Intersect / EvenOdd / NonZero / Negative).
 //
-// FastEdge + CastWindingRay are the ray-cast helpers for the outer-
-// face seed; FilterByWindingHalfedges is the entry point. iostream usage
+// FastEdge + CastExternalWindingRay are the ray-cast helpers for local outer
+// face seeds; FilterByWindingHalfedges is the entry point. iostream usage is
 // gated by MANIFOLD_DEBUG.
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
 #include <map>
@@ -46,12 +44,6 @@ namespace boolean2 {
 
 namespace {
 
-// Ray-cast seeds are sampled just inside a face. These caps keep the sample
-// close to its boundary halfedge without turning into another merge tolerance.
-constexpr double kSeedStepCoordScaleUlps = 16.0;
-constexpr double kSeedStepEpsFraction = 0.25;
-constexpr double kSeedStepEdgeLengthFraction = 1e-3;
-
 bool IsInside(WindRule rule, int w) {
   switch (rule) {
     case WindRule::Add:
@@ -68,49 +60,62 @@ bool IsInside(WindRule rule, int w) {
   return false;
 }
 
-// Pre-flattened canonical sub-edges for seed ray-casts. Hoisting to a flat
-// array of (yMin, yMax, x0, dx_dy, signedMult) turns the crossing loop into a
-// tight cache-friendly scan and removes per-call indirection through canon
-// edges / verts[].
-//
-// signedMult encodes both direction and magnitude: positive when the
-// canonical (vMin -> vMax) form is upward (p0.y < p1.y), negative when
-// downward. The ray-cast then just sums signedMult over crossed edges.
+// Pre-flattened canonical sub-edges for symbolic seed ray-casts. `a` and `b`
+// are ordered upward, while signedMult preserves the canonical edge direction.
 struct FastEdge {
-  double yMin, yMax;  // canonical orientation: yMin < yMax
-  double x0;          // x at y = yMin
-  double xSlope;      // segment dx/dy, used to interpolate x at ray y
-  int signedMult;     // mult if upward in canonical form, else -mult
+  vec2 a, b;
+  int edge;
+  int signedMult;
 };
 
 std::vector<FastEdge> BuildFastEdges(const CanonicalSubEdges& canon,
                                      const std::vector<vec2>& verts) {
   std::vector<FastEdge> out;
   out.reserve(canon.edges.size());
-  for (const auto& edge : canon.edges) {
+  for (int i = 0; i < static_cast<int>(canon.edges.size()); ++i) {
+    const auto& edge = canon.edges[i];
     const int mult = edge.mult;
     vec2 p0 = verts[edge.vMin];
     vec2 p1 = verts[edge.vMax];
     const bool upward = p0.y < p1.y;
     if (!upward) std::swap(p0, p1);
     if (p0.y == p1.y) continue;  // horizontal edges contribute nothing
-    FastEdge e;
-    e.yMin = p0.y;
-    e.yMax = p1.y;
-    e.x0 = p0.x;
-    e.xSlope = (p1.x - p0.x) / (p1.y - p0.y);
-    e.signedMult = upward ? mult : -mult;
-    out.push_back(e);
+    out.push_back({p0, p1, i, upward ? mult : -mult});
   }
   return out;
 }
 
-int CastWindingRay(vec2 origin, const std::vector<FastEdge>& edges) {
+int SignInfinitesimal(double base, double delta) {
+  if (base > 0.0) return 1;
+  if (base < 0.0) return -1;
+  if (delta > 0.0) return 1;
+  if (delta < 0.0) return -1;
+  return 0;
+}
+
+bool SymbolicYInHalfOpenInterval(double y, double dy, double yMin,
+                                 double yMax) {
+  const int cmpMin = SignInfinitesimal(y - yMin, dy);
+  const int cmpMax = SignInfinitesimal(y - yMax, dy);
+  return cmpMin >= 0 && cmpMax < 0;
+}
+
+int CastExternalWindingRay(vec2 mid, vec2 perturb,
+                           const std::vector<FastEdge>& edges,
+                           const std::vector<int>& edgeComponent,
+                           int skipComponent) {
   int winding = 0;
   for (const auto& e : edges) {
-    if (origin.y < e.yMin || origin.y >= e.yMax) continue;
-    const double xCross = e.x0 + e.xSlope * (origin.y - e.yMin);
-    if (xCross <= origin.x) continue;
+    DEBUG_ASSERT(e.edge >= 0 && e.edge < static_cast<int>(edgeComponent.size()),
+                 logicErr, "winding edge component index out of range");
+    DEBUG_ASSERT(edgeComponent[e.edge] >= 0, logicErr,
+                 "winding edge is missing component assignment");
+    if (edgeComponent[e.edge] == skipComponent) continue;
+    if (!SymbolicYInHalfOpenInterval(mid.y, perturb.y, e.a.y, e.b.y)) continue;
+    const vec2 edgeDir = e.b - e.a;
+    const int side = SignInfinitesimal(la::cross(edgeDir, mid - e.a),
+                                       la::cross(edgeDir, perturb));
+    if (side <= 0) continue;
     winding += e.signedMult;
   }
   return winding;
@@ -121,8 +126,9 @@ int CastWindingRay(vec2 origin, const std::vector<FastEdge>& edges) {
 //
 // Builds the same halfedge structure manifold's 3D mesh
 // `Manifold::Impl::halfedge_` uses from the canonical sub-edges, walks face
-// cycles to identify each planar face, seeds one face per connected component
-// by ray-cast, and propagates winding numbers across halfedge twins. An edge
+// cycles to identify each planar face, seeds one face per disconnected edge
+// component by symbolic ray-cast, and propagates winding numbers across
+// halfedge twins. An edge
 // is kept iff its left and right faces disagree under the selected rule.
 // =============================================================================
 
@@ -380,38 +386,57 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   thread_local static std::vector<uint8_t> wAssigned;
   faceWind.assign(nFaces, 0);
   wAssigned.assign(nFaces, 0);
-  double coordScale = 0.0;
-  vec2 bboxMin(std::numeric_limits<double>::infinity());
-  vec2 bboxMax(-std::numeric_limits<double>::infinity());
-  for (const vec2& v : verts) {
-    coordScale = std::max(coordScale, std::max(std::fabs(v.x), std::fabs(v.y)));
-    bboxMin.x = std::min(bboxMin.x, v.x);
-    bboxMin.y = std::min(bboxMin.y, v.y);
-    bboxMax.x = std::max(bboxMax.x, v.x);
-    bboxMax.y = std::max(bboxMax.y, v.y);
+  thread_local static std::vector<int> faceComponent;
+  thread_local static std::vector<int> edgeComponent;
+  thread_local static std::vector<int> componentOuterFace;
+  thread_local static std::vector<int> componentQ;
+  faceComponent.assign(nFaces, -1);
+  edgeComponent.assign(canon.edges.size(), -1);
+  componentOuterFace.clear();
+  componentQ.clear();
+  componentQ.reserve(nFaces);
+  auto assignComponent = [&](int seed, int component) {
+    componentQ.clear();
+    componentQ.push_back(seed);
+    faceComponent[seed] = component;
+    int localOuter = seed;
+    size_t head = 0;
+    while (head < componentQ.size()) {
+      const int f = componentQ[head++];
+      if (faceArea[f] < faceArea[localOuter]) localOuter = f;
+      const int h0 = faceStartHE[f];
+      if (h0 < 0) continue;
+      int hh = h0;
+      int safety = 0;
+      do {
+        edgeComponent[hh / 2] = component;
+        const int adj = halfedges[halfedges[hh].twin].face;
+        if (adj >= 0 && faceComponent[adj] < 0) {
+          faceComponent[adj] = component;
+          componentQ.push_back(adj);
+        }
+        hh = halfedges[hh].next;
+        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
+      } while (hh != h0);
+    }
+    componentOuterFace.push_back(localOuter);
+  };
+  for (int f = 0; f < nFaces; ++f) {
+    if (faceComponent[f] < 0) {
+      assignComponent(f, static_cast<int>(componentOuterFace.size()));
+    }
   }
-  const double bboxHalfExtent =
-      0.5 * std::max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y);
-  // Bound the inward seed offset. The cap is at least several ULPs at the
-  // coordinate scale, while the chosen step stays no larger than a small
-  // edge-length fraction so the sample remains next to the boundary feature.
-  const double seedStepCap =
-      std::max(kSeedStepCoordScaleUlps * kU * coordScale,
-               kSeedStepEpsFraction * EpsilonFromScale(bboxHalfExtent));
+
   auto castFaceHalfedge = [&](int h) {
     if (h < 0) return 0;
     const vec2 a = verts[halfedges[h].origin];
     const vec2 b = verts[halfedges[halfedges[h].twin].origin];
     const vec2 mid = (a + b) * 0.5;
     const vec2 d = b - a;
-    const double len = length(d);
-    if (len == 0) return 0;
-    const vec2 perp(-d.y / len, d.x / len);
-    const double step =
-        std::min(len * kSeedStepEdgeLengthFraction, seedStepCap);
-    const vec2 pInF = mid + perp * step;
+    const vec2 perturb(-d.y, d.x);
     ensureFastEdges();
-    return CastWindingRay(pInF, fastEdges);
+    return CastExternalWindingRay(mid, perturb, fastEdges, edgeComponent,
+                                  edgeComponent[h / 2]);
   };
   auto seedRayCast = [&](int f) {
     const int h0 = faceStartHE[f];
@@ -450,48 +475,14 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     }
   };
   propagateFrom(outerFace);
-  // Pick up any disconnected components with their own seed ray-cast.
-  thread_local static std::vector<int> componentQ;
-  thread_local static std::vector<int> componentFaces;
-  thread_local static std::vector<uint8_t> componentSeen;
+  // Pick up disconnected edge components with a symbolic ray-cast from a local
+  // outer face. The component's own contribution on that side is zero, so the
+  // cast only counts other components.
   thread_local static std::vector<uint8_t> islandOuterFace;
-  componentQ.clear();
-  componentFaces.clear();
-  componentSeen.assign(nFaces, 0);
   islandOuterFace.assign(nFaces, 0);
-  islandOuterFace[outerFace] = 1;
-  auto collectComponent = [&](int seed) {
-    componentQ.clear();
-    componentFaces.clear();
-    componentQ.push_back(seed);
-    componentSeen[seed] = 1;
-    size_t head = 0;
-    while (head < componentQ.size()) {
-      const int f = componentQ[head++];
-      componentFaces.push_back(f);
-      const int h0 = faceStartHE[f];
-      if (h0 < 0) continue;
-      int hh = h0;
-      int safety = 0;
-      do {
-        const int adj = halfedges[halfedges[hh].twin].face;
-        if (adj >= 0 && !wAssigned[adj] && !componentSeen[adj]) {
-          componentSeen[adj] = 1;
-          componentQ.push_back(adj);
-        }
-        hh = halfedges[hh].next;
-        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
-      } while (hh != h0);
-    }
-  };
-  for (int f = 0; f < nFaces; ++f) {
-    if (!wAssigned[f]) {
-      collectComponent(f);
-      int localOuter = f;
-      for (int cf : componentFaces) {
-        if (faceArea[cf] < faceArea[localOuter]) localOuter = cf;
-      }
-      islandOuterFace[localOuter] = 1;
+  for (int localOuter : componentOuterFace) {
+    islandOuterFace[localOuter] = 1;
+    if (!wAssigned[localOuter]) {
       seedRayCast(localOuter);
       propagateFrom(localOuter);
     }
