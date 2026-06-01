@@ -187,7 +187,7 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 #if (MANIFOLD_PAR == 1)
   PairsRecorder rec{bvh.leafToOrig, edges, verts, eps, {}};
   auto qf = [&](int i) { return edgeBoxes[i]; };
-  BVHCollisions<false>(bvh, rec, qf, nE, /*parallel=*/true);
+  BVHCollisions(bvh, rec, qf, nE, /*parallel=*/true);
   rec.tls.combine_each([&](const auto& localPairs) {
     pairs->insert(pairs->end(), localPairs.begin(), localPairs.end());
   });
@@ -329,7 +329,7 @@ void FindAndInsertIntersections(
     auto qf = [&](int qi) {
       return BoxOf2DPoint((*verts)[origNumVerts + qi], eps);
     };
-    BVHCollisions<false>(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
+    BVHCollisions(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
   }
 }
 

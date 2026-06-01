@@ -44,11 +44,6 @@ bool AllFinite(const Polygons& polys) {
   return true;
 }
 
-struct LocalFrame {
-  vec2 origin = vec2(0.0);
-  bool hasVerts = false;
-};
-
 void AccumulateBounds(const Polygons& polys, Rect* box) {
   for (const auto& loop : polys) {
     for (const vec2& v : loop) {
@@ -57,14 +52,11 @@ void AccumulateBounds(const Polygons& polys, Rect* box) {
   }
 }
 
-LocalFrame MakeLocalFrame(const Polygons& a, const Polygons& b = {}) {
+vec2 MakeLocalOrigin(const Polygons& a, const Polygons& b = {}) {
   Rect box;
   AccumulateBounds(a, &box);
   AccumulateBounds(b, &box);
-  LocalFrame frame;
-  frame.hasVerts = box.IsFinite();
-  if (frame.hasVerts) frame.origin = box.Center();
-  return frame;
+  return box.IsFinite() ? box.Center() : vec2(0.0);
 }
 
 Polygons TranslatePolygons(const Polygons& polys, vec2 delta) {
@@ -146,9 +138,9 @@ void AppendInput(const Polygons& polys, int mult, std::vector<vec2>* verts,
 Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
                         WindRule rule, double eps, double tolerance) {
   if (!AllFinite(a) || !AllFinite(b)) return {};
-  const auto frame = MakeLocalFrame(a, b);
-  Polygons localA = TranslatePolygons(a, -frame.origin);
-  Polygons localB = TranslatePolygons(b, -frame.origin);
+  const vec2 origin = MakeLocalOrigin(a, b);
+  Polygons localA = TranslatePolygons(a, -origin);
+  Polygons localB = TranslatePolygons(b, -origin);
   if (eps <= 0.0) eps = InferEps(localA, localB);
   if (tolerance < eps) tolerance = eps;
 
@@ -160,21 +152,12 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
 
   auto r =
       RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
-  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), frame.origin);
+  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), origin);
 }
 
 Polygons RegularizeByRule(const Polygons& in, WindRule rule, double eps,
                           double tolerance) {
-  if (!AllFinite(in)) return {};
-  const auto frame = MakeLocalFrame(in);
-  Polygons local = TranslatePolygons(in, -frame.origin);
-  if (eps <= 0.0) eps = InferEps(local, {});
-  if (tolerance < eps) tolerance = eps;
-  auto [verts, edges] = PolygonsToInput(local);
-  if (verts.empty()) return {};
-  auto r =
-      RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
-  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), frame.origin);
+  return BinaryOpByRule(in, {}, 1, rule, eps, tolerance);
 }
 }  // namespace
 
@@ -274,9 +257,8 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
                    double tolerance) {
   const int bMult = op == OpType::Subtract ? -1 : 1;
-  const WindRule rule = op == OpType::Intersect  ? WindRule::Intersect
-                        : op == OpType::Subtract ? WindRule::Add
-                                                 : WindRule::Add;
+  const WindRule rule =
+      op == OpType::Intersect ? WindRule::Intersect : WindRule::Add;
   return BinaryOpByRule(a, b, bMult, rule, eps, tolerance);
 }
 

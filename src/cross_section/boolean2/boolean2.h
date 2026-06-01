@@ -17,7 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include "driver.h"
 #include "manifold/common.h"
 #include "predicates.h"
 #include "winding_filter.h"

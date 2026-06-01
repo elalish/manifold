@@ -80,17 +80,18 @@ void AddSplitSubsegments(TracePhase* phase, const std::vector<vec2>& verts,
         edge.v1 >= static_cast<int>(verts.size())) {
       continue;
     }
-    if (eId >= static_cast<int>(lists.size()) || lists[eId].size() < 2) {
+    if (eId >= static_cast<int>(lists.size()) || lists[eId].empty()) {
       phase->segments.push_back({Id("e", eId), verts[edge.v0], verts[edge.v1],
                                  kind + "_unsplit", "", edge.mult, ""});
       continue;
     }
     const auto& list = lists[eId];
-    for (int i = 0; i + 1 < static_cast<int>(list.size()); ++i) {
-      const int v0 = list[i];
-      const int v1 = list[i + 1];
+    int v0 = edge.v0;
+    for (int i = 0; i <= static_cast<int>(list.size()); ++i) {
+      const int v1 = i == static_cast<int>(list.size()) ? edge.v1 : list[i];
       if (v0 < 0 || v1 < 0 || v0 >= static_cast<int>(verts.size()) ||
           v1 >= static_cast<int>(verts.size()) || v0 == v1) {
+        v0 = v1;
         continue;
       }
       std::ostringstream label;
@@ -98,6 +99,7 @@ void AddSplitSubsegments(TracePhase* phase, const std::vector<vec2>& verts,
       phase->segments.push_back(
           {std::string("s") + std::to_string(eId) + "_" + std::to_string(i),
            verts[v0], verts[v1], kind, "", edge.mult, label.str()});
+      v0 = v1;
     }
   }
 }

@@ -69,7 +69,7 @@ struct BVH {
 
 BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes);
 
-template <const bool selfCollision = false, typename Recorder, typename F>
+template <typename Recorder, typename F>
 inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
                           int n, bool parallel) {
   using namespace collider_internal;
@@ -88,8 +88,7 @@ inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
         const bool overlaps = bvh.nodeBBox[child].DoesOverlap(query);
         if (overlaps && IsLeaf(child)) {
           const int leafIdx = Node2Leaf(child);
-          if (!selfCollision || leafIdx != queryIdx)
-            recorder.record(queryIdx, leafIdx, local);
+          recorder.record(queryIdx, leafIdx, local);
         }
         return overlaps && IsInternal(child);
       };
@@ -119,8 +118,8 @@ inline void CollidePairs(const BVH& bvh, const std::vector<Box2>& queries,
   auto adapter = [&](int qi, int leafIdx) { f(qi, bvh.leafToOrig[leafIdx]); };
   auto recorder = MakeSimpleRecorder(adapter);
   auto qf = [&](int i) { return queries[i]; };
-  BVHCollisions<false>(bvh, recorder, qf, static_cast<int>(queries.size()),
-                       /*parallel=*/false);
+  BVHCollisions(bvh, recorder, qf, static_cast<int>(queries.size()),
+                /*parallel=*/false);
 }
 
 }  // namespace boolean2

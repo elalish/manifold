@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "../../parallel.h"
-#include "bvh.h"
 #include "canonicalize.h"
 #include "diagnostics.h"
 #include "predicates.h"
