@@ -251,6 +251,26 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
   return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
+// ctx-aware static factories: like the plain factories above, but run under an
+// ExecutionContext so progress / cancellation are observed (these ops have no
+// source Manifold to attach via withContext). Bound as ExecutionContext methods
+// (first arg is the receiver).
+Manifold ExecutionContextFromMesh(ExecutionContext& ctx, const val& mesh) {
+  return ctx.FromMeshGL(js::MeshJS2GL(mesh));
+}
+
+Manifold ExecutionContextSmooth(ExecutionContext& ctx, const val& mesh,
+                                const std::vector<Smoothness>& sharpenedEdges) {
+  return ctx.Smooth(js::MeshJS2GL(mesh), sharpenedEdges);
+}
+
+Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,
+                                  Box bounds, double edgeLength, double level,
+                                  double tolerance) {
+  double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
+  return ctx.LevelSet(f, bounds, edgeLength, level, tolerance, false);
+}
+
 std::string ErrorToString(Manifold::Error error) {
   switch (error) {
     case Manifold::Error::NoError:
