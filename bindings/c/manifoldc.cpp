@@ -32,7 +32,7 @@ namespace {
 ManifoldManifold* level_set(
     void* mem, double (*sdf_context)(double, double, double, void*),
     ManifoldBox* bounds, double edge_length, double level, double tolerance,
-    bool seq, void* ctx) {
+    bool seq, void* ctx, ExecutionContext* ec = nullptr) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<double(double, double, double)> sdf =
@@ -40,8 +40,12 @@ ManifoldManifold* level_set(
   std::function<double(vec3)> fun = [sdf](vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
-  return to_c(new (mem) Manifold(Manifold::LevelSet(
-      fun, *from_c(bounds), edge_length, level, tolerance, !seq)));
+  // Run under the ExecutionContext when given, so progress/cancel are observed.
+  Manifold result = ec ? ec->LevelSet(fun, *from_c(bounds), edge_length, level,
+                                      tolerance, !seq)
+                       : Manifold::LevelSet(fun, *from_c(bounds), edge_length,
+                                            level, tolerance, !seq);
+  return to_c(new (mem) Manifold(result));
 }
 
 // Raw uninitialized storage for a T — callers must placement-new into it
@@ -897,6 +901,57 @@ int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx) {
 
 double manifold_execution_context_progress(ManifoldExecutionContext* ctx) {
   return from_c(ctx)->Progress();
+}
+
+// ctx-aware static factories: the FromMeshGL / LevelSet / Smooth ops have no
+// source Manifold to attach via manifold_with_context, so they run directly on
+// the ExecutionContext. Each mirrors its plain factory but observes progress /
+// cancellation. `sdf_context` is the SDF callback's user-data (distinct from
+// the ExecutionContext `ec`).
+ManifoldManifold* manifold_execution_context_level_set(
+    void* mem, ManifoldExecutionContext* ec,
+    double (*sdf)(double, double, double, void*), ManifoldBox* bounds,
+    double edge_length, double level, double tolerance, void* sdf_context) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, false,
+                   sdf_context, from_c(ec));
+}
+
+ManifoldManifold* manifold_execution_context_level_set_seq(
+    void* mem, ManifoldExecutionContext* ec,
+    double (*sdf)(double, double, double, void*), ManifoldBox* bounds,
+    double edge_length, double level, double tolerance, void* sdf_context) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, true,
+                   sdf_context, from_c(ec));
+}
+
+ManifoldManifold* manifold_execution_context_of_meshgl(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh) {
+  return to_c(new (mem) Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
+}
+
+ManifoldManifold* manifold_execution_context_of_meshgl64(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh) {
+  return to_c(new (mem) Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
+}
+
+ManifoldManifold* manifold_execution_context_smooth(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
+}
+
+ManifoldManifold* manifold_execution_context_smooth64(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
 }
 
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,

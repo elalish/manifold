@@ -724,6 +724,40 @@ Module.setup = function() {
     return out;
   };
 
+  // ctx-aware static factories: mirror Manifold.ofMesh / smooth / levelSet but
+  // run under this ExecutionContext so progress/cancellation are observed.
+  Module.ExecutionContext.prototype.fromMesh = function(mesh) {
+    return this._FromMesh(mesh);
+  };
+
+  Module.ExecutionContext.prototype.smooth = function(
+      mesh, sharpenedEdges = []) {
+    const sharp = new Module.Vector_smoothness();
+    toVec(sharp, sharpenedEdges);
+    const result = this._Smooth(mesh, sharp);
+    sharp.delete();
+    return result;
+  };
+
+  Module.ExecutionContext.prototype.levelSet = function(
+      sdf, bounds, edgeLength, level = 0, tolerance = -1) {
+    const bounds2 = {
+      min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
+      max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
+    };
+    const wasmFuncPtr = addFunction(function(vec3Ptr) {
+      const x = getValue(vec3Ptr, 'double');
+      const y = getValue(vec3Ptr + 8, 'double');
+      const z = getValue(vec3Ptr + 16, 'double');
+      const vert = [x, y, z];
+      return sdf(vert);
+    }, 'di');
+    const out =
+        this._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
+    removeFunction(wasmFuncPtr);
+    return out;
+  };
+
   function pushVec3(vec, ps) {
     toVec(vec, ps, p => {
       if (p instanceof Array) return {x: p[0], y: p[1], z: p[2]};

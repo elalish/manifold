@@ -739,7 +739,83 @@ NB_MODULE(manifold3d, m) {
       .def(nb::init<>())
       .def("cancel", &ExecutionContext::Cancel)
       .def("cancelled", &ExecutionContext::Cancelled)
-      .def("progress", &ExecutionContext::Progress);
+      .def("progress", &ExecutionContext::Progress)
+      // ctx-aware static factories: like Manifold.from_mesh / level_set /
+      // smooth, but run under this context so progress / cancellation are
+      // observed (these ops have no source Manifold to attach via
+      // with_context).
+      .def(
+          "from_mesh",
+          [](ExecutionContext& ctx, const MeshGL& mesh) {
+            return ctx.FromMeshGL(mesh);
+          },
+          nb::arg("mesh"),
+          "Ingest a MeshGL into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation.")
+      .def(
+          "from_mesh",
+          [](ExecutionContext& ctx, const MeshGL64& mesh) {
+            return ctx.FromMeshGL(mesh);
+          },
+          nb::arg("mesh"),
+          "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation.")
+      .def(
+          "level_set",
+          [](ExecutionContext& ctx,
+             const std::function<double(double, double, double)>& f,
+             std::vector<double> bounds, double edgeLength, double level,
+             double tolerance) {
+            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
+                         vec3(bounds[3], bounds[4], bounds[5])};
+            std::function<double(vec3)> cppToPython = [&f](vec3 v) {
+              return f(v.x, v.y, v.z);
+            };
+            return ctx.LevelSet(cppToPython, bound, edgeLength, level,
+                                tolerance, false);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
+          "Like Manifold.level_set, run under this context so the level-set "
+          "evaluation reports progress and observes cancellation.")
+      .def(
+          "smooth",
+          [](ExecutionContext& ctx, const MeshGL& mesh,
+             std::vector<size_t> sharpened_edges,
+             std::vector<double> edge_smoothness) {
+            if (sharpened_edges.size() != edge_smoothness.size()) {
+              throw std::runtime_error(
+                  "sharpened_edges.size() != edge_smoothness.size()");
+            }
+            std::vector<Smoothness> vec(sharpened_edges.size());
+            for (size_t i = 0; i < vec.size(); i++) {
+              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
+            }
+            return ctx.Smooth(mesh, vec);
+          },
+          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
+          nb::arg("edge_smoothness") = nb::list(),
+          "Like Manifold.smooth, run under this context so progress and "
+          "cancellation are observed.")
+      .def(
+          "smooth",
+          [](ExecutionContext& ctx, const MeshGL64& mesh,
+             std::vector<size_t> sharpened_edges,
+             std::vector<double> edge_smoothness) {
+            if (sharpened_edges.size() != edge_smoothness.size()) {
+              throw std::runtime_error(
+                  "sharpened_edges.size() != edge_smoothness.size()");
+            }
+            std::vector<Smoothness> vec(sharpened_edges.size());
+            for (size_t i = 0; i < vec.size(); i++) {
+              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
+            }
+            return ctx.Smooth(mesh, vec);
+          },
+          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
+          nb::arg("edge_smoothness") = nb::list(),
+          "Like Manifold.smooth, run under this context so progress and "
+          "cancellation are observed.");
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)

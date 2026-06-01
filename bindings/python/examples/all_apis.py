@@ -119,6 +119,26 @@ def all_manifold():
     cancelled_ctx.cancel()
     tree = (Manifold.cube() + Manifold.sphere(1)).with_context(cancelled_ctx)
     assert tree.status() == Error.Cancelled
+    # ctx-aware static factories: these ops have no source Manifold to attach a
+    # context to via with_context, so they run on the context directly.
+    ingest_ctx = ExecutionContext()
+    assert ingest_ctx.from_mesh(Manifold.cube().to_mesh()).status() == Error.NoError
+    assert ingest_ctx.progress() == 1.0
+    sdf_ctx = ExecutionContext()
+    sphere = sdf_ctx.level_set(
+        lambda x, y, z: 1 - (x * x + y * y + z * z) ** 0.5,
+        [-1.1, -1.1, -1.1, 1.1, 1.1, 1.1],
+        0.2,
+    )
+    assert sphere.status() == Error.NoError
+    smooth_ctx = ExecutionContext()
+    m = smooth_ctx.smooth(Manifold.cube().to_mesh(), [0], [0.5])
+    # A pre-cancelled ctx propagates through a factory; this proves the ctx is
+    # wired, since NoError + progress==1 also hold for an untouched ctx.
+    cancel_factory_ctx = ExecutionContext()
+    cancel_factory_ctx.cancel()
+    cancelled = cancel_factory_ctx.from_mesh(Manifold.cube().to_mesh())
+    assert cancelled.status() == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
     ok = mesh.merge()

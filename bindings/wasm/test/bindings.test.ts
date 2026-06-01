@@ -90,6 +90,38 @@ suite('Manifold Bindings', () => {
     ctx.delete();
   });
 
+  test('ExecutionContext static factories', () => {
+    // levelSet via the context: no source Manifold to attach via withContext.
+    const sdfCtx = new manifoldModule.ExecutionContext();
+    const sphere = sdfCtx.levelSet(
+        ([x, y, z]) => 1 - Math.sqrt(x * x + y * y + z * z),
+        {min: [-1.1, -1.1, -1.1], max: [1.1, 1.1, 1.1]}, 0.2);
+    expect(sphere.status()).toEqual('NoError');
+    expect(sdfCtx.progress()).toEqual(1);
+
+    // fromMesh via the context.
+    const ingestCtx = new manifoldModule.ExecutionContext();
+    const cube = manifoldModule.Manifold.cube([2, 2, 2], true);
+    const ingested = ingestCtx.fromMesh(cube.getMesh());
+    expect(ingested.status()).toEqual('NoError');
+    expect(ingestCtx.progress()).toEqual(1);
+
+    // A pre-cancelled ctx propagates through a factory; this proves the ctx is
+    // wired (NoError + progress==1 also hold for an untouched ctx).
+    const cancelCtx = new manifoldModule.ExecutionContext();
+    cancelCtx.cancel();
+    const cancelled = cancelCtx.fromMesh(cube.getMesh());
+    expect(cancelled.status()).toEqual('Cancelled');
+
+    sphere.delete();
+    cube.delete();
+    ingested.delete();
+    cancelled.delete();
+    sdfCtx.delete();
+    ingestCtx.delete();
+    cancelCtx.delete();
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat

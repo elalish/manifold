@@ -115,7 +115,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .constructor<>()
       .function("cancel", &ExecutionContext::Cancel)
       .function("cancelled", &ExecutionContext::Cancelled)
-      .function("progress", &ExecutionContext::Progress);
+      .function("progress", &ExecutionContext::Progress)
+      .function("_FromMesh", &man_js::ExecutionContextFromMesh)
+      .function("_Smooth", &man_js::ExecutionContextSmooth)
+      .function("_LevelSet", &man_js::ExecutionContextLevelSet);
 
   register_vector<RayHit>("Vector_rayHit");
   register_vector<ivec3>("Vector_ivec3");
