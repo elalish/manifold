@@ -23,6 +23,7 @@
 // gated by MANIFOLD_DEBUG.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
@@ -93,6 +94,25 @@ int SignInfinitesimal(double base, double delta) {
   return 0;
 }
 
+// The symbolic side test is an orientation sign. Scale both vectors first so
+// tiny valid inputs do not turn a nonzero L^2 determinant into signed zero.
+int ScaledCrossSign(vec2 a, vec2 b) {
+  const double aScale = std::max(std::fabs(a.x), std::fabs(a.y));
+  const double bScale = std::max(std::fabs(b.x), std::fabs(b.y));
+  if (aScale == 0.0 || bScale == 0.0) return 0;
+  if (!std::isfinite(aScale) || !std::isfinite(bScale)) {
+    return SignInfinitesimal(la::cross(a, b), 0.0);
+  }
+  a = a / aScale;
+  b = b / bScale;
+  return SignInfinitesimal(la::cross(a, b), 0.0);
+}
+
+int ScaledCrossSignInfinitesimal(vec2 a, vec2 base, vec2 delta) {
+  const int baseSign = ScaledCrossSign(a, base);
+  return baseSign != 0 ? baseSign : ScaledCrossSign(a, delta);
+}
+
 bool SymbolicYInHalfOpenInterval(double y, double dy, double yMin,
                                  double yMax) {
   const int cmpMin = SignInfinitesimal(y - yMin, dy);
@@ -113,8 +133,7 @@ int CastExternalWindingRay(vec2 mid, vec2 perturb,
     if (edgeComponent[e.edge] == skipComponent) continue;
     if (!SymbolicYInHalfOpenInterval(mid.y, perturb.y, e.a.y, e.b.y)) continue;
     const vec2 edgeDir = e.b - e.a;
-    const int side = SignInfinitesimal(la::cross(edgeDir, mid - e.a),
-                                       la::cross(edgeDir, perturb));
+    const int side = ScaledCrossSignInfinitesimal(edgeDir, mid - e.a, perturb);
     if (side <= 0) continue;
     winding += e.signedMult;
   }
@@ -146,7 +165,8 @@ void RecordHalfedgeFaces(Trace* trace, WindRule rule,
                          const std::vector<Halfedge>& halfedges,
                          const std::vector<int>& faceStartHE,
                          const std::vector<int>& faceWind,
-                         const std::vector<double>& faceArea, int outerFace) {
+                         const std::vector<long double>& faceArea,
+                         int outerFace) {
   if (!trace) return;
   TracePhase& phase = trace->AddPhase("halfedge_faces");
   const int nFaces = static_cast<int>(faceStartHE.size());
@@ -319,26 +339,31 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   }
 
   // 5. Compute signed area per face. Centering the shoelace sum avoids
-  // cancellation from large translations or skinny-but-valid faces.
+  // cancellation from large translations or skinny-but-valid faces; long double
+  // keeps tiny components ordered when selecting local outer faces.
   // First halfedge encountered per face. Used both as the centering
   // reference for the shoelace area (below) and as the starting halfedge
   // for the per-face winding ray-cast.
   thread_local static std::vector<int> faceStartHE;
-  thread_local static std::vector<double> faceArea;
+  thread_local static std::vector<long double> faceArea;
   faceStartHE.assign(nFaces, -1);
   for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     if (halfedges[i].face >= 0 && faceStartHE[halfedges[i].face] == -1)
       faceStartHE[halfedges[i].face] = i;
   }
-  faceArea.assign(nFaces, 0.0);
+  faceArea.assign(nFaces, 0.0L);
   for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     if (halfedges[i].face < 0) continue;
     const int faceRefHE = faceStartHE[halfedges[i].face];
     if (faceRefHE < 0) continue;
-    const vec2 ref = verts[halfedges[faceRefHE].origin];
-    const vec2 a = verts[halfedges[i].origin] - ref;
-    const vec2 b = verts[halfedges[halfedges[i].twin].origin] - ref;
-    faceArea[halfedges[i].face] += (a.x * b.y - b.x * a.y) * 0.5;
+    const vec2 refD = verts[halfedges[faceRefHE].origin];
+    const vec2 aD = verts[halfedges[i].origin];
+    const vec2 bD = verts[halfedges[halfedges[i].twin].origin];
+    const long double ax = static_cast<long double>(aD.x) - refD.x;
+    const long double ay = static_cast<long double>(aD.y) - refD.y;
+    const long double bx = static_cast<long double>(bD.x) - refD.x;
+    const long double by = static_cast<long double>(bD.y) - refD.y;
+    faceArea[halfedges[i].face] += (ax * by - bx * ay) * 0.5L;
   }
   int outerFace = 0;
   for (int f = 1; f < nFaces; ++f) {
