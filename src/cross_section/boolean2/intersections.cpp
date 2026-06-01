@@ -155,7 +155,7 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
         return edgeBoxes[a].min.x < edgeBoxes[b].min.x;
       return a < b;
     });
-    if ((int)byFirst.size() < nE) byFirst.resize(nE);
+    if (static_cast<int>(byFirst.size()) < nE) byFirst.resize(nE);
     for (int i = 0; i < nE; ++i) byFirst[i].clear();
     int numPairs = 0;
     for (int oi = 0; oi < nE; ++oi) {

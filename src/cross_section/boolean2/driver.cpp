@@ -74,7 +74,8 @@ void MergeNearbyIntersectionVerts(
     tlist.reserve(list.size());
     for (int v : list) {
       // Skip pure-old verts; keep snapped-onto-old for new-to-new pairing.
-      if (v >= (int)vertEdges.size() || vertEdges[v].empty()) continue;
+      if (v >= static_cast<int>(vertEdges.size()) || vertEdges[v].empty())
+        continue;
       const vec2 p = verts[v];
       const double t = dot(p - a, ab) / abLen2;
       tlist.emplace_back(t, v);

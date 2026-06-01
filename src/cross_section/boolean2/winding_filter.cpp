@@ -205,13 +205,13 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   auto& outFlat = outFlatBuf;
   auto& outCur = outCurBuf;
   outOff.assign(nVerts + 1, 0);
-  for (int i = 0; i < (int)halfedges.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     ++outOff[halfedges[i].origin + 1];
   }
   for (int v = 1; v <= nVerts; ++v) outOff[v] += outOff[v - 1];
   outFlat.resize(halfedges.size());
   outCur.assign(outOff.begin(), outOff.end());
-  for (int i = 0; i < (int)halfedges.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     outFlat[outCur[halfedges[i].origin]++] = i;
   }
   // atan2-free angular comparator: split the plane into two half-planes, then
@@ -277,13 +277,14 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   // 4. Walk face cycles, assign face IDs. Each unmarked halfedge starts a
   //    new face; follow `next` chain back to the start.
   int nFaces = 0;
-  for (int i = 0; i < (int)halfedges.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     if (halfedges[i].face != -1) continue;
     int h = i;
     int safety = 0;
     bool malformed = false;
     do {
-      if (halfedges[h].next == -1 || safety++ > (int)halfedges.size()) {
+      if (halfedges[h].next == -1 ||
+          safety++ > static_cast<int>(halfedges.size())) {
         // Malformed cycle; bail rather than infinite-loop. Indicates an
         // upstream bug (mismatched twin/next pointers from the angular
         // sort, or a non-2-manifold canonical edge set). Surface under
@@ -319,12 +320,12 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   thread_local static std::vector<int> faceStartHE;
   thread_local static std::vector<double> faceArea;
   faceStartHE.assign(nFaces, -1);
-  for (int i = 0; i < (int)halfedges.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     if (halfedges[i].face >= 0 && faceStartHE[halfedges[i].face] == -1)
       faceStartHE[halfedges[i].face] = i;
   }
   faceArea.assign(nFaces, 0.0);
-  for (int i = 0; i < (int)halfedges.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
     if (halfedges[i].face < 0) continue;
     const int faceRefHE = faceStartHE[halfedges[i].face];
     if (faceRefHE < 0) continue;
@@ -354,7 +355,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     }
     // Group halfedges by face, count mults.
     std::map<int, std::map<int, int>> faceMults;
-    for (int i = 0; i < (int)halfedges.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
       faceMults[halfedges[i].face][halfedges[i].mult]++;
     }
     for (auto& [f, m] : faceMults) {
@@ -444,7 +445,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
           bfsQ.push_back(adj);
         }
         hh = halfedges[hh].next;
-        if (hh < 0 || ++safety > (int)halfedges.size()) break;
+        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
       } while (hh != h0);
     }
   };
@@ -479,7 +480,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
           componentQ.push_back(adj);
         }
         hh = halfedges[hh].next;
-        if (hh < 0 || ++safety > (int)halfedges.size()) break;
+        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
       } while (hh != h0);
     }
   };
