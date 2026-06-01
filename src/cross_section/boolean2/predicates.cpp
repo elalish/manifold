@@ -217,7 +217,7 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   // horizontal, one vertical, exactly), so neither axis has both
   // segments contributing spread. Trim-and-Interpolate would degenerate
   // (zero-width overlap interval). Compute only strict interior crossings
-  // directly; endpoint/T-junction contacts are degeneracies for the
+  // directly; endpoint/near-line sliver contacts are degeneracies for the
   // vertex-on-edge phase.
   if (xUsable == 0 && yUsable == 0) {
     const bool aHoriz = aSpreadX > 0 && aSpreadY == 0;
@@ -273,22 +273,10 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   const double bOL = manifold::Interpolate(bL3, bR3, overlapL).x;
   const double bOR = manifold::Interpolate(bL3, bR3, overlapR).x;
 
-  // Intersect closed-form. dyL/dyR are the ortho gaps at the two overlap
-  // boundaries; pick whichever has smaller |dy| as the lambda basepoint for
-  // FP stability.
-  const double dyL = bOL - aOL;
-  const double dyR = bOR - aOR;
-  const bool useL = std::fabs(dyL) < std::fabs(dyR);
-  const double dProj = overlapR - overlapL;
-  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!std::isfinite(lambda)) return false;
-  const double outProj = lambda * dProj + (useL ? overlapL : overlapR);
-  const double aDy = aOR - aOL;
-  const double bDy = bOR - bOL;
-  const bool useA = std::fabs(aDy) < std::fabs(bDy);
-  const double outOrtho = lambda * (useA ? aDy : bDy) +
-                          (useL ? (useA ? aOL : bOL) : (useA ? aOR : bOR));
-  *out = axis == 0 ? vec2(outProj, outOrtho) : vec2(outOrtho, outProj);
+  const vec4 xyzz =
+      manifold::Intersect(vec3(overlapL, aOL, 0.0), vec3(overlapR, aOR, 0.0),
+                          vec3(overlapL, bOL, 0.0), vec3(overlapR, bOR, 0.0));
+  *out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
   return std::isfinite(out->x) && std::isfinite(out->y) &&
          AwayFromEndpoints(*out, a0, a1, eps) &&
          AwayFromEndpoints(*out, b0, b1, eps);

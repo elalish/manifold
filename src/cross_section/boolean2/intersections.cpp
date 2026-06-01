@@ -74,7 +74,7 @@ void SortSmallInts(std::vector<int>* values) {
 }
 
 // Drop shared-endpoint pairs when both non-shared endpoints are more than eps
-// from the opposite edge line; then no T-junction is possible.
+// from the opposite edge line; then no near-line sliver split is possible.
 bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
                                    const std::vector<vec2>& verts, double eps) {
   int vS, wA, wB;
@@ -160,10 +160,10 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
     int numPairs = 0;
     for (int oi = 0; oi < nE; ++oi) {
       const int i = order[oi];
-      const auto& bi = edgeBoxes[i];
+      const Box2& bi = edgeBoxes[i];
       for (int oj = oi + 1; oj < nE; ++oj) {
         const int j = order[oj];
-        const auto& bj = edgeBoxes[j];
+        const Box2& bj = edgeBoxes[j];
         if (bj.min.x > bi.max.x) break;
         if (bi.min.y <= bj.max.y && bi.max.y >= bj.min.y) {
           if (SharedEndpointSafelySkippable(edges[i], edges[j], verts, eps))
@@ -202,16 +202,17 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 #endif
 }
 
-void FindAndInsertIntersections(
-    const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
-    std::vector<std::vector<int>>* lists,
-    std::vector<std::vector<int>>* vertEdges, double eps,
+IntersectionInsertion FindAndInsertIntersections(
+    const std::vector<EdgeM>& edges, std::vector<vec2> verts,
+    std::vector<std::vector<int>> lists, double eps,
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
     const std::vector<IntersectionPoint>& precomputedIntersections) {
   const int nE = static_cast<int>(edges.size());
   const double eps2 = eps * eps;
-  vertEdges->resize(verts->size());
-  const int origNumVerts = static_cast<int>(verts->size());
+  std::vector<std::vector<int>> vertEdges;
+  vertEdges.resize(verts.size());
+  const size_t origNumVerts = verts.size();
+  const int firstNewVert = static_cast<int>(origNumVerts);
 
   // Serial snap+insert pass. Each iteration may push to `verts` and
   // mutate `lists[*]`, so subsequent iterations see the latest state.
@@ -223,7 +224,7 @@ void FindAndInsertIntersections(
     // Snap: is p within eps of any existing vert? Search the union of
     // (i,j)'s endpoints and existing list members of i and j.
     auto nearVert = [&](int candidate) -> bool {
-      vec2 d = p - (*verts)[candidate];
+      vec2 d = p - verts[candidate];
       return dot(d, d) <= eps2;
     };
     int snapTo = -1;
@@ -234,7 +235,7 @@ void FindAndInsertIntersections(
       }
     }
     if (snapTo < 0) {
-      for (int v : (*lists)[i]) {
+      for (int v : lists[i]) {
         if (nearVert(v)) {
           snapTo = v;
           break;
@@ -242,7 +243,7 @@ void FindAndInsertIntersections(
       }
     }
     if (snapTo < 0) {
-      for (int v : (*lists)[j]) {
+      for (int v : lists[j]) {
         if (nearVert(v)) {
           snapTo = v;
           break;
@@ -253,25 +254,25 @@ void FindAndInsertIntersections(
     if (snapTo >= 0) {
       vNew = snapTo;
     } else {
-      vNew = static_cast<int>(verts->size());
-      verts->push_back(p);
-      vertEdges->emplace_back();
+      vNew = static_cast<int>(verts.size());
+      verts.push_back(p);
+      vertEdges.emplace_back();
     }
-    VESetInsert(&(*vertEdges)[vNew], i);
-    VESetInsert(&(*vertEdges)[vNew], j);
+    VESetInsert(&vertEdges[vNew], i);
+    VESetInsert(&vertEdges[vNew], j);
     auto insertSorted = [&](int eIdx) {
       if (vNew == edges[eIdx].v0 || vNew == edges[eIdx].v1) return;
-      auto& lst = (*lists)[eIdx];
+      auto& lst = lists[eIdx];
       if (VESetContains(lst, vNew)) return;
-      vec2 a = (*verts)[edges[eIdx].v0];
-      vec2 b = (*verts)[edges[eIdx].v1];
+      vec2 a = verts[edges[eIdx].v0];
+      vec2 b = verts[edges[eIdx].v1];
       vec2 ab = b - a;
       double abLen2 = dot(ab, ab);
       if (abLen2 == 0) return;
       double tNew = dot(p - a, ab) / abLen2;
       auto pos =
           std::lower_bound(lst.begin(), lst.end(), tNew, [&](int v, double t) {
-            double tv = dot((*verts)[v] - a, ab) / abLen2;
+            double tv = dot(verts[v] - a, ab) / abLen2;
             return tv < t;
           });
       if (pos == lst.end() || *pos != vNew) lst.insert(pos, vNew);
@@ -285,38 +286,39 @@ void FindAndInsertIntersections(
   // geometrically splits. Otherwise a later canonical sub-edge can pass through
   // a new vertex without being split there, leaving the halfedge arrangement
   // dependent on tiny angular-sort differences.
-  if ((int)verts->size() == origNumVerts) return;
-  const int numNewVerts = static_cast<int>(verts->size()) - origNumVerts;
+  if (verts.size() == origNumVerts)
+    return {std::move(verts), std::move(lists), std::move(vertEdges)};
+  const int numNewVerts = static_cast<int>(verts.size() - origNumVerts);
 
   // Per-(qi, eIdx) propagation step. Same logic for BVH and brute-force
   // broad phases.
   auto propagateNarrow = [&](int qi, int eIdx) {
-    const int v = origNumVerts + qi;
+    const int v = firstNewVert + qi;
     if (v == edges[eIdx].v0 || v == edges[eIdx].v1) return;
-    if (VESetContains((*vertEdges)[v], eIdx)) return;  // already incident
-    const vec2 a = (*verts)[edges[eIdx].v0];
-    const vec2 b = (*verts)[edges[eIdx].v1];
+    if (VESetContains(vertEdges[v], eIdx)) return;  // already incident
+    const vec2 a = verts[edges[eIdx].v0];
+    const vec2 b = verts[edges[eIdx].v1];
     const vec2 ab = b - a;
     const double abLen2 = dot(ab, ab);
     if (abLen2 == 0) return;
-    const vec2 p = (*verts)[v];
+    const vec2 p = verts[v];
     const double t = dot(p - a, ab) / abLen2;
     if (t <= 0 || t >= 1) return;
     const vec2 closest = a + ab * t;
     const vec2 d = p - closest;
     if (dot(d, d) > eps2) return;
-    auto& lst = (*lists)[eIdx];
+    auto& lst = lists[eIdx];
     auto pos =
         std::lower_bound(lst.begin(), lst.end(), t, [&](int vv, double tQ) {
-          double tv = dot((*verts)[vv] - a, ab) / abLen2;
+          double tv = dot(verts[vv] - a, ab) / abLen2;
           return tv < tQ;
         });
     if (pos == lst.end() || *pos != v) lst.insert(pos, v);
-    VESetInsert(&(*vertEdges)[v], eIdx);
+    VESetInsert(&vertEdges[v], eIdx);
   };
   if (bvh.leafToOrig.empty()) {
     for (int qi = 0; qi < numNewVerts; ++qi) {
-      const Box2 queryBox = BoxOf2DPoint((*verts)[origNumVerts + qi], eps);
+      const Box2 queryBox = BoxOf2DPoint(verts[firstNewVert + qi], eps);
       for (int e = 0; e < nE; ++e) {
         if (queryBox.DoesOverlap(edgeBoxes[e])) propagateNarrow(qi, e);
       }
@@ -327,10 +329,11 @@ void FindAndInsertIntersections(
     };
     auto recorder = MakeSimpleRecorder(adapter);
     auto qf = [&](int qi) {
-      return BoxOf2DPoint((*verts)[origNumVerts + qi], eps);
+      return BoxOf2DPoint(verts[firstNewVert + qi], eps);
     };
     BVHCollisions(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
   }
+  return {std::move(verts), std::move(lists), std::move(vertEdges)};
 }
 
 }  // namespace boolean2

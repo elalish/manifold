@@ -15,7 +15,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -23,6 +22,7 @@
 
 #include "../../collider.h"
 #include "../../parallel.h"
+#include "manifold/optional_assert.h"
 #include "parallel_policy.h"
 
 namespace manifold {
@@ -100,7 +100,8 @@ inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
       } else {
         node = traverse1 ? child1 : child2;
         if (traverse1 && traverse2) {
-          assert(top + 1 < kBvhTraversalStackCapacity);
+          DEBUG_ASSERT(top + 1 < kBvhTraversalStackCapacity, logicErr,
+                       "Boolean2 BVH traversal stack overflow");
           stack[++top] = child2;
         }
       }

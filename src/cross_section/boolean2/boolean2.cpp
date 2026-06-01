@@ -17,12 +17,12 @@
 #include "boolean2.h"
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <utility>
 #include <vector>
 
 #include "driver.h"
+#include "manifold/optional_assert.h"
 #include "predicates.h"
 #include "winding_filter.h"
 
@@ -30,10 +30,6 @@ namespace manifold {
 namespace boolean2 {
 
 namespace {
-
-double Cross(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
-
-double Dot(vec2 a, vec2 b) { return a.x * b.x + a.y * b.y; }
 
 bool AllFinite(const Polygons& polys) {
   for (const auto& loop : polys) {
@@ -44,18 +40,18 @@ bool AllFinite(const Polygons& polys) {
   return true;
 }
 
-void AccumulateBounds(const Polygons& polys, Rect* box) {
+void AccumulateBounds(const Polygons& polys, Rect& box) {
   for (const auto& loop : polys) {
     for (const vec2& v : loop) {
-      box->Union(v);
+      box.Union(v);
     }
   }
 }
 
 vec2 MakeLocalOrigin(const Polygons& a, const Polygons& b = {}) {
   Rect box;
-  AccumulateBounds(a, &box);
-  AccumulateBounds(b, &box);
+  AccumulateBounds(a, box);
+  AccumulateBounds(b, box);
   return box.IsFinite() ? box.Center() : vec2(0.0);
 }
 
@@ -72,39 +68,42 @@ Polygons TranslatePolygons(const Polygons& polys, vec2 delta) {
 // A zero turn is ordered last so loop tracing does not immediately reverse
 // over the incoming edge when any positive turn is available.
 int CcwTurnGroup(vec2 ref, vec2 dir) {
-  const double cross = Cross(ref, dir);
+  const double cross = la::cross(ref, dir);
   if (cross > 0) return 0;
   if (cross < 0) return 1;
-  return Dot(ref, dir) < 0 ? 0 : 2;
+  return la::dot(ref, dir) < 0 ? 0 : 2;
 }
 
+// Order outgoing candidates for loop extraction by the smallest positive CCW
+// turn from the reverse incoming direction. Collinear ties prefer the nearer
+// endpoint, then stable edge id, so extraction is deterministic.
 bool CcwTurnLess(vec2 ref, vec2 a, int edgeA, vec2 b, int edgeB) {
   const int groupA = CcwTurnGroup(ref, a);
   const int groupB = CcwTurnGroup(ref, b);
   if (groupA != groupB) return groupA < groupB;
 
-  const double cross = Cross(a, b);
+  const double cross = la::cross(a, b);
   if (cross != 0) return cross > 0;
 
-  const double lenA = Dot(a, a);
-  const double lenB = Dot(b, b);
-  if (lenA != lenB) return lenA < lenB;
+  const double dist2A = la::dot(a, a);
+  const double dist2B = la::dot(b, b);
+  if (dist2A != dist2B) return dist2A < dist2B;
   return edgeA < edgeB;
 }
 
 void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
                              const std::vector<int>& loopVerts,
-                             Polygons* polys) {
+                             Polygons& polys) {
   if (loopVerts.size() >= 3) {
     SimplePolygon loop;
     loop.reserve(loopVerts.size());
     for (int v : loopVerts) loop.push_back(verts[v]);
-    polys->push_back(std::move(loop));
+    polys.push_back(std::move(loop));
   }
 }
 
 void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
-                     Polygons* polys) {
+                     Polygons& polys) {
   for (;;) {
     bool split = false;
     for (size_t i = 1; i < loopVerts.size() && !split; ++i) {
@@ -122,21 +121,24 @@ void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
   PushLoopIfNondegenerate(verts, loopVerts, polys);
 }
 
-void AppendInput(const Polygons& polys, int mult, std::vector<vec2>* verts,
-                 std::vector<EdgeM>* edges) {
+void AppendInput(const Polygons& polys, int mult, std::vector<vec2>& verts,
+                 std::vector<EdgeM>& edges) {
   for (const auto& loop : polys) {
     if (loop.size() < 3) continue;
-    const int base = static_cast<int>(verts->size());
+    const int base = static_cast<int>(verts.size());
     const int n = static_cast<int>(loop.size());
-    for (const auto& v : loop) verts->push_back(v);
+    for (const auto& v : loop) verts.push_back(v);
     for (int i = 0; i < n; ++i) {
-      edges->push_back({base + i, base + ((i + 1) % n), mult});
+      edges.push_back({base + i, base + ((i + 1) % n), mult});
     }
   }
 }
 
-Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
+// `bSign` is +1 for Add/Intersect-style accumulation and -1 for Subtract.
+Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bSign,
                         WindRule rule, double eps, double tolerance) {
+  DEBUG_ASSERT(bSign == 1 || bSign == -1, logicErr,
+               "Boolean2 input multiplicity must be +/-1");
   if (!AllFinite(a) || !AllFinite(b)) return {};
   const vec2 origin = MakeLocalOrigin(a, b);
   Polygons localA = TranslatePolygons(a, -origin);
@@ -146,11 +148,11 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bMult,
 
   std::vector<vec2> verts;
   std::vector<EdgeM> edges;
-  AppendInput(localA, 1, &verts, &edges);
-  AppendInput(localB, bMult, &verts, &edges);
+  AppendInput(localA, 1, verts, edges);
+  AppendInput(localB, bSign, verts, edges);
   if (verts.empty()) return {};
 
-  auto r =
+  OverlapResult r =
       RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
   return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), origin);
 }
@@ -167,7 +169,7 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
     const Polygons& polys) {
   std::vector<vec2> verts;
   std::vector<EdgeM> edges;
-  AppendInput(polys, 1, &verts, &edges);
+  AppendInput(polys, 1, verts, edges);
   return {std::move(verts), std::move(edges)};
 }
 
@@ -198,7 +200,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
         closed = true;
         break;
       }
-      if (destV < 0 || destV >= (int)outgoing.size() ||
+      if (destV < 0 || destV >= static_cast<int>(outgoing.size()) ||
           outgoing[destV].empty()) {
         cur = -1;
         break;
@@ -221,11 +223,12 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       cur = next;
     }
     if (!closed) {
-      assert(false && "retained directed edges must form closed walks");
+      DEBUG_ASSERT(false, logicErr,
+                   "retained directed edges must form closed walks");
       continue;
     }
     if (loopVerts.size() >= 3) {
-      PushSimpleLoops(verts, std::move(loopVerts), &polys);
+      PushSimpleLoops(verts, std::move(loopVerts), polys);
     }
   }
   return polys;
@@ -237,15 +240,15 @@ Polygons Simplify(const Polygons& in, double eps, double tolerance) {
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
-// alpha-budget formula. Callers translate to a local frame first.
+// alpha-budget formula. Keep this translation invariant because CrossSection
+// methods call it before localizing coordinates.
 double InferEps(const Polygons& a, const Polygons& b) {
   Rect box;
-  AccumulateBounds(a, &box);
-  AccumulateBounds(b, &box);
+  AccumulateBounds(a, box);
+  AccumulateBounds(b, box);
   if (!box.IsFinite()) return 0.0;
-  const vec2 size = box.Size();
-  const double L = 0.5 * std::max(size.x, size.y);
-  return EpsilonFromScale(L);
+  const vec2 halfSize = 0.5 * box.Size();
+  return EpsilonFromScale(Rect(-halfSize, halfSize).Scale());
 }
 
 // Regularize one Polygons input under an explicit CrossSection fill rule.
@@ -256,10 +259,10 @@ Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
                    double tolerance) {
-  const int bMult = op == OpType::Subtract ? -1 : 1;
+  const int bSign = op == OpType::Subtract ? -1 : 1;
   const WindRule rule =
       op == OpType::Intersect ? WindRule::Intersect : WindRule::Add;
-  return BinaryOpByRule(a, b, bMult, rule, eps, tolerance);
+  return BinaryOpByRule(a, b, bSign, rule, eps, tolerance);
 }
 
 }  // namespace boolean2

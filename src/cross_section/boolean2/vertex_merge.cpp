@@ -197,13 +197,12 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   return {std::move(inputVert2Merged), std::move(verts)};
 }
 
-// vertEdges[v] (filled by FindAndInsertIntersections) and adj[v] (filled
-// by BuildEdgeVertLists) both hold a small set of int ids per vertex.
-// Almost always 2-4 elements; occasionally larger at concurrent
-// intersection points. A sorted std::vector<int> beats a std::set<int>
-// by 5-10x on per-op cost for sets this small (no node allocation, no
-// tree rebalancing, contiguous memory). Helpers keep the "set"
-// semantics: idempotent insert, fast contains, ordered iteration.
+// Per-edge split lists and per-vertex edge-incidence lists both hold small sets
+// of int ids. Almost always 2-4 elements; occasionally larger at concurrent
+// intersection points. A sorted std::vector<int> beats a std::set<int> by 5-10x
+// on per-op cost for sets this small (no node allocation, no tree rebalancing,
+// contiguous memory). Helpers keep the "set" semantics: idempotent insert, fast
+// contains, ordered iteration.
 bool VESetContains(const std::vector<int>& vec, int x) {
   return std::binary_search(vec.begin(), vec.end(), x);
 }

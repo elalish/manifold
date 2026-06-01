@@ -23,7 +23,6 @@
 // gated by MANIFOLD_DEBUG.
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -38,6 +37,7 @@
 #include "../../parallel.h"
 #include "canonicalize.h"
 #include "diagnostics.h"
+#include "manifold/optional_assert.h"
 #include "predicates.h"
 #include "winding_filter.h"
 
@@ -46,6 +46,8 @@ namespace boolean2 {
 
 namespace {
 
+// Ray-cast seeds are sampled just inside a face. These caps keep the sample
+// close to its boundary halfedge without turning into another merge tolerance.
 constexpr double kSeedStepCoordScaleUlps = 16.0;
 constexpr double kSeedStepEpsFraction = 0.25;
 constexpr double kSeedStepEdgeLengthFraction = 1e-3;
@@ -303,7 +305,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     }
 #endif
     if (malformed) {
-      assert(false && "malformed halfedge cycle");
+      DEBUG_ASSERT(false, logicErr, "malformed halfedge cycle");
       return {};
     }
     ++nFaces;
@@ -451,12 +453,12 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   thread_local static std::vector<int> componentQ;
   thread_local static std::vector<int> componentFaces;
   thread_local static std::vector<uint8_t> componentSeen;
-  thread_local static std::vector<uint8_t> componentLocalOuter;
+  thread_local static std::vector<uint8_t> islandOuterFace;
   componentQ.clear();
   componentFaces.clear();
   componentSeen.assign(nFaces, 0);
-  componentLocalOuter.assign(nFaces, 0);
-  componentLocalOuter[outerFace] = 1;
+  islandOuterFace.assign(nFaces, 0);
+  islandOuterFace[outerFace] = 1;
   auto collectComponent = [&](int seed) {
     componentQ.clear();
     componentFaces.clear();
@@ -488,7 +490,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
       for (int cf : componentFaces) {
         if (faceArea[cf] < faceArea[localOuter]) localOuter = cf;
       }
-      componentLocalOuter[localOuter] = 1;
+      islandOuterFace[localOuter] = 1;
       seedRayCast(localOuter);
       propagateFrom(localOuter);
     }
@@ -519,11 +521,12 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const int leftFace = halfedges[hA].face;
     const int rightFace = halfedges[hB].face;
     if (leftFace < 0 || rightFace < 0) continue;
-    // A component's local outer cycle can be split by other components;
-    // classify the side adjacent to this edge instead of reusing one propagated
-    // winding.
+    // For a disconnected island, the face outside that island is not one
+    // globally uniform region under NonZero; other islands can lie in different
+    // parts of it. Recast next to the queried halfedge so classification uses
+    // the side adjacent to this edge.
     const auto faceWindingAtHalfedge = [&](int face, int halfedge) {
-      if (rule == WindRule::NonZero && componentLocalOuter[face]) {
+      if (rule == WindRule::NonZero && islandOuterFace[face]) {
         return castFaceHalfedge(halfedge);
       }
       return faceWind[face];

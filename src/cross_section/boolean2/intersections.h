@@ -37,10 +37,15 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 // snapped intersection vertex in `vertEdges`; nearby-intersection merge uses
 // that incidence to distinguish unrelated near vertices from vertices that
 // share an intersection source.
-void FindAndInsertIntersections(
-    const std::vector<EdgeM>& edges, std::vector<vec2>* verts,
-    std::vector<std::vector<int>>* lists,
-    std::vector<std::vector<int>>* vertEdges, double eps,
+struct IntersectionInsertion {
+  std::vector<vec2> verts;
+  std::vector<std::vector<int>> lists;
+  std::vector<std::vector<int>> vertEdges;
+};
+
+IntersectionInsertion FindAndInsertIntersections(
+    const std::vector<EdgeM>& edges, std::vector<vec2> verts,
+    std::vector<std::vector<int>> lists, double eps,
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
     const std::vector<IntersectionPoint>& precomputedIntersections);
 
