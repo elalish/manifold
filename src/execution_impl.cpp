@@ -14,6 +14,12 @@
 
 #include "execution_impl.h"
 
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+#include <chrono>
+#include <cstring>
+#include <iostream>
+#endif
+
 #include "impl.h"
 #include "manifold/manifold.h"
 #include "manifold/mesh.h"
@@ -30,10 +36,28 @@ void ResetForStaticFactory(ExecutionContext::Impl* ctx, int totalPhases) {
   ctx->donePhases.store(0, std::memory_order_relaxed);
   ctx->totalBooleans.store(0, std::memory_order_relaxed);
   ctx->totalPhases.store(totalPhases, std::memory_order_relaxed);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  ctx->lastPhase = std::chrono::high_resolution_clock::now();
+#endif
 }
 
 }  // namespace
 namespace manifold {
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line) {
+  const auto now = std::chrono::high_resolution_clock::now();
+  if (ManifoldParams().verbose >= 2) {
+    const double ms =
+        std::chrono::duration<double, std::milli>(now - ctx->lastPhase).count();
+    const char* slash = std::strrchr(file, '/');
+    std::cout << "  phase " << ctx->donePhases.load(std::memory_order_relaxed)
+              << " (" << (slash ? slash + 1 : file) << ":" << line
+              << ") = " << ms << " ms" << std::endl;
+  }
+  ctx->lastPhase = now;
+}
+#endif
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}
 ExecutionContext::~ExecutionContext() = default;
