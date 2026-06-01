@@ -57,6 +57,10 @@ void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line) {
   }
   ctx->lastPhase = now;
 }
+
+void BeginPhaseTiming(ExecutionContext::Impl* ctx) {
+  if (ctx) ctx->lastPhase = std::chrono::high_resolution_clock::now();
+}
 #endif
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}

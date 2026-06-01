@@ -13,11 +13,13 @@
 // limitations under the License.
 //
 // Prints per-phase wall-clock timings on representative workloads for the
-// eager ops that carry phase instrumentation: Boolean3 (its own Timers) and
-// the ADVANCE_PHASE_OR_RETURN ops driven through an ExecutionContext -
-// LevelSet, FromMesh ingest, and Smooth. Requires MANIFOLD_TIMING=ON (or
-// MANIFOLD_DEBUG=ON). Used for cancel-latency analysis and identifying dominant
-// phases.
+// eager ops that carry phase instrumentation, all driven through an
+// ExecutionContext (phases only record with a ctx attached): Boolean, LevelSet,
+// FromMesh ingest, and Smooth. Boolean's Result stage reports through the
+// shared phase timing like the others; its intersection stage keeps its own
+// Timers (a P/Q sub-op breakdown, not sequential phases). Requires
+// MANIFOLD_TIMING=ON (or MANIFOLD_DEBUG=ON). Used for cancel-latency analysis
+// and identifying dominant phases.
 
 #include <algorithm>
 #include <chrono>
@@ -33,7 +35,10 @@ using namespace manifold;
 
 namespace {
 // Runs one boolean op of each kind (Add, Subtract, Intersect) against the
-// same input pair. Each is a single boolean so Timer output is clean.
+// same input pair, each through a fresh ExecutionContext so Result's per-phase
+// timing prints (phases only record with a ctx attached). One boolean per op
+// keeps the breakdown readable; the intersection stage's own Timers print
+// alongside.
 void BenchAll(const std::string& workload, const Manifold& a,
               const Manifold& b) {
   struct Op {
@@ -49,8 +54,9 @@ void BenchAll(const std::string& workload, const Manifold& a,
     std::cout << "=== " << workload << ": " << op.name
               << ", nTri(a) = " << a.NumTri() << " ===" << std::endl;
     auto t0 = std::chrono::high_resolution_clock::now();
-    Manifold result = op.apply(a, b);
-    result.NumTri();
+    ExecutionContext ctx;
+    Manifold result = op.apply(a, b).WithContext(ctx);
+    result.Status();  // force evaluation under ctx so phases time and print
     auto t1 = std::chrono::high_resolution_clock::now();
     std::cout << "total = " << std::chrono::duration<double>(t1 - t0).count()
               << " sec\n"

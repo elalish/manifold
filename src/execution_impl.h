@@ -119,6 +119,10 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 // defined in execution_impl.cpp so <chrono>/<iostream> stay out of this
 // widely-included header.
 void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line);
+// Seeds the per-phase timing baseline (`lastPhase`) for phased paths that do
+// not go through the static-factory reset - notably Boolean3::Result, whose
+// phase() lambda records via MANIFOLD_RECORD_PHASE_AT. No-op if ctx is null.
+void BeginPhaseTiming(ExecutionContext::Impl* ctx);
 #endif
 
 }  // namespace manifold
@@ -131,8 +135,17 @@ void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 #define MANIFOLD_RECORD_PHASE(ctx) \
   manifold::RecordPhase((ctx), __FILE__, __LINE__)
+// Like MANIFOLD_RECORD_PHASE, but attributes the boundary to an explicit
+// source line - for a shared phase() helper called from many sites (e.g.
+// Boolean3::Result's lambda) that would otherwise all report the helper's own
+// line. Caller guards on ctx; RecordPhase does not null-check.
+#define MANIFOLD_RECORD_PHASE_AT(ctx, line) \
+  manifold::RecordPhase((ctx), __FILE__, (line))
+#define MANIFOLD_BEGIN_PHASE_TIMING(ctx) manifold::BeginPhaseTiming((ctx))
 #else
 #define MANIFOLD_RECORD_PHASE(ctx) ((void)0)
+#define MANIFOLD_RECORD_PHASE_AT(ctx, line) ((void)(ctx), (void)(line))
+#define MANIFOLD_BEGIN_PHASE_TIMING(ctx) ((void)(ctx))
 #endif
 
 #define ADVANCE_PHASE_OR_RETURN(ctx)                             \
