@@ -23,6 +23,31 @@
 
 using namespace manifold;
 
+#if MANIFOLD_PAR == 1
+namespace {
+// Sense-reversing spin barrier (std::barrier is C++20). Lazy CSG-node
+// realization is one-shot, so all workers must first-touch a shared node
+// together to race deterministically under ThreadSanitizer. Used by the
+// concurrent-shared-node tests below.
+struct SpinBarrier {
+  const int n;
+  std::atomic<int> arrived{0};
+  std::atomic<int> generation{0};
+  explicit SpinBarrier(int n) : n(n) {}
+  void Sync() {
+    const int gen = generation.load(std::memory_order_acquire);
+    if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 == n) {
+      arrived.store(0, std::memory_order_release);
+      generation.fetch_add(1, std::memory_order_acq_rel);
+    } else {
+      while (generation.load(std::memory_order_acquire) == gen)
+        std::this_thread::yield();
+    }
+  }
+};
+}  // namespace
+#endif
+
 /**
  * The very simplest Boolean operation test.
  */
@@ -847,6 +872,84 @@ TEST(Boolean, BatchBooleanComposeMeshIDStable) {
   EXPECT_EQ(orphans.load(), 0)
       << "Compose produced runs with originalID = -1; indicates a "
          "non-atomic meshIDCounter_ snapshot.";
+}
+
+// Regression: a CSG leaf is realized lazily on first const access -
+// CsgLeafNode::GetImpl rewrites pImpl_/transform_. A Manifold and its copies
+// share the node but not its lock, so two threads realizing one shared node at
+// once tore the meshID mapping and faces came back with originalID = -1.
+TEST(Boolean, ConcurrentSharedNodeOriginalIDStable) {
+  constexpr int kThreads = 8;
+  constexpr int kRounds = 256;
+  // Each view shares original's realized Impl with a pending transform, so its
+  // first touch realizes it - the contended write.
+  const Manifold original = Manifold::Cube(vec3(2)).AsOriginal();
+  const auto origID = static_cast<uint32_t>(original.OriginalID());
+  const size_t expectTri = original.NumTri();
+  std::vector<Manifold> shared;
+  shared.reserve(kRounds);
+  for (int r = 0; r < kRounds; ++r)
+    shared.push_back(original.Translate({0.1 * r, 0, 0}));
+
+  SpinBarrier barrier(kThreads);
+  std::atomic<int> bad{0};
+  auto worker = [&]() {
+    for (int r = 0; r < kRounds; ++r) {
+      barrier.Sync();
+      const MeshGL m = shared[r].GetMeshGL();
+      if (m.NumTri() != expectTri) ++bad;
+      // A transformed view keeps the original's per-face id in runOriginalID.
+      for (uint32_t orig : m.runOriginalID)
+        if (orig != origID) ++bad;  // includes the -1 (UINT32_MAX) collapse
+    }
+  };
+  std::vector<std::thread> ts;
+  for (int t = 0; t < kThreads; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(bad.load(), 0)
+      << "concurrent realization of a shared CSG leaf corrupted originalID or "
+         "the mesh; also flagged as a data race under ThreadSanitizer.";
+}
+
+// Companion for CsgOpNode's lazy-eval cache_: a shared, unevaluated op node is
+// evaluated by all threads at once via per-thread Manifold copies (which share
+// pNode_ but get their own pNodeMutex_). Without the guarded cache_
+// read/publish the concurrent evaluation tears the result.
+TEST(Boolean, ConcurrentSharedOpNodeOriginalIDStable) {
+  constexpr int kThreads = 8;
+  constexpr int kRounds = 256;
+  const Manifold a = Manifold::Cube(vec3(2)).AsOriginal();
+  // Disjoint union: each result keeps runs from both originals, none collapsed.
+  std::vector<Manifold> shared;
+  shared.reserve(kRounds);
+  for (int r = 0; r < kRounds; ++r)
+    shared.push_back(
+        a + Manifold::Cube(vec3(0.2)).Translate({10.0 + 0.1 * r, 0, 0}));
+  // Probe a throwaway union so the shared nodes stay unevaluated until the
+  // race.
+  const size_t expectTri =
+      (a + Manifold::Cube(vec3(0.2)).Translate({10, 0, 0})).NumTri();
+
+  SpinBarrier barrier(kThreads);
+  std::atomic<int> bad{0};
+  auto worker = [&]() {
+    for (int r = 0; r < kRounds; ++r) {
+      Manifold m = shared[r];  // copy shares the op node, own pNodeMutex_
+      barrier.Sync();
+      const MeshGL mesh = m.GetMeshGL();
+      if (mesh.NumTri() != expectTri) ++bad;
+      for (uint32_t orig : mesh.runOriginalID)
+        if (orig == std::numeric_limits<uint32_t>::max()) ++bad;  // -1 collapse
+    }
+  };
+  std::vector<std::thread> ts;
+  for (int t = 0; t < kThreads; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(bad.load(), 0)
+      << "concurrent evaluation of a shared CsgOpNode corrupted originalID or "
+         "the mesh; also flagged as a data race under ThreadSanitizer.";
 }
 #endif  // MANIFOLD_PAR == 1
 
