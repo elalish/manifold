@@ -324,18 +324,23 @@ NB_MODULE(manifold3d, m) {
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
       .def("winding_number",
-           nb::overload_cast<vec3>(&Manifold::WindingNumber), nb::arg("point"),
+           static_cast<int (Manifold::*)(vec3) const>(
+               &Manifold::WindingNumber),
+           nb::arg("point"),
            "Returns the winding number of this manifold around the given "
            "point. 0 means outside, non-zero means inside.")
       .def("winding_number",
-           nb::overload_cast<const std::vector<vec3>&>(&Manifold::WindingNumber),
+           static_cast<std::vector<int> (Manifold::*)(
+               const std::vector<vec3>&) const>(&Manifold::WindingNumber),
            nb::arg("points"),
            "Returns the winding number for each point in the list.")
-      .def("contains", nb::overload_cast<vec3>(&Manifold::Contains),
+      .def("contains",
+           static_cast<bool (Manifold::*)(vec3) const>(&Manifold::Contains),
            nb::arg("point"),
            "Returns True if the given point is inside this manifold.")
       .def("contains",
-           nb::overload_cast<const std::vector<vec3>&>(&Manifold::Contains),
+           static_cast<std::vector<bool> (Manifold::*)(
+               const std::vector<vec3>&) const>(&Manifold::Contains),
            nb::arg("points"),
            "Returns a list of bools indicating containment for each point.")
       .def("calculate_normals", &Manifold::CalculateNormals,

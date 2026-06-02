@@ -346,6 +346,7 @@ TEST(Manifold, WindingMatchesRayCastParity) {
     const size_t hits = cube.RayCast(p, far).size();
     const bool byParity = (hits % 2) == 1;
     const bool byWinding = cube.Contains(p);
-    EXPECT_EQ(byWinding, byParity) << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
+    EXPECT_EQ(byWinding, byParity)
+        << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
   }
 }

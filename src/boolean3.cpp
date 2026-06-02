@@ -594,9 +594,10 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
     pointImpl.vertPos_[i] = points[active[i]];
 
   // expandP=false: no symbolic perturbation from the query side (zero normals).
-  // forward=true: project along +Z to count signed face crossings above each point.
-  // f returns vec3 → collider uses DoesOverlap(vec3), which is XY-projected,
-  // so all faces with XY overlap are returned regardless of Z (correct for +Z winding).
+  // forward=true: project along +Z to count signed face crossings above each
+  // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
+  // XY-projected, so all faces with XY overlap are returned regardless of Z
+  // (correct for +Z winding).
   Kernel02<false, true> k02{pointImpl, *this};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
@@ -606,7 +607,8 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
-  collider_.Collisions<false>(recorder, f, static_cast<int>(active.size()), true);
+  collider_.Collisions<false>(recorder, f,
+                              static_cast<int>(active.size()), true);
   return winding;
 }
 
