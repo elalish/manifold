@@ -1,3 +1,4 @@
+// Volume: 31945.078370375744, SurfaceArea: 9186.79158096168
 // Viewport test
 $vpr = [75, 0, 45];   // rotated 75° on X, 45° on Z — angled view
 $vpt = [0, 0, 10];    // look at a point slightly above the origin

@@ -53,6 +53,7 @@ async function getCompiledManifoldProperties(
           const jsonMatch = stdout.match(/(\{.*\})/s);
           const jsonStr = jsonMatch?.[1];
           if (!jsonStr) throw new Error('No JSON found in output');
+          if (stderr) console.log("Worker stderr:", stderr);
           resolve(JSON.parse(jsonStr));
         } catch {
           reject(new Error(`Bad JSON from worker.\nstdout: ${stdout}\nstderr: ${stderr}`));
@@ -105,7 +106,11 @@ suite('Single Compiled Example', async () => {
     const compiledFile = fileName.replace(".scad", ".ts").replace("examples", "out");
     const { volume: compiledVolume, surfaceArea: compiledSurfaceArea } = await getCompiledManifoldProperties(compiledFile);
 
-    expectApproximatelyEqual(volume, compiledVolume, 0.2);
-    expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, 0.2);
+    const tolerance = 0.001;
+
+    console.log(`expected volume: ${volume}, recieved volume: ${compiledVolume}`);
+    expectApproximatelyEqual(volume, compiledVolume, tolerance);
+    console.log(`expected surfaceArea: ${surfaceArea}, recieved surfaceArea: ${compiledSurfaceArea}`);
+    expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, tolerance);
   });
 });

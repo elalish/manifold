@@ -5,6 +5,9 @@
  */
 import Module from "manifold-3d";
 import * as opentype from "opentype.js";
+import { createCanvas, loadImage } from "canvas";
+
+const opentypeParse = opentype.parse || (opentype as any).default?.parse;
 
 declare const document: any;
 declare const OffscreenCanvas: any;
@@ -283,9 +286,16 @@ function __safe_offset2d(shape: any, delta: any, joinType = "Round", miterLimit 
   return shape;
 }
 
-function __safe_project3d(shape: any) {
+function __safe_project3d(shape: any, cut = false) {
   try {
-    if (shape && typeof shape.project === "function") return shape.project();
+    if (shape) {
+      if (cut && typeof shape.slice === "function") {
+        return shape.slice(0);
+      }
+      if (typeof shape.project === "function") {
+        return shape.project();
+      }
+    }
   } catch {}
   return CrossSection.square(0);
 }
@@ -585,43 +595,158 @@ function __minkowski_convex_chain3d(items: any[]) {
   return acc;
 }
 
-// Minkowski sum: native API when available; otherwise use a convex approximation.
 function __minkowski2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
-  if (valid.length === 0) return Manifold.union([]);
-  if (valid.length === 1) return valid[0];
-  if (__is2D(valid[0])) return CrossSection.hull(valid); // 2D: no minkowski in CrossSection
+  if (valid.length === 0)
+    return Manifold.union([]);
+  if (valid.length === 1)
+    return valid[0];
 
-  // Some manifold-3d builds do not expose any minkowski API.
-  const first = valid[0];
-  const hasInstanceMinkowski = first && typeof first.minkowskiSum === "function";
-  const hasStaticMinkowski = typeof Manifold.minkowskiSum === "function";
-  if (!hasInstanceMinkowski && !hasStaticMinkowski) {
-    if (valid.every(__is_likely_convex3d)) {
-      try {
-        return __minkowski_convex_chain3d(valid);
-      } catch (_err) {
-        // Fall through to last-resort behavior.
-      }
-    }
-    return Manifold.hull(valid);
+  // Check ALL items upfront
+  for (const item of valid) {
+    if (__is2D(item))
+      throw new Error("2D minkowski not implemented");
+    if (typeof item.minkowskiSum !== "function")
+      throw new Error("Your manifold-3d build does not expose minkowskiSum");
   }
 
   let acc = valid[0];
   for (let i = 1; i < valid.length; i++) {
-    acc = hasInstanceMinkowski ? acc.minkowskiSum(valid[i]) : Manifold.minkowskiSum(acc, valid[i]);
+    acc = acc.minkowskiSum(valid[i]);
   }
   return acc;
 }
 
-function __extrude(shape: any, height = 1, options: { twist?: number, nDivisions?: number, scale?: any, center?: boolean } = {}) {
+function __normalizeScale(scale: number | number[] | undefined): [number, number] | undefined {
+  if (scale === undefined) return undefined;
+  const [sx, sy] = Array.isArray(scale)
+    ? [scale[0], scale[1]]
+    : [scale, scale];
+  return [Math.max(0, sx as number), Math.max(0, sy as number)];
+}
+
+function __getDiagonalSlices(maxDeltaSqr: number, height: number, fn: number, fs: number): number {
+  if (fn > 0) return fn;
+  return Math.ceil(Math.sqrt(maxDeltaSqr + height * height) / fs);
+}
+
+function __getHelixSlices(rSqr: number, height: number, twist: number, fn: number, fa: number, fs: number, fe: number): number {
+  const minSlices = Math.max(Math.ceil(twist / 120), 1);
+
+  if (fn > 0) {
+    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
+  }
+
+  if (fe > 0) {
+    const r = Math.sqrt(rSqr);
+    const twistRad = (twist * Math.PI) / 180;
+    const circumference = r * twistRad;
+    return Math.max(Math.ceil(circumference / fe), minSlices);
+  }
+
+  const twistRad = (twist * Math.PI) / 180;
+
+  const helixLength = Math.sqrt(rSqr * twistRad * twistRad + height * height);
+
+  const faSlices = Math.ceil(twist / fa);
+  const fsSlices = Math.ceil(helixLength / fs);
+
+  return Math.max(Math.min(faSlices, fsSlices), minSlices);
+}
+
+function __getConicalHelixSlices(rSqr: number, height: number, twist: number, scale: number, fn: number, fa: number, fs: number): number {
+  const minSlices = Math.max(Math.ceil(twist / 120), 1);
+
+  if (fn > 0) {
+    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
+  }
+
+  const r = Math.sqrt(rSqr);
+  const twistRad = (twist * Math.PI) / 180;
+
+  const rEnd = r * scale;
+  const rMid = (r + rEnd) / 2;
+  const dh = height / (twist / 360);
+  const helixLength = Math.sqrt(
+    rMid * rMid * twistRad * twistRad + height * height
+  );
+
+  const faSlices = Math.ceil(twist / fa);
+  const fsSlices = Math.ceil(helixLength / fs);
+
+  return Math.max(Math.min(faSlices, fsSlices), minSlices);
+}
+
+function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[]; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
+  if (options.slices !== undefined) {
+    return Math.max(1, options.slices);
+  }
+
+  const twist = Math.abs(options.twist ?? 0);
+  const fn = options.fn ?? 0;
+  const fa = options.fa ?? 12;
+  const fs = options.fs ?? 2;
+  const fe = options.fe ?? 0;
+
+  const normScale = __normalizeScale(options.scale);
+  const sx = normScale?.[0] ?? 1;
+  const sy = normScale?.[1] ?? 1;
+
+  const isNonUniformScale = sx !== sy;
+  const isUniformScale = sx === sy && sx !== 1;
+
+  let rSqr = 1;
+  try {
+    const box = shape.bounds();
+    const dx = box.max[0] - box.min[0];
+    const dy = box.max[1] - box.min[1];
+    rSqr = Math.pow(Math.max(dx, dy) / 2, 2);
+  } catch {
+    rSqr = 100;
+  }
+
+  const maxDeltaSqr = rSqr * Math.pow(Math.max(Math.abs(sx - 1), Math.abs(sy - 1)), 2);
+
+  if (twist === 0) {
+    if (isNonUniformScale) {
+      return __getDiagonalSlices(maxDeltaSqr, height, fn, fs);
+    }
+    return 1;
+  }
+
+  if (isNonUniformScale) {
+    const diag = __getDiagonalSlices(maxDeltaSqr, height, fn, fs);
+    const helix = __getHelixSlices(rSqr, height, twist, fn, fa, fs, fe);
+    return Math.max(diag, helix);
+  }
+
+  if (isUniformScale) {
+    return __getConicalHelixSlices(rSqr, height, twist, sx, fn, fa, fs);
+  }
+
+  return __getHelixSlices(rSqr, height, twist, fn, fa, fs, fe);
+}
+
+function __extrude(shape: any, height = 1, options: {twist?: number; scale?: number | number[]; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
-  if (__is2D(shape)) {
-    return shape.extrude(height, options.nDivisions, options.twist, options.scale, options.center);
+
+  if (!__is2D(shape)) {
+    return shape;
   }
-  return shape;
+
+  const normScale = __normalizeScale(options.scale);
+
+  const nDivisions = __computeExtrudeDivisions(shape, height, { ...options, scale: normScale });
+
+  return shape.extrude(
+    height,
+    Math.max(0, nDivisions - 1),
+    options.twist !== undefined ? Math.abs(options.twist) : undefined,
+    normScale,
+    options.center
+  );
 }
 
 function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
@@ -662,39 +787,34 @@ function __sampleCubic(x0: number, y0: number, x1: number, y1: number, x2: numbe
 }
 
 function __pathToContours(commands: any[], fn: number): [number, number][][] {
-  const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 8);
+  const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 4);
   const contours: [number, number][][] = [];
   let current: [number, number][] | null = null;
-  let cx = 0, cy = 0; // current point (Y-up coords)
  
   for (const cmd of commands) {
     switch (cmd.type) {
       case "M": // Move to — starts a new contour
         if (current && current.length >= 3) contours.push(current);
-        cx = cmd.x; cy = -cmd.y;
-        current = [[cx, cy]];
+        current = [[cmd.x, cmd.y]];
         break;
  
       case "L": // Line to
-        cx = cmd.x; cy = -cmd.y;
-        current?.push([cx, cy]);
+        current?.push([cmd.x, cmd.y]);
         break;
  
       case "Q": { // Quadratic bezier
         if (!current) break;
         const prev = current[current.length - 1]!;
-        const pts = __sampleQuadratic(prev[0], -prev[1], cmd.x1, -cmd.y1, cmd.x, cmd.y, steps);
-        for (const [px, py] of pts) current.push([px, -py]);
-        cx = cmd.x; cy = -cmd.y;
+        const pts = __sampleQuadratic(prev[0], prev[1], cmd.x1, cmd.y1, cmd.x, cmd.y, steps);
+        for (const [px, py] of pts) current.push([px, py]);
         break;
       }
  
       case "C": { // Cubic bezier
         if (!current) break;
         const prev = current[current.length - 1]!;
-        const pts = __sampleCubic(prev[0], -prev[1], cmd.x1, -cmd.y1, cmd.x2, -cmd.y2, cmd.x, cmd.y, steps);
-        for (const [px, py] of pts) current.push([px, -py]);
-        cx = cmd.x; cy = -cmd.y;
+        const pts = __sampleCubic(prev[0], prev[1], cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y, steps);
+        for (const [px, py] of pts) current.push([px, py]);
         break;
       }
  
@@ -705,7 +825,7 @@ function __pathToContours(commands: any[], fn: number): [number, number][][] {
     }
   }
   if (current && current.length >= 3) contours.push(current);
-  return contours;
+  return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
 }
 
 const __opentypeFontCache = new Map<string, any>();
@@ -721,40 +841,69 @@ function __getOpentypeFont(base64DataUrl: string): any | undefined {
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
-    const font = opentype.parse(bytes.buffer as ArrayBuffer);
+    const font = opentypeParse(bytes.buffer as ArrayBuffer);
     __opentypeFontCache.set(base64DataUrl, font);
     return font;
-  } catch {
+  } catch (e) {
+    console.log("err: ", e);
     return undefined;
   }
 }
 
 function __opentypeGlyphContours(ch: string, font: any, size: number, fn: number): { contours: [number, number][][]; width: number } | undefined {
+  const fontSize = size * 100 / 72;
+
   if (ch === " ") {
     const spaceGlyph = font.charToGlyph(" ");
-    const scale = size / font.unitsPerEm;
-    const spaceWidth = (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
-    return { contours: [], width: spaceWidth };
+
+    const scale = fontSize / font.unitsPerEm;
+
+    const spaceWidth =
+      (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
+
+    return {
+      contours: [],
+      width: spaceWidth
+    };
   }
 
   const glyph = font.charToGlyph(ch);
-  if (!glyph || glyph.index === 0) return undefined;
 
-  const scale = size / font.unitsPerEm;
-  const advance = (glyph.advanceWidth ?? 0) * scale;
-  const glyphPath = glyph.getPath(0, 0, size);
+  if (!glyph || glyph.index === 0) {
+    return undefined;
+  }
+
+  const scale = fontSize / font.unitsPerEm;
+
+  const advance =
+    (glyph.advanceWidth ?? 0) * scale;
+
+  const glyphPath = glyph.getPath(
+    0,
+    0,
+    fontSize
+  );
+
   const commands = glyphPath.commands;
 
   if (!commands || commands.length === 0) {
-    return { contours: [], width: advance };
+    return {
+      contours: [],
+      width: advance
+    };
   }
 
   const contours = __pathToContours(commands, fn);
-  return { contours, width: advance };
+
+  return {
+    contours,
+    width: advance
+  };
 }
 
 function __opentypeTextContours(chars: string[], size: number, spacing: number, direction: string, fontBase64: string, fn: number): [number, number][][] | undefined {
   const font = __getOpentypeFont(fontBase64);
+  
   if (!font) return undefined;
 
   const contours: [number, number][][] = [];
@@ -851,7 +1000,7 @@ function __canvasGlyphContours(ch: string, font: string, size: number): { contou
     }
   }
 
-  const scale = size / px;
+  const scale = (size * 100 / 72) / px;
   const result = { contours: [] as [number, number][][], width: Math.max(1, metrics.width) * scale };
   if (maxX < minX || maxY < minY) {
     __canvasGlyphCache.set(cacheKey, result);
@@ -922,10 +1071,18 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
 
   contours = __canvasTextContours(chars, size, spacing, dir, font);
 
+  if (!fontBase64Data) console.log("fontBase64Data is undefined");
+  else console.log("fontBase64Data is defined");
+  console.log("canvas contours:", contours?.length);
+
   if (!contours && fontBase64Data) {
     contours = __opentypeTextContours(chars, size, spacing, dir, fontBase64Data, fn);
   }
-  if (!contours || contours.length === 0) return CrossSection.square([0.001, 0.001], false);
+  console.log("opentype contours:", contours?.length);
+  if (!contours || contours.length === 0) {
+    console.log("returning simple square");
+    return CrossSection.square([0.001, 0.001], false);
+  }
 
   let left = Infinity, right = -Infinity, top = -Infinity, bottom = Infinity;
   for (const c of contours) {
@@ -948,7 +1105,7 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
   else if (valign === "bottom") dy = -bottom;
 
   const shifted = contours.map(c => c.map(([x, y]): [number, number] => [x + dx, y + dy]));
-  return CrossSection.ofPolygons(shifted);
+  return CrossSection.ofPolygons(shifted, 'EvenOdd');
 }
 
 function __sync_quality(fa: any, fs: any) {
@@ -1119,17 +1276,78 @@ function __mirror(shape: any, v: any) {
 }
 
 function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
-  if (fn <= 0) {
-    __sync_quality(fa, fs);
+  let N: number;
+  if (fn > 0) {
+    N = Math.max(3, Math.ceil(fn));
+  } else {
+    const N_fa = 360 / fa;
+    const N_fs = (2 * Math.PI * radius) / fs;
+    N = Math.ceil(Math.max(Math.min(N_fa, N_fs), 5));
   }
-  return Manifold.sphere(radius, fn);
+
+  const R = Math.floor((N + 1) / 2);
+
+  const verts: number[] = [];
+  const tris: number[] = [];
+
+  // Generate rings
+  const rings: number[][] = [];
+  for (let i = 0; i < R; i++) {
+    const phi = (Math.PI * (i + 0.5)) / R;
+    const ring_r = radius * Math.sin(phi);
+    const z = radius * Math.cos(phi);
+    const ring: number[] = [];
+    for (let j = 0; j < N; j++) {
+      const theta = (2 * Math.PI * j) / N;
+      ring.push(verts.length / 3);
+      verts.push(ring_r * Math.cos(theta), ring_r * Math.sin(theta), z);
+    }
+    rings.push(ring);
+  }
+
+  // Top cap: flat triangulation of first ring
+  const top = rings[0]!;
+  for (let j = 1; j < N - 1; j++) {
+    tris.push(top[0]!, top[j]!, top[j + 1]!);
+  }
+
+  // Middle bands
+  for (let r = 0; r < R - 1; r++) {
+    const lo = rings[r]!;
+    const hi = rings[r + 1]!;
+    for (let j = 0; j < N; j++) {
+      const jn = (j + 1) % N;
+      tris.push(lo[j]!, hi[j]!, hi[jn]!);
+      tris.push(lo[j]!, hi[jn]!, lo[jn]!);
+    }
+  }
+
+  // Bottom cap: flat triangulation of last ring
+  const bot = rings[R - 1]!;
+  for (let j = 1; j < N - 1; j++) {
+    tris.push(bot[0]!, bot[j + 1]!, bot[j]!);
+  }
+
+  const mesh: any = {
+    vertProperties: new Float32Array(verts),
+    triVerts: new Uint32Array(tris),
+    numProp: 3,
+  };
+
+  const sphere = new Manifold(mesh);
+  
+  return sphere;
 }
 
-function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, circularSegments = 0, center = false, fa = 12, fs = 2) {
-  if (circularSegments <= 0) {
-    __sync_quality(fa, fs);
+function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0, center = false, fa = 12, fs = 2) {
+  let segs = fn;
+  if (segs <= 0) {
+    const r = Math.max(radiusLow, radiusHigh < 0 ? radiusLow : radiusHigh);
+    const N_fa = 360 / fa;
+    const N_fs = (2 * Math.PI * r) / fs;
+    segs = Math.ceil(Math.max(Math.min(N_fa, N_fs), 5));
   }
-  return Manifold.cylinder(height, radiusLow, radiusHigh, circularSegments, center);
+  return Manifold.cylinder(height, radiusLow, radiusHigh, segs, center);
 }
 
 function __circle(radius: number, circularSegments = 0, fa = 12, fs = 2) {
@@ -1209,6 +1427,132 @@ function __parse_color_for_scope(c: any, alpha: any): any {
   return [base[0], base[1], base[2], a];
 }
 
+async function __surface(dataUrl: string, opts: { center?: boolean; fn?: number; fa?: number; fs?: number } = {}) {
+  const { center = false } = opts;
+  const { width, height, data } = await decodeImageToPixels(dataUrl);
+
+  // Build height values (0–100) from grayscale (OpenSCAD: black (0) → 0, white (255) → 100)
+  const Z = (x: number, y: number): number => {
+    const row = y;
+    const i = (row * width + x) * 4;          // RGBA offset
+    const gray = 0.2126 * data![i]! + 0.7152 * data![i + 1]! + 0.0722 * data![i + 2]!;
+    return (gray / 255) * 100;
+  };
+
+  const ox = center ? -(width  - 1) / 2 : 0;
+  const oy = center ? -(height - 1) / 2 : 0;
+
+  // Build a watertight mesh
+  const numTop = width * height;
+  const numQuads = (width - 1) * (height - 1);
+  const vertProps: number[] = [];
+  const tris: number[] = [];
+
+  const topIdx = (x: number, y: number) => y * width  + x;
+  const centerIdx = (x: number, y: number) => numTop + y * (width - 1) + x;
+  const botIdx = (x: number, y: number) => numTop + numQuads + y * width + x;
+
+  // top surface grid vertices
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      vertProps.push(x + ox, y + oy, Z(x, y));
+    }
+  }
+  // top surface center vertices (one per quad, with average height of 4 corners)
+  for (let y = 0; y < height - 1; y++) {
+    for (let x = 0; x < width - 1; x++) {
+      const zCenter = (Z(x, y) + Z(x + 1, y) + Z(x, y + 1) + Z(x + 1, y + 1)) / 4;
+      vertProps.push(x + 0.5 + ox, y + 0.5 + oy, zCenter);
+    }
+  }
+  // bottom surface vertices (same XY, z=0)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      vertProps.push(x + ox, y + oy, 0);
+    }
+  }
+
+  // top surface faces (CCW when viewed from +Z, 4 triangles per quad)
+  for (let y = 0; y < height - 1; y++) {
+    for (let x = 0; x < width - 1; x++) {
+      const a = topIdx(x, y);
+      const b = topIdx(x + 1, y);
+      const c = topIdx(x, y + 1);
+      const d = topIdx(x + 1, y + 1);
+      const center = centerIdx(x, y);
+      tris.push(a, b, center);
+      tris.push(b, d, center);
+      tris.push(d, c, center);
+      tris.push(c, a, center);
+    }
+  }
+
+  // bottom surface faces (CW from +Z = CCW from -Z, outward normal points down)
+  for (let y = 0; y < height - 1; y++) {
+    for (let x = 0; x < width - 1; x++) {
+      const a = botIdx(x, y);
+      const b = botIdx(x + 1, y);
+      const c = botIdx(x, y + 1);
+      const d = botIdx(x + 1, y + 1);
+      tris.push(a, c, b);
+      tris.push(b, c, d);
+    }
+  }
+
+  // side walls (4 edges of the grid)
+  for (let x = 0; x < width - 1; x++) {
+    tris.push(topIdx(x, 0), botIdx(x, 0), topIdx(x + 1, 0));
+    tris.push(topIdx(x + 1, 0), botIdx(x, 0), botIdx(x + 1, 0));
+  }
+  // Back edge (y = height-1, normal points in +Y)
+  const yb = height - 1;
+  for (let x = 0; x < width - 1; x++) {
+    tris.push(topIdx(x, yb), topIdx(x + 1, yb), botIdx(x, yb));
+    tris.push(topIdx(x + 1, yb), botIdx(x + 1, yb), botIdx(x, yb));
+  }
+  // Left edge (x = 0, normal points in -X)
+  for (let y = 0; y < height - 1; y++) {
+    tris.push(topIdx(0, y), topIdx(0, y + 1), botIdx(0, y));
+    tris.push(topIdx(0, y + 1), botIdx(0, y + 1), botIdx(0, y));
+  }
+  // Right edge (x = width-1, normal points in +X)
+  const xr = width - 1;
+  for (let y = 0; y < height - 1; y++) {
+    tris.push(topIdx(xr, y), botIdx(xr, y), topIdx(xr, y + 1));
+    tris.push(topIdx(xr, y + 1), botIdx(xr, y), botIdx(xr, y + 1));
+  }
+
+  return new Manifold(new wasm.Mesh({
+    vertProperties: new Float32Array(vertProps),
+    triVerts: new Uint32Array(tris),
+    numProp: 3,
+  }));
+}
+
+async function decodeImageToPixels(dataUrl: string): Promise<{ width: number; height: number; data: Uint8ClampedArray; }> {
+  if (typeof OffscreenCanvas !== "undefined") {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = new OffscreenCanvas(img.width, img.height);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0);
+        const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+        resolve({ width, height, data });
+      };
+      img.onerror = () => reject(new Error("__surface: failed to decode image"));
+      img.src = dataUrl;
+    });
+  } else {
+    const img = await loadImage(dataUrl);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+    return { width, height, data: data as unknown as Uint8ClampedArray };
+  }
+}
+
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
@@ -1227,5 +1571,5 @@ export {
   __apply_color,
   __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
   __extrude, __revolve,
-  __text, __parse_color_for_scope
+  __text, __parse_color_for_scope, __surface
 };

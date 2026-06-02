@@ -123,8 +123,9 @@ suite('Compiled Examples', async () => {
         const compiledFile = file.replace(".scad", ".ts").replace("examples", "out");
         const { volume: compiledVolume, surfaceArea: compiledSurfaceArea } = await getCompiledManifoldProperties(compiledFile);
 
-        expectApproximatelyEqual(volume, compiledVolume, 0.2);
-        expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, 0.2);
+        const tolerance = 0.001;
+        expectApproximatelyEqual(volume, compiledVolume, tolerance);
+        expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, tolerance);
       });
     }
   }

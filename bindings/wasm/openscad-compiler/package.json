@@ -16,8 +16,10 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "canvas": "^3.2.3",
     "commander": "^14.0.3",
-    "manifold-3d": "^3.3.2",
+    "dxf-parser": "^1.1.2",
+    "manifold-3d": "^3.5.0",
     "opentype.js": "^2.0.0"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-// Volume: 1965.7751923493017, SurfaceArea: 1844.6080905408676
+// Volume: 1965.7751941621907, SurfaceArea: 1844.6081252263448
 // animation.scad - Demo of animation usage
 
 // The animation functionality is based simply on a variable $t

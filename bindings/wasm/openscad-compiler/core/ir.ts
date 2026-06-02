@@ -8,7 +8,8 @@ export type PrimitiveKind =
   | "square"
   | "polygon"
   | "polyhedron"
-  | "text";
+  | "text"
+  | "surface";
 
 export type TransformKind =
   | "translate"

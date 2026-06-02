@@ -80,6 +80,11 @@ let moduleDeclRegistry = new Map<string, ModuleDeclStmtType>();
 // Track unique fonts encountered during compilation for base64 generation.
 let encounteredFonts = new Set<string>();
 
+// Track unique images encountered during compilation for base64 generation.
+let encounteredImages = new Map<string, { stem: string; exportName: string }>();
+
+let currentRuntimePath: string = "./runtime/runtime.js";
+
 function fontSpecToFilename(fontSpec: string): string {
   const cleaned = fontSpec.replace(/"/g, "").trim();
   const parts = cleaned.split(":");
@@ -148,7 +153,7 @@ const BUILTIN_SIGNATURES: Record<string, string[]> = {
   "circle$mod": ["r", "d", "$fn", "$fa", "$fs"],
   "polygon$mod": ["points", "paths", "convexity"],
   "polyhedron$mod": ["points", "faces", "convexity"],
-  "linear_extrude$mod": ["height", "center", "convexity", "twist", "slices", "scale", "$fn"],
+  "linear_extrude$mod": ["height", "center", "convexity", "twist", "slices", "scale", "$fn", "$fa", "$fs"],
   "rotate_extrude$mod": ["angle", "convexity", "$fn"],
   "text$mod": ["text", "size", "font", "halign", "valign", "spacing", "direction", "language", "script", "$fn"],
   "surface$mod": ["file", "center", "invert", "convexity"],
@@ -482,8 +487,10 @@ function collectLocalVariableNames(stmts: Statement[]): string[] {
 
 // Main entry
 export function compile(program: Program, options?: { runtimePath?: string }): string {
+  currentRuntimePath = options?.runtimePath ?? "./runtime/runtime.js";
   dynamicScopeVars = new Set();
   encounteredFonts = new Set();
+  encounteredImages.clear();
   signatures.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
     signatures.set(k, { params: v });
@@ -516,7 +523,15 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
       declMap.set(key, `// ${stmt.kind} <${stmt.path}>`);
     } else {
       const geo = compileGeometry(stmt);
-      if (geo) pushCommentedLine(geometryLines, stmt, `__result_items.push(${geo});`);
+      if (geo) {
+        if (stmt.kind === "moduleCall" && !stmt.modifier) {
+          pushCommentedLine(geometryLines, stmt, `__result_items.push(${geo});`);
+        } else if (stmt.kind === "moduleCall" && stmt.modifier === "%") {
+          pushCommentedLine(geometryLines, stmt, `__background_items.push(${geo});`);
+        } else {
+          pushCommentedLine(geometryLines, stmt, `__result_items.push(${geo});`);
+        }
+      }
     }
   }
 
@@ -543,7 +558,7 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     `min_fn, max_fn, norm_fn, cross_fn, len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn, parent_module_fn, openscad_assert_fn, ` +
     `__eq, __add, __sub, __mul, __div, __mod, __neg, __pos, version_fn, version_num_fn, ` +
     `__children_stack, __with_children, ` +
-    `__is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4, __safe_attach_transform, __safe_offset2d, __safe_project3d, __apply_color, __flat_map_iter, __range, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d, __extrude, __revolve, __rotate, __translate, __scale, __mirror, __text, __parse_color_for_scope } = __rt;\n`;
+    `__is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4, __safe_attach_transform, __safe_offset2d, __safe_project3d, __apply_color, __flat_map_iter, __range, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d, __extrude, __revolve, __rotate, __translate, __scale, __mirror, __text, __parse_color_for_scope, __surface } = __rt;\n`;
 
   let output = RUNTIME_IMPORT;
 
@@ -553,6 +568,13 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     const importPath = `${runtimeDir}/fonts/${sanitized}_base64.js`;
     const varName = `__font_${sanitized.replace(/-/g, "_")}`;
     output += `import { fontBase64 as ${varName} } from "${importPath}";\n`;
+  }
+
+  // Add image base64 imports for each resolved image.
+  for (const [filename, info] of encounteredImages) {
+    const runtimeDir = options?.runtimePath ? path.dirname(options.runtimePath).replace(/\\/g, "/") : "./runtime";
+    const importPath = `${runtimeDir}/images/${info.stem}_base64.js`;
+    output += `import { ${info.exportName} } from "${importPath}";\n`;
   }
 
   output += `var PI: any = __rt.PI;\n` +
@@ -588,8 +610,10 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     output += `export const result = Manifold.union([]);\n`;
   } else {
     output += `const __result_items: any[] = [];\n`;
+    output += `const __background_items: any[] = [];\n`;
     output += `${geometryLines.join("\n")}\n`;
     output += `export const result = __union2d3d(__result_items);\n`;
+    output += `export const background = __union2d3d(__background_items);\n`;
   }
   output += `export const __viewport = { vpr: $vpr, vpt: $vpt, vpd: $vpd, vpf: $vpf };\n`;
 
@@ -746,7 +770,7 @@ function compileGeometry(stmt: Statement): string {
 }
 
 const IR_PRIMITIVES = new Set([
-  "cube", "sphere", "cylinder", "circle", "square", "polygon", "polyhedron", "text",
+  "cube", "sphere", "cylinder", "circle", "square", "polygon", "polyhedron", "text", "surface",
 ]);
 
 const IR_TRANSFORMS = new Set([
@@ -1038,6 +1062,7 @@ function compileIRPrimitive(node: IRPrimitiveNode): string {
     case "polygon": return compilePolygon(node.args);
     case "polyhedron": return compilePolyhedron(node.args);
     case "text": return compileText(node.args);
+    case "surface": return compileSurface(node.args);
     default: return "/* unsupported primitive */";
   }
 }
@@ -1076,8 +1101,11 @@ function compileIRTransform(node: IRTransformNode): string {
     }
     case "render":
       return `/* render(${node.args.map(a => compileExpr(a.value)).join(", ")}) */ ${child}`;
-    case "projection":
-      return `__safe_project3d(${child})`;
+    case "projection": {
+      const cut = findArg(node.args, "cut", 0);
+      const cutStr = cut ? compileExpr(cut.value) : "false";
+      return `__safe_project3d(${child}, ${cutStr})`;
+    }
     default:
       return child;
   }
@@ -1114,6 +1142,19 @@ function buildWithChildrenCall(callExpr: string, children: string[], moduleName:
     return `__with_children(() => Manifold.union([]), 0, () => ${callExpr}, ${JSON.stringify(moduleName)})`;
   }
 
+  const childrenCode = children.map(child => `() => (${child})`).join(",\n  ");
+  const hasAwait = childrenCode.includes("await ") || callExpr.includes("await ");
+  
+  if (hasAwait) {
+    return `await (() => { ` +
+      `const __childFns = [\n  ${children.map(child => `async () => (${child})`).join(",\n  ")}\n]; ` +
+      `return __with_children(async (i) => (` +
+      `i === undefined ? __union2d3d(await Promise.all(__childFns.map(fn => fn()))) : ` +
+      `((i >= 0 && i < __childFns.length) ? await __childFns[i]() : Manifold.union([]))` +
+      `), __childFns.length, async () => await ${callExpr}, ${JSON.stringify(moduleName)}); ` +
+      `})()`;
+  }
+
   return `(() => { ` +
     `const __childFns = [\n  ${children.map(child => `() => (${child})`).join(",\n  ")}\n]; ` +
     `return __with_children((i) => (` +
@@ -1135,11 +1176,34 @@ function compileIRModuleCall(node: IRModuleCallNode): string {
       const hStr = height ? compileExpr(height.value) : "1";
       const twist = findArg(node.args, "twist");
       const slices = findArg(node.args, "slices");
+      const scale = findArg(node.args, "scale");
+      const center = findArg(node.args, "center");
+
       const fn = findArg(node.args, "$fn");
+      const fa = findArg(node.args, "$fa");
+      const fs = findArg(node.args, "$fs");
+
       const opts: string[] = [];
+
       if (twist) opts.push(`twist: ${compileExpr(twist.value)}`);
-      const nDiv = fn ? compileExpr(fn.value) : slices ? compileExpr(slices.value) : "$fn";
-      opts.push(`nDivisions: ${nDiv}`);
+      if (scale) opts.push(`scale: ${compileExpr(scale.value)}`);
+      if (center) opts.push(`center: ${compileExpr(center.value)}`);
+
+      opts.push(
+        `fn: ${fn ? compileExpr(fn.value) : "$fn"}`
+      );
+
+      opts.push(
+        `fa: ${fa ? compileExpr(fa.value) : "$fa"}`
+      );
+
+      opts.push(
+        `fs: ${fs ? compileExpr(fs.value) : "$fs"}`
+      );
+
+      if (slices) {
+        opts.push(`slices: ${compileExpr(slices.value)}`);
+      }
       return opts.length
         ? `__extrude(${child}, ${hStr}, { ${opts.join(", ")} })`
         : `__extrude(${child}, ${hStr})`;
@@ -1194,7 +1258,11 @@ function compileIRModuleCall(node: IRModuleCallNode): string {
       for (let i = node.args.length - 1; i >= 0; i--) {
         const a = node.args[i]!;
         const name = a.name ? escapeName(a.name) : "_";
-        child = `((${name}) => (${child}))(${compileExpr(a.value)})`;
+        if (child.includes("await ")) {
+          child = `await (async (${name}) => (${child}))(${compileExpr(a.value)})`;
+        } else {
+          child = `((${name}) => (${child}))(${compileExpr(a.value)})`;
+        }
       }
       return child;
     }
@@ -1254,6 +1322,7 @@ function compileModuleCall(stmt: ModuleCallStmt): string {
     case "polygon": return compilePolygon(stmt.args);
     case "polyhedron": return compilePolyhedron(stmt.args);
     case "text": return compileText(stmt.args);
+    case "surface": return compileSurface(stmt.args);
 
     // Transforms
     case "translate": return compileTransform(stmt, "translate");
@@ -1320,7 +1389,11 @@ function compileLetModule(stmt: ModuleCallStmt): string {
   for (let i = stmt.args.length - 1; i >= 0; i--) {
     const a = stmt.args[i]!;
     const name = a.name ? escapeName(a.name) : "_";
-    result = `((${name}) => (${result}))(${compileExpr(a.value)})`;
+    if (result.includes("await ")) {
+      result = `await (async (${name}: any) => (${result}))(${compileExpr(a.value)})`;
+    } else {
+      result = `((${name}: any) => (${result}))(${compileExpr(a.value)})`;
+    }
   }
   return result;
 }
@@ -1519,6 +1592,9 @@ function compileColor(stmt: ModuleCallStmt): string {
   const alpha = findArg(stmt.args, "alpha", 1);
   const cExpr = c ? compileExpr(c.value) : "undefined";
   const aExpr = alpha ? compileExpr(alpha.value) : "undefined";
+  if (child.includes("await ")) {
+    return `await (async () => { var __save_$color: any = $color; $color = __parse_color_for_scope(${cExpr}, ${aExpr}); try { return await __apply_color(${child}, ${cExpr}, ${aExpr}); } finally { $color = __save_$color; } })()`;
+  }
   return `(() => { var __save_$color: any = $color; $color = __parse_color_for_scope(${cExpr}, ${aExpr}); try { return __apply_color(${child}, ${cExpr}, ${aExpr}); } finally { $color = __save_$color; } })()`;
 }
 
@@ -1541,7 +1617,9 @@ function compileProjection(stmt: ModuleCallStmt): string {
   if (!stmt.child) return "CrossSection.square(0)";
   const child = compileGeometry(stmt.child);
   if (child === "Manifold.union([])") return "CrossSection.square(0)";
-  return `__safe_project3d(${child})`;
+  const cut = findArg(stmt.args, "cut", 0);
+  const cutStr = cut ? compileExpr(cut.value) : "false";
+  return `__safe_project3d(${child}, ${cutStr})`;
 }
 
 // Boolean / collection 
@@ -1577,8 +1655,11 @@ function compileBlockStatements(stmts: Statement[]): string[] {
   // If there are declarations, wrap the whole thing into a single IIFE
   if (decls.length > 0 && geos.length > 0) {
     const result = geos.length === 1
-      ? geos[0]
+      ? geos[0]!
       : `__union2d3d([\n    ${geos.join(",\n    ")}\n  ])`;
+    if (result.includes("await ")) {
+      return [`await (async () => {\n  ${decls.join("\n  ")}\n  return await ${result};\n})()`];
+    }
     return [`(() => {\n  ${decls.join("\n  ")}\n  return ${result};\n})()`];
   }
 
@@ -1620,12 +1701,41 @@ function compileLinearExtrude(stmt: ModuleCallStmt): string {
 
   const twist = findArg(stmt.args, "twist");
   const slices = findArg(stmt.args, "slices");
+  const scale = findArg(stmt.args, "scale");
+  const center = findArg(stmt.args, "center");
   const fn = findArg(stmt.args, "$fn");
+  const fa = findArg(stmt.args, "$fa");
+  const fs = findArg(stmt.args, "$fs");
 
   const opts: string[] = [];
-  if (twist) opts.push(`twist: ${compileExpr(twist.value)}`);
-  const nDiv = fn ? compileExpr(fn.value) : slices ? compileExpr(slices.value) : "$fn";
-  opts.push(`nDivisions: ${nDiv}`);
+
+  if (twist) {
+    opts.push(`twist: ${compileExpr(twist.value)}`);
+  }
+
+  if (scale) {
+    opts.push(`scale: ${compileExpr(scale.value)}`);
+  }
+
+  if (center) {
+    opts.push(`center: ${compileExpr(center.value)}`);
+  }
+
+  opts.push(
+    `fn: ${fn ? compileExpr(fn.value) : "$fn"}`
+  );
+
+  opts.push(
+    `fa: ${fa ? compileExpr(fa.value) : "$fa"}`
+  );
+
+  opts.push(
+    `fs: ${fs ? compileExpr(fs.value) : "$fs"}`
+  );
+
+  if (slices) {
+    opts.push(`slices: ${compileExpr(slices.value)}`);
+  }
 
   if (opts.length) {
     return `__extrude(${child}, ${hStr}, { ${opts.join(", ")} })`;
@@ -1694,12 +1804,24 @@ function compileBlockGeometry(block: BlockStmt): string {
   for (let i = decls.length - 1; i >= 0; i--) {
     const d = decls[i]!;
     if (d.kind === "var") {
-      body = `((${d.name}: any) => (${body}))(${d.code})`;
+      if (body.includes("await ")) {
+        body = `await (async (${d.name}: any) => (${body}))(${d.code})`;
+      } else {
+        body = `((${d.name}: any) => (${body}))(${d.code})`;
+      }
     } else if (d.kind === "dollar") {
-      body = `(() => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return ${body}; } finally { ${d.name} = __save_${d.name}; } })()`;
+      if (body.includes("await ")) {
+        body = `await (async () => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return await ${body}; } finally { ${d.name} = __save_${d.name}; } })()`;
+      } else {
+        body = `(() => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return ${body}; } finally { ${d.name} = __save_${d.name}; } })()`;
+      }
     } else {
       // Wrap remaining body in IIFE with the declaration
-      body = `(() => {\n  ${d.code}\n  return ${body};\n})()`;
+      if (body.includes("await ")) {
+        body = `await (async () => {\n  ${d.code}\n  return await ${body};\n})()`;
+      } else {
+        body = `(() => {\n  ${d.code}\n  return ${body};\n})()`;
+      }
     }
   }
 
@@ -1715,7 +1837,13 @@ function compileForGeometry(stmt: ForStmt): string {
     "  return __union2d3d(__items);",
     "})()",
   ];
-  return lines.join("\n");
+  const code = lines.join("\n");
+  if (code.includes("await ")) {
+    lines[0] = "async () => {";
+    lines[lines.length - 1] = "})()";
+    return "await (" + lines.join("\n");
+  }
+  return code;
 }
 
 function buildNestedFor(vars: ForVariable[], idx: number, body: string): string {
@@ -1830,6 +1958,72 @@ function compileUserModuleCall(stmt: ModuleCallStmt): string {
   const argList = compileArgList(name, stmt.args);
   const children = stmt.child && stmt.child.kind !== "empty" ? collectChildren(stmt) : [];
   return buildWithChildrenCall(`${name}(${argList})`, children, stmt.name);
+}
+
+function guessMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const map: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".bmp": "image/bmp",
+    ".gif": "image/gif",
+  };
+  return map[ext] ?? "image/png";
+}
+
+// compile surface
+export function compileSurface(args: Argument[]): string {
+  const file = findArg(args, "file", 0);
+  const center = findArg(args, "center", 1);
+  const invert = findArg(args, "invert", 2);
+
+  if (!file?.value || file.value.kind !== "string") {
+    throw new Error(`surface(): expected string literal for file`);
+  }
+  const filenameStr = file.value.value;
+
+  // Resolve the image path
+  const basePath = process.env.IMAGEBASEPATH;
+  if (!basePath) {
+    throw new Error(`surface("${filenameStr}"): IMAGEBASEPATH environment variable is not set.`);
+  }
+
+  const imagePath = path.join(basePath, path.basename(filenameStr));
+  if (!fs.existsSync(imagePath)) {
+    throw new Error(`surface("${filenameStr}"): image not found at "${imagePath}". Check IMAGEBASEPATH="${basePath}".`);
+  }
+
+  // Encode to base64
+  const base64 = fs.readFileSync(imagePath).toString("base64");
+  const mimeType = guessMimeType(imagePath);
+  const dataUrl = `data:${mimeType};base64,${base64}`;
+
+  // Write ./runtime/images/<stem>_base64.ts
+  const stem = path.basename(filenameStr, path.extname(filenameStr)).replace(/[^a-zA-Z0-9_]/g, "_");
+  const exportName = `__img_${stem}`;
+
+  const currentFileDir = typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/i, "$1"));
+  const compilerDir = path.resolve(currentFileDir, "..");
+  const imagesDir = path.join(compilerDir, "runtime", "images");
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const tsContent =
+    `// Auto-generated by OpenSCAD compiler — do not edit\n` +
+    `// Source: ${imagePath}\n` +
+    `export const ${exportName} = "${dataUrl}";\n`;
+
+  const tsPath = path.join(imagesDir, `${stem}_base64.ts`);
+  fs.writeFileSync(tsPath, tsContent, "utf8");
+
+  // Track the image for top-level import
+  encounteredImages.set(filenameStr, { stem, exportName });
+
+  const centerStr = center ? compileExpr(center.value) : "false";
+
+  return `await __surface(${exportName}, { center: ${centerStr}, fn: $fn, fa: $fa, fs: $fs })`;
 }
 
 // Expression compilation
