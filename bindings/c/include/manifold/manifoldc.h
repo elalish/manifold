@@ -257,6 +257,10 @@ ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
 size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
 
+// Point containment
+int manifold_winding_number(ManifoldManifold* m, double x, double y, double z);
+int manifold_contains(ManifoldManifold* m, double x, double y, double z);
+
 // ExecutionContext: observe progress and request cancellation of a
 // long-running Manifold evaluation. Attach to a manifold via
 // manifold_with_context; subsequent operations on that manifold observe

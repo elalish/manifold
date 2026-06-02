@@ -323,6 +323,21 @@ NB_MODULE(manifold3d, m) {
       .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
+      .def("winding_number",
+           nb::overload_cast<vec3>(&Manifold::WindingNumber), nb::arg("point"),
+           "Returns the winding number of this manifold around the given "
+           "point. 0 means outside, non-zero means inside.")
+      .def("winding_number",
+           nb::overload_cast<const std::vector<vec3>&>(&Manifold::WindingNumber),
+           nb::arg("points"),
+           "Returns the winding number for each point in the list.")
+      .def("contains", nb::overload_cast<vec3>(&Manifold::Contains),
+           nb::arg("point"),
+           "Returns True if the given point is inside this manifold.")
+      .def("contains",
+           nb::overload_cast<const std::vector<vec3>&>(&Manifold::Contains),
+           nb::arg("points"),
+           "Returns a list of bools indicating containment for each point.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
            manifold__calculate_normals__normal_idx__min_sharp_angle)

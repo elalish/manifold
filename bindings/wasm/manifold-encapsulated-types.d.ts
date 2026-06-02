@@ -1163,6 +1163,28 @@ export class Manifold {
   rayCast(origin: Vec3, endpoint: Vec3): RayHit[];
 
   /**
+   * Returns the winding number of this manifold around the given point.
+   * Returns 0 for points outside and a non-zero value (typically ±1) for
+   * points inside. May exceed ±1 for manifolds with overlapping regions.
+   *
+   * @param point The 3D query point.
+   *
+   * @group Spatial Queries
+   */
+  windingNumber(point: Vec3): number;
+
+  /**
+   * Returns true if the given point is inside this manifold, i.e. its winding
+   * number is non-zero.
+   *
+   * @param point The 3D query point.
+   *
+   * @group Spatial Queries
+   */
+  contains(point: Vec3): boolean;
+
+
+  /**
    * Returns the reason for an input Mesh producing an empty Manifold. This
    * Status will carry on through operations like NaN propogation, ensuring an
    * errored mesh doesn't get mysteriously lost. Empty meshes may still show

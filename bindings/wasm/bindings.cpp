@@ -212,6 +212,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
       .function("_RayCast", &man_js::RayCast)
+      .function("windingNumber", &Manifold::WindingNumber)
+      .function("contains", &Manifold::Contains)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)
