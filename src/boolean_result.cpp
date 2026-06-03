@@ -692,11 +692,13 @@ namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
-  // Seed the per-phase timing baseline; the phase() lambda below reports each
-  // boundary's span via MANIFOLD_RECORD_PHASE_AT, consistent with
-  // ADVANCE_PHASE_OR_RETURN. Replaces the old per-stage Timers. No-op without a
-  // ctx or in release.
-  MANIFOLD_BEGIN_PHASE_TIMING(ctx_);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  // Per-Result local timing baseline, kept off the shared ctx so concurrent
+  // booleans in a CSG tree don't clobber it; the uid tags each printed phase
+  // line so interleaved parallel output can be split apart. Replaces the old
+  // per-stage Timers.
+  LocalPhaseTiming phaseTiming = BeginLocalPhaseTiming();
+#endif
 
   DEBUG_ASSERT(expandP_ == (op == OpType::Add), logicErr,
                "Result op type not compatible with constructor op type.");
@@ -761,9 +763,11 @@ Manifold::Impl Boolean3::Result(OpType op) const {
       impl.status_ = Manifold::Error::Cancelled;
       return impl;
     }
-    // Time the span since the previous boundary; `line` is the call site, so
-    // each phase reports its own location (the lambda body has only one).
-    if (ctx_) MANIFOLD_RECORD_PHASE_AT(ctx_, line);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+    // Record this boundary against the per-Result baseline; `line` is the call
+    // site so each phase reports its own location (the lambda body has one).
+    if (ctx_) RecordPhase(phaseTiming, balance.published, __FILE__, line);
+#endif
     return std::nullopt;
   };
 
@@ -960,10 +964,11 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   // Per-stage timing now comes from the phase() boundaries above (verbose >= 2,
-  // ctx attached); this keeps the result-size summary.
+  // ctx attached); this keeps the result-size summary, tagged with the same uid
+  // so it groups with this boolean's phase lines.
   if (ManifoldParams().verbose >= 2) {
-    std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
-              << std::endl;
+    std::cout << "  [b" << phaseTiming.uid << "] " << outR.NumVert()
+              << " verts and " << outR.NumTri() << " tris" << std::endl;
   }
 #endif
 
