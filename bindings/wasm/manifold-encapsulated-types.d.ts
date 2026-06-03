@@ -1163,25 +1163,17 @@ export class Manifold {
   rayCast(origin: Vec3, endpoint: Vec3): RayHit[];
 
   /**
-   * Returns the winding number of this manifold around the given point.
-   * Returns 0 for points outside and a non-zero value (typically ±1) for
-   * points inside. May exceed ±1 for manifolds with overlapping regions.
+   * Returns the winding number of this manifold around each of the given
+   * points. Returns 0 for points outside and a non-zero value (typically ±1)
+   * for points inside a simple closed surface. May exceed ±1 in magnitude for
+   * manifolds with overlapping regions.
    *
-   * @param point The 3D query point.
+   * @param points The 3D query points.
    *
    * @group Spatial Queries
    */
-  windingNumber(point: Vec3): number;
+  windingNumber(points: Vec3[]): number[];
 
-  /**
-   * Returns true if the given point is inside this manifold, i.e. its winding
-   * number is non-zero.
-   *
-   * @param point The 3D query point.
-   *
-   * @group Spatial Queries
-   */
-  contains(point: Vec3): boolean;
 
 
   /**

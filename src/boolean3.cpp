@@ -579,19 +579,19 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   if (points.empty() || IsEmpty()) return winding;
 
   // Points outside the bounding box have winding 0 for any closed manifold.
-  Vec<int> active;
-  active.reserve(points.size());
+  Vec<int> query2input;
+  query2input.reserve(points.size());
   for (size_t i = 0; i < points.size(); ++i)
-    if (bBox_.Contains(points[i])) active.push_back(static_cast<int>(i));
-  if (active.empty()) return winding;
+    if (bBox_.Contains(points[i])) query2input.push_back(static_cast<int>(i));
+  if (query2input.empty()) return winding;
 
   // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
   // and vertNormal_ from inA; halfedges and faces are not accessed.
   Impl pointImpl;
-  pointImpl.vertPos_.resize(active.size());
-  pointImpl.vertNormal_.resize(active.size(), vec3(0.0));
-  for (size_t i = 0; i < active.size(); ++i)
-    pointImpl.vertPos_[i] = points[active[i]];
+  pointImpl.vertPos_.resize(query2input.size());
+  pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
+  for (size_t i = 0; i < query2input.size(); ++i)
+    pointImpl.vertPos_[i] = points[query2input[i]];
 
   // expandP=false: no symbolic perturbation from the query side (zero normals).
   // forward=true: project along +Z to count signed face crossings above each
@@ -601,14 +601,14 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   Kernel02<false, true> k02{pointImpl, *this};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
-    if (std::isfinite(z02)) winding[active[localIdx]] += s02;
+    if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
   collider_.Collisions<false>(recorder, f,
-                              static_cast<int>(active.size()), true);
+                              static_cast<int>(query2input.size()), true);
   return winding;
 }
 

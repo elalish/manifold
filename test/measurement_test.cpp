@@ -273,80 +273,57 @@ TEST(Properties, TriangleDistanceOverlapping) {
   EXPECT_FLOAT_EQ(distance, 0);
 }
 
-TEST(Manifold, ContainsBasic) {
-  Manifold cube = Manifold::Cube(vec3(1), true);
-  EXPECT_TRUE(cube.Contains(vec3(0, 0, 0)));
-  EXPECT_TRUE(cube.Contains(vec3(0.4, 0.4, 0.4)));
-  EXPECT_FALSE(cube.Contains(vec3(1, 1, 1)));
-  EXPECT_FALSE(cube.Contains(vec3(0, 0, 5)));
-}
-
-TEST(Manifold, ContainsEmpty) {
-  Manifold empty;
-  EXPECT_FALSE(empty.Contains(vec3(0, 0, 0)));
-  EXPECT_EQ(empty.WindingNumber(vec3(0, 0, 0)), 0);
-}
-
 // A tall box where the query point is far below the top face. The +Z ray from
 // the point must reach the top face even though it's well outside the point's
-// 3D AABB neighbourhood. This exercises the XY-projected collider query.
-TEST(Manifold, ContainsTallBox) {
+// 3D bounding-box in Z. This exercises the XY-projected collider query.
+TEST(Manifold, WindingTallBox) {
   Manifold box = Manifold::Cube(vec3(1, 1, 10), true);  // z in [-5, 5]
-  EXPECT_EQ(box.WindingNumber(vec3(0, 0, -4)), 1);
-  EXPECT_EQ(box.WindingNumber(vec3(0, 0, 0)), 1);
-  EXPECT_EQ(box.WindingNumber(vec3(0, 0, 6)), 0);   // above
-  EXPECT_EQ(box.WindingNumber(vec3(0, 0, -6)), 0);  // below
+  const auto w =
+      box.WindingNumber({{0, 0, -4}, {0, 0, 0}, {0, 0, 6}, {0, 0, -6}});
+  EXPECT_EQ(w[0], 1);  // inside, near bottom
+  EXPECT_EQ(w[1], 1);  // center
+  EXPECT_EQ(w[2], 0);  // above
+  EXPECT_EQ(w[3], 0);  // below
+}
+
+TEST(Manifold, WindingEmpty) {
+  const auto w = Manifold{}.WindingNumber({{0, 0, 0}});
+  ASSERT_EQ(w.size(), 1u);
+  EXPECT_EQ(w[0], 0);
 }
 
 // Watertight winding across shared cube edges and vertices - must be exactly
 // 0 or 1, never 2 from double-counting.
 TEST(Manifold, WindingWatertight) {
   Manifold cube = Manifold::Cube(vec3(1), true);
-  // Ray through a shared vertex at (0.5, 0.5, z): winding must be 0 or 1.
-  const int w = cube.WindingNumber(vec3(0.4999, 0.4999, 0));
-  EXPECT_TRUE(w == 0 || w == 1);
-  // Silhouette edge query: must also be 0 or 1.
-  const int w2 = cube.WindingNumber(vec3(0.5, 0, 0));
-  EXPECT_TRUE(w2 == 0 || w2 == 1);
+  const auto w =
+      cube.WindingNumber({{0.4999, 0.4999, 0}, {0.5, 0, 0}, {0, 0, 0}});
+  EXPECT_TRUE(w[0] == 0 || w[0] == 1);  // near shared vertex
+  EXPECT_TRUE(w[1] == 0 || w[1] == 1);  // silhouette edge
+  EXPECT_EQ(w[2], 1);                   // center
 }
 
-// Hollow shell (sphere - sphere): cavity center is NOT inside (winding 0),
-// a point in the shell wall IS inside (winding 1). Proves real winding, not
-// just "hit something."
+// Hollow shell (sphere - sphere): cavity center must return winding 0, wall
+// point 1, outside 0. Proves real winding number, not just ray parity.
 TEST(Manifold, WindingHollowShell) {
   Manifold shell = Manifold::Sphere(2, 32) - Manifold::Sphere(1, 32);
-  EXPECT_EQ(shell.WindingNumber(vec3(0, 0, 0)), 0);    // cavity
-  EXPECT_EQ(shell.WindingNumber(vec3(0, 0, 1.5)), 1);  // wall
-  EXPECT_EQ(shell.WindingNumber(vec3(0, 0, 3)), 0);    // outside
+  const auto w = shell.WindingNumber({{0, 0, 0}, {0, 0, 1.5}, {0, 0, 3}});
+  EXPECT_EQ(w[0], 0);  // cavity
+  EXPECT_EQ(w[1], 1);  // wall
+  EXPECT_EQ(w[2], 0);  // outside
 }
 
-// Batch API agrees with scalar API on a grid of points.
-TEST(Manifold, ContainsBatch) {
-  Manifold sphere = Manifold::Sphere(1, 32);
-  std::vector<vec3> pts = {
-      {0, 0, 0}, {0.5, 0.5, 0.5}, {0.9, 0, 0}, {1.1, 0, 0}, {0, 2, 0}};
-  const auto batchW = sphere.WindingNumber(pts);
-  const auto batchC = sphere.Contains(pts);
-  ASSERT_EQ(batchW.size(), pts.size());
-  ASSERT_EQ(batchC.size(), pts.size());
-  for (size_t i = 0; i < pts.size(); ++i) {
-    EXPECT_EQ(batchW[i], sphere.WindingNumber(pts[i]));
-    EXPECT_EQ(batchC[i], sphere.Contains(pts[i]));
-  }
-}
-
-// Cross-check: WindingNumber != 0 agrees with RayCast hit-count parity.
+// Cross-check: winding != 0 agrees with RayCast hit-count parity.
 TEST(Manifold, WindingMatchesRayCastParity) {
   Manifold cube = Manifold::Cube(vec3(1), true);
-  const std::vector<vec3> pts = {{0, 0, 0},      {0.3, 0.2, 0.1},
+  const std::vector<vec3> pts = {{0, 0, 0},       {0.3, 0.2, 0.1},
                                   {0.5, 0.5, 0.5}, {0, 0, 1},
-                                  {0, 0, 2},      {-1, 0, 0}};
-  for (const vec3& p : pts) {
-    const vec3 far(p.x, p.y, p.z + 1e6);
-    const size_t hits = cube.RayCast(p, far).size();
-    const bool byParity = (hits % 2) == 1;
-    const bool byWinding = cube.Contains(p);
-    EXPECT_EQ(byWinding, byParity)
+                                  {0, 0, 2},       {-1, 0, 0}};
+  const auto winding = cube.WindingNumber(pts);
+  for (size_t i = 0; i < pts.size(); ++i) {
+    const vec3& p = pts[i];
+    const size_t hits = cube.RayCast(p, {p.x, p.y, p.z + 1e6}).size();
+    EXPECT_EQ(winding[i] != 0, hits % 2 == 1)
         << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
   }
 }

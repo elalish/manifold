@@ -1139,8 +1139,9 @@ std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
 
 /**
  * Returns the winding number of this manifold around each of the given points.
- * 0 means outside; non-zero (typically ±1) means inside. For manifolds with
- * overlapping regions the magnitude may exceed 1.
+ * Returns 0 for points outside, and a non-zero value (typically ±1) for points
+ * inside a simple closed surface. For manifolds with overlapping regions the
+ * magnitude may exceed 1.
  *
  * @param points The 3D query points.
  */
@@ -1152,39 +1153,4 @@ std::vector<int> Manifold::WindingNumber(
       impl->PointWinding(VecView<const vec3>(points.data(), points.size()));
   return std::vector<int>(w.begin(), w.end());
 }
-
-/**
- * Returns the winding number of this manifold around the given point. Returns
- * 0 for points outside, and a non-zero value (typically ±1) for points inside.
- * For manifolds with overlapping regions the magnitude may exceed 1.
- *
- * @param point The 3D query point.
- */
-int Manifold::WindingNumber(vec3 point) const {
-  const auto impl = GetCsgLeafNode().GetImpl();
-  Vec<int> w = impl->PointWinding(VecView<const vec3>(&point, 1));
-  return w.empty() ? 0 : w[0];
-}
-
-/**
- * Returns whether each of the given points is inside this manifold, i.e. its
- * winding number is non-zero.
- *
- * @param points The 3D query points.
- */
-std::vector<bool> Manifold::Contains(const std::vector<vec3>& points) const {
-  if (points.empty()) return {};
-  const auto winding = WindingNumber(points);
-  std::vector<bool> inside(winding.size());
-  for (size_t i = 0; i < winding.size(); ++i) inside[i] = winding[i] != 0;
-  return inside;
-}
-
-/**
- * Returns true if the given point is inside this manifold, i.e. its winding
- * number is non-zero.
- *
- * @param point The 3D query point.
- */
-bool Manifold::Contains(vec3 point) const { return WindingNumber(point) != 0; }
 }  // namespace manifold

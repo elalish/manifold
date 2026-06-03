@@ -888,11 +888,8 @@ ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
 }
 
 int manifold_winding_number(ManifoldManifold* m, double x, double y, double z) {
-  return from_c(m)->WindingNumber(vec3(x, y, z));
-}
-
-int manifold_contains(ManifoldManifold* m, double x, double y, double z) {
-  return from_c(m)->Contains(vec3(x, y, z)) ? 1 : 0;
+  const auto result = from_c(m)->WindingNumber({{x, y, z}});
+  return result.empty() ? 0 : result[0];
 }
 
 ManifoldExecutionContext* manifold_execution_context(void* mem) {
