@@ -32,11 +32,14 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const BVH& bvh,
                               std::vector<std::pair<int, int>>* pairs);
 
-// Serially materialize precomputed proper intersections into `verts` and the
-// edge split `lists`. Also records which edges meet at each materialized or
-// snapped intersection vertex in `vertEdges`; nearby-intersection merge uses
-// that incidence to distinguish unrelated near vertices from vertices that
-// share an intersection source.
+// Serially materialize precomputed proper intersections into caller-owned
+// containers. `verts` and `lists` are taken by value so callers can move in the
+// post-narrow-phase state; the returned fields are those same containers after
+// appending/snapping intersection vertices and updating edge split lists.
+// `vertEdges` records which edges meet at each materialized or snapped
+// intersection vertex; nearby-intersection merge uses that incidence to
+// distinguish unrelated near vertices from vertices that share an intersection
+// source.
 struct IntersectionInsertion {
   std::vector<vec2> verts;
   std::vector<std::vector<int>> lists;
