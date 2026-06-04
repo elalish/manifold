@@ -100,7 +100,9 @@ struct EdgeBoxMortonLess {
 };
 
 struct TangentParameterLess {
-  bool operator()(const Tangent& a, const Tangent& b) const { return a.t < b.t; }
+  bool operator()(const Tangent& a, const Tangent& b) const {
+    return a.t < b.t;
+  }
 };
 
 struct CollisionRecorder {
@@ -129,7 +131,9 @@ double NormalizeAngle(double angle) {
   return angle;
 }
 
-bool IsFinite(const vec2& v) { return std::isfinite(v.x) && std::isfinite(v.y); }
+bool IsFinite(const vec2& v) {
+  return std::isfinite(v.x) && std::isfinite(v.y);
+}
 
 bool IsInFilletRange(const vec2& v) {
   constexpr double kMaxCoordinate = 1e30;
@@ -146,9 +150,8 @@ bool SamePointWithin(const vec2& a, const vec2& b, double tolerance) {
 }
 
 void AppendPoint(SimplePolygon& loop, const vec2& point, double tolerance = 0) {
-  if (loop.empty() ||
-      (!SamePoint(loop.back(), point) &&
-       !SamePointWithin(loop.back(), point, tolerance))) {
+  if (loop.empty() || (!SamePoint(loop.back(), point) &&
+                       !SamePointWithin(loop.back(), point, tolerance))) {
     loop.push_back(point);
   }
 }
@@ -322,7 +325,8 @@ std::vector<std::pair<int, int>> BuildCollider(
         const vec2 nextEdgeDir = normalize(p2 - p1);
         const vec2 nextNormal = EdgeNormal(nextEdgeDir, invert);
         filletBox.Union(ToVec3(p1 + nextNormal * 2.0 * radius));
-        filletBox.Union(ToVec3(p1 + nextEdgeDir * radius + nextNormal * radius));
+        filletBox.Union(
+            ToVec3(p1 + nextEdgeDir * radius + nextNormal * radius));
       }
 
       filletBoxes.push_back(filletBox);
@@ -358,23 +362,24 @@ std::vector<std::pair<int, int>> BuildCollider(
   return pairs;
 }
 
-bool FinishFilletGeometry(const FilletInput& input, int firstEdge, int secondEdge,
-                          double firstT, double secondT, vec2 center,
-                          FilletGeometry& geometry) {
+bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
+                          int secondEdge, double firstT, double secondT,
+                          vec2 center, FilletGeometry& geometry) {
   int fromEdge = firstEdge;
   int toEdge = secondEdge;
   double fromT = firstT;
   double toT = secondT;
-  vec2 fromPoint = EdgeStart(input, firstEdge) +
-                   firstT * (EdgeEnd(input, firstEdge) - EdgeStart(input, firstEdge));
-  vec2 toPoint = EdgeStart(input, secondEdge) +
-                 secondT * (EdgeEnd(input, secondEdge) - EdgeStart(input, secondEdge));
+  vec2 fromPoint =
+      EdgeStart(input, firstEdge) +
+      firstT * (EdgeEnd(input, firstEdge) - EdgeStart(input, firstEdge));
+  vec2 toPoint =
+      EdgeStart(input, secondEdge) +
+      secondT * (EdgeEnd(input, secondEdge) - EdgeStart(input, secondEdge));
   vec2 fromRadius = fromPoint - center;
   vec2 toRadius = toPoint - center;
 
   const double radiusCross = la::cross(fromRadius, toRadius);
-  if ((!input.invert && radiusCross < 0) ||
-      (input.invert && radiusCross > 0)) {
+  if ((!input.invert && radiusCross < 0) || (input.invert && radiusCross > 0)) {
     std::swap(fromEdge, toEdge);
     std::swap(fromT, toT);
     std::swap(fromPoint, toPoint);
@@ -390,15 +395,8 @@ bool FinishFilletGeometry(const FilletInput& input, int firstEdge, int secondEdg
     toT = 0;
   }
 
-  geometry = FilletGeometry{fromEdge,
-                            toEdge,
-                            fromT,
-                            toT,
-                            fromPoint,
-                            toPoint,
-                            center,
-                            startRad,
-                            endRad};
+  geometry = FilletGeometry{fromEdge, toEdge, fromT,    toT,   fromPoint,
+                            toPoint,  center, startRad, endRad};
   return true;
 }
 
@@ -421,7 +419,8 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
 
   const vec2 firstNormal = EdgeNormal(firstVec, input.invert);
   const vec2 secondNormal = EdgeNormal(secondVec, input.invert);
-  const vec2 firstNextNormal = EdgeNormal(firstNextEnd - firstEnd, input.invert);
+  const vec2 firstNextNormal =
+      EdgeNormal(firstNextEnd - firstEnd, input.invert);
   const vec2 secondNextNormal =
       EdgeNormal(secondNextEnd - secondEnd, input.invert);
   const vec2 firstOffset = firstStart + firstNormal * radius;
@@ -450,7 +449,8 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
 
     for (int i = 0; i < ev.count; ++i) {
       const vec2 candidate = ev.points[i];
-      const double t = dot(candidate - firstOffset, firstVec) / dot(firstVec, firstVec);
+      const double t =
+          dot(candidate - firstOffset, firstVec) / dot(firstVec, firstVec);
       if (t > 0 && t < 1 &&
           FinishFilletGeometry(input, firstEdge, secondEdge, t, 1, candidate,
                                geometry)) {
@@ -460,9 +460,9 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   }
 
   if (!firstConvex) {
-    const IntersectResult ve = IntersectSegmentArc(
-        secondOffset, secondOffset + secondVec, firstEnd, radius, firstNormal,
-        firstNextNormal, input.invert);
+    const IntersectResult ve =
+        IntersectSegmentArc(secondOffset, secondOffset + secondVec, firstEnd,
+                            radius, firstNormal, firstNextNormal, input.invert);
 
     for (int i = 0; i < ve.count; ++i) {
       const vec2 candidate = ve.points[i];
@@ -477,10 +477,9 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   }
 
   if (!firstConvex && !secondConvex) {
-    const IntersectResult vv =
-        IntersectArcArc(firstEnd, firstNormal, firstNextNormal, input.invert,
-                        secondEnd, secondNormal, secondNextNormal, input.invert,
-                        radius);
+    const IntersectResult vv = IntersectArcArc(
+        firstEnd, firstNormal, firstNextNormal, input.invert, secondEnd,
+        secondNormal, secondNextNormal, input.invert, radius);
 
     for (int i = 0; i < vv.count; ++i) {
       if (FinishFilletGeometry(input, firstEdge, secondEdge, 1, 1, vv.points[i],
@@ -535,8 +534,8 @@ bool RadiusFits(const FilletInput& input, ivec3 edgeIndices, double radius) {
 }
 
 std::vector<FilletGeometry> FindFilletPairs(
-    const FilletInput& input, const std::vector<std::pair<int, int>>& broadPairs,
-    double radius) {
+    const FilletInput& input,
+    const std::vector<std::pair<int, int>>& broadPairs, double radius) {
   struct Candidate {
     std::pair<int, int> pair;
     FilletGeometry geometry;
@@ -548,8 +547,8 @@ std::vector<FilletGeometry> FindFilletPairs(
   for (const auto& pair : broadPairs) {
     for (const FilletGeometry& geometry :
          BuildFilletGeometries(input, pair.first, pair.second, radius)) {
-      candidates.push_back(Candidate{{geometry.fromEdge, geometry.toEdge},
-                                     geometry});
+      candidates.push_back(
+          Candidate{{geometry.fromEdge, geometry.toEdge}, geometry});
     }
   }
 
@@ -568,8 +567,8 @@ std::vector<FilletGeometry> FindFilletPairs(
     for (const size_t otherIndex : pairsByFirst[geometry.fromEdge]) {
       const FilletGeometry& other = candidates[otherIndex].geometry;
       if (other.toEdge == geometry.toEdge) continue;
-      if (!RadiusFits(input, ivec3(geometry.fromEdge, geometry.toEdge,
-                                   other.toEdge),
+      if (!RadiusFits(input,
+                      ivec3(geometry.fromEdge, geometry.toEdge, other.toEdge),
                       radius)) {
         fits = false;
         break;
@@ -603,7 +602,8 @@ std::vector<vec2> discreteArcToPoint(const FilletGeometry& arc, double radius,
 
 void AppendArcPoints(SimplePolygon& loop, const FilletGeometry& arc,
                      double radius, int circularSegments) {
-  const std::vector<vec2> points = discreteArcToPoint(arc, radius, circularSegments);
+  const std::vector<vec2> points =
+      discreteArcToPoint(arc, radius, circularSegments);
   const double pointTolerance = std::max(radius * 1e-8, 1e-12);
   for (size_t i = 1; i < points.size(); ++i) {
     AppendPoint(loop, points[i], pointTolerance);
@@ -621,7 +621,8 @@ bool BuildSegments(const FilletInput& input,
     const FilletGeometry& geometry = geometries[i];
     ends[geometry.fromEdge].push_back(
         Tangent{geometry.fromT, i, geometry.fromPoint});
-    starts[geometry.toEdge].push_back(Tangent{geometry.toT, i, geometry.toPoint});
+    starts[geometry.toEdge].push_back(
+        Tangent{geometry.toT, i, geometry.toPoint});
   }
 
   segmentFromStartFillet.assign(geometries.size(), -1);
@@ -643,22 +644,17 @@ bool BuildSegments(const FilletInput& input,
 
       const int segmentIndex = static_cast<int>(segments.size());
       segmentFromStartFillet[start.fillet] = segmentIndex;
-      segments.push_back(Segment{static_cast<int>(edge),
-                                 start.t,
-                                 end.t,
-                                 start.point,
-                                 end.point,
-                                 end.fillet,
-                                 false});
+      segments.push_back(Segment{static_cast<int>(edge), start.t, end.t,
+                                 start.point, end.point, end.fillet, false});
     }
   }
 
   return true;
 }
 
-std::vector<CrossSection> TraceFillets(const FilletInput& input,
-                                       const std::vector<FilletGeometry>& geometries,
-                                       double radius, int circularSegments) {
+std::vector<CrossSection> TraceFillets(
+    const FilletInput& input, const std::vector<FilletGeometry>& geometries,
+    double radius, int circularSegments) {
   if (geometries.empty()) return {};
 
   std::vector<Segment> segments;
@@ -671,10 +667,12 @@ std::vector<CrossSection> TraceFillets(const FilletInput& input,
 
   Polygons resultLoops;
   std::vector<uint8_t> touchedLoop(input.loops.size(), 0);
-  const size_t maxSteps = segments.size() + geometries.size() + input.edges.size();
+  const size_t maxSteps =
+      segments.size() + geometries.size() + input.edges.size();
   const double pointTolerance = std::max(radius * 1e-8, 1e-12);
 
-  for (size_t startSegment = 0; startSegment < segments.size(); ++startSegment) {
+  for (size_t startSegment = 0; startSegment < segments.size();
+       ++startSegment) {
     if (segments[startSegment].used) continue;
 
     SimplePolygon loop;
@@ -764,7 +762,8 @@ bool IsValidFilletResult(const std::vector<CrossSection>& result,
   if (result.empty()) return false;
   for (const CrossSection& crossSection : result) {
     if (!HasValidFilletGeometry(crossSection)) return false;
-    if (!invert && !HasFilletAngles(crossSection, circularSegments)) return false;
+    if (!invert && !HasFilletAngles(crossSection, circularSegments))
+      return false;
   }
 
   const CrossSection composed = CrossSection::Compose(result);
@@ -850,8 +849,9 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
     }
   }
 
-  const int segments =
-      circularSegments > 2 ? circularSegments : Quality::GetCircularSegments(radius);
+  const int segments = circularSegments > 2
+                           ? circularSegments
+                           : Quality::GetCircularSegments(radius);
 
   const std::vector<size_t> loopOffsets = BuildLoopOffsets(polygons);
   const std::vector<EdgeRef> edges = BuildEdges(polygons, loopOffsets);
@@ -868,7 +868,8 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
               << " for writing." << std::endl;
     throw std::exception();
   }
-  resultOutputFile << std::setprecision(std::numeric_limits<double>::max_digits10)
+  resultOutputFile << std::setprecision(
+                          std::numeric_limits<double>::max_digits10)
                    << radius << "\n";
   caseIndex++;
 
@@ -895,10 +896,12 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   if (result.empty() && segments > 3) {
     const double firstOffset = invert ? radius : -radius;
     const CrossSection opened =
-        original.Offset(firstOffset, CrossSection::JoinType::Round, 2.0, segments)
+        original
+            .Offset(firstOffset, CrossSection::JoinType::Round, 2.0, segments)
             .Offset(-firstOffset, CrossSection::JoinType::Round, 2.0, segments);
     const std::vector<CrossSection> fallback = opened.Decompose();
-    if (IsValidFilletResult(fallback, original, segments, invert)) result = fallback;
+    if (IsValidFilletResult(fallback, original, segments, invert))
+      result = fallback;
   }
 
 #ifdef MANIFOLD_DEBUG
