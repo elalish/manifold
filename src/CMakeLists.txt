@@ -17,7 +17,21 @@ if(MANIFOLD_CROSS_SECTION)
   if(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
     list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section.cpp)
   elseif(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "boolean2")
-    list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section_boolean2.cpp)
+    list(
+      APPEND
+      MANIFOLD_CROSS_SECTION_SRCS
+      cross_section/cross_section_boolean2.cpp
+      cross_section/boolean2/boolean2.cpp
+      cross_section/boolean2/bvh.cpp
+      cross_section/boolean2/canonicalize.cpp
+      cross_section/boolean2/diagnostics.cpp
+      cross_section/boolean2/driver.cpp
+      cross_section/boolean2/edge_vert_lists.cpp
+      cross_section/boolean2/intersections.cpp
+      cross_section/boolean2/predicates.cpp
+      cross_section/boolean2/vertex_merge.cpp
+      cross_section/boolean2/winding_filter.cpp
+    )
   endif()
 endif()
 
@@ -53,6 +67,17 @@ set(
   MANIFOLD_PRIVATE_HDRS
   boolean3.h
   collider.h
+  cross_section/boolean2/boolean2.h
+  cross_section/boolean2/bvh.h
+  cross_section/boolean2/canonicalize.h
+  cross_section/boolean2/diagnostics.h
+  cross_section/boolean2/driver.h
+  cross_section/boolean2/edge_vert_lists.h
+  cross_section/boolean2/intersections.h
+  cross_section/boolean2/parallel_policy.h
+  cross_section/boolean2/predicates.h
+  cross_section/boolean2/vertex_merge.h
+  cross_section/boolean2/winding_filter.h
   csg_tree.h
   execution_impl.h
   hashtable.h

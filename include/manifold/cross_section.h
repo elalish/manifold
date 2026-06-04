@@ -64,6 +64,9 @@ class CrossSection {
    * docs](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm)
    * for a detailed explaination with illusrations.
    */
+  // TODO(#1707): EvenOdd/NonZero/Negative are preserved for backend/API
+  // compatibility; remove them when the public construction API can break. The
+  // Boolean2 backend supports only Positive construction.
   enum class FillRule {
     EvenOdd,   ///< Only odd numbered sub-regions are filled.
     NonZero,   ///< Only non-zero sub-regions are filled.

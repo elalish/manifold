@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+
 #include "manifold/cross_section.h"
 
 // Temporary backend-selection placeholder. The boolean2 implementation lands
@@ -61,12 +63,14 @@ CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
 
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
   (void)contour;
+  assert(fillrule == FillRule::Positive);
   (void)fillrule;
   paths_ = empty_paths();
 }
 
 CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   (void)contours;
+  assert(fillrule == FillRule::Positive);
   (void)fillrule;
   paths_ = empty_paths();
 }

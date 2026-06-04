@@ -19,6 +19,7 @@
 
 #include "disjoint_sets.h"
 #include "parallel.h"
+#include "shared.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -27,30 +28,6 @@
 using namespace manifold;
 
 namespace {
-
-// `Intersect` stays local to the Boolean3 kernel cascade; the lower-level
-// symbolic perturbation primitives it uses live in shared.h.
-
-vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL, const vec3& bR) {
-  const double dyL = bL.y - aL.y;
-  const double dyR = bR.y - aR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
-               "Boolean manifold error: no intersection");
-  const bool useL = fabs(dyL) < fabs(dyR);
-  const double dx = aR.x - aL.x;
-  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!std::isfinite(lambda)) lambda = 0.0;
-  vec4 xyzz;
-  xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
-  const double aDy = aR.y - aL.y;
-  const double bDy = bR.y - bL.y;
-  const bool useA = fabs(aDy) < fabs(bDy);
-  xyzz.y = lambda * (useA ? aDy : bDy) +
-           (useL ? (useA ? aL.y : bL.y) : (useA ? aR.y : bR.y));
-  xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
-  xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
-  return xyzz;
-}
 
 struct FaceEdge {
   int edge;
