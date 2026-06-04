@@ -19,6 +19,7 @@
 
 #include "disjoint_sets.h"
 #include "parallel.h"
+#include "shared.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -27,30 +28,6 @@
 using namespace manifold;
 
 namespace {
-
-// `Intersect` stays local to the Boolean3 kernel cascade; the lower-level
-// symbolic perturbation primitives it uses live in shared.h.
-
-vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL, const vec3& bR) {
-  const double dyL = bL.y - aL.y;
-  const double dyR = bR.y - aR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
-               "Boolean manifold error: no intersection");
-  const bool useL = fabs(dyL) < fabs(dyR);
-  const double dx = aR.x - aL.x;
-  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!std::isfinite(lambda)) lambda = 0.0;
-  vec4 xyzz;
-  xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
-  const double aDy = aR.y - aL.y;
-  const double bDy = bR.y - bL.y;
-  const bool useA = fabs(aDy) < fabs(bDy);
-  xyzz.y = lambda * (useA ? aDy : bDy) +
-           (useL ? (useA ? aL.y : bL.y) : (useA ? aR.y : bR.y));
-  xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
-  xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
-  return xyzz;
-}
 
 struct FaceEdge {
   int edge;
@@ -573,6 +550,45 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   }
 #endif
 }
+Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
+  ZoneScoped;
+  Vec<int> winding(points.size(), 0);
+  if (points.empty() || IsEmpty()) return winding;
+
+  // Points outside the bounding box have winding 0 for any closed manifold.
+  Vec<int> query2input;
+  query2input.reserve(points.size());
+  for (size_t i = 0; i < points.size(); ++i)
+    if (bBox_.Contains(points[i])) query2input.push_back(static_cast<int>(i));
+  if (query2input.empty()) return winding;
+
+  // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
+  // and vertNormal_ from inA; halfedges and faces are not accessed.
+  Impl pointImpl;
+  pointImpl.vertPos_.resize(query2input.size());
+  pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
+  for (size_t i = 0; i < query2input.size(); ++i)
+    pointImpl.vertPos_[i] = points[query2input[i]];
+
+  // expandP=false: no symbolic perturbation from the query side (zero normals).
+  // forward=true: project along +Z to count signed face crossings above each
+  // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
+  // XY-projected, so all faces with XY overlap are returned regardless of Z
+  // (correct for +Z winding).
+  Kernel02<false, true> k02{pointImpl, *this};
+  auto recorderf = [&](int localIdx, int tri) {
+    const auto [s02, z02] = k02(localIdx, tri);
+    if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
+  };
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
+  // Each queryIdx is processed by at most one thread (for_each_n), so the
+  // per-queryIdx accumulation into winding[] is race-free without atomics.
+  collider_.Collisions<false>(recorder, f, static_cast<int>(query2input.size()),
+                              true);
+  return winding;
+}
+
 std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   ZoneScoped;
   if (IsEmpty()) return {};

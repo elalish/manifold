@@ -1136,4 +1136,21 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
 std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
   return GetCsgLeafNode().GetImpl()->RayCast(origin, endpoint);
 }
+
+/**
+ * Returns the winding number of this manifold around each of the given points.
+ * Returns 0 for points outside, and a non-zero value (typically ±1) for points
+ * inside a simple closed surface. For manifolds with overlapping regions the
+ * magnitude may exceed 1.
+ *
+ * @param points The 3D query points.
+ */
+std::vector<int> Manifold::WindingNumber(
+    const std::vector<vec3>& points) const {
+  if (points.empty()) return {};
+  const auto impl = GetCsgLeafNode().GetImpl();
+  Vec<int> w =
+      impl->PointWinding(VecView<const vec3>(points.data(), points.size()));
+  return std::vector<int>(w.begin(), w.end());
+}
 }  // namespace manifold

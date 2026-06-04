@@ -14,6 +14,12 @@
 
 #include "execution_impl.h"
 
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+#include <chrono>
+#include <cstring>
+#include <iostream>
+#endif
+
 #include "impl.h"
 #include "manifold/manifold.h"
 #include "manifold/mesh.h"
@@ -30,10 +36,48 @@ void ResetForStaticFactory(ExecutionContext::Impl* ctx, int totalPhases) {
   ctx->donePhases.store(0, std::memory_order_relaxed);
   ctx->totalBooleans.store(0, std::memory_order_relaxed);
   ctx->totalPhases.store(totalPhases, std::memory_order_relaxed);
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  ctx->lastPhase = std::chrono::high_resolution_clock::now();
+#endif
 }
 
 }  // namespace
 namespace manifold {
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line) {
+  const auto now = std::chrono::high_resolution_clock::now();
+  if (ManifoldParams().verbose >= 2) {
+    const double ms =
+        std::chrono::duration<double, std::milli>(now - ctx->lastPhase).count();
+    const char* slash = std::strrchr(file, '/');
+    std::cout << "  phase " << ctx->donePhases.load(std::memory_order_relaxed)
+              << " (" << (slash ? slash + 1 : file) << ":" << line
+              << ") = " << ms << " ms" << std::endl;
+  }
+  ctx->lastPhase = now;
+}
+
+LocalPhaseTiming BeginLocalPhaseTiming() {
+  static std::atomic<int> counter{0};
+  return {std::chrono::high_resolution_clock::now(),
+          counter.fetch_add(1, std::memory_order_relaxed)};
+}
+
+void RecordPhase(LocalPhaseTiming& timing, int phase, const char* file,
+                 int line) {
+  const auto now = std::chrono::high_resolution_clock::now();
+  if (ManifoldParams().verbose >= 2) {
+    const double ms =
+        std::chrono::duration<double, std::milli>(now - timing.last).count();
+    const char* slash = std::strrchr(file, '/');
+    std::cout << "  [b" << timing.uid << "] phase " << phase << " ("
+              << (slash ? slash + 1 : file) << ":" << line << ") = " << ms
+              << " ms" << std::endl;
+  }
+  timing.last = now;
+}
+#endif
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}
 ExecutionContext::~ExecutionContext() = default;
@@ -70,6 +114,28 @@ Manifold ExecutionContext::FromMeshGL(const MeshGL64& mesh) {
   ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
   return Manifold::FromImpl(
       std::make_shared<Manifold::Impl>(mesh, impl_.get()));
+}
+
+Manifold ExecutionContext::Smooth(
+    const MeshGL& mesh, const std::vector<Smoothness>& sharpenedEdges) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerSmooth);
+  return Manifold::FromImpl(MakeSmoothImpl(mesh, sharpenedEdges, impl_.get()));
+}
+
+Manifold ExecutionContext::Smooth(
+    const MeshGL64& mesh, const std::vector<Smoothness>& sharpenedEdges) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerSmooth);
+  return Manifold::FromImpl(MakeSmoothImpl(mesh, sharpenedEdges, impl_.get()));
+}
+
+Manifold ExecutionContext::LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                                    double edgeLength, double level,
+                                    double tolerance, bool canParallel) {
+  ResetForStaticFactory(impl_.get(), kPhasesPerLevelSet);
+  auto pImpl = std::make_shared<Manifold::Impl>();
+  pImpl->CreateLevelSet(sdf, bounds, edgeLength, level, tolerance, canParallel,
+                        impl_.get());
+  return Manifold::FromImpl(pImpl);
 }
 
 }  // namespace manifold

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <mutex>
+
 #include "manifold/manifold.h"
 #include "utils.h"
 
@@ -47,6 +49,8 @@ class CsgLeafNode final : public CsgNode {
   CsgLeafNode();
   CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_);
   CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_, mat3x4 transform_);
+  // mutex_ is not copyable; snapshot the source under its lock.
+  CsgLeafNode(const CsgLeafNode& other);
 
   std::shared_ptr<const Manifold::Impl> GetImpl() const;
 
@@ -72,6 +76,9 @@ class CsgLeafNode final : public CsgNode {
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
   mutable mat3x4 transform_ = la::identity;
+  // Lazy realization mutates these through const accessors on a shared node,
+  // so every access takes mutex_.
+  mutable std::mutex mutex_;
 };
 
 class CsgOpNode final : public CsgNode {
