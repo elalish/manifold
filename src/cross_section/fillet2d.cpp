@@ -436,7 +436,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   double secondT = 0;
   if (IntersectLines(firstOffset, firstVec, secondOffset, secondVec, center,
                      firstT, secondT) &&
-      firstT > 0 && firstT < 1 && secondT > 0 && secondT < 1 &&
+      firstT >= 0 && firstT <= 1 && secondT >= 0 && secondT <= 1 &&
       FinishFilletGeometry(input, firstEdge, secondEdge, firstT, secondT,
                            center, geometry)) {
     geometries.push_back(geometry);
@@ -451,7 +451,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
       const vec2 candidate = ev.points[i];
       const double t =
           dot(candidate - firstOffset, firstVec) / dot(firstVec, firstVec);
-      if (t > 0 && t < 1 &&
+      if (t >= 0 && t <= 1 &&
           FinishFilletGeometry(input, firstEdge, secondEdge, t, 1, candidate,
                                geometry)) {
         geometries.push_back(geometry);
@@ -468,7 +468,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
       const vec2 candidate = ve.points[i];
       const double t =
           dot(candidate - secondOffset, secondVec) / dot(secondVec, secondVec);
-      if (t > 0 && t < 1 &&
+      if (t >= 0 && t <= 1 &&
           FinishFilletGeometry(input, firstEdge, secondEdge, 1, t, candidate,
                                geometry)) {
         geometries.push_back(geometry);
@@ -657,50 +657,77 @@ std::vector<CrossSection> TraceFillets(
     double radius, int circularSegments) {
   if (geometries.empty()) return {};
 
-  std::vector<Segment> segments;
-  std::vector<int> segmentFromStartFillet;
-  if (!BuildSegments(input, geometries, segments, segmentFromStartFillet)) {
-    return {};
+  std::vector<std::vector<size_t>> starts(input.edges.size());
+  for (size_t i = 0; i < geometries.size(); ++i) {
+    starts[geometries[i].fromEdge].push_back(i);
   }
-
-  if (segments.empty()) return {};
+  for (auto& edgeStarts : starts) {
+    std::sort(edgeStarts.begin(), edgeStarts.end(),
+              [&](size_t a, size_t b) {
+                return geometries[a].fromT < geometries[b].fromT;
+              });
+  }
 
   Polygons resultLoops;
   std::vector<uint8_t> touchedLoop(input.loops.size(), 0);
   const size_t maxSteps =
-      segments.size() + geometries.size() + input.edges.size();
+      geometries.size() * (input.edges.size() + 1) + input.edges.size();
   const double pointTolerance = std::max(radius * 1e-8, 1e-12);
+  std::vector<uint8_t> used(geometries.size(), 0);
 
-  for (size_t startSegment = 0; startSegment < segments.size();
-       ++startSegment) {
-    if (segments[startSegment].used) continue;
+  auto findNextFillet = [&](int edge, double t, size_t startFillet)
+      -> std::pair<int, bool> {
+    for (size_t fillet : starts[edge]) {
+      const FilletGeometry& geometry = geometries[fillet];
+      if (!(geometry.fromT >= t)) continue;
+      if (fillet == startFillet) return {static_cast<int>(fillet), true};
+      if (!used[fillet]) return {static_cast<int>(fillet), false};
+    }
+    return {-1, false};
+  };
+
+  for (size_t startFillet = 0; startFillet < geometries.size();
+       ++startFillet) {
+    if (used[startFillet]) continue;
 
     SimplePolygon loop;
-    size_t current = startSegment;
+    size_t current = startFillet;
     bool closed = false;
 
     for (size_t step = 0; step <= maxSteps; ++step) {
-      Segment& segment = segments[current];
-      if (segment.used) {
-        if (current != startSegment) return {};
-        closed = true;
-        break;
-      }
+      if (used[current]) return {};
+      used[current] = 1;
 
-      segment.used = true;
-      touchedLoop[input.edges[segment.edge].loop] = 1;
-
-      AppendPoint(loop, segment.startPoint, pointTolerance);
-      AppendPoint(loop, segment.endPoint, pointTolerance);
-
-      const FilletGeometry& fillet = geometries[segment.endFillet];
+      const FilletGeometry& fillet = geometries[current];
+      AppendPoint(loop, fillet.fromPoint, pointTolerance);
       AppendArcPoints(loop, fillet, radius, circularSegments);
+      touchedLoop[input.edges[fillet.fromEdge].loop] = 1;
       touchedLoop[input.edges[fillet.toEdge].loop] = 1;
 
-      const int next = segmentFromStartFillet[segment.endFillet];
-      if (next < 0) return {};
+      int edge = fillet.toEdge;
+      double t = fillet.toT;
+      bool foundNext = false;
+      for (size_t walk = 0; walk <= input.edges.size(); ++walk) {
+        const auto next = findNextFillet(edge, t, startFillet);
+        if (next.first >= 0) {
+          const FilletGeometry& nextFillet = geometries[next.first];
+          AppendPoint(loop, nextFillet.fromPoint, pointTolerance);
+          if (next.second) {
+            closed = true;
+          } else {
+            current = static_cast<size_t>(next.first);
+          }
+          foundNext = true;
+          break;
+        }
 
-      current = static_cast<size_t>(next);
+        AppendPoint(loop, EdgeEnd(input, edge), pointTolerance);
+        touchedLoop[input.edges[edge].loop] = 1;
+        edge = NextEdge(input, edge);
+        t = 0;
+      }
+
+      if (!foundNext || closed) break;
     }
 
     if (!closed || loop.size() < 3) return {};
@@ -712,8 +739,8 @@ std::vector<CrossSection> TraceFillets(
     resultLoops.push_back(loop);
   }
 
-  for (const Segment& segment : segments) {
-    if (!segment.used) return {};
+  for (uint8_t filletUsed : used) {
+    if (!filletUsed) return {};
   }
 
   for (size_t loopIdx = 0; loopIdx < input.loops.size(); ++loopIdx) {
