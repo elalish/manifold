@@ -16,7 +16,7 @@
 // arrangement, walks each face once via BFS to propagate winding numbers
 // (seeded by symbolic ray-casts from local outer faces),
 // then keeps only the sub-edges that separate "inside" from "outside"
-// under the chosen rule (Add / Intersect / EvenOdd / NonZero / Negative).
+// under the chosen rule (Add / Intersect).
 //
 // FastEdge + CastExternalWindingRay are the ray-cast helpers for local outer
 // face seeds; FilterByWindingHalfedges is the entry point. iostream usage is
@@ -51,12 +51,6 @@ bool IsInside(WindRule rule, int w) {
       return w > 0;
     case WindRule::Intersect:
       return w > 1;
-    case WindRule::EvenOdd:
-      return (w & 1) != 0;
-    case WindRule::NonZero:
-      return w != 0;
-    case WindRule::Negative:
-      return w < 0;
   }
   return false;
 }
@@ -503,10 +497,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
   // Pick up disconnected edge components with a symbolic ray-cast from a local
   // outer face. The component's own contribution on that side is zero, so the
   // cast only counts other components.
-  thread_local static std::vector<uint8_t> islandOuterFace;
-  islandOuterFace.assign(nFaces, 0);
   for (int localOuter : componentOuterFace) {
-    islandOuterFace[localOuter] = 1;
     if (!wAssigned[localOuter]) {
       seedRayCast(localOuter);
       propagateFrom(localOuter);
@@ -538,18 +529,8 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
     const int leftFace = halfedges[hA].face;
     const int rightFace = halfedges[hB].face;
     if (leftFace < 0 || rightFace < 0) continue;
-    // For a disconnected island, the face outside that island is not one
-    // globally uniform region under NonZero; other islands can lie in different
-    // parts of it. Recast next to the queried halfedge so classification uses
-    // the side adjacent to this edge.
-    const auto faceWindingAtHalfedge = [&](int face, int halfedge) {
-      if (rule == WindRule::NonZero && islandOuterFace[face]) {
-        return castFaceHalfedge(halfedge);
-      }
-      return faceWind[face];
-    };
-    const int wL = faceWindingAtHalfedge(leftFace, hA);
-    const int wR = faceWindingAtHalfedge(rightFace, hB);
+    const int wL = faceWind[leftFace];
+    const int wR = faceWind[rightFace];
     const bool leftIn = IsInside(rule, wL);
     const bool rightIn = IsInside(rule, wR);
     if (leftIn == rightIn) continue;

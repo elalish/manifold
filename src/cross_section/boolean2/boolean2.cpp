@@ -157,10 +157,6 @@ Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bSign,
   return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), origin);
 }
 
-Polygons RegularizeByRule(const Polygons& in, WindRule rule, double eps,
-                          double tolerance) {
-  return BinaryOpByRule(in, {}, 1, rule, eps, tolerance);
-}
 }  // namespace
 
 // Flatten manifold::Polygons into the lower-level (verts, edges) input.
@@ -236,7 +232,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
 
 // Single-input regularization used by `CrossSection::Simplify(eps)`.
 Polygons Simplify(const Polygons& in, double eps, double tolerance) {
-  return RegularizeByRule(in, WindRule::Add, eps, tolerance);
+  return BinaryOpByRule(in, {}, 1, WindRule::Add, eps, tolerance);
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
@@ -249,11 +245,6 @@ double InferEps(const Polygons& a, const Polygons& b) {
   if (!box.IsFinite()) return 0.0;
   const vec2 halfSize = 0.5 * box.Size();
   return EpsilonFromScale(Rect(-halfSize, halfSize).Scale());
-}
-
-// Regularize one Polygons input under an explicit CrossSection fill rule.
-Polygons FillByRule(const Polygons& in, WindRule rule, double eps) {
-  return RegularizeByRule(in, rule, eps, eps);
 }
 
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.

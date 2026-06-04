@@ -94,8 +94,8 @@ This implementation follows the six-step 2D overlap-removal sketch from
 upstream issue #289: epsilon-based vertex merge, collapsed-edge removal,
 ordered edge vertex lists, snapped proper crossings, multiplicity-based
 sub-edge canonicalization, and positive-winding output. The current code
-generalizes the final filter so the same arrangement can serve union,
-subtract, intersect, and construction-time fill rules.
+generalizes the final filter only as far as the Boolean2 operations need:
+positive-winding add/subtract/fill and intersection.
 
 The main implementation differences are:
 
@@ -112,30 +112,27 @@ The main implementation differences are:
   Bentley-Ottmann sweep. Endpoint-on-edge and collinear degeneracies are
   handled by the edge vertex lists; isolated crossings are inserted or snapped
   to neighboring list vertices.
-- Output filtering uses a halfedge face traversal and winding propagation instead
-  of independent midpoint ray casts for every sub-edge. This makes one winding
-  decision per face, avoids per-edge disagreement around high-valence
+- Output filtering uses a halfedge face traversal and winding propagation
+  instead of independent midpoint ray casts for every sub-edge. This makes one
+  winding decision per face, avoids per-edge disagreement around high-valence
   intersection vertices, and still retains exactly the edges whose adjacent
-  faces differ under the selected rule.
+  faces differ under the selected Boolean2 predicate.
 
 ## Winding Rules
 
-The halfedge filter keeps an edge iff the face on one side is inside the
-result and the face on the other side is outside. The built-in predicates are:
+The halfedge filter keeps an edge iff the face on one side is inside the result
+and the face on the other side is outside. The internal Boolean2 predicates are:
 
 - `Add`: `w > 0`, used for union/fill under the default positive-winding rule.
 - `Subtract`: implemented by appending the second input with negative
   multiplicity, then using `Add`.
 - `Intersect`: `w > 1`, which corresponds to both operands covering the face
   for normalized unit-winding operands.
-- `EvenOdd`: `w & 1`, available for construction-time fill.
-- `NonZero`: `w != 0`, available for construction-time fill and offset cleanup.
-- `Negative`: `w < 0`, available for construction-time fill and negative-offset
-  fallback.
 
-Construction-time fill rules are exposed through `FillByRule`. The public
-`CrossSection` backend mapping from `FillRule`, `OpType`, decomposition, and
-offset is staged in the backend-wiring branch.
+The public `CrossSection::FillRule` enum is still present for backend/API
+compatibility while `clipper2` remains selectable. Boolean2 construction is
+Positive-only; non-Positive public fill rules are unsupported by the Boolean2
+backend until the public API cleanup in #1707 removes them.
 
 ## Regularization And Epsilon
 

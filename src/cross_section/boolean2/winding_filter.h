@@ -26,11 +26,6 @@ struct Trace;
 enum class WindRule {
   Add,
   Intersect,
-  // TODO(#1707): Preserved for CrossSection::FillRule compatibility; remove
-  // these when FillRule::EvenOdd/NonZero/Negative are deleted.
-  EvenOdd,
-  NonZero,
-  Negative,
 };
 
 std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
