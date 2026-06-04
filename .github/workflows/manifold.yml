@@ -614,44 +614,11 @@ jobs:
     - name: Prepare base and head worktrees
       continue-on-error: true
       shell: bash
-      run: |
-        set -euo pipefail
-        BASE_SHA="${{ github.event.pull_request.base.sha }}"
-        HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-        git worktree add wt-base "$BASE_SHA"
-        git worktree add wt-head "$HEAD_SHA"
+      run: bash ./scripts/prepare_pr_perf_guard_worktrees.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
     - name: Benchmark base and head
       continue-on-error: true
       shell: bash
-      run: |
-        for variant in base head; do
-          bash ./scripts/run_pr_perf_guard.sh "./wt-${variant}" ./clipper2 "./bench/${variant}" "${PERF_REPEATS}"
-        done
+      run: bash ./scripts/benchmark_pr_perf_guard.sh ./clipper2 "${PERF_REPEATS}"
     - name: Compare benchmark results
       shell: bash
-      run: |
-        python3 ./scripts/compare_pr_perf_guard.py \
-          --base-dir ./bench/base \
-          --head-dir ./bench/head \
-          --warn-pct "${REGRESSION_WARN_PCT}" \
-          --warn-abs-ms "${REGRESSION_WARN_ABS_MS}" \
-          --markdown-out ./bench/summary.md \
-          --json-out ./bench/result.json
-        echo "::group::PR benchmark summary"
-        cat ./bench/summary.md
-        echo "::endgroup::"
-        echo "::group::PR benchmark result.json"
-        cat ./bench/result.json
-        echo "::endgroup::"
-        echo "::group::PR benchmark raw outputs"
-        for variant in base head; do
-          for run_file in ./bench/${variant}/run*.txt; do
-            [ -f "${run_file}" ] || continue
-            echo "--- ${run_file} ---"
-            cat "${run_file}"
-          done
-        done
-        echo "::endgroup::"
-        cat ./bench/summary.md >> "$GITHUB_STEP_SUMMARY"
-        echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "Raw logs: open this step and expand \`PR benchmark result.json\` and \`PR benchmark raw outputs\` groups." >> "$GITHUB_STEP_SUMMARY"
+      run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}"
