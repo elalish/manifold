@@ -246,13 +246,20 @@ def read_input_file(filename: str) -> List[Dict[str, Any]]:
         
         line_idx = 0
         
-        # Line 1: Header (e.g., "input.txt 1"), skip
-        header_name = lines[line_idx].split()[0]
+        # Either SavePolygons input:
+        #   filename
+        #   num polygons
+        # or test/polygons fixture input:
+        #   name expectedNumTri epsilon numPolygons [maxCircleRadius]
+        header_parts = lines[line_idx].split()
+        header_name = header_parts[0]
         line_idx += 1
 
-        # Line 2: Number of polygons
-        n_polygons = int(lines[line_idx])
-        line_idx += 1
+        if len(header_parts) >= 4:
+            n_polygons = int(header_parts[3])
+        else:
+            n_polygons = int(lines[line_idx])
+            line_idx += 1
         print(f"  Found {n_polygons} input polygon(s).")
 
         current_cross_section_paths = []
