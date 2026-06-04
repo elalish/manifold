@@ -168,6 +168,7 @@ struct Manifold::Impl {
 
   // boolean3.cpp
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
+  Vec<int> PointWinding(VecView<const vec3> points) const;
 
   // sort.cpp
   void SortGeometry(ExecutionContext::Impl* ctx = nullptr);

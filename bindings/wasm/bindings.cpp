@@ -126,6 +126,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<vec2>("Vector_vec2");
   register_vector<std::vector<vec2>>("Vector2_vec2");
   register_vector<double>("Vector_f64");
+  register_vector<int>("Vector_i32");
   register_vector<CrossSection>("Vector_crossSection");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
@@ -212,6 +213,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
       .function("_RayCast", &man_js::RayCast)
+      .function("_WindingNumber", &Manifold::WindingNumber)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)

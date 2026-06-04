@@ -188,6 +188,7 @@ class Manifold {
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
+  std::vector<int> WindingNumber(const std::vector<vec3>& points) const;
   ///@}
 
   /** @name Mesh ID

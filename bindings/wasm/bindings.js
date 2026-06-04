@@ -329,6 +329,16 @@ Module.setup = function() {
     return result;
   };
 
+  Module.Manifold.prototype.windingNumber = function(points) {
+    const inVec = new Module.Vector_vec3();
+    for (const p of points) inVec.push_back(vararg2vec3([p]));
+    const outVec = this._WindingNumber(inVec);
+    inVec.delete();
+    const result = fromVec(outVec);
+    outVec.delete();
+    return result;
+  };
+
   Module.Manifold.prototype.rayCast = function(origin, endpoint) {
     const vec = this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
     const result =

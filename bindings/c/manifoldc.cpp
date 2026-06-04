@@ -887,6 +887,11 @@ ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
   return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
 }
 
+int manifold_winding_number(ManifoldManifold* m, double x, double y, double z) {
+  const auto result = from_c(m)->WindingNumber({{x, y, z}});
+  return result.empty() ? 0 : result[0];
+}
+
 ManifoldExecutionContext* manifold_execution_context(void* mem) {
   return to_c(new (mem) ExecutionContext());
 }

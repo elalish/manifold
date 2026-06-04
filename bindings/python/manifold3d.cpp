@@ -323,6 +323,9 @@ NB_MODULE(manifold3d, m) {
       .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
+      .def("winding_number", &Manifold::WindingNumber, nb::arg("points"),
+           "Returns the winding number of this manifold around each of the "
+           "given points. 0 means outside, non-zero means inside.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
