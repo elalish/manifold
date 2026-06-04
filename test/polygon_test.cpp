@@ -146,7 +146,8 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
   return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
 };
 
-void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
+void BuildFillet(const Polygons& polys, double epsilon = -1.0,
+                 double maxCircleRadius = 0.0) {
   std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
 
   const int inputCircularSegments = 20;
@@ -197,7 +198,8 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
 
     // Testing Positive Radius
 
-    double low = 1E-6, high = 0.8 * min;
+    double low = 1E-6;
+    double high = maxCircleRadius > low ? 1.05 * maxCircleRadius : 0.8 * min;
 
     TestFillet(polys, input, low, inputCircularSegments);
 
@@ -218,6 +220,8 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
         high = mid;
       }
     }
+    EXPECT_NEAR(low, maxCircleRadius,
+                std::max(1E-6, 1E-3 * maxCircleRadius));
 
     // Testing Negative Radius
 
@@ -254,7 +258,8 @@ class PolygonTestFixture : public testing::Test {
   std::string name;
 
   explicit PolygonTestFixture(Polygons polys, double epsilon,
-                              int expectedNumTri, const std::string& name)
+                              int expectedNumTri, const std::string& name,
+                              double maxCircleRadius)
       : polys(polys),
         epsilon(epsilon),
         expectedNumTri(expectedNumTri),
@@ -267,17 +272,19 @@ class FilletTestFixture : public testing::Test {
  public:
   Polygons polys;
   double epsilon;
+  double maxCircleRadius;
   int expectedNumTri;
   std::string name;
 
   explicit FilletTestFixture(Polygons polys, double epsilon, int expectedNumTri,
-                             const std::string& name)
+                             const std::string& name, double maxCircleRadius)
       : polys(polys),
         epsilon(epsilon),
+        maxCircleRadius(maxCircleRadius),
         expectedNumTri(expectedNumTri),
         name(name) {}
 
-  void TestBody() { BuildFillet(polys, epsilon); }
+  void TestBody() { BuildFillet(polys, epsilon, maxCircleRadius); }
 };
 
 template <typename TestFixture>
@@ -287,7 +294,7 @@ void RegisterPolygonTestsFile(const std::string& suitename,
   EXPECT_TRUE(f.is_open());
 
   // for each test:
-  //   test name, expectedNumTri, epsilon, num polygons
+  //   test name, expectedNumTri, epsilon, num polygons, max circle radius
   //   for each polygon:
   //     num points
   //     for each vertex:
@@ -296,13 +303,13 @@ void RegisterPolygonTestsFile(const std::string& suitename,
   // note that we should not have commas in the file
 
   std::string name;
-  double epsilon, x, y;
+  double epsilon, x, y, maxCircleRadius;
   int expectedNumTri, numPolys, numPoints;
 
   while (1) {
     f >> name;
     if (f.eof()) break;
-    f >> expectedNumTri >> epsilon >> numPolys;
+    f >> expectedNumTri >> epsilon >> numPolys >> maxCircleRadius;
     Polygons polys;
     for (int i = 0; i < numPolys; i++) {
       polys.emplace_back();
@@ -315,7 +322,8 @@ void RegisterPolygonTestsFile(const std::string& suitename,
     testing::RegisterTest(
         suitename.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
         [=, polys = std::move(polys)]() -> TestFixture* {
-          return new TestFixture(polys, epsilon, expectedNumTri, name);
+          return new TestFixture(polys, epsilon, expectedNumTri, name,
+                                 maxCircleRadius);
         });
   }
   f.close();
