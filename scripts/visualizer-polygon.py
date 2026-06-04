@@ -587,7 +587,7 @@ if __name__ == "__main__":
     # Adjust layout to prevent title overlap
     plt.tight_layout(rect=[0, 0.03, 1, 0.95]) 
     
-    save_name = os.path.join(result_dir, "all_results.png")
+    save_name = os.path.join(result_dir, "../../all_results.png")
     try:
         plt.savefig(save_name)
         print(f"\nSuccessfully saved combined plot to {save_name}")

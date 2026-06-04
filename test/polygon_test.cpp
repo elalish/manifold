@@ -146,25 +146,10 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
   return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
 };
 
-bool IsValidFilletInput(const Polygons& polys) {
-  constexpr double kMaxCoordinate = 1e30;
-  for (const auto& loop : polys) {
-    for (const vec2& point : loop) {
-      if (!std::isfinite(point.x) || !std::isfinite(point.y) ||
-          std::abs(point.x) >= kMaxCoordinate ||
-          std::abs(point.y) >= kMaxCoordinate) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 void BuildFillet(const Polygons& polys, double epsilon = -1.0) {
   std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
 
   const int inputCircularSegments = 20;
-  if (!IsValidFilletInput(polys)) return;
   const CrossSection input = CrossSection(polys);
 
 #ifdef MANIFOLD_DEBUG
