@@ -57,6 +57,26 @@ void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line) {
   }
   ctx->lastPhase = now;
 }
+
+LocalPhaseTiming BeginLocalPhaseTiming() {
+  static std::atomic<int> counter{0};
+  return {std::chrono::high_resolution_clock::now(),
+          counter.fetch_add(1, std::memory_order_relaxed)};
+}
+
+void RecordPhase(LocalPhaseTiming& timing, int phase, const char* file,
+                 int line) {
+  const auto now = std::chrono::high_resolution_clock::now();
+  if (ManifoldParams().verbose >= 2) {
+    const double ms =
+        std::chrono::duration<double, std::milli>(now - timing.last).count();
+    const char* slash = std::strrchr(file, '/');
+    std::cout << "  [b" << timing.uid << "] phase " << phase << " ("
+              << (slash ? slash + 1 : file) << ":" << line << ") = " << ms
+              << " ms" << std::endl;
+  }
+  timing.last = now;
+}
 #endif
 
 ExecutionContext::ExecutionContext() : impl_(std::make_shared<Impl>()) {}

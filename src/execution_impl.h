@@ -119,6 +119,18 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 // defined in execution_impl.cpp so <chrono>/<iostream> stay out of this
 // widely-included header.
 void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line);
+
+// Per-op local phase-timing state. Boolean3::Result keeps this on its own
+// stack rather than on the shared ctx, so concurrent booleans in a CSG tree
+// don't clobber each other's baseline. `uid` tags the printed lines so the
+// interleaved output of parallel booleans can be split apart.
+struct LocalPhaseTiming {
+  std::chrono::high_resolution_clock::time_point last;
+  int uid;
+};
+LocalPhaseTiming BeginLocalPhaseTiming();
+void RecordPhase(LocalPhaseTiming& timing, int phase, const char* file,
+                 int line);
 #endif
 
 }  // namespace manifold
