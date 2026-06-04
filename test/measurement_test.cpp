@@ -316,9 +316,8 @@ TEST(Manifold, WindingHollowShell) {
 // Cross-check: winding != 0 agrees with RayCast hit-count parity.
 TEST(Manifold, WindingMatchesRayCastParity) {
   Manifold cube = Manifold::Cube(vec3(1), true);
-  const std::vector<vec3> pts = {{0, 0, 0},       {0.3, 0.2, 0.1},
-                                  {0.5, 0.5, 0.5}, {0, 0, 1},
-                                  {0, 0, 2},       {-1, 0, 0}};
+  const std::vector<vec3> pts = {{0, 0, 0}, {0.3, 0.2, 0.1}, {0.5, 0.5, 0.5},
+                                 {0, 0, 1}, {0, 0, 2},       {-1, 0, 0}};
   const auto winding = cube.WindingNumber(pts);
   for (size_t i = 0; i < pts.size(); ++i) {
     const vec3& p = pts[i];

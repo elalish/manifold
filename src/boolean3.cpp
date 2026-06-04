@@ -607,8 +607,8 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
-  collider_.Collisions<false>(recorder, f,
-                              static_cast<int>(query2input.size()), true);
+  collider_.Collisions<false>(recorder, f, static_cast<int>(query2input.size()),
+                              true);
   return winding;
 }
 
