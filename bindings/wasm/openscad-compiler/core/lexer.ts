@@ -296,8 +296,57 @@ export class Lexer {
         switch (esc) {
           case "n": result += "\n"; break;
           case "t": result += "\t"; break;
+          case "r": result += "\r"; break;
           case "\\": result += "\\"; break;
           case '"': result += '"'; break;
+          case "x": {
+            let hex = "";
+            for (let i = 0; i < 2; i++) {
+              if (/[0-9a-fA-F]/.test(this.peek())) {
+                hex += this.advance();
+              } else {
+                break;
+              }
+            }
+            if (hex.length === 2) {
+              result += String.fromCharCode(parseInt(hex, 16));
+            } else {
+              result += "x" + hex;
+            }
+            break;
+          }
+          case "u": {
+            let hex = "";
+            for (let i = 0; i < 4; i++) {
+              if (/[0-9a-fA-F]/.test(this.peek())) {
+                hex += this.advance();
+              } else {
+                break;
+              }
+            }
+            if (hex.length === 4) {
+              result += String.fromCharCode(parseInt(hex, 16));
+            } else {
+              result += "u" + hex;
+            }
+            break;
+          }
+          case "U": {
+            let hex = "";
+            for (let i = 0; i < 6; i++) {
+              if (/[0-9a-fA-F]/.test(this.peek())) {
+                hex += this.advance();
+              } else {
+                break;
+              }
+            }
+            if (hex.length === 6) {
+              result += String.fromCodePoint(parseInt(hex, 16));
+            } else {
+              result += "U" + hex;
+            }
+            break;
+          }
           default: result += esc; break;
         }
       } else {

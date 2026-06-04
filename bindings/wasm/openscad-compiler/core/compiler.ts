@@ -64,7 +64,10 @@ function escapeName(name: string): string {
 }
 
 // Signatures
-interface Signature { params: string[]; }
+interface Signature {
+  params: string[];
+  defaults: (Expr | undefined)[];
+}
 const signatures = new Map<string, Signature>();
 
 type ModuleDeclStmtType = Extract<Statement, { kind: "moduleDecl" }>;
@@ -110,9 +113,15 @@ function generateFontBase64(fontSpec: string, compilerDir: string): string | und
     return undefined;
   }
 
-  const filename = fontSpecToFilename(fontSpec);
-  const ttfPath = path.join(fontDir, `${filename}.ttf`);
-  const otfPath = path.join(fontDir, `${filename}.otf`);
+  let filename = fontSpec;
+  let ttfPath = path.join(fontDir, `${filename}.ttf`);
+  let otfPath = path.join(fontDir, `${filename}.otf`);
+
+  if (!fs.existsSync(ttfPath) && !fs.existsSync(otfPath)) {
+    filename = fontSpecToFilename(fontSpec);
+    ttfPath = path.join(fontDir, `${filename}.ttf`);
+    otfPath = path.join(fontDir, `${filename}.otf`);
+  }
 
   let fontFilePath: string | undefined;
   let mimeType: string;
@@ -173,7 +182,10 @@ function collectSignatures(stmts: Statement[]) {
   for (const stmt of stmts) {
     if (stmt.kind === "functionDecl" || stmt.kind === "moduleDecl") {
       const name = stmt.kind === "functionDecl" ? escapeName(stmt.name) + "_fn" : escapeName(stmt.name) + "$mod";
-      signatures.set(name, { params: stmt.params.map(p => p.name) });
+      signatures.set(name, {
+        params: stmt.params.map(p => p.name),
+        defaults: stmt.params.map(p => p.defaultValue)
+      });
       if (stmt.kind === "moduleDecl" && stmt.body.kind === "block") {
         collectSignatures(stmt.body.statements);
       }
@@ -485,6 +497,223 @@ function collectLocalVariableNames(stmts: Statement[]): string[] {
   return names;
 }
 
+function collectStringLiteralsInExpr(expr: Expr, literals: Set<string>): void {
+  if (!expr) return;
+  switch (expr.kind) {
+    case "string":
+      literals.add(expr.value);
+      break;
+    case "vector":
+      for (const el of expr.elements) collectStringLiteralsInExpr(el, literals);
+      break;
+    case "range":
+      collectStringLiteralsInExpr(expr.start, literals);
+      collectStringLiteralsInExpr(expr.end, literals);
+      if (expr.step) collectStringLiteralsInExpr(expr.step, literals);
+      break;
+    case "binary":
+      collectStringLiteralsInExpr(expr.left, literals);
+      collectStringLiteralsInExpr(expr.right, literals);
+      break;
+    case "unary":
+      collectStringLiteralsInExpr(expr.operand, literals);
+      break;
+    case "ternary":
+      collectStringLiteralsInExpr(expr.condition, literals);
+      collectStringLiteralsInExpr(expr.ifTrue, literals);
+      collectStringLiteralsInExpr(expr.ifFalse, literals);
+      break;
+    case "call":
+      for (const arg of expr.args) collectStringLiteralsInExpr(arg.value, literals);
+      break;
+    case "index":
+      collectStringLiteralsInExpr(expr.object, literals);
+      collectStringLiteralsInExpr(expr.index, literals);
+      break;
+    case "member":
+      collectStringLiteralsInExpr(expr.object, literals);
+      break;
+    case "group":
+      collectStringLiteralsInExpr(expr.expr, literals);
+      break;
+    case "echo":
+    case "assert":
+      for (const arg of expr.args) collectStringLiteralsInExpr(arg.value, literals);
+      collectStringLiteralsInExpr(expr.expr, literals);
+      break;
+    case "let":
+      for (const assign of expr.assignments) collectStringLiteralsInExpr(assign.value, literals);
+      collectStringLiteralsInExpr(expr.body, literals);
+      break;
+    case "each":
+      collectStringLiteralsInExpr(expr.expr, literals);
+      break;
+    case "lambda":
+      for (const param of expr.params) {
+        if (param.defaultValue) collectStringLiteralsInExpr(param.defaultValue, literals);
+      }
+      collectStringLiteralsInExpr(expr.body, literals);
+      break;
+    case "dynCall":
+      collectStringLiteralsInExpr(expr.callee, literals);
+      for (const arg of expr.args) collectStringLiteralsInExpr(arg.value, literals);
+      break;
+    case "listComp":
+      collectStringLiteralsInGenerator(expr.generator, literals);
+      break;
+  }
+}
+
+function collectStringLiteralsInGenerator(gen: ListCompGenerator, literals: Set<string>): void {
+  if (!gen) return;
+  switch (gen.kind) {
+    case "lcFor":
+      for (const v of gen.variables) collectStringLiteralsInExpr(v.range, literals);
+      collectStringLiteralsInGenerator(gen.body, literals);
+      break;
+    case "lcCFor":
+      for (const init of gen.inits) collectStringLiteralsInExpr(init.value, literals);
+      collectStringLiteralsInExpr(gen.condition, literals);
+      for (const update of gen.updates) collectStringLiteralsInExpr(update.value, literals);
+      collectStringLiteralsInGenerator(gen.body, literals);
+      break;
+    case "lcIf":
+      collectStringLiteralsInExpr(gen.condition, literals);
+      collectStringLiteralsInGenerator(gen.ifTrue, literals);
+      if (gen.ifFalse) collectStringLiteralsInGenerator(gen.ifFalse, literals);
+      break;
+    case "lcLet":
+      for (const assign of gen.assignments) collectStringLiteralsInExpr(assign.value, literals);
+      collectStringLiteralsInGenerator(gen.body, literals);
+      break;
+    case "lcExpr":
+      collectStringLiteralsInExpr(gen.expr, literals);
+      break;
+  }
+}
+
+function resolveCallArgs(moduleCallName: string, callArgs: Argument[]): Map<string, Expr> {
+  const resolved = new Map<string, Expr>();
+  const name = `${escapeName(moduleCallName)}$mod`;
+  const sig = signatures.get(name);
+  if (!sig) return resolved;
+
+  // Initialize with default values
+  for (let i = 0; i < sig.params.length; i++) {
+    const paramName = sig.params[i]!;
+    const defaultVal = sig.defaults[i];
+    if (defaultVal) {
+      resolved.set(paramName, defaultVal);
+    }
+  }
+
+  // Map positional arguments
+  let pos = 0;
+  while (pos < callArgs.length && !callArgs[pos]!.name) {
+    if (pos < sig.params.length) {
+      resolved.set(sig.params[pos]!, callArgs[pos]!.value);
+    }
+    pos++;
+  }
+
+  // Map named arguments
+  for (let i = pos; i < callArgs.length; i++) {
+    const a = callArgs[i]!;
+    if (a.name) {
+      resolved.set(a.name, a.value);
+    }
+  }
+
+  return resolved;
+}
+
+function collectFontRelatedLiterals(program: Program): Set<string> {
+  const modulesCallingText = new Set<string>(["text"]);
+  
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const stmt of program.statements) {
+      if (stmt.kind === "moduleDecl" && !modulesCallingText.has(stmt.name)) {
+        let callsText = false;
+        
+        const checkCalls = (s: Statement) => {
+          if (s.kind === "moduleCall") {
+            if (modulesCallingText.has(s.name)) {
+              callsText = true;
+            }
+            if (s.child) checkCalls(s.child);
+          } else if (s.kind === "block") {
+            for (const sub of s.statements) checkCalls(sub);
+          } else if (s.kind === "for") {
+            checkCalls(s.body);
+          } else if (s.kind === "if") {
+            checkCalls(s.thenBody);
+            if (s.elseBody) checkCalls(s.elseBody);
+          }
+        };
+        
+        checkCalls(stmt.body);
+        if (callsText) {
+          modulesCallingText.add(stmt.name);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  const literals = new Set<string>();
+
+  // Helper to collect all string literals from an expression
+  const collectExpr = (expr: Expr) => {
+    if (!expr) return;
+    collectStringLiteralsInExpr(expr, literals);
+  };
+
+  // Traverse AST to collect literals from related definitions and invocations
+  const traverse = (s: Statement, insideTextModule: boolean) => {
+    if (!s) return;
+    
+    if (s.kind === "moduleDecl") {
+      const isTextMod = modulesCallingText.has(s.name);
+      if (isTextMod) {
+        for (const p of s.params) {
+          if (p.defaultValue) collectExpr(p.defaultValue);
+        }
+      }
+      traverse(s.body, isTextMod);
+    } else if (s.kind === "moduleCall") {
+      if (modulesCallingText.has(s.name)) {
+        // Resolve arguments including default parameter values if omitted
+        const argMap = resolveCallArgs(s.name, s.args);
+        for (const [paramName, expr] of argMap.entries()) {
+          collectExpr(expr);
+        }
+      }
+      if (s.child) traverse(s.child, insideTextModule);
+    } else if (s.kind === "variableDecl") {
+      const nameLower = s.name.toLowerCase();
+      const isRelated = insideTextModule || nameLower.includes("font") || nameLower.includes("style") || nameLower.includes("family");
+      if (isRelated) {
+        collectExpr(s.value);
+      }
+    } else if (s.kind === "block") {
+      for (const sub of s.statements) traverse(sub, insideTextModule);
+    } else if (s.kind === "for") {
+      traverse(s.body, insideTextModule);
+    } else if (s.kind === "if") {
+      traverse(s.thenBody, insideTextModule);
+      if (s.elseBody) traverse(s.elseBody, insideTextModule);
+    }
+  };
+
+  for (const stmt of program.statements) {
+    traverse(stmt, false);
+  }
+
+  return literals;
+}
+
 // Main entry
 export function compile(program: Program, options?: { runtimePath?: string }): string {
   currentRuntimePath = options?.runtimePath ?? "./runtime/runtime.js";
@@ -493,10 +722,55 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
   encounteredImages.clear();
   signatures.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
-    signatures.set(k, { params: v });
+    signatures.set(k, { params: v, defaults: new Array(v.length).fill(undefined) });
   }
   collectSignatures(program.statements);
   moduleDeclRegistry = collectModuleDeclarations(program.statements);
+
+  // Gather all font-related string literals from the program
+  const fontLiterals = collectFontRelatedLiterals(program);
+
+  // Scan FONTPATH and match fonts
+  const fontDir = getFontPath();
+  if (fontDir && fs.existsSync(fontDir)) {
+    try {
+      const files = fs.readdirSync(fontDir);
+      const cleanedLiterals = Array.from(fontLiterals).map(lit =>
+        lit.toLowerCase().replace(/[^a-z0-9]/g, "")
+      );
+      
+      for (const file of files) {
+        const ext = path.extname(file).toLowerCase();
+        if (ext === ".ttf" || ext === ".otf") {
+          const basename = path.basename(file, ext);
+          const dashIdx = basename.indexOf("-");
+          const family = dashIdx >= 0 ? basename.slice(0, dashIdx) : basename;
+          const style = dashIdx >= 0 ? basename.slice(dashIdx + 1) : "Regular";
+
+          const cleanedFamily = family.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const cleanedStyle = style.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+          // Check if family matches any of the cleaned literals
+          const familyMatched = cleanedLiterals.some(lit =>
+            lit.includes(cleanedFamily) || (lit.length >= 4 && cleanedFamily.includes(lit))
+          );
+          if (familyMatched) {
+            const styleMatched = cleanedStyle === "regular" || cleanedLiterals.some(lit => {
+              if (cleanedStyle === "bolditalic") {
+                return (lit.includes("bold") && lit.includes("italic")) || lit.includes("bolditalic");
+              }
+              return lit.includes(cleanedStyle);
+            });
+            if (styleMatched) {
+              encounteredFonts.add(basename);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Warning: failed to read font directory for matching:", e);
+    }
+  }
 
   // Build declarations, deduplicating by output name (last wins, matching OpenSCAD semantics)
   const declMap = new Map<string, string>();
@@ -563,7 +837,10 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
   let output = RUNTIME_IMPORT;
 
   // Add font base64 imports for each resolved font.
+  const seenImports = new Set<string>();
   for (const [fontFamily, sanitized] of resolvedFonts) {
+    if (seenImports.has(sanitized)) continue;
+    seenImports.add(sanitized);
     const runtimeDir = options?.runtimePath ? path.dirname(options.runtimePath).replace(/\\/g, "/") : "./runtime";
     const importPath = `${runtimeDir}/fonts/${sanitized}_base64.js`;
     const varName = `__font_${sanitized.replace(/-/g, "_")}`;
@@ -576,6 +853,16 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     const importPath = `${runtimeDir}/images/${info.stem}_base64.js`;
     output += `import { ${info.exportName} } from "${importPath}";\n`;
   }
+  
+  output += `const __font_registry: Record<string, string> = {\n`;
+  const seenSanitized = new Set<string>();
+  for (const [fontFamily, sanitized] of resolvedFonts) {
+    if (seenSanitized.has(sanitized)) continue;
+    seenSanitized.add(sanitized);
+    const varName = `__font_${sanitized.replace(/-/g, "_")}`;
+    output += `  ${JSON.stringify(sanitized)}: ${varName},\n`;
+  }
+  output += `};\n\n`;
 
   output += `var PI: any = __rt.PI;\n` +
     `var INF: any = __rt.INF;\n` +
@@ -1267,6 +1554,20 @@ function compileIRModuleCall(node: IRModuleCallNode): string {
       return child;
     }
 
+    case "intersection_for": {
+      const variables: ForVariable[] = node.args.map(arg => ({
+        name: arg.name || "_",
+        range: arg.value,
+        loc: arg.loc,
+      }));
+      const body = node.children.length === 0
+        ? "Manifold.union([])"
+        : node.children.length === 1
+          ? compileIRNode(node.children[0]!)
+          : `__union2d3d([\n  ${node.children.map(compileIRNode).join(",\n  ")}\n])`;
+      return buildNestedIntersectionFor(variables, 0, body);
+    }
+
     default: {
       if (!moduleDeclRegistry.has(node.name)) {
         const line = node.loc?.start.line;
@@ -1352,6 +1653,7 @@ function compileModuleCall(stmt: ModuleCallStmt): string {
     case "assert": return compileAssertModule(stmt);
     case "let": return compileLetModule(stmt);
     case "children": return compileChildrenModule(stmt);
+    case "intersection_for": return compileIntersectionFor(stmt);
 
     default:
       return compileUserModuleCall(stmt);
@@ -1536,18 +1838,37 @@ function compileText(args: Argument[]): string {
   const rawFontSpec = font && font.value.kind === "string" ? font.value.value : "Liberation Sans:style=Regular";
   encounteredFonts.add(rawFontSpec);
   const filename = fontSpecToFilename(rawFontSpec);
-  const fontVarName = `__font_${filename.replace(/-/g, "_")}`;
-  // At runtime, the variable will exist if the font was resolved; otherwise we fall back to undefined.
-  const fontDataExpr = `(typeof ${fontVarName} !== "undefined" ? ${fontVarName} : undefined)`;
+  console.log("Font file name: ", filename);
 
-  return `__text(${txtStr}, ${sizeStr}, ${fontStr}, ${halignStr}, ${valignStr}, ${spacingStr}, ${dirStr}, ${fnStr}, ${fontDataExpr})`;
+  return `__text(${txtStr}, ${sizeStr}, ${fontStr}, ${halignStr}, ${valignStr}, ${spacingStr}, ${dirStr}, ${fnStr}, __font_registry)`;
 }
 
 function compilePolyhedron(args: Argument[]): string {
   const points = findArg(args, "points", 0);
-  const faces = findArg(args, "faces", 1);
+  const triangles = findArg(args, "triangles", 1);
+  let faces = findArg(args, "faces", 2);
+  if (triangles) faces = triangles;
+
   if (!points || !faces) return `/* polyhedron: missing points or faces */`;
-  return `new Manifold(new wasm.Mesh({ numProp: 3, vertProperties: new Float32Array(${compileExpr(points.value)}.flat()), triVerts: new Uint32Array(${compileExpr(faces.value)}.flat()) }))`;
+
+  const modifiedFaces: number[][] = [];
+  if (faces.value.kind === "vector") {
+    const faceElements = faces.value.elements;
+    for (let i = 0; i < faceElements.length; i++) {
+      const el = faceElements[i]!;
+      if (el.kind === "vector") {
+        const face = el.elements.map((v: any) => v.value);
+        if (face.length > 3) {
+          modifiedFaces.push([face[0], face[1], face[2]].reverse());
+          modifiedFaces.push([face[0], face[2], face[3]].reverse());
+        } else {
+          modifiedFaces.push(face.reverse());
+        }
+      }
+    }
+  }
+
+  return `new Manifold(new wasm.Mesh({ numProp: 3, vertProperties: new Float32Array(${compileExpr(points.value)}.flat()), triVerts: new Uint32Array(${JSON.stringify(modifiedFaces)}.flat()) }))`;
 }
 
 // Transforms
@@ -1826,6 +2147,55 @@ function compileBlockGeometry(block: BlockStmt): string {
   }
 
   return body;
+}
+
+function compileIntersectionFor(stmt: ModuleCallStmt): string {
+  if (!stmt.child) return "Manifold.union([])";
+
+  const variables: ForVariable[] = stmt.args.map(arg => ({
+    name: arg.name || "_",
+    range: arg.value,
+    loc: arg.loc,
+  }));
+
+  const lines = [
+    "(() => {",
+    "  const __items: any[] = [];",
+    ...buildNestedForStatements(variables, 0, stmt.child, 1),
+    "  return __intersection2d3d(__items);",
+    "})()",
+  ];
+  const code = lines.join("\n");
+  if (code.includes("await ")) {
+    lines[0] = "async () => {";
+    lines[lines.length - 1] = "})()";
+    return "await (" + lines.join("\n");
+  }
+  return code;
+}
+
+function buildNestedIntersectionFor(vars: ForVariable[], idx: number, body: string): string {
+  if (idx >= vars.length) return body;
+
+  const v = vars[idx]!;
+  const inner = buildNestedIntersectionFor(vars, idx + 1, body);
+
+  if (v.range.kind === "range") {
+    const start = compileExpr(v.range.start);
+    const end = compileExpr(v.range.end);
+    const step = v.range.step ? compileExpr(v.range.step) : "1";
+    return `__intersection2d3d((() => {\n` +
+      `  const __items = [];\n` +
+      `  for (let ${escapeName(v.name)}: any = ${start}; ${escapeName(v.name)} <= ${end}; ${escapeName(v.name)} += ${step}) {\n` +
+      `    __items.push(${inner});\n` +
+      `  }\n` +
+      `  return __items;\n` +
+      `})())`;
+  }
+
+  // vector iteration
+  const rangeExpr = compileExpr(v.range);
+  return `__intersection2d3d(__flat_map_iter(${rangeExpr}, (${escapeName(v.name)}: any, __i: any) => { var __save_$idx: any = $idx; $idx = __i; try { return [${inner}]; } finally { $idx = __save_$idx; } }))`;
 }
 
 // For / If geometry

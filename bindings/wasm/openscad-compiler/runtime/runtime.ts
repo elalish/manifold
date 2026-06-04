@@ -677,7 +677,7 @@ function __getConicalHelixSlices(rSqr: number, height: number, twist: number, sc
   return Math.max(Math.min(faSlices, fsSlices), minSlices);
 }
 
-function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[]; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
+function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[] | undefined; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
   if (options.slices !== undefined) {
     return Math.max(1, options.slices);
   }
@@ -727,7 +727,7 @@ function __computeExtrudeDivisions(shape: any, height: number, options: { twist?
   return __getHelixSlices(rSqr, height, twist, fn, fa, fs, fe);
 }
 
-function __extrude(shape: any, height = 1, options: {twist?: number; scale?: number | number[]; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
+function __extrude(shape: any, height = 1, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
@@ -754,10 +754,23 @@ function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
     return Manifold.union([]);
   }
   if (__is2D(shape)) {
-    if (fn <= 0) {
-      __sync_quality(fa, fs);
+    let circularSegments: number;
+    const absAngle = Math.abs(angle);
+
+    if (fn > 0) {
+      const num_sections = Math.max(1, Math.ceil(Math.max(fn, 3) * absAngle / 360));
+      circularSegments = Math.round(num_sections * 360 / absAngle);
+    } else {
+      const bounds = shape.bounds();
+      const r = Math.max(Math.abs(bounds.max[0]), Math.abs(bounds.min[0]));
+      const N_fa = 360 / fa;
+      const N_fs = 2 * Math.PI * r / fs;
+      const num_sections = Math.max(1, Math.ceil(Math.max(Math.min(N_fa, N_fs), 5) * absAngle / 360));
+      circularSegments = Math.round(num_sections * 360 / absAngle);
     }
-    return shape.revolve(fn, angle);
+
+    const revolved = shape.revolve(circularSegments, absAngle);
+    return angle < 0 ? revolved.mirror([0, 1, 0]) : revolved;
   }
   return shape;
 }
@@ -828,6 +841,24 @@ function __pathToContours(commands: any[], fn: number): [number, number][][] {
   return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
 }
 
+function __fontSpecToFilename(fontSpec: string): string {
+  const cleaned = fontSpec.replace(/"/g, "").trim();
+  const parts = cleaned.split(":");
+  const family = (parts[0] || "Liberation Sans").trim().replace(/\s+/g, "");
+
+  let style = "Regular";
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i]!.trim();
+    const match = part.match(/^style\s*=\s*(.+)$/i);
+    if (match) {
+      style = match[1]!.trim().replace(/\s+/g, "");
+      break;
+    }
+  }
+
+  return `${family}-${style}`;
+}
+
 const __opentypeFontCache = new Map<string, any>();
 
 function __getOpentypeFont(base64DataUrl: string): any | undefined {
@@ -859,7 +890,7 @@ function __opentypeGlyphContours(ch: string, font: any, size: number, fn: number
     const scale = fontSize / font.unitsPerEm;
 
     const spaceWidth =
-      (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
+      (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale * 0.9766;
 
     return {
       contours: [],
@@ -1059,10 +1090,12 @@ function __canvasTextContours(chars: string[], size: number, spacing: number, di
   return contours;
 }
 
-function __text(text: string, size: number = 10, font: string, halign: string = "left", valign: string = "baseline", spacing: number = 1, direction: string = "ltr", fn: number = 0, fontBase64Data: string | undefined = undefined): any {
+function __text(text: string, size: number = 10, font: string, halign: string = "left", valign: string = "baseline", spacing: number = 1, direction: string = "ltr", fn: number = 0, fontBase64Data: string | Record<string, string> | undefined = undefined): any {
   if (!text || text.length === 0) return CrossSection.square([0.001, 0.001], false);
 
   void fn;
+
+  console.log("font passed for text: ", font);
 
   const dir = (direction || "ltr").toLowerCase();
   const chars = dir === "rtl" ? Array.from(text).reverse() : Array.from(text);
@@ -1071,16 +1104,27 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
 
   contours = __canvasTextContours(chars, size, spacing, dir, font);
 
-  if (!fontBase64Data) console.log("fontBase64Data is undefined");
-  else console.log("fontBase64Data is defined");
-  console.log("canvas contours:", contours?.length);
-
   if (!contours && fontBase64Data) {
-    contours = __opentypeTextContours(chars, size, spacing, dir, fontBase64Data, fn);
+    let base64: string | undefined;
+    if (typeof fontBase64Data === "string") {
+      base64 = fontBase64Data;
+    } else if (typeof fontBase64Data === "object" && fontBase64Data !== null) {
+      const filename = __fontSpecToFilename(font);
+      base64 = fontBase64Data[filename];
+      console.log("filename: ", filename);
+      // console.log("base64 data: ", base64)
+      if (!base64) {
+        const keys = Object.keys(fontBase64Data);
+        if (keys.length > 0) {
+          base64 = fontBase64Data[keys[0]!];
+        }
+      }
+    }
+    if (base64) {
+      contours = __opentypeTextContours(chars, size, spacing, dir, base64, fn);
+    }
   }
-  console.log("opentype contours:", contours?.length);
   if (!contours || contours.length === 0) {
-    console.log("returning simple square");
     return CrossSection.square([0.001, 0.001], false);
   }
 
@@ -1097,7 +1141,7 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
   let dx = 0;
   if      (halign === "center") dx = -(left + right) / 2;
   else if (halign === "right")  dx = -right;
-  else                          dx = -left;
+  else                          dx = 0;
 
   let dy = 0;
   if (valign === "center") dy = -(top + bottom) / 2;
