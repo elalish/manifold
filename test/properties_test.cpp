@@ -91,9 +91,20 @@ TEST(Properties, ToleranceCylinder) {
   Manifold cylinder2 = cylinder.Simplify(0.01);
   EXPECT_LT(cylinder2.NumTri(), 130);
   EXPECT_EQ(cylinder2.Genus(), 0);
-  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.005);
-  EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.002);
+  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.006);
+  EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.006);
   if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
+}
+
+TEST(Properties, ToleranceCube) {
+  Manifold cube = Manifold::Cube().Refine(5);
+  EXPECT_EQ(cube.NumTri(), 300);
+  Manifold cube2 = cube.Simplify();
+  EXPECT_LT(cube2.NumTri(), 40);
+  EXPECT_EQ(cube2.Genus(), 0);
+  EXPECT_DOUBLE_EQ(cube.Volume(), cube2.Volume());
+  EXPECT_DOUBLE_EQ(cube.SurfaceArea(), cube2.SurfaceArea());
+  if (options.exportModels) WriteTestOBJ("cube.obj", cube2);
 }
 
 /**

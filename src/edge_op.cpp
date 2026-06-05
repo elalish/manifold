@@ -18,6 +18,7 @@
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
+#include "svd.h"
 
 namespace {
 using namespace manifold;
@@ -174,14 +175,16 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   }
   const vec3 delta = vertPos_[end] - vertPos_[start];
   const double lenSq = la::dot(delta, delta);
+  const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {0, vertPos_[start] + delta / 2};
+    return {0, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
   int numTri = 0;
   int firstEdge = edge;
+
   auto addTri = [&](int current) {
     if (current == firstEdge) {
       return;  // don't double-count the collapsing triangles.
@@ -192,9 +195,12 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
         la::cross(vertPos_[halfedge_.End(current)] - center,
                   vertPos_[halfedge_.End(NextHalfedge(current))] - center);
 
-    double area2inv = 1 / la::length2(triAreaNormal);
+    const double area2 = la::length2(triAreaNormal);
+    if (area2 == 0) return;
+    const double area2inv = 1 / area2;
+
     A += area2inv * la::outerprod(triAreaNormal, triAreaNormal);
-    double d = la::dot(triAreaNormal, center);
+    double d = la::dot(triAreaNormal, center - mid);
     b += area2inv * triAreaNormal * d;
     c += area2inv * d * d;
   };
@@ -202,10 +208,12 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   firstEdge = halfedge_.Pair(edge);
   ForVert(firstEdge, addTri);
 
-  const vec3 v = la::inverse(A) * b;
+  // v is relative to the midpoint, so the pseudo-inverse is used to minimize
+  // the length of v if A is singular.
+  const vec3 v = PseudoInverse(A) * b;
   // Cost has units of length^2.
   const double cost = (la::dot(v, A * v) - 2 * la::dot(b, v) + c);
-  return {cost, v};
+  return {cost, mid + v};
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
@@ -228,7 +236,6 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   scratchBuffer.reserve(10);
 
   int i = 0;
-  std::cout << maxCost << std::endl;
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
@@ -794,6 +801,10 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
     }
   }
 
+  if (NumProp() > 0) {
+    // TODO: Update and recalculate the prop verts.
+  }
+
   int start = halfedge_.Pair(tri1edge[1]);
   // Remove toRemove.startVert and replace with endVert.
   vertPos_[startVert] = vec3(NAN);
@@ -801,22 +812,9 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
   CollapseTri(tri1edge);
 
   // Orbit startVert
-  const int tri0 = edge / 3;
-  const int tri1 = pair / 3;
   int current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
-
-    if (NumProp() > 0) {
-      // Update the shifted triangles to the vertBary of endVert
-      const int tri = current / 3;
-      if (triRef[tri].SameFace(triRef[tri0])) {
-        halfedge_.SetProp(current, halfedge_.Prop(NextHalfedge(edge)));
-      } else if (triRef[tri].SameFace(triRef[tri1])) {
-        halfedge_.SetProp(current, halfedge_.Prop(pair));
-      }
-    }
-
     const int vert = halfedge_.End(current);
     const int next = halfedge_.Pair(current);
     for (size_t i = 0; i < edges.size(); ++i) {
