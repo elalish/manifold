@@ -195,13 +195,15 @@ struct Manifold::Impl {
   Polygons Project() const;
 
   // edge_op.cpp
-  struct EdgeCost {
-    double cost;
-    vec3 newPos;
+  struct Merger {
+    double cost = std::numeric_limits<double>::infinity();
+    vec3 newPos = vec3(std::numeric_limits<double>::quiet_NaN());
+    vec3 normal = vec3(0.0);
+    bool Valid() const { return std::isfinite(cost); }
   };
   void CleanupTopology();
   void SimplifyTopology2(int firstNewVert = 0);
-  EdgeCost CheckEdge(int edge, int firstNewVert) const;
+  Merger CheckEdge(int edge, int firstNewVert) const;
   void SimplifyTopology(int firstNewVert = 0);
   void RemoveDegenerates(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);

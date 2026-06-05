@@ -162,8 +162,8 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   CalculateVertNormals();
 }
 
-Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
-                                                   int firstNewVert) const {
+Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
+                                                 int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);
   if (pair < 0 || !halfedge_.IsForward(edge)) {
     return {std::numeric_limits<double>::infinity(), vec3(NAN)};
@@ -199,6 +199,9 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
     if (area2 == 0) return;
     const double area2inv = 1 / area2;
 
+    // Equal-weighted per triangle, keeps the cost in terms of distance.
+    // Angle-weighting like pseudo-normals may be better, but it is more
+    // expensive to compute and may be less stable on degenerates.
     A += area2inv * la::outerprod(triAreaNormal, triAreaNormal);
     double d = la::dot(triAreaNormal, center - mid);
     b += area2inv * triAreaNormal * d;
@@ -212,8 +215,8 @@ Manifold::Impl::EdgeCost Manifold::Impl::CheckEdge(int edge,
   // the length of v if A is singular.
   const vec3 v = PseudoInverse(A) * b;
   // Cost has units of length^2.
-  const double cost = (la::dot(v, A * v) - 2 * la::dot(b, v) + c);
-  return {cost, mid + v};
+  const double cost = la::dot(v, A * v) - 2 * la::dot(b, v) + c;
+  return {cost, mid + v, b};
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
@@ -229,8 +232,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   Vec<bool> vertsVisited(vertPos_.size(), false);
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t numCollapsed = 0;
-  Vec<double> cost(edges.size());
-  Vec<vec3> newPos(edges.size());
+  Vec<Merger> merger(edges.size());
   const double maxCost = tolerance_ * tolerance_;
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
@@ -240,26 +242,25 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
                if (halfedge_.Pair(edge) < 0) {
-                 cost[edge] = std::numeric_limits<double>::infinity();
+                 merger[edge] = Merger();
                  return;
                }
                const auto edgeCost = CheckEdge(edge, firstNewVert);
                if (totalCost[halfedge_.Start(edge)] + edgeCost.cost < maxCost &&
                    totalCost[halfedge_.End(edge)] + edgeCost.cost < maxCost) {
-                 cost[edge] = edgeCost.cost;
-                 newPos[edge] = edgeCost.newPos;
+                 merger[edge] = edgeCost;
                } else {
-                 cost[edge] = std::numeric_limits<double>::infinity();
+                 merger[edge] = Merger();
                }
              });
     stable_sort(edges.begin(), end,
-                [&](int a, int b) { return cost[a] < cost[b]; });
+                [&](int a, int b) { return merger[a].cost < merger[b].cost; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     auto itr = edges.begin();
-    for (; itr != end && std::isfinite(cost[*itr]); ++itr) {
+    for (; itr != end && merger[*itr].Valid(); ++itr) {
       const int edge = *itr;
       if (halfedge_.Pair(edge) < 0) {
-        cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+        merger[edge] = Merger();  // mark visited
         continue;
       }
       const int startV = halfedge_.Start(edge);
@@ -267,20 +268,21 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       if (vertsVisited[startV] || vertsVisited[endV]) {
         continue;
       }
-      const bool didCollapse = CollapseEdge2(edge, scratchBuffer, newPos[edge]);
+      const bool didCollapse =
+          CollapseEdge2(edge, scratchBuffer, merger[edge].newPos);
       vertsVisited.resize(vertPos_.size(), false);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
-        totalCost[startV] += cost[edge];
-        totalCost[endV] += cost[edge];
+        totalCost[startV] += merger[edge].cost;
+        totalCost[endV] += merger[edge].cost;
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
-        cost[edge] = std::numeric_limits<double>::infinity();  // mark visited
+        merger[edge] = Merger();  // mark visited
         ++numCollapsed;
       }
     }
     end = std::partition(edges.begin(), end,
-                         [&](int edge) { return std::isfinite(cost[edge]); });
+                         [&](int edge) { return merger[edge].Valid(); });
     // std::cout << "edges left: " << (end - edges.begin()) << ", " << itr - end
     //           << std::endl;
     if (itr == end) break;
@@ -802,7 +804,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
   }
 
   if (NumProp() > 0) {
-    // TODO: Update and recalculate the prop verts.
+    // TODO : Update and recalculate the prop verts.
   }
 
   int start = halfedge_.Pair(tri1edge[1]);
