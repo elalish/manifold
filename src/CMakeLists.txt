@@ -24,10 +24,12 @@ if(MANIFOLD_CROSS_SECTION)
       cross_section/boolean2/boolean2.cpp
       cross_section/boolean2/bvh.cpp
       cross_section/boolean2/canonicalize.cpp
+      cross_section/boolean2/containment.cpp
       cross_section/boolean2/diagnostics.cpp
       cross_section/boolean2/driver.cpp
       cross_section/boolean2/edge_vert_lists.cpp
       cross_section/boolean2/intersections.cpp
+      cross_section/boolean2/offset.cpp
       cross_section/boolean2/predicates.cpp
       cross_section/boolean2/vertex_merge.cpp
       cross_section/boolean2/winding_filter.cpp
@@ -70,10 +72,12 @@ set(
   cross_section/boolean2/boolean2.h
   cross_section/boolean2/bvh.h
   cross_section/boolean2/canonicalize.h
+  cross_section/boolean2/containment.h
   cross_section/boolean2/diagnostics.h
   cross_section/boolean2/driver.h
   cross_section/boolean2/edge_vert_lists.h
   cross_section/boolean2/intersections.h
+  cross_section/boolean2/offset.h
   cross_section/boolean2/parallel_policy.h
   cross_section/boolean2/predicates.h
   cross_section/boolean2/vertex_merge.h
