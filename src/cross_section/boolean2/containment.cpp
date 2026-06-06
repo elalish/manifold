@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "containment.h"
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
 
 #include "../../utils.h"
+#include "boolean2.h"
 #include "manifold/optional_assert.h"
 #include "predicates.h"
 

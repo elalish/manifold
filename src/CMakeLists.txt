@@ -72,12 +72,10 @@ set(
   cross_section/boolean2/boolean2.h
   cross_section/boolean2/bvh.h
   cross_section/boolean2/canonicalize.h
-  cross_section/boolean2/containment.h
   cross_section/boolean2/diagnostics.h
   cross_section/boolean2/driver.h
   cross_section/boolean2/edge_vert_lists.h
   cross_section/boolean2/intersections.h
-  cross_section/boolean2/offset.h
   cross_section/boolean2/parallel_policy.h
   cross_section/boolean2/predicates.h
   cross_section/boolean2/vertex_merge.h
