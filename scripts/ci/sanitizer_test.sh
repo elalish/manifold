@@ -40,25 +40,13 @@ if [ -z "${SANITIZER_TEST_BIN}" ]; then
 fi
 chmod +x "${SANITIZER_TEST_BIN}" || true
 
-BIN_DIR="$(dirname "${SANITIZER_TEST_BIN}")"
-LIB_CANDIDATES=(
-  "${BIN_DIR}/../src"
-  "${BIN_DIR}/../lib"
-  "${BIN_DIR}/../bindings/c"
-  ./src
-  ./lib
-  ./bindings/c
-  ./build/src
-  ./build/lib
-  ./build/bindings/c
-)
-
 LIB_PATHS=()
-for LIB_DIR in "${LIB_CANDIDATES[@]}"; do
-  if [ -d "${LIB_DIR}" ]; then
-    LIB_PATHS+=("${LIB_DIR}")
-  fi
-done
+while IFS= read -r SO_DIR; do
+  [ -n "${SO_DIR}" ] && LIB_PATHS+=("${SO_DIR}")
+done < <(
+  find . -type f \( -name 'libmanifold*.so*' -o -name 'libsamples.so*' -o -name 'libmanifoldc.so*' \) \
+    -printf '%h\n' | sort -u
+)
 
 if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
   mapfile -t LIB_PATHS < <(printf '%s\n' "${LIB_PATHS[@]}" | awk '!seen[$0]++')
