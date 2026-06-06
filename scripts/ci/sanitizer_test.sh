@@ -40,6 +40,36 @@ if [ -z "${SANITIZER_TEST_BIN}" ]; then
 fi
 chmod +x "${SANITIZER_TEST_BIN}" || true
 
+BIN_DIR="$(dirname "${SANITIZER_TEST_BIN}")"
+LIB_CANDIDATES=(
+  "${BIN_DIR}/../src"
+  "${BIN_DIR}/../lib"
+  "${BIN_DIR}/../bindings/c"
+  ./src
+  ./lib
+  ./bindings/c
+  ./build/src
+  ./build/lib
+  ./build/bindings/c
+)
+
+LIB_PATHS=()
+for LIB_DIR in "${LIB_CANDIDATES[@]}"; do
+  if [ -d "${LIB_DIR}" ]; then
+    LIB_PATHS+=("${LIB_DIR}")
+  fi
+done
+
+if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
+  mapfile -t LIB_PATHS < <(printf '%s\n' "${LIB_PATHS[@]}" | awk '!seen[$0]++')
+  SANITIZER_LD_PATH="$(IFS=:; echo "${LIB_PATHS[*]}")"
+  if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+    export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}:${LD_LIBRARY_PATH}"
+  else
+    export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}"
+  fi
+fi
+
 set +e
 timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
   "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
