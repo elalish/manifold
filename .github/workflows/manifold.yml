@@ -209,6 +209,51 @@ jobs:
           exit 1
         fi
 
+  build_libcxx_hardened:
+    name: Libc++ hardened (clang, EXTENSIVE, TBB:${{matrix.parallelization}})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        parallelization: [OFF, ON]
+    runs-on: ubuntu-latest
+    env:
+      # Match nixpkgs hardening profile (the trigger for #1735), plus
+      # EXTENSIVE checks to catch latent preconditions beyond bounds.
+      CXXFLAGS: "-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE -stdlib=libc++"
+      LDFLAGS: "-stdlib=libc++"
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        # tbb/clipper2/gtest are built from the cloned sources below under the
+        # lane's libc++ flags so they match the test binary's ABI; the distro
+        # packages are libstdc++.
+        packages: cmake clang libc++-dev libc++abi-dev
+    - *clone-tbb
+    - *clone-clipper2
+    - *clone-gtest
+    - name: Configure + build with libc++ and EXTENSIVE hardening
+      run: |
+        cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DMANIFOLD_PAR=${{matrix.parallelization}} \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_TEST=ON \
+          -DMANIFOLD_PYBIND=OFF \
+          -DMANIFOLD_USE_BUILTIN_TBB=ON \
+          -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
+          -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
+          -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
+          . -B build
+        cmake --build build
+    - name: Run manifold_test
+      run: ./build/test/manifold_test
+
   build_gcc_codecov:
     name: code coverage
     timeout-minutes: 45
