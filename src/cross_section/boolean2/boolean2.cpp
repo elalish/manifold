@@ -135,8 +135,8 @@ void AppendInput(const Polygons& polys, int mult, std::vector<vec2>& verts,
 }
 
 // `bSign` is +1 for Add/Intersect-style accumulation and -1 for Subtract.
-Polygons BinaryOpByRule(const Polygons& a, const Polygons& b, int bSign,
-                        WindRule rule, double eps, double tolerance) {
+Polygons ApplyFillRule(const Polygons& a, const Polygons& b, int bSign,
+                       WindRule rule, double eps, double tolerance) {
   DEBUG_ASSERT(bSign == 1 || bSign == -1, logicErr,
                "Boolean2 input multiplicity must be +/-1");
   if (!AllFinite(a) || !AllFinite(b)) return {};
@@ -230,9 +230,12 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   return polys;
 }
 
-// Single-input regularization used by `CrossSection::Simplify(eps)`.
-Polygons Simplify(const Polygons& in, double eps, double tolerance) {
-  return BinaryOpByRule(in, {}, 1, WindRule::Add, eps, tolerance);
+// Apply the Positive (Add) winding rule to one polygon set, regularizing it at
+// machine-scale eps with no extra tolerance. This is fill-rule application -
+// what construction and Offset use to resolve self-intersections - as opposed
+// to CrossSection::Simplify, which decimates at a user-designated tolerance.
+Polygons ApplyFillRule(const Polygons& polys, double eps) {
+  return ApplyFillRule(polys, {}, 1, WindRule::Add, eps, 0.0);
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
@@ -253,7 +256,7 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
   const int bSign = op == OpType::Subtract ? -1 : 1;
   const WindRule rule =
       op == OpType::Intersect ? WindRule::Intersect : WindRule::Add;
-  return BinaryOpByRule(a, b, bSign, rule, eps, tolerance);
+  return ApplyFillRule(a, b, bSign, rule, eps, tolerance);
 }
 
 }  // namespace boolean2

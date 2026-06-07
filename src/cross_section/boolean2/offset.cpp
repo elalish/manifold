@@ -183,13 +183,12 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     }
     const bool convex = cross * deltaSign > 0;
     if (!convex) {
-      // Concave joins intentionally create a self-intersection that the final
+      // Concave joins intentionally leave a self-intersection that the final
       // Positive union resolves, keeping the correct corner fill (matching
-      // Clipper2's offset cleanup). Keep V so the union resolves on the right
-      // side; a direct endPrev->startNext bevel would cut the corner the wrong
-      // way and lose area.
+      // Clipper2's offset cleanup). endPrev and startNext suffice; the original
+      // vertex V is redundant - the union fills the same region with or without
+      // it, V only changes the corner's winding multiplicity.
       out.push_back(endPrev);
-      out.push_back(V);
       out.push_back(startNext);
       continue;
     }
@@ -253,7 +252,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
 // caller to `Simplify` if wanted, matching Manifold's tolerance model rather
 // than Clipper2's finishing behaviour.
 Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
-                double miterLimit, int circularSegments, double tolerance) {
+                double miterLimit, int circularSegments) {
   // Reject NaN/Inf delta and input coordinates.
   if (!std::isfinite(delta)) return {};
   for (const auto& ring : in) {
@@ -281,7 +280,9 @@ Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
   // thin feature's half-width and the offset pinches itself into multiple
   // loops). CrossSection storage is normal-oriented before reaching Offset,
   // so Positive/Add cleanup keeps the filled side for both dilation and inset.
-  return Simplify(offsetRings, eps, tolerance);
+  // This is fill-rule application at machine eps, not tolerance decimation -
+  // the caller can Simplify the result if it wants collinear verts removed.
+  return ApplyFillRule(offsetRings, eps);
 }
 
 }  // namespace boolean2

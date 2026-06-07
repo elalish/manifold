@@ -31,15 +31,16 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges);
 
-Polygons Simplify(const Polygons& in, double eps, double tolerance = 0.0);
+// Regularize one polygon set under the Positive (Add) winding rule at
+// machine-scale eps. Fill-rule application, not tolerance decimation.
+Polygons ApplyFillRule(const Polygons& polys, double eps);
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
                    double eps = 0.0, double tolerance = 0.0);
 
 // Polygon offset backing CrossSection::Offset.
 enum class OffsetJoinType { Square, Round, Miter, Bevel };
 Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
-                double miterLimit = 2.0, int circularSegments = 0,
-                double tolerance = 0.0);
+                double miterLimit = 2.0, int circularSegments = 0);
 
 // Group regularized simple loops into outer-ring components with their
 // directly contained holes, backing CrossSection::Decompose.
