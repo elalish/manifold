@@ -140,6 +140,33 @@ SimplePolygon HullImpl(SimplePolygon& points) {
   return path;
 }
 
+// Drop the vertex closest to the line through its current neighbors, repeating
+// while under eps (Clipper2 SimplifyPaths semantics). Re-checking current, not
+// original, neighbors each step is what keeps a curve from collapsing.
+SimplePolygon SimplifyRing(SimplePolygon ring, double eps) {
+  const double eps2 = eps * eps;
+  while (ring.size() > 3) {
+    const int n = static_cast<int>(ring.size());
+    int victim = -1;
+    double bestD2 = eps2;
+    for (int i = 0; i < n; ++i) {
+      const vec2 P = ring[(i + n - 1) % n];
+      const vec2 N = ring[(i + 1) % n];
+      const vec2 pn = N - P;
+      const double pnLen2 = la::dot(pn, pn);
+      const double cross = la::cross(ring[i] - P, pn);
+      const double d2 = pnLen2 > 0.0 ? cross * cross / pnLen2 : 0.0;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        victim = i;
+      }
+    }
+    if (victim < 0) break;  // every vertex deviates by >= eps
+    ring.erase(ring.begin() + victim);
+  }
+  return ring;
+}
+
 }  // namespace
 
 namespace manifold {
@@ -402,12 +429,25 @@ CrossSection CrossSection::WarpBatch(
 
 CrossSection CrossSection::Simplify(double epsilon) const {
   const auto& paths = GetPaths()->paths_;
-  const Polygons filtered = FilterSmallContours(paths, epsilon);
-  const double tolerance = std::max(tolerance_, epsilon);
-  CrossSection out(shared_paths(FilterSmallContours(
-      b2::Simplify(filtered, epsilon, tolerance), epsilon)));
-  out.tolerance_ = tolerance;
-  return out;
+  // Regularize at the geometry's own eps, NOT `epsilon`: feeding the simplify
+  // distance as the boolean merge tolerance snap-collapses whole shapes. Then
+  // filter thin contours and reduce vertices (clipper2 Union + SimplifyPaths).
+  const double eps = b2::InferEps(paths, {});
+  const Polygons regular = FilterSmallContours(
+      b2::Simplify(paths, eps, std::max(tolerance_, eps)), epsilon);
+  // Per-ring decimation is best-effort and NOT re-regularized afterward, same
+  // as clipper2's SimplifyPaths: an `epsilon` coarser than a feature's
+  // thickness (e.g. a thin annulus wall) can pull a ring across its neighbor
+  // and self-intersect. Re-unioning here would change the contract and cost.
+  Polygons out;
+  out.reserve(regular.size());
+  for (const auto& ring : regular) {
+    SimplePolygon simplified = SimplifyRing(ring, epsilon);
+    if (simplified.size() >= 3) out.push_back(std::move(simplified));
+  }
+  CrossSection result(shared_paths(std::move(out)));
+  result.tolerance_ = std::max(tolerance_, epsilon);
+  return result;
 }
 
 CrossSection CrossSection::Offset(double delta, JoinType jt, double miterLimit,
