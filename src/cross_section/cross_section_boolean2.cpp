@@ -230,7 +230,7 @@ CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
   (void)fillrule;
   Polygons input{contour};
   tolerance_ = b2::InferEps(input, {});
-  paths_ = shared_paths(b2::Simplify(input, 0.0, tolerance_));
+  paths_ = shared_paths(b2::ApplyFillRule(input, tolerance_));
 }
 
 CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
@@ -238,7 +238,7 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
                "Boolean2 CrossSection supports only Positive fill");
   (void)fillrule;
   tolerance_ = b2::InferEps(contours, {});
-  paths_ = shared_paths(b2::Simplify(contours, 0.0, tolerance_));
+  paths_ = shared_paths(b2::ApplyFillRule(contours, tolerance_));
 }
 
 CrossSection::CrossSection(const Rect& rect) {
@@ -436,28 +436,26 @@ CrossSection CrossSection::WarpBatch(
   for (auto& path : paths) {
     for (auto& v : path) v = *point++;
   }
+  // Warping can self-intersect the rings, so re-apply the fill rule at machine
+  // eps (not the drift tolerance - this is regularization, not decimation).
   const double eps = b2::InferEps(paths, {});
-  const double tolerance = std::max(tolerance_, eps);
-  CrossSection out(shared_paths(b2::Simplify(paths, eps, tolerance)));
-  out.tolerance_ = tolerance;
+  CrossSection out(shared_paths(b2::ApplyFillRule(paths, eps)));
+  out.tolerance_ = std::max(tolerance_, eps);
   return out;
 }
 
 CrossSection CrossSection::Simplify(double epsilon) const {
-  const auto& paths = GetPaths()->paths_;
-  // Regularize at the geometry's own eps, NOT `epsilon`: feeding the simplify
-  // distance as the boolean merge tolerance snap-collapses whole shapes. Then
-  // filter thin contours and reduce vertices (clipper2 Union + SimplifyPaths).
-  const double eps = b2::InferEps(paths, {});
-  const Polygons regular = FilterSmallContours(
-      b2::Simplify(paths, eps, std::max(tolerance_, eps)), epsilon);
-  // Per-ring decimation is best-effort and NOT re-regularized afterward, same
-  // as clipper2's SimplifyPaths: an `epsilon` coarser than a feature's
-  // thickness (e.g. a thin annulus wall) can pull a ring across its neighbor
-  // and self-intersect. Re-unioning here would change the contract and cost.
+  // Storage is already fill-rule-regularized (on construction and by every
+  // producing op), so Simplify is pure decimation: drop tiny contours, then
+  // RDP each ring at `epsilon`. The result is intentionally NOT re-regularized
+  // - an `epsilon` coarser than a feature's thickness can self-intersect, the
+  // same best-effort behaviour as clipper2's SimplifyPaths. Healing that is the
+  // job of a separate user-called op (a boolean), since it can be expensive.
+  const Polygons& paths = GetPaths()->paths_;
+  const Polygons filtered = FilterSmallContours(paths, epsilon);
   Polygons out;
-  out.reserve(regular.size());
-  for (const auto& ring : regular) {
+  out.reserve(filtered.size());
+  for (const auto& ring : filtered) {
     SimplePolygon simplified = SimplifyRing(ring, epsilon);
     if (simplified.size() >= 3) out.push_back(std::move(simplified));
   }
@@ -469,7 +467,7 @@ CrossSection CrossSection::Simplify(double epsilon) const {
 CrossSection CrossSection::Offset(double delta, JoinType jt, double miterLimit,
                                   int circularSegments) const {
   Polygons offset = b2::Offset(GetPaths()->paths_, delta, JoinTypeOf(jt),
-                               miterLimit, circularSegments, tolerance_);
+                               miterLimit, circularSegments);
   CrossSection out(shared_paths(std::move(offset)));
   // Round-join faceting comes from circularSegments inside b2::Offset; it is
   // not folded into tolerance_. The faceting sagitta scales with delta and is a
