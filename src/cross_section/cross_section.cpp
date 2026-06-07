@@ -217,8 +217,22 @@ CrossSection::CrossSection() {
 }
 
 CrossSection::~CrossSection() = default;
-CrossSection::CrossSection(CrossSection&&) noexcept = default;
-CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
+// Inline std::mutex member: user-defined move ops (mirror the copy ops below)
+// so this and the moved-from object each keep a valid, separate mutex.
+CrossSection::CrossSection(CrossSection&& other) noexcept {
+  std::lock_guard<std::mutex> lock(other.pathsMutex_);
+  paths_ = std::move(other.paths_);
+  transform_ = other.transform_;
+}
+
+CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
+  if (this != &other) {
+    std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
+    paths_ = std::move(other.paths_);
+    transform_ = other.transform_;
+  }
+  return *this;
+}
 
 /**
  * The copy constructor avoids copying the underlying paths vector (sharing
@@ -228,14 +242,14 @@ CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
  * const methods.
  */
 CrossSection::CrossSection(const CrossSection& other) {
-  std::lock_guard<std::mutex> lock(*other.pathsMutex_);
+  std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
 }
 
 CrossSection& CrossSection::operator=(const CrossSection& other) {
   if (this != &other) {
-    std::scoped_lock lock(*pathsMutex_, *other.pathsMutex_);
+    std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
     paths_ = other.paths_;
     transform_ = other.transform_;
   }
@@ -297,7 +311,7 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  std::lock_guard<std::mutex> lock(*pathsMutex_);
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   if (transform_ == mat2x3(la::identity)) {
     return paths_;
   }
@@ -559,7 +573,7 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  * @param m The affine transform matrix to apply to all the vertices.
  */
 CrossSection CrossSection::Transform(const mat2x3& m) const {
-  std::lock_guard<std::mutex> lock(*pathsMutex_);
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   auto transformed = CrossSection();
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;

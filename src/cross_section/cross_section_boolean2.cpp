@@ -11,18 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
-// CrossSection implementation backed by the Boolean2 algorithm. Public
-// methods route through `boolean2/` headers for polygon boolean operations,
-// containment grouping, offsets, and polygon utilities.
 
 #include <algorithm>
-#include <cassert>
+#include <cmath>
 
 #include "../utils.h"
 #include "boolean2/boolean2.h"
 #include "manifold/cross_section.h"
+#include "manifold/optional_assert.h"
 
+// CrossSection implementation backed by the Boolean2 algorithm. Public methods
+// route through `boolean2/` headers for polygon boolean operations, containment
+// grouping, offsets, and polygon utilities.
 namespace b2 = manifold::boolean2;
 
 using namespace manifold;
@@ -39,6 +39,13 @@ struct PathImpl {
 }  // namespace manifold
 
 namespace {
+
+bool AllFinite(const mat2x3& m) {
+  for (int c = 0; c < 3; ++c) {
+    if (!std::isfinite(m[c].x) || !std::isfinite(m[c].y)) return false;
+  }
+  return true;
+}
 
 Polygons FilterSmallContours(const Polygons& paths, double epsilon) {
   Polygons filtered;
@@ -69,7 +76,9 @@ b2::OffsetJoinType JoinTypeOf(CrossSection::JoinType jointype) {
   return b2::OffsetJoinType::Square;
 }
 
-// ||M||_2; callers pass the linear part of an affine 2D transform.
+// ||M||_2 (largest singular value) of the linear part of an affine 2D
+// transform. Closed 2x2 form rather than svd.h SpectralNorm, which is mat3-only
+// (embedding via Mat3 would fold in the homogeneous block and floor the norm).
 double Mat2SpectralNorm(const mat2& m) {
   const vec2 c0 = m[0];
   const vec2 c1 = m[1];
@@ -113,6 +122,9 @@ void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
 
 SimplePolygon HullImpl(SimplePolygon& points) {
   if (points.size() < 3) return {};
+  for (const vec2& p : points) {
+    if (!std::isfinite(p.x) || !std::isfinite(p.y)) return {};
+  }
   manifold::stable_sort(points.begin(), points.end(), [](vec2 a, vec2 b) {
     if (a.x == b.x) return a.y < b.y;
     return a.x < b.x;
@@ -178,7 +190,7 @@ CrossSection::~CrossSection() = default;
 // Explicit move ops keep `other.pathsMutex_` intact so a subsequent copy-
 // or move-assign into the moved-from object can still lock it.
 CrossSection::CrossSection(CrossSection&& other) noexcept {
-  std::lock_guard<std::mutex> lock(*other.pathsMutex_);
+  std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = std::move(other.paths_);
   transform_ = other.transform_;
   tolerance_ = other.tolerance_;
@@ -186,7 +198,7 @@ CrossSection::CrossSection(CrossSection&& other) noexcept {
 
 CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
   if (this == &other) return *this;
-  std::scoped_lock lock(*pathsMutex_, *other.pathsMutex_);
+  std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
   paths_ = std::move(other.paths_);
   transform_ = other.transform_;
   tolerance_ = other.tolerance_;
@@ -194,7 +206,7 @@ CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
 }
 
 CrossSection::CrossSection(const CrossSection& other) {
-  std::lock_guard<std::mutex> lock(*other.pathsMutex_);
+  std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
   tolerance_ = other.tolerance_;
@@ -202,7 +214,7 @@ CrossSection::CrossSection(const CrossSection& other) {
 
 CrossSection& CrossSection::operator=(const CrossSection& other) {
   if (this == &other) return *this;
-  std::scoped_lock lock(*pathsMutex_, *other.pathsMutex_);
+  std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
   tolerance_ = other.tolerance_;
@@ -213,7 +225,8 @@ CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
     : paths_(std::move(paths)) {}
 
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
-  assert(fillrule == FillRule::Positive);
+  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
+               "Boolean2 CrossSection supports only Positive fill");
   (void)fillrule;
   Polygons input{contour};
   tolerance_ = b2::InferEps(input, {});
@@ -221,7 +234,8 @@ CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
 }
 
 CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
-  assert(fillrule == FillRule::Positive);
+  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
+               "Boolean2 CrossSection supports only Positive fill");
   (void)fillrule;
   tolerance_ = b2::InferEps(contours, {});
   paths_ = shared_paths(b2::Simplify(contours, 0.0, tolerance_));
@@ -239,7 +253,7 @@ CrossSection::CrossSection(const Rect& rect) {
 }
 
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  std::lock_guard<std::mutex> lock(*pathsMutex_);
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   if (transform_ == mat2x3(la::identity)) return paths_;
   paths_ = shared_paths(TransformPolygons(paths_->paths_, transform_));
   transform_ = mat2x3(la::identity);
@@ -388,7 +402,9 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
 }
 
 CrossSection CrossSection::Transform(const mat2x3& m) const {
-  std::lock_guard<std::mutex> lock(*pathsMutex_);
+  // A non-finite transform is a no-op rather than poisoning coords/tolerance_.
+  if (!AllFinite(m)) return *this;
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   CrossSection transformed;
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
@@ -482,7 +498,7 @@ CrossSection CrossSection::Hull(
   }
 
   SimplePolygon hull = HullImpl(points);
-  if (hull.empty()) return CrossSection();
+  if (hull.size() < 3) return CrossSection();
   CrossSection out(shared_paths({std::move(hull)}));
   out.tolerance_ = std::max(maxTol, b2::InferEps(out.GetPaths()->paths_, {}));
   return out;
@@ -492,7 +508,7 @@ CrossSection CrossSection::Hull() const { return Hull({*this}); }
 
 CrossSection CrossSection::Hull(SimplePolygon pts) {
   SimplePolygon hull = HullImpl(pts);
-  if (hull.empty()) return CrossSection();
+  if (hull.size() < 3) return CrossSection();
   Polygons inputForEps{pts};
   CrossSection out(shared_paths({std::move(hull)}));
   out.tolerance_ = b2::InferEps(inputForEps, {});

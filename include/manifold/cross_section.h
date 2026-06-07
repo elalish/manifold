@@ -179,8 +179,7 @@ class CrossSection {
   ///@}
 
  private:
-  mutable std::shared_ptr<std::mutex> pathsMutex_ =
-      std::make_shared<std::mutex>();
+  mutable std::mutex pathsMutex_;
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
   // Propagated drift budget, analogous to Manifold::Impl::tolerance_.
