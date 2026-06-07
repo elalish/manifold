@@ -255,6 +255,18 @@ CrossSection::CrossSection(const Rect& rect) {
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   std::lock_guard<std::mutex> lock(pathsMutex_);
   if (transform_ == mat2x3(la::identity)) return paths_;
+  // Scale tolerance from the COMPOSED transform, once, here - not eagerly per
+  // Transform call. Spectral norm is sub-multiplicative, so a product of
+  // per-step norms inflates tolerance super-linearly under chained shears; the
+  // composed matrix gives the exact factor. The max singular value also keeps a
+  // scalar tolerance conservative under anisotropic scale (the shrunk axis is
+  // over-served, never under-served) - safe by design. Floor at the translated
+  // scale so large translations stay above the post-materialization FP noise.
+  const double translationScale =
+      std::max(std::fabs(transform_[2][0]), std::fabs(transform_[2][1]));
+  tolerance_ = std::max(
+      Mat2SpectralNorm(mat2(transform_[0], transform_[1])) * tolerance_,
+      b2::EpsilonFromScale(translationScale));
   paths_ = shared_paths(TransformPolygons(paths_->paths_, transform_));
   transform_ = mat2x3(la::identity);
   return paths_;
@@ -408,13 +420,10 @@ CrossSection CrossSection::Transform(const mat2x3& m) const {
   CrossSection transformed;
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
-  // Floor at the translated scale so large translations don't leave
-  // tolerance below the post-materialization FP-noise bound.
-  const double translationScale =
-      std::max(std::fabs(m[2][0]), std::fabs(m[2][1]));
-  transformed.tolerance_ =
-      std::max(Mat2SpectralNorm(mat2(m[0], m[1])) * tolerance_,
-               b2::EpsilonFromScale(translationScale));
+  // Carry tolerance unscaled; GetPaths() scales it from the composed transform
+  // once at materialization. Scaling per call would inflate it super-linearly
+  // under chained shears (product of norms vs norm of the product).
+  transformed.tolerance_ = tolerance_;
   return transformed;
 }
 
@@ -445,12 +454,14 @@ CrossSection CrossSection::WarpBatch(
 }
 
 CrossSection CrossSection::Simplify(double epsilon) const {
-  // Storage is already fill-rule-regularized (on construction and by every
-  // producing op), so Simplify is pure decimation: drop tiny contours, then
-  // RDP each ring at `epsilon`. The result is intentionally NOT re-regularized
-  // - an `epsilon` coarser than a feature's thickness can self-intersect, the
-  // same best-effort behaviour as clipper2's SimplifyPaths. Healing that is the
-  // job of a separate user-called op (a boolean), since it can be expensive.
+  // Storage from construction and from the boolean/offset ops is fill-rule-
+  // regularized, so Simplify just decimates: drop tiny contours, then remove
+  // near-collinear verts per ring at `epsilon` (clipper2 SimplifyPaths style,
+  // not Ramer-Douglas-Peucker). The output is intentionally NOT re-regularized:
+  // an `epsilon` coarser than a feature's thickness can self-intersect, the
+  // same best-effort behaviour as clipper2's SimplifyPaths. So Simplify's own
+  // result is not guaranteed regularized; re-decomposing a self-intersected one
+  // can silently drop a crossed hole. Healing is a separate boolean's job.
   const Polygons& paths = GetPaths()->paths_;
   const Polygons filtered = FilterSmallContours(paths, epsilon);
   Polygons out;
