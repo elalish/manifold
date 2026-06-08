@@ -119,8 +119,7 @@ double EpsilonFromScale(double L, int k_budget) {
   if (L <= 0) return 0;
   int expBits;
   std::frexp(L, &expBits);
-  const double L_pow2 = std::ldexp(1.0, expBits);
-  return (k_budget + 1) * kAlphaCoeff * kU * L_pow2;
+  return std::ldexp((k_budget + 1) * kAlphaCoeff * kU, expBits);
 }
 
 double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
