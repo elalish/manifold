@@ -61,3 +61,4 @@ Manifold ReadTestOBJ(const std::string& filename);
 MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename);
 void WriteTestOBJ(const std::string& filename, Manifold m);
 void RegisterPolygonTests();
+void RegisterFilletTests();

@@ -15,7 +15,12 @@
 set(MANIFOLD_CROSS_SECTION_SRCS)
 if(MANIFOLD_CROSS_SECTION)
   if(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
-    list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section.cpp)
+    list(
+      APPEND
+      MANIFOLD_CROSS_SECTION_SRCS
+      cross_section/cross_section.cpp
+      cross_section/fillet2d.cpp
+    )
   elseif(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "boolean2")
     list(
       APPEND

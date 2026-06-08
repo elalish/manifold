@@ -1,0 +1,85 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Project",
+      "type": "shell",
+      "command": "make -j64",
+      "options": {
+        // Sets the working directory for the command.
+        // Assumes your 'build' directory is at the root of your project.
+        "cwd": "${workspaceFolder}/build"
+      },
+      "problemMatcher": [
+        "$gcc" // Helps VS Code parse compiler errors and warnings.
+      ],
+      "detail": "Compiles the project using 'make -j64' in the build directory."
+    },
+    {
+      "label": "Clean testing ouptut",
+      "type": "shell",
+      "command": "rm -f Testing/Fillet/*.*",
+      "options": {
+        // Sets the working directory for the command.
+        // Assumes your 'build' directory is at the root of your project.
+        "cwd": "${workspaceFolder}"
+      },
+    },
+    {
+      "label": "Run Test",
+      "type": "shell",
+      // Executes the compiled test program.
+      // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3:Polygon.Fillet.Precision2:Polygon.Fillet.Sponge:Polygon.Fillet.Sponge2 || true",
+      // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.ExtraTriangle:Polygon.Fillet.Simple1:Polygon.Fillet.Precision:Polygon.Fillet.Sponge3b:Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3 || true",
+      "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.UShape || true",
+      // "command": "${workspaceFolder}/build/test/manifold_test --gtest_filter=Polygon.Fillet.*-Polygon.Fillet.BigSponge:Polygon.Fillet.Zebra1:Polygon.Fillet.Zebra:Polygon.Fillet.Zebra3 || true",
+      "options": {
+        // Sets the working directory for the command.
+        // Assumes your 'build' directory is at the root of your project.
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "detail": "Runs the specific Google Test 'Properties.ToleranceSphere'."
+    },
+    {
+      "label": "Run Visualization",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/scripts/visualizer-polygon.py",
+        // Provides the path to the result file as an argument.
+        "${workspaceFolder}/input.txt",
+        "${workspaceFolder}/result.txt"
+      ],
+      "options": {
+        // Sets the working directory for the command.
+        // Assumes your 'build' directory is at the root of your project.
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "detail": "Executes the Python visualization script with the result file."
+    },
+    {
+      "label": "Build, Test, and Visualize",
+      // This is a compound task that runs the other tasks in order.
+      "dependsOn": [
+        "Build Project",
+        "Clean testing ouptut",
+        "Run Test",
+        "Run Visualization"
+      ],
+      // This ensures the tasks run sequentially, not in parallel.
+      "dependsOrder": "sequence",
+      "group": {
+        // Makes this task available in the "Run Build Task..." command palette option.
+        "kind": "build",
+        // Makes this the default build task (Ctrl+Shift+B).
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "A full sequence: builds the project, runs a specific test, and then runs the visualizer."
+    }
+  ]
+}

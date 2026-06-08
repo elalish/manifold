@@ -6,16 +6,17 @@
   "configurations": [
     {
       "name": "manifold test",
-      "type": "lldb-dap",
-      "MIMode": "lldb",
+      "type": "cppdbg",
+      // "MIMode": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_catch_exceptions=0",
-        "--gtest_filter=Properties.CalculateNormals"
+        "--gtest_filter=Polygon.Fillet.Precision"
       ],
+      "setupCommands": [{"text": "-enable-pretty-printing"}],
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/build/test",
+      "cwd": "${workspaceFolder}",
       "environment": [
         {
           "name": "MALLOC_CHECK_",
