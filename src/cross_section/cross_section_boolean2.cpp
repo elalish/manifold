@@ -42,7 +42,7 @@ namespace {
 
 bool AllFinite(const mat2x3& m) {
   for (int c = 0; c < 3; ++c) {
-    if (!std::isfinite(m[c].x) || !std::isfinite(m[c].y)) return false;
+    if (!la::all(la::isfinite(m[c]))) return false;
   }
   return true;
 }
@@ -123,7 +123,7 @@ void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
 SimplePolygon HullImpl(SimplePolygon& points) {
   if (points.size() < 3) return {};
   for (const vec2& p : points) {
-    if (!std::isfinite(p.x) || !std::isfinite(p.y)) return {};
+    if (!la::all(la::isfinite(p))) return {};
   }
   manifold::stable_sort(points.begin(), points.end(), [](vec2 a, vec2 b) {
     if (a.x == b.x) return a.y < b.y;
@@ -255,13 +255,10 @@ CrossSection::CrossSection(const Rect& rect) {
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   std::lock_guard<std::mutex> lock(pathsMutex_);
   if (transform_ == mat2x3(la::identity)) return paths_;
-  // Scale tolerance from the COMPOSED transform, once, here - not eagerly per
-  // Transform call. Spectral norm is sub-multiplicative, so a product of
-  // per-step norms inflates tolerance super-linearly under chained shears; the
-  // composed matrix gives the exact factor. The max singular value also keeps a
-  // scalar tolerance conservative under anisotropic scale (the shrunk axis is
-  // over-served, never under-served) - safe by design. Floor at the translated
-  // scale so large translations stay above the post-materialization FP noise.
+  // Scale tolerance once from the composed transform, not per Transform call:
+  // spectral norm is sub-multiplicative, so per-step scaling would inflate it
+  // super-linearly under chained shears. Floor at the translated scale so large
+  // translations stay above post-materialization FP noise.
   const double translationScale =
       std::max(std::fabs(transform_[2][0]), std::fabs(transform_[2][1]));
   tolerance_ = std::max(
@@ -420,9 +417,8 @@ CrossSection CrossSection::Transform(const mat2x3& m) const {
   CrossSection transformed;
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
-  // Carry tolerance unscaled; GetPaths() scales it from the composed transform
-  // once at materialization. Scaling per call would inflate it super-linearly
-  // under chained shears (product of norms vs norm of the product).
+  // Carry tolerance unscaled; GetPaths() scales it once from the composed
+  // transform at materialization.
   transformed.tolerance_ = tolerance_;
   return transformed;
 }
@@ -454,14 +450,11 @@ CrossSection CrossSection::WarpBatch(
 }
 
 CrossSection CrossSection::Simplify(double epsilon) const {
-  // Storage from construction and from the boolean/offset ops is fill-rule-
-  // regularized, so Simplify just decimates: drop tiny contours, then remove
-  // near-collinear verts per ring at `epsilon` (clipper2 SimplifyPaths style,
-  // not Ramer-Douglas-Peucker). The output is intentionally NOT re-regularized:
-  // an `epsilon` coarser than a feature's thickness can self-intersect, the
-  // same best-effort behaviour as clipper2's SimplifyPaths. So Simplify's own
-  // result is not guaranteed regularized; re-decomposing a self-intersected one
-  // can silently drop a crossed hole. Healing is a separate boolean's job.
+  // Stored paths are already fill-rule-regularized, so Simplify only decimates:
+  // drop tiny contours, then remove near-collinear verts per ring at `epsilon`
+  // (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker). Like clipper2,
+  // the result is NOT re-regularized - a coarse `epsilon` can self-intersect a
+  // ring, so healing is left to a later boolean.
   const Polygons& paths = GetPaths()->paths_;
   const Polygons filtered = FilterSmallContours(paths, epsilon);
   Polygons out;
@@ -480,10 +473,9 @@ CrossSection CrossSection::Offset(double delta, JoinType jt, double miterLimit,
   Polygons offset = b2::Offset(GetPaths()->paths_, delta, JoinTypeOf(jt),
                                miterLimit, circularSegments);
   CrossSection out(shared_paths(std::move(offset)));
-  // Round-join faceting comes from circularSegments inside b2::Offset; it is
-  // not folded into tolerance_. The faceting sagitta scales with delta and is a
-  // quality choice, not a drift budget, so folding it would over-merge features
-  // in every downstream op. Max, not sum, keeps chained Offset bounded.
+  // Round-join faceting (circularSegments) is a quality choice, not a drift
+  // budget, so it is not folded into tolerance_ - doing so would over-merge
+  // features downstream. Max, not sum, keeps chained Offset bounded.
   out.tolerance_ =
       std::max(tolerance_, b2::InferEps(out.GetPaths()->paths_, {}));
   return out;
