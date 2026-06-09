@@ -34,12 +34,6 @@ jobs:
         name: tbb
         url: https://github.com/oneapi-src/oneTBB.git
         tag: v2022.3.0
-    - &clone-clipper2
-      uses: ./.github/actions/git-clone
-      with:
-        name: clipper2
-        url: https://github.com/AngusJohnson/Clipper2.git
-        rev: 46f639177fe418f9689e8ddb74f08a870c71f5b4
     - &clone-nanobind
       uses: ./.github/actions/git-clone
       with:
@@ -66,7 +60,6 @@ jobs:
           -DMANIFOLD_ASSERT=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
           -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
           -A x64 -B build
@@ -131,7 +124,6 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
         packages: libgtest-dev libassimp-dev git libtbb-dev pkg-config cmake
-    - *clone-clipper2
     - *clone-nanobind
 
     - name: Build
@@ -143,7 +135,6 @@ jobs:
           -DMANIFOLD_PYBIND=ON \
           -DMANIFOLD_DEBUG=ON \
           -DMANIFOLD_ASSERT=ON \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
           -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} \
           -DASSIMP_ENABLE=ON \
@@ -192,7 +183,6 @@ jobs:
           -DCMAKE_C_COMPILER=clang \
           -DCMAKE_CXX_COMPILER=clang++ \
           -DMANIFOLD_NO_IOSTREAM=ON \
-          -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
           -DMANIFOLD_STRICT=ON \
           -DMANIFOLD_TEST=ON \
           -DMANIFOLD_PYBIND=OFF \
@@ -203,7 +193,6 @@ jobs:
     - name: Verify conflict guard fires (NO_IOSTREAM + DEBUG)
       run: |
         if cmake -DMANIFOLD_NO_IOSTREAM=ON -DMANIFOLD_DEBUG=ON \
-                 -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
                  . -B /tmp/conflict-debug 2>&1; then
           echo "FAIL: configure should have failed for NO_IOSTREAM + DEBUG"
           exit 1
@@ -227,12 +216,11 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        # tbb/clipper2/gtest are built from the cloned sources below under the
+        # tbb/gtest are built from the cloned sources below under the
         # lane's libc++ flags so they match the test binary's ABI; the distro
         # packages are libstdc++.
         packages: cmake clang libc++-dev libc++abi-dev
     - *clone-tbb
-    - *clone-clipper2
     - *clone-gtest
     - name: Configure + build with libc++ and EXTENSIVE hardening
       run: |
@@ -245,9 +233,7 @@ jobs:
           -DMANIFOLD_TEST=ON \
           -DMANIFOLD_PYBIND=OFF \
           -DMANIFOLD_USE_BUILTIN_TBB=ON \
-          -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
           . -B build
         cmake --build build
@@ -271,14 +257,6 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
         packages: libgtest-dev git libtbb-dev pkg-config lcov cmake
-    - *clone-clipper2
-    - name: build clipper2
-      run: |
-        cd clipper2/CPP
-        cmake -DCMAKE_BUILD_TYPE=Release . -B build
-        cmake --build build
-        sudo cmake --install build
-
     - name: build
       run: |
         cmake \
@@ -335,7 +313,6 @@ jobs:
       with:
         version: 5.0.2
     - *clone-tbb
-    - *clone-clipper2
     - *clone-gtest
     - name: Build WASM ${{matrix.parallelization}}
       run: |
@@ -347,7 +324,6 @@ jobs:
           -DMANIFOLD_DEBUG=${{matrix.debug}} \
           -DMANIFOLD_ASSERT=${{matrix.debug}} \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
           . -B build
         cd build
@@ -435,7 +411,6 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         brew install googletest cmake
-    - *clone-clipper2
     - uses: ./.github/actions/git-clone
       with:
         name: fuzztest
@@ -451,7 +426,6 @@ jobs:
           -DMANIFOLD_PYBIND=OFF \
           -DCMAKE_CXX_COMPILER=clang++ \
           -DMANIFOLD_CROSS_SECTION=ON \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           -DFETCHCONTENT_SOURCE_DIR_FUZZTEST=fuzztest \
           . -B build
         ASAN_OPTIONS=detect_container_overflow=0 cmake --build build
@@ -467,7 +441,6 @@ jobs:
       with:
         packages: libgtest-dev libtbb-dev clang-18 cmake
         version: 1
-    - *clone-clipper2
     - name: Build (clang-18 + asan/ubsan)
       run: bash ./scripts/ci/sanitizer_build.sh
     - name: Upload sanitizer build artifacts
@@ -508,7 +481,6 @@ jobs:
     container: openscad/mxe-x86_64-gui:latest
     steps:
     - uses: actions/checkout@v6
-    - *clone-clipper2
     - name: Build
       run: |
         export MXEDIR=/mxe
@@ -525,7 +497,6 @@ jobs:
           -DMANIFOLD_CBIND=ON \
           -DMANIFOLD_DEBUG=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           . -B build
         $CMAKE --build build
 
@@ -553,7 +524,6 @@ jobs:
     - name: Install TBB
       if: matrix.parallelization == 'ON'
       run: brew install tbb
-    - *clone-clipper2
     - name: Build
       run: |
         cmake \
@@ -565,7 +535,6 @@ jobs:
           -DMANIFOLD_PYBIND=ON \
           -DASSIMP_ENABLE=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           . -B build
         cmake --build build
     - name: Test
@@ -606,10 +575,8 @@ jobs:
         brew install googletest cmake
         pip install trimesh pytest
     - *clone-tbb
-    - *clone-clipper2
     - name: test cmake consumer subdir
       run: |
-        export CLIPPER2=$(pwd)/clipper2
         export TBB=$(pwd)/tbb
         cd ..
         ./manifold/scripts/test-cmake-subdir.sh
@@ -625,7 +592,6 @@ jobs:
           -DMANIFOLD_PYBIND=OFF \
           -DMANIFOLD_PAR=ON \
           -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
-          -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
           . -B build
         cmake --build build
     - name: Test
@@ -692,7 +658,6 @@ jobs:
       with:
         packages: libgtest-dev libtbb-dev cmake
         version: 1
-    - *clone-clipper2
     - name: Prepare base and head worktrees
       continue-on-error: true
       shell: bash
@@ -700,7 +665,7 @@ jobs:
     - name: Benchmark base and head
       continue-on-error: true
       shell: bash
-      run: bash ./scripts/benchmark_pr_perf_guard.sh ./clipper2 "${PERF_REPEATS}"
+      run: bash ./scripts/benchmark_pr_perf_guard.sh "${PERF_REPEATS}"
     - name: Compare benchmark results
       shell: bash
       run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}"

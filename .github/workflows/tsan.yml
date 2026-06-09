@@ -69,7 +69,6 @@ jobs:
             -DMANIFOLD_CROSS_SECTION=ON \
             -DMANIFOLD_TEST=ON \
             -DMANIFOLD_PAR=ON \
-            -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON \
             -DCMAKE_PREFIX_PATH="$TBB_PREFIX" \
             -DCMAKE_CXX_FLAGS=-fsanitize=thread \
             -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \

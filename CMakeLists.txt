@@ -38,28 +38,6 @@ set(
 
 # Primary user facing options
 option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
-set(
-  MANIFOLD_CROSS_SECTION_BACKEND
-  "clipper2"
-  CACHE STRING
-        "CrossSection backend to build: clipper2 or experimental boolean2"
-)
-set_property(
-  CACHE MANIFOLD_CROSS_SECTION_BACKEND
-  PROPERTY STRINGS clipper2 boolean2
-)
-mark_as_advanced(MANIFOLD_CROSS_SECTION_BACKEND)
-if(MANIFOLD_CROSS_SECTION)
-  if(
-    NOT MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2"
-    AND NOT MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "boolean2"
-  )
-    message(
-      FATAL_ERROR
-        "MANIFOLD_CROSS_SECTION_BACKEND must be 'clipper2' or 'boolean2'"
-    )
-  endif()
-endif()
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
 option(MANIFOLD_TIMING "Enable Boolean3 phase timing without debug overhead" OFF)
@@ -107,7 +85,6 @@ cmake_dependent_option(
 # When the system package is unavailable, the option will be automatically set
 # to true.
 option(MANIFOLD_USE_BUILTIN_TBB "Use builtin tbb" OFF)
-option(MANIFOLD_USE_BUILTIN_CLIPPER2 "Use builtin clipper2" OFF)
 option(MANIFOLD_USE_BUILTIN_NANOBIND "Use builtin nanobind" OFF)
 
 # default to Release build
@@ -350,9 +327,6 @@ install(
 # PkgConfig file
 if(MANIFOLD_PAR)
   set(TEMPLATE_OPTIONAL_TBB "tbb")
-endif()
-if(MANIFOLD_CROSS_SECTION AND MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
-  set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
 endif()
 configure_file(
   cmake/manifold.pc.in

@@ -35,9 +35,8 @@ struct PathImpl;
 /**
  * @brief Two-dimensional cross sections guaranteed to be without
  * self-intersections, or overlaps between polygons (from construction onwards).
- * This class makes use of the
- * [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library for
- * polygon clipping (boolean) and offsetting operations.
+ * Polygon clipping (boolean) and offsetting use Manifold's own robust
+ * floating-point predicates.
  */
 class CrossSection {
  public:

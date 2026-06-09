@@ -14,197 +14,157 @@
 
 #include "manifold/cross_section.h"
 
-#include "../utils.h"
-#include "clipper2/clipper.core.h"
-#include "clipper2/clipper.h"
-#include "clipper2/clipper.offset.h"
+#include <algorithm>
+#include <cmath>
 
-namespace C2 = Clipper2Lib;
+#include "../svd.h"
+#include "../utils.h"
+#include "boolean2/boolean2.h"
+#include "manifold/optional_assert.h"
+
+// CrossSection implementation. Public methods route through `boolean2/` for
+// polygon boolean operations, containment grouping, offsets, and polygon
+// utilities.
+namespace b2 = manifold::boolean2;
 
 using namespace manifold;
 
 namespace manifold {
 struct PathImpl {
-  PathImpl(const C2::PathsD paths_) : paths_(paths_) {}
-  operator const C2::PathsD&() const { return paths_; }
-  const C2::PathsD paths_;
+  PathImpl(Polygons paths) : paths_(std::move(paths)) {}
+  operator const Polygons&() const { return paths_; }
+  const Polygons paths_;
 };
 }  // namespace manifold
 
 namespace {
-const int precision_ = 8;
 
-C2::ClipType cliptype_of_op(OpType op) {
-  C2::ClipType ct = C2::ClipType::Union;
-  switch (op) {
-    case OpType::Add:
-      break;
-    case OpType::Subtract:
-      ct = C2::ClipType::Difference;
-      break;
-    case OpType::Intersect:
-      ct = C2::ClipType::Intersection;
-      break;
-  };
-  return ct;
+bool AllFinite(const mat2x3& m) {
+  for (const int c : {0, 1, 2}) {
+    if (!la::all(la::isfinite(m[c]))) return false;
+  }
+  return true;
 }
 
-C2::FillRule fr(CrossSection::FillRule fillrule) {
-  C2::FillRule fr = C2::FillRule::EvenOdd;
-  switch (fillrule) {
-    case CrossSection::FillRule::EvenOdd:
-      break;
-    case CrossSection::FillRule::NonZero:
-      fr = C2::FillRule::NonZero;
-      break;
-    case CrossSection::FillRule::Positive:
-      fr = C2::FillRule::Positive;
-      break;
-    case CrossSection::FillRule::Negative:
-      fr = C2::FillRule::Negative;
-      break;
-  };
-  return fr;
+Polygons FilterSmallContours(const Polygons& paths, double epsilon) {
+  Polygons filtered;
+  filtered.reserve(paths.size());
+  for (const auto& path : paths) {
+    const double area = b2::SignedArea(path);
+    Rect box;
+    for (const vec2& v : path) box.Union(v);
+    const vec2 size = box.Size();
+    if (std::fabs(area) > std::max(size.x, size.y) * epsilon) {
+      filtered.push_back(path);
+    }
+  }
+  return filtered;
 }
 
-C2::JoinType jt(CrossSection::JoinType jointype) {
-  C2::JoinType jt = C2::JoinType::Square;
+b2::OffsetJoinType JoinTypeOf(CrossSection::JoinType jointype) {
   switch (jointype) {
     case CrossSection::JoinType::Square:
-      break;
+      return b2::OffsetJoinType::Square;
     case CrossSection::JoinType::Round:
-      jt = C2::JoinType::Round;
-      break;
+      return b2::OffsetJoinType::Round;
     case CrossSection::JoinType::Miter:
-      jt = C2::JoinType::Miter;
-      break;
+      return b2::OffsetJoinType::Miter;
     case CrossSection::JoinType::Bevel:
-      jt = C2::JoinType::Bevel;
-      break;
-  };
-  return jt;
-}
-
-vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
-
-C2::PointD v2_to_pd(const vec2 v) { return C2::PointD(v.x, v.y); }
-
-C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
-  auto p = C2::PathD();
-  p.reserve(ctr.size());
-  for (auto v : ctr) {
-    p.push_back(v2_to_pd(v));
+      return b2::OffsetJoinType::Bevel;
   }
-  return p;
+  return b2::OffsetJoinType::Square;
 }
 
-C2::PathsD transform(const C2::PathsD ps, const mat2x3 m) {
-  const bool invert = la::determinant(mat2(m)) < 0;
-  auto transformed = C2::PathsD();
-  transformed.reserve(ps.size());
-  for (auto path : ps) {
-    auto sz = path.size();
-    auto s = C2::PathD(sz);
-    for (size_t i = 0; i < sz; ++i) {
-      auto idx = invert ? sz - 1 - i : i;
-      s[idx] = v2_to_pd(m * vec3(path[i].x, path[i].y, 1));
+Polygons TransformPolygons(const Polygons& paths, const mat2x3& transform) {
+  const bool invert = la::determinant(mat2(transform)) < 0;
+  Polygons out;
+  out.reserve(paths.size());
+  for (const auto& path : paths) {
+    const size_t size = path.size();
+    SimplePolygon transformed(size);
+    for (size_t i = 0; i < size; ++i) {
+      const size_t index = invert ? size - 1 - i : i;
+      transformed[index] = transform * vec3(path[i].x, path[i].y, 1.0);
     }
-    transformed.push_back(s);
+    out.push_back(std::move(transformed));
   }
-  return transformed;
+  return out;
 }
 
-std::shared_ptr<const PathImpl> shared_paths(const C2::PathsD& ps) {
-  return std::make_shared<const PathImpl>(ps);
+std::shared_ptr<const PathImpl> shared_paths(Polygons paths) {
+  return std::make_shared<const PathImpl>(std::move(paths));
 }
 
-// forward declaration for mutual recursion
-void decompose_hole(const C2::PolyTreeD* outline,
-                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
-                    size_t n_holes, size_t j);
-
-void decompose_outline(const C2::PolyTreeD* tree,
-                       std::vector<C2::PathsD>& polys, size_t i) {
-  auto n_outlines = tree->Count();
-  if (i < n_outlines) {
-    auto outline = tree->Child(i);
-    auto n_holes = outline->Count();
-    auto poly = C2::PathsD(n_holes + 1);
-    poly[0] = outline->Polygon();
-    decompose_hole(outline, polys, poly, n_holes, 0);
-    polys.push_back(poly);
-    if (i < n_outlines - 1) {
-      decompose_outline(tree, polys, i + 1);
-    }
-  }
-}
-
-void decompose_hole(const C2::PolyTreeD* outline,
-                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
-                    size_t n_holes, size_t j) {
-  if (j < n_holes) {
-    auto child = outline->Child(j);
-    decompose_outline(child, polys, 0);
-    poly[j + 1] = child->Polygon();
-    decompose_hole(outline, polys, poly, n_holes, j + 1);
-  }
-}
-
-void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, size_t i) {
-  auto n_outlines = tree->Count();
-  if (i < n_outlines) {
-    auto outline = tree->Child(i);
-    flatten(outline, polys, 0);
-    polys.push_back(outline->Polygon());
-    if (i < n_outlines - 1) {
-      flatten(tree, polys, i + 1);
-    }
-  }
-}
-
-bool V2Lesser(vec2 a, vec2 b) {
-  if (a.x == b.x) return a.y < b.y;
-  return a.x < b.x;
-}
-
-void HullBacktrack(const vec2& pt, std::vector<vec2>& stack) {
-  auto sz = stack.size();
-  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 0.0) <= 0.0) {
+void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
+  size_t size = stack.size();
+  while (size >= 2 &&
+         CCW(stack[size - 2], stack[size - 1], point, 0.0) <= 0.0) {
     stack.pop_back();
-    sz = stack.size();
+    size = stack.size();
   }
 }
 
-// Based on method described here:
-// https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
-// Changed to follow:
-// https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
-// This is the same algorithm (Andrew, also called Montone Chain).
-C2::PathD HullImpl(SimplePolygon& pts) {
-  size_t len = pts.size();
-  if (len < 3) return C2::PathD();  // not enough points to create a polygon
-  std::sort(pts.begin(), pts.end(), V2Lesser);
-
-  auto lower = std::vector<vec2>{};
-  for (auto& pt : pts) {
-    HullBacktrack(pt, lower);
-    lower.push_back(pt);
+SimplePolygon HullImpl(SimplePolygon& points) {
+  if (points.size() < 3) return {};
+  for (const vec2& p : points) {
+    if (!la::all(la::isfinite(p))) return {};
   }
-  auto upper = std::vector<vec2>{};
-  for (auto pt_iter = pts.rbegin(); pt_iter != pts.rend(); pt_iter++) {
-    HullBacktrack(*pt_iter, upper);
-    upper.push_back(*pt_iter);
+  manifold::stable_sort(points.begin(), points.end(), [](vec2 a, vec2 b) {
+    if (a.x == b.x) return a.y < b.y;
+    return a.x < b.x;
+  });
+
+  std::vector<vec2> lower;
+  for (const vec2& point : points) {
+    HullBacktrack(point, lower);
+    lower.push_back(point);
+  }
+
+  std::vector<vec2> upper;
+  for (auto it = points.rbegin(); it != points.rend(); ++it) {
+    HullBacktrack(*it, upper);
+    upper.push_back(*it);
   }
 
   upper.pop_back();
   lower.pop_back();
 
-  auto path = C2::PathD();
+  SimplePolygon path;
   path.reserve(lower.size() + upper.size());
-  for (const auto& l : lower) path.push_back(v2_to_pd(l));
-  for (const auto& u : upper) path.push_back(v2_to_pd(u));
+  for (const vec2& point : lower) path.push_back(point);
+  for (const vec2& point : upper) path.push_back(point);
   return path;
 }
+
+// Drop the vertex closest to the line through its current neighbors, repeating
+// while under tol (Clipper2 SimplifyPaths semantics). Re-checking current, not
+// original, neighbors each step is what keeps a curve from collapsing. O(n^2)
+// in the ring size (rescans every vertex per removal); worth optimizing if
+// large rings show up.
+SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
+  const double tol2 = tol * tol;
+  while (ring.size() > 3) {
+    const int n = static_cast<int>(ring.size());
+    int victim = -1;
+    double bestD2 = tol2;
+    for (int i = 0; i < n; ++i) {
+      const vec2 P = ring[(i + n - 1) % n];
+      const vec2 N = ring[(i + 1) % n];
+      const vec2 pn = N - P;
+      const double pnLen2 = la::dot(pn, pn);
+      const double cross = la::cross(ring[i] - P, pn);
+      const double d2 = pnLen2 > 0.0 ? cross * cross / pnLen2 : 0.0;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        victim = i;
+      }
+    }
+    if (victim < 0) break;  // every vertex deviates by >= tol
+    ring.erase(ring.begin() + victim);
+  }
+  return ring;
+}
+
 }  // namespace
 
 namespace manifold {
@@ -212,25 +172,25 @@ namespace manifold {
 /**
  * The default constructor is an empty cross-section (containing no contours).
  */
-CrossSection::CrossSection() {
-  paths_ = std::make_shared<const PathImpl>(C2::PathsD());
-}
+CrossSection::CrossSection() : paths_(shared_paths({})) {}
 
 CrossSection::~CrossSection() = default;
-// Inline std::mutex member: user-defined move ops (mirror the copy ops below)
-// so this and the moved-from object each keep a valid, separate mutex.
+
+// Explicit move ops keep `other.pathsMutex_` intact so a subsequent copy-
+// or move-assign into the moved-from object can still lock it.
 CrossSection::CrossSection(CrossSection&& other) noexcept {
   std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = std::move(other.paths_);
   transform_ = other.transform_;
+  tolerance_ = other.tolerance_;
 }
 
 CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
-  if (this != &other) {
-    std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
-    paths_ = std::move(other.paths_);
-    transform_ = other.transform_;
-  }
+  if (this == &other) return *this;
+  std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
+  paths_ = std::move(other.paths_);
+  transform_ = other.transform_;
+  tolerance_ = other.tolerance_;
   return *this;
 }
 
@@ -245,52 +205,56 @@ CrossSection::CrossSection(const CrossSection& other) {
   std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
+  tolerance_ = other.tolerance_;
 }
 
 CrossSection& CrossSection::operator=(const CrossSection& other) {
-  if (this != &other) {
-    std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
-    paths_ = other.paths_;
-    transform_ = other.transform_;
-  }
+  if (this == &other) return *this;
+  std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
+  paths_ = other.paths_;
+  transform_ = other.transform_;
+  tolerance_ = other.tolerance_;
   return *this;
-};
+}
 
-// Private, skips unioning.
-CrossSection::CrossSection(std::shared_ptr<const PathImpl> ps) { paths_ = ps; }
+CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
+    : paths_(std::move(paths)) {}
 
 /**
  * Create a 2d cross-section from a single contour. A boolean union operation
- * (with Positive filling rule by default) is performed to ensure the
- * resulting CrossSection is free of self-intersections.
+ * (with the Positive filling rule) is performed to ensure the resulting
+ * CrossSection is free of self-intersections.
  *
  * @param contour A closed path outlining the desired cross-section.
- * @param fillrule The filling rule used to interpret polygon sub-regions
- * created by self-intersections in contour.
+ * @param fillrule Only FillRule::Positive is supported; other values are
+ * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
-  auto ps = C2::PathsD{(pathd_of_contour(contour))};
-  paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
+  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
+               "Boolean2 CrossSection supports only Positive fill");
+  (void)fillrule;
+  Polygons input{contour};
+  tolerance_ = b2::InferEps(input, {});
+  paths_ = shared_paths(b2::ApplyFillRule(input, tolerance_));
 }
 
 /**
  * Create a 2d cross-section from a set of contours (complex polygons). A
- * boolean union operation (with Positive filling rule by default) is
- * performed to combine overlapping polygons and ensure the resulting
- * CrossSection is free of intersections.
+ * boolean union operation (with the Positive filling rule) is performed to
+ * combine overlapping polygons and ensure the resulting CrossSection is free
+ * of intersections.
  *
  * @param contours A set of closed paths describing zero or more complex
  * polygons.
- * @param fillrule The filling rule used to interpret polygon sub-regions in
- * contours.
+ * @param fillrule Only FillRule::Positive is supported; other values are
+ * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
 CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
-  auto ps = C2::PathsD();
-  ps.reserve(contours.size());
-  for (auto ctr : contours) {
-    ps.push_back(pathd_of_contour(ctr));
-  }
-  paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
+  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
+               "Boolean2 CrossSection supports only Positive fill");
+  (void)fillrule;
+  tolerance_ = b2::InferEps(contours, {});
+  paths_ = shared_paths(b2::ApplyFillRule(contours, tolerance_));
 }
 
 /**
@@ -299,23 +263,29 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
  * @param rect An axis-aligned rectangular bounding box.
  */
 CrossSection::CrossSection(const Rect& rect) {
-  C2::PathD p(4);
-  p[0] = C2::PointD(rect.min.x, rect.min.y);
-  p[1] = C2::PointD(rect.max.x, rect.min.y);
-  p[2] = C2::PointD(rect.max.x, rect.max.y);
-  p[3] = C2::PointD(rect.min.x, rect.max.y);
-  paths_ = shared_paths(C2::PathsD{p});
+  if (rect.IsEmpty()) {
+    paths_ = shared_paths({});
+    return;
+  }
+  paths_ = shared_paths({{{rect.min.x, rect.min.y},
+                          {rect.max.x, rect.min.y},
+                          {rect.max.x, rect.max.y},
+                          {rect.min.x, rect.max.y}}});
 }
 
-// Private
-// All access to paths_ should be done through the GetPaths() method, which
-// applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   std::lock_guard<std::mutex> lock(pathsMutex_);
-  if (transform_ == mat2x3(la::identity)) {
-    return paths_;
-  }
-  paths_ = shared_paths(::transform(paths_->paths_, transform_));
+  if (transform_ == mat2x3(la::identity)) return paths_;
+  // Scale tolerance once from the composed transform, not per Transform call:
+  // spectral norm is sub-multiplicative, so per-step scaling would inflate it
+  // super-linearly under chained shears. Floor at the translated scale so large
+  // translations stay above post-materialization FP noise.
+  const double translationScale =
+      std::max(std::fabs(transform_[2][0]), std::fabs(transform_[2][1]));
+  tolerance_ =
+      std::max(SpectralNorm(mat2(transform_[0], transform_[1])) * tolerance_,
+               b2::EpsilonFromScale(translationScale));
+  paths_ = shared_paths(TransformPolygons(paths_->paths_, transform_));
   transform_ = mat2x3(la::identity);
   return paths_;
 }
@@ -332,24 +302,9 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
   if (size.x < 0.0 || size.y < 0.0 || la::length(size) == 0.0) {
     return CrossSection();
   }
-
-  auto p = C2::PathD(4);
-  if (center) {
-    const auto w = size.x / 2;
-    const auto h = size.y / 2;
-    p[0] = C2::PointD(w, h);
-    p[1] = C2::PointD(-w, h);
-    p[2] = C2::PointD(-w, -h);
-    p[3] = C2::PointD(w, -h);
-  } else {
-    const double x = size.x;
-    const double y = size.y;
-    p[0] = C2::PointD(0.0, 0.0);
-    p[1] = C2::PointD(x, 0.0);
-    p[2] = C2::PointD(x, y);
-    p[3] = C2::PointD(0.0, y);
-  }
-  return CrossSection(shared_paths(C2::PathsD{p}));
+  const vec2 half = size * 0.5;
+  if (center) return CrossSection(Rect(-half, half));
+  return CrossSection(Rect({0.0, 0.0}, size));
 }
 
 /**
@@ -360,17 +315,14 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
  * calculated by the static Quality defaults according to the radius.
  */
 CrossSection CrossSection::Circle(double radius, int circularSegments) {
-  if (radius <= 0.0) {
-    return CrossSection();
-  }
-  int n = circularSegments > 2 ? circularSegments
-                               : Quality::GetCircularSegments(radius);
-  double dPhi = 360.0 / n;
-  auto circle = C2::PathD(n);
-  for (int i = 0; i < n; ++i) {
-    circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
-  }
-  return CrossSection(shared_paths(C2::PathsD{circle}));
+  if (radius <= 0.0) return CrossSection();
+  const int n = circularSegments > 2 ? circularSegments
+                                     : Quality::GetCircularSegments(radius);
+  SimplePolygon circle(n);
+  const double dPhi = 360.0 / n;
+  for (int i = 0; i < n; ++i)
+    circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
+  return CrossSection(shared_paths({std::move(circle)}));
 }
 
 /**
@@ -378,10 +330,15 @@ CrossSection CrossSection::Circle(double radius, int circularSegments) {
  */
 CrossSection CrossSection::Boolean(const CrossSection& second,
                                    OpType op) const {
-  auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, GetPaths()->paths_,
-                           second.GetPaths()->paths_, precision_);
-  return CrossSection(shared_paths(res));
+  // GetPaths() returns a snapshot aliasing each source's paths_, which stays
+  // alive for this call, so bind by reference instead of deep-copying.
+  const Polygons& a = GetPaths()->paths_;
+  const Polygons& b = second.GetPaths()->paths_;
+  const double eps = b2::InferEps(a, b);
+  const double tolerance = std::max({tolerance_, second.tolerance_, eps});
+  CrossSection result(shared_paths(b2::Boolean2D(a, b, op, eps, tolerance)));
+  result.tolerance_ = tolerance;
+  return result;
 }
 
 /**
@@ -390,37 +347,40 @@ CrossSection CrossSection::Boolean(const CrossSection& second,
  */
 CrossSection CrossSection::BatchBoolean(
     const std::vector<CrossSection>& crossSections, OpType op) {
-  if (crossSections.size() == 0)
-    return CrossSection();
-  else if (crossSections.size() == 1)
-    return crossSections[0];
-
-  auto subjs = crossSections[0].GetPaths();
+  if (crossSections.empty()) return CrossSection();
+  if (crossSections.size() == 1) return crossSections[0];
 
   if (op == OpType::Intersect) {
-    auto res = subjs->paths_;
+    Polygons result = crossSections[0].GetPaths()->paths_;
+    double tol = crossSections[0].tolerance_;
     for (size_t i = 1; i < crossSections.size(); ++i) {
-      res = C2::BooleanOp(C2::ClipType::Intersection, C2::FillRule::Positive,
-                          res, crossSections[i].GetPaths()->paths_, precision_);
+      const auto& clip = crossSections[i].GetPaths()->paths_;
+      const double eps = b2::InferEps(result, clip);
+      const double tolerance =
+          std::max({tol, crossSections[i].tolerance_, eps});
+      result = b2::Boolean2D(result, clip, OpType::Intersect, eps, tolerance);
+      tol = tolerance;
     }
-    return CrossSection(shared_paths(res));
+    CrossSection out(shared_paths(std::move(result)));
+    out.tolerance_ = tol;
+    return out;
   }
 
-  int n_clips = 0;
+  Polygons clips;
+  double clipsTol = 0.0;
   for (size_t i = 1; i < crossSections.size(); ++i) {
-    n_clips += crossSections[i].GetPaths()->paths_.size();
+    const auto& paths = crossSections[i].GetPaths()->paths_;
+    clips.insert(clips.end(), paths.begin(), paths.end());
+    clipsTol = std::max(clipsTol, crossSections[i].tolerance_);
   }
-  auto clips = C2::PathsD();
-  clips.reserve(n_clips);
-  for (size_t i = 1; i < crossSections.size(); ++i) {
-    auto ps = crossSections[i].GetPaths();
-    clips.insert(clips.end(), ps->paths_.begin(), ps->paths_.end());
-  }
-
-  auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, subjs->paths_, clips,
-                           precision_);
-  return CrossSection(shared_paths(res));
+  const auto& subject = crossSections[0].GetPaths()->paths_;
+  const double eps = b2::InferEps(subject, clips);
+  const double tolerance =
+      std::max({crossSections[0].tolerance_, clipsTol, eps});
+  CrossSection out(
+      shared_paths(b2::Boolean2D(subject, clips, op, eps, tolerance)));
+  out.tolerance_ = tolerance;
+  return out;
 }
 
 /**
@@ -487,24 +447,17 @@ CrossSection CrossSection::Compose(
  * holes.
  */
 std::vector<CrossSection> CrossSection::Decompose() const {
-  if (NumContour() < 2) {
-    return std::vector<CrossSection>{CrossSection(*this)};
+  if (NumContour() < 2) return {*this};
+  const auto& paths = GetPaths()->paths_;
+  std::vector<Polygons> components = b2::DecomposeByContainment(paths);
+  std::vector<CrossSection> out;
+  out.reserve(components.size());
+  for (auto& component : components) {
+    CrossSection piece(shared_paths(std::move(component)));
+    piece.tolerance_ = tolerance_;
+    out.push_back(std::move(piece));
   }
-
-  C2::PolyTreeD tree;
-  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
-                C2::PathsD(), tree, precision_);
-
-  auto polys = std::vector<C2::PathsD>();
-  decompose_outline(&tree, polys, 0);
-
-  auto comps = std::vector<CrossSection>();
-  comps.reserve(polys.size());
-  // reverse the stack while wrapping
-  for (auto poly = polys.rbegin(); poly != polys.rend(); ++poly)
-    comps.emplace_back(CrossSection(shared_paths(*poly)));
-
-  return comps;
+  return out;
 }
 
 /**
@@ -514,9 +467,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  * @param v The vector to add to every vertex.
  */
 CrossSection CrossSection::Translate(const vec2 v) const {
-  mat2x3 m({1.0, 0.0},  //
-           {0.0, 1.0},  //
-           {v.x, v.y});
+  mat2x3 m({1.0, 0.0}, {0.0, 1.0}, {v.x, v.y});
   return Transform(m);
 }
 
@@ -527,11 +478,9 @@ CrossSection CrossSection::Translate(const vec2 v) const {
  * @param degrees degrees about the Z-axis to rotate.
  */
 CrossSection CrossSection::Rotate(double degrees) const {
-  auto s = sind(degrees);
-  auto c = cosd(degrees);
-  mat2x3 m({c, s},   //
-           {-s, c},  //
-           {0.0, 0.0});
+  const double s = sind(degrees);
+  const double c = cosd(degrees);
+  mat2x3 m({c, s}, {-s, c}, {0.0, 0.0});
   return Transform(m);
 }
 
@@ -542,9 +491,7 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * @param scale The vector to multiply every vertex by per component.
  */
 CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat2x3 m({scale.x, 0.0},  //
-           {0.0, scale.y},  //
-           {0.0, 0.0});
+  mat2x3 m({scale.x, 0.0}, {0.0, scale.y}, {0.0, 0.0});
   return Transform(m);
 }
 
@@ -557,12 +504,10 @@ CrossSection CrossSection::Scale(const vec2 scale) const {
  * @param ax the axis to be mirrored over
  */
 CrossSection CrossSection::Mirror(const vec2 ax) const {
-  if (la::length(ax) == 0.) {
-    return CrossSection();
-  }
-  auto n = la::normalize(ax);
-  auto m = mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0));
-  return Transform(m);
+  if (la::length(ax) == 0.0) return CrossSection();
+  const vec2 n = la::normalize(ax);
+  return Transform(
+      mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0)));
 }
 
 /**
@@ -573,10 +518,15 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  * @param m The affine transform matrix to apply to all the vertices.
  */
 CrossSection CrossSection::Transform(const mat2x3& m) const {
+  // A non-finite transform is a no-op rather than poisoning coords/tolerance_.
+  if (!AllFinite(m)) return *this;
   std::lock_guard<std::mutex> lock(pathsMutex_);
-  auto transformed = CrossSection();
+  CrossSection transformed;
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
+  // Carry tolerance unscaled; GetPaths() scales it once from the composed
+  // transform at materialization.
+  transformed.tolerance_ = tolerance_;
   return transformed;
 }
 
@@ -589,10 +539,8 @@ CrossSection CrossSection::Transform(const mat2x3& m) const {
  * @param warpFunc A function that modifies a given vertex position.
  */
 CrossSection CrossSection::Warp(std::function<void(vec2&)> warpFunc) const {
-  return WarpBatch([&warpFunc](VecView<vec2> vecs) {
-    for (vec2& p : vecs) {
-      warpFunc(p);
-    }
+  return WarpBatch([&warpFunc](VecView<vec2> points) {
+    for (vec2& point : points) warpFunc(point);
   });
 }
 
@@ -605,34 +553,30 @@ CrossSection CrossSection::Warp(std::function<void(vec2&)> warpFunc) const {
  */
 CrossSection CrossSection::WarpBatch(
     std::function<void(VecView<vec2>)> warpFunc) const {
-  std::vector<vec2> tmp_verts;
-  C2::PathsD paths = GetPaths()->paths_;  // deep copy
-  for (C2::PathD const& path : paths) {
-    for (C2::PointD const& p : path) {
-      tmp_verts.push_back(v2_of_pd(p));
-    }
+  Polygons paths = GetPaths()->paths_;
+  std::vector<vec2> points;
+  for (const auto& path : paths) {
+    points.insert(points.end(), path.begin(), path.end());
   }
-
-  warpFunc(VecView<vec2>(tmp_verts.data(), tmp_verts.size()));
-
-  auto cursor = tmp_verts.begin();
-  for (C2::PathD& path : paths) {
-    for (C2::PointD& p : path) {
-      p = v2_to_pd(*cursor);
-      ++cursor;
-    }
+  warpFunc(VecView<vec2>(points.data(), points.size()));
+  auto point = points.begin();
+  for (auto& path : paths) {
+    for (auto& v : path) v = *point++;
   }
-
-  return CrossSection(
-      shared_paths(C2::Union(paths, C2::FillRule::Positive, precision_)));
+  // Warping can self-intersect the rings, so re-apply the fill rule at machine
+  // eps (not the drift tolerance - this is regularization, not decimation).
+  const double eps = b2::InferEps(paths, {});
+  CrossSection out(shared_paths(b2::ApplyFillRule(paths, eps)));
+  out.tolerance_ = std::max(tolerance_, eps);
+  return out;
 }
 
 /**
  * Remove vertices from the contours in this CrossSection that are less than
- * the specified distance epsilon from an imaginary line that passes through
+ * the specified distance tolerance from an imaginary line that passes through
  * its two adjacent vertices. Near duplicate vertices and collinear points
- * will be removed at lower epsilons, with elimination of line segments
- * becoming increasingly aggressive with larger epsilons.
+ * will be removed at lower tolerances, with elimination of line segments
+ * becoming increasingly aggressive with larger tolerances.
  *
  * It is recommended to apply this function following Offset, in order to
  * clean up any spurious tiny line segments introduced that do not improve
@@ -640,29 +584,22 @@ CrossSection CrossSection::WarpBatch(
  * offseting operations are to be performed, which would compound the issue.
  */
 CrossSection CrossSection::Simplify(double epsilon) const {
-  C2::PolyTreeD tree;
-  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
-                C2::PathsD(), tree, precision_);
-
-  C2::PathsD polys;
-  flatten(&tree, polys, 0);
-
-  // Filter out contours less than epsilon wide.
-  C2::PathsD filtered;
-  for (C2::PathD poly : polys) {
-    auto area = C2::Area(poly);
-    Rect box;
-    for (auto vert : poly) {
-      box.Union(vec2(vert.x, vert.y));
-    }
-    vec2 size = box.Size();
-    if (std::abs(area) > std::max(size.x, size.y) * epsilon) {
-      filtered.push_back(poly);
-    }
+  // Stored paths are already fill-rule-regularized, so Simplify only decimates:
+  // drop tiny contours, then remove near-collinear verts per ring at `epsilon`
+  // (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker). Like clipper2,
+  // the result is NOT re-regularized - a coarse `epsilon` can self-intersect a
+  // ring, so healing is left to a later boolean.
+  const Polygons& paths = GetPaths()->paths_;
+  const Polygons filtered = FilterSmallContours(paths, epsilon);
+  Polygons out;
+  out.reserve(filtered.size());
+  for (const auto& ring : filtered) {
+    SimplePolygon simplified = SimplifyRing(ring, epsilon);
+    if (simplified.size() >= 3) out.push_back(std::move(simplified));
   }
-
-  auto ps = SimplifyPaths(filtered, epsilon, true);
-  return CrossSection(shared_paths(ps));
+  CrossSection result(shared_paths(std::move(out)));
+  result.tolerance_ = std::max(tolerance_, epsilon);
+  return result;
 }
 
 /**
@@ -686,22 +623,17 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * defaults according to the radius.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
-                                  double miter_limit,
+                                  double miterLimit,
                                   int circularSegments) const {
-  double arc_tol = 0.;
-  if (jointype == JoinType::Round) {
-    int n = circularSegments > 2 ? circularSegments
-                                 : Quality::GetCircularSegments(delta);
-    // This calculates tolerance as a function of circular segments and delta
-    // (radius) in order to get back the same number of segments in Clipper2:
-    // steps_per_360 = PI / acos(1 - arc_tol / abs_delta)
-    const double abs_delta = std::fabs(delta);
-    arc_tol = (math::cos(Clipper2Lib::PI / n) - 1) * -abs_delta;
-  }
-  auto ps =
-      C2::InflatePaths(GetPaths()->paths_, delta, jt(jointype),
-                       C2::EndType::Polygon, miter_limit, precision_, arc_tol);
-  return CrossSection(shared_paths(ps));
+  Polygons offset = b2::Offset(GetPaths()->paths_, delta, JoinTypeOf(jointype),
+                               miterLimit, circularSegments);
+  CrossSection out(shared_paths(std::move(offset)));
+  // Round-join faceting (circularSegments) is a quality choice, not a drift
+  // budget, so it is not folded into tolerance_ - doing so would over-merge
+  // features downstream. Max, not sum, keeps chained Offset bounded.
+  out.tolerance_ =
+      std::max(tolerance_, b2::InferEps(out.GetPaths()->paths_, {}));
+  return out;
 }
 
 /**
@@ -712,27 +644,32 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
  */
 CrossSection CrossSection::Hull(
     const std::vector<CrossSection>& crossSections) {
-  int n = 0;
-  for (auto cs : crossSections) n += cs.NumVert();
-  SimplePolygon pts;
-  pts.reserve(n);
-  for (auto cs : crossSections) {
-    auto paths = cs.GetPaths()->paths_;
-    for (auto path : paths) {
-      for (auto p : path) {
-        pts.push_back(v2_of_pd(p));
-      }
-    }
+  size_t numPoints = 0;
+  double maxTol = 0.0;
+  for (const auto& cs : crossSections) {
+    numPoints += cs.NumVert();
+    maxTol = std::max(maxTol, cs.tolerance_);
   }
-  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
+
+  SimplePolygon points;
+  points.reserve(numPoints);
+  for (const auto& cs : crossSections) {
+    const auto& paths = cs.GetPaths()->paths_;
+    for (const auto& path : paths)
+      for (const vec2& point : path) points.push_back(point);
+  }
+
+  SimplePolygon hull = HullImpl(points);
+  if (hull.size() < 3) return CrossSection();
+  CrossSection out(shared_paths({std::move(hull)}));
+  out.tolerance_ = std::max(maxTol, b2::InferEps(out.GetPaths()->paths_, {}));
+  return out;
 }
 
 /**
  * Compute the convex hull of this cross-section.
  */
-CrossSection CrossSection::Hull() const {
-  return Hull(std::vector<CrossSection>{*this});
-}
+CrossSection CrossSection::Hull() const { return Hull({*this}); }
 
 /**
  * Compute the convex hull of a set of points. If the given points are fewer
@@ -742,7 +679,12 @@ CrossSection CrossSection::Hull() const {
  * hull.
  */
 CrossSection CrossSection::Hull(SimplePolygon pts) {
-  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
+  SimplePolygon hull = HullImpl(pts);
+  if (hull.size() < 3) return CrossSection();
+  Polygons inputForEps{pts};
+  CrossSection out(shared_paths({std::move(hull)}));
+  out.tolerance_ = b2::InferEps(inputForEps, {});
+  return out;
 }
 
 /**
@@ -753,31 +695,27 @@ CrossSection CrossSection::Hull(SimplePolygon pts) {
  * compute a convex hull.
  */
 CrossSection CrossSection::Hull(const Polygons polys) {
-  SimplePolygon pts;
-  for (auto poly : polys) {
-    for (auto p : poly) {
-      pts.push_back(p);
-    }
-  }
-  return Hull(pts);
+  SimplePolygon points;
+  for (const auto& path : polys)
+    for (const vec2& point : path) points.push_back(point);
+  return Hull(points);
 }
 
 /**
  * Return the total area covered by complex polygons making up the
  * CrossSection.
  */
-double CrossSection::Area() const { return C2::Area(GetPaths()->paths_); }
+double CrossSection::Area() const {
+  return b2::TotalSignedArea(GetPaths()->paths_);
+}
 
 /**
  * Return the number of vertices in the CrossSection.
  */
 size_t CrossSection::NumVert() const {
-  size_t n = 0;
-  auto paths = GetPaths()->paths_;
-  for (auto p : paths) {
-    n += p.size();
-  }
-  return n;
+  size_t numVert = 0;
+  for (const auto& path : GetPaths()->paths_) numVert += path.size();
+  return numVert;
 }
 
 /**
@@ -796,25 +734,16 @@ bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
  * vertices.
  */
 Rect CrossSection::Bounds() const {
-  auto r = C2::GetBounds(GetPaths()->paths_);
-  return Rect({r.left, r.bottom}, {r.right, r.top});
+  Rect box;
+  for (const auto& path : GetPaths()->paths_) {
+    for (const vec2& v : path) box.Union(v);
+  }
+  return box;
 }
 
 /**
  * Return the contours of this CrossSection as a Polygons.
  */
-Polygons CrossSection::ToPolygons() const {
-  auto polys = Polygons();
-  auto paths = GetPaths()->paths_;
-  polys.reserve(paths.size());
-  for (auto p : paths) {
-    auto sp = SimplePolygon();
-    sp.reserve(p.size());
-    for (auto v : p) {
-      sp.push_back({v.x, v.y});
-    }
-    polys.push_back(sp);
-  }
-  return polys;
-}
+Polygons CrossSection::ToPolygons() const { return GetPaths()->paths_; }
+
 }  // namespace manifold

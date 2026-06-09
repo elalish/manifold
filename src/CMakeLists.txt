@@ -14,32 +14,23 @@
 
 set(MANIFOLD_CROSS_SECTION_SRCS)
 if(MANIFOLD_CROSS_SECTION)
-  if(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
-    list(APPEND MANIFOLD_CROSS_SECTION_SRCS cross_section/cross_section.cpp)
-  elseif(MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "boolean2")
-    list(
-      APPEND
-      MANIFOLD_CROSS_SECTION_SRCS
-      cross_section/cross_section_boolean2.cpp
-      cross_section/boolean2/boolean2.cpp
-      cross_section/boolean2/bvh.cpp
-      cross_section/boolean2/canonicalize.cpp
-      cross_section/boolean2/containment.cpp
-      cross_section/boolean2/diagnostics.cpp
-      cross_section/boolean2/driver.cpp
-      cross_section/boolean2/edge_vert_lists.cpp
-      cross_section/boolean2/intersections.cpp
-      cross_section/boolean2/offset.cpp
-      cross_section/boolean2/predicates.cpp
-      cross_section/boolean2/vertex_merge.cpp
-      cross_section/boolean2/winding_filter.cpp
-    )
-  endif()
-endif()
-
-set(MANIFOLD_CROSS_SECTION_LIBS)
-if(MANIFOLD_CROSS_SECTION AND MANIFOLD_CROSS_SECTION_BACKEND STREQUAL "clipper2")
-  list(APPEND MANIFOLD_CROSS_SECTION_LIBS Clipper2::Clipper2)
+  list(
+    APPEND
+    MANIFOLD_CROSS_SECTION_SRCS
+    cross_section/cross_section.cpp
+    cross_section/boolean2/boolean2.cpp
+    cross_section/boolean2/bvh.cpp
+    cross_section/boolean2/canonicalize.cpp
+    cross_section/boolean2/containment.cpp
+    cross_section/boolean2/diagnostics.cpp
+    cross_section/boolean2/driver.cpp
+    cross_section/boolean2/edge_vert_lists.cpp
+    cross_section/boolean2/intersections.cpp
+    cross_section/boolean2/offset.cpp
+    cross_section/boolean2/predicates.cpp
+    cross_section/boolean2/vertex_merge.cpp
+    cross_section/boolean2/winding_filter.cpp
+  )
 endif()
 
 set(
@@ -109,7 +100,6 @@ target_link_libraries(
   PRIVATE
     # optional dependencies
     $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
-    ${MANIFOLD_CROSS_SECTION_LIBS}
 )
 
 target_compile_options(manifold PRIVATE ${MANIFOLD_FLAGS})
