@@ -14,9 +14,7 @@
 
 #include <algorithm>
 
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -81,7 +79,6 @@ TEST(Smooth, TruncatedCone) {
   if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
@@ -103,7 +100,6 @@ TEST(Smooth, ToLength) {
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }
-#endif
 
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
@@ -221,7 +217,6 @@ TEST(Smooth, MissingNormalsCone) {
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;
@@ -242,7 +237,6 @@ TEST(Smooth, Fillet) {
   EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
-#endif
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
@@ -322,7 +316,6 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
   return vec4(vec3(bz3) / bz3.w, bz3.w);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Smooth, Torus) {
   MeshGL64 torusMesh =
       Manifold::Revolve(
@@ -381,7 +374,6 @@ TEST(Smooth, Torus) {
 
   if (options.exportModels) WriteTestOBJ("smoothTorus.obj", smooth);
 }
-#endif
 
 TEST(Smooth, SDF) {
   const double r = 10;

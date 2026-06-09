@@ -66,7 +66,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DBUILD_SHARED_LIBS=ON \
             -DMANIFOLD_CBIND=ON \
-            -DMANIFOLD_CROSS_SECTION=ON \
             -DMANIFOLD_TEST=ON \
             -DMANIFOLD_PAR=ON \
             -DCMAKE_PREFIX_PATH="$TBB_PREFIX" \

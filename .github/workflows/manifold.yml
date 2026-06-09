@@ -91,21 +91,15 @@ jobs:
         name: meshes-windows
         path: meshes-windows/
   build:
-    name: GCC ${{matrix.gcc}} (CrossSection:${{matrix.cross_section}}, TBB:${{matrix.parallelization}})
+    name: GCC ${{matrix.gcc}} (TBB:${{matrix.parallelization}})
     timeout-minutes: 45
     strategy:
       matrix:
-        cross_section: [ON]
         parallelization: [OFF, ON]
         os: [ubuntu-24.04]
         gcc: [13, 14]
         include:
-          - cross_section: OFF
-            parallelization: ON
-            os: ubuntu-24.04
-            gcc: 14
-          - cross_section: ON
-            parallelization: ON
+          - parallelization: ON
             os: ubuntu-22.04
             gcc: 11
     runs-on: ${{ matrix.os }}
@@ -136,13 +130,11 @@ jobs:
           -DMANIFOLD_DEBUG=ON \
           -DMANIFOLD_ASSERT=ON \
           -DFETCHCONTENT_SOURCE_DIR_NANOBIND=nanobind \
-          -DMANIFOLD_CROSS_SECTION=${{matrix.cross_section}} \
           -DASSIMP_ENABLE=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           . -B build
         cmake --build build
     - name: Test
-      if: matrix.cross_section == 'ON'
       run: |
         ./build/test/manifold_test
         # python tests
@@ -266,7 +258,6 @@ jobs:
           -DMANIFOLD_PYBIND=OFF \
           -DMANIFOLD_DEBUG=ON \
           -DMANIFOLD_ASSERT=ON \
-          -DMANIFOLD_CROSS_SECTION=ON \
           -DMANIFOLD_PAR=${{matrix.parallelization}} \
           -DCODE_COVERAGE=ON \
           . -B build
@@ -425,7 +416,6 @@ jobs:
           -DMANIFOLD_FUZZ=ON \
           -DMANIFOLD_PYBIND=OFF \
           -DCMAKE_CXX_COMPILER=clang++ \
-          -DMANIFOLD_CROSS_SECTION=ON \
           -DFETCHCONTENT_SOURCE_DIR_FUZZTEST=fuzztest \
           . -B build
         ASAN_OPTIONS=detect_container_overflow=0 cmake --build build

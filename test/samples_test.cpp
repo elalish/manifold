@@ -14,9 +14,7 @@
 
 #include "samples.h"
 
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
 #include "test.h"
 
 using namespace manifold;
@@ -40,7 +38,6 @@ std::vector<int> EdgePairs(const MeshGL in) {
   return edgePair;
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
@@ -64,7 +61,6 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
   CheckGL(knot42);
 }
-#endif
 
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
@@ -124,7 +120,6 @@ TEST(Samples, Frame) {
 
 // This creates a bracelet sample which involves many operations between shapes
 // that are not in general position, e.g. coplanar faces.
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
@@ -174,7 +169,6 @@ TEST(Samples, GyroidModule) {
 
   if (options.exportModels) WriteTestOBJ("gyroidModule.obj", gyroid);
 }
-#endif
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
@@ -190,7 +184,6 @@ TEST(Samples, Sponge1) {
 #ifndef __EMSCRIPTEN__
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
   EXPECT_LE(sponge.NumDegenerateTris(), 8);
@@ -229,7 +222,6 @@ TEST(Samples, Sponge4) {
   std::pair<Manifold, Manifold> cutSponge2 = sponge2.SplitByPlane({1, 1, 1}, 0);
   CheckGLEquiv(cutSponge.first.GetMeshGL(), cutSponge2.first.GetMeshGL());
 }
-#endif
 #endif
 
 TEST(Samples, CondensedMatter16) {

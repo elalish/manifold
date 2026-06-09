@@ -115,7 +115,6 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding, requires `nanobind`.
 - `MANIFOLD_PAR=[<OFF>, ON]`: Enables multi-thread parallelization, requires `tbb`.
-- `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings).
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.
 - `MANIFOLD_ASSERT=[<OFF>, ON]`: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.

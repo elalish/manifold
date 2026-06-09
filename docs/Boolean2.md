@@ -1,8 +1,8 @@
 # Boolean2 CrossSection Core
 
 Boolean2 is the sole `CrossSection` implementation. There is no
-`MANIFOLD_CROSS_SECTION_BACKEND` selector and no Clipper2 dependency; building
-with `MANIFOLD_CROSS_SECTION=ON` builds Boolean2.
+`MANIFOLD_CROSS_SECTION_BACKEND` selector and no Clipper2 dependency; Boolean2
+is always built in-tree.
 
 Boolean2 is a manifold-native 2D arrangement pipeline for polygon fill and
 Boolean operations. The core library lives in `src/cross_section/boolean2/`,
@@ -134,7 +134,6 @@ Build and run the `CrossSection` regression tests:
 
 ```sh
 cmake -S . -B build \
-  -DMANIFOLD_CROSS_SECTION=ON \
   -DMANIFOLD_TEST=ON
 cmake --build build -j4 --target manifold_test
 ctest --test-dir build -R '^CrossSection\.' --output-on-failure

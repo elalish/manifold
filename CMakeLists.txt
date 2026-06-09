@@ -37,7 +37,6 @@ set(
 )
 
 # Primary user facing options
-option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
 option(MANIFOLD_TIMING "Enable Boolean3 phase timing without debug overhead" OFF)
@@ -60,14 +59,7 @@ option(
 )
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
-# MANIFOLD_CBIND is only available when MANIFOLD_CROSS_SECTION is enabled
-cmake_dependent_option(
-  MANIFOLD_CBIND
-  "Build C (FFI) bindings"
-  ON
-  "MANIFOLD_CROSS_SECTION"
-  OFF
-)
+option(MANIFOLD_CBIND "Build C (FFI) bindings" ON)
 # MANIFOLD_JSBIND is only available when building with Emscripten
 cmake_dependent_option(
   MANIFOLD_JSBIND
@@ -310,7 +302,7 @@ set(
   optional_assert.h
   polygon.h
   vec_view.h
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
+  cross_section.h
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 list(
