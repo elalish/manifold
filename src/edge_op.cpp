@@ -165,8 +165,8 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
                                                  int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);
-  if (pair < 0 || !halfedge_.IsForward(edge)) {
-    return {};
+  if (pair < 0 || halfedge_.IsForward(edge)) {
+    return {MaxCost()};
   }
   const int start = halfedge_.Start(edge);
   const int end = halfedge_.End(edge);
@@ -177,19 +177,17 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {0, 0.5, mid};
+    return {-1, 0.5, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
-  int numTri = 0;
   int firstEdge = edge;
 
   auto addTri = [&](int current) {
     if (current == firstEdge) {
       return;  // don't double-count the collapsing triangles.
     }
-    ++numTri;
     const vec3 center = vertPos_[halfedge_.Start(current)];
     const vec3 triAreaNormal =
         la::cross(vertPos_[halfedge_.End(current)] - center,
@@ -237,9 +235,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   std::iota(edges.begin(), end, 0);
   Vec<bool> vertsVisited(vertPos_.size(), false);
   Vec<double> totalCost(vertPos_.size(), 0);
-  size_t numCollapsed = 0;
+  size_t totalCollapsed = 0;
   Vec<Merger> merger(edges.size());
-  const double maxCost = tolerance_ * tolerance_;
+  const double maxCost = MaxCost();
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
@@ -263,11 +261,16 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
                 [&](int a, int b) { return merger[a].cost < merger[b].cost; });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     auto itr = edges.begin();
+    size_t numCollapsed = 0;
+    const bool shortCollapse = merger[*itr].cost < 0;
     for (; itr != end && merger[*itr].Valid(); ++itr) {
       const int edge = *itr;
       if (halfedge_.Pair(edge) < 0) {
         merger[edge] = Merger();  // mark visited
         continue;
+      }
+      if (shortCollapse && merger[edge].cost >= 0) {
+        break;  // force recalculation of cost after short edges collapse.
       }
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
@@ -278,27 +281,34 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       vertsVisited.resize(vertPos_.size(), false);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
-        totalCost[startV] += merger[edge].cost;
-        totalCost[endV] += merger[edge].cost;
-        vertsVisited[startV] = true;
-        vertsVisited[endV] = true;
+        // only mark long edges as visited, allowing short merges to stack.
+        if (merger[edge].cost >= 0) {
+          totalCost[startV] += merger[edge].cost;
+          totalCost[endV] += merger[edge].cost;
+          vertsVisited[startV] = true;
+          vertsVisited[endV] = true;
+        }
         merger[edge] = Merger();  // mark visited
         ++numCollapsed;
       }
     }
     end = std::partition(edges.begin(), end,
                          [&](int edge) { return merger[edge].Valid(); });
-    // std::cout << "edges left: " << (end - edges.begin()) << ", " << itr - end
+    // std::cout << "short? " << shortCollapse << ", collapsed: " <<
+    // numCollapsed
+    //           << ", edges left: " << (end - edges.begin()) << ", " << itr -
+    //           end
     //           << std::endl;
-    if (itr == end) break;
+    totalCollapsed += numCollapsed;
+    if (numCollapsed == 0) break;
     // if (++i > 0) break;
   }
   // Merging verts causes their normals to change
   CalculateVertNormals();
 
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose >= 2 && numCollapsed > 0) {
-    std::cout << "collapsed " << numCollapsed << " edges" << std::endl;
+  if (ManifoldParams().verbose >= 2 && totalCollapsed > 0) {
+    std::cout << "collapsed " << totalCollapsed << " edges" << std::endl;
   }
 #endif
 }
@@ -801,7 +811,11 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   // is equivalent to having no obtuse angles. This would be a threshold of zero
   // on this dot product, but 0.5 is used to allow obtuse angles up to 120
   // degrees to allow more edges to collapse.
-  if (newWorst > 0.5 && newWorst > oldWorst) return false;
+
+  const double threshold =
+      1 - std::max(0., std::min(0.5, 10 * merger.cost / MaxCost()));
+  // relax threshold for short edges
+  if (newWorst > threshold && newWorst > oldWorst) return false;
 
   // Orbit endVert
   {

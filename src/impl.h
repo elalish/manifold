@@ -202,6 +202,7 @@ struct Manifold::Impl {
 
     bool Valid() const { return std::isfinite(cost); }
   };
+  double MaxCost() const { return std::max(epsilon_, tolerance_ * tolerance_); }
   void CleanupTopology();
   void SimplifyTopology2(int firstNewVert = 0);
   Merger CheckEdge(int edge, int firstNewVert) const;
