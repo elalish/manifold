@@ -229,14 +229,8 @@ CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
  * @param fillrule Only FillRule::Positive is supported; other values are
  * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
-CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
-  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
-               "Boolean2 CrossSection supports only Positive fill");
-  (void)fillrule;
-  Polygons input{contour};
-  tolerance_ = b2::InferEps(input, {});
-  paths_ = shared_paths(b2::ApplyFillRule(input, tolerance_));
-}
+CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule)
+    : CrossSection(Polygons{contour}, fillrule) {}
 
 /**
  * Create a 2d cross-section from a set of contours (complex polygons). A
