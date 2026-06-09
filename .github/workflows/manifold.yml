@@ -28,7 +28,6 @@ jobs:
     - uses: lukka/get-cmake@v4.3.3
       with:
         cmakeVersion: 4.3.3
-        useCloudCache: false
     - &clone-tbb
       uses: ./.github/actions/git-clone
       with:
