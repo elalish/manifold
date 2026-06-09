@@ -197,8 +197,9 @@ struct Manifold::Impl {
   // edge_op.cpp
   struct Merger {
     double cost = std::numeric_limits<double>::infinity();
-    vec3 newPos = vec3(std::numeric_limits<double>::quiet_NaN());
-    vec3 normal = vec3(0.0);
+    double a = std::numeric_limits<double>::quiet_NaN();
+    vec3 newPos = vec3(a);
+
     bool Valid() const { return std::isfinite(cost); }
   };
   void CleanupTopology();
@@ -212,7 +213,7 @@ struct Manifold::Impl {
   void DedupeEdge(int edge);
   bool CollapseEdge(int edge, Vec<int>& edges, double tol = -1,
                     int firstNewVert = 0);
-  bool CollapseEdge2(int edge, Vec<int>& scratch, vec3 pNew);
+  bool CollapseEdge2(int edge, Vec<int>& scratch, Merger merger);
   void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
                          Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);

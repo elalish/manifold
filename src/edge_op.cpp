@@ -166,18 +166,18 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
                                                  int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);
   if (pair < 0 || !halfedge_.IsForward(edge)) {
-    return {std::numeric_limits<double>::infinity(), vec3(NAN)};
+    return {};
   }
   const int start = halfedge_.Start(edge);
   const int end = halfedge_.End(edge);
   if (start < firstNewVert && end < firstNewVert) {
-    return {std::numeric_limits<double>::infinity(), vec3(NAN)};
+    return {};
   }
   const vec3 delta = vertPos_[end] - vertPos_[start];
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {0, mid};
+    return {0, 0.5, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
@@ -211,12 +211,20 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   firstEdge = halfedge_.Pair(edge);
   ForVert(firstEdge, addTri);
 
-  // v is relative to the midpoint, so the pseudo-inverse is used to minimize
-  // the length of v if A is singular.
-  const vec3 v = PseudoInverse(A) * b;
+  // Constrain the solution to the plane containing the edge and the normal.
+  const vec3 avgNormal = (vertNormal_[start] + vertNormal_[end]) / 2;
+  const mat3x2 P = {delta,
+                    avgNormal - la::dot(avgNormal, delta) * delta / lenSq};
+  // Epsilon stabilizes the inverse, driving the solution toward the midpoint.
+  const mat2 A2 = transpose(P) * A * P + epsilon_ * mat2(la::identity);
+  const vec2 b2 = transpose(P) * b;
+  vec2 u = inverse(A2) * b2;
+  // u[0] is the interpolation along the collapsed edge, which is used to
+  // interpolate the properties. It is clamped to avoid extrapolation.
+  u[0] = la::clamp(u[0], -0.5, 0.5);
   // Cost has units of length^2.
-  const double cost = la::dot(v, A * v) - 2 * la::dot(b, v) + c;
-  return {cost, mid + v, b};
+  const double cost = la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c;
+  return {cost, 0.5 - u[0], mid + P * u};
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
@@ -268,8 +276,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       if (vertsVisited[startV] || vertsVisited[endV]) {
         continue;
       }
-      const bool didCollapse =
-          CollapseEdge2(edge, scratchBuffer, merger[edge].newPos);
+      const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
       vertsVisited.resize(vertPos_.size(), false);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
@@ -744,7 +751,8 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
 // have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
+bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
+                                   Merger merger) {
   edges.resize(0);
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
@@ -770,8 +778,9 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
     const vec3 pLast = vertPos_[halfedge_.End(last)];
     const mat3 oldEdges(normalize(pOld - pLast), normalize(pLast - pCurr),
                         normalize(pCurr - pOld));
-    const mat3 newEdges(normalize(pNew - pLast), normalize(pLast - pCurr),
-                        normalize(pCurr - pNew));
+    const mat3 newEdges(normalize(merger.newPos - pLast),
+                        normalize(pLast - pCurr),
+                        normalize(pCurr - merger.newPos));
     if (la::dot(la::cross(newEdges[1], newEdges[0]), faceNormal_[current / 3]) <
         0) {
       collapse = false;
@@ -803,20 +812,30 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges, vec3 pNew) {
     }
   }
 
-  if (NumProp() > 0) {
-    // TODO : Update and recalculate the prop verts.
+  const int startProp = halfedge_.Prop(tri0edge[0]);
+  const int endProp = halfedge_.Prop(tri0edge[1]);
+  const size_t numProp = NumProp();
+  for (int p = 0; p < numProp; ++p) {
+    properties_[numProp * endProp + p] =
+        la::lerp(properties_[numProp * startProp + p],
+                 properties_[numProp * endProp + p], merger.a);
   }
 
   int start = halfedge_.Pair(tri1edge[1]);
   // Remove toRemove.startVert and replace with endVert.
   vertPos_[startVert] = vec3(NAN);
-  vertPos_[endVert] = pNew;
+  vertPos_[endVert] = merger.newPos;
+  vertNormal_[endVert] = normalize(
+      la::lerp(vertNormal_[startVert], vertNormal_[endVert], merger.a));
   CollapseTri(tri1edge);
 
   // Orbit startVert
   int current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
+    if (numProp > 0 && halfedge_.Prop(current) == startProp) {
+      halfedge_.SetProp(current, endProp);
+    }
     const int vert = halfedge_.End(current);
     const int next = halfedge_.Pair(current);
     for (size_t i = 0; i < edges.size(); ++i) {

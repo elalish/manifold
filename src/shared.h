@@ -222,6 +222,7 @@ class Halfedges {
   int End(int idx) const { return start_[NextHalfedge(idx)]; }
   int Pair(int idx) const { return paired_[idx]; }
   int Prop(int idx) const { return propVert_[idx]; }
+  int PropEnd(int idx) const { return propVert_[NextHalfedge(idx)]; }
 
   void SetStart(int idx, int vert) { start_[idx] = vert; }
   void SetEnd(int idx, int vert) { start_[NextHalfedge(idx)] = vert; }
