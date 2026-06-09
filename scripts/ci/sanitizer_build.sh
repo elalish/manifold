@@ -16,6 +16,7 @@ cmake \
   -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
+  -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
   -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
   . -B build
 
