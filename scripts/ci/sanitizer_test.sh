@@ -40,24 +40,6 @@ if [ -z "${SANITIZER_TEST_BIN}" ]; then
 fi
 chmod +x "${SANITIZER_TEST_BIN}" || true
 
-LIB_PATHS=()
-while IFS= read -r SO_DIR; do
-  [ -n "${SO_DIR}" ] && LIB_PATHS+=("${SO_DIR}")
-done < <(
-  find . -type f \( -name 'libmanifold*.so*' -o -name 'libsamples.so*' -o -name 'libmanifoldc.so*' \) \
-    -printf '%h\n' | sort -u
-)
-
-if [ "${#LIB_PATHS[@]}" -gt 0 ]; then
-  mapfile -t LIB_PATHS < <(printf '%s\n' "${LIB_PATHS[@]}" | awk '!seen[$0]++')
-  SANITIZER_LD_PATH="$(IFS=:; echo "${LIB_PATHS[*]}")"
-  if [ -n "${LD_LIBRARY_PATH:-}" ]; then
-    export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}:${LD_LIBRARY_PATH}"
-  else
-    export LD_LIBRARY_PATH="${SANITIZER_LD_PATH}"
-  fi
-fi
-
 set +e
 timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
   "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
