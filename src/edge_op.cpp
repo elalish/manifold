@@ -211,10 +211,8 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   firstEdge = halfedge_.Pair(edge);
   ForVert(firstEdge, addTri);
 
-  // Constrain the solution to the plane containing the edge and the normal.
-  const vec3 avgNormal = (vertNormal_[start] + vertNormal_[end]) / 2;
-  const mat3x2 P = {delta,
-                    avgNormal - la::dot(avgNormal, delta) * delta / lenSq};
+  // Constrain the solution to the plane containing the edge and its normal.
+  const mat3x2 P = {delta, (faceNormal_[edge / 3] + faceNormal_[pair / 3]) / 2};
   // Epsilon stabilizes the inverse, driving the solution toward the midpoint.
   const mat2 A2 = transpose(P) * A * P + epsilon_ * mat2(la::identity);
   const vec2 b2 = transpose(P) * b;
@@ -295,6 +293,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     if (itr == end) break;
     // if (++i > 0) break;
   }
+  // Merging verts causes their normals to change
+  CalculateVertNormals();
+
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2 && numCollapsed > 0) {
     std::cout << "collapsed " << numCollapsed << " edges" << std::endl;
@@ -752,7 +753,7 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
 bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
-                                   Merger merger) {
+                                   const Merger& merger) {
   edges.resize(0);
   Vec<TriRef>& triRef = meshRelation_.triRef;
 
@@ -825,8 +826,6 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   // Remove toRemove.startVert and replace with endVert.
   vertPos_[startVert] = vec3(NAN);
   vertPos_[endVert] = merger.newPos;
-  vertNormal_[endVert] = normalize(
-      la::lerp(vertNormal_[startVert], vertNormal_[endVert], merger.a));
   CollapseTri(tri1edge);
 
   // Orbit startVert
