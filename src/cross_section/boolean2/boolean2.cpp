@@ -27,7 +27,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -259,5 +258,4 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
   return ApplyFillRule(a, b, bSign, rule, eps, tolerance);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

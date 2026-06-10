@@ -24,7 +24,6 @@
 #include "../../utils.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -281,5 +280,4 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
          AwayFromEndpoints(*out, b0, b1, eps);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

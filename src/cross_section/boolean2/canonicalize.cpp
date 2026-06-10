@@ -15,7 +15,6 @@
 #include "canonicalize.h"
 
 namespace manifold {
-namespace boolean2 {
 
 CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
                                const std::vector<std::vector<int>>& lists) {
@@ -36,5 +35,4 @@ CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
   return out;
 }
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -26,7 +26,6 @@
 // (containment grouping). Not part of the boolean-overlap algorithm
 // pipeline; operates on already-regularized Positive `Polygons`.
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -170,5 +169,4 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
   return components;
 }
 
-}  // namespace boolean2
 }  // namespace manifold

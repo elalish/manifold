@@ -21,7 +21,6 @@
 #include "predicates.h"
 
 namespace manifold {
-namespace boolean2 {
 
 struct CanonEdge {
   int vMin, vMax;
@@ -73,5 +72,4 @@ struct CanonicalSubEdges {
 CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
                                const std::vector<std::vector<int>>& lists);
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -27,7 +27,6 @@
 #include "vertex_merge.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -182,5 +181,4 @@ NarrowPhaseResult BuildListsAndFindIntersections(
   return result;
 }
 
-}  // namespace boolean2
 }  // namespace manifold

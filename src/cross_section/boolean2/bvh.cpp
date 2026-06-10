@@ -17,7 +17,6 @@
 #include "bvh.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -91,5 +90,4 @@ BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
   return out;
 }
 
-}  // namespace boolean2
 }  // namespace manifold

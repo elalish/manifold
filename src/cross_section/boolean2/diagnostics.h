@@ -31,7 +31,6 @@
 #include "canonicalize.h"
 
 namespace manifold {
-namespace boolean2 {
 
 enum class WindRule;
 struct Trace;
@@ -213,5 +212,4 @@ class TraceRecorder {
   Trace* trace_;
 };
 
-}  // namespace boolean2
 }  // namespace manifold

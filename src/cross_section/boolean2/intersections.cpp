@@ -30,7 +30,6 @@
 #include "vertex_merge.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -336,5 +335,4 @@ IntersectionInsertion FindAndInsertIntersections(
   return {std::move(verts), std::move(lists), std::move(vertEdges)};
 }
 
-}  // namespace boolean2
 }  // namespace manifold

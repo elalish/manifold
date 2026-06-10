@@ -21,7 +21,6 @@
 #include "vertex_merge.h"
 
 namespace manifold {
-namespace boolean2 {
 
 struct NarrowPhaseResult {
   std::vector<std::vector<int>> lists;
@@ -36,5 +35,4 @@ NarrowPhaseResult BuildListsAndFindIntersections(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs);
 
-}  // namespace boolean2
 }  // namespace manifold
