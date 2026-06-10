@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <queue>
 
 #include "../svd.h"
 #include "../utils.h"
@@ -122,31 +123,68 @@ SimplePolygon HullImpl(SimplePolygon& points) {
 
 // Drop the vertex closest to the line through its current neighbors, repeating
 // while under tol (Clipper2 SimplifyPaths semantics). Re-checking current, not
-// original, neighbors each step is what keeps a curve from collapsing. O(n^2)
-// in the ring size (rescans every vertex per removal); worth optimizing if
-// large rings show up.
+// original, neighbors each step is what keeps a curve from collapsing. A
+// min-heap over (deviation, index) with stamp-based lazy invalidation makes
+// each removal re-key only the two neighbors, so the pass is O(n log n).
+// Exactly-tied deviations remove the lowest original index first.
 SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
+  const int n = static_cast<int>(ring.size());
+  if (n <= 3) return ring;
   const double tol2 = tol * tol;
-  while (ring.size() > 3) {
-    const int n = static_cast<int>(ring.size());
-    int victim = -1;
-    double bestD2 = tol2;
-    for (int i = 0; i < n; ++i) {
-      const vec2 P = ring[(i + n - 1) % n];
-      const vec2 N = ring[(i + 1) % n];
-      const vec2 pn = N - P;
-      const double pnLen2 = la::dot(pn, pn);
-      const double cross = la::cross(ring[i] - P, pn);
-      const double d2 = pnLen2 > 0.0 ? cross * cross / pnLen2 : 0.0;
-      if (d2 < bestD2) {
-        bestD2 = d2;
-        victim = i;
-      }
-    }
-    if (victim < 0) break;  // every vertex deviates by >= tol
-    ring.erase(ring.begin() + victim);
+
+  std::vector<int> prev(n), next(n), stamp(n, 0);
+  std::vector<char> alive(n, 1);
+  for (int i = 0; i < n; ++i) {
+    prev[i] = (i + n - 1) % n;
+    next[i] = (i + 1) % n;
   }
-  return ring;
+
+  auto deviation2 = [&](int i) {
+    const vec2 P = ring[prev[i]];
+    const vec2 N = ring[next[i]];
+    const vec2 pn = N - P;
+    const double pnLen2 = la::dot(pn, pn);
+    const double cross = la::cross(ring[i] - P, pn);
+    return pnLen2 > 0.0 ? cross * cross / pnLen2 : 0.0;
+  };
+
+  struct Entry {
+    double d2;
+    int stamp;
+    int idx;
+  };
+  auto worse = [](const Entry& a, const Entry& b) {
+    return a.d2 > b.d2 || (a.d2 == b.d2 && a.idx > b.idx);
+  };
+  std::priority_queue<Entry, std::vector<Entry>, decltype(worse)> heap(worse);
+  for (int i = 0; i < n; ++i) heap.push({deviation2(i), 0, i});
+
+  int numAlive = n;
+  while (numAlive > 3 && !heap.empty()) {
+    const Entry top = heap.top();
+    heap.pop();
+    // Each live vertex always has exactly one current-stamp entry, so the
+    // first non-stale pop is the true global minimum.
+    if (!alive[top.idx] || top.stamp != stamp[top.idx]) continue;
+    if (top.d2 >= tol2) break;  // every vertex deviates by >= tol
+    alive[top.idx] = 0;
+    --numAlive;
+    const int p = prev[top.idx];
+    const int nx = next[top.idx];
+    next[p] = nx;
+    prev[nx] = p;
+    for (const int j : {p, nx}) {
+      ++stamp[j];
+      heap.push({deviation2(j), stamp[j], j});
+    }
+  }
+
+  SimplePolygon out;
+  out.reserve(numAlive);
+  for (int i = 0; i < n; ++i) {
+    if (alive[i]) out.push_back(ring[i]);
+  }
+  return out;
 }
 
 }  // namespace
