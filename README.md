@@ -166,6 +166,18 @@ Offline building (with missing dependencies/dependency version override):
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
+#### Sanitizer CI Reproduction
+
+To reproduce the sanitizer CI test locally from repo root:
+
+```bash
+bash ./scripts/ci/sanitizer_build.sh
+source ./scripts/sanitizer_cases.sh
+ASAN_OPTIONS=detect_container_overflow=0:strict_init_order=1 \
+UBSAN_OPTIONS=print_stacktrace=1 \
+./build/test/manifold_test --gtest_filter="${SANITIZER_GTEST_FILTER_CORE}"
+```
+
 ### WASM
 
 > Note: While we support compiling with `MANIFOLD_PAR=ON` in recent emscripten
