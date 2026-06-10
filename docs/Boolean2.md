@@ -5,7 +5,7 @@ Boolean2 is the sole `CrossSection` implementation. There is no
 is always built in-tree.
 
 Boolean2 is a manifold-native 2D arrangement pipeline for polygon fill and
-Boolean operations. The core library lives in `src/cross_section/boolean2/`,
+Boolean operations. The core library lives in `src/boolean2*.{h,cpp}`,
 and the public `CrossSection` methods dispatch to it. Sibling utilities provide
 the decomposition and offset pieces that cover the rest of the public
 `CrossSection` API.
@@ -40,7 +40,7 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
    whose adjacent faces disagree under the requested rule.
 
 The high-level fill/Boolean core API is in
-`src/cross_section/boolean2/boolean2.h`. The lower-level driver returns
+`src/boolean2.h`. The lower-level driver returns
 retained directed sub-edges plus the merged vertex map, and the wrapper turns
 those edges back into regularized `manifold::Polygons`. Offset and containment
 helpers live in `offset.h` and `containment.h`; they are included by the
