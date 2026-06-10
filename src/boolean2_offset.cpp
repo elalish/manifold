@@ -284,7 +284,10 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   return ApplyFillRule(offsetRings, eps);
 }
 
-// ===== containment (was cross_section/boolean2/containment.cpp) =====
+// ===== Containment decompose =====
+// Standalone polygon utilities used by `CrossSection::Decompose`
+// (containment grouping). Not part of the boolean-overlap algorithm
+// pipeline; operates on already-regularized Positive `Polygons`.
 
 namespace {
 

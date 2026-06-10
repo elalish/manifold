@@ -261,7 +261,8 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
   return ApplyFillRule(a, b, bSign, rule, eps, tolerance);
 }
 
-// ===== bvh (was cross_section/boolean2/bvh.cpp) =====
+// ===== BVH =====
+// BVH helpers for eps-padded 2D box queries.
 
 namespace {
 
@@ -335,7 +336,7 @@ BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
   return out;
 }
 
-// ===== canonicalize (was cross_section/boolean2/canonicalize.cpp) =====
+// ===== Canonicalize =====
 
 CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
                                const std::vector<std::vector<int>>& lists) {
@@ -356,7 +357,13 @@ CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
   return out;
 }
 
-// ===== vertex_merge (was cross_section/boolean2/vertex_merge.cpp) =====
+// ===== Vertex merge =====
+// Vertex-merge and edge-collapse passes. MergeVerts buckets verts within eps
+// of each other onto an existing representative vertex;
+// CollapseDegenerateEdges drops any input edge whose endpoints merged to the
+// same vert. Both run before the BVH-broad intersection discovery. Also hosts
+// the tiny "sorted-vector as set" helpers (VESetContains, VESetInsert) used by
+// the per-edge / per-vert adjacency tracking below.
 
 using manifold::la::dot;
 
@@ -542,7 +549,10 @@ std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
   return out;
 }
 
-// ===== edge_vert_lists (was cross_section/boolean2/edge_vert_lists.cpp) =====
+// ===== Edge-vertex lists =====
+// Edge-vertex list construction: for each input edge, the sorted-by-parameter
+// list of vertices that lie within eps of the edge interior. Candidates are
+// derived from the same edge-pair broad phase used for intersections.
 
 namespace {
 
@@ -697,7 +707,12 @@ NarrowPhaseResult BuildListsAndFindIntersections(
   return result;
 }
 
-// ===== intersections (was cross_section/boolean2/intersections.cpp) =====
+// ===== Intersections =====
+// Edge-edge intersection discovery: broad phase collects candidate edge
+// pairs; the edge-vertex narrow phase precomputes proper intersections;
+// FindAndInsertIntersections then snaps/inserts them into both edges'
+// parameter lists. Eager-propagation re-sweeps any vert that snapped onto
+// its k-th edge to detect k+1 incidences in one pass.
 
 namespace {
 
@@ -1003,7 +1018,13 @@ IntersectionInsertion FindAndInsertIntersections(
   return {std::move(verts), std::move(lists), std::move(vertEdges)};
 }
 
-// ===== driver (was cross_section/boolean2/driver.cpp) =====
+// ===== Driver =====
+// End-to-end Boolean2 driver. Stitches together vertex merging, edge
+// collapse, near-vertex indexing, proper edge-edge crossing insertion,
+// nearby-intersection merging, sub-edge canonicalization, and winding-rule
+// filtering. Returns an OverlapResult holding the merged-vert list, the
+// retained directed sub-edges, the inputVert2Merged remap, and the
+// merged-vert count.
 
 namespace {
 
