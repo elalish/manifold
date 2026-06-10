@@ -8,7 +8,6 @@ cmake \
   -DMANIFOLD_PYBIND=OFF \
   -DMANIFOLD_DEBUG=ON \
   -DMANIFOLD_ASSERT=ON \
-  -DMANIFOLD_CROSS_SECTION=ON \
   -DMANIFOLD_PAR=OFF \
   -DCMAKE_C_COMPILER=clang-18 \
   -DCMAKE_CXX_COMPILER=clang++-18 \
@@ -17,7 +16,6 @@ cmake \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
-  -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=clipper2 \
   . -B build
 
 cmake --build build
