@@ -35,9 +35,8 @@ struct PathImpl;
 /**
  * @brief Two-dimensional cross sections guaranteed to be without
  * self-intersections, or overlaps between polygons (from construction onwards).
- * This class makes use of the
- * [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library for
- * polygon clipping (boolean) and offsetting operations.
+ * Polygon clipping (boolean) and offsetting use Manifold's own robust
+ * floating-point predicates.
  */
 class CrossSection {
  public:
@@ -74,38 +73,12 @@ class CrossSection {
     Negative   ///< Only sub-regions with winding counts < 0 are filled.
   };
 
-  // Adapted from Clipper2 docs:
-  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
-  // (Copyright © 2010-2023 Angus Johnson)
   /**
    * Specifies the treatment of path/contour joins (corners) when offseting
-   * CrossSections. See the [Clipper2
-   * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
-   * for illustrations.
+   * CrossSections; alias of manifold::JoinType (see common.h), shared with the
+   * polygon offset implementation.
    */
-  enum class JoinType {
-    Square, /*!< Squaring is applied uniformly at all joins where the internal
-              join angle is less that 90 degrees. The squared edge will be at
-              exactly the offset distance from the join vertex. */
-    Round,  /*!< Rounding is applied to all joins that have convex external
-             angles, and it maintains the exact offset distance from the join
-             vertex. */
-    Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
-             angled joins producing excessively long and narrow
-             [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
-             So where mitered joins would exceed a given maximum miter distance
-             (relative to the offset distance), these are 'squared' instead. */
-    Bevel   /*!< Bevelled joins are similar to 'squared' joins except that
-             squaring won't occur at a fixed distance. While bevelled joins may
-             not be as pretty as squared joins, bevelling is much easier (ie
-             faster) than squaring. And perhaps this is why bevelling rather
-             than squaring is preferred in numerous graphics display formats
-             (including
-             [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
-             and
-             [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
-             document formats). */
-  };
+  using JoinType = ::manifold::JoinType;
 
   /** @name Input & Output
    */
@@ -179,10 +152,11 @@ class CrossSection {
   ///@}
 
  private:
-  mutable std::shared_ptr<std::mutex> pathsMutex_ =
-      std::make_shared<std::mutex>();
+  mutable std::mutex pathsMutex_;
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
+  // Propagated drift budget, analogous to Manifold::Impl::tolerance_.
+  mutable double tolerance_ = 0.0;
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

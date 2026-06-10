@@ -38,7 +38,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -251,5 +250,4 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
           std::move(merge.inputVert2Merged), numMerged};
 }
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -22,7 +22,6 @@
 #include "vertex_merge.h"
 
 namespace manifold {
-namespace boolean2 {
 
 inline constexpr double kIntersectionMergeEpsFactor = 10.0;
 
@@ -52,5 +51,4 @@ IntersectionInsertion FindAndInsertIntersections(
     const std::vector<Box2>& edgeBoxes, const BVH& bvh,
     const std::vector<IntersectionPoint>& precomputedIntersections);
 
-}  // namespace boolean2
 }  // namespace manifold

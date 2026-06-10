@@ -93,12 +93,10 @@ export function resetToCircularDefaults(): void;
 
 /**
  * Two-dimensional cross sections guaranteed to be without self-intersections,
- * or overlaps between polygons (from construction onwards). This class makes
- * use of the Clipper2 library for polygon clipping (boolean) and offsetting
- * operations.
+ * or overlaps between polygons (from construction onwards). Polygon clipping
+ * (boolean) and offsetting use Manifold's own robust floating-point predicates.
  *
  * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html | C++ API: CrossSection Class Reference}
- * @see {@link https://www.angusj.com/clipper2/Docs/Overview.htm | Clipper2 - Polygon Clipping Offsetting & Triangulating}
  * @group Basics
  */
 export class CrossSection {

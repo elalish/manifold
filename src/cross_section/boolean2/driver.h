@@ -20,7 +20,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 struct Trace;
 
@@ -42,5 +41,4 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                WindRule pred = WindRule::Add,
                                Trace* trace = nullptr);
 
-}  // namespace boolean2
 }  // namespace manifold

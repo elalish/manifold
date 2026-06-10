@@ -22,7 +22,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 double InferEps(const Polygons& a, const Polygons& b);
 
@@ -38,13 +37,11 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
                    double eps = 0.0, double tolerance = 0.0);
 
 // Polygon offset backing CrossSection::Offset.
-enum class OffsetJoinType { Square, Round, Miter, Bevel };
-Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
+Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit = 2.0, int circularSegments = 0);
 
 // Group regularized simple loops into outer-ring components with their
 // directly contained holes, backing CrossSection::Decompose.
 std::vector<Polygons> DecomposeByContainment(const Polygons& polys);
 
-}  // namespace boolean2
 }  // namespace manifold

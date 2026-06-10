@@ -15,7 +15,6 @@
 #pragma once
 
 namespace manifold {
-namespace boolean2 {
 
 // Shared grain size for boolean2 parallel loops whose per-item work is small
 // but non-trivial: BVH traversal, pair narrow tests, and merge broad-phase
@@ -23,5 +22,4 @@ namespace boolean2 {
 // its per-index work is much smaller.
 inline constexpr int kFineParallelGrainSize = 512;
 
-}  // namespace boolean2
 }  // namespace manifold

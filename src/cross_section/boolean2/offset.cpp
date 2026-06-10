@@ -22,7 +22,6 @@
 
 // Polygon offset backing `CrossSection::Offset`.
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -140,8 +139,7 @@ double ValidMiterLimit(double miterLimit) {
 // the solid for delta > 0, regardless of ring orientation, and the
 // convex/concave decision depends only on `cross * sign(delta)`.
 SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
-                            OffsetJoinType jt, double miterLimit,
-                            int segments) {
+                            JoinType jt, double miterLimit, int segments) {
   const int n = static_cast<int>(contour.size());
   if (n < 3 || delta == 0) return contour;
   const double deltaSign = (delta >= 0) ? 1.0 : -1.0;
@@ -195,10 +193,10 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     // Convex corner: apply join.
     out.push_back(endPrev);
     switch (jt) {
-      case OffsetJoinType::Round:
+      case JoinType::Round:
         AppendRoundJoin(out, V, nPrev, nNext, delta, segments);
         break;
-      case OffsetJoinType::Miter: {
+      case JoinType::Miter: {
         // miterLen / |delta| = 1 / cos(half_angle) =
         // sqrt(2 / (1 + dot(nPrev, nNext))). The limit
         // miterLen <= miterLimit * |delta| rearranges to
@@ -229,10 +227,10 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
         }
         break;
       }
-      case OffsetJoinType::Square:
+      case JoinType::Square:
         AppendSquareJoin(out, V, nPrev, nNext, delta);
         break;
-      case OffsetJoinType::Bevel:
+      case JoinType::Bevel:
         break;
     }
     out.push_back(startNext);
@@ -251,7 +249,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
 // with Positive/Add filling. Collinear vertices are left in place for the
 // caller to `Simplify` if wanted, matching Manifold's tolerance model rather
 // than Clipper2's finishing behaviour.
-Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
+Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, int circularSegments) {
   // Reject NaN/Inf delta and input coordinates.
   if (!std::isfinite(delta)) return {};
@@ -285,5 +283,4 @@ Polygons Offset(const Polygons& in, double delta, OffsetJoinType jt,
   return ApplyFillRule(offsetRings, eps);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

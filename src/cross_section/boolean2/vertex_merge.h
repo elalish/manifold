@@ -19,7 +19,6 @@
 #include "predicates.h"
 
 namespace manifold {
-namespace boolean2 {
 
 struct IntersectionPoint {
   int i;
@@ -38,5 +37,4 @@ void VESetInsert(std::vector<int>* vec, int x);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
-}  // namespace boolean2
 }  // namespace manifold

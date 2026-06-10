@@ -19,7 +19,6 @@
 #include "canonicalize.h"
 
 namespace manifold {
-namespace boolean2 {
 
 struct Trace;
 
@@ -34,5 +33,4 @@ std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
                                               WindRule rule = WindRule::Add,
                                               Trace* trace = nullptr);
 
-}  // namespace boolean2
 }  // namespace manifold

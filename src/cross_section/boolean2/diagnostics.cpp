@@ -22,7 +22,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 #ifdef MANIFOLD_DEBUG
 namespace {
@@ -312,5 +311,4 @@ void TraceRecorder::RecordFilteredOutput(const std::vector<vec2>& verts,
 #endif
 }
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -41,7 +41,6 @@
 #include "winding_filter.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -554,5 +553,4 @@ std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
   return FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -19,7 +19,6 @@
 #include "manifold/common.h"
 
 namespace manifold {
-namespace boolean2 {
 
 constexpr double kU = 1.110223024625156540423631668e-16;
 constexpr double kAlphaCoeff = 12.37;
@@ -67,5 +66,4 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
                        double eps, vec2* out);
 
-}  // namespace boolean2
 }  // namespace manifold

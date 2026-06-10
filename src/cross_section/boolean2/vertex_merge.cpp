@@ -38,7 +38,6 @@
 #include "predicates.h"
 
 namespace manifold {
-namespace boolean2 {
 
 using manifold::la::dot;
 
@@ -224,5 +223,4 @@ std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
   return out;
 }
 
-}  // namespace boolean2
 }  // namespace manifold

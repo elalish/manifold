@@ -200,7 +200,6 @@ TEST(Properties, MingapAfterTransformations) {
   ASSERT_NEAR(distance, 1, 0.001);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Properties, MingapStretchyBracelet) {
   auto a = StretchyBracelet();
   auto b = StretchyBracelet().Translate({0, 0, 20});
@@ -209,7 +208,6 @@ TEST(Properties, MingapStretchyBracelet) {
 
   ASSERT_NEAR(distance, 5, 0.001);
 }
-#endif
 
 TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
   auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);

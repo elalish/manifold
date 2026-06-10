@@ -26,7 +26,6 @@
 #include "parallel_policy.h"
 
 namespace manifold {
-namespace boolean2 {
 
 inline constexpr int kEdgePairBvhThreshold = 1024;
 // The radix-tree BVH is binary and has at most 32 Morton-code bits plus
@@ -123,5 +122,4 @@ inline void CollidePairs(const BVH& bvh, const std::vector<Box2>& queries,
                 /*parallel=*/false);
 }
 
-}  // namespace boolean2
 }  // namespace manifold
