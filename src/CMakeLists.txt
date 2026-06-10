@@ -53,15 +53,6 @@ set(
   boolean2_diagnostics.h
   boolean3.h
   collider.h
-  cross_section/boolean2/bvh.h
-  cross_section/boolean2/canonicalize.h
-  cross_section/boolean2/driver.h
-  cross_section/boolean2/edge_vert_lists.h
-  cross_section/boolean2/intersections.h
-  cross_section/boolean2/parallel_policy.h
-  cross_section/boolean2/predicates.h
-  cross_section/boolean2/vertex_merge.h
-  cross_section/boolean2/winding_filter.h
   csg_tree.h
   execution_impl.h
   hashtable.h

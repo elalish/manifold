@@ -19,7 +19,7 @@
 #include <string>
 #endif
 
-#include "cross_section/boolean2/winding_filter.h"
+#include "boolean2.h"
 
 namespace manifold {
 

@@ -19,23 +19,15 @@
 // Returns an OverlapResult holding the merged-vert list, the retained
 // directed sub-edges, the inputVert2Merged remap, and the merged-vert count.
 
-#include "driver.h"
-
 #include <algorithm>
 #include <cmath>
 #include <utility>
 #include <vector>
 
+#include "../../boolean2.h"
 #include "../../boolean2_diagnostics.h"
 #include "../../disjoint_sets.h"
 #include "../../parallel.h"
-#include "bvh.h"
-#include "canonicalize.h"
-#include "edge_vert_lists.h"
-#include "intersections.h"
-#include "predicates.h"
-#include "vertex_merge.h"
-#include "winding_filter.h"
 
 namespace manifold {
 

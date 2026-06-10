@@ -20,7 +20,6 @@
 #include "../../boolean2.h"
 #include "../../utils.h"
 #include "manifold/optional_assert.h"
-#include "predicates.h"
 
 // Standalone polygon utilities used by `CrossSection::Decompose`
 // (containment grouping). Not part of the boolean-overlap algorithm

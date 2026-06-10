@@ -18,16 +18,12 @@
 // parameter lists. Eager-propagation re-sweeps any vert that snapped onto
 // its k-th edge to detect k+1 incidences in one pass.
 
-#include "intersections.h"
-
 #include <algorithm>
 #include <utility>
 #include <vector>
 
+#include "../../boolean2.h"
 #include "../../parallel.h"
-#include "bvh.h"
-#include "predicates.h"
-#include "vertex_merge.h"
 
 namespace manifold {
 

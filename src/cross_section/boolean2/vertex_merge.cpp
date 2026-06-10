@@ -21,8 +21,6 @@
 // VESetInsert) used by the per-edge / per-vert adjacency tracking in
 // edge_vert_lists.h and intersections.h.
 
-#include "vertex_merge.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -31,11 +29,9 @@
 #include <utility>
 #include <vector>
 
+#include "../../boolean2.h"
 #include "../../disjoint_sets.h"
 #include "../../parallel.h"
-#include "bvh.h"
-#include "parallel_policy.h"
-#include "predicates.h"
 
 namespace manifold {
 

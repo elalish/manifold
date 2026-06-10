@@ -16,15 +16,11 @@
 // list of vertices that lie within eps of the edge interior. Candidates are
 // derived from the same edge-pair broad phase used for intersections.
 
-#include "edge_vert_lists.h"
-
 #include <algorithm>
 #include <vector>
 
+#include "../../boolean2.h"
 #include "../../parallel.h"
-#include "parallel_policy.h"
-#include "predicates.h"
-#include "vertex_merge.h"
 
 namespace manifold {
 

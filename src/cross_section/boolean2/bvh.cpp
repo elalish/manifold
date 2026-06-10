@@ -14,7 +14,7 @@
 //
 // BVH helpers for eps-padded 2D box queries.
 
-#include "bvh.h"
+#include "../../boolean2.h"
 
 namespace manifold {
 

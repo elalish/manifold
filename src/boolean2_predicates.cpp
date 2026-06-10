@@ -18,7 +18,7 @@
 #include <cmath>
 #include <vector>
 
-#include "cross_section/boolean2/predicates.h"
+#include "boolean2.h"
 #include "shared.h"
 #include "utils.h"
 
