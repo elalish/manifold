@@ -23,13 +23,6 @@ set(
   boolean_result.cpp
   constructors.cpp
   cross_section.cpp
-  cross_section/boolean2/bvh.cpp
-  cross_section/boolean2/canonicalize.cpp
-  cross_section/boolean2/containment.cpp
-  cross_section/boolean2/driver.cpp
-  cross_section/boolean2/edge_vert_lists.cpp
-  cross_section/boolean2/intersections.cpp
-  cross_section/boolean2/vertex_merge.cpp
   csg_tree.cpp
   edge_op.cpp
   execution_impl.cpp
