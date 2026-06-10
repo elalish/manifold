@@ -19,8 +19,6 @@
 #include <string>
 #endif
 
-#include "boolean2.h"
-
 namespace manifold {
 
 #ifdef MANIFOLD_DEBUG

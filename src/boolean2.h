@@ -295,8 +295,6 @@ std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
                                               WindRule rule = WindRule::Add,
                                               Trace* trace = nullptr);
 
-struct Trace;
-
 struct OverlapResult {
   std::vector<vec2> verts;
   std::vector<OutEdge> edges;
