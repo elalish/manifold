@@ -18,10 +18,10 @@
 #include <cmath>
 #include <queue>
 
-#include "../svd.h"
-#include "../utils.h"
-#include "boolean2/boolean2.h"
+#include "boolean2.h"
 #include "manifold/optional_assert.h"
+#include "svd.h"
+#include "utils.h"
 
 // CrossSection implementation. Public methods route through `boolean2/` for
 // polygon boolean operations, containment grouping, offsets, and polygon

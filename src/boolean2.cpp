@@ -21,10 +21,10 @@
 #include <utility>
 #include <vector>
 
-#include "driver.h"
+#include "cross_section/boolean2/driver.h"
+#include "cross_section/boolean2/predicates.h"
+#include "cross_section/boolean2/winding_filter.h"
 #include "manifold/optional_assert.h"
-#include "predicates.h"
-#include "winding_filter.h"
 
 namespace manifold {
 

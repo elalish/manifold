@@ -17,8 +17,8 @@
 #include <limits>
 #include <vector>
 
+#include "../../boolean2.h"
 #include "../../utils.h"
-#include "boolean2.h"
 #include "manifold/optional_assert.h"
 #include "predicates.h"
 

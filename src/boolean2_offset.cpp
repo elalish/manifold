@@ -16,9 +16,9 @@
 #include <cmath>
 #include <vector>
 
-#include "../../utils.h"
 #include "boolean2.h"
-#include "predicates.h"
+#include "cross_section/boolean2/predicates.h"
+#include "utils.h"
 
 // Polygon offset backing `CrossSection::Offset`.
 namespace manifold {

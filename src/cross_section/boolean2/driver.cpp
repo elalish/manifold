@@ -26,11 +26,11 @@
 #include <utility>
 #include <vector>
 
+#include "../../boolean2_diagnostics.h"
 #include "../../disjoint_sets.h"
 #include "../../parallel.h"
 #include "bvh.h"
 #include "canonicalize.h"
-#include "diagnostics.h"
 #include "edge_vert_lists.h"
 #include "intersections.h"
 #include "predicates.h"

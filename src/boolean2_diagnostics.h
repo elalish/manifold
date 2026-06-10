@@ -28,7 +28,7 @@
 #include "manifold/manifold.h"
 #endif
 
-#include "canonicalize.h"
+#include "cross_section/boolean2/canonicalize.h"
 
 namespace manifold {
 

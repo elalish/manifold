@@ -17,9 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include "cross_section/boolean2/predicates.h"
+#include "cross_section/boolean2/winding_filter.h"
 #include "manifold/common.h"
-#include "predicates.h"
-#include "winding_filter.h"
 
 namespace manifold {
 
