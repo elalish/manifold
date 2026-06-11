@@ -1039,7 +1039,9 @@ void MergeNearbyIntersectionVerts(
     const std::vector<std::vector<int>>& vertEdges, int oldVertEnd, double eps,
     double tolerance, std::vector<int>& inputVert2Merged) {
   DisjointSets uf(static_cast<int>(verts.size()));
-  const double newToNewThresh = kIntersectionMergeEpsFactor * eps;
+  // Merge intersection verts only at the eps snap scale; a wider band fuses
+  // distinct crossings of one edge into a non-manifold pinch.
+  const double newToNewThresh = eps;
   const double newToNewThresh2 = newToNewThresh * newToNewThresh;
   // Fresh intersection vs old endpoint: prior drift plus current-op error.
   const double newToOldThresh = tolerance + eps;
