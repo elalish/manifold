@@ -112,8 +112,6 @@ export type RayHit = {
   normal: Vec3
 };
 
-export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
-
 export type JoinType = 'Square'|'Round'|'Miter';
 
 /**

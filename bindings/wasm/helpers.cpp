@@ -115,13 +115,8 @@ Manifold Smooth(const val& mesh,
 }  // namespace js
 
 namespace cross_js {
-CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons,
-                        int fill_rule) {
-  auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
-            : fill_rule == 1 ? CrossSection::FillRule::NonZero
-            : fill_rule == 2 ? CrossSection::FillRule::Positive
-                             : CrossSection::FillRule::Negative;
-  return CrossSection(polygons, fr);
+CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons) {
+  return CrossSection(polygons);
 }
 
 CrossSection Union(const CrossSection& a, const CrossSection& b) {

@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, ExecutionContext, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
@@ -108,11 +108,9 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Basics
    */
-  constructor(contours: Polygons, fillRule?: FillRule);
+  constructor(contours: Polygons);
 
   // Shapes
 
@@ -277,7 +275,9 @@ export class CrossSection {
    *     1e-6)
    * @group Transformations
    */
-  simplify(epsilon?: number): CrossSection;
+  simplify(tolerance?: number): CrossSection;
+  tolerance(): number;
+  setTolerance(tolerance: number): CrossSection;
 
   // Clipping Operations
 
@@ -355,13 +355,6 @@ export class CrossSection {
   // Topological Operations
 
   /**
-   * Construct a CrossSection from a vector of other Polygons (batch
-   * boolean union).
-   * @group Boolean
-   */
-  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
-
-  /**
    * This operation returns a vector of CrossSections that are topologically
    * disconnected, each containing one outline contour with zero or more
    * holes.
@@ -379,11 +372,9 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Input & Output
    */
-  static ofPolygons(contours: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(contours: Polygons): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.

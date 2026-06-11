@@ -86,12 +86,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("InvalidTangents", Manifold::Error::InvalidTangents)
       .value("Cancelled", Manifold::Error::Cancelled);
 
-  enum_<CrossSection::FillRule>("fillrule")
-      .value("EvenOdd", CrossSection::FillRule::EvenOdd)
-      .value("NonZero", CrossSection::FillRule::NonZero)
-      .value("Positive", CrossSection::FillRule::Positive)
-      .value("Negative", CrossSection::FillRule::Negative);
-
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)
       .value("Round", CrossSection::JoinType::Round)
@@ -150,6 +144,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numContour", &CrossSection::NumContour)
       .function("_Bounds", &CrossSection::Bounds)
       .function("_Simplify", &CrossSection::Simplify)
+      .function("tolerance", &CrossSection::GetTolerance)
+      .function("setTolerance", &CrossSection::SetTolerance)
       .function("_Offset", &cross_js::Offset)
       .function("_ToPolygons", &CrossSection::ToPolygons)
       .function("hull",
@@ -158,14 +154,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
   // CrossSection Static Methods
   function("_Square", &CrossSection::Square);
   function("_Circle", &CrossSection::Circle);
-  function("_crossSectionCompose", &CrossSection::Compose);
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
   function("_crossSectionCollectVertices", &cross_js::CollectVertices);
-  function(
-      "_crossSectionHullPoints",
-      select_overload<CrossSection(std::vector<vec2>)>(&CrossSection::Hull));
+  function("_crossSectionHullPoints",
+           select_overload<CrossSection(const std::vector<vec2>&)>(
+               &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
       .constructor(&man_js::FromMeshJS)
