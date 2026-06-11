@@ -16,6 +16,7 @@ export class Parser {
 
   constructor(lexer: Lexer) {
     this.filename = lexer.filename;
+
     // Pre-tokenize for easy lookahead
     let tok: Token;
     do {
@@ -85,9 +86,12 @@ export class Parser {
     const start = this.startLoc();
     const statements: Statement[] = [];
     while (this.current.type !== TokenType.EOF) {
-      statements.push(this.parseStatement());
+      const stmt = this.parseStatement();
+      stmt.filename = this.filename;
+      statements.push(stmt);
     }
     const program: Program = { kind: "program", statements, loc: this.rangeSince(start) };
+    program.filename = this.filename;
     attachComments(program, this.comments);
     return program;
   }

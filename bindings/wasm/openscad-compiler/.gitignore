@@ -6,3 +6,5 @@
 /runtime/runtime.js
 /runtime/fonts/
 /runtime/images/
+/test/source-location-single.test.ts
+/test/single.test.ts

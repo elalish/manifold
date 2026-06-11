@@ -83,14 +83,15 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   if (is_string_fn(needle) && is_list_fn(haystack)) {
     return [...needle].map(function(n) {
       var indices = [];
-
       for (var i = 0; i < haystack.length; i++) {
         var item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
-
         if (__eq(item, n)) indices.push(i);
       }
-
-      return num_returns === 0 ? indices : (indices.length > 0 ? indices[0] : undefined);
+      if (num_returns === 0) return indices;
+      if (indices.length === 0) return [];
+      return num_returns === 1 || num_returns === undefined
+        ? indices[0]
+        : indices.slice(0, num_returns);
     });
   }
   return undefined;
@@ -1394,11 +1395,16 @@ function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0
   return Manifold.cylinder(height, radiusLow, radiusHigh, segs, center);
 }
 
-function __circle(radius: number, circularSegments = 0, fa = 12, fs = 2) {
-  if (circularSegments <= 0) {
-    __sync_quality(fa, fs);
+function __circle(radius: number, fn = 0, fa = 12, fs = 2) {
+  let N: number;
+  if (fn > 0) {
+    N = Math.max(3, Math.ceil(fn));
+  } else {
+    const N_fa = 360 / fa;
+    const N_fs = (2 * Math.PI * radius) / fs;
+    N = Math.ceil(Math.max(Math.min(N_fa, N_fs), 5));
   }
-  return CrossSection.circle(radius, circularSegments);
+  return CrossSection.circle(radius, N);
 }
 
 function __getSignedArea(contour: [number, number][]): number {
@@ -1427,38 +1433,31 @@ function __polygon(points: any, paths?: any) {
     return CrossSection.ofPolygons([]);
   }
 
-  // If paths is not specified
   if (paths === undefined || paths === null) {
     const ccwPoints = __forceWinding([...points], true);
     return CrossSection.ofPolygons([ccwPoints]);
   }
 
-  // If paths is a 1D array of indices (e.g. [0, 1, 2, 3])
   if (Array.isArray(paths) && paths.length > 0 && !Array.isArray(paths[0])) {
     const contour = paths.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
     const ccwContour = __forceWinding(contour, true);
     return CrossSection.ofPolygons([ccwContour]);
   }
 
-  // If paths is a 2D array of indices (e.g. [[0, 1, 2], [3, 4, 5]])
   if (Array.isArray(paths)) {
-    const contours = paths.map((path: any, pathIdx: number) => {
+    const contours = paths.map((path: any) => {
       let contour: any[] = [];
       if (Array.isArray(path)) {
         contour = path.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
       } else if (typeof path === "number") {
         contour = [points[path]];
       }
-      if (contour.length > 0) {
-        // First path is outer boundary (CCW), subsequent paths are holes (CW)
-        return __forceWinding(contour, pathIdx === 0);
-      }
-      return [];
+      return contour;
     }).filter((c: any) => c.length > 0);
-    return CrossSection.ofPolygons(contours);
+    // Use EvenOdd fill rule — OpenSCAD polygon() does not assume outer/hole winding
+    return CrossSection.ofPolygons(contours, 'EvenOdd');
   }
 
-  // Fallback
   const ccwPoints = __forceWinding([...points], true);
   return CrossSection.ofPolygons([ccwPoints]);
 }

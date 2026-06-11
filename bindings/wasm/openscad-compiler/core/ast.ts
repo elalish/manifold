@@ -10,6 +10,7 @@ export interface ASTNode {
   loc?: SourceRange | undefined;
   leadingComments?: Comment[] | undefined;
   trailingComments?: Comment[] | undefined;
+  filename?: string | undefined;
 }
 
 export type Expr =

@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
     "serve": "npx serve .",
-    "test": "cd test && npx vitest run compiler.test.ts"
+    "test": "cd test && npx vitest run compiler.test.ts && npx vitest run source-location.test.ts"
   },
   "keywords": [],
   "author": "",

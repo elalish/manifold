@@ -39,6 +39,14 @@ function trailingCommentText(node: ASTNode | undefined): string {
   return ` ${comments.map(comment => comment.value.replace(/\r?\n/g, " ")).join(" ")}`;
 }
 
+function returnExpr(expr: string, indent = ""): string {
+  const trimmed = expr.trim();
+  if (trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+    return `(\n${expr}\n${indent})`;
+  }
+  return expr;
+}
+
 function pushCommentedLine(lines: string[], node: ASTNode, line: string, indent = ""): void {
   lines.push(...leadingCommentLines(node, indent));
   lines.push(`${line}${trailingCommentText(node)}`);
@@ -773,10 +781,11 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
   }
 
   // Build declarations, deduplicating by output name (last wins, matching OpenSCAD semantics)
-  const declMap = new Map<string, string>();
+  const declMap = new Map<string, { stmt: Statement; code: string }>();
   const declOrder: string[] = [];
   const geometryLines: string[] = [];
 
+  let lastGeoFilename = "";
   for (const stmt of program.statements) {
     if (
       stmt.kind === "variableDecl" ||
@@ -790,16 +799,27 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
       else key = `fn:${escapeName(stmt.name)}_fn`;
 
       if (!declMap.has(key)) declOrder.push(key);
-      declMap.set(key, compileDeclaration(stmt));
+      declMap.set(key, { stmt, code: compileDeclaration(stmt) });
     } else if (stmt.kind === "use" || stmt.kind === "include") {
       const key = `comment:${stmt.path}`;
       if (!declMap.has(key)) declOrder.push(key);
-      declMap.set(key, `// ${stmt.kind} <${stmt.path}>`);
+      declMap.set(key, { stmt, code: `// ${stmt.kind} <${stmt.path}>` });
     } else {
       const geo = compileGeometry(stmt);
       if (geo) {
+        const filename = stmt.filename;
+        if (filename && filename !== lastGeoFilename) {
+          const relativePath = path.relative(process.cwd(), filename).replace(/\\/g, "/");
+          geometryLines.push(`\n// ${relativePath}`);
+          lastGeoFilename = filename;
+        }
+
         if (stmt.kind === "moduleCall" && !stmt.modifier) {
-          pushCommentedLine(geometryLines, stmt, `__result_items.push(${geo});`);
+          if (isModuleCallBackgroundOnly(stmt, moduleDeclRegistry)) {
+            pushCommentedLine(geometryLines, stmt, `__background_items.push(${geo});`);
+          } else {
+            pushCommentedLine(geometryLines, stmt, `__result_items.push(${geo});`);
+          }
         } else if (stmt.kind === "moduleCall" && stmt.modifier === "%") {
           pushCommentedLine(geometryLines, stmt, `__background_items.push(${geo});`);
         } else {
@@ -809,7 +829,18 @@ export function compile(program: Program, options?: { runtimePath?: string }): s
     }
   }
 
-  const declarations = declOrder.map(k => declMap.get(k)!);
+  const declarations: string[] = [];
+  let lastFilename = "";
+  for (const k of declOrder) {
+    const entry = declMap.get(k)!;
+    const filename = entry.stmt.filename;
+    if (filename && filename !== lastFilename) {
+      const relativePath = path.relative(process.cwd(), filename).replace(/\\/g, "/");
+      declarations.push(`\n// ${relativePath}`);
+      lastFilename = filename;
+    }
+    declarations.push(entry.code);
+  }
 
   const currentFileDir = typeof __dirname !== "undefined"
     ? __dirname
@@ -1051,6 +1082,47 @@ function compileModuleBody(body: Statement, moduleName?: string, localParamNames
   return lines.join("\n");
 }
 
+function isStatementBackgroundOnly(stmt: Statement, modules: Map<string, ModuleDeclStmtType>, visited: Set<string>): boolean {
+  switch (stmt.kind) {
+    case "empty":
+    case "variableDecl":
+    case "moduleDecl":
+    case "functionDecl":
+    case "use":
+    case "include":
+      return true;
+    case "block":
+      return stmt.statements.every(s => isStatementBackgroundOnly(s, modules, visited));
+    case "for":
+      return isStatementBackgroundOnly(stmt.body, modules, visited);
+    case "if":
+      return isStatementBackgroundOnly(stmt.thenBody, modules, visited) &&
+             (!stmt.elseBody || isStatementBackgroundOnly(stmt.elseBody, modules, visited));
+    case "moduleCall":
+      if (stmt.modifier === "%") {
+        return true;
+      }
+      if (modules.has(stmt.name)) {
+        if (visited.has(stmt.name)) {
+          return true;
+        }
+        visited.add(stmt.name);
+        const decl = modules.get(stmt.name)!;
+        const res = isStatementBackgroundOnly(decl.body, modules, visited);
+        visited.delete(stmt.name);
+        return res;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
+function isModuleCallBackgroundOnly(stmt: ModuleCallStmt, modules: Map<string, ModuleDeclStmtType>): boolean {
+  if (stmt.modifier === "%") return true;
+  return isStatementBackgroundOnly(stmt, modules, new Set<string>());
+}
+
 // Geometry compilation
 function compileGeometry(stmt: Statement): string {
   return compileGeometryLegacy(stmt);
@@ -1280,10 +1352,31 @@ function lowerModuleChildrenToIR(child: Statement | undefined, ctx: IRLowerConte
   if (!child || child.kind === "empty") return [];
   if (child.kind === "block") {
     const items: IRNode[] = [];
+    const letBindings: Argument[] = [];
+    let activeModules = new Map(ctx.modules);
+
     for (const s of child.statements) {
-      const lowered = lowerGeometryToIR(s, ctx);
+      if (s.kind === "empty" || s.kind === "use" || s.kind === "include") continue;
+
+      if (s.kind === "variableDecl") {
+        letBindings.push({ name: s.name, value: s.value });
+        continue;
+      }
+
+      if (s.kind === "moduleDecl") {
+        activeModules.set(s.name, s);
+        continue;
+      }
+
+      if (s.kind === "functionDecl") {
+        return undefined;
+      }
+
+      const lowered = lowerGeometryToIR(s, { ...ctx, modules: activeModules });
       if (!lowered) return undefined;
-      if (lowered.kind !== "empty") items.push(lowered);
+      if (lowered.kind !== "empty") {
+        items.push(wrapWithLetBindings(lowered, letBindings, s.loc));
+      }
     }
     return items;
   }
@@ -1741,13 +1834,13 @@ function compileSphere(args: Argument[]): string {
 
 function compileCylinder(args: Argument[]): string {
   const h = findArg(args, "h", 0);
-  const r = findArg(args, "r", 1);
-  const r1 = findArg(args, "r1");
-  const r2 = findArg(args, "r2");
+  const r = findArg(args, "r");
+  const r1 = findArg(args, "r1", 1);
+  const r2 = findArg(args, "r2", 2);
   const d = findArg(args, "d");
   const d1 = findArg(args, "d1");
   const d2 = findArg(args, "d2");
-  const center = findArg(args, "center");
+  const center = findArg(args, "center", 3);
   const fn = findArg(args, "$fn");
   const fa = findArg(args, "$fa");
   const fs = findArg(args, "$fs");
@@ -1755,16 +1848,16 @@ function compileCylinder(args: Argument[]): string {
   const hStr = h ? compileExpr(h.value) : "1";
 
   let rLow: string, rHigh: string;
-  if (d1 && d2) {
-    rLow = `(${compileExpr(d1.value)}) / 2`;
-    rHigh = `(${compileExpr(d2.value)}) / 2`;
-  } else if (r1 && r2) {
-    rLow = compileExpr(r1.value);
-    rHigh = compileExpr(r2.value);
-  } else if (d) {
+  if (d) {
     rLow = rHigh = `(${compileExpr(d.value)}) / 2`;
+  } else if (d1 || d2) {
+    rLow = d1 ? `(${compileExpr(d1.value)}) / 2` : "1";
+    rHigh = d2 ? `(${compileExpr(d2.value)}) / 2` : "1";
+  } else if (r) {
+    rLow = rHigh = compileExpr(r.value);
   } else {
-    rLow = rHigh = r ? compileExpr(r.value) : "1";
+    rLow = r1 ? compileExpr(r1.value) : "1";
+    rHigh = r2 ? compileExpr(r2.value) : "1";
   }
 
   const fnStr = fn ? compileExpr(fn.value) : "$fn";
@@ -1944,17 +2037,16 @@ function compileProjection(stmt: ModuleCallStmt): string {
 }
 
 // Boolean / collection 
-function collectChildren(stmt: ModuleCallStmt): string[] {
-  if (!stmt.child) return [];
+function collectChildrenWithDecls(stmt: ModuleCallStmt): { decls: string[]; geos: string[] } {
+  if (!stmt.child) return { decls: [], geos: [] };
   if (stmt.child.kind === "block") {
-    return compileBlockStatements(stmt.child.statements);
+    return compileBlockStatementsWithDecls(stmt.child.statements);
   }
   const g = compileGeometry(stmt.child);
-  return g ? [g] : [];
+  return { decls: [], geos: g ? [g] : [] };
 }
 
-// Compile a mixed list of statements, separating declarations into an IIFE wrapper when needed
-function compileBlockStatements(stmts: Statement[]): string[] {
+function compileBlockStatementsWithDecls(stmts: Statement[]): { decls: string[]; geos: string[] } {
   const decls: string[] = [];
   const geos: string[] = [];
 
@@ -1973,44 +2065,74 @@ function compileBlockStatements(stmts: Statement[]): string[] {
     }
   }
 
-  // If there are declarations, wrap the whole thing into a single IIFE
-  if (decls.length > 0 && geos.length > 0) {
-    const result = geos.length === 1
-      ? geos[0]!
-      : `__union2d3d([\n    ${geos.join(",\n    ")}\n  ])`;
-    if (result.includes("await ")) {
-      return [`await (async () => {\n  ${decls.join("\n  ")}\n  return await ${result};\n})()`];
-    }
-    return [`(() => {\n  ${decls.join("\n  ")}\n  return ${result};\n})()`];
-  }
-
-  return geos;
+  return { decls, geos };
 }
 
 function compileBoolOp(stmt: ModuleCallStmt, op: string): string {
-  const children = collectChildren(stmt);
-  if (children.length === 0) return "Manifold.union([])";
-  if (children.length === 1) return children[0]!;
-  if (op === "union") return `__union2d3d([\n  ${children.join(",\n  ")}\n])`;
-  if (op === "intersection") return `__intersection2d3d([\n  ${children.join(",\n  ")}\n])`;
-  if (op === "hull") return `__hull2d3d([\n  ${children.join(",\n  ")}\n])`;
-  return `Manifold.${op}([\n  ${children.join(",\n  ")}\n])`;
+  const { decls, geos } = collectChildrenWithDecls(stmt);
+  if (geos.length === 0) return "Manifold.union([])";
+
+  let result: string;
+  if (geos.length === 1) {
+    result = geos[0]!;
+  } else if (op === "union") {
+    result = `__union2d3d([\n  ${geos.join(",\n  ")}\n])`;
+  } else if (op === "intersection") {
+    result = `__intersection2d3d([\n  ${geos.join(",\n  ")}\n])`;
+  } else if (op === "hull") {
+    result = `__hull2d3d([\n  ${geos.join(",\n  ")}\n])`;
+  } else {
+    result = `Manifold.${op}([\n  ${geos.join(",\n  ")}\n])`;
+  }
+
+  if (decls.length > 0) {
+    if (result.includes("await ")) {
+      return `await (async () => {\n  ${decls.join("\n  ")}\n  return await ${returnExpr(result, "  ")};\n})()`;
+    }
+    return `(() => {\n  ${decls.join("\n  ")}\n  return ${returnExpr(result, "  ")};\n})()`;
+  }
+  return result;
 }
 
 function compileDifference(stmt: ModuleCallStmt): string {
-  const children = collectChildren(stmt);
-  if (children.length === 0) return "Manifold.union([])";
-  if (children.length === 1) return children[0]!;
+  const { decls, geos } = collectChildrenWithDecls(stmt);
+  if (geos.length === 0) return "Manifold.union([])";
 
-  const [first, ...rest] = children;
-  return `__difference2d3d(${first}, [\n  ${rest.join(",\n  ")}\n])`;
+  let result: string;
+  if (geos.length === 1) {
+    result = geos[0]!;
+  } else {
+    const [first, ...rest] = geos;
+    result = `__difference2d3d(${first}, [\n  ${rest.join(",\n  ")}\n])`;
+  }
+
+  if (decls.length > 0) {
+    if (result.includes("await ")) {
+      return `await (async () => {\n  ${decls.join("\n  ")}\n  return await ${returnExpr(result, "  ")};\n})()`;
+    }
+    return `(() => {\n  ${decls.join("\n  ")}\n  return ${returnExpr(result, "  ")};\n})()`;
+  }
+  return result;
 }
 
 function compileMinkowski(stmt: ModuleCallStmt): string {
-  const children = collectChildren(stmt);
-  if (children.length === 0) return "Manifold.union([])";
-  if (children.length === 1) return children[0]!;
-  return `__minkowski2d3d([\n  ${children.join(",\n  ")}\n])`;
+  const { decls, geos } = collectChildrenWithDecls(stmt);
+  if (geos.length === 0) return "Manifold.union([])";
+
+  let result: string;
+  if (geos.length === 1) {
+    result = geos[0]!;
+  } else {
+    result = `__minkowski2d3d([\n  ${geos.join(",\n  ")}\n])`;
+  }
+
+  if (decls.length > 0) {
+    if (result.includes("await ")) {
+      return `await (async () => {\n  ${decls.join("\n  ")}\n  return await ${returnExpr(result, "  ")};\n})()`;
+    }
+    return `(() => {\n  ${decls.join("\n  ")}\n  return ${returnExpr(result, "  ")};\n})()`;
+  }
+  return result;
 }
 
 function compileLinearExtrude(stmt: ModuleCallStmt): string {
@@ -2132,16 +2254,16 @@ function compileBlockGeometry(block: BlockStmt): string {
       }
     } else if (d.kind === "dollar") {
       if (body.includes("await ")) {
-        body = `await (async () => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return await ${body}; } finally { ${d.name} = __save_${d.name}; } })()`;
+        body = `await (async () => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return await ${returnExpr(body, "  ")}; } finally { ${d.name} = __save_${d.name}; } })()`;
       } else {
-        body = `(() => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return ${body}; } finally { ${d.name} = __save_${d.name}; } })()`;
+        body = `(() => { var __save_${d.name}: any = ${d.name}; ${d.name} = ${d.code}; try { return ${returnExpr(body, "  ")}; } finally { ${d.name} = __save_${d.name}; } })()`;
       }
     } else {
       // Wrap remaining body in IIFE with the declaration
       if (body.includes("await ")) {
-        body = `await (async () => {\n  ${d.code}\n  return await ${body};\n})()`;
+        body = `await (async () => {\n  ${d.code}\n  return await ${returnExpr(body, "  ")};\n})()`;
       } else {
-        body = `(() => {\n  ${d.code}\n  return ${body};\n})()`;
+        body = `(() => {\n  ${d.code}\n  return ${returnExpr(body, "  ")};\n})()`;
       }
     }
   }
@@ -2296,10 +2418,10 @@ function compileIfGeometry(stmt: IfStmt): string {
       "(() => {",
       `  if (${cond}) {`,
     ];
-    pushCommentedLine(lines, stmt.thenBody, `    return ${then};`, "    ");
+    pushCommentedLine(lines, stmt.thenBody, `    return ${returnExpr(then, "    ")};`, "    ");
     lines.push("  }");
     lines.push("  else {");
-    pushCommentedLine(lines, stmt.elseBody, `    return ${els};`, "    ");
+    pushCommentedLine(lines, stmt.elseBody, `    return ${returnExpr(els, "    ")};`, "    ");
     lines.push("  }");
     lines.push("})()");
     return lines.join("\n");
@@ -2308,7 +2430,7 @@ function compileIfGeometry(stmt: IfStmt): string {
     "(() => {",
     `  if (${cond}) {`,
   ];
-  pushCommentedLine(lines, stmt.thenBody, `    return ${then};`, "    ");
+  pushCommentedLine(lines, stmt.thenBody, `    return ${returnExpr(then, "    ")};`, "    ");
   lines.push("  }");
   lines.push("  return Manifold.union([]);");
   lines.push("})()");
@@ -2326,8 +2448,16 @@ function compileUserModuleCall(stmt: ModuleCallStmt): string {
 
   const name = `${escapeName(stmt.name)}$mod`;
   const argList = compileArgList(name, stmt.args);
-  const children = stmt.child && stmt.child.kind !== "empty" ? collectChildren(stmt) : [];
-  return buildWithChildrenCall(`${name}(${argList})`, children, stmt.name);
+  const { decls, geos } = stmt.child && stmt.child.kind !== "empty" ? collectChildrenWithDecls(stmt) : { decls: [], geos: [] };
+  const result = buildWithChildrenCall(`${name}(${argList})`, geos, stmt.name);
+
+  if (decls.length > 0) {
+    if (result.includes("await ")) {
+      return `await (async () => {\n  ${decls.join("\n  ")}\n  return await ${returnExpr(result, "  ")};\n})()`;
+    }
+    return `(() => {\n  ${decls.join("\n  ")}\n  return ${returnExpr(result, "  ")};\n})()`;
+  }
+  return result;
 }
 
 function guessMimeType(filePath: string): string {
