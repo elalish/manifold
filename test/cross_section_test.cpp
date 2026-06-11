@@ -109,6 +109,57 @@ CrossSection MakeShape(const Shape& s) {
   return cs;
 }
 
+// A tiny feature loop anchored ~1e-12 (a few times the op-epsilon) from a host
+// vertex must survive the boolean. Two near-coincident crossings of one host
+// edge by the feature were over-merged into a non-manifold pinch, which the
+// winding filter then collapsed to an empty result. Swept over a coordinate
+// offset because the failure only surfaces where the float grid is finer than
+// the op-epsilon. (CrossSectionFuzz.TinyFeatureNearCorner.)
+void ExpectTinyFeatureSurvivesNearCorner(
+    const std::vector<double>& hostRadii,
+    const std::vector<double>& featureRadii, vec2 dir) {
+  SimplePolygon host = StarRing(hostRadii);
+  SimplePolygon feature = StarRing(featureRadii);
+  for (auto& v : feature) {  // shrink to a tiny feature
+    v.x *= 1e-3;
+    v.y *= 1e-3;
+  }
+  // Anchor the feature 1e-12 from host vertex 0 along the seed's direction.
+  const double dlen = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+  const vec2 anchor{host[0].x + 1e-12 * dir.x / dlen,
+                    host[0].y + 1e-12 * dir.y / dlen};
+  const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
+  for (auto& v : feature) {
+    v.x += shift.x;
+    v.y += shift.y;
+  }
+
+  for (double offset : {0.0, 1024.0, 4096.0}) {
+    SimplePolygon shiftedHost = host;
+    SimplePolygon shiftedFeature = feature;
+    for (auto& v : shiftedHost) {
+      v.x += offset;
+      v.y += offset;
+    }
+    for (auto& v : shiftedFeature) {
+      v.x += offset;
+      v.y += offset;
+    }
+    const CrossSection a(shiftedHost);
+    const CrossSection b(shiftedFeature);
+    if (a.IsEmpty() || b.IsEmpty()) continue;
+
+    const auto aUb = a + b;
+    const auto aIb = a.Boolean(b, OpType::Intersect);
+    const CrossSection soup(Polygons{shiftedHost, shiftedFeature});
+    const double scale = 1.0 + std::fabs(a.Area()) + std::fabs(b.Area());
+    EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), 1e-3 * scale)
+        << "inclusion-exclusion violated at offset " << offset;
+    EXPECT_NEAR(soup.Area(), aUb.Area(), 1e-5 * scale)
+        << "edge-soup union disagrees with binary union at offset " << offset;
+  }
+}
+
 }  // namespace
 
 TEST(CrossSection, Square) {
@@ -332,6 +383,20 @@ TEST(CrossSection, TranslatedSmallPolygonKeepsFeatures) {
   const vec2 size = cs.Bounds().Size();
   EXPECT_NEAR(size.x, 10.0, 1e-9);
   EXPECT_NEAR(size.y, 10.0, 1e-9);
+}
+
+TEST(CrossSection, TinyFeatureNearCornerEdgeSoupParity) {
+  ExpectTinyFeatureSurvivesNearCorner(
+      {0., 0.14864156234381307, 0., 0.}, {0., 0., 0., 0.},
+      {0.11230272954875442, 0.72082846036740955});
+}
+
+// Same failure with host and feature roles swapped.
+TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
+  ExpectTinyFeatureSurvivesNearCorner(
+      {0., 0., 0., 0.},
+      {299.80431860145183, 188.67283503085034, 4.2284094583496739, 0.},
+      {0.9901767613117145, 0.60823663500743508});
 }
 
 // Regression test for the BR-cell hole pattern from Samples.Sponge4. Two
