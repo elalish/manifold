@@ -871,7 +871,7 @@ TEST(Boolean2, OutEdgesToPolygonsKeepsNearDistinctVertex) {
   EXPECT_EQ(polys[0].size(), 6u);
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 
-  const CrossSection reconsumed(polys, CrossSection::FillRule::Positive);
+  const CrossSection reconsumed(polys);
   EXPECT_FALSE(reconsumed.IsEmpty());
   EXPECT_NEAR(reconsumed.Area(), 1.0, 1e-9);
   const Manifold solid = Manifold::Extrude(reconsumed.ToPolygons(), 1.0);

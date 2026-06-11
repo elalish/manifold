@@ -258,7 +258,7 @@ TEST(CrossSection, OffsetWithHole) {
   // CCW outer + CW hole are already oriented for Positive fill, which yields
   // the same annulus as EvenOdd here and is the only rule CrossSection
   // supports.
-  CrossSection cs({outer, hole}, CrossSection::FillRule::Positive);
+  CrossSection cs({outer, hole});
 
   auto inflated = cs.Offset(1., CrossSection::JoinType::Miter);
   EXPECT_NEAR(inflated.Area(), 484. - 4., 0.01);
@@ -302,7 +302,7 @@ TEST(CrossSection, FourConcurrentEdges) {
 
   Polygons polys;
   for (double angle : {0., 45., 90., 135.}) polys.push_back(rhomb(angle));
-  CrossSection cs(polys, CrossSection::FillRule::Positive);
+  CrossSection cs(polys);
 
   EXPECT_EQ(cs.NumContour(), 1);
   EXPECT_NEAR(cs.Area(), 0.644423, 1e-4);
@@ -330,7 +330,7 @@ TEST(CrossSection, ConcurrentIndependentEdgePairs) {
 
   Polygons polys;
   for (double angle : {0., 30., 90., 120.}) polys.push_back(rhomb(angle));
-  CrossSection cs(polys, CrossSection::FillRule::Positive);
+  CrossSection cs(polys);
 
   EXPECT_EQ(cs.NumContour(), 1);
   EXPECT_NEAR(cs.Area(), 0.527482, 1e-4);
@@ -363,9 +363,8 @@ TEST(CrossSection, TranslatedShallowConcurrentEdges) {
   };
 
   const double base = std::ldexp(1.0, 40);
-  CrossSection origin(polysAt({0., 0.}), CrossSection::FillRule::Positive);
-  CrossSection shifted(polysAt({base, -base}),
-                       CrossSection::FillRule::Positive);
+  CrossSection origin(polysAt({0., 0.}));
+  CrossSection shifted(polysAt({base, -base}));
   CrossSection shiftedBack = shifted.Translate({-base, base});
 
   EXPECT_EQ(origin.NumContour(), 1);
@@ -590,7 +589,7 @@ TEST(CrossSection, CollinearSegmentOverlap) {
   SimplePolygon A = {{0.0, 0.0}, {10.0, 0.0}, {10.0, 1.0}, {0.0, 1.0}};
   SimplePolygon B = {{3.0, 0.0}, {7.0, 0.0}, {7.0, 2.0}, {3.0, 2.0}};
 
-  CrossSection cs(Polygons{A, B}, CrossSection::FillRule::Positive);
+  CrossSection cs(Polygons{A, B});
 
   EXPECT_EQ(cs.NumContour(), 1);
   // A = 10, B = 8, overlap (4x1 strip on shared bottom) = 4, union = 14.
@@ -616,7 +615,7 @@ TEST(CrossSection, ManyPolygonsShareCenterVertex) {
                      {std::cos(a1), std::sin(a1)},
                      {std::cos(a2), std::sin(a2)}});
   }
-  CrossSection cs(polys, CrossSection::FillRule::Positive);
+  CrossSection cs(polys);
 
   EXPECT_EQ(cs.NumContour(), 1);
   const double expectedArea = 0.5 * N * std::sin(2.0 * kPi / N);
@@ -1661,7 +1660,7 @@ TEST(CrossSection, DecomposeRecomposeOuterStarWithSmallHole) {
       << "sum(components.NumContour)=" << componentContourSum
       << " vs holed.NumContour()=" << holed.NumContour();
 
-  const auto recomposed = CrossSection::Compose(components);
+  const auto recomposed = CrossSection::BatchBoolean(components, OpType::Add);
   EXPECT_NEAR(recomposed.Area(), holedArea, tol);
   EXPECT_EQ(recomposed.NumContour(), holed.NumContour());
 }
@@ -1710,7 +1709,7 @@ TEST(CrossSection, DecomposeRecomposeNearTangentSmallHole) {
   EXPECT_EQ(componentContourSum, holed.NumContour())
       << "Decompose split or merged contours unexpectedly";
 
-  const auto recomposed = CrossSection::Compose(components);
+  const auto recomposed = CrossSection::BatchBoolean(components, OpType::Add);
   EXPECT_NEAR(recomposed.Area(), holedArea, tol)
       << "Compose(Decompose(holed)) changed area";
   EXPECT_EQ(recomposed.NumContour(), holed.NumContour())
@@ -1867,8 +1866,7 @@ TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {
   const SimplePolygon tri = {{-1.0, 0.0}, {1.0, 0.0}, {0.0, apex}};
   const SimplePolygon quad = {
       {-0.05, -1.0}, {0.05, -1.0}, {0.05, 2.0}, {-0.05, 2.0}};
-  const CrossSection input(Polygons{tri, quad},
-                           CrossSection::FillRule::Positive);
+  const CrossSection input(Polygons{tri, quad});
 
   const CrossSection once = input.Simplify();
   const CrossSection twice = once.Simplify();
@@ -1966,7 +1964,7 @@ TEST(CrossSection, Decompose) {
   auto b = a.Translate({4, 4});
   auto ab = a + b;
   auto decomp = ab.Decompose();
-  auto recomp = CrossSection::Compose(decomp);
+  auto recomp = CrossSection::BatchBoolean(decomp, OpType::Add);
 
   EXPECT_EQ(decomp.size(), 2);
   EXPECT_EQ(decomp[0].NumContour(), 2);
@@ -1984,7 +1982,7 @@ TEST(CrossSection, DecomposeNestedHoleAndIsland) {
   SimplePolygon outer = {{-5, -5}, {5, -5}, {5, 5}, {-5, 5}};
   SimplePolygon hole = {{-3, -3}, {-3, 3}, {3, 3}, {3, -3}};
   SimplePolygon island = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
-  CrossSection input({outer, hole, island}, CrossSection::FillRule::Positive);
+  CrossSection input({outer, hole, island});
 
   auto components = input.Decompose();
   ASSERT_EQ(components.size(), 2);
@@ -2004,7 +2002,8 @@ TEST(CrossSection, DecomposeNestedHoleAndIsland) {
   EXPECT_EQ(donutCount, 1);
   EXPECT_EQ(islandCount, 1);
   EXPECT_NEAR(totalArea, input.Area(), 1e-9);
-  EXPECT_NEAR(CrossSection::Compose(components).Area(), input.Area(), 1e-9);
+  EXPECT_NEAR(CrossSection::BatchBoolean(components, OpType::Add).Area(),
+              input.Area(), 1e-9);
 }
 
 TEST(CrossSection, WarpAffineMatchesScaleTranslate) {
@@ -2135,22 +2134,6 @@ TEST(CrossSection, SquareDegenerateDimIsEmpty) {
   EXPECT_TRUE(CrossSection::Square({0, 5}, false).IsEmpty());
   EXPECT_TRUE(CrossSection::Circle(0.0).IsEmpty());
   EXPECT_TRUE(CrossSection::BatchBoolean({}, OpType::Add).IsEmpty());
-}
-
-TEST(CrossSection, FillRule) {
-  SimplePolygon polygon = {
-      {-7, 13},   //
-      {-7, 12},   //
-      {-5, 9},    //
-      {-5, 8.1},  //
-      {-4.8, 8},  //
-  };
-
-  // CrossSection regularizes every input with the Positive fill rule; the
-  // FillRule argument is retained for API compatibility but only Positive is
-  // supported, so non-Positive rules are not exercised here.
-  CrossSection positive(polygon);
-  EXPECT_NEAR(positive.Area(), 0.683, 0.001);
 }
 
 TEST(CrossSection, Hull) {
