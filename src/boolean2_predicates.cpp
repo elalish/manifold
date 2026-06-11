@@ -14,14 +14,13 @@
 //
 // Leaf primitives for the Boolean2 pipeline.
 
-#include "predicates.h"
-
 #include <algorithm>
 #include <cmath>
 #include <vector>
 
-#include "../../shared.h"
-#include "../../utils.h"
+#include "boolean2.h"
+#include "shared.h"
+#include "utils.h"
 
 namespace manifold {
 

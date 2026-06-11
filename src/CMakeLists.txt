@@ -12,30 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(MANIFOLD_CROSS_SECTION_SRCS)
-list(
-  APPEND
-  MANIFOLD_CROSS_SECTION_SRCS
-  cross_section/cross_section.cpp
-  cross_section/boolean2/boolean2.cpp
-  cross_section/boolean2/bvh.cpp
-  cross_section/boolean2/canonicalize.cpp
-  cross_section/boolean2/containment.cpp
-  cross_section/boolean2/diagnostics.cpp
-  cross_section/boolean2/driver.cpp
-  cross_section/boolean2/edge_vert_lists.cpp
-  cross_section/boolean2/intersections.cpp
-  cross_section/boolean2/offset.cpp
-  cross_section/boolean2/predicates.cpp
-  cross_section/boolean2/vertex_merge.cpp
-  cross_section/boolean2/winding_filter.cpp
-)
-
 set(
   MANIFOLD_SRCS
+  boolean2.cpp
+  boolean2_diagnostics.cpp
+  boolean2_offset.cpp
+  boolean2_predicates.cpp
+  boolean2_winding.cpp
   boolean3.cpp
   boolean_result.cpp
   constructors.cpp
+  cross_section.cpp
   csg_tree.cpp
   edge_op.cpp
   execution_impl.cpp
@@ -51,24 +38,14 @@ set(
   sort.cpp
   subdivision.cpp
   tree2d.cpp
-  ${MANIFOLD_CROSS_SECTION_SRCS}
 )
 
 set(
   MANIFOLD_PRIVATE_HDRS
+  boolean2.h
+  boolean2_diagnostics.h
   boolean3.h
   collider.h
-  cross_section/boolean2/boolean2.h
-  cross_section/boolean2/bvh.h
-  cross_section/boolean2/canonicalize.h
-  cross_section/boolean2/diagnostics.h
-  cross_section/boolean2/driver.h
-  cross_section/boolean2/edge_vert_lists.h
-  cross_section/boolean2/intersections.h
-  cross_section/boolean2/parallel_policy.h
-  cross_section/boolean2/predicates.h
-  cross_section/boolean2/vertex_merge.h
-  cross_section/boolean2/winding_filter.h
   csg_tree.h
   execution_impl.h
   hashtable.h

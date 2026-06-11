@@ -28,11 +28,10 @@
 #include "manifold/manifold.h"
 #endif
 
-#include "canonicalize.h"
+#include "boolean2.h"
 
 namespace manifold {
 
-enum class WindRule;
 struct Trace;
 
 struct PhaseAcc {

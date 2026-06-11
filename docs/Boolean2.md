@@ -1,11 +1,13 @@
-# Boolean2 CrossSection Core
+#Boolean2 CrossSection Core
 
-Boolean2 is the sole `CrossSection` implementation. There is no
+Boolean2 is the sole `CrossSection` implementation.There is no
 `MANIFOLD_CROSS_SECTION_BACKEND` selector and no Clipper2 dependency; Boolean2
 is always built in-tree.
 
 Boolean2 is a manifold-native 2D arrangement pipeline for polygon fill and
-Boolean operations. The core library lives in `src/cross_section/boolean2/`,
+Boolean operations. The core library lives in `src/boolean2*.{
+  h, cpp
+}`,
 and the public `CrossSection` methods dispatch to it. Sibling utilities provide
 the decomposition and offset pieces that cover the rest of the public
 `CrossSection` API.
@@ -40,29 +42,29 @@ Boolean2 builds a planar arrangement and filters it by per-face winding:
    whose adjacent faces disagree under the requested rule.
 
 The high-level fill/Boolean core API is in
-`src/cross_section/boolean2/boolean2.h`. The lower-level driver returns
+`src/boolean2.h`. The lower-level driver returns
 retained directed sub-edges plus the merged vertex map, and the wrapper turns
 those edges back into regularized `manifold::Polygons`. Offset and containment
-helpers live in `offset.h` and `containment.h`; they are included by the
-backend wiring rather than by `boolean2.h`.
+helpers live in `boolean2_offset.cpp`, declared alongside the core API in
+`boolean2.h`.
 
 ## Architecture
 
 The main dataflow is:
 
-`boolean2.h` -> `boolean2.cpp` -> `driver.cpp` ->
-`canonicalize.cpp` -> `winding_filter.cpp` -> regularized `Polygons`.
+`boolean2.h` -> `boolean2.cpp` (conversion -> arrangement driver ->
+canonicalization) -> `boolean2_winding.cpp` -> regularized `Polygons`.
 
 | Layer | Files | Role |
 | --- | --- | --- |
-| Public core API | `boolean2.h`, `boolean2.cpp` | Converts `Polygons` to local vertices plus directed edges, invokes one arrangement pass, and turns retained edges back into regularized output. |
-| Arrangement coordinator | `driver.cpp` | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
-| Geometry leaves | `vertex_merge.cpp`, `bvh.cpp`, `edge_vert_lists.cpp`, `intersections.cpp` | Provide the local geometric operations used by the arrangement pass. |
-| Output filter | `canonicalize.cpp`, `winding_filter.cpp` | Splits directed edges into canonical sub-edges, builds halfedges, propagates winding, and keeps result boundary edges. |
-| Sibling helpers | `offset.cpp`, `containment.cpp` | Offset and decomposition support for the rest of the `CrossSection` API. |
+| Public core API | `boolean2.h`, `boolean2.cpp` (entry points) | Converts `Polygons` to local vertices plus directed edges, invokes one arrangement pass, and turns retained edges back into regularized output. |
+| Arrangement coordinator | `boolean2.cpp` (driver section) | Runs one pass of merge, edge-pair discovery, edge vertex insertion, crossing insertion, canonicalization, and winding filtering. |
+| Geometry leaves | `boolean2.cpp` (BVH, vertex merge, edge-vertex lists, intersections sections) | Provide the local geometric operations used by the arrangement pass. |
+| Output filter | `boolean2.cpp` (canonicalize section), `boolean2_winding.cpp` | Splits directed edges into canonical sub-edges, builds halfedges, propagates winding, and keeps result boundary edges. |
+| Sibling helpers | `boolean2_offset.cpp` | Offset and decomposition support for the rest of the `CrossSection` API. |
 
-Shared leaf utilities live in `predicates.*`, and debug/performance tracing
-lives in `diagnostics.h`.
+Shared leaf utilities live in `boolean2_predicates.cpp`, and debug/performance
+tracing lives in `boolean2_diagnostics.h`.
 
 ## Relationship To The Sketch
 
@@ -78,15 +80,16 @@ The main implementation differences are:
 - Vertex merging uses deterministic union-find over all pairs within epsilon,
   then chooses the source vertex nearest each cluster centroid as the
   representative. The sketch called out weighted, up-to-date positions for
-  chains of nearby vertices; Boolean2 treats the first arrangement pass as the
-  robustness boundary rather than relying on a production fixed-point cleanup
-  loop.
-- Broad phases use the local boolean2 sweep/BVH helpers. This keeps the core
-  independent from the 3D `Collider` surface while preserving the intended
-  sub-quadratic candidate search.
-- Proper crossings are discovered from broad-phase edge pairs rather than a
-  Bentley-Ottmann sweep. Endpoint-on-edge and collinear degeneracies are
-  handled by the edge vertex lists; isolated crossings are inserted or snapped
+  chains of nearby vertices;
+Boolean2 treats the first arrangement pass as the robustness boundary rather
+        than relying on a production fixed -
+    point cleanup loop.-
+    Broad phases use the local boolean2 sweep /
+        BVH helpers.This keeps the core independent from
+            the 3D `Collider` surface while preserving the intended sub -
+    quadratic candidate search.- Proper crossings are discovered from broad -
+    phase edge pairs rather than a Bentley - Ottmann sweep.Endpoint - on -
+    edge and collinear degeneracies are handled by the edge vertex lists; isolated crossings are inserted or snapped
   to neighboring list vertices.
 - Output filtering uses a halfedge face traversal and winding propagation
   instead of independent midpoint ray casts for every sub-edge. This makes one

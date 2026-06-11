@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "diagnostics.h"
+#include "boolean2_diagnostics.h"
 
 #ifdef MANIFOLD_DEBUG
 #include <sstream>
 #include <string>
 #endif
-
-#include "winding_filter.h"
 
 namespace manifold {
 
