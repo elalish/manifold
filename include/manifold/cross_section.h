@@ -53,26 +53,6 @@ class CrossSection {
   CrossSection& operator=(CrossSection&&) noexcept;
   ///@}
 
-  // Adapted from Clipper2 docs:
-  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm
-  // (Copyright © 2010-2023 Angus Johnson)
-  /**
-   * Filling rules defining which polygon sub-regions are considered to be
-   * inside a given polygon, and which sub-regions will not (based on winding
-   * numbers). See the [Clipper2
-   * docs](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm)
-   * for a detailed explaination with illusrations.
-   */
-  // TODO(#1707): EvenOdd/NonZero/Negative are preserved for backend/API
-  // compatibility; remove them when the public construction API can break. The
-  // Boolean2 backend supports only Positive construction.
-  enum class FillRule {
-    EvenOdd,   ///< Only odd numbered sub-regions are filled.
-    NonZero,   ///< Only non-zero sub-regions are filled.
-    Positive,  ///< Only sub-regions with winding counts > 0 are filled.
-    Negative   ///< Only sub-regions with winding counts < 0 are filled.
-  };
-
   /**
    * Specifies the treatment of path/contour joins (corners) when offseting
    * CrossSections; alias of manifold::JoinType (see common.h), shared with the
@@ -83,10 +63,8 @@ class CrossSection {
   /** @name Input & Output
    */
   ///@{
-  CrossSection(const SimplePolygon& contour,
-               FillRule fillrule = FillRule::Positive);
-  CrossSection(const Polygons& contours,
-               FillRule fillrule = FillRule::Positive);
+  CrossSection(const SimplePolygon& contour);
+  CrossSection(const Polygons& contours);
   CrossSection(const Rect& rect);
   Polygons ToPolygons() const;
   ///@}
@@ -96,7 +74,6 @@ class CrossSection {
    */
   ///@{
   std::vector<CrossSection> Decompose() const;
-  static CrossSection Compose(const std::vector<CrossSection>&);
   static CrossSection Square(const vec2 dims, bool center = false);
   static CrossSection Circle(double radius, int circularSegments = 0);
   ///@}
@@ -110,6 +87,7 @@ class CrossSection {
   size_t NumContour() const;
   Rect Bounds() const;
   double Area() const;
+  double GetTolerance() const;
   ///@}
 
   /** @name Transformation
@@ -122,7 +100,8 @@ class CrossSection {
   CrossSection Transform(const mat2x3& m) const;
   CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
   CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
-  CrossSection Simplify(double epsilon = 1e-6) const;
+  CrossSection SetTolerance(double tolerance) const;
+  CrossSection Simplify(double tolerance = 0) const;
   CrossSection Offset(double delta, JoinType jt = JoinType::Round,
                       double miter_limit = 2.0, int circularSegments = 0) const;
   ///@}
@@ -147,8 +126,8 @@ class CrossSection {
   ///@{
   CrossSection Hull() const;
   static CrossSection Hull(const std::vector<CrossSection>& crossSections);
-  static CrossSection Hull(const SimplePolygon pts);
-  static CrossSection Hull(const Polygons polys);
+  static CrossSection Hull(const SimplePolygon& pts);
+  static CrossSection Hull(const Polygons& polys);
   ///@}
 
  private:

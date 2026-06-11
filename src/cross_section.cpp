@@ -251,8 +251,8 @@ CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
  * @param fillrule Only FillRule::Positive is supported; other values are
  * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
-CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule)
-    : CrossSection(Polygons{contour}, fillrule) {}
+CrossSection::CrossSection(const SimplePolygon& contour)
+    : CrossSection(Polygons{contour}) {}
 
 /**
  * Create a 2d cross-section from a set of contours (complex polygons). A
@@ -262,13 +262,8 @@ CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule)
  *
  * @param contours A set of closed paths describing zero or more complex
  * polygons.
- * @param fillrule Only FillRule::Positive is supported; other values are
- * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
-CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
-  DEBUG_ASSERT(fillrule == FillRule::Positive, logicErr,
-               "Boolean2 CrossSection supports only Positive fill");
-  (void)fillrule;
+CrossSection::CrossSection(const Polygons& contours) {
   tolerance_ = InferEps(contours, {});
   paths_ = shared_paths(ApplyFillRule(contours, tolerance_));
 }
@@ -448,15 +443,6 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
 }
 
 /**
- * Construct a CrossSection from a vector of other CrossSections (batch
- * boolean union).
- */
-CrossSection CrossSection::Compose(
-    const std::vector<CrossSection>& crossSections) {
-  return BatchBoolean(crossSections, OpType::Add);
-}
-
-/**
  * This operation returns a vector of CrossSections that are topologically
  * disconnected, each containing one outline contour with zero or more
  * holes.
@@ -598,23 +584,43 @@ CrossSection CrossSection::WarpBatch(
  * quality in any meaningful way. This is particularly important if further
  * offseting operations are to be performed, which would compound the issue.
  */
-CrossSection CrossSection::Simplify(double epsilon) const {
+CrossSection CrossSection::Simplify(double tolerance) const {
   // Stored paths are already fill-rule-regularized, so Simplify only decimates:
-  // drop tiny contours, then remove near-collinear verts per ring at `epsilon`
-  // (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker). Like clipper2,
-  // the result is NOT re-regularized - a coarse `epsilon` can self-intersect a
-  // ring, so healing is left to a later boolean.
+  // drop tiny contours, then remove near-collinear verts per ring at
+  // `tolerance` (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker). Like
+  // clipper2, the result is NOT re-regularized - a coarse tolerance can
+  // self-intersect a ring, so healing is left to a later boolean. Tolerance 0
+  // decimates at the cross-section's own tolerance, matching Manifold.
+  if (tolerance == 0) tolerance = tolerance_;
   const Polygons& paths = GetPaths()->paths_;
-  const Polygons filtered = FilterSmallContours(paths, epsilon);
+  const Polygons filtered = FilterSmallContours(paths, tolerance);
   Polygons out;
   out.reserve(filtered.size());
   for (const auto& ring : filtered) {
-    SimplePolygon simplified = SimplifyRing(ring, epsilon);
+    SimplePolygon simplified = SimplifyRing(ring, tolerance);
     if (simplified.size() >= 3) out.push_back(std::move(simplified));
   }
   CrossSection result(shared_paths(std::move(out)));
-  result.tolerance_ = std::max(tolerance_, epsilon);
+  result.tolerance_ = std::max(tolerance_, tolerance);
   return result;
+}
+
+/**
+ * Return the cross-section's tolerance: the propagated drift budget, analogous
+ * to Manifold::GetTolerance.
+ */
+double CrossSection::GetTolerance() const { return tolerance_; }
+
+/**
+ * Return a copy with the given tolerance. Raising it decimates the geometry to
+ * the new tolerance (via Simplify); lowering it floors at the geometry's
+ * epsilon. Mirrors Manifold::SetTolerance.
+ */
+CrossSection CrossSection::SetTolerance(double tolerance) const {
+  if (tolerance > tolerance_) return Simplify(tolerance);
+  CrossSection out = *this;
+  out.tolerance_ = std::max(InferEps(GetPaths()->paths_, {}), tolerance);
+  return out;
 }
 
 /**
@@ -694,8 +700,9 @@ CrossSection CrossSection::Hull() const { return Hull({*this}); }
  * @param pts A vector of 2-dimensional points over which to compute a convex
  * hull.
  */
-CrossSection CrossSection::Hull(SimplePolygon pts) {
-  SimplePolygon hull = HullImpl(pts);
+CrossSection CrossSection::Hull(const SimplePolygon& pts) {
+  SimplePolygon points = pts;  // HullImpl sorts in place
+  SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
   Polygons inputForEps{pts};
   CrossSection out(shared_paths({std::move(hull)}));
@@ -710,7 +717,7 @@ CrossSection CrossSection::Hull(SimplePolygon pts) {
  * @param polys A vector of vectors of 2-dimensional points over which to
  * compute a convex hull.
  */
-CrossSection CrossSection::Hull(const Polygons polys) {
+CrossSection CrossSection::Hull(const Polygons& polys) {
   SimplePolygon points;
   for (const auto& path : polys)
     for (const vec2& point : path) points.push_back(point);
