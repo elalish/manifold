@@ -1,0 +1,33 @@
+{
+  "name": "openscad-to-manifold",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "bin": {
+    "openscad-to-manifold": "./dist/index.cjs"
+  },
+  "scripts": {
+    "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
+    "serve": "npx serve .",
+    "test": "cd test && npx vitest run compiler.test.ts && npx vitest run source-location.test.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "canvas": "^3.2.3",
+    "commander": "^14.0.3",
+    "dxf-parser": "^1.1.2",
+    "manifold-3d": "^3.5.0",
+    "opentype.js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/opentype.js": "^1.3.9",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}
