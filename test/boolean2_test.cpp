@@ -270,7 +270,6 @@ std::vector<EdgeM> EdgesFromOverlapResult(const OverlapResult& result) {
 
 OverlapResult CleanupPassLikeIterate(const OverlapResult& result, double eps) {
   return RemoveOverlaps2D(result.verts, EdgesFromOverlapResult(result), eps,
-                          /*tolerance=*/0.0,
                           /*debug=*/false, WindRule::Add);
 }
 
@@ -518,8 +517,8 @@ TEST(Boolean2, CleanupPassMatchesValidAddSinglePass) {
   Polygons polys{RandomTopologicalRing(8, 15)};
   const double eps = InferEps(polys, {});
   const auto [verts, edges] = PolygonsToInput(polys);
-  const auto pass1 = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/0.0,
-                                      /*debug=*/false, WindRule::Add);
+  const auto pass1 =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
   EXPECT_TRUE(CheckRetainedGraphValidity(pass1, edges, pass1.inputVert2Merged,
                                          pass1.numMergedVerts, eps));
 
@@ -778,8 +777,8 @@ TEST(Boolean2, BooleanRobustnessMergeTopologyBalance) {
   const auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
   ASSERT_FALSE(verts.empty());
   const double eps = InferEps(a, b);
-  const auto overlap = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/0.0,
-                                        /*debug=*/false, WindRule::Add);
+  const auto overlap =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
   EXPECT_TRUE(CheckRetainedGraphValidity(
       overlap, edges, overlap.inputVert2Merged, overlap.numMergedVerts, eps));
 }
@@ -811,8 +810,8 @@ TEST(Boolean2, BooleanRobustnessDirectCastKeepsExpectedArea) {
   const auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
   ASSERT_FALSE(verts.empty());
   const double eps = InferEps(a, b);
-  const auto overlap = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/0.0,
-                                        /*debug=*/false, WindRule::Add);
+  const auto overlap =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
   EXPECT_TRUE(CheckRetainedGraphValidity(
       overlap, edges, overlap.inputVert2Merged, overlap.numMergedVerts, eps));
 
@@ -875,48 +874,14 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
   constexpr double kDelta = 1e-12;
   const Polygons input = {
       {{0, 0}, {1, 0}, {1, -1}, {2, -1}, {1 + kDelta, 0}, {1, 1}}};
-  const auto polys = Boolean2D(input, {}, OpType::Add, /*eps=*/1e-15,
-                               /*tolerance=*/1e-9);
+  const auto polys = Boolean2D(input, {}, OpType::Add, /*eps=*/1e-15);
   ASSERT_EQ(polys.size(), 1u);
   EXPECT_EQ(polys[0].size(), 6u);
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 }
 
-// The arrangement is eps-only: a crossing a tolerance-scale distance from an
-// old endpoint (5e-4 from corner (0,0), eps 1e-6) is a real tiny feature, kept
-// whatever the op tolerance. Merging it is Simplify's job, not the boolean's.
-TEST(Boolean2, GeneratedCrossingNearEndpointStaysDistinct) {
-  constexpr double eps = 1e-6;
-  const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
-  const Polygons b = {{{5e-4, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {5e-4, 0.5}}};
-  const auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
-
-  const auto atEps = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/eps,
-                                      /*debug=*/false, WindRule::Add);
-  const auto atTol = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/1e-3,
-                                      /*debug=*/false, WindRule::Add);
-
-  auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
-    int count = 0;
-    for (const vec2& p : points)
-      if (dot(p - target, p - target) <= r * r) ++count;
-    return count;
-  };
-  const vec2 generatedNearOld{5e-4, 0.0};
-
-  // A 1000x-larger tolerance changes nothing.
-  EXPECT_GT(countNear(atEps.verts, generatedNearOld, 10 * eps), 0);
-  EXPECT_GT(countNear(atTol.verts, generatedNearOld, 10 * eps), 0);
-  EXPECT_EQ(atEps.verts.size(), atTol.verts.size());
-  EXPECT_TRUE(CheckRetainedGraphValidity(atEps, edges, atEps.inputVert2Merged,
-                                         atEps.numMergedVerts, eps));
-  EXPECT_TRUE(CheckRetainedGraphValidity(atTol, edges, atTol.inputVert2Merged,
-                                         atTol.numMergedVerts, eps));
-}
-
 // The new-to-old snap is a 2*eps budget: a generated crossing within 2*eps of
-// an old corner fuses into it; beyond 2*eps it stays a distinct vertex. Op
-// tolerance does not enter - this is purely the eps-scale merge.
+// an old corner fuses into it; beyond 2*eps it stays a distinct vertex.
 TEST(Boolean2, NewToOldMergeBudgetIsTwoEps) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
@@ -925,8 +890,8 @@ TEST(Boolean2, NewToOldMergeBudgetIsTwoEps) {
   auto runWithLeftEdgeAt = [&](double xLeft) {
     const Polygons b = {{{xLeft, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {xLeft, 0.5}}};
     auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
-    auto result = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/eps,
-                                   /*debug=*/false, WindRule::Add);
+    auto result =
+        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
     return std::make_pair(std::move(result), std::move(edges));
   };
   auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
@@ -950,50 +915,13 @@ TEST(Boolean2, NewToOldMergeBudgetIsTwoEps) {
                                          distinct.numMergedVerts, eps));
 }
 
-// Regression: an elevated tolerance used to snap a shared crossing onto an old
-// corner and fold this two-star union to empty. Eps-scale snapping cannot move
-// old geometry that far, so it stays a valid ~2.04 union.
-TEST(Boolean2, ElevatedToleranceDoesNotFoldOverlap) {
-  const Polygons a = {{{-0.057041, 0.823614},
-                       {-0.285626, 0.308351},
-                       {-0.835764, 0.185488},
-                       {-0.416356, -0.191134},
-                       {-0.469509, -0.752313},
-                       {0.018284, -0.469815},
-                       {0.535572, -0.693780},
-                       {0.417637, -0.142565},
-                       {0.790491, 0.280197},
-                       {0.229810, 0.338368}}};
-  const Polygons b = {{{-0.210685, -0.690574},
-                       {-0.062302, -0.062027},
-                       {0.582263, -0.021725},
-                       {0.112117, 0.421051},
-                       {0.399497, 0.999411},
-                       {-0.219032, 0.813641},
-                       {-0.576217, 1.351700},
-                       {-0.724599, 0.723153},
-                       {-1.369164, 0.682852},
-                       {-0.899018, 0.240075},
-                       {-1.186398, -0.338285},
-                       {-0.567870, -0.152515}}};
-  const auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
-  constexpr double eps = 1e-9;
-  const auto result = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/0.08,
-                                       /*debug=*/false, WindRule::Add);
-  EXPECT_FALSE(result.edges.empty());
-  EXPECT_TRUE(CheckRetainedGraphValidity(result, edges, result.inputVert2Merged,
-                                         result.numMergedVerts, eps));
-  EXPECT_NEAR(TotalSignedArea(OutEdgesToPolygons(result.verts, result.edges)),
-              2.04, 0.05);
-}
-
 TEST(Boolean2, RemoveOverlapsMergesExactDuplicateCoordinates) {
   const Polygons polys = {{{0, 0}, {1, 0}, {0, 1}}, {{0, 0}, {-1, 0}, {0, -1}}};
   const auto [verts, edges] = PolygonsToInput(polys);
   ASSERT_EQ(verts.size(), 6u);
   const double eps = InferEps(polys, {});
-  const auto overlap = RemoveOverlaps2D(verts, edges, eps, /*tolerance=*/0.0,
-                                        /*debug=*/false, WindRule::Add);
+  const auto overlap =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
   ASSERT_EQ(overlap.inputVert2Merged.size(), verts.size());
   ASSERT_GE(overlap.inputVert2Merged[0], 0);
   ASSERT_LT(overlap.inputVert2Merged[0], overlap.numMergedVerts);
