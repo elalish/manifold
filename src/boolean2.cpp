@@ -1112,13 +1112,29 @@ void MergeNearbyIntersectionVerts(
   }
   if (distinctClusters == nV) return;
 
+  // Pin a cluster with an old (pre-intersection) vertex to that vertex (nearest
+  // the centroid, like MergeVerts), not the centroid: drifting an old vertex
+  // sub-eps folds the winding walk at a near-coincident tip.
+  std::vector<int> anchor(nV, -1);
+  std::vector<double> anchorDist2(nV, std::numeric_limits<double>::infinity());
+  for (int i = 0; i < oldVertEnd; ++i) {
+    const int r = uf.find(i);
+    const vec2 d = verts[i] - sumPos[r] * (1.0 / sumCnt[r]);
+    const double dist2 = dot(d, d);
+    if (dist2 < anchorDist2[r]) {
+      anchorDist2[r] = dist2;
+      anchor[r] = i;
+    }
+  }
+
   std::vector<int> rootToNew(nV, -1);
   std::vector<vec2> newVerts;
   newVerts.reserve(distinctClusters);
   for (int r = 0; r < nV; ++r) {
     if (sumCnt[r] == 0) continue;
     rootToNew[r] = static_cast<int>(newVerts.size());
-    newVerts.push_back(sumPos[r] * (1.0 / sumCnt[r]));
+    newVerts.push_back(anchor[r] >= 0 ? verts[anchor[r]]
+                                      : sumPos[r] * (1.0 / sumCnt[r]));
   }
   std::vector<int> preMergeToPost(nV);
   for (int i = 0; i < nV; ++i) preMergeToPost[i] = rootToNew[uf.find(i)];
