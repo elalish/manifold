@@ -300,14 +300,11 @@ struct OverlapResult {
   int numMergedVerts;
 };
 
-// `eps` is the fresh per-op FP-noise bound (3D analogue: Impl::epsilon_).
-// `tolerance` is the propagated drift bound (3D analogue: Impl::tolerance_).
-// The arrangement is eps-only: no merge or snap consults `tolerance`.
-// TODO: drop `tolerance` from the arrangement entry points; CrossSection still
-// tracks tolerance_ for Simplify's decimation.
+// `eps` is the per-op FP-noise bound (3D: Impl::epsilon_). The arrangement is
+// eps-only; tolerance-scale decimation is Simplify's job, as in boolean3.
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
-                               double tolerance = 0.0, bool debug = false,
+                               bool debug = false,
                                WindRule pred = WindRule::Add,
                                Trace* trace = nullptr);
 
@@ -322,7 +319,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
 // machine-scale eps. Fill-rule application, not tolerance decimation.
 Polygons ApplyFillRule(const Polygons& polys, double eps);
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
-                   double eps = 0.0, double tolerance = 0.0);
+                   double eps = 0.0);
 
 // Polygon offset backing CrossSection::Offset.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
