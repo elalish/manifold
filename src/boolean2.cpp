@@ -282,19 +282,19 @@ Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
 }
 
 uint32_t MortonCode2(vec2 position, Box2 bBox) {
-  using collider_internal::SpreadBits3;
   const vec2 size = bBox.max - bBox.min;
   const double xNorm = size.x > 0 ? (position.x - bBox.min.x) / size.x : 0.5;
   const double yNorm = size.y > 0 ? (position.y - bBox.min.y) / size.y : 0.5;
   const double xClamped = std::min(1023.0, std::max(0.0, 1024.0 * xNorm));
   const double yClamped = std::min(1023.0, std::max(0.0, 1024.0 * yNorm));
-  const uint32_t x = SpreadBits3(static_cast<uint32_t>(xClamped));
-  const uint32_t y = SpreadBits3(static_cast<uint32_t>(yClamped));
+  const uint32_t x =
+      collider_internal::SpreadBits3(static_cast<uint32_t>(xClamped));
+  const uint32_t y =
+      collider_internal::SpreadBits3(static_cast<uint32_t>(yClamped));
   return x * 2 + y;
 }
 
 BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
-  using namespace collider_internal;
   const int n = static_cast<int>(boxes.size());
   BVH out;
   out.leafToOrig.resize(n);
@@ -319,20 +319,21 @@ BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
   // overhead dominating construction.
   manifold::for_each_n(
       autoPolicy(n - 1, kRadixTreeBuildGrainSize), countAt(0), n - 1,
-      CreateRadixTree(
+      collider_internal::CreateRadixTree(
           {VecView<int>(nodeParent.data(), nodeParent.size()),
            VecView<std::pair<int, int>>(out.internalChildren.data(),
                                         out.internalChildren.size()),
            VecView<const uint32_t>(sortedMorton)}));
   for (int i = 0; i < n; ++i)
-    out.nodeBBox[Leaf2Node(i)] = boxes[out.leafToOrig[i]];
+    out.nodeBBox[collider_internal::Leaf2Node(i)] = boxes[out.leafToOrig[i]];
   auto buildNode = [&](auto&& self, int node) -> Box2 {
-    if (IsLeaf(node)) return out.nodeBBox[node];
-    const auto [left, right] = out.internalChildren[Node2Internal(node)];
+    if (collider_internal::IsLeaf(node)) return out.nodeBBox[node];
+    const auto [left, right] =
+        out.internalChildren[collider_internal::Node2Internal(node)];
     out.nodeBBox[node] = self(self, left).Union(self(self, right));
     return out.nodeBBox[node];
   };
-  if (n > 1) buildNode(buildNode, kRoot);
+  if (n > 1) buildNode(buildNode, collider_internal::kRoot);
   return out;
 }
 
@@ -364,8 +365,6 @@ CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
 // same vert. Both run before the BVH-broad intersection discovery. Also hosts
 // the tiny "sorted-vector as set" helpers (VESetContains, VESetInsert) used by
 // the per-edge / per-vert adjacency tracking below.
-
-using manifold::la::dot;
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   const int n = static_cast<int>(in.size());
