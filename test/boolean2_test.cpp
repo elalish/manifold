@@ -129,6 +129,11 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
   return std::fabs(la::cross(d, p - a)) <= eps * std::sqrt(len2);
 }
 
+// Independent oracle for the arrangement RemoveOverlaps2D retains - its
+// predicates are not reused from the engine, so it can't rubber-stamp a bug.
+// Checks: retained verts finite and >eps apart; edges valid and non-eps-zero;
+// edge balance conserved (per-vertex signed multiplicity matches the input's,
+// zero for introduced verts); no two non-adjacent edges strictly cross.
 ::testing::AssertionResult CheckRetainedGraphValidity(
     const OverlapResult& result, const std::vector<EdgeM>& inputEdges,
     const std::vector<int>& inputVert2Merged, int numMergedVerts, double eps) {
@@ -273,6 +278,9 @@ OverlapResult CleanupPassLikeIterate(const OverlapResult& result, double eps) {
                           /*debug=*/false, WindRule::Add);
 }
 
+// Determinism/idempotence check: two arrangements equal up to eps-quantization,
+// comparing sorted per-edge keys (endpoints rounded to eps*0.01 and canonically
+// ordered, with signed multiplicity).
 void ExpectSameFingerprint(const OverlapResult& a, const OverlapResult& b,
                            double eps) {
   using Fingerprint =
@@ -354,12 +362,11 @@ TEST(Boolean2, PropagatesShallowIndependentIntersections) {
   EXPECT_EQ(inserted.lists[4].size(), 2);
 }
 
-// RemoveOverlaps2D produces an edge-balance imbalance for some
-//   vertices on these mixed-scale inputs - 1e-6 alongside 1024.
-//   Likely eps-inference at the extreme-scale-mix boundary or
-//   vertex-merge corner case in RemoveOverlaps2D. Replicated inline
-//   because CheckRetainedGraphValidity isn't exposed via the public
-//   API.
+// Edge balance at a vertex is the signed sum of incident edge multiplicities
+// (outgoing minus incoming); a valid arrangement conserves it. Asserts
+// RemoveOverlaps2D does so through a boolean Add on a hard mixed-scale input
+// (1e-6 alongside 1024). Replicated inline (CheckRetainedGraphValidity isn't
+// public).
 TEST(Boolean2, RemoveOverlaps2DTopologyMixedScale) {
   // Inputs A and B exactly as the BooleanRobustness fuzz target
   // constructs them from the counterexample raw polygons. The
