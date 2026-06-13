@@ -413,9 +413,14 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
     v += vec2(4096.0);
   }
   const CrossSection ca(host), cb(feature);
-  const auto sum =
-      ca.Area() + cb.Area() - ca.Boolean(cb, OpType::Intersect).Area();
-  EXPECT_NEAR((ca + cb).Area(), sum, 1e-3 * (1.0 + ca.Area() + cb.Area()));
+  // The feature only point-touches the host (~1e-9 from a vertex), so they are
+  // disjoint: the intersection is empty and the union is the whole host +
+  // feature. The bound is a loose area-relative one (not eps-derived); the bug
+  // drops a whole big piece (the ~30107-area host), well past any such bound.
+  const auto inter = ca.Boolean(cb, OpType::Intersect);
+  const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
+  EXPECT_NEAR(inter.Area(), 0.0, tol) << "feature only point-touches the host";
+  EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
 // Host-drop only at large offset (passes at the origin): the StarRing host plus
@@ -445,9 +450,10 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
       v += vec2(offset);
     }
     const CrossSection ca(sh), cb(sf);
-    const auto sum =
-        ca.Area() + cb.Area() - ca.Boolean(cb, OpType::Intersect).Area();
-    EXPECT_NEAR((ca + cb).Area(), sum, 1e-3 * (1.0 + ca.Area() + cb.Area()))
+    const auto inter = ca.Boolean(cb, OpType::Intersect);
+    const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
+    EXPECT_NEAR(inter.Area(), 0.0, tol) << "offset=" << offset;
+    EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area() - inter.Area(), tol)
         << "offset=" << offset;
   }
 }
