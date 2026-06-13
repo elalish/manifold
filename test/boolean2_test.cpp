@@ -78,7 +78,10 @@ std::map<int, int> ComputeBalance(const std::vector<Edge>& edges) {
 // output, deliberately not reusing the engine's IntersectSegments (that
 // would be circular) or the house CCW (whose zero band normalizes by the
 // longer edge from p0, not by perpendicular distance). Each uses an exact
-// distance-from-line band: |cross(d, p - a)| <= eps * |d|.
+// distance-from-line band: |cross(d, p - a)| <= eps * |d|. They run only on
+// retained engine output, where the validator has already rejected eps-zero
+// edges, so |b - a| > eps holds and the band is well-defined - this is not a
+// general collinearity test for sub-eps segments.
 bool ValidVertId(int v, const std::vector<vec2>& verts) {
   return 0 <= v && v < static_cast<int>(verts.size());
 }
