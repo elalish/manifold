@@ -138,7 +138,7 @@ void AppendInput(const Polygons& polys, int mult, std::vector<vec2>& verts,
 
 // `bSign` is +1 for Add/Intersect-style accumulation and -1 for Subtract.
 Polygons ApplyFillRule(const Polygons& a, const Polygons& b, int bSign,
-                       WindRule rule, double eps, double tolerance) {
+                       WindRule rule, double eps) {
   DEBUG_ASSERT(bSign == 1 || bSign == -1, logicErr,
                "Boolean2 input multiplicity must be +/-1");
   if (!AllFinite(a) || !AllFinite(b)) return {};
@@ -146,7 +146,6 @@ Polygons ApplyFillRule(const Polygons& a, const Polygons& b, int bSign,
   Polygons localA = TranslatePolygons(a, -origin);
   Polygons localB = TranslatePolygons(b, -origin);
   if (eps <= 0.0) eps = InferEps(localA, localB);
-  if (tolerance < eps) tolerance = eps;
 
   std::vector<vec2> verts;
   std::vector<EdgeM> edges;
@@ -154,8 +153,7 @@ Polygons ApplyFillRule(const Polygons& a, const Polygons& b, int bSign,
   AppendInput(localB, bSign, verts, edges);
   if (verts.empty()) return {};
 
-  OverlapResult r =
-      RemoveOverlaps2D(verts, edges, eps, tolerance, /*debug=*/false, rule);
+  OverlapResult r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
   return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), origin);
 }
 
@@ -237,7 +235,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
 // what construction and Offset use to resolve self-intersections - as opposed
 // to CrossSection::Simplify, which decimates at a user-designated tolerance.
 Polygons ApplyFillRule(const Polygons& polys, double eps) {
-  return ApplyFillRule(polys, {}, 1, WindRule::Add, eps, 0.0);
+  return ApplyFillRule(polys, {}, 1, WindRule::Add, eps);
 }
 
 // Infer eps from a polygon set's coordinate half-extent via Smith's
@@ -253,12 +251,12 @@ double InferEps(const Polygons& a, const Polygons& b) {
 }
 
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.
-Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op, double eps,
-                   double tolerance) {
+Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
+                   double eps) {
   const int bSign = op == OpType::Subtract ? -1 : 1;
   const WindRule rule =
       op == OpType::Intersect ? WindRule::Intersect : WindRule::Add;
-  return ApplyFillRule(a, b, bSign, rule, eps, tolerance);
+  return ApplyFillRule(a, b, bSign, rule, eps);
 }
 
 // ===== BVH =====
@@ -1030,19 +1028,20 @@ namespace {
 // Unlike MergeVerts, this pass only considers vertices with intersection
 // incidence: newly inserted intersection points and old vertices that an
 // intersection snapped onto. The close-pair threshold is intersection-specific,
-// and endpoint tolerance snaps are limited to truly-new vertices, so this does
-// not re-run broad old-vertex clustering across the input.
+// and endpoint snaps are limited to truly-new vertices, so this does not re-run
+// broad old-vertex clustering across the input.
 void MergeNearbyIntersectionVerts(
     std::vector<vec2>& verts, std::vector<EdgeM>& edges,
     std::vector<std::vector<int>>& lists,
     const std::vector<std::vector<int>>& vertEdges, int oldVertEnd, double eps,
-    double tolerance, std::vector<int>& inputVert2Merged) {
+    std::vector<int>& inputVert2Merged) {
   DisjointSets uf(static_cast<int>(verts.size()));
-  const double newToNewThresh = kIntersectionMergeEpsFactor * eps;
-  const double newToNewThresh2 = newToNewThresh * newToNewThresh;
-  // Fresh intersection vs old endpoint: prior drift plus current-op error.
-  const double newToOldThresh = tolerance + eps;
-  const double newToOldThresh2 = newToOldThresh * newToOldThresh;
+  // Merge intersection verts only at the eps snap scale; a wider band fuses
+  // distinct crossings of one edge into a non-manifold pinch.
+  const double newToNewThresh2 = eps * eps;
+  // Fresh intersection vs old endpoint: a 2*eps snap budget, the combined eps
+  // reach of an old endpoint and a generated crossing.
+  const double newToOldThresh2 = 4 * eps * eps;
   std::vector<std::pair<int, int>> pairs;
   std::vector<std::pair<double, int>> tlist;
   for (size_t e = 0; e < edges.size(); ++e) {
@@ -1055,7 +1054,7 @@ void MergeNearbyIntersectionVerts(
     const double abLen2 = dot(ab, ab);
     if (abLen2 == 0) continue;
     const double abLen = std::sqrt(abLen2);
-    const double tThresh = newToNewThresh / abLen;
+    const double tThresh = eps / abLen;
     tlist.clear();
     tlist.reserve(list.size());
     for (int v : list) {
@@ -1066,7 +1065,7 @@ void MergeNearbyIntersectionVerts(
       const double t = dot(p - a, ab) / abLen2;
       tlist.emplace_back(t, v);
       // Only truly-new verts: widening old-old would stack error across ops.
-      if (v >= oldVertEnd && newToOldThresh > 0.0) {
+      if (v >= oldVertEnd) {
         const vec2 dA = p - a;
         if (dot(dA, dA) <= newToOldThresh2) {
           const int p0 = std::min(v, v0);
@@ -1138,9 +1137,7 @@ void MergeNearbyIntersectionVerts(
 
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
-                               double tolerance, bool debug, WindRule pred,
-                               Trace* trace) {
-  if (tolerance < eps) tolerance = eps;
+                               bool debug, WindRule pred, Trace* trace) {
   auto& P = GlobalPhases();
   ScopedTiming totalTiming(P.totalNs);
   TraceRecorder traceRecorder(trace, eps, pred);
@@ -1213,8 +1210,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   {
     ScopedTiming timing(P.nearbyIxMergeNs);
     MergeNearbyIntersectionVerts(merge.verts, edges, lists, vertEdges,
-                                 numMerged, eps, tolerance,
-                                 merge.inputVert2Merged);
+                                 numMerged, eps, merge.inputVert2Merged);
   }
   traceRecorder.RecordNearbyIntersectionMerge(merge.verts, edges, lists);
   // Sub-edge canonicalization.
