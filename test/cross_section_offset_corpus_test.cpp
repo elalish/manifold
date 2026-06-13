@@ -53,19 +53,36 @@ TEST(CrossSectionOffsetCorpus, TriangulatesCleanly) {
   int nonEmpty = 0;
   for (const auto& entry : corpus) {
     const CrossSection cs(entry.polys);
+    const double inArea = cs.Area();
     const vec2 size = cs.Bounds().Size();
     const double diag = la::length(size);
     if (!std::isfinite(diag) || diag <= 0) continue;
     // Offset out and in, by fractions of the bbox diagonal, on every join type.
+    double outset[4], inset[4];
     for (const double frac : {0.05, -0.02}) {
-      for (const CrossSection::JoinType jt : joins) {
+      for (int j = 0; j < 4; ++j) {
         SCOPED_TRACE(entry.name + " frac=" + std::to_string(frac));
-        const CrossSection off = cs.Offset(frac * diag, jt);
+        const CrossSection off = cs.Offset(frac * diag, joins[j]);
         const Polygons result = off.ToPolygons();
         if (!result.empty()) ++nonEmpty;
         EXPECT_NO_THROW(Triangulate(result));
+        (frac > 0 ? outset : inset)[j] = off.Area();
       }
     }
+    if (inArea <= 0) continue;
+    // An outset never loses area and an inset never gains it; and across a
+    // given outset the join-type areas order Miter >= Square >= Round >= Bevel
+    // (verified over the whole corpus). joins[] is {Round, Miter, Square,
+    // Bevel}.
+    const double tol = 1e-6 * inArea;
+    SCOPED_TRACE(entry.name + " area ordering");
+    for (int j = 0; j < 4; ++j) {
+      EXPECT_GE(outset[j], inArea - tol) << "outset lost area";
+      EXPECT_LE(inset[j], inArea + tol) << "inset gained area";
+    }
+    EXPECT_GE(outset[1], outset[2] - tol);  // Miter >= Square
+    EXPECT_GE(outset[2], outset[0] - tol);  // Square >= Round
+    EXPECT_GE(outset[0], outset[3] - tol);  // Round >= Bevel
   }
   // Guard against a regression that silently empties every offset, which would
   // make the triangulation checks vacuous.

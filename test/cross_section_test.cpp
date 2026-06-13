@@ -213,8 +213,9 @@ TEST(CrossSection, MiterOffset) {
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(), 30. * 30., 0.01);
   // Offset keeps collinear verts on the miter edges; stripping them is
-  // Simplify's job, so check the simplified corner count (4)
-  // backend-agnostically.
+  // Simplify's job, so the raw offset has more than 4 verts and Simplify
+  // reduces it to the 4 corners (checked backend-agnostically).
+  EXPECT_GT(offset.NumVert(), 4);
   EXPECT_EQ(offset.Simplify().NumVert(), 4);
 }
 
@@ -274,9 +275,9 @@ TEST(CrossSection, FourConcurrentEdges) {
   EXPECT_NEAR(cs.Area(), 0.644423, 1e-4);
   for (const auto& loop : cs.ToPolygons()) {
     for (const vec2& v : loop) {
-      EXPECT_TRUE(std::isfinite(v.x));
-      EXPECT_TRUE(std::isfinite(v.y));
-      EXPECT_LE(la::length(v), 1.05);
+      // The rhombi sit on the unit circle (radius 1), so the union must too:
+      // a bound just above 1 is a no-blowup guard (and trips on NaN).
+      EXPECT_LE(la::length(v), 1.0 + 1e-6);
     }
   }
 }
@@ -302,9 +303,9 @@ TEST(CrossSection, ConcurrentIndependentEdgePairs) {
   EXPECT_NEAR(cs.Area(), 0.527482, 1e-4);
   for (const auto& loop : cs.ToPolygons()) {
     for (const vec2& v : loop) {
-      EXPECT_TRUE(std::isfinite(v.x));
-      EXPECT_TRUE(std::isfinite(v.y));
-      EXPECT_LE(la::length(v), 1.05);
+      // The rhombi sit on the unit circle (radius 1), so the union must too:
+      // a bound just above 1 is a no-blowup guard (and trips on NaN).
+      EXPECT_LE(la::length(v), 1.0 + 1e-6);
     }
   }
 }
