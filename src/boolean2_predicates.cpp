@@ -98,9 +98,7 @@ double SignedArea(const SimplePolygon& loop) {
   for (size_t i = 0; i < loop.size(); ++i) {
     const auto& a = loop[i];
     const auto& b = loop[(i + 1) % loop.size()];
-    const double ax = a.x - r.x, ay = a.y - r.y;
-    const double bx = b.x - r.x, by = b.y - r.y;
-    sum += ax * by - bx * ay;
+    sum += la::cross(a - r, b - r);
   }
   return 0.5 * sum;
 }

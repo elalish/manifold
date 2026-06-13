@@ -36,7 +36,7 @@ namespace {
 bool AllFinite(const Polygons& polys) {
   for (const auto& loop : polys) {
     for (const vec2& v : loop) {
-      if (!std::isfinite(v.x) || !std::isfinite(v.y)) return false;
+      if (!la::all(la::isfinite(v))) return false;
     }
   }
   return true;
@@ -382,7 +382,7 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
         // overlap on [v[i] - eps, v[i] + eps] intersect [v[j] - eps, v[j] +
         // eps].
         const vec2 d = in[i] - in[j];
-        if (std::fabs(d.x) <= 2 * eps && std::fabs(d.y) <= 2 * eps)
+        if (la::all(la::lequal(la::abs(d), vec2(2 * eps))))
           pairs.emplace_back(i, j);
       }
     }
@@ -589,9 +589,9 @@ void RecordEdgeVertHit(const std::vector<EdgeM>& edges,
   const auto& g = edgeG[e];
   if (g.abLen2 == 0) return;
   const vec2 ap = verts[v] - g.a;
-  const double dotAB = ap.x * g.ab.x + ap.y * g.ab.y;
+  const double dotAB = dot(ap, g.ab);
   if (dotAB <= 0 || dotAB >= g.abLen2) return;
-  const double cross = ap.x * g.ab.y - ap.y * g.ab.x;
+  const double cross = la::cross(ap, g.ab);
   const double cross2 = cross * cross;
   const double eps2_abLen2 = eps2 * g.abLen2;
   if (cross2 > eps2_abLen2) return;
@@ -780,14 +780,12 @@ bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
   const vec2& pS = verts[vS];
   const vec2& pA = verts[wA];
   const vec2& pB = verts[wB];
-  const double dAx = pA.x - pS.x;
-  const double dAy = pA.y - pS.y;
-  const double dBx = pB.x - pS.x;
-  const double dBy = pB.y - pS.y;
-  const double cross = dAx * dBy - dAy * dBx;
+  const vec2 dA = pA - pS;
+  const vec2 dB = pB - pS;
+  const double cross = la::cross(dA, dB);
   const double cross2 = cross * cross;
-  const double lenA2 = dAx * dAx + dAy * dAy;
-  const double lenB2 = dBx * dBx + dBy * dBy;
+  const double lenA2 = dot(dA, dA);
+  const double lenB2 = dot(dB, dB);
   const double eps2 = eps * eps;
   // Drop iff w_A is > eps from line B AND w_B is > eps from line A.
   // The check is symmetric in the |cross| numerator, so we only have
