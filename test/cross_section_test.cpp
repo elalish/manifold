@@ -399,6 +399,96 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
       {0.9901767613117145, 0.60823663500743508});
 }
 
+// DISABLED: known winding-robustness failures, not yet fixed. A tiny feature
+// that point-touches a large host ~1e-9 from one of the host's vertices (the
+// two pieces are genuinely disjoint, so the correct union is host + feature)
+// drops one of the two pieces. Which piece drops, and whether, depends on
+// sub-eps details (the intersection-merge emission and the absolute coordinate
+// offset), so the arrangement's winding face-walk is unstable far below eps.
+// These are the fuzzer seeds for that bug; enable them when the winding fix
+// lands.
+
+// Host-drop: the host's zero-radius star vertex makes it a thin spike that
+// collapses. Built from raw radii (StarRing's 0.1 floor would remove the
+// spike).
+TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
+  const std::vector<double> hostRadii = {
+      0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
+  SimplePolygon host;
+  for (int k = 0; k < 5; ++k) {
+    const double theta = 2.0 * kPi * k / 5;
+    host.push_back(
+        {hostRadii[k] * std::cos(theta), hostRadii[k] * std::sin(theta)});
+  }
+  const std::vector<double> featRadii = {
+      999.86970256972995, 1., 1., 823.03853274897119, 253.38906741827319};
+  SimplePolygon feature;
+  for (int k = 0; k < 5; ++k) {
+    const double theta = 2.0 * kPi * k / 5;
+    feature.push_back({1e-3 * featRadii[k] * std::cos(theta),
+                       1e-3 * featRadii[k] * std::sin(theta)});
+  }
+  const double dirX = 0.41098114346248393, dirY = -0.227966841143317;
+  const double dlen = std::sqrt(dirX * dirX + dirY * dirY);
+  const vec2 anchor{host[1].x + 1e-9 * dirX / dlen,
+                    host[1].y + 1e-9 * dirY / dlen};
+  const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
+  for (auto& v : feature) {
+    v.x += shift.x;
+    v.y += shift.y;
+  }
+  for (auto& v : host) {
+    v.x += 4096.0;
+    v.y += 4096.0;
+  }
+  for (auto& v : feature) {
+    v.x += 4096.0;
+    v.y += 4096.0;
+  }
+  const CrossSection ca(host), cb(feature);
+  const auto sum =
+      ca.Area() + cb.Area() - ca.Boolean(cb, OpType::Intersect).Area();
+  EXPECT_NEAR((ca + cb).Area(), sum, 1e-3 * (1.0 + ca.Area() + cb.Area()));
+}
+
+// Host-drop only at large offset (passes at the origin): the StarRing host plus
+// an 8-vertex feature anchored 1e-9 from host[1].
+TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
+  SimplePolygon host = StarRing({0., 1., 0., 181.7694024845519});
+  SimplePolygon feature =
+      StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
+                0.84629435037780809, 593.99733078452005, 738.68366086294714});
+  for (auto& v : feature) {
+    v.x *= 1e-3;
+    v.y *= 1e-3;
+  }
+  const double dirX = 0.20051392197659679, dirY = -0.51476208035366366;
+  const double dlen = std::sqrt(dirX * dirX + dirY * dirY);
+  const vec2 anchor{host[1].x + 1e-9 * dirX / dlen,
+                    host[1].y + 1e-9 * dirY / dlen};
+  const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
+  for (auto& v : feature) {
+    v.x += shift.x;
+    v.y += shift.y;
+  }
+  for (double offset : {0.0, 1024.0, 4096.0}) {
+    SimplePolygon sh = host, sf = feature;
+    for (auto& v : sh) {
+      v.x += offset;
+      v.y += offset;
+    }
+    for (auto& v : sf) {
+      v.x += offset;
+      v.y += offset;
+    }
+    const CrossSection ca(sh), cb(sf);
+    const auto sum =
+        ca.Area() + cb.Area() - ca.Boolean(cb, OpType::Intersect).Area();
+    EXPECT_NEAR((ca + cb).Area(), sum, 1e-3 * (1.0 + ca.Area() + cb.Area()))
+        << "offset=" << offset;
+  }
+}
+
 // Regression test for the BR-cell hole pattern from Samples.Sponge4. Two
 // CCW polygons that share an endpoint AND form a T-junction at the
 // non-shared endpoint of one edge. Before the broad-phase / fused-pass
