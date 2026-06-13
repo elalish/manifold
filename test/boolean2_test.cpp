@@ -87,7 +87,7 @@ bool PointsCollinearWithinEps(vec2 a, vec2 b, vec2 p, double eps) {
   const vec2 d = b - a;
   const double len2 = dot(d, d);
   if (len2 == 0.0) return false;
-  return std::fabs(la::cross(d, p - a)) <= eps * std::sqrt(len2);
+  return std::fabs(la::cross(d, p - a)) <= eps * la::length(d);
 }
 
 bool SegmentsHavePositiveCollinearOverlap(vec2 a0, vec2 a1, vec2 b0, vec2 b1,
@@ -96,7 +96,8 @@ bool SegmentsHavePositiveCollinearOverlap(vec2 a0, vec2 a1, vec2 b0, vec2 b1,
       !PointsCollinearWithinEps(a0, a1, b1, eps)) {
     return false;
   }
-  const int axis = std::fabs(a1.x - a0.x) >= std::fabs(a1.y - a0.y) ? 0 : 1;
+  const vec2 spread = la::abs(a1 - a0);
+  const int axis = spread.x >= spread.y ? 0 : 1;
   const double aMin = std::min(Coord(a0, axis), Coord(a1, axis));
   const double aMax = std::max(Coord(a0, axis), Coord(a1, axis));
   const double bMin = std::min(Coord(b0, axis), Coord(b1, axis));
@@ -106,7 +107,7 @@ bool SegmentsHavePositiveCollinearOverlap(vec2 a0, vec2 a1, vec2 b0, vec2 b1,
 
 int StrictSide(vec2 a, vec2 b, vec2 p, double eps) {
   const vec2 d = b - a;
-  const double threshold = eps * std::sqrt(dot(d, d));
+  const double threshold = eps * la::length(d);
   const double area = la::cross(d, p - a);
   return (area > threshold) - (area < -threshold);
 }
@@ -126,7 +127,7 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
   if (len2 == 0.0) return false;
   const double along = dot(p - a, d);
   if (along <= 0.0 || along >= len2) return false;
-  return std::fabs(la::cross(d, p - a)) <= eps * std::sqrt(len2);
+  return std::fabs(la::cross(d, p - a)) <= eps * la::length(d);
 }
 
 // Independent oracle for the arrangement RemoveOverlaps2D retains - its
@@ -142,8 +143,7 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
   };
 
   for (int v = 0; v < static_cast<int>(result.verts.size()); ++v) {
-    if (!std::isfinite(result.verts[v].x) ||
-        !std::isfinite(result.verts[v].y)) {
+    if (!la::all(la::isfinite(result.verts[v]))) {
       std::ostringstream out;
       out << "non-finite retained vertex " << v << " = (" << result.verts[v].x
           << ", " << result.verts[v].y << ")";
@@ -590,8 +590,7 @@ TEST(Boolean2, OffsetExtremeFiniteEdgesStayFinite) {
   ASSERT_FALSE(out.empty());
   for (const SimplePolygon& ring : out) {
     for (const vec2& v : ring) {
-      EXPECT_TRUE(std::isfinite(v.x));
-      EXPECT_TRUE(std::isfinite(v.y));
+      EXPECT_TRUE(la::all(la::isfinite(v)));
     }
   }
 }
@@ -673,7 +672,7 @@ TEST(Boolean2, OffsetLargeMiterLimitStaysBounded) {
   double maxCoord = 0;
   for (const SimplePolygon& ring : out)
     for (const vec2& v : ring)
-      maxCoord = std::max(maxCoord, std::max(std::fabs(v.x), std::fabs(v.y)));
+      maxCoord = std::max(maxCoord, la::maxelem(la::abs(v)));
   // Apex sits at y=1e6; a capped corner stays near that scale. The unclamped
   // miter escapes to ~6e7.
   EXPECT_LT(maxCoord, 1.0e7) << "miter escaped to " << maxCoord;

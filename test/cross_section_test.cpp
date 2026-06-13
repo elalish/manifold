@@ -95,29 +95,25 @@ void ExpectTinyFeatureSurvivesNearCorner(
   SimplePolygon host = StarRing(hostRadii);
   SimplePolygon feature = StarRing(featureRadii);
   for (auto& v : feature) {  // shrink to a tiny feature
-    v.x *= 1e-3;
-    v.y *= 1e-3;
+    v *= 1e-3;
   }
   // Anchor the feature 1e-12 from host vertex 0 along the seed's direction.
-  const double dlen = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+  const double dlen = la::length(dir);
   const vec2 anchor{host[0].x + 1e-12 * dir.x / dlen,
                     host[0].y + 1e-12 * dir.y / dlen};
   const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
   for (auto& v : feature) {
-    v.x += shift.x;
-    v.y += shift.y;
+    v += shift;
   }
 
   for (double offset : {0.0, 1024.0, 4096.0}) {
     SimplePolygon shiftedHost = host;
     SimplePolygon shiftedFeature = feature;
     for (auto& v : shiftedHost) {
-      v.x += offset;
-      v.y += offset;
+      v += vec2(offset);
     }
     for (auto& v : shiftedFeature) {
-      v.x += offset;
-      v.y += offset;
+      v += vec2(offset);
     }
     const CrossSection a(shiftedHost);
     const CrossSection b(shiftedFeature);
@@ -317,10 +313,9 @@ TEST(CrossSection, TranslatedShallowConcurrentEdges) {
     const double sinA = std::sin(angle);
     constexpr double radius = 1.0;
     constexpr double width = 0.08;
-    return SimplePolygon{{offset.x + radius * cosA, offset.y + radius * sinA},
-                         {offset.x - width * sinA, offset.y + width * cosA},
-                         {offset.x - radius * cosA, offset.y - radius * sinA},
-                         {offset.x + width * sinA, offset.y - width * cosA}};
+    return SimplePolygon{
+        offset + radius * vec2(cosA, sinA), offset + width * vec2(-sinA, cosA),
+        offset - radius * vec2(cosA, sinA), offset + width * vec2(sinA, -cosA)};
   };
 
   auto polysAt = [&](vec2 offset) {
@@ -409,16 +404,13 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
                     host[1].y + 1e-9 * dirY / dlen};
   const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
   for (auto& v : feature) {
-    v.x += shift.x;
-    v.y += shift.y;
+    v += shift;
   }
   for (auto& v : host) {
-    v.x += 4096.0;
-    v.y += 4096.0;
+    v += vec2(4096.0);
   }
   for (auto& v : feature) {
-    v.x += 4096.0;
-    v.y += 4096.0;
+    v += vec2(4096.0);
   }
   const CrossSection ca(host), cb(feature);
   const auto sum =
@@ -434,8 +426,7 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
                 0.84629435037780809, 593.99733078452005, 738.68366086294714});
   for (auto& v : feature) {
-    v.x *= 1e-3;
-    v.y *= 1e-3;
+    v *= 1e-3;
   }
   const double dirX = 0.20051392197659679, dirY = -0.51476208035366366;
   const double dlen = std::sqrt(dirX * dirX + dirY * dirY);
@@ -443,18 +434,15 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
                     host[1].y + 1e-9 * dirY / dlen};
   const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
   for (auto& v : feature) {
-    v.x += shift.x;
-    v.y += shift.y;
+    v += shift;
   }
   for (double offset : {0.0, 1024.0, 4096.0}) {
     SimplePolygon sh = host, sf = feature;
     for (auto& v : sh) {
-      v.x += offset;
-      v.y += offset;
+      v += vec2(offset);
     }
     for (auto& v : sf) {
-      v.x += offset;
-      v.y += offset;
+      v += vec2(offset);
     }
     const CrossSection ca(sh), cb(sf);
     const auto sum =
@@ -1961,10 +1949,7 @@ TEST(CrossSection, Transform) {
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](vec2& v) {
-    v.x = v.x * 2 + 4;
-    v.y = v.y * 3 + 5;
-  });
+  auto b = sq.Warp([](vec2& v) { v = v * vec2(2, 3) + vec2(4, 5); });
 
   EXPECT_EQ(sq.NumVert(), 4);
   EXPECT_EQ(sq.NumContour(), 1);
@@ -2080,8 +2065,7 @@ TEST(CrossSection, OffsetRoundNonFiniteAndHugeDelta) {
   EXPECT_GT(huge.NumVert(), 0u);
   for (const SimplePolygon& ring : huge.ToPolygons())
     for (const vec2& v : ring) {
-      EXPECT_TRUE(std::isfinite(v.x));
-      EXPECT_TRUE(std::isfinite(v.y));
+      EXPECT_TRUE(la::all(la::isfinite(v)));
     }
 }
 
