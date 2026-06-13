@@ -68,32 +68,6 @@ double AreaTol(const CrossSection& a, const CrossSection& b,
                  std::fabs(c.Area()));
 }
 
-void ExpectBooleanInvariants(const CrossSection& a, const CrossSection& b) {
-  const auto aIb = a.Boolean(b, OpType::Intersect);
-  const double tol = AreaTol(a, b);
-  EXPECT_NEAR((a - b).Area() + aIb.Area(), a.Area(), tol)
-      << "area(A - B) + area(A ∩ B) != area(A)";
-  EXPECT_NEAR((b - a).Area() + aIb.Area(), b.Area(), tol)
-      << "area(B - A) + area(A ∩ B) != area(B)";
-  EXPECT_NEAR((a + b).Area(), a.Area() + b.Area() - aIb.Area(), tol)
-      << "inclusion-exclusion violated";
-}
-
-void ExpectDistributesOverUnion(const CrossSection& a, const CrossSection& b,
-                                const CrossSection& c) {
-  const auto bUc = b + c;
-  const auto left = a.Boolean(bUc, OpType::Intersect);
-  const auto right =
-      a.Boolean(b, OpType::Intersect) + a.Boolean(c, OpType::Intersect);
-  const double tol = AreaTol(a, b, c);
-  EXPECT_NEAR(left.Area(), right.Area(), tol)
-      << "A ∩ (B ∪ C) != (A ∩ B) ∪ (A ∩ C)";
-  EXPECT_NEAR((left - right).Area(), 0.0, tol)
-      << "distributivity: left-right difference is non-empty";
-  EXPECT_NEAR((right - left).Area(), 0.0, tol)
-      << "distributivity: right-left difference is non-empty";
-}
-
 // Shared builder for the consolidated star-seed regression tables below
 // (BooleanDistributivity/SubtractInvariants/BooleanCommutativity/
 // BooleanAssociativity *Seeds). Each fuzz seed is a StarRing optionally
@@ -783,7 +757,14 @@ TEST(CrossSection, SubtractInvariantsSeeds) {
       EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
           << "inclusion-exclusion violated";
     } else {
-      ExpectBooleanInvariants(a, b);
+      const auto aIb = a.Boolean(b, OpType::Intersect);
+      const double tol = AreaTol(a, b);
+      EXPECT_NEAR((a - b).Area() + aIb.Area(), a.Area(), tol)
+          << "area(A - B) + area(A ∩ B) != area(A)";
+      EXPECT_NEAR((b - a).Area() + aIb.Area(), b.Area(), tol)
+          << "area(B - A) + area(A ∩ B) != area(B)";
+      EXPECT_NEAR((a + b).Area(), a.Area() + b.Area() - aIb.Area(), tol)
+          << "inclusion-exclusion violated";
     }
   }
 }
@@ -1584,7 +1565,17 @@ TEST(CrossSection, BooleanDistributivitySeeds) {
           AreaTol(a, b, cc))
           << "A ∩ (B ∪ C) != (A ∩ B) ∪ (A ∩ C)";
     } else {
-      ExpectDistributesOverUnion(a, b, cc);
+      const auto bUc = b + cc;
+      const auto left = a.Boolean(bUc, OpType::Intersect);
+      const auto right =
+          a.Boolean(b, OpType::Intersect) + a.Boolean(cc, OpType::Intersect);
+      const double tol = AreaTol(a, b, cc);
+      EXPECT_NEAR(left.Area(), right.Area(), tol)
+          << "A ∩ (B ∪ C) != (A ∩ B) ∪ (A ∩ C)";
+      EXPECT_NEAR((left - right).Area(), 0.0, tol)
+          << "distributivity: left-right difference is non-empty";
+      EXPECT_NEAR((right - left).Area(), 0.0, tol)
+          << "distributivity: right-left difference is non-empty";
     }
     if (c.kind == DistribKind::Monotonicity) {
       const double tol = AreaTol(a, b, cc);

@@ -14,14 +14,12 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "manifold/polygon.h"
+#include "polygon_corpus.h"
 
 // Offset the polygon triangulation corpus across every join type and verify
 // each result triangulates cleanly (a valid, non-overlapping fill). Triangulate
@@ -31,32 +29,6 @@
 
 namespace {
 using namespace manifold;
-
-// Read the polygon corpus (name, expectedNumTri, epsilon, numPolys, then the
-// polygons), keeping just the name and the polygon set.
-std::vector<std::pair<std::string, Polygons>> ReadCorpus(
-    const std::string& path) {
-  std::vector<std::pair<std::string, Polygons>> corpus;
-  std::ifstream f(path);
-  if (!f.is_open()) return corpus;
-  std::string name;
-  double epsilon, x, y;
-  int expectedNumTri, numPolys, numPoints;
-  while (f >> name) {
-    f >> expectedNumTri >> epsilon >> numPolys;
-    Polygons polys;
-    for (int i = 0; i < numPolys; ++i) {
-      polys.emplace_back();
-      f >> numPoints;
-      for (int j = 0; j < numPoints; ++j) {
-        f >> x >> y;
-        polys.back().emplace_back(x, y);
-      }
-    }
-    corpus.emplace_back(name, std::move(polys));
-  }
-  return corpus;
-}
 
 std::string CorpusPath() {
 #ifdef __EMSCRIPTEN__
@@ -73,21 +45,21 @@ std::string CorpusPath() {
 }  // namespace
 
 TEST(CrossSectionOffsetCorpus, TriangulatesCleanly) {
-  const auto corpus = ReadCorpus(CorpusPath());
+  const auto corpus = ReadPolygonCorpus(CorpusPath());
   ASSERT_FALSE(corpus.empty());
   const CrossSection::JoinType joins[] = {
       CrossSection::JoinType::Round, CrossSection::JoinType::Miter,
       CrossSection::JoinType::Square, CrossSection::JoinType::Bevel};
   int nonEmpty = 0;
   for (const auto& entry : corpus) {
-    const CrossSection cs(entry.second);
+    const CrossSection cs(entry.polys);
     const vec2 size = cs.Bounds().Size();
-    const double diag = std::sqrt(size.x * size.x + size.y * size.y);
+    const double diag = la::length(size);
     if (!std::isfinite(diag) || diag <= 0) continue;
     // Offset out and in, by fractions of the bbox diagonal, on every join type.
     for (const double frac : {0.05, -0.02}) {
       for (const CrossSection::JoinType jt : joins) {
-        SCOPED_TRACE(entry.first + " frac=" + std::to_string(frac));
+        SCOPED_TRACE(entry.name + " frac=" + std::to_string(frac));
         const CrossSection off = cs.Offset(frac * diag, jt);
         const Polygons result = off.ToPolygons();
         if (!result.empty()) ++nonEmpty;
