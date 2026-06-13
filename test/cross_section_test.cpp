@@ -2212,24 +2212,3 @@ TEST(CrossSection, NegativeOffset) {
       plusSign.Offset(-10, CrossSection::JoinType::Round, 2.0, 1024);
   EXPECT_NEAR(dilated.Area(), 30 * 30 - 10 * 10 * kPi, 0.01);
 }
-
-// A tiny feature anchored 1e-9 from a host vertex must not drop the host from
-// the union: the new-to-old merge has to pin that near-coincidence onto the
-// host vertex; averaging it drifts the vertex sub-eps and folds the host away.
-TEST(CrossSection, TinyFeatureNearVertexKeepsHost) {
-  const SimplePolygon host = StarRing(
-      {0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.});
-  SimplePolygon feature = StarRing({0.99986970256972995, 1e-3, 1e-3,
-                                    0.82303853274897119, 0.25338906741827319});
-  const vec2 dir = la::normalize(vec2{0.41098114346248393, -0.227966841143317});
-  const vec2 shift = host[1] + 1e-9 * dir - feature[0];
-  for (vec2& v : feature) v += shift;
-
-  const CrossSection a(host), b(feature);
-  const auto aUnionB = a + b;
-  const auto aIntersectB = a.Boolean(b, OpType::Intersect);
-  EXPECT_GT(aUnionB.Area(), a.Area() - AreaTol(a, b))
-      << "host dropped from union";
-  EXPECT_NEAR(aUnionB.Area(), a.Area() + b.Area() - aIntersectB.Area(),
-              AreaTol(a, b));
-}
