@@ -68,6 +68,13 @@ double AreaTol(const CrossSection& a, const CrossSection& b,
                  std::fabs(c.Area()));
 }
 
+void ExpectUnionRetainsArea(const CrossSection& result, double floorArea,
+                            double tol, const char* context) {
+  if (floorArea <= tol) return;
+  EXPECT_GE(result.Area(), floorArea - tol)
+      << context << " collapsed below a non-empty input area";
+}
+
 // Shared builder for the consolidated star-seed regression tables below
 // (BooleanDistributivity/SubtractInvariants/BooleanCommutativity/
 // BooleanAssociativity *Seeds). Each fuzz seed is a StarRing optionally
@@ -123,6 +130,12 @@ void ExpectTinyFeatureSurvivesNearCorner(
     const auto aIb = a.Boolean(b, OpType::Intersect);
     const CrossSection soup(Polygons{shiftedHost, shiftedFeature});
     const double scale = 1.0 + std::fabs(a.Area()) + std::fabs(b.Area());
+    const double rawHostArea = RawArea(shiftedHost);
+    const double rawFeatureArea = RawArea(shiftedFeature);
+    ExpectUnionRetainsArea(aUb, rawHostArea, 1e-3 * (1.0 + rawHostArea),
+                           "host input");
+    ExpectUnionRetainsArea(aUb, rawFeatureArea, 1e-3 * (1.0 + rawFeatureArea),
+                           "feature input");
     EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), 1e-3 * scale)
         << "inclusion-exclusion violated at offset " << offset;
     EXPECT_NEAR(soup.Area(), aUb.Area(), 1e-5 * scale)
@@ -369,91 +382,114 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
       {0.9901767613117145, 0.60823663500743508});
 }
 
-// DISABLED: known winding-robustness failures, not yet fixed. A tiny feature
-// that point-touches a large host ~1e-9 from one of the host's vertices (the
-// two pieces are genuinely disjoint, so the correct union is host + feature)
-// drops one of the two pieces. Which piece drops, and whether, depends on
-// sub-eps details (the intersection-merge emission and the absolute coordinate
-// offset), so the arrangement's winding face-walk is unstable far below eps.
-// These are the fuzzer seeds for that bug; enable them when the winding fix
-// lands.
+// DISABLED: known winding-robustness failures, not yet fixed. A tiny piece that
+// point-touches a big piece ~1e-9 from one of the big piece's vertices (the two
+// pieces are genuinely disjoint, so the correct union is the big plus the tiny
+// piece) drops one of the two pieces. Which piece drops, and whether, depends
+// on sub-eps details (the intersection-merge emission and the absolute
+// coordinate offset), so the arrangement's winding face-walk is unstable far
+// below eps. These are the fuzzer seeds for that bug; enable them when the
+// winding fix lands.
 
-// Host-drop: the host's zero-radius star vertex makes it a thin spike that
-// collapses. Built from raw radii (StarRing's 0.1 floor would remove the
+// Big-piece drop: the big piece's zero-radius star vertex makes it a thin spike
+// that collapses. Built from raw radii (StarRing's 0.1 floor would remove the
 // spike).
 TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
-  const std::vector<double> hostRadii = {
+  const std::vector<double> bigRadii = {
       0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
-  SimplePolygon host;
+  SimplePolygon big;
   for (int k = 0; k < 5; ++k) {
     const double theta = 2.0 * kPi * k / 5;
-    host.push_back(
-        {hostRadii[k] * std::cos(theta), hostRadii[k] * std::sin(theta)});
+    big.push_back(
+        {bigRadii[k] * std::cos(theta), bigRadii[k] * std::sin(theta)});
   }
-  const std::vector<double> featRadii = {
+  const std::vector<double> tinyRadii = {
       999.86970256972995, 1., 1., 823.03853274897119, 253.38906741827319};
-  SimplePolygon feature;
+  SimplePolygon tiny;
   for (int k = 0; k < 5; ++k) {
     const double theta = 2.0 * kPi * k / 5;
-    feature.push_back({1e-3 * featRadii[k] * std::cos(theta),
-                       1e-3 * featRadii[k] * std::sin(theta)});
+    tiny.push_back({1e-3 * tinyRadii[k] * std::cos(theta),
+                    1e-3 * tinyRadii[k] * std::sin(theta)});
   }
   const double dirX = 0.41098114346248393, dirY = -0.227966841143317;
   const double dlen = std::sqrt(dirX * dirX + dirY * dirY);
-  const vec2 anchor{host[1].x + 1e-9 * dirX / dlen,
-                    host[1].y + 1e-9 * dirY / dlen};
-  const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
-  for (auto& v : feature) {
+  const vec2 anchor{big[1].x + 1e-9 * dirX / dlen,
+                    big[1].y + 1e-9 * dirY / dlen};
+  const vec2 shift{anchor.x - tiny[0].x, anchor.y - tiny[0].y};
+  for (auto& v : tiny) {
     v += shift;
   }
-  for (auto& v : host) {
+  for (auto& v : big) {
     v += vec2(4096.0);
   }
-  for (auto& v : feature) {
+  for (auto& v : tiny) {
     v += vec2(4096.0);
   }
-  const CrossSection ca(host), cb(feature);
-  // The feature only point-touches the host (~1e-9 from a vertex), so they are
-  // disjoint: the intersection is empty and the union is the whole host +
-  // feature. The bound is a loose area-relative one (not eps-derived); the bug
-  // drops a whole big piece (the ~30107-area host), well past any such bound.
+  const CrossSection ca(big), cb(tiny);
+  const auto aUb = ca + cb;
+  const double rawBigArea = RawArea(big);
+  const double rawTinyArea = RawArea(tiny);
+  ASSERT_GT(rawBigArea, 0.0);
+  ASSERT_GT(rawTinyArea, 0.0);
+  ExpectUnionRetainsArea(aUb, rawBigArea, 1e-3 * (1.0 + rawBigArea),
+                         "big piece");
+  EXPECT_NEAR(aUb.Area(), rawBigArea + rawTinyArea,
+              1e-3 * (1.0 + rawBigArea + rawTinyArea))
+      << "union does not match independent raw big+tiny area";
+  // The tiny piece only point-touches the big piece (~1e-9 from a vertex), so
+  // they are disjoint: the intersection is empty and the union is the whole
+  // big + tiny piece. The bound is a loose area-relative one (not eps-derived);
+  // the bug drops the whole big piece (the ~30107-area one), well past any such
+  // bound.
   const auto inter = ca.Boolean(cb, OpType::Intersect);
   const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
-  EXPECT_NEAR(inter.Area(), 0.0, tol) << "feature only point-touches the host";
-  EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area() - inter.Area(), tol);
+  EXPECT_NEAR(inter.Area(), 0.0, tol)
+      << "tiny piece only point-touches the big piece";
+  EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
-// Host-drop only at large offset (passes at the origin): the StarRing host plus
-// an 8-vertex feature anchored 1e-9 from host[1].
+// Big-piece drop only at large offset (passes at the origin): the StarRing big
+// piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
 TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
-  SimplePolygon host = StarRing({0., 1., 0., 181.7694024845519});
-  SimplePolygon feature =
+  SimplePolygon big = StarRing({0., 1., 0., 181.7694024845519});
+  SimplePolygon tiny =
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
                 0.84629435037780809, 593.99733078452005, 738.68366086294714});
-  for (auto& v : feature) {
+  for (auto& v : tiny) {
     v *= 1e-3;
   }
   const double dirX = 0.20051392197659679, dirY = -0.51476208035366366;
   const double dlen = std::sqrt(dirX * dirX + dirY * dirY);
-  const vec2 anchor{host[1].x + 1e-9 * dirX / dlen,
-                    host[1].y + 1e-9 * dirY / dlen};
-  const vec2 shift{anchor.x - feature[0].x, anchor.y - feature[0].y};
-  for (auto& v : feature) {
+  const vec2 anchor{big[1].x + 1e-9 * dirX / dlen,
+                    big[1].y + 1e-9 * dirY / dlen};
+  const vec2 shift{anchor.x - tiny[0].x, anchor.y - tiny[0].y};
+  for (auto& v : tiny) {
     v += shift;
   }
   for (double offset : {0.0, 1024.0, 4096.0}) {
-    SimplePolygon sh = host, sf = feature;
-    for (auto& v : sh) {
+    SimplePolygon sBig = big, sTiny = tiny;
+    for (auto& v : sBig) {
       v += vec2(offset);
     }
-    for (auto& v : sf) {
+    for (auto& v : sTiny) {
       v += vec2(offset);
     }
-    const CrossSection ca(sh), cb(sf);
+    const CrossSection ca(sBig), cb(sTiny);
+    const auto aUb = ca + cb;
+    const double rawBigArea = RawArea(sBig);
+    const double rawTinyArea = RawArea(sTiny);
+    ASSERT_GT(rawBigArea, 0.0);
+    ASSERT_GT(rawTinyArea, 0.0);
+    ExpectUnionRetainsArea(aUb, rawBigArea, 1e-3 * (1.0 + rawBigArea),
+                           "big piece");
+    EXPECT_NEAR(aUb.Area(), rawBigArea + rawTinyArea,
+                1e-3 * (1.0 + rawBigArea + rawTinyArea))
+        << "union does not match independent raw big+tiny area at offset="
+        << offset;
     const auto inter = ca.Boolean(cb, OpType::Intersect);
     const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
     EXPECT_NEAR(inter.Area(), 0.0, tol) << "offset=" << offset;
-    EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area() - inter.Area(), tol)
+    EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol)
         << "offset=" << offset;
   }
 }
@@ -614,8 +650,7 @@ TEST(CrossSection, OffsetPositiveOnExtremeRadiusStar) {
 // Consolidated SubtractInvariants* fuzz-seed regressions, one row per seed.
 // Each row carries that seed's radii + translate verbatim; SubtractKind
 // selects which assertions the original standalone test made:
-//   Invariants         - ExpectBooleanInvariants (both subtract identities
-//                        plus inclusion-exclusion)
+//   Invariants         - both subtract identities plus inclusion-exclusion
 //   InclusionExclusion - only the inclusion-exclusion identity
 // SubtractInvariantsEmptyIntersectionDrop stays standalone (below): it is
 // boolean2-gated and asserts only a single subtract identity.
@@ -751,15 +786,19 @@ TEST(CrossSection, SubtractInvariantsSeeds) {
       const double tol = AreaTol(a, b);
       EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
           << "inclusion-exclusion violated";
+      ExpectUnionRetainsArea(aUb, std::max(a.Area(), b.Area()), tol,
+                             "subtract seed union");
     } else {
       const auto aIb = a.Boolean(b, OpType::Intersect);
+      const auto aUb = a + b;
       const double tol = AreaTol(a, b);
       EXPECT_NEAR((a - b).Area() + aIb.Area(), a.Area(), tol)
-          << "area(A - B) + area(A ∩ B) != area(A)";
+          << "area(A - B) + area(A intersection B) != area(A)";
       EXPECT_NEAR((b - a).Area() + aIb.Area(), b.Area(), tol)
-          << "area(B - A) + area(A ∩ B) != area(B)";
-      EXPECT_NEAR((a + b).Area(), a.Area() + b.Area() - aIb.Area(), tol)
+          << "area(B - A) + area(A intersection B) != area(B)";
+      EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
           << "inclusion-exclusion violated";
+      ExpectUnionRetainsArea(aUb, std::max(a.Area(), b.Area()), tol, "union");
     }
   }
 }
@@ -899,6 +938,8 @@ TEST(CrossSection, BooleanCommutativitySeeds) {
     const double tol = AreaTol(a, b);
     EXPECT_NEAR(aPlusB.Area(), bPlusA.Area(), tol) << "A + B != B + A";
     EXPECT_EQ(aPlusB.NumContour(), bPlusA.NumContour());
+    ExpectUnionRetainsArea(aPlusB, std::max(a.Area(), b.Area()), tol, "A+B");
+    ExpectUnionRetainsArea(bPlusA, std::max(a.Area(), b.Area()), tol, "B+A");
     if (c.checkIntersect) {
       const auto aIntB = a.Boolean(b, OpType::Intersect);
       const auto bIntA = b.Boolean(a, OpType::Intersect);
@@ -1012,6 +1053,10 @@ TEST(CrossSection, BooleanAssociativitySeeds) {
     const auto a_bc = a + (b + cc);
     const double tol = AreaTol(a, b, cc);
     EXPECT_NEAR(ab_c.Area(), a_bc.Area(), tol) << "(A ∪ B) ∪ C != A ∪ (B ∪ C)";
+    ExpectUnionRetainsArea(ab_c, std::max({a.Area(), b.Area(), cc.Area()}), tol,
+                           "(A+B)+C");
+    ExpectUnionRetainsArea(a_bc, std::max({a.Area(), b.Area(), cc.Area()}), tol,
+                           "A+(B+C)");
   }
 }
 
@@ -1019,8 +1064,8 @@ TEST(CrossSection, BooleanAssociativitySeeds) {
 // seed. Each row carries that seed's radii and translate inputs verbatim;
 // DistribKind selects which assertions the original standalone test made:
 //   AreaOnly     - only the area-equality check
-//   Standard     - ExpectDistributesOverUnion (area-equality plus both
-//                  one-directional area-difference checks)
+//   Standard     - area-equality plus both one-directional area-difference
+//                  checks
 //   Monotonicity - the Standard checks plus the two containment checks
 //                  (A intersect B and A intersect C each inside the union)
 // Kept as a single TEST in the CrossSection suite so the CrossSection.*
@@ -1553,11 +1598,15 @@ TEST(CrossSection, BooleanDistributivitySeeds) {
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b),
                        cc = MakeShape(c.c);
     if (c.kind == DistribKind::AreaOnly) {
+      const auto bUc = b + cc;
+      const double tol = AreaTol(a, b, cc);
+      ExpectUnionRetainsArea(bUc, std::max(b.Area(), cc.Area()), tol,
+                             "B union C");
       EXPECT_NEAR(
-          a.Boolean(b + cc, OpType::Intersect).Area(),
+          a.Boolean(bUc, OpType::Intersect).Area(),
           (a.Boolean(b, OpType::Intersect) + a.Boolean(cc, OpType::Intersect))
               .Area(),
-          AreaTol(a, b, cc))
+          tol)
           << "A ∩ (B ∪ C) != (A ∩ B) ∪ (A ∩ C)";
     } else {
       const auto bUc = b + cc;
@@ -1565,8 +1614,10 @@ TEST(CrossSection, BooleanDistributivitySeeds) {
       const auto right =
           a.Boolean(b, OpType::Intersect) + a.Boolean(cc, OpType::Intersect);
       const double tol = AreaTol(a, b, cc);
+      ExpectUnionRetainsArea(bUc, std::max(b.Area(), cc.Area()), tol,
+                             "B union C");
       EXPECT_NEAR(left.Area(), right.Area(), tol)
-          << "A ∩ (B ∪ C) != (A ∩ B) ∪ (A ∩ C)";
+          << "A intersect (B union C) != (A intersect B) union (A intersect C)";
       EXPECT_NEAR((left - right).Area(), 0.0, tol)
           << "distributivity: left-right difference is non-empty";
       EXPECT_NEAR((right - left).Area(), 0.0, tol)
