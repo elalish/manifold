@@ -27,6 +27,7 @@
 // debug build. Raw first pass: it runs the whole corpus, so some pathological
 // cases may still need filtering before this becomes a hard gate.
 
+#ifndef MANIFOLD_NO_IOSTREAM
 namespace {
 using namespace manifold;
 
@@ -88,3 +89,7 @@ TEST(CrossSectionOffsetCorpus, TriangulatesCleanly) {
   // make the triangulation checks vacuous.
   EXPECT_GT(nonEmpty, 0);
 }
+#else
+// The offset corpus test loads fixtures via ReadPolygonCorpus (std::ifstream),
+// so it is skipped under MANIFOLD_NO_IOSTREAM.
+#endif
