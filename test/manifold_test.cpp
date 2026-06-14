@@ -17,9 +17,7 @@
 #include <algorithm>
 
 #include "../src/execution_impl.h"
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
 #include "test.h"
 
 namespace {
@@ -816,14 +814,12 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(donutHole.SurfaceArea(), 96.0 * kPi, 1.0);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Revolve3) {
   CrossSection circle = CrossSection::Circle(1, 32);
   Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
   EXPECT_NEAR(sphere.Volume(), 4.0 / 3.0 * kPi, 0.1);
   EXPECT_NEAR(sphere.SurfaceArea(), 4 * kPi, 0.15);
 }
-#endif
 
 TEST(Manifold, RevolveClip) {
   Polygons polys = {{{-5, -10}, {5, 0}, {-5, 10}}};
@@ -863,7 +859,6 @@ TEST(Manifold, PartialRevolveOffset) {
   }
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Warp) {
   CrossSection square = CrossSection::Square({1, 1});
   Manifold shape =
@@ -898,7 +893,6 @@ TEST(Manifold, Warp2) {
   EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
   EXPECT_NEAR(shape.Volume(), 321, 1);
 }
-#endif
 
 TEST(Manifold, WarpBatch) {
   Manifold cube = Manifold::Cube({2, 3, 4});
@@ -924,7 +918,6 @@ TEST(Manifold, WarpBatch) {
   EXPECT_EQ(shape1.SurfaceArea(), shape2.SurfaceArea());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Project) {
   MeshGL input;
   input.numProp = 3;
@@ -1009,7 +1002,6 @@ TEST(Manifold, Project) {
   CrossSection projected = in.Project();
   EXPECT_NEAR(projected.Area(), 0.72, 0.01);
 }
-#endif
 
 /**
  * Testing more advanced Manifold operations.
@@ -1040,7 +1032,6 @@ TEST(Manifold, Transform) {
   Identical(cube.GetMeshGL(), cube2.GetMeshGL());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Slice) {
   Manifold cube = Manifold::Cube();
   CrossSection bottom = cube.Slice();
@@ -1065,7 +1056,6 @@ TEST(Manifold, Simplify) {
 
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
-#endif
 
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
@@ -1279,7 +1269,6 @@ TEST(Manifold, MirrorUnion2) {
   EXPECT_TRUE(result.MatchesTriNormals());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
@@ -1297,7 +1286,6 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Extrude(empty_circ.ToPolygons(), 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
 }
-#endif
 
 TEST(Manifold, MergeDegenerates) {
   MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();

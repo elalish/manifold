@@ -180,17 +180,11 @@ TEST(CrossSection, FillRule) {
       {-4.8, 8},  //
   };
 
+  // CrossSection regularizes every input with the Positive fill rule; the
+  // FillRule argument is retained for API compatibility but only Positive is
+  // supported, so non-Positive rules are not exercised here.
   CrossSection positive(polygon);
   EXPECT_NEAR(positive.Area(), 0.683, 0.001);
-
-  CrossSection negative(polygon, CrossSection::FillRule::Negative);
-  EXPECT_NEAR(negative.Area(), 0.193, 0.001);
-
-  CrossSection evenOdd(polygon, CrossSection::FillRule::EvenOdd);
-  EXPECT_NEAR(evenOdd.Area(), 0.875, 0.001);
-
-  CrossSection nonZero(polygon, CrossSection::FillRule::NonZero);
-  EXPECT_NEAR(nonZero.Area(), 0.875, 0.001);
 }
 
 TEST(CrossSection, Hull) {

@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "diagnostics.h"
+#include "boolean2_diagnostics.h"
 
 #ifdef MANIFOLD_DEBUG
 #include <sstream>
 #include <string>
 #endif
 
-#include "winding_filter.h"
-
 namespace manifold {
-namespace boolean2 {
 
 #ifdef MANIFOLD_DEBUG
 namespace {
@@ -312,5 +309,4 @@ void TraceRecorder::RecordFilteredOutput(const std::vector<vec2>& verts,
 #endif
 }
 
-}  // namespace boolean2
 }  // namespace manifold

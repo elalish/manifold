@@ -33,15 +33,12 @@
 #include <utility>
 #include <vector>
 
-#include "../../parallel.h"
-#include "canonicalize.h"
-#include "diagnostics.h"
+#include "boolean2.h"
+#include "boolean2_diagnostics.h"
 #include "manifold/optional_assert.h"
-#include "predicates.h"
-#include "winding_filter.h"
+#include "parallel.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -554,5 +551,4 @@ std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
   return FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

@@ -886,9 +886,8 @@ NB_MODULE(manifold3d, m) {
       m, "CrossSection",
       "Two-dimensional cross sections guaranteed to be without "
       "self-intersections, or overlaps between polygons (from construction "
-      "onwards). This class makes use of the "
-      "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
-      "for polygon clipping (boolean) and offsetting operations.")
+      "onwards). Polygon clipping (boolean) and offsetting use Manifold's own "
+      "robust floating-point predicates.")
       .def(nb::init<>(), cross_section__cross_section)
       .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
            nb::arg("contours"),

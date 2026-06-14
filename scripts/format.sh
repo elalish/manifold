@@ -17,7 +17,6 @@ $CLANG_FORMAT -i bindings/wasm/test/*.ts &
 $CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
 $CLANG_FORMAT -i bindings/wasm/types/*.ts &
 $CLANG_FORMAT -i src/*.{h,cpp} &
-$CLANG_FORMAT -i src/*/*.cpp &
 $CLANG_FORMAT -i include/manifold/*.h &
 
 black --quiet bindings/python/examples/*.py &

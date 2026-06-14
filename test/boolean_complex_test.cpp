@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
-
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -273,7 +270,6 @@ TEST(BooleanComplex, Spiral) {
   EXPECT_EQ(result.Genus(), -120);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(BooleanComplex, Sweep) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
@@ -508,7 +504,6 @@ TEST(BooleanComplex, Sweep) {
   EXPECT_NEAR(shape.Volume(), 3757, 1);
   if (options.exportModels) WriteTestOBJ("unionError.obj", shape);
 }
-#endif
 
 TEST(BooleanComplex, InterpolatedNormals) {
   MeshGL a;

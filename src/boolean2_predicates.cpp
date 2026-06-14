@@ -14,17 +14,15 @@
 //
 // Leaf primitives for the Boolean2 pipeline.
 
-#include "predicates.h"
-
 #include <algorithm>
 #include <cmath>
 #include <vector>
 
-#include "../../shared.h"
-#include "../../utils.h"
+#include "boolean2.h"
+#include "shared.h"
+#include "utils.h"
 
 namespace manifold {
-namespace boolean2 {
 
 namespace {
 
@@ -119,8 +117,7 @@ double EpsilonFromScale(double L, int k_budget) {
   if (L <= 0) return 0;
   int expBits;
   std::frexp(L, &expBits);
-  const double L_pow2 = std::ldexp(1.0, expBits);
-  return (k_budget + 1) * kAlphaCoeff * kU * L_pow2;
+  return std::ldexp((k_budget + 1) * kAlphaCoeff * kU, expBits);
 }
 
 double Coord(vec2 p, int axis) { return axis == 0 ? p.x : p.y; }
@@ -282,5 +279,4 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
          AwayFromEndpoints(*out, b0, b1, eps);
 }
 
-}  // namespace boolean2
 }  // namespace manifold

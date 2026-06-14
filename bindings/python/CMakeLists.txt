@@ -52,7 +52,7 @@ set(
   ${PROJECT_SOURCE_DIR}/src/manifold.cpp
   ${PROJECT_SOURCE_DIR}/src/constructors.cpp
   ${PROJECT_SOURCE_DIR}/src/sort.cpp
-  ${PROJECT_SOURCE_DIR}/src/cross_section/cross_section.cpp
+  ${PROJECT_SOURCE_DIR}/src/cross_section.cpp
   ${PROJECT_SOURCE_DIR}/src/polygon.cpp
   ${PROJECT_SOURCE_DIR}/include/manifold/common.h
   ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py

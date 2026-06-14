@@ -976,7 +976,7 @@ INPUT                  = include/manifold/manifold.h \
                          src/manifold.cpp \
                          src/constructors.cpp \
                          src/polygon.cpp \
-                         src/cross_section/cross_section.cpp \
+                         src/cross_section.cpp \
                          src/sdf.cpp \
                          README.md \
                          samples/include/samples.h \
