@@ -220,7 +220,7 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   u[0] = la::clamp(u[0], -0.5, 0.5);
   // Cost has units of length^2.
   const double cost = la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c;
-  return {cost, 0.5 - u[0], mid + P * u};
+  return {cost, u[0] + 0.5, mid + P * u};
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
