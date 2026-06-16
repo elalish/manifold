@@ -112,7 +112,7 @@ export type RayHit = {
   normal: Vec3
 };
 
-export type JoinType = 'Square'|'Round'|'Miter';
+export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
 
 /**
  * @see {@link Manifold.status}

@@ -88,7 +88,10 @@ Module.setup = function() {
   }
 
   function joinTypeToInt(joinType) {
-    return joinType == 'Round' ? 1 : joinType == 'Miter' ? 2 : /* Square */ 0;
+    return joinType == 'Round' ? 1 :
+        joinType == 'Miter'    ? 2 :
+        joinType == 'Bevel'    ? 3 :
+                                 /* Square */ 0;
   }
 
   // CrossSection methods
