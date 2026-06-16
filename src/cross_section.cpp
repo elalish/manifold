@@ -244,12 +244,10 @@ CrossSection::CrossSection(std::shared_ptr<const PathImpl> paths)
 
 /**
  * Create a 2d cross-section from a single contour. A boolean union operation
- * (with the Positive filling rule) is performed to ensure the resulting
- * CrossSection is free of self-intersections.
+ * is performed to ensure the resulting CrossSection is free of
+ * self-intersections.
  *
  * @param contour A closed path outlining the desired cross-section.
- * @param fillrule Only FillRule::Positive is supported; other values are
- * ignored (and, with MANIFOLD_ASSERT, rejected).
  */
 CrossSection::CrossSection(const SimplePolygon& contour)
     : CrossSection(Polygons{contour}) {}
