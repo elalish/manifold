@@ -1168,3 +1168,10 @@ TEST(Boolean2, IntersectSegmentsSeeds) {
     }
   }
 }
+
+TEST(Boolean2, NonFiniteInputReturnsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  Polygons bad = {{{0.0, 0.0}, {1.0, 0.0}, {inf, 1.0}, {0.0, 1.0}}};
+  Polygons finite = {{{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}};
+  EXPECT_TRUE(Boolean2D(bad, finite, OpType::Add).empty());
+}

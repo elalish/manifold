@@ -29,7 +29,6 @@
 #include <thread>
 #include <vector>
 
-#include "../src/boolean2.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"
@@ -1847,9 +1846,6 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
 
   CrossSection constructed(bad);
   EXPECT_TRUE(constructed.IsEmpty());
-
-  Polygons finite = {{{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}};
-  EXPECT_TRUE(Boolean2D(Polygons{bad}, finite, OpType::Add).empty());
 }
 
 TEST(CrossSection, OffsetIsInvariantUnderLargeTranslation) {
