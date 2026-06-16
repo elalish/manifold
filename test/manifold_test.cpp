@@ -1205,6 +1205,7 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  man = man.Simplify();
   EXPECT_TRUE(man.IsEmpty());
 }
 

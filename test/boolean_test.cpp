@@ -799,10 +799,12 @@ TEST(Boolean, Precision) {
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}});
 
   cube3 = cube3.Scale(vec3(2 * scale)).Translate({distance, 0, 0});
   cube += cube3;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}, {8, 12}});
 }
 

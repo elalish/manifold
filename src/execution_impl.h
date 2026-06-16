@@ -39,7 +39,7 @@ constexpr int kPhasesPerBoolean = 11;
  * in lockstep with the `donePhases.fetch_add(1, ...)` sites in the
  * ctor body.
  */
-constexpr int kPhasesPerFromMesh = 7;
+constexpr int kPhasesPerFromMesh = 6;
 
 /** @ingroup Private
  *

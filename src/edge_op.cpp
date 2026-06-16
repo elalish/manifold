@@ -151,17 +151,6 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   CalculateVertNormals();
 }
 
-void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
-  if (!halfedge_.size()) return;
-  halfedge_.MakeUnique();
-
-  CleanupTopology();
-  CollapseShortEdges(firstNewVert);
-  SwapDegenerates(firstNewVert);
-  // Merging verts causes their normals to change
-  CalculateVertNormals();
-}
-
 Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
                                                  int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);

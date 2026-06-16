@@ -207,7 +207,6 @@ struct Manifold::Impl {
   void SimplifyTopology2(int firstNewVert = 0);
   Merger CheckEdge(int edge, int firstNewVert) const;
   void SimplifyTopology(int firstNewVert = 0);
-  void RemoveDegenerates(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);
   void CollapseColinearEdges(int firstNewVert = 0);
   void SwapDegenerates(int firstNewVert = 0);
@@ -503,9 +502,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   SetNormalsAndCoplanar();
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  RemoveDegenerates();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveUnreferencedVerts();
