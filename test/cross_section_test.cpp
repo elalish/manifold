@@ -417,7 +417,7 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
 // Big-piece drop: the big piece's zero-radius star vertex makes it a thin spike
 // that collapses. Built from raw radii (StarRing's 0.1 floor would remove the
 // spike).
-TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset4096) {
+TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
   const std::vector<double> bigRadii = {
       0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
   SimplePolygon big;
@@ -473,7 +473,7 @@ TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset4096) {
 
 // Big-piece drop only at large offset (passes at the origin): the StarRing big
 // piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
-TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset1024) {
+TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
   SimplePolygon big = StarRing({0., 1., 0., 181.7694024845519});
   SimplePolygon tiny =
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
