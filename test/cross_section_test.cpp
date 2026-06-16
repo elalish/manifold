@@ -143,6 +143,31 @@ void ExpectTinyFeatureSurvivesNearCorner(
   }
 }
 
+// Row types for the consolidated fuzz-seed regression tables below.
+struct SubtractCase {
+  const char* name;
+  Shape a, b;
+};
+struct CommCase {
+  const char* name;
+  Shape a, b;
+  bool checkIntersect = false;
+};
+struct PrismCase {
+  const char* name;
+  double radiusA, radiusB;
+};
+struct AssocCase {
+  const char* name;
+  Shape a, b, c;
+};
+enum class DistribKind { Standard, AreaOnly, Monotonicity };
+struct DistribCase {
+  const char* name;
+  Shape a, b, c;
+  DistribKind kind = DistribKind::Standard;
+};
+
 }  // namespace
 
 TEST(CrossSection, Square) {
@@ -647,52 +672,27 @@ TEST(CrossSection, OffsetPositiveOnExtremeRadiusStar) {
   EXPECT_GE(output.Area(), input.Area() - 1e-6 * (1.0 + input.Area()));
 }
 
-// Consolidated SubtractInvariants* fuzz-seed regressions, one row per seed.
-// Each row carries that seed's radii + translate verbatim; SubtractKind
-// selects which assertions the original standalone test made:
-//   Invariants         - both subtract identities plus inclusion-exclusion
-//   InclusionExclusion - only the inclusion-exclusion identity
+// Consolidated SubtractInvariants* fuzz-seed regressions, one row per seed,
+// radii + translate verbatim. Each was a real area-invariant failure that now
+// passes; the per-seed note records the distinguishing geometry.
 // SubtractInvariantsEmptyIntersectionDrop stays standalone (below): it is
 // boolean2-gated and asserts only a single subtract identity.
-namespace {
-enum class SubtractKind { Invariants, InclusionExclusion };
-
-struct SubtractCase {
-  const char* name;
-  Shape a, b;
-  SubtractKind kind = SubtractKind::Invariants;
-};
-
 const SubtractCase kSubtractInvariantsSeeds[] = {
-    // Extreme magnitude mismatch
-    //   between two star polygons - A is ~1e-9 scale, B is ~100 scale.
-    //   At least one of the boolean algebraic invariants
-    //   `area(A-B)+area(A∩B)=area(A)` etc. fails. Likely an eps-inference
-    //   or vertex-merge cliff where A's tiny scale gets crushed by B's
-    //   eps.
+    // Extreme magnitude mismatch: A ~1e-9 scale, B ~100 scale. The subtract
+    // invariants used to break where A's tiny scale got crushed by B's eps.
     {"TinyVsLargeStars",
      {{2.0371964671064575e-14, 1.814002251251902e-10, 0.,
        2.1825088357767143e-09}},
      {{113.5978182908662, 0., 114.34968677141997, 6.5076626333939721e-10},
       {0., 4.667562921730494e-33}}},
-    // Two spiky stars at origin - A
-    //   is 5-pointed with mixed magnitudes including two ~1000-radius
-    //   spikes and a near-zero vertex; B is 4-pointed with three
-    //   ~1000-scale spikes plus a near-zero vertex. One of the boolean
-    //   algebraic invariants fails. Likely a different code path than
-    //   the TinyVsLargeStars needle case - this is two large spiky
-    //   shapes, not a tiny shape vs a needle. May share the off-axis
-    //   T-junction root cause diagnosed earlier in this table, but the spike-
-    //   collision geometry could be its own failure mode.
+    // Two spiky stars at origin: A 5-pointed with two ~1000 spikes and a
+    // near-zero vertex, B 4-pointed with three ~1000 spikes. Large-spike
+    // collision geometry, distinct from the TinyVsLargeStars needle case.
     {"SpikyStars",
      {{1000., 886.10628147264833, 1000., 1., 0.}},
      {{1000., 827.10387617193078, 548.20533789242359, 0.}}},
-    // 17-vertex star with most radii zero collapsed to 0.1, plus a
-    //   4-pointed star with one ~112 spike. area(b - a) + area(a ∩ b) =
-    //   402.04, b.Area() = 634.18 - 232 units of area leak. Different
-    //   geometry from the needle/spiky-star seeds above; the earlier
-    //   winding-seed fix didn't cover this case. Reproduces via direct
-    //   call with these exact args.
+    // 17-vertex star (most radii ~0.1) vs a 4-pointed star with one ~112
+    // spike. Used to leak ~232 of b.Area()=634 from the subtract identity.
     {"LeakySparseStar",
      {{627.11994612906153, 0.11978140887764367, 601.04982226530046,
        102.31660501134466, 2.1549912703437601, 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -700,20 +700,16 @@ const SubtractCase kSubtractInvariantsSeeds[] = {
      {{112.00504648760347, 4.3823848227606392, 1.2795858846899296e-07,
        6.7216166802304542},
       {-2.7193614970785894e-29, 0.}}},
-    // 19-vertex sparse star with only 2 nonzero radii (~39, ~21) vs a
-    //   4-pointed star with one ~73 spike and tiny radii. area(b - a) +
-    //   area(a ∩ b) is off
-    //   by ~234 from b.Area() (~788). Different geometry from prior
-    //   Subtract seeds.
+    // 19-vertex sparse star (2 nonzero radii ~39, ~21) vs a 4-pointed star
+    // with one ~73 spike. Used to be off by ~234 from b.Area()=788.
     {"TwoNonzeroVsNeedle",
      {{0., 39.150613710409736, 0., 21.472413919643575, 0., 0., 0., 0., 0., 0.,
        0., 0., 0., 0., 0., 0., 0., 0., 3.237760857312173e-24}},
      {{72.814105930277677, 21.384583693573447, 1.6644635543899127e-243,
        1.6688953794582528e-229}}},
-    // 34-vert star vs 20-vert star
-    //   each with one dominant radius (~33 and ~36) and the rest very
-    //   small. Inclusion-exclusion violated by ~8 absolute on a∪b≈10.
-    //   Verified against post-68cbade7 binary.
+    // 34-vert star vs 20-vert star, each with one dominant radius (~33, ~36)
+    // and the rest tiny. Inclusion-exclusion used to be violated by ~8 on a
+    // combined area of ~10.
     {"DominantSpikeStars",
      {{0.15588462038906103,
        0.00015361176400222398,
@@ -769,10 +765,8 @@ const SubtractCase kSubtractInvariantsSeeds[] = {
        36.09032519236748,
        0.,
        7.5123873966542927e-05},
-      {0.72140998591309213, 0.}},
-     SubtractKind::InclusionExclusion},
+      {0.72140998591309213, 0.}}},
 };
-}  // namespace
 
 TEST(CrossSection, SubtractInvariantsSeeds) {
   for (const auto& c : kSubtractInvariantsSeeds) {
@@ -780,26 +774,16 @@ TEST(CrossSection, SubtractInvariantsSeeds) {
     // Flush the seed name so a hard crash is still attributable.
     std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b);
-    if (c.kind == SubtractKind::InclusionExclusion) {
-      const auto aIb = a.Boolean(b, OpType::Intersect);
-      const auto aUb = a + b;
-      const double tol = AreaTol(a, b);
-      EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
-          << "inclusion-exclusion violated";
-      ExpectUnionRetainsArea(aUb, std::max(a.Area(), b.Area()), tol,
-                             "subtract seed union");
-    } else {
-      const auto aIb = a.Boolean(b, OpType::Intersect);
-      const auto aUb = a + b;
-      const double tol = AreaTol(a, b);
-      EXPECT_NEAR((a - b).Area() + aIb.Area(), a.Area(), tol)
-          << "area(A - B) + area(A intersection B) != area(A)";
-      EXPECT_NEAR((b - a).Area() + aIb.Area(), b.Area(), tol)
-          << "area(B - A) + area(A intersection B) != area(B)";
-      EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
-          << "inclusion-exclusion violated";
-      ExpectUnionRetainsArea(aUb, std::max(a.Area(), b.Area()), tol, "union");
-    }
+    const auto aIb = a ^ b;
+    const auto aUb = a + b;
+    const double tol = AreaTol(a, b);
+    EXPECT_NEAR((a - b).Area() + aIb.Area(), a.Area(), tol)
+        << "area(A - B) + area(A intersection B) != area(A)";
+    EXPECT_NEAR((b - a).Area() + aIb.Area(), b.Area(), tol)
+        << "area(B - A) + area(A intersection B) != area(B)";
+    EXPECT_NEAR(aUb.Area(), a.Area() + b.Area() - aIb.Area(), tol)
+        << "inclusion-exclusion violated";
+    ExpectUnionRetainsArea(aUb, std::max(a.Area(), b.Area()), tol, "union");
   }
 }
 
@@ -808,13 +792,6 @@ TEST(CrossSection, SubtractInvariantsSeeds) {
 // union commutativity (A + B vs B + A: area + contour count); checkIntersect
 // additionally asserts intersect commutativity (A ∩ B vs B ∩ A: area +
 // contour count).
-namespace {
-struct CommCase {
-  const char* name;
-  Shape a, b;
-  bool checkIntersect = false;
-};
-
 const CommCase kBooleanCommutativitySeeds[] = {
     // Asymmetric handling of two
     //   inputs in the boolean engine - A+B and B+A produce different
@@ -925,7 +902,6 @@ const CommCase kBooleanCommutativitySeeds[] = {
        1.},
       {1.7126290778198534, -0.5023590407011973}}},
 };
-}  // namespace
 
 TEST(CrossSection, BooleanCommutativitySeeds) {
   for (const auto& c : kBooleanCommutativitySeeds) {
@@ -954,12 +930,6 @@ TEST(CrossSection, BooleanCommutativitySeeds) {
 // extrudes them to prisms, and asserts the union's Volume matches the 2D union
 // area times the height. Rows differ only in the two radii. Ungated: runs on
 // both backends.
-namespace {
-struct PrismCase {
-  const char* name;
-  double radiusA, radiusB;
-};
-
 const PrismCase kPrismSeeds[] = {
     // Two equilateral triangles with
     //   circumradii 0.1 and 0.1+6.88e-13, op=Add. Two near-IDENTICAL
@@ -976,7 +946,6 @@ const PrismCase kPrismSeeds[] = {
     //   against post-68cbade7 binary..
     {"CloseRadiiTriangles", 1.6750962039134867, 1.6691810932888278},
 };
-}  // namespace
 
 TEST(CrossSection, PrismSeeds) {
   auto regular = [](int sides, double radius) {
@@ -1008,12 +977,6 @@ TEST(CrossSection, PrismSeeds) {
 // Each row carries that seed's radii + translate verbatim. Both seeds assert
 // union-associativity area equality ((A ∪ B) ∪ C vs A ∪ (B ∪ C)); neither
 // asserted intersect associativity.
-namespace {
-struct AssocCase {
-  const char* name;
-  Shape a, b, c;
-};
-
 const AssocCase kBooleanAssociativitySeeds[] = {
     // Three 4-vertex stars with
     //   mixed magnitudes; (A∪B)∪C = 2.994 but A∪(B∪C) = 5.472 - off
@@ -1040,7 +1003,6 @@ const AssocCase kBooleanAssociativitySeeds[] = {
       {0., 0.}},
      {{0., 0., 0., 0.}}},
 };
-}  // namespace
 
 TEST(CrossSection, BooleanAssociativitySeeds) {
   for (const auto& c : kBooleanAssociativitySeeds) {
@@ -1070,15 +1032,6 @@ TEST(CrossSection, BooleanAssociativitySeeds) {
 //                  (A intersect B and A intersect C each inside the union)
 // Kept as a single TEST in the CrossSection suite so the CrossSection.*
 // CI filter keeps exercising every seed.
-namespace {
-enum class DistribKind { Standard, AreaOnly, Monotonicity };
-
-struct DistribCase {
-  const char* name;
-  Shape a, b, c;
-  DistribKind kind = DistribKind::Standard;
-};
-
 const DistribCase kDistributivitySeeds[] = {
     // Three 4-vertex stars with all
     //   near-zero radii. A∩(B∪C) returns 0 but (A∩B)∪(A∩C) returns
@@ -1586,7 +1539,6 @@ const DistribCase kDistributivitySeeds[] = {
             {1, 1.}}),
       {0.99578244833742113, -4.0475870932225444}}},
 };
-}  // namespace
 
 TEST(CrossSection, BooleanDistributivitySeeds) {
   for (const auto& c : kDistributivitySeeds) {
@@ -2268,13 +2220,10 @@ TEST(CrossSection, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.NumVert(), 42);
 }
 
-// A is a 37-vertex star with many zero-radius vertices producing a dense
-// near-degenerate shape; B is a 5-vertex star translated by ~5e-5 in x. The
-// intersection A ∩ B returns area=0 even though both inputs are non-empty and
-// overlap geometrically. (A - B) + (A ∩ B) ends up at 39605 versus
-// a.Area=90895, missing ~51290 area units. The tiny x translation puts B's
-// vertices just inside the eps band of A's; the intersect path appears to
-// mis-classify the overlap region as empty.
+// A is a 37-vertex near-degenerate star (many zero-radius vertices); B is a
+// 5-vertex star translated ~5e-5 in x so its vertices land just inside A's eps
+// band. The intersection of A and B used to return area=0, leaking ~51290 of
+// a.Area=90895 from the subtract identity below.
 TEST(CrossSection, SubtractInvariantsEmptyIntersectionDrop) {
   const std::vector<double> rA = Runs({{1, 1000.},
                                        {1, 0.},
@@ -2301,7 +2250,7 @@ TEST(CrossSection, SubtractInvariantsEmptyIntersectionDrop) {
   const CrossSection b =
       CrossSection(StarRing(rB)).Translate({-4.725175119801861e-05, -0.0});
   const auto aMinusB = a - b;
-  const auto aIntersectB = a.Boolean(b, OpType::Intersect);
+  const auto aIntersectB = a ^ b;
   const double tol = AreaTol(a, b);
   EXPECT_NEAR(aMinusB.Area() + aIntersectB.Area(), a.Area(), tol)
       << "area(A - B) + area(A ∩ B) != area(A)";
