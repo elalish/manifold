@@ -585,6 +585,11 @@ CrossSection CrossSection::WarpBatch(
  * clean up any spurious tiny line segments introduced that do not improve
  * quality in any meaningful way. This is particularly important if further
  * offseting operations are to be performed, which would compound the issue.
+ *
+ * @param tolerance Default 0 uses the cross-section's own tolerance (from
+ * GetTolerance()), which is geometry-scale-derived and may be larger than a
+ * fixed epsilon for large-coordinate geometry. Pass an explicit value to
+ * override.
  */
 CrossSection CrossSection::Simplify(double tolerance) const {
   // Stored paths are already fill-rule-regularized, so Simplify only decimates:

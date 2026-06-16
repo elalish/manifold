@@ -43,12 +43,9 @@ const cells = mesh
   .map(cs => cs.intersect(boundary));
 
 // We now have a list of rounded cells, but it's easier to have a single
-// object.  We could union them together, but we do know that they do not
-// overlap.  This makes CrossSection.compose() the more efficient option.
-// After that, make a Manifold object from the CrossSection by extruding
-// it along the Z axis. 
+// object.  Union them together, then extrude along the Z axis.
 const result = CrossSection
-  .compose(cells)
+  .union(cells)
   .extrude(thickness);
 
 export default result;
