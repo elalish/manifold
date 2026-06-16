@@ -202,7 +202,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
         break;
       }
       // Continue with the smallest positive CCW turn from the reverse incoming
-      // edge, matching the halfedge winding filter.
+      // edge, the next edge along the boundary loop.
       const vec2 vp = verts[destV];
       const vec2 ref = verts[edges[cur].v0] - vp;
       const auto& lst = outgoing[destV];
@@ -452,8 +452,7 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   }
   // Parallelize the geometric distance gate (read-only on `in`); unite
   // serially in sorted pair order so cluster roots are deterministic
-  // regardless of thread scheduling. Same pattern as the nearby-
-  // intersection merge in driver.cpp (after intersection insertion).
+  // regardless of thread scheduling.
   //
   // Written by worker threads, so this must be shared storage.
   std::vector<uint8_t> doUnite;
@@ -587,6 +586,7 @@ void RecordEdgeVertHit(const std::vector<EdgeM>& edges,
   if (v == edges[e].v0 || v == edges[e].v1) return;
   const auto& g = edgeG[e];
   if (g.abLen2 == 0) return;
+
   const vec2 ap = verts[v] - g.a;
   const double dotAB = dot(ap, g.ab);
   if (dotAB <= 0 || dotAB >= g.abLen2) return;
@@ -898,6 +898,16 @@ IntersectionInsertion FindAndInsertIntersections(
     const int i = ix.i;
     const int j = ix.j;
     const vec2 p = ix.p;
+    // Skip a crossing when an endpoint of one edge already sits in the other's
+    // vert list: the narrow phase recorded that endpoint on the partner edge,
+    // so the edges already meet there. Minting a separate crossing would split
+    // one edge a hair off the shared endpoint, leaving a sub-eps vertex pair.
+    if (VESetContains(lists[j], edges[i].v0) ||
+        VESetContains(lists[j], edges[i].v1) ||
+        VESetContains(lists[i], edges[j].v0) ||
+        VESetContains(lists[i], edges[j].v1)) {
+      continue;
+    }
     // Snap: is p within eps of any existing vert? Search the union of
     // (i,j)'s endpoints and existing list members of i and j.
     auto nearVert = [&](int candidate) -> bool {
@@ -961,10 +971,9 @@ IntersectionInsertion FindAndInsertIntersections(
   // Eager propagation: after all independent edge-pair intersections are
   // inserted, add each new intersection vertex to every other edge it
   // geometrically splits. Otherwise a later canonical sub-edge can pass through
-  // a new vertex without being split there, leaving the halfedge arrangement
+  // a new vertex without being split there, leaving the loop tracing
   // dependent on tiny angular-sort differences.
-  if (verts.size() == origNumVerts)
-    return {std::move(verts), std::move(lists), std::move(vertEdges)};
+  if (verts.size() == origNumVerts) return {std::move(verts), std::move(lists)};
   const int numNewVerts = static_cast<int>(verts.size() - origNumVerts);
 
   // Per-(qi, eIdx) propagation step. Same logic for BVH and brute-force
@@ -1010,128 +1019,20 @@ IntersectionInsertion FindAndInsertIntersections(
     };
     BVHCollisions(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
   }
-  return {std::move(verts), std::move(lists), std::move(vertEdges)};
+  return {std::move(verts), std::move(lists)};
 }
 
 // ===== Driver =====
 // End-to-end Boolean2 driver. Stitches together vertex merging, edge
 // collapse, near-vertex indexing, proper edge-edge crossing insertion,
-// nearby-intersection merging, sub-edge canonicalization, and winding-rule
-// filtering. Returns an OverlapResult holding the merged-vert list, the
-// retained directed sub-edges, the inputVert2Merged remap, and the
-// merged-vert count.
-
-namespace {
-
-// Unlike MergeVerts, this pass only considers vertices with intersection
-// incidence: newly inserted intersection points and old vertices that an
-// intersection snapped onto. The close-pair threshold is intersection-specific,
-// and endpoint snaps are limited to truly-new vertices, so this does not re-run
-// broad old-vertex clustering across the input.
-void MergeNearbyIntersectionVerts(
-    std::vector<vec2>& verts, std::vector<EdgeM>& edges,
-    std::vector<std::vector<int>>& lists,
-    const std::vector<std::vector<int>>& vertEdges, int oldVertEnd, double eps,
-    std::vector<int>& inputVert2Merged) {
-  DisjointSets uf(static_cast<int>(verts.size()));
-  // Merge intersection verts only at the eps snap scale; a wider band fuses
-  // distinct crossings of one edge into a non-manifold pinch.
-  const double newToNewThresh2 = eps * eps;
-  // Fresh intersection vs old endpoint: a 2*eps snap budget, the combined eps
-  // reach of an old endpoint and a generated crossing.
-  const double newToOldThresh2 = 4 * eps * eps;
-  std::vector<std::pair<int, int>> pairs;
-  std::vector<std::pair<double, int>> tlist;
-  for (size_t e = 0; e < edges.size(); ++e) {
-    const auto& list = lists[e];
-    const int v0 = edges[e].v0;
-    const int v1 = edges[e].v1;
-    const vec2 a = verts[v0];
-    const vec2 b = verts[v1];
-    const vec2 ab = b - a;
-    const double abLen2 = dot(ab, ab);
-    if (abLen2 == 0) continue;
-    const double abLen = std::sqrt(abLen2);
-    const double tThresh = eps / abLen;
-    tlist.clear();
-    tlist.reserve(list.size());
-    for (int v : list) {
-      // Skip pure-old verts; keep snapped-onto-old for new-to-new pairing.
-      if (v >= static_cast<int>(vertEdges.size()) || vertEdges[v].empty())
-        continue;
-      const vec2 p = verts[v];
-      const double t = dot(p - a, ab) / abLen2;
-      tlist.emplace_back(t, v);
-      // Only truly-new verts: widening old-old would stack error across ops.
-      if (v >= oldVertEnd) {
-        const vec2 dA = p - a;
-        if (dot(dA, dA) <= newToOldThresh2) {
-          const int p0 = std::min(v, v0);
-          const int q0 = std::max(v, v0);
-          if (p0 != q0) pairs.emplace_back(p0, q0);
-        }
-        const vec2 dB = p - b;
-        if (dot(dB, dB) <= newToOldThresh2) {
-          const int p0 = std::min(v, v1);
-          const int q0 = std::max(v, v1);
-          if (p0 != q0) pairs.emplace_back(p0, q0);
-        }
-      }
-    }
-    if (tlist.size() < 2) continue;
-    for (size_t i = 0; i < tlist.size(); ++i) {
-      for (size_t j = i + 1;
-           j < tlist.size() && tlist[j].first - tlist[i].first <= tThresh;
-           ++j) {
-        const int va = tlist[i].second;
-        const int vb = tlist[j].second;
-        const vec2 d = verts[vb] - verts[va];
-        if (dot(d, d) > newToNewThresh2) continue;
-        const int p = std::min(va, vb);
-        const int q = std::max(va, vb);
-        pairs.emplace_back(p, q);
-      }
-    }
-  }
-  manifold::stable_sort(pairs.begin(), pairs.end());
-  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-  for (const auto& pr : pairs) uf.unite(pr.first, pr.second);
-
-  const int nV = static_cast<int>(verts.size());
-  std::vector<vec2> sumPos(nV, vec2{0, 0});
-  std::vector<int> sumCnt(nV, 0);
-  int distinctClusters = 0;
-  for (int i = 0; i < nV; ++i) {
-    int r = uf.find(i);
-    if (sumCnt[r] == 0) ++distinctClusters;
-    sumPos[r] = sumPos[r] + verts[i];
-    sumCnt[r] += 1;
-  }
-  if (distinctClusters == nV) return;
-
-  std::vector<int> rootToNew(nV, -1);
-  std::vector<vec2> newVerts;
-  newVerts.reserve(distinctClusters);
-  for (int r = 0; r < nV; ++r) {
-    if (sumCnt[r] == 0) continue;
-    rootToNew[r] = static_cast<int>(newVerts.size());
-    newVerts.push_back(sumPos[r] * (1.0 / sumCnt[r]));
-  }
-  std::vector<int> preMergeToPost(nV);
-  for (int i = 0; i < nV; ++i) preMergeToPost[i] = rootToNew[uf.find(i)];
-  for (auto& e : edges) {
-    e.v0 = preMergeToPost[e.v0];
-    e.v1 = preMergeToPost[e.v1];
-  }
-  for (auto& list : lists) {
-    for (auto& v : list) v = preMergeToPost[v];
-    list.erase(std::unique(list.begin(), list.end()), list.end());
-  }
-  for (auto& r : inputVert2Merged) r = preMergeToPost[r];
-  verts = std::move(newVerts);
-}
-
-}  // namespace
+// sub-edge canonicalization, and winding-rule filtering. Returns an
+// OverlapResult holding the merged-vert list, the retained directed sub-edges,
+// the inputVert2Merged remap, and the merged-vert count.
+//
+// Crossings resolve at insertion: FindAndInsertIntersections reuses an existing
+// within-eps neighbor id for each crossing and skips crossings at an
+// already-shared endpoint, so distinct crossings stay distinct and coincident
+// ones collapse in place.
 
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
@@ -1149,6 +1050,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   }
   const int numMerged = static_cast<int>(merge.verts.size());
   traceRecorder.RecordMergedVertices(merge.verts, merge.inputVert2Merged);
+
   // Edge collapse.
   std::vector<EdgeM> edges;
   {
@@ -1202,15 +1104,8 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
   }
   merge.verts = std::move(inserted.verts);
   std::vector<std::vector<int>> lists = std::move(inserted.lists);
-  std::vector<std::vector<int>> vertEdges = std::move(inserted.vertEdges);
   traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
 
-  {
-    ScopedTiming timing(P.nearbyIxMergeNs);
-    MergeNearbyIntersectionVerts(merge.verts, edges, lists, vertEdges,
-                                 numMerged, eps, merge.inputVert2Merged);
-  }
-  traceRecorder.RecordNearbyIntersectionMerge(merge.verts, edges, lists);
   // Sub-edge canonicalization.
   CanonicalSubEdges canon;
   {
@@ -1218,11 +1113,11 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     canon = Canonicalize(edges, lists);
   }
   traceRecorder.RecordCanonicalSubedges(merge.verts, canon);
-  // Halfedge face-traversal winding filter.
+  // Per-edge ray-cast winding filter.
   std::vector<OutEdge> out;
   {
-    ScopedTiming timing(P.filterHalfedgeNs);
-    out = FilterByWindingHalfedges(canon, merge.verts, debug, pred, trace);
+    ScopedTiming timing(P.filterWindingNs);
+    out = FilterByWinding(canon, merge.verts, pred);
   }
   traceRecorder.RecordFilteredOutput(merge.verts, out);
   CountTimingCase();

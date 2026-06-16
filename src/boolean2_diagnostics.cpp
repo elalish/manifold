@@ -267,22 +267,6 @@ void TraceRecorder::RecordInsertedIntersections(
 #endif
 }
 
-void TraceRecorder::RecordNearbyIntersectionMerge(
-    const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
-    const std::vector<std::vector<int>>& lists) {
-#ifdef MANIFOLD_DEBUG
-  if (!trace_) return;
-  TracePhase& phase = trace_->AddPhase("nearby_intersection_merge");
-  AddPoints(&phase, verts, "nearby_intersection_vertex");
-  AddSplitSubsegments(&phase, verts, edges, lists, "nearby_intersection");
-  AddEdgeVertListAnnotations(&phase, lists);
-#else
-  (void)verts;
-  (void)edges;
-  (void)lists;
-#endif
-}
-
 void TraceRecorder::RecordCanonicalSubedges(const std::vector<vec2>& verts,
                                             const CanonicalSubEdges& canon) {
 #ifdef MANIFOLD_DEBUG

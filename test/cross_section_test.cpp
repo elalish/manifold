@@ -417,7 +417,7 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
 // Big-piece drop: the big piece's zero-radius star vertex makes it a thin spike
 // that collapses. Built from raw radii (StarRing's 0.1 floor would remove the
 // spike).
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset4096) {
   const std::vector<double> bigRadii = {
       0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
   SimplePolygon big;
@@ -473,7 +473,7 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
 
 // Big-piece drop only at large offset (passes at the origin): the StarRing big
 // piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset1024) {
   SimplePolygon big = StarRing({0., 1., 0., 181.7694024845519});
   SimplePolygon tiny =
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
@@ -515,6 +515,85 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
     EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol)
         << "offset=" << offset;
   }
+}
+
+// Near-degenerate cases at the eps scale.
+
+// A unit square unioned with a tiny triangle whose middle vertex is exactly
+// 2*eps from a corner.
+//
+// DISABLED: the recentered on-edge perp band is translation-dependent, so this
+// near-corner pinch annihilates the square. TODO: fix the arrangement.
+TEST(CrossSection, DISABLED_SquareAnnihilation) {
+  const CrossSection a(SimplePolygon{{0, 0}, {1, 0}, {1, 1}, {0, 1}});
+  const CrossSection b(
+      SimplePolygon{{1.5000023810829433e-06, -8.6602402906521135e-07},
+                    {2.3810953209135732e-12, 1.3747192273300745e-12},
+                    {2.3810953209135732e-12, -1.7320494328496497e-06}});
+  EXPECT_GT((a + b).Area(), a.Area() - AreaTol(a, b)) << "square annihilated";
+}
+
+// Two disjoint triangles where one's vertex is within eps of the
+// other's sloped edge; the union adds a ~4e-6 outside sliver that intersect
+// does not see (inclusion-exclusion violation via the near-vertex split path).
+//
+// DISABLED: floor, not a regression. The vertex sits within eps of the edge (a
+// ~1e-9-rad near-incidence); no single eps-scale on/off-edge decision is
+// correct for both Add (include the sliver) and Intersect (exclude it).
+// Irreducible at the eps resolution limit.
+TEST(CrossSection, DISABLED_InclusionExclusionSliver) {
+  const CrossSection a(SimplePolygon{{0.0, 1e-8}, {0.5, 5e-9}, {1.0, 0.5}});
+  const CrossSection b(
+      SimplePolygon{{2048.0, 0.0}, {4096.0, 4.096e-6}, {0.0, 0.0}});
+  const auto inter = a.Boolean(b, OpType::Intersect);
+  EXPECT_NEAR((a + b).Area(), a.Area() + b.Area() - inter.Area(),
+              AreaTol(a, b));
+}
+
+// A genuine ~4*eps-wide rectangle overlap that Intersect must keep, not drop to
+// empty; one ULP on B's near edge is the difference. A sub-eps binary-incidence
+// knife-edge.
+TEST(CrossSection, SubEpsRectangleOverlap) {
+  const CrossSection a(
+      SimplePolygon{{0, 0}, {2048, 0}, {2048, 2048}, {0, 2048}});
+  const CrossSection b(SimplePolygon{{2047.9999999943693, 512},
+                                     {2303.9999999943693, 512},
+                                     {2303.9999999943693, 768},
+                                     {2047.9999999943693, 768}});
+  // Overlap = [2047.9999999943693, 2048] x [512, 768]: width ~5.6e-9 (~4*eps)
+  // by height 256, area ~1.44e-6 by rectangle arithmetic (independent of the
+  // engine).
+  const double expected = (2048.0 - 2047.9999999943693) * 256.0;
+  EXPECT_NEAR(a.Boolean(b, OpType::Intersect).Area(), expected, 1e-3 * expected)
+      << "sub-eps rectangle overlap dropped to empty";
+}
+
+// A tiny square unioned with a huge thin strip (~1e6:1 aspect
+// ratio) that clips the square's corner. The corner sits ~0.12 eps off the
+// strip's ~1.4e6-long edge; the engine keeps the topology exact (one connected
+// region), but that sub-eps placement, levered by the strip length, shifts the
+// area by ~eps*length - here ~0.06 on 20.07 (0.3%). A tight relative area bound
+// is unachievable at this aspect ratio, so NumContour is the load-bearing check
+// and the area tolerance below is deliberately loose.
+TEST(CrossSection, CornerCrossingStrip) {
+  const CrossSection a(SimplePolygon{{0, 0},
+                                     {4.1400636649775659, 0},
+                                     {4.1400636649775659, 4.1400636649775659},
+                                     {0, 4.1400636649775659}});
+  const CrossSection b(
+      SimplePolygon{{-708434.62837340333, -85773.605469182352},
+                    {708434.62837640126, 85773.605469897113},
+                    {708434.62837615469, 85773.605471933799},
+                    {-708434.62837364990, -85773.605467145666}});
+  // Independent shoelace + convex clip: the strip clips the square's corner
+  // with a ~8.6e-6 overlap, so the union is one connected region of area
+  // ~20.0681.
+  const auto u = a + b;
+  // Loose by design (~1%): per the aspect-ratio note above, the area floor here
+  // is ~eps*length, not the usual tight relative bound.
+  EXPECT_NEAR(u.Area(), 20.068131036304429, 1e-2 * 20.068131036304429)
+      << "corner-crossing strip union area outside the aspect-ratio floor";
+  EXPECT_EQ(u.NumContour(), 1) << "union split into multiple contours";
 }
 
 // Regression test for the BR-cell hole pattern from Samples.Sponge4. Two

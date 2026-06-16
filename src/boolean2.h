@@ -264,14 +264,9 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 // containers. `verts` and `lists` are taken by value so callers can move in the
 // post-narrow-phase state; the returned fields are those same containers after
 // appending/snapping intersection vertices and updating edge split lists.
-// `vertEdges` records which edges meet at each materialized or snapped
-// intersection vertex; nearby-intersection merge uses that incidence to
-// distinguish unrelated near vertices from vertices that share an intersection
-// source.
 struct IntersectionInsertion {
   std::vector<vec2> verts;
   std::vector<std::vector<int>> lists;
-  std::vector<std::vector<int>> vertEdges;
 };
 
 IntersectionInsertion FindAndInsertIntersections(
@@ -287,11 +282,14 @@ enum class WindRule {
   Intersect,
 };
 
-std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
-                                              const std::vector<vec2>& verts,
-                                              bool debug = false,
-                                              WindRule rule = WindRule::Add,
-                                              Trace* trace = nullptr);
+// Per-edge winding filter: for each canonical sub-edge, ray-cast the winding
+// just to its left and right and keep it iff the rule disagrees across it.
+// Correct only on a true arrangement. The nearest-edge clearance and the +x
+// ray-cast both reuse boolean2's BVH over the canonical sub-edges, so the pass
+// is ~O(E log E) amortized rather than O(E^2).
+std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
+                                     const std::vector<vec2>& verts,
+                                     WindRule rule = WindRule::Add);
 
 struct OverlapResult {
   std::vector<vec2> verts;
