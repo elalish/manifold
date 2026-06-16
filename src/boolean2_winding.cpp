@@ -88,8 +88,8 @@ int SignInfinitesimal(double base, double delta) {
 // The symbolic side test is an orientation sign. Scale both vectors first so
 // tiny valid inputs do not turn a nonzero L^2 determinant into signed zero.
 int ScaledCrossSign(vec2 a, vec2 b) {
-  const double aScale = std::max(std::fabs(a.x), std::fabs(a.y));
-  const double bScale = std::max(std::fabs(b.x), std::fabs(b.y));
+  const double aScale = la::maxelem(la::abs(a));
+  const double bScale = la::maxelem(la::abs(b));
   if (aScale == 0.0 || bScale == 0.0) return 0;
   if (!std::isfinite(aScale) || !std::isfinite(bScale)) {
     return SignInfinitesimal(la::cross(a, b), 0.0);
@@ -257,7 +257,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
           if (bA != bB)
             aFirst = bA < bB;
           else
-            aFirst = (dA.x * dB.y - dA.y * dB.x > 0);
+            aFirst = la::cross(dA, dB) > 0;
           if (!aFirst) std::swap(outFlat[beg], outFlat[beg + 1]);
           return;
         }
@@ -267,7 +267,7 @@ std::vector<OutEdge> FilterByWindingHalfedgesImpl(
               const vec2 dB = verts[halfedges[halfedges[b].twin].origin] - vp;
               const int bA = bucketOf(dA), bB = bucketOf(dB);
               if (bA != bB) return bA < bB;
-              return dA.x * dB.y - dA.y * dB.x > 0;
+              return la::cross(dA, dB) > 0;
             });
       });
 

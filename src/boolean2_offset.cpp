@@ -86,7 +86,7 @@ void AppendRoundJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
 // sin alpha; using the more FP-stable form sin / (1 + cos).
 void AppendSquareJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
                       double delta) {
-  vec2 bisector(nPrev.x + nNext.x, nPrev.y + nNext.y);
+  vec2 bisector = nPrev + nNext;
   const ScaledDirection bisectorDir = UnitFromScaled(bisector);
   if (bisectorDir.scale == 0) return;  // 180-deg reversal; nothing reasonable
   bisector = bisectorDir.unit;
@@ -95,8 +95,7 @@ void AppendSquareJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
   // 180-degree reversal; clamp to 0 so the cap degrades to its limiting
   // half-width (|delta|) instead of vanishing. Exact reversals are handled by
   // the bisectorDir.scale == 0 guard above.
-  const double cosHalf =
-      std::max(0.0, bisector.x * nPrev.x + bisector.y * nPrev.y);
+  const double cosHalf = std::max(0.0, dot(bisector, nPrev));
   const double sinHalf = std::sqrt(std::max(0.0, 1.0 - cosHalf * cosHalf));
   const double half = std::fabs(delta) * sinHalf / (1.0 + cosHalf);
   // Signed delta: the cap follows the offset side (outward for delta > 0,
@@ -114,15 +113,16 @@ vec2 MiterPoint(vec2 V, vec2 nPrev, vec2 nNext, double delta) {
   // The two offset lines pass through V + delta*nPrev (perp to ePrev)
   // and V + delta*nNext (perp to eNext). Their intersection lies along
   // the bisector at distance delta / cos(half-angle).
-  const double dotN = nPrev.x * nNext.x + nPrev.y * nNext.y;
+  const double dotN = dot(nPrev, nNext);
   const double denom = 1.0 + dotN;
   if (denom <= 0) {
     // Opposite normals make the miter unbounded. The caller's miter-limit
     // check handles near-opposite normals before this point.
     return V + delta * nPrev;
   }
-  return V +
-         delta * vec2((nPrev.x + nNext.x) / denom, (nPrev.y + nNext.y) / denom);
+  // Divide before scaling by delta to match the original per-component order
+  // ((sum / denom) * delta), so the linalg rewrite stays numerically identical.
+  return V + delta * ((nPrev + nNext) / denom);
 }
 
 double ValidMiterLimit(double miterLimit) {
@@ -152,8 +152,8 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     const vec2 V = contour[i];
     const vec2 P = contour[(i + n - 1) % n];
     const vec2 N = contour[(i + 1) % n];
-    const vec2 ePrev = vec2(V.x - P.x, V.y - P.y);
-    const vec2 eNext = vec2(N.x - V.x, N.y - V.y);
+    const vec2 ePrev = V - P;
+    const vec2 eNext = N - V;
     const vec2 nPrev = OutwardNormal(ePrev);
     const vec2 nNext = OutwardNormal(eNext);
     if (nPrev == vec2(0, 0) || nNext == vec2(0, 0)) continue;
@@ -169,7 +169,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     // Collinearity reuses the canonical CCW predicate, with a scale-derived
     // tolerance from the larger adjacent edge.
     const double eps = EpsilonFromScale(
-        std::sqrt(std::max(dot(ePrev, ePrev), dot(eNext, eNext))));
+        std::sqrt(std::max(la::length2(ePrev), la::length2(eNext))));
     if (CCW(P, V, N, eps) == 0) {
       // Zero cross is either a straight continuation (dot >= 0: nPrev == nNext,
       // so endPrev == startNext - one point suffices) or an antiparallel
@@ -206,7 +206,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
         // clamped case (and avoids FP-fragility of MiterPoint when
         // the denominator (1 + dot) approaches zero - exactly the
         // case where we'd clamp anyway).
-        const double dotN = nPrev.x * nNext.x + nPrev.y * nNext.y;
+        const double dotN = dot(nPrev, nNext);
         const double miterCosThresh = 2.0 / (miterLimit * miterLimit) - 1.0;
         // Equality is allowed by the miter limit. `dotN` comes from rounded
         // unit normals, so use only the baseline unit-scale predicate epsilon
@@ -256,7 +256,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   if (!std::isfinite(delta)) return {};
   for (const auto& ring : in) {
     for (const auto& v : ring) {
-      if (!std::isfinite(v.x) || !std::isfinite(v.y)) return {};
+      if (!la::all(la::isfinite(v))) return {};
     }
   }
   if (delta == 0 || in.empty()) return in;
@@ -326,7 +326,7 @@ bool PointInRing(vec2 p, const SimplePolygon& ring, double eps) {
 // max absolute coordinate); the two diverge for rings far from the origin.
 double BoxScale(const Rect& box) {
   const vec2 size = box.Size();
-  return 0.5 * std::max(size.x, size.y);
+  return 0.5 * la::maxelem(size);
 }
 
 struct RingInfo {
@@ -348,8 +348,8 @@ RingInfo Summarize(const SimplePolygon& ring) {
 // stricter than that test.
 bool BoxInside(const RingInfo& a, const RingInfo& b) {
   const double eps = b.eps;
-  return a.box.min.x >= b.box.min.x - eps && a.box.min.y >= b.box.min.y - eps &&
-         a.box.max.x <= b.box.max.x + eps && a.box.max.y <= b.box.max.y + eps;
+  return la::all(la::gequal(a.box.min, b.box.min - vec2(eps))) &&
+         la::all(la::lequal(a.box.max, b.box.max + vec2(eps)));
 }
 
 bool RingInside(const SimplePolygon& a, const SimplePolygon& b, double bEps) {
@@ -374,7 +374,7 @@ std::vector<Polygons> DecomposeByContainment(const Polygons& polys) {
     // length * epsilon (scale-consistent), matching the CrossSection
     // area-drop idiom rather than comparing an area against a length eps.
     const vec2 size = ri.box.Size();
-    if (std::fabs(ri.area) <= std::max(size.x, size.y) * ri.eps) continue;
+    if (std::fabs(ri.area) <= la::maxelem(size) * ri.eps) continue;
     rings.push_back(r);
     info.push_back(ri);
   }
