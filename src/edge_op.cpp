@@ -154,7 +154,10 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
 Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
                                                  int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);
-  if (pair < 0 || halfedge_.IsForward(edge)) {
+  if (pair < 0) {
+    return {};
+  }
+  if (halfedge_.IsForward(edge)) {
     return {MaxCost()};
   }
   const int start = halfedge_.Start(edge);
@@ -201,14 +204,16 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   // Constrain the solution to the plane containing the edge and its normal.
   const mat3x2 P = {delta, (faceNormal_[edge / 3] + faceNormal_[pair / 3]) / 2};
   // Epsilon stabilizes the inverse, driving the solution toward the midpoint.
-  const mat2 A2 = transpose(P) * A * P + epsilon_ * mat2(la::identity);
+  const mat2 A2 = transpose(P) * A * P;
   const vec2 b2 = transpose(P) * b;
   vec2 u = inverse(A2) * b2;
+  if (!std::isfinite(u[0])) return {0, 0.5, mid};
   // u[0] is the interpolation along the collapsed edge, which is used to
   // interpolate the properties. It is clamped to avoid extrapolation.
   u[0] = la::clamp(u[0], -0.5, 0.5);
   // Cost has units of length^2.
-  const double cost = la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c;
+  const double cost =
+      std::max(0.0, la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c);
   return {cost, u[0] + 0.5, mid + P * u};
 }
 
@@ -234,12 +239,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
-               if (halfedge_.Pair(edge) < 0) {
-                 merger[edge] = Merger();
-                 return;
-               }
                const auto edgeCost = CheckEdge(edge, firstNewVert);
-               if (totalCost[halfedge_.Start(edge)] + edgeCost.cost < maxCost &&
+               if (edgeCost.Valid() &&
+                   totalCost[halfedge_.Start(edge)] + edgeCost.cost < maxCost &&
                    totalCost[halfedge_.End(edge)] + edgeCost.cost < maxCost) {
                  merger[edge] = edgeCost;
                } else {
@@ -801,10 +803,10 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   // on this dot product, but 0.5 is used to allow obtuse angles up to 120
   // degrees to allow more edges to collapse.
 
-  const double threshold =
-      1 - std::max(0., std::min(0.5, 10 * merger.cost / MaxCost()));
   // relax threshold for short edges
-  if (newWorst > threshold && newWorst > oldWorst) return false;
+  if (merger.cost > epsilon_ * epsilon_ && newWorst > 0.5 &&
+      newWorst > oldWorst)
+    return false;
 
   // Orbit endVert
   {
