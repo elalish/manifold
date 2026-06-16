@@ -1871,8 +1871,9 @@ TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {
   const CrossSection once = input.Simplify();
   const CrossSection twice = once.Simplify();
 
-  // 10 verts (incl. the apex just above the 1e-6 default eps), matching
-  // clipper2: Simplify regularizes at the geometry eps then RDP-reduces at eps.
+  // 10 verts (incl. the apex at ~1e-6, well above the geometry's natural eps):
+  // Simplify(0) uses tolerance_ (set from InferEps on construction) and
+  // RDP-reduces at that scale, so the apex survives.
   EXPECT_EQ(once.NumContour(), 1);
   EXPECT_EQ(once.NumVert(), 10);
   EXPECT_EQ(twice.NumContour(), once.NumContour());

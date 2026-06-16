@@ -760,6 +760,29 @@ TEST(CBIND, run_flag_accessors) {
   free(cube);
 }
 
+TEST(CBIND, cross_section_tolerance) {
+  void* buf = malloc(manifold_cross_section_size());
+
+  ManifoldCrossSection* sq = manifold_cross_section_square(buf, 10.0, 5.0, 0);
+  double tol = manifold_cross_section_get_tolerance(sq);
+  EXPECT_GT(tol, 0.0);
+
+  ManifoldCrossSection* tighter = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 0.5);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(tighter), tol, tol * 0.5);
+
+  ManifoldCrossSection* wider = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 2.0);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(wider), tol * 2.0, tol);
+
+  manifold_destruct_cross_section(sq);
+  manifold_destruct_cross_section(tighter);
+  manifold_destruct_cross_section(wider);
+  free(sq);
+  free(tighter);
+  free(wider);
+}
+
 // Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The
 // rest of this file covers the malloc + manifold_destruct_* + free
 // pattern; this one fills in the alloc/delete variant (used by

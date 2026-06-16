@@ -280,6 +280,7 @@ CrossSection::CrossSection(const Rect& rect) {
                           {rect.max.x, rect.min.y},
                           {rect.max.x, rect.max.y},
                           {rect.min.x, rect.max.y}}});
+  tolerance_ = InferEps(paths_->paths_, {});
 }
 
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
@@ -331,7 +332,10 @@ CrossSection CrossSection::Circle(double radius, int circularSegments) {
   const double dPhi = 360.0 / n;
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
-  return CrossSection(shared_paths({std::move(circle)}));
+  const double tol = InferEps({circle}, {});
+  CrossSection cs(shared_paths({std::move(circle)}));
+  cs.tolerance_ = tol;
+  return cs;
 }
 
 /**
@@ -702,7 +706,7 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
   SimplePolygon points = pts;  // HullImpl sorts in place
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  Polygons inputForEps{pts};
+  Polygons inputForEps{points};
   CrossSection out(shared_paths({std::move(hull)}));
   out.tolerance_ = InferEps(inputForEps, {});
   return out;

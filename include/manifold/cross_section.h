@@ -88,6 +88,7 @@ class CrossSection {
   Rect Bounds() const;
   double Area() const;
   double GetTolerance() const;
+  CrossSection SetTolerance(double tolerance) const;
   ///@}
 
   /** @name Transformation
@@ -100,7 +101,6 @@ class CrossSection {
   CrossSection Transform(const mat2x3& m) const;
   CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
   CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
-  CrossSection SetTolerance(double tolerance) const;
   CrossSection Simplify(double tolerance = 0) const;
   CrossSection Offset(double delta, JoinType jt = JoinType::Round,
                       double miter_limit = 2.0, int circularSegments = 0) const;
