@@ -405,19 +405,14 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
       {0.9901767613117145, 0.60823663500743508});
 }
 
-// DISABLED: known winding-robustness failures, not yet fixed. A tiny piece that
-// point-touches a big piece ~1e-9 from one of the big piece's vertices (the two
-// pieces are genuinely disjoint, so the correct union is the big plus the tiny
-// piece) drops one of the two pieces. Which piece drops, and whether, depends
-// on sub-eps details (the intersection-merge emission and the absolute
-// coordinate offset), so the arrangement's winding face-walk is unstable far
-// below eps. These are the fuzzer seeds for that bug; enable them when the
-// winding fix lands.
+// A tiny piece point-touches a big piece ~1e-9 from one of the big piece's
+// vertices. The two pieces are genuinely disjoint, so the correct union keeps
+// both, dropping neither. Magnitude-sensitive near-corner cases at large
+// coordinate offset (1024 and 4096 below).
 
-// Big-piece drop: the big piece's zero-radius star vertex makes it a thin spike
-// that collapses. Built from raw radii (StarRing's 0.1 floor would remove the
-// spike).
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
+// The big piece's zero-radius star vertex makes it a thin spike, built from raw
+// radii (StarRing's 0.1 floor would remove the spike).
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset4096) {
   const std::vector<double> bigRadii = {
       0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
   SimplePolygon big;
@@ -471,9 +466,9 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
   EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
-// Big-piece drop only at large offset (passes at the origin): the StarRing big
+// The large-offset variant (this class passes at the origin): the StarRing big
 // piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset1024) {
   SimplePolygon big = StarRing({0., 1., 0., 181.7694024845519});
   SimplePolygon tiny =
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
