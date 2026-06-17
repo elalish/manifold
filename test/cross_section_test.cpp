@@ -468,6 +468,29 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
   EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
+// A big square built together with a tiny self-intersecting feature whose edges
+// cross the square's edge at nearly the same spot (within epsilon). Those
+// crossings are distinct and must stay distinct: treating them as one collapses
+// the square's boundary and drops the whole square (area -> 0). A regression
+// guard against a crossing merge that reaches too far.
+TEST(CrossSection, TinyEdgeFeatureKeepsSquare) {
+  const CrossSection cs(Polygons{{{-2097152.0, 0.0},
+                                  {2097152.0, 0.0},
+                                  {2097152.0, 4194304.0},
+                                  {-2097152.0, 4194304.0}},
+                                 {{1500000.0, -4e-05},
+                                  {1500000.000024, 5e-05},
+                                  {1500000.000012, 2e-05},
+                                  {1500000.00002, -5e-05},
+                                  {1500000.000016, 5e-05},
+                                  {1500000.00002, 4e-05},
+                                  {1500000.00002, -5e-05}}},
+                        CrossSection::FillRule::Positive);
+  EXPECT_NEAR(cs.Area(), 17592186044416.0, 1e-3 * 17592186044416.0)
+      << "clustered edge crossings merged and dropped the square";
+  EXPECT_GT(cs.NumContour(), 0);
+}
+
 // The large-offset variant (this class passes at the origin): the StarRing big
 // piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
 TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset1024) {
