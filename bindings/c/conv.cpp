@@ -200,24 +200,6 @@ OpType from_c(ManifoldOpType optype) {
   return op;
 }
 
-CrossSection::FillRule from_c(ManifoldFillRule fillrule) {
-  auto fr = CrossSection::FillRule::EvenOdd;
-  switch (fillrule) {
-    case MANIFOLD_FILL_RULE_EVEN_ODD:
-      break;
-    case MANIFOLD_FILL_RULE_NON_ZERO:
-      fr = CrossSection::FillRule::NonZero;
-      break;
-    case MANIFOLD_FILL_RULE_POSITIVE:
-      fr = CrossSection::FillRule::Positive;
-      break;
-    case MANIFOLD_FILL_RULE_NEGATIVE:
-      fr = CrossSection::FillRule::Negative;
-      break;
-  };
-  return fr;
-}
-
 CrossSection::JoinType from_c(ManifoldJoinType join_type) {
   auto jt = CrossSection::JoinType::Square;
   switch (join_type) {

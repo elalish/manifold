@@ -300,16 +300,13 @@ ManifoldCrossSection* manifold_cross_section_empty(void* mem);
 ManifoldCrossSection* manifold_cross_section_copy(void* mem,
                                                   ManifoldCrossSection* cs);
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
-    void* mem, ManifoldSimplePolygon* p, ManifoldFillRule fr);
+    void* mem, ManifoldSimplePolygon* p);
 ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
-                                                         ManifoldPolygons* p,
-                                                         ManifoldFillRule fr);
+                                                         ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(void* mem, double x,
                                                     double y, int center);
 ManifoldCrossSection* manifold_cross_section_circle(void* mem, double radius,
                                                     int circular_segments);
-ManifoldCrossSection* manifold_cross_section_compose(
-    void* mem, ManifoldCrossSectionVec* csv);
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     void* mem, ManifoldCrossSection* cs);
 
@@ -378,7 +375,9 @@ ManifoldCrossSection* manifold_cross_section_warp_context(
     ManifoldVec2 (*fun)(double, double, void*), void* ctx);
 ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
                                                       ManifoldCrossSection* cs,
-                                                      double epsilon);
+                                                      double tolerance);
+ManifoldCrossSection* manifold_cross_section_set_tolerance(
+    void* mem, ManifoldCrossSection* cs, double tolerance);
 ManifoldCrossSection* manifold_cross_section_offset(
     void* mem, ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
     double miter_limit, int circular_segments);
@@ -386,6 +385,7 @@ ManifoldCrossSection* manifold_cross_section_offset(
 // CrossSection Info
 
 double manifold_cross_section_area(ManifoldCrossSection* cs);
+double manifold_cross_section_get_tolerance(ManifoldCrossSection* cs);
 size_t manifold_cross_section_num_vert(ManifoldCrossSection* cs);
 size_t manifold_cross_section_num_contour(ManifoldCrossSection* cs);
 int manifold_cross_section_is_empty(ManifoldCrossSection* cs);
