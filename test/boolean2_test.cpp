@@ -1098,13 +1098,16 @@ const SegCase kIntersectSegmentsSeeds[] = {
      true,
      {5.0, 0.0},
      1e-12},
-    {"DropsEpsNearEndpointCrossing",
+    // A genuine transversal crossing that lands within eps of an endpoint is
+    // kept, not dropped: the straddle is sign-confirmed and the near-endpoint
+    // resolution is left to insertion-time snapping.
+    {"KeepsEpsNearEndpointCrossing",
      {{0.0, 0.0}, {10.0, 0.0}, 0},
      {{0.5, -1.0}, {0.5, 1.0}, 1},
      1.0,
-     false,
-     {},
-     0.0},
+     true,
+     {0.5, 0.0},
+     1e-12},
     {"KeepsSteepInteriorCrossing",
      {{0.0, 0.0}, {0.0015, 1000.0}, 0},
      {{-1.0, 500.0}, {1.0, 500.0}, 1},

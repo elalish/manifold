@@ -522,9 +522,7 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
 // A unit square unioned with a tiny triangle whose middle vertex is exactly
 // 2*eps from a corner.
 //
-// DISABLED: the recentered on-edge perp band is translation-dependent, so this
-// near-corner pinch annihilates the square. TODO: fix the arrangement.
-TEST(CrossSection, DISABLED_SquareAnnihilation) {
+TEST(CrossSection, SquareAnnihilation) {
   const CrossSection a(SimplePolygon{{0, 0}, {1, 0}, {1, 1}, {0, 1}});
   const CrossSection b(
       SimplePolygon{{1.5000023810829433e-06, -8.6602402906521135e-07},
