@@ -282,11 +282,12 @@ enum class WindRule {
   Intersect,
 };
 
-// Per-edge winding filter: for each canonical sub-edge, ray-cast the winding
-// just to its left and right and keep it iff the rule disagrees across it.
-// Correct only on a true arrangement. The nearest-edge clearance and the +x
-// ray-cast both reuse boolean2's BVH over the canonical sub-edges, so the pass
-// is ~O(E log E) amortized rather than O(E^2).
+// Per-edge winding filter: for each canonical sub-edge, evaluate the winding of
+// the face just left of vMin->vMax at the start vertex (a +x ray-cast under a
+// symbolic perturbation into that face), take the right winding as leftW-mult,
+// and keep the edge iff the rule disagrees across it. Correct only on a true
+// arrangement. The ray-cast reuses boolean2's BVH over the canonical sub-edges,
+// so the pass is ~O(E log E) amortized rather than O(E^2).
 std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
                                      const std::vector<vec2>& verts,
                                      WindRule rule = WindRule::Add);

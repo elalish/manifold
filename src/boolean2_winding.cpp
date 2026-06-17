@@ -16,11 +16,13 @@
 // boolean2.h. The helpers below are file-local.
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <utility>
 #include <vector>
 
 #include "boolean2.h"
+#include "shared.h"
 
 namespace manifold {
 
@@ -36,25 +38,91 @@ bool IsInside(WindRule rule, int w) {
   return false;
 }
 
-// Winding number at `p`, which the caller keeps off every edge (offset
-// perpendicular into a face). +x ray over the canonical-sub-edge BVH; the slab
-// x in [p.x, globalMaxX] bounds every edge that can cross to the right of `p`.
-int WindingNumberAt(vec2 p, const BVH& bvh, const CanonicalSubEdges& canon,
-                    const std::vector<vec2>& verts, double globalMaxX) {
+// Signed contribution of a canonical sub-edge to a +x winding ray that it
+// crosses to the right: +mult if vMin->vMax points up, else -mult. Matches the
+// standard CCW=+1 convention (an upward edge to the right of the point raises
+// the winding by its multiplicity).
+inline int RayContribution(const CanonEdge& e, const std::vector<vec2>& verts) {
+  const bool upward = verts[e.vMin].y < verts[e.vMax].y;
+  return upward ? e.mult : -e.mult;
+}
+
+// Winding of the face immediately to the LEFT of the directed sub-edge
+// `start`->`end`, evaluated AT the start vertex.
+//
+// The query point is the start vertex P pushed an infinitesimal distance into
+// the left face: Q = P + e*d + e^2*n (e -> 0+), where d = end - start and
+// n = (-d.y, d.x) is the left normal. The primary step is ALONG the sub-edge,
+// the secondary a tiny push to its left: this hugs start->end so Q lands in its
+// left face even when other edges incident to P fall between the bare left
+// normal and the edge (the bare normal can overshoot past them into a different
+// face). We then count signed crossings of a +x ray from Q over the edges the
+// BVH reports (the slab [P.x, maxX] x {P.y} bounds every edge that can cross to
+// the right). The two-level perturbation also resolves the ties a +x ray hits
+// at a vertex - an axis can leave d.y == 0 (horizontal edge) or cross(d, w) ==
+// 0 (an incident edge collinear with this one's direction).
+//
+// Edges incident to P (sharing it as a vertex, including this sub-edge itself)
+// pass through the ray origin, so the standard "is the crossing to the right of
+// P.x" test is degenerate. They are resolved instead by the Smith shadow of
+// their OTHER endpoint O: post-insertion no edges cross and coincidences are
+// one shared vertex, so an incident edge cannot cross the ray at P, and whether
+// the perturbed ray crosses it is fixed by where O sits relative to the
+// perturbation (an orient2d sign on cross(d, O-P), broken by cross(n, O-P)).
+int LeftWindingAtVertex(int start, int end, const BVH& bvh,
+                        const CanonicalSubEdges& canon,
+                        const std::vector<vec2>& verts, double globalMaxX) {
+  const vec2 P = verts[start];
+  const vec2 d = verts[end] - P;
+  const vec2 n(-d.y, d.x);  // left normal of start->end
+
+  // Effective sign of the y-perturbation Q.y - P.y under (primary d, secondary
+  // n). d.y == 0 exactly iff start->end is horizontal, and then n.y == d.x !=
+  // 0, so this is always well defined.
+  const bool perturbUp = d.y != 0.0 ? d.y > 0.0 : n.y > 0.0;
+  // dir argument for the on-ray (crossing-x == P.x) tie-break, with the same
+  // (primary d, secondary n) priority: Shadows treats dir < 0 as "P.x < x".
+  const double xTieDir = d.x != 0.0 ? d.x : n.x;
+
   int winding = 0;
-  const Box2 slab(vec2(p.x, p.y), vec2(globalMaxX, p.y));
+  const Box2 slab(vec2(P.x, P.y), vec2(globalMaxX, P.y));
   auto accumulate = [&](int /*queryIdx*/, int leafIdx) {
-    const int e = bvh.leafToOrig[leafIdx];
-    const auto& edge = canon.edges[e];
-    vec2 a = verts[edge.vMin];
-    vec2 b = verts[edge.vMax];
-    const bool upward = a.y < b.y;
-    if (!upward) std::swap(a, b);
-    if (a.y == b.y) return;  // horizontal edges contribute nothing
-    if (!(a.y <= p.y && p.y < b.y)) return;
-    const double t = (p.y - a.y) / (b.y - a.y);
-    const double xi = a.x + t * (b.x - a.x);
-    if (xi > p.x) winding += upward ? edge.mult : -edge.mult;
+    const int ei = bvh.leafToOrig[leafIdx];
+    const CanonEdge& e = canon.edges[ei];
+    const vec2 a = verts[e.vMin];
+    const vec2 b = verts[e.vMax];
+    if (a.y == b.y) return;  // horizontal edges never cross a +x ray
+    const vec2& lo = a.y < b.y ? a : b;
+    const vec2& hi = a.y < b.y ? b : a;
+
+    // Half-open y-membership [lo.y, Q.y) under the perturbed ray height: an
+    // endpoint exactly at P.y is decided by perturbUp.
+    auto below = [&](double y) { return y == P.y ? perturbUp : y < P.y; };
+    if (!(below(lo.y) && !below(hi.y))) return;
+
+    bool rightOf;
+    if (e.vMin == start || e.vMax == start) {
+      // Incident edge: it passes through P, so its crossing-x equals P.x to
+      // leading order and the perturbation decides. With w = O - P (O the
+      // non-P endpoint), the +x ray crosses to the right iff, after clearing
+      // the sign of w.y, -e*cross(d,w) - e^2*cross(n,w) > 0. cross is the 2D
+      // orient determinant u.x*w.y - u.y*w.x.
+      const int other = e.vMin == start ? e.vMax : e.vMin;
+      const vec2 w = verts[other] - P;
+      const double primary = -(d.x * w.y - d.y * w.x);
+      const double secondary = -(n.x * w.y - n.y * w.x);
+      const bool pos = primary != 0.0 ? primary > 0.0 : secondary > 0.0;
+      rightOf = w.y > 0.0 ? pos : !pos;
+    } else {
+      // Non-incident edge: crossing-x at height P.y via Smith's Interpolate
+      // (axes swapped so the segment is interpolated at its y). The finite gap
+      // crossX - P.x dominates; xTieDir only matters on an exact tie.
+      const vec3 loYX(lo.y, lo.x, 0.0);
+      const vec3 hiYX(hi.y, hi.x, 0.0);
+      const double crossX = Interpolate(loYX, hiYX, P.y).x;
+      rightOf = Shadows(P.x, crossX, xTieDir);
+    }
+    if (rightOf) winding += RayContribution(e, verts);
   };
   auto recorder = MakeSimpleRecorder(accumulate);
   auto qf = [&](int) { return slab; };
@@ -62,22 +130,13 @@ int WindingNumberAt(vec2 p, const BVH& bvh, const CanonicalSubEdges& canon,
   return winding;
 }
 
-double DistPointSeg(vec2 p, vec2 a, vec2 b) {
-  const vec2 ab = b - a;
-  const double L2 = la::dot(ab, ab);
-  if (L2 == 0.0) return la::length(p - a);
-  const double t = la::clamp(la::dot(p - a, ab) / L2, 0.0, 1.0);
-  return la::length(p - (a + ab * t));
-}
-
 }  // namespace
 
 std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
                                      const std::vector<vec2>& verts,
                                      WindRule rule) {
-  // Accelerate both per-edge O(E) scans (nearest-other-edge clearance and the
-  // +x ray-cast winding) by reusing boolean2's BVH over the canonical
-  // sub-edges. One tree, built once.
+  // Reuse boolean2's BVH over the canonical sub-edges for the per-edge +x
+  // ray-cast winding. One tree, built once, so the pass is ~O(E log E).
   const int nE = static_cast<int>(canon.edges.size());
   std::vector<Box2> boxes(nE);
   double globalMaxX = -std::numeric_limits<double>::infinity();
@@ -92,36 +151,16 @@ std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
   out.reserve(canon.edges.size());
   for (int ei = 0; ei < nE; ++ei) {
     const auto& edge = canon.edges[ei];
-    const vec2 p = verts[edge.vMin];
-    const vec2 q = verts[edge.vMax];
-    const vec2 mid = (p + q) * 0.5;
-    const vec2 d = q - p;
-    const double L = la::length(d);
-    if (L == 0.0) continue;
-    // Perpendicular sample offset, bounded by a quarter of the clearance to the
-    // nearest other sub-edge so each side-point lands in the adjacent face.
-    // Clearance is capped at L: winding is constant within a face, so a smaller
-    // in-face offset gives the same winding, and any edge nearer than L to mid
-    // has its tight AABB inside the half-extent-L query box, so it is found.
-    double clr = L;
-    {
-      const Box2 query(mid - vec2(L, L), mid + vec2(L, L));
-      auto nearest = [&](int /*queryIdx*/, int leafIdx) {
-        const int f = bvh.leafToOrig[leafIdx];
-        if (f == ei) return;
-        clr = std::min(clr, DistPointSeg(mid, verts[canon.edges[f].vMin],
-                                         verts[canon.edges[f].vMax]));
-      };
-      auto recorder = MakeSimpleRecorder(nearest);
-      auto qf = [&](int) { return query; };
-      BVHCollisions(bvh, recorder, qf, /*n=*/1, /*parallel=*/false);
-    }
-    const vec2 nrm = la::normalize(vec2(-d.y, d.x));  // left unit normal
-    const double delta = 0.25 * clr;
-    const vec2 leftP = mid + nrm * delta;
-    const vec2 rightP = mid - nrm * delta;
-    const int leftW = WindingNumberAt(leftP, bvh, canon, verts, globalMaxX);
-    const int rightW = WindingNumberAt(rightP, bvh, canon, verts, globalMaxX);
+    if (edge.vMin == edge.vMax) continue;
+    // Winding of the face just left of the directed sub-edge vMin->vMax,
+    // evaluated at the start vertex vMin. Crossing that edge from right to left
+    // raises the winding by its signed multiplicity, so the right face is
+    // leftW - mult (one computation, not two). For a stable arrangement the
+    // step across a retained boundary is +-1; coincident input can sum to a
+    // larger magnitude, hence -mult rather than a literal -1.
+    const int leftW = LeftWindingAtVertex(edge.vMin, edge.vMax, bvh, canon,
+                                          verts, globalMaxX);
+    const int rightW = leftW - edge.mult;
     const bool leftIn = IsInside(rule, leftW);
     const bool rightIn = IsInside(rule, rightW);
     if (leftIn == rightIn) continue;
