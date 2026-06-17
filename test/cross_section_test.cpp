@@ -528,21 +528,25 @@ TEST(CrossSection, SquareAnnihilation) {
   EXPECT_GT((a + b).Area(), a.Area() - AreaTol(a, b)) << "square annihilated";
 }
 
-// Two disjoint triangles where one's vertex is within eps of the
-// other's sloped edge; the union adds a ~4e-6 outside sliver that intersect
-// does not see (inclusion-exclusion violation via the near-vertex split path).
-//
-// DISABLED: floor, not a regression. The vertex sits within eps of the edge (a
-// ~1e-9-rad near-incidence); no single eps-scale on/off-edge decision is
-// correct for both Add (include the sliver) and Intersect (exclude it).
-// Irreducible at the eps resolution limit.
-TEST(CrossSection, DISABLED_InclusionExclusionSliver) {
+// Two disjoint triangles, one's vertex ~0.80 eps off the other's long sloped
+// edge. The topology is exact (disjoint, empty intersection); only the union
+// area wobbles by ~eps*length below the resolution floor. See the body.
+TEST(CrossSection, InclusionExclusionSliver) {
+  // a and b are disjoint: a's middle vertex (0.5, 5e-9) sits ~0.80 eps off b's
+  // nearest (sloped) edge (eps = InferEps ~5.6e-9, from the 2048 half-extent).
+  // The engine keeps the exact topology - union is two contours, intersection
+  // empty - so NumContour is the load-bearing check. The union boundary can
+  // still shift ~eps, and b's ~4096-long base levers that into an ~eps*length
+  // area wobble (~4e-6 here) past a tight AreaTol, so the area bound is loose.
   const CrossSection a(SimplePolygon{{0.0, 1e-8}, {0.5, 5e-9}, {1.0, 0.5}});
   const CrossSection b(
       SimplePolygon{{2048.0, 0.0}, {4096.0, 4.096e-6}, {0.0, 0.0}});
+  const auto u = a + b;
   const auto inter = a.Boolean(b, OpType::Intersect);
-  EXPECT_NEAR((a + b).Area(), a.Area() + b.Area() - inter.Area(),
-              AreaTol(a, b));
+  EXPECT_EQ(u.NumContour(), 2) << "disjoint inputs must remain two contours";
+  EXPECT_EQ(inter.NumContour(), 0) << "disjoint inputs have empty intersection";
+  EXPECT_NEAR(u.Area(), a.Area() + b.Area() - inter.Area(), 5e-5)
+      << "inclusion-exclusion area outside the eps*length floor";
 }
 
 // A genuine ~4*eps-wide rectangle overlap that Intersect must keep, not drop to
