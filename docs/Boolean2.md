@@ -107,10 +107,15 @@ The core operates on `manifold::Polygons`, which cannot encode isolated
 one-dimensional features. Output is therefore regularized: zero-area loops,
 collapsed edges, and cancelled opposing sub-edges are dropped.
 
-Segment crossings are decided over a positive-width shared projection interval.
-Orthogonal-coordinate ties within epsilon are treated as symbolic ties, not raw
-CCW fallbacks. The current tie policy first uses canonical segment geometry, then
-falls back to stable edge ID for geometrically identical ties.
+Whether two segments cross is a sign decision: a crossing exists where each
+strictly straddles the other over a positive-width shared projection interval,
+with no epsilon band on nearness to an endpoint. A crossing that lands within
+epsilon of an endpoint is kept and snapped to that endpoint at insertion, not
+rejected. Orthogonal-coordinate ties within epsilon are treated as symbolic
+ties, not raw CCW fallbacks: the tie policy first uses canonical segment
+geometry, then falls back to stable edge ID for geometrically identical ties.
+Splitting an edge at a vertex that lies on it stays an epsilon (bounded-distance)
+decision, distinct from this sign-based crossing test.
 
 Callers may pass an explicit epsilon. A non-positive epsilon asks the core to
 infer an operation scale and apply the local floating-point budget used by the
